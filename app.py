@@ -11,49 +11,40 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # 2. STYLING CSS CUSTOM (Thema Modern & Anti-Boring)
 st.markdown("""
     <style>
-    /* Latar belakang aplikasi dengan gradien halus agar tidak putih polos */
+    /* Latar belakang aplikasi */
     .stApp {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     }
 
-    /* Glassmorphism Header (Bar Atas) */
+    /* Mengatur Sidebar agar tetap Gelap */
+    [data-testid="stSidebar"] {
+        background-color: #1e1e2f !important;
+    }
+
+    /* --- PERBAIKAN TEKS MENU JADI PUTIH --- */
+    /* Target semua teks di dalam sidebar agar putih terang */
+    [data-testid="stSidebar"] .stText, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] span {
+        color: white !important;
+        opacity: 1 !important;
+    }
+
+    /* Target khusus untuk teks di dalam Radio Group (Menu Utama) */
+    div[data-testid="stSidebar"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {
+        color: white !important;
+        font-weight: 500 !important;
+    }
+    /* -------------------------------------- */
+
+    /* Glassmorphism Header */
     header[data-testid="stHeader"] {
         background-color: rgba(30, 30, 47, 0.85) !important;
         backdrop-filter: blur(12px);
         border-bottom: 2px solid #FFD700;
-        height: 3.5rem;
     }
     header[data-testid="stHeader"] svg { fill: white !important; }
-
-    /* Mengatur Sidebar agar tetap Gelap */
-    [data-testid="stSidebar"] {
-        background-color: #1e1e2f !important;
-        padding-top: 0rem !important;
-    }
-    
-    /* Menaikkan Header Sidebar */
-    .sidebar-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-top: -50px; /* Menaikkan posisi header sidebar */
-        padding-bottom: 10px;
-    }
-    .header-icon { font-size: 32px; }
-    .header-text { 
-        color: white; 
-        font-weight: 800; 
-        line-height: 1.1; 
-        font-size: 1.1rem;
-    }
-    .header-text span { color: #FFD700; font-size: 0.9rem; }
-
-    /* Garis Pemisah Emas */
-    .sidebar-divider {
-        margin: 5px 0px 20px 0px;
-        height: 2px;
-        background: linear-gradient(to right, #FFD700, transparent);
-    }
 
     /* Menu Radio menjadi Card Modern */
     div[data-testid="stSidebar"] div[role="radiogroup"] { gap: 10px; }
@@ -62,9 +53,10 @@ st.markdown("""
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
         padding: 15px 20px !important;
         border-radius: 12px !important;
-        color: white !important;
         transition: all 0.3s ease;
     }
+    
+    /* Efek Hover & Seleksi */
     div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
         background-color: rgba(255, 255, 255, 0.1) !important;
         border-color: #FFD700 !important;
@@ -73,15 +65,21 @@ st.markdown("""
     div[data-testid="stSidebar"] div[role="radiogroup"] label[data-selected="true"] {
         background: linear-gradient(45deg, #007bff, #0056b3) !important;
         border: none !important;
-        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
     }
 
-    /* Styling Card Metrik di Halaman Utama */
-    div[data-testid="metric-container"] {
-        background-color: white;
-        padding: 15px;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: -50px;
+        padding-bottom: 10px;
+    }
+    .header-text { color: white; font-weight: 800; font-size: 1.1rem; }
+    .header-text span { color: #FFD700; font-size: 0.9rem; }
+    .sidebar-divider {
+        margin: 5px 0px 20px 0px;
+        height: 2px;
+        background: linear-gradient(to right, #FFD700, transparent);
     }
     </style>
     """, unsafe_allow_html=True)
