@@ -1,0 +1,6 @@
+pandas
+numpy
+streamlit
+mysql-connector-python
+python-calamine
+xlsxwriter
