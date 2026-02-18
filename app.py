@@ -8,121 +8,45 @@ from python_calamine import CalamineWorkbook
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
-# 2. PREMIUM DARK-ELEMENTS ON LIGHT-BG CSS
+# 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
-    /* Google Fonts */
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-    
-    html, body, [class*="css"]  {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-    }
+    .stApp { background-color: #ffffff; color: #31333f; }
+    [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: white !important; }
 
-    /* Latar Belakang Utama Tetap Putih */
-    .stApp {
-        background-color: #FFFFFF !important;
+    div[data-baseweb="select"] > div {
+        background-color: #1e1e2f !important;
+        color: #FFD700 !important;
+        border: 2px solid #3b82f6 !important;
+        z-index: 999999 !important;
     }
+    div[role="listbox"] ul { background-color: #1e1e2f !important; }
+    div[role="option"] { color: white !important; }
 
-    /* Sidebar Tetap Gelap (Standar Pro) */
-    [data-testid="stSidebar"] {
-        background-color: #0f172a !important;
-    }
-
-    /* METRIC BOX - DIBIKIN GELAP (DARK NAVY) */
     .m-box { 
-        background-color: #1e293b !important; /* Gelap */
-        border: none !important;
-        border-bottom: 4px solid #fbbf24 !important; /* Aksen Emas */
-        padding: 20px !important; 
-        border-radius: 12px !important; 
-        text-align: left !important; 
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2) !important;
+        background-color: #1e1e2f !important; 
+        border: 2px solid #3b82f6 !important;
+        border-left: 12px solid #FFD700 !important;
+        padding: 25px !important; 
+        border-radius: 15px !important; 
+        text-align: center !important; 
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3) !important;
         margin-bottom: 15px !important;
     }
-    .m-val { 
-        font-size: 32px !important; 
-        font-weight: 800 !important; 
-        color: #fbbf24 !important; /* Nilai warna emas */
-        display: block !important;
-    }
-    .m-lbl { 
-        font-size: 11px !important; 
-        color: #94a3b8 !important; /* Label abu-abu terang */
-        text-transform: uppercase !important; 
-        font-weight: 700 !important; 
-        letter-spacing: 1.2px !important;
-    }
+    .m-val { font-size: 32px !important; font-weight: 800 !important; color: #FFD700 !important; display: block !important; }
+    .m-lbl { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase !important; font-weight: 700 !important; letter-spacing: 1.5px !important; }
 
-    /* DROPDOWN & INPUT - DIBIKIN GELAP */
-    div[data-baseweb="select"] > div, 
-    div[data-baseweb="input"] > div,
-    div[data-baseweb="base-input"] {
-        background-color: #1e293b !important; /* Background Gelap */
-        color: #FFFFFF !important;
-        border: 1px solid #334155 !important;
-        border-radius: 8px !important;
-    }
-    
-    /* Warna teks di dalam input/dropdown */
-    div[data-baseweb="select"] span, input {
-        color: #FFFFFF !important;
-    }
-
-    /* Listbox dropdown saat diklik */
-    div[role="listbox"] {
-        background-color: #1e293b !important;
-    }
-    div[role="option"] {
-        color: #FFFFFF !important;
-    }
-    div[role="option"]:hover {
-        background-color: #334155 !important;
-    }
-
-    /* TAB STYLING */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #f1f5f9;
-        padding: 5px;
-        border-radius: 12px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 8px 16px;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #1e293b !important;
-        color: #fbbf24 !important;
-    }
-
-    /* HERO HEADER */
     .hero-header {
-        background: #0f172a;
-        color: white;
-        padding: 2rem;
-        border-radius: 16px;
-        margin-bottom: 2rem;
-        border-left: 10px solid #fbbf24;
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white; padding: 1.5rem 2rem;
+        border-bottom: 5px solid #FFD700; border-radius: 15px; margin-bottom: 20px;
     }
-
-    /* BUTTONS */
-    .stButton>button {
-        background: #1e293b !important;
-        color: #fbbf24 !important;
-        border: 1px solid #fbbf24 !important;
-        font-weight: 700 !important;
-        border-radius: 8px !important;
-        height: 3em !important;
-    }
-    .stButton>button:hover {
-        background: #fbbf24 !important;
-        color: #1e293b !important;
-    }
-
-    /* DATAFRAME ADJUSTMENT */
-    [data-testid="stDataFrame"] {
-        background-color: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
+    .dash-container {
+        border: 5px solid #1e3a8a; border-radius: 15px;
+        padding: 10px; background: #f8f9fa;
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
+        overflow: hidden;
     }
     </style>
     """, unsafe_allow_html=True)
