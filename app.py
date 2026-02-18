@@ -11,47 +11,62 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
-    .stApp { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    header[data-testid="stHeader"] { background-color: rgba(30, 30, 47, 0.85) !important; backdrop-filter: blur(12px); border-bottom: 2px solid #FFD700; }
+    /* 1. BACKGROUND UTAMA (Lebih Gelap & Elegan) */
+    .stApp { background-color: #0e1117; color: #e0e0e0; }
     
-    /* Style Header Biru Dashboard */
+    /* 2. SIDEBAR (Tulisan Putih & BG Dark) */
+    [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
+    [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label { color: white !important; font-weight: 600; }
+    [data-testid="stSidebar"] .stRadio div { color: white !important; }
+
+    /* 3. HEADER & DROPDOWN (Biar gak silau) */
+    header[data-testid="stHeader"] { background-color: rgba(30, 30, 47, 0.9) !important; border-bottom: 2px solid #FFD700; }
+    
+    /* Style Dropdown / Selectbox */
+    div[data-baseweb="select"] > div {
+        background-color: #1e1e2f !important;
+        border: 1px solid #3b82f6 !important;
+        color: white !important;
+    }
+    div[data-testid="stSelectbox"] label { color: #FFD700 !important; font-weight: bold; }
+    
+    /* Input Text / Search Bar */
+    div[data-testid="stTextInput"] input {
+        background-color: #1e1e2f !important;
+        color: white !important;
+        border: 1px solid #3b82f6 !important;
+    }
+
+    /* 4. SUMMARY BOX (Gaya Glassmorphism Dark) */
+    .m-box { 
+        background: rgba(255, 255, 255, 0.05); 
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-left: 5px solid #FFD700; 
+        padding: 15px; 
+        border-radius: 10px; 
+        text-align: center; 
+        margin-bottom: 10px;
+    }
+    .m-val { font-size: 22px; font-weight: 800; color: #FFD700; display: block; }
+    .m-lbl { font-size: 11px; color: #a0a0a0; text-transform: uppercase; font-weight: 600; }
+
+    /* 5. TABEL (Warna Dark Elegan) */
+    [data-testid="stDataFrame"] {
+        background-color: #1e1e2f !important;
+        border-radius: 10px;
+        border: 1px solid #3b82f6;
+    }
+
+    /* 6. HERO HEADER */
     .hero-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        background: linear-gradient(90deg, #1e3a8a 0%, #000000 100%);
         color: white; padding: 1.5rem 2rem;
         border-bottom: 4px solid #FFD700;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         border-radius: 0 0 15px 15px;
         margin-bottom: 15px;
     }
-    .hero-header h1 { margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; color: white !important; }
-    
-    .scroll-wrapper {
-        width: 100%; height: 80vh; overflow: auto;
-        background: #0e1117; border: 1px solid #3b82f6; border-radius: 10px;
-    }
-    .scroll-wrapper iframe { border: none; transform-origin: 0 0; }
-
-    /* --- TAMBAHAN SUMMARY BOX --- */
-    .m-box { 
-        background: white; 
-        border-left: 5px solid #1e3a8a; 
-        padding: 15px; 
-        border-radius: 8px; 
-        text-align: center; 
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        transition: transform 0.2s;
-        margin-bottom: 10px;
-    }
-    .m-box:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-    .m-val { font-size: 22px; font-weight: 800; color: #1e3a8a; display: block; line-height: 1.2; }
-    .m-lbl { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
     </style>
     """, unsafe_allow_html=True)
-
 # --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
