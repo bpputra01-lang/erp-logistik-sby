@@ -31,110 +31,35 @@ st.markdown("""
 import pandas as pd
 import math
 
-def create_refill(gl3_df, gl4_df):
+def process_refill_overstock(df_all, df_track):
 
-    # --- pastikan SKU string & trim ---
-    gl3_df["SKU"] = gl3_df["SKU"].astype(str).str.strip()
-    gl4_df["SKU"] = gl4_df["SKU"].astype(str).str.strip()
+    # ====== FILTER GL3 & GL4 (SAMA PERSIS VBA) ======
+    df_all["BIN"] = df_all["BIN"].astype(str)
 
-    # dictionary GL3
-    dict_gl3 = dict(zip(gl3_df["SKU"], gl3_df["QTY_SYSTEM"]))
+    # GL3 = BIN mengandung GL3 dan tidak mengandung LIVE
+    df_gl3 = df_all[
+        df_all["BIN"].str.contains("GL3", case=False, na=False) &
+        ~df_all["BIN"].str.contains("LIVE", case=False, na=False)
+    ].copy()
 
-    # cari SKU refill
-    refill_skus = set()
+    # GL4 = BIN mengandung GL4 dan tidak mengandung DEFECT/REJECT/ONLINE/RAK
+    df_gl4 = df_all[
+        df_all["BIN"].str.contains("GL4", case=False, na=False) &
+        ~df_all["BIN"].str.contains("DEFECT|REJECT|ONLINE|RAK", case=False, na=False)
+    ].copy()
 
-    # SKU GL3 < 3
-    for sku, qty in dict_gl3.items():
-        if qty < 3:
-            refill_skus.add(sku)
+    # ====== RENAME KOLOM SUPAYA MATCH FUNCTION ======
+    # Samakan nama kolom dengan function
+    df_gl3 = df_gl3.rename(columns={"QTY SYS": "QTY_SYSTEM"})
+    df_gl4 = df_gl4.rename(columns={"QTY SYS": "QTY_SYSTEM"})
+    df_track = df_track.rename(columns={"QTY SYS": "QTY"})
 
-    # SKU baru dari GL4
-    for _, row in gl4_df.iterrows():
-        sku = row["SKU"]
-        qty_gl4 = int(row["QTY_SYSTEM"])
-        if qty_gl4 > 0 and sku not in dict_gl3:
-            refill_skus.add(sku)
+    # ====== PANGGIL LOGIC ASLI ======
+    df_refill = create_refill(df_gl3, df_gl4)
+    df_overstock = create_overstock(df_gl3, df_track)
 
-    output = []
+    return df_gl3, df_gl4, df_refill, df_overstock
 
-    # PROCESS
-    for sku in refill_skus:
-
-        qty_gl3 = dict_gl3.get(sku, 0)
-        sisa_load = 12
-
-        rows_gl4 = gl4_df[gl4_df["SKU"] == sku]
-
-        for _, row in rows_gl4.iterrows():
-
-            qty_gl4 = int(row["QTY_SYSTEM"])
-
-            if qty_gl4 > 0 and sisa_load > 0:
-
-                load_qty = min(qty_gl4, sisa_load)
-
-                output.append([
-                    row["BIN"],
-                    sku,
-                    row["BRAND"],
-                    row["ITEM NAME"],
-                    row["VARIANT"],
-                    qty_gl4,
-                    load_qty,
-                    qty_gl3
-                ])
-
-                sisa_load -= load_qty
-
-                if sisa_load == 0:
-                    break
-
-    columns = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT",
-               "QTY BIN AMBIL", "LOAD", "QTY GL3"]
-
-    return pd.DataFrame(output, columns=columns)
-def create_overstock(gl3_df, stock_df):
-
-    gl3_df["SKU"] = gl3_df["SKU"].astype(str).str.strip()
-    stock_df["SKU"] = stock_df["SKU"].astype(str).str.strip()
-
-    # total qty stock tracking per SKU
-    dict_trans = stock_df.groupby("SKU")["QTY"].sum().to_dict()
-
-    output = []
-
-    for _, row in gl3_df.iterrows():
-
-        sku = row["SKU"]
-        qty_gl3 = int(row["QTY_SYSTEM"])
-
-        if qty_gl3 > 24:
-
-            sisa_load = qty_gl3 - 24
-
-            qty_trans = dict_trans.get(sku, 0)
-
-            if qty_trans >= 7:
-                sisa_load = math.ceil(sisa_load / 3)
-
-            if sisa_load > 0:
-
-                load_qty = min(qty_gl3, sisa_load)
-
-                output.append([
-                    row["BIN"],
-                    sku,
-                    row["BRAND"],
-                    row["ITEM NAME"],
-                    row["VARIANT"],
-                    qty_gl3,
-                    load_qty
-                ])
-
-    columns = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT",
-               "QTY BIN AMBIL", "LOAD"]
-
-    return pd.DataFrame(output, columns=columns)
 
 # --- SIDEBAR NAVIGATION ---
 with st.sidebar:
