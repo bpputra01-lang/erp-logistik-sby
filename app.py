@@ -9,44 +9,76 @@ from python_calamine import CalamineWorkbook
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
 # 2. CUSTOM CSS GLOBAL
+# 1. KONFIGURASI HALAMAN
+st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
+
+# 2. THE AUTHENTIC ADMINITY UI ENGINE (HANYA SIDEBAR & VISUAL)
 st.markdown("""
     <style>
-    .stApp { background-color: #ffffff; color: #31333f; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: white !important; }
+    /* Background Page */
+    .stApp { background-color: #f4f7f6; }
 
-    div[data-baseweb="select"] > div {
+    /* Sidebar Adminity Style */
+    [data-testid="stSidebar"] {
         background-color: #1e1e2f !important;
-        color: #FFD700 !important;
-        border: 2px solid #3b82f6 !important;
-        z-index: 999999 !important;
+        border-right: 1px solid #2d2d44;
     }
-    div[role="listbox"] ul { background-color: #1e1e2f !important; }
-    div[role="option"] { color: white !important; }
-
-    .m-box { 
-        background-color: #1e1e2f !important; 
-        border: 2px solid #3b82f6 !important;
-        border-left: 12px solid #FFD700 !important;
-        padding: 25px !important; 
-        border-radius: 15px !important; 
-        text-align: center !important; 
-        box-shadow: 0 8px 20px rgba(0,0,0,0.3) !important;
-        margin-bottom: 15px !important;
+    
+    /* Sidebar Text & Menu */
+    [data-testid="stSidebar"] .stMarkdown p {
+        color: #aeb1b5 !important;
+        font-family: 'Inter', sans-serif;
     }
-    .m-val { font-size: 32px !important; font-weight: 800 !important; color: #FFD700 !important; display: block !important; }
-    .m-lbl { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase !important; font-weight: 700 !important; letter-spacing: 1.5px !important; }
 
+    /* Sidebar Navigation Category Header */
+    .nav-header {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #6c757d;
+        padding: 20px 0 10px 10px;
+        font-weight: 700;
+        border-bottom: 1px solid #2d2d44;
+        margin-bottom: 10px;
+    }
+
+    /* Hero Banner Adminity */
     .hero-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 1.5rem 2rem;
-        border-bottom: 5px solid #FFD700; border-radius: 15px; margin-bottom: 20px;
+        background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
     }
-    .dash-container {
-        border: 5px solid #1e3a8a; border-radius: 15px;
-        padding: 10px; background: #f8f9fa;
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
-        overflow: hidden;
+
+    /* Adminity Metric Cards */
+    .m-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 5px solid #3a7bd5;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+        text-align: left;
+    }
+    .m-label { color: #6c757d; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    .m-value { color: #2d3436; font-size: 24px; font-weight: 800; display: block; }
+
+    /* Custom Radio Button Styling (Adminity Style) */
+    div.row-widget.stRadio > div {
+        background-color: transparent !important;
+        padding: 5px;
+    }
+    div.row-widget.stRadio label {
+        color: #d1d1d1 !important;
+        font-size: 14px !important;
+        padding: 8px 15px !important;
+        border-radius: 5px;
+        transition: 0.3s;
+    }
+    div.row-widget.stRadio label:hover {
+        background: rgba(255,255,255,0.05);
+        color: white !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -166,10 +198,20 @@ def process_scan_out(df_scan, df_history, df_stock):
     return pd.DataFrame(results), pd.DataFrame(draft_setup)
 
 # --- SIDEBAR ---
+# --- SIDEBAR NAVIGASI ADMINITY (INI YANG DIUBAH) ---
 with st.sidebar:
-    st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-bottom: 20px;'>🚀 ERP ADMINITY</h2>", unsafe_allow_html=True)
+    
+    # Kategori 1: MAIN
+    st.markdown('<p class="nav-header">MAIN DASHBOARD</p>', unsafe_allow_html=True)
+    main_menu = st.radio("Main", ["📊 Overview", "📓 Database Master"], label_visibility="collapsed")
+    
+    # Kategori 2: INVENTORY
+    st.markdown('<p class="nav-header">INVENTORY TOOLS</p>', unsafe_allow_html=True)
+    inv_tool = st.radio("Inventory", ["📥 Putaway System", "📤 Scan Out Validasi", "⛔ Stock Minus"], label_visibility="collapsed")
+    
     st.divider()
-    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "📥 Putaway System", "📤 Scan Out", "📝 Dashboard Database", "⛔ Stock Minus"])
+    st.caption("Adminity v2.4 | Surabaya Branch")
 
 # --- MENU LOGIC ---
 if menu == "📥 Putaway System":
