@@ -201,7 +201,7 @@ elif menu == "📦 Database Artikel":
                         # Bersihin Tanggal (Buang 00:00:00)
                         if any(x in col_name for x in ["DATE", "TANGGAL", "MONTH"]):
                            # Biar tanggal dan jam (Menit & Detik) muncul semua
-df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+                        df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
                         # Bersihin Waktu (Buang Tanggal hantu 1970)
                         elif any(x in col_name for x in ["TIME", "AVERAGE", "MOVE", "QC", "PACK"]):
                             df_master[col] = df_master[col].astype(str).str.split().str[-1]
