@@ -11,63 +11,42 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
-    /* 1. BACKGROUND UTAMA TETAP PUTIH */
-    .stApp { background-color: #ffffff; color: #31333f; }
+    /* Latar Putih */
+    .stApp { background-color: #ffffff; }
     
-    /* 2. SIDEBAR (Tulisan Putih Bersih di atas BG Gelap) */
+    /* Sidebar Putih */
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    /* Memaksa semua teks di sidebar jadi putih */
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p, 
     [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] span { 
-        color: white !important; 
-        font-weight: 500; 
-    }
+    [data-testid="stSidebar"] span { color: white !important; }
 
-    /* 3. ELEMEN INPUT (DARK THEME) - DROPDOWN & SEARCH BAR */
-    /* Kotak Dropdown & Input */
-    div[data-baseweb="select"] > div, 
-    div[data-testid="stTextInput"] input {
-        background-color: #1e1e2f !important; /* Warna Gelap */
-        color: #ffffff !important; /* Tulisan Putih */
+    /* Input & Dropdown Dark */
+    div[data-baseweb="select"] > div, div[data-testid="stTextInput"] input {
+        background-color: #1e1e2f !important;
+        color: white !important;
         border: 1px solid #3b82f6 !important;
-        border-radius: 8px !important;
     }
-    
-    /* Icon dropdown dan teks pilihan */
-    div[data-baseweb="select"] svg { fill: white !important; }
-    div[data-baseweb="select"] span { color: white !important; }
 
-    /* 4. TABEL / DATAFRAME (DARK MODE) */
+    /* KOTAK SUMMARY DARK ELEGAN */
+    .m-box { 
+        background: linear-gradient(135deg, #1e1e2f 0%, #0e1117 100%); 
+        border: 1px solid #3b82f6;
+        border-left: 5px solid #FFD700;
+        padding: 20px; 
+        border-radius: 12px; 
+        text-align: center; 
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        margin-bottom: 15px;
+    }
+    .m-val { font-size: 26px; font-weight: 800; color: #FFD700 !important; display: block; }
+    .m-lbl { font-size: 12px; color: #8892b0 !important; text-transform: uppercase; font-weight: 700; letter-spacing: 2px; }
+
+    /* Tabel Dark */
     [data-testid="stDataFrame"] {
         background-color: #1e1e2f !important;
         border: 1px solid #3b82f6 !important;
-        border-radius: 10px !important;
-        padding: 5px;
     }
-
-    /* 5. SUMMARY BOX (Warna Cerah Elegan di Latar Putih) */
-    .m-box { 
-        background: #ffffff; 
-        border: 1px solid #e0e0e0;
-        border-left: 5px solid #1e3a8a; 
-        padding: 15px; 
-        border-radius: 10px; 
-        text-align: center; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        margin-bottom: 10px;
-    }
-    .m-val { font-size: 22px; font-weight: 800; color: #1e3a8a; display: block; }
-    .m-lbl { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
-
-    /* 6. HERO HEADER */
-    .hero-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 1.5rem 2rem;
-        border-bottom: 4px solid #FFD700;
-        border-radius: 10px;
-        margin-bottom: 15px;
-    } </style>
+    </style>
     """, unsafe_allow_html=True)
 # --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
 with st.sidebar:
