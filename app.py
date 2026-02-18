@@ -72,15 +72,60 @@ if menu == "📊 Dashboard Overview":
             <p>Warehouse Management System Surabaya • Logistic Operation Monitor</p>
         </div>
     """, unsafe_allow_html=True)
+# --- 3. SIDEBAR (PASTIKAN INI DI ATAS) ---
+with st.sidebar:
+    st.markdown("<h2 style='color: white;'>🚀 ERP SURABAYA</h2>", unsafe_allow_html=True)
+    st.divider()
+    # Variabel 'menu' didefinisikan di sini
+    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
 
-    # 3. PANEL KONTROL (RAPID & ELEGAN)
+# --- MODUL DASHBOARD OVERVIEW (VERSI PROFESIONAL & RAPI) ---
+if menu == "📊 Dashboard Overview":
+    # 1. CSS SAKTI
+    st.markdown("""
+        <style>
+            .main .block-container { padding: 0rem !important; max-width: 100% !important; }
+            header { visibility: hidden; }
+            .stApp { margin-top: -75px; }
+
+            .hero-header {
+                background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+                color: white; padding: 1.5rem 2rem;
+                border-bottom: 4px solid #FFD700;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                border-radius: 0 0 15px 15px;
+            }
+            .hero-header h1 { margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; }
+            
+            .control-panel {
+                background-color: #1e1e2f; padding: 15px 25px; 
+                border-bottom: 1px solid #333; margin-top: 10px;
+            }
+
+            .scroll-wrapper {
+                width: 100%; height: 80vh; overflow: auto;
+                background: #0e1117; position: relative;
+                border: 1px solid #3b82f6; margin-top: 5px;
+            }
+            .scroll-wrapper iframe { border: none; transform-origin: 0 0; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 2. HEADER
+    st.markdown(f"""
+        <div class="hero-header">
+            <h1>📊 DASHBOARD ANALYTICS</h1>
+            <p>Warehouse Management System Surabaya • Logistic Operation Monitor</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 3. PANEL KONTROL
     st.markdown('<div class="control-panel">', unsafe_allow_html=True)
     c1, c2 = st.columns([2, 1])
     with c1:
         pilih_dash = st.selectbox("PILIH LAPORAN OPERASIONAL", 
                                 ["WORKING REPORT", "PERSONAL PERFOMANCE", 
-                                 "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], 
-                                label_visibility="visible")
+                                 "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
     with c2:
         zoom_val = st.slider("PASIN UKURAN TAMPILAN", 0.10, 1.0, 0.35, 0.01)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -93,9 +138,8 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 5. EKSEKUSI TAMPILAN
-    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
-    
+    # 5. TAMPILAN
+    url_final = f"{dash_links[pilih_dash]}&rm=minimal"
     st.markdown(f"""
         <div class="scroll-wrapper">
             <iframe src="{url_final}" 
