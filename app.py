@@ -28,7 +28,7 @@ with st.sidebar:
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
 
 
-## --- MODUL DASHBOARD OVERVIEW ---
+# --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
     # 1. CSS SAKTI
     st.markdown("""
@@ -49,17 +49,25 @@ if menu == "📊 Dashboard Overview":
                 border: none;
                 transform-origin: 0 0;
             }
-            /* Styling tombol download agar mencolok */
-            .stButton>button {
-                width: 100%;
-                background-color: #1e3a47;
-                color: white;
-                border-radius: 5px;
-            }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. MAPPING LINK (Dipindah ke atas agar variabel url_pilihan tersedia untuk tombol)
+    # 2. PANEL KONTROL
+    c1, c2, c3 = st.columns([2, 1, 1])
+    with c1:
+        pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
+    with c2:
+        zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
+    with c3:
+        # --- PERBAIKAN SPASI DI SINI ---
+        if st.button("📥 EXPORT TO PDF"):
+            # Ambil link asli GSheets lo (sebelum di-pubhtml)
+            # Karena GSheets pubhtml gak bisa langsung di-replace ke export, 
+            # kita arahin ke print mode biar user tinggal 'Save as PDF' dengan rapi.
+            st.warning("Silakan pilih 'Save as PDF' pada menu yang muncul.")
+            st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+
+    # 3. MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -67,32 +75,11 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 3. PANEL KONTROL (Dropdown, Zoom, & Download)
-    c1, c2, c3 = st.columns([2, 1, 1])
-    
-    with c1:
-        pilih_dash = st.selectbox("", list(dash_links.keys()), label_visibility="collapsed")
-        url_pilihan = dash_links[pilih_dash] # Simpan URL yang dipilih
-
-    with c2:
-        zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
-
-    with c3:
-        # TOMBOL EXPORT LANGSUNG KE PDF GOOGLE
-        if st.button("📥 EXPORT TO PDF"):
-            # Kita ubah URL 'pubhtml' jadi 'export?format=pdf'
-            pdf_url = url_pilihan.replace("pubhtml", "export?format=pdf")
-            # Tambahin parameter biar jadi satu halaman landscape
-            pdf_url += "&size=A4&portrait=false&fitw=true&gridlines=false"
-            
-            # Link download otomatis
-            st.markdown(f"""
-                <meta http-equiv="refresh" content="0; url={pdf_url}">
-                <p style="color: #00ff00;">⏳ Sedang menyiapkan PDF, tunggu sebentar...</p>
-            """, unsafe_allow_html=True)
-
     # 4. PROSES TAMPILAN
-    url_final = f"{url_pilihan}&rm=minimal&chrome=false&widget=false"
+    url_aktif = dash_links[pilih_dash]
+    url_final = f"{url_aktif}&rm=minimal&chrome=false&widget=false"
+    
+    # Kalkulasi rasio agar space kanan hilang
     calc_ratio = (1 / zoom_val) * 100
 
     st.markdown(f"""
@@ -102,7 +89,7 @@ if menu == "📊 Dashboard Overview":
             </iframe>
         </div>
     """, unsafe_allow_html=True)
-
+    
     # Info tipis di bawah
     st.caption(f"📍 View: {pilih_dash} | Gunakan slider ZOOM untuk menyesuaikan lebar dan tinggi halaman.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
