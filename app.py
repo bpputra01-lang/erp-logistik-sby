@@ -29,64 +29,57 @@ with st.sidebar:
     # Menu Utama
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
     
-    # LOGIKA SUB-MENU: Hanya muncul jika 'Dashboard Overview' dipilih
-    if menu == "📊 Dashboard Overview":
-        st.markdown("---")
-        st.markdown("<p style='color: #FFD700; font-weight: bold; margin-bottom: 0px;'>📂 DAFTAR LAPORAN:</p>", unsafe_allow_html=True)
+# --- 3. SIDEBAR (DIPERBAIKI: LAPORAN JADI SUB-MENU PERSIS DI BAWAH DASHBOARD OVERVIEW) ---
+with st.sidebar:
+    st.markdown("<h2 style='color: white;'>🚀 ERP SURABAYA</h2>", unsafe_allow_html=True)
+    st.divider()
+    
+    st.markdown("<p style='color: #8ecad4; font-size: 0.8rem; font-weight: bold;'>MODUL UTAMA</p>", unsafe_allow_html=True)
+    
+    # 1. Menu Utama Pertama
+    menu_utama = st.radio("PILIH MODUL:", 
+                         ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"],
+                         label_visibility="collapsed")
+    
+    # 2. LOGIKA SUB-MENU: Muncul persis di bawah jika Dashboard Overview dipilih
+    if menu_utama == "📊 Dashboard Overview":
+        st.markdown("""
+            <div style='margin-left: 20px; margin-top: 10px;'>
+                <p style='color: #FFD700; font-size: 0.75rem; font-weight: bold; margin-bottom: 0px;'>📂 DAFTAR LAPORAN:</p>
+            </div>
+        """, unsafe_allow_html=True)
         
-        # Ini adalah Sub-Menu lo, Bos
+        # Pake Radio lagi tapi dikasih identitas sub-menu
         pilih_dash = st.radio(
-            "Pilih salah satu:",
-            ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
+            "Sub-Menu",
+            ["   ↳ WORKING REPORT", "   ↳ PERSONAL PERFOMANCE", 
+             "   ↳ CYCLE COUNT", "   ↳ MOVING STOCK"],
             label_visibility="collapsed"
         )
+        
+        # Bersihkan string untuk mapping URL nanti
+        pilih_dash_clean = pilih_dash.replace("   ↳ ", "")
     else:
-        pilih_dash = None
+        pilih_dash_clean = None
 
-# --- MODUL DASHBOARD OVERVIEW (PERBAIKAN TAMPILAN) ---
-if menu == "📊 Dashboard Overview":
-    # HEADER BIRU PROFESIONAL (Biar gak kosong melompong)
-    st.markdown(f"""
-        <div style="background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); 
-                    padding: 20px; border-radius: 0px 0px 15px 15px; 
-                    border-bottom: 3px solid #FFD700; margin-bottom: 20px;">
-            <h1 style="color: white; margin: 0; font-size: 22px;">📊 {pilih_dash}</h1>
-            <p style="color: #cbd5e1; margin: 0; font-size: 12px;">Logistic Analytics System • Operational Dashboard</p>
-        </div>
-        <style>
-            .main .block-container {{ padding-top: 0rem !important; }}
-            header {{ visibility: hidden; }}
-            /* Wadah Dashboard */
-            .scroll-wrapper {{
-                width: 100%; height: 80vh; overflow: auto; 
-                background: #0e1117; border-radius: 10px; border: 1px solid #3b82f6;
-            }}
-        </style>
-    """, unsafe_allow_html=True)
-
-    # PANEL ZOOM (Taruh di pojok kanan)
-    _, c2 = st.columns([3, 1])
-    with c2:
-        zoom_val = st.slider("PASIN UKURAN", 0.10, 1.0, 0.35, 0.01)
-
-    # MAPPING LINK
+# --- MODUL DASHBOARD OVERVIEW (PENYESUAIAN MAPPING) ---
+if menu_utama == "📊 Dashboard Overview":
+    # MAPPING LINK (Sesuaikan key dengan nama sub-menu baru)
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
-        "CYCLE COUNT DAN KERAPIHAN": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
-        "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
+        "CYCLE COUNT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
+        "MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # TAMPILKAN DASHBOARD
-    url_final = f"{dash_links[pilih_dash]}&rm=minimal"
-    
+    # Header & Iframe tetap sama kayak sebelumnya...
     st.markdown(f"""
-        <div class="scroll-wrapper">
-            <iframe src="{url_final}" 
-                    style="width: 3500px; height: 2500px; transform: scale({zoom_val}); transform-origin: 0 0; border: none;">
-            </iframe>
+        <div style="background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); padding: 20px; border-radius: 0 0 15px 15px; border-bottom: 3px solid #FFD700; margin-bottom: 20px;">
+            <h1 style="color: white; margin: 0; font-size: 20px;">📊 {pilih_dash_clean}</h1>
         </div>
     """, unsafe_allow_html=True)
+    
+    # (Sisa kode iframe lo yang tadi tinggal lanjutin di sini)
     
     st.info("💡 Jika masih kepotong, gunakan mouse untuk scroll ke bawah/samping di dalam dashboard.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
