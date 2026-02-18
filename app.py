@@ -66,10 +66,19 @@ if menu == "📊 Dashboard Overview":
     with c2:
         zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
     with c3:
-        # FITUR EXPORT: Membuka fungsi print browser
-        if st.button("📥 EXPORT REPORT"):
-            st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-            st.info("Pilih 'Save as PDF' di menu printer untuk mendownload grafik.")
+        with c3:
+        # TOMBOL EXPORT LANGSUNG KE PDF GOOGLE
+        if st.button("📥 EXPORT TO PDF"):
+            # Kita ubah URL 'pubhtml' jadi 'export?format=pdf'
+            pdf_url = url_pilihan.replace("pubhtml", "export?format=pdf")
+            # Tambahin parameter biar jadi satu halaman landscape
+            pdf_url += "&size=A4&portrait=false&fitw=true&gridlines=false"
+            
+            # Link download otomatis
+            st.markdown(f"""
+                <meta http-equiv="refresh" content="0; url={pdf_url}">
+                <p style="color: #00ff00;">⏳ Sedang menyiapkan PDF, tunggu sebentar...</p>
+            """, unsafe_allow_html=True)
 
     # 3. MAPPING LINK
     dash_links = {
