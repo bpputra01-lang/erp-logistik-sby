@@ -8,57 +8,48 @@ from python_calamine import CalamineWorkbook
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
-# 2. CUSTOM CSS GLOBAL (MEWAH & FIX DROPDOWN)
+# 2. CUSTOM CSS GLOBAL (NAVY MEWAH & FIX DROPDOWN)
 st.markdown("""
     <style>
-    /* Dasar & Sidebar */
     .stApp { background-color: #ffffff; color: #31333f; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: white !important; }
 
-    /* FIX DROPDOWN & SLIDER (DARK MODE) */
+    /* DROPDOWN & SLIDER DARK MODE */
     div[data-baseweb="select"] > div {
         background-color: #1e1e2f !important;
-        color: white !important;
+        color: #FFD700 !important;
         border: 2px solid #3b82f6 !important;
-        z-index: 999999 !important; /* Biar gak ketutup iframe */
+        z-index: 999999 !important;
     }
     div[role="listbox"] ul { background-color: #1e1e2f !important; }
     div[role="option"] { color: white !important; }
-    
-    /* SLIDER WARNA EMAS */
-    .stSlider [data-baseweb="slider"] { z-index: 999999 !important; }
 
-    /* SUMMARY BOX (GAMBAR 2 - NAVY MEWAH) */
+    /* SUMMARY BOX NAVY GALAK (GAMBAR 11 VIBES) */
     .m-box { 
         background-color: #1e1e2f !important; 
-        border: 2px solid #3b82f6;
-        border-left: 10px solid #FFD700 !important;
-        padding: 25px; 
-        border-radius: 15px; 
-        text-align: center; 
-        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-        margin-bottom: 15px;
+        border: 2px solid #3b82f6 !important;
+        border-left: 12px solid #FFD700 !important;
+        padding: 25px !important; 
+        border-radius: 15px !important; 
+        text-align: center !important; 
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3) !important;
+        margin-bottom: 15px !important;
     }
-    .m-val { font-size: 32px; font-weight: 800; color: #FFD700 !important; display: block; }
-    .m-lbl { font-size: 14px; color: #ffffff !important; text-transform: uppercase; font-weight: 700; letter-spacing: 1.5px; }
+    .m-val { font-size: 32px !important; font-weight: 800 !important; color: #FFD700 !important; display: block !important; }
+    .m-lbl { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase !important; font-weight: 700 !important; letter-spacing: 1.5px !important; }
 
-    /* BORDER MEWAH BUAT DASHBOARD */
-    .dashboard-frame {
-        border: 5px solid #1e3a8a;
-        border-radius: 15px;
-        padding: 10px;
-        background: #f8f9fa;
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.5); /* Glow biru */
-        overflow: hidden;
-        margin-top: 20px;
-    }
-
+    /* HEADER & FRAME */
     .hero-header {
         background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
         color: white; padding: 1.5rem 2rem;
-        border-bottom: 5px solid #FFD700;
-        border-radius: 15px;
+        border-bottom: 5px solid #FFD700; border-radius: 15px; margin-bottom: 20px;
+    }
+    .dash-container {
+        border: 5px solid #1e3a8a; border-radius: 15px;
+        padding: 10px; background: #f8f9fa;
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
+        overflow: hidden;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -69,8 +60,8 @@ with st.sidebar:
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
 
-# 4. LOGIKA MODUL
-elif menu == "📊 Dashboard Overview":
+# 4. LOGIKA MODUL (WAJIB PAKAI 'if' PERTAMA KALI)
+if menu == "📊 Dashboard Overview":
     st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
     
     c1, c2 = st.columns([3, 1])
@@ -79,7 +70,6 @@ elif menu == "📊 Dashboard Overview":
     with c2:
         zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
 
-    # DISINI KUNCINYA: height di div container kita batasi (misal 600px)
     st.markdown(f'''
         <div class="dash-container">
             <div style="overflow: auto; width: 100%; height: 600px; border-radius: 10px;">
@@ -87,25 +77,40 @@ elif menu == "📊 Dashboard Overview":
                 style="width: 4000px; height: 2500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
             </div>
         </div>
-        <p style="font-size: 10px; color: gray; margin-top: 5px;">*Gunakan scrollbar di dalam kotak untuk geser laporan</p>
     ''', unsafe_allow_html=True)
-    
-elif menu == "📝 Dashboard Database":
-    st.markdown("""<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1><p>Automatic Sync with Google Sheets Master</p></div>""", unsafe_allow_html=True)
-    
-    # Link lo tadi
-    SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
-    
-    # Summary Box Sejajar (Gue paksa Navy)
-    c1, c2, c3 = st.columns(3)
-    with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">47</span></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">24</span></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">SYNC STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
-# --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
-elif menu == "⛔ Stock Minus":
-    st.title("⛔ Inventory : Stock Minus Clearance")
-    uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
 
+elif menu == "📝 Dashboard Database":
+    st.markdown('<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1></div>', unsafe_allow_html=True)
+    
+    raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", placeholder="Paste link di sini...")
+    
+    if raw_url:
+        try:
+            if "/d/" in raw_url:
+                file_id = raw_url.split("/d/")[1].split("/")[0]
+                xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+                
+                all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+                selected_sheet = st.selectbox("PILIH TAB / SHEET:", list(all_sheets.keys()))
+                
+                if selected_sheet:
+                    df_master = all_sheets[selected_sheet]
+                    
+                    # BOX SUMMARY NAVY (Gambar 2 yang lo mau)
+                    c1, c2, c3 = st.columns(3)
+                    with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+                    with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+                    with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+
+                    st.divider()
+                    st.dataframe(df_master, use_container_width=True, height=500)
+        except Exception as e:
+            st.error(f"Gagal narik data: {e}")
+
+elif menu == "⛔ Stock Minus":
+    st.markdown('<div class="hero-header"><h1>⛔ STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
+    # ... (Sisa logic stock minus lo masukin sini)
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file, engine="calamine")
         col_sku, col_bin = 'SKU', 'BIN'
