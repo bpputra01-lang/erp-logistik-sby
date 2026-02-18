@@ -54,104 +54,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. SIDEBAR ---
+# --- BAGIAN MENU SIDEBAR (Gue tambahin biar lengkap) ---
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
-
-# --- GLOBAL TOP BAR (FULL BIRU NAVY, MEPET ATAS, TANPA STAT CARDS) ---
-st.markdown("""
-    <style>
-        /* Menghilangkan padding bawaan Streamlit agar header bisa mepet atas */
-        .block-container {
-            padding-top: 0rem !important;
-            padding-bottom: 0rem !important;
-        }
-    </style>
-    
-    <div style="
-        background-color: #1e3a8a;
-        padding: 20px;
-        border-bottom: 5px solid #FFD700;
-        margin-left: -5rem; /* Menutup gap kiri */
-        margin-right: -5rem; /* Menutup gap kanan */
-        margin-top: -1rem; /* Memaksa naik mepet atas */
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    ">
-        <h1 style="color: #FFD700; margin: 0; font-weight: 800; letter-spacing: 5px; font-size: 35px;">
-            SURABAYA LOGISTICS COMMAND CENTER
-        </h1>
-        <p style="color: white; margin: 0; font-size: 14px; font-weight: 600; opacity: 0.9;">PRESTIGE SYSTEM v2.0</p>
-    </div>
-    <div style="margin-bottom: 30px;"></div>
-""", unsafe_allow_html=True)
-
-# --- 4. LOGIKA MODUL ---
-if menu == "📊 Dashboard Overview":
-    # Dropdown Laporan (Langsung tanpa Zoom)
-    pilih = st.selectbox("PILIH LAPORAN ANALYTICS", [
-        "WORKING REPORT", 
-        "PERSONAL PERFORMANCE", 
-        "CYCLE COUNT DAN KERAPIHAN", 
-        "DASHBOARD MOVING STOCK"
-    ])
-
-    dash_links = {
-        "WORKING REPORT": "864743695",
-        "PERSONAL PERFORMANCE": "251294539",
-        "CYCLE COUNT DAN KERAPIHAN": "1743896821",
-        "DASHBOARD MOVING STOCK": "1671817510"
-    }
-    gid = dash_links[pilih]
-
-    # FRAME DASHBOARD (UKURAN FIXED 100%, TANPA SCROLL KEJAOHAN)
-    st.markdown(f'''
-        <div class="dash-container" style="height: auto; overflow: hidden; border: 3px solid #1e3a8a; border-radius: 15px;">
-            <div style="width: 100%; height: 750px; overflow: auto; background: #0b242d;">
-                <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={gid}&single=true&rm=minimal" 
-                style="width: 100%; height: 1800px; border: none;"></iframe>
-            </div>
-        </div>
-    ''', unsafe_allow_html=True)
-
-elif menu == "📝 Dashboard Database":
-    # Kode Database lo tetap sama, cuma sekarang kepalanya udah mepet atas
-    pass
-# --- 4. LOGIKA MODUL ---
-if menu == "📊 Dashboard Overview":
-    # Dropdown Laporan Tetap Ada
-    pilih = st.selectbox("PILIH LAPORAN ANALYTICS", [
-        "WORKING REPORT", 
-        "PERSONAL PERFORMANCE", 
-        "CYCLE COUNT DAN KERAPIHAN", 
-        "DASHBOARD MOVING STOCK"
-    ])
-
-    # Mapping GID
-    dash_links = {
-        "WORKING REPORT": "864743695",
-        "PERSONAL PERFORMANCE": "251294539",
-        "CYCLE COUNT DAN KERAPIHAN": "1743896821",
-        "DASHBOARD MOVING STOCK": "1671817510"
-    }
-    gid = dash_links[pilih]
-
-    # FRAME DASHBOARD (ZOOM DIHAPUS, UKURAN FIXED)
-    st.markdown(f'''
-        <div class="dash-container" style="height: auto; overflow: hidden; border: 3px solid #1e3a8a;">
-            <div style="width: 100%; height: 650px; overflow: auto; border-radius: 10px; background: #0b242d;">
-                <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={gid}&single=true&rm=minimal" 
-                style="width: 100%; height: 1500px; border: none;"></iframe>
-            </div>
-        </div>
-    ''', unsafe_allow_html=True)
-
-elif menu == "📝 Dashboard Database":
-    # ... (Kode Database lo yang otomatis link tadi)
-    pass
-
 
 # --- 4. LOGIKA MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
@@ -188,51 +95,35 @@ if menu == "📊 Dashboard Overview":
         </div>
 
     ''', unsafe_allow_html=True)
-
+    
 elif menu == "📝 Dashboard Database":
     st.markdown('<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1></div>', unsafe_allow_html=True)
     
-    # --- LINK DATABASE UTAMA (DIKUNCI) ---
-    FILE_ID = "1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY"
-    XLSX_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=xlsx"
+    raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", placeholder="Paste link di sini...")
     
-    try:
-        # Load data otomatis pakai engine Calamine (Speed Demon)
-        all_sheets = pd.read_excel(XLSX_URL, sheet_name=None, engine='calamine')
-        sheet_names = list(all_sheets.keys())
-        
-        # Dropdown buat pilih Tab saja
-        selected_sheet = st.selectbox("📂 PILIH TAB DATABASE:", sheet_names)
-        
-        if selected_sheet:
-            # 1. Ambil data mentah
-            df_master = all_sheets[selected_sheet]
-            
-            # 2. Pembersihan Data Otomatis (Format Tanggal & Kolom)
-            df_master = df_master.loc[:, ~df_master.columns.astype(str).str.contains('^Unnamed')]
-            df_master = df_master.dropna(how='all').reset_index(drop=True)
+    if raw_url:
+        try:
+            if "/d/" in raw_url:
+                file_id = raw_url.split("/d/")[1].split("/")[0]
+                xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+                
+                all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+                selected_sheet = st.selectbox("PILIH TAB / SHEET:", list(all_sheets.keys()))
+                
+                if selected_sheet:
+                    df_master = all_sheets[selected_sheet]
+                    
+                    # BOX SUMMARY NAVY (Gambar 2 yang lo mau)
+                    c1, c2, c3 = st.columns(3)
+                    with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+                    with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+                    with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
 
-            # --- SUMMARY BOX NAVY GALAK (GAMBAR 2 VIBES) ---
-            c1, c2, c3 = st.columns(3)
-            with c1: 
-                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-            with c2: 
-                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-            with c3: 
-                st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+                    st.divider()
+                    st.dataframe(df_master, use_container_width=True, height=500)
+        except Exception as e:
+            st.error(f"Gagal narik data: {e}")
 
-            st.divider()
-
-            # --- SEARCH & DATA VIEW ---
-            search = st.text_input("🔍 Cari Data Tertentu (SKU / Nama / Bin)...")
-            if search:
-                mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
-                st.dataframe(df_master[mask], use_container_width=True, height=500)
-            else:
-                st.dataframe(df_master, use_container_width=True, height=500)
-
-    except Exception as e:
-        st.error(f"❌ Koneksi Terputus atau Link Salah: {e}")
 elif menu == "⛔ Stock Minus":
     st.markdown('<div class="hero-header"><h1>⛔ STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
