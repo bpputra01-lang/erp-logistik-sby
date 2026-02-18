@@ -27,157 +27,99 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- FUNGSI LOGIKA ASLI (TETAP SAMA) ---
-def process_putaway_system(df_putaway, df_asal_bin):
-    working_bin = df_asal_bin.copy()
-    results_compare, results_putaway_list, results_kurang_setup = [], [], []
-    for _, row_ds in df_putaway.iterrows():
-        bin_tujuan_ds, sku_ds, qty_needed = str(row_ds.iloc[0]).strip(), str(row_ds.iloc[1]).strip(), int(row_ds.iloc[2])
-        diff_qty = qty_needed
-        while diff_qty > 0:
-            allocated = False; bin_ketemu = ""; qty_found_in_bin = 0
-            def try_allocate(prio_type):
-                nonlocal diff_qty, allocated, bin_ketemu, qty_found_in_bin
-                for idx, row_bin in working_bin.iterrows():
-                    b_code, s_code, q_avail = str(row_bin.iloc[1]).strip().upper(), str(row_bin.iloc[2]).strip(), int(row_bin.iloc[9])
-                    if s_code == sku_ds and q_avail > 0:
-                        is_match = False
-                        if prio_type == 1: is_match = "STAGGING LT.3" in b_code or "STAGING LT.3" in b_code
-                        elif prio_type == 2: is_match = ("STAGGING" in b_code or "STAGING" in b_code or "KARANTINA" in b_code) and "LT.3" not in b_code
-                        elif prio_type == 3: is_match = "STAGGING" not in b_code and "STAGING" not in b_code and "KARANTINA" not in b_code
-                        if is_match:
-                            take = min(q_avail, diff_qty); working_bin.iat[idx, 9] = q_avail - take
-                            qty_found_in_bin, bin_ketemu, allocated = take, b_code, True; return True
-                return False
-            if not try_allocate(1):
-                if not try_allocate(2): try_allocate(3)
-            if allocated:
-                note = "FULLY SETUP" if (diff_qty - qty_found_in_bin) == 0 else "PARTIAL SETUP"
-                results_compare.append({"BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_needed, "BIN DITEMUKAN": bin_ketemu, "QTY BIN SYSTEM": qty_found_in_bin, "DIFF": diff_qty - qty_found_in_bin, "NOTE": note})
-                results_putaway_list.append({"BIN AWAL": bin_ketemu, "BIN TUJUAN": bin_tujuan_ds, "SKU": sku_ds, "QUANTITY": qty_found_in_bin, "NOTES": "PUTAWAY"})
-                diff_qty -= qty_found_in_bin
-            else:
-                results_compare.append({"BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_needed, "BIN DITEMUKAN": "(NO BIN)", "QTY BIN SYSTEM": 0, "DIFF": diff_qty, "NOTE": "PERLU CARI STOCK MANUAL"})
-                results_kurang_setup.append({"BIN": bin_tujuan_ds, "SKU": sku_ds, "QTY": diff_qty}); break
-    df_comp_final = pd.DataFrame(results_compare)
-    df_sum = df_comp_final[df_comp_final['NOTE'].str.contains("SETUP", na=False)].copy()
-    if not df_sum.empty:
-        df_sum = df_sum[['BIN DITEMUKAN', 'BIN ASAL', 'SKU', 'QTY BIN SYSTEM']]; df_sum.columns = ['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QTY PUTAWAY']
-        df_sum['SISA BIN AWAL'] = df_sum.apply(lambda r: working_bin[(working_bin.iloc[:, 1].str.upper() == r['BIN AWAL']) & (working_bin.iloc[:, 2] == r['SKU'])].iloc[:, 9].sum(), axis=1)
-    mask_lt3 = (working_bin.iloc[:, 9] != 0) & (working_bin.iloc[:, 1].str.contains("STAGGING LT.3", case=False, na=False))
-    df_lt3 = working_bin[mask_lt3].iloc[:, [1, 2, 4, 3, 6, 5, 9]].copy() if any(mask_lt3) else pd.DataFrame()
-    if not df_lt3.empty: df_lt3.columns = ["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"]
-    return df_comp_final, pd.DataFrame(results_putaway_list), pd.DataFrame(results_kurang_setup), df_sum, df_lt3, working_bin
-
-def process_scan_out(df_scan, df_history, df_stock):
-    df_scan.columns = [str(c).strip().upper() for c in df_scan.columns]
-    df_scan['BIN_CLEAN'] = df_scan.iloc[:, 0].astype(str).str.strip()
-    df_scan['SKU_CLEAN'] = df_scan.iloc[:, 1].astype(str).str.strip()
-    df_scan_clean = df_scan.groupby(['BIN_CLEAN', 'SKU_CLEAN']).size().reset_index(name='QTY')
-    results, draft_setup = [], []
-    for _, row in df_scan_clean.iterrows():
-        sku = row['SKU_CLEAN']; bin_scan = row['BIN_CLEAN']; qty = row['QTY']
-        found_stock = False; found_history = False; keterangan = ""; total_qty_setup_terjual = 0; bin_after_setup = ""; invoice = ""
-        match_stock = df_stock[(df_stock.iloc[:, 1].astype(str).str.strip() == sku) & (df_stock.iloc[:, 6].astype(str).str.strip() == bin_scan)]
-        if not match_stock.empty:
-            found_stock = True; total_qty_setup_terjual = match_stock.iloc[0, 10]; invoice = match_stock.iloc[0, 0]
-            keterangan = "ITEM TELAH TERJUAL" if total_qty_setup_terjual == qty else "ITEM TERJUAL (QTY MISSMATCH)"
-        if not found_stock:
-            match_hist = df_history[df_history.iloc[:, 3].astype(str).str.strip() == sku]
-            if not match_hist.empty:
-                found_history = True; total_qty_setup_terjual = match_hist.iloc[0, 10]; bin_after_setup = match_hist.iloc[0, 12]; bin_hist_i = str(match_hist.iloc[0, 8]).strip()
-                if bin_hist_i == bin_scan: keterangan = "DONE AND MATCH SET UP" if total_qty_setup_terjual == qty else "DONE SETUP (QTY MISSMATCH)"
-                else: keterangan = "DONE SET UP (BIN MISSMATCH)"
-        if not found_stock and not found_history:
-            match_stock_any = df_stock[df_stock.iloc[:, 1].astype(str).str.strip() == sku]
-            if not match_stock_any.empty: keterangan = "ITEM TERJUAL (BIN MISSMATCH)"; total_qty_setup_terjual = match_stock_any.iloc[0, 10]; invoice = match_stock_any.iloc[0, 0]; found_stock = True
-        if not found_stock and not found_history: keterangan = "ITEM BELUM TERSETUP & TIDAK TERJUAL"
-        if keterangan == "DONE SETUP (QTY MISSMATCH)": draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": bin_after_setup, "SKU": sku, "QUANTITY": qty - total_qty_setup_terjual, "NOTES": "WAITING OFFLINE"})
-        elif keterangan == "ITEM BELUM TERSETUP & TIDAK TERJUAL": draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": "KARANTINA", "SKU": sku, "QUANTITY": qty, "NOTES": "WAITING OFFLINE"})
-        elif keterangan == "DONE SET UP (BIN MISSMATCH)":
-            draft_setup.append({"BIN AWAL": bin_after_setup, "BIN TUJUAN": bin_scan, "SKU": sku, "QUANTITY": total_qty_setup_terjual, "NOTES": "SET UP BALIK"})
-            draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": "KARANTINA", "SKU": sku, "QUANTITY": qty, "NOTES": "WAITING OFFLINE"})
-        results.append({"BIN": bin_scan, "SKU": sku, "QTY": qty, "Keterangan": keterangan, "Total Qty Setup/Terjual": total_qty_setup_terjual, "Bin After Set Up": bin_after_setup, "Invoice": invoice})
-    return pd.DataFrame(results), pd.DataFrame(draft_setup)
-
-# --- FUNGSI BARU: REFILL & OVERSTOCK (Sesuai Logic VBA) ---
 def process_refill_overstock(df_all_data, df_stock_tracking):
-    df_gl3, df_gl4, df_refill_final, df_overstock_final = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    # Inisialisasi DataFrame kosong
+    df_gl3 = pd.DataFrame()
+    df_gl4 = pd.DataFrame()
+    df_refill_final = pd.DataFrame()
+    df_overstock_final = pd.DataFrame()
 
     try:
-        # 1. Bersihkan Data & Header
-        df_all_data.columns = [str(c).strip().upper() for c in df_all_data.columns]
-        df_stock_tracking.columns = [str(c).strip().upper() for c in df_stock_tracking.columns]
+        # 1. FILTER ALL DATA TO GL3 & GL4 (Sesuai Sub Filter_ALL_DATA... VBA)
+        # VBA: binCode = UCase(srcArr(i, 2)) -> Kolom B
+        # Di Pandas indeks 1 adalah Kolom B
+        df_all_data.iloc[:, 1] = df_all_data.iloc[:, 1].astype(str).str.strip().str.upper()
+        bin_col = df_all_data.iloc[:, 1]
 
-        # SESUAIKAN INDEKS BERDASARKAN SCREENSHOT LO:
-        # Col A (0): Invoice | Col B (1): Barcode/Bin | Col C (2): Brand | Col D (3): Product Name
-        # Col K (10): Qty -> Cek apakah Qty beneran di kolom ke-11
-        
-        # Cari posisi kolom QTY secara otomatis biar gak meleset lagi
-        try:
-            qty_idx = df_all_data.columns.get_loc("QTY")
-            sku_idx = df_all_data.columns.get_loc("BARCODE") # Sesuai screenshot lo
-            bin_idx = df_all_data.columns.get_loc("LOCATION CODE") # Biasanya Bin di sini
-        except:
-            # Fallback ke indeks manual kalau nama kolom beda
-            qty_idx, sku_idx, bin_idx = 10, 1, 6 
-
-        df_all_data.iloc[:, qty_idx] = pd.to_numeric(df_all_data.iloc[:, qty_idx], errors='coerce').fillna(0).astype(int)
-        df_stock_tracking.iloc[:, qty_idx] = pd.to_numeric(df_stock_tracking.iloc[:, qty_idx], errors='coerce').fillna(0).astype(int)
-
-        # 2. FILTER GL3 & GL4 (Pake Location Code / Bin)
-        # Kita cari di mana kata 'GL3' atau 'GL4' berada
-        def find_gl_mask(df, target):
-            # Scan semua kolom string untuk cari GL3/GL4 (antisipasi kolom geser)
-            return df.astype(str).apply(lambda x: x.str.contains(target, case=False, na=False)).any(axis=1)
-
-        mask_gl3 = find_gl_mask(df_all_data, "GL3") & ~find_gl_mask(df_all_data, "LIVE")
-        mask_gl4 = find_gl_mask(df_all_data, "GL4") & ~df_all_data.astype(str).apply(lambda x: x.str.contains("DEFECT|REJECT|ONLINE", case=False, na=False)).any(axis=1)
+        # Filter GL3: InStr(GL3) > 0 and InStr(LIVE) == 0
+        mask_gl3 = (bin_col.str.contains("GL3", na=False)) & (~bin_col.str.contains("LIVE", na=False))
+        # Filter GL4: InStr(GL4) > 0 and No Defect/Reject/Online/Rak
+        exclude_gl4 = "DEFECT|REJECT|ONLINE|RAK"
+        mask_gl4 = (bin_col.str.contains("GL4", na=False)) & (~bin_col.str.contains(exclude_gl4, na=False))
 
         df_gl3 = df_all_data[mask_gl3].copy()
         df_gl4 = df_all_data[mask_gl4].copy()
 
-        if df_gl3.empty:
-            st.error("KOSONG: Kagak ada data GL3. Cek apakah kolom Bin isinya beneran ada tulisan 'GL3'.")
-            return df_gl3, df_gl4, df_refill_final, df_overstock_final
+        # Konversi QTY (VBA GL3 pakai Col J=10, ST pakai Col K=11)
+        # Python: Indeks 9 = Col J, Indeks 10 = Col K
+        df_gl3.iloc[:, 9] = pd.to_numeric(df_gl3.iloc[:, 9], errors='coerce').fillna(0).astype(int)
+        df_gl4.iloc[:, 9] = pd.to_numeric(df_gl4.iloc[:, 9], errors='coerce').fillna(0).astype(int)
 
-        # 3. REFILL LOGIC
-        dict_gl3 = df_gl3.groupby(df_gl3.columns[sku_idx])[df_gl3.columns[qty_idx]].sum().to_dict()
-        refill_list = []
+        # 2. CREATE REFILL SHEET (Sesuai Sub CreateRefillSheet... VBA)
+        # Dictionary GL3: Key = SKU (Col C/Idx 2), Value = Qty (Col J/Idx 9)
+        dict_gl3 = df_gl3.groupby(df_gl3.iloc[:, 2])[df_gl3.columns[9]].sum().to_dict()
         
-        for sku in df_gl4.iloc[:, sku_idx].unique():
-            q_gl3 = dict_gl3.get(sku, 0)
-            if q_gl3 < 3:
-                sisa = 12
-                for _, row in df_gl4[df_gl4.iloc[:, sku_idx] == sku].iterrows():
-                    q_gl4 = int(row.iloc[qty_idx])
-                    if q_gl4 > 0 and sisa > 0:
-                        take = min(q_gl4, sisa)
-                        refill_list.append({
-                            "BIN": row.iloc[bin_idx], "SKU": sku, "LOAD": take, "QTY GL3": q_gl3
-                        })
-                        sisa -= take
-                        if sisa <= 0: break
-        df_refill_final = pd.DataFrame(refill_list)
+        # Dictionary SKU Refill
+        skus_to_refill = {}
+        # Cek SKU GL3 < 3
+        for sku, qty in dict_gl3.items():
+            if qty < 3: skus_to_refill[str(sku).strip()] = True
+        # Cek SKU di GL4 yang gak ada di GL3
+        for sku_gl4 in df_gl4.iloc[:, 2].dropna().unique():
+            sku_gl4_s = str(sku_gl4).strip()
+            if sku_gl4_s not in dict_gl3: skus_to_refill[sku_gl4_s] = True
 
-        # 4. OVERSTOCK LOGIC
-        # Filter Stock Tracking (No INV, Ada DC)
-        mask_st = (~df_stock_tracking.iloc[:, 0].astype(str).str.contains("INV", case=False)) & \
-                  (df_stock_tracking.astype(str).apply(lambda x: x.str.contains("DC", case=False)).any(axis=1))
-        df_st_f = df_stock_tracking[mask_st]
-        dict_st = df_st_f.groupby(df_st_f.columns[1])[df_st_f.columns[qty_idx]].sum().to_dict()
+        refill_results = []
+        for sku in skus_to_refill.keys():
+            qty_gl3_val = dict_gl3.get(sku, 0)
+            sisa_load = 12
+            # Cari di GL4
+            items_gl4 = df_gl4[df_gl4.iloc[:, 2].astype(str).str.strip() == sku]
+            for _, row in items_gl4.iterrows():
+                qty_gl4 = int(row.iloc[9])
+                if qty_gl4 > 0 and sisa_load > 0:
+                    load_qty = min(qty_gl4, sisa_load)
+                    refill_results.append({
+                        "BIN": row.iloc[1], "SKU": sku, "BRAND": row.iloc[3],
+                        "ITEM NAME": row.iloc[4], "VARIANT": row.iloc[5],
+                        "QTY BIN AMBIL": qty_gl4, "LOAD": load_qty, "QTY GL3": qty_gl3_val
+                    })
+                    sisa_load -= load_qty
+                    if sisa_load <= 0: break
+        df_refill_final = pd.DataFrame(refill_results)
 
-        over_list = []
+        # 3. CREATE OVERSTOCK SHEET (Sesuai Sub CreateOverstockSheet... VBA)
+        # Filter Stock Tracking: No 'INV' (Col A/Idx 0), Ada 'DC' (Col G/Idx 6)
+        df_st = df_stock_tracking.copy()
+        df_st.iloc[:, 10] = pd.to_numeric(df_st.iloc[:, 10], errors='coerce').fillna(0).astype(int) # Qty Col K
+        mask_st = (~df_st.iloc[:, 0].astype(str).str.contains("INV", case=False, na=False)) & \
+                  (df_st.iloc[:, 6].astype(str).str.contains("DC", case=False, na=False))
+        df_st_filtered = df_st[mask_st]
+        
+        # Dict ST: SKU (Col B/Idx 1), Qty (Col K/Idx 10)
+        dict_st = df_st_filtered.groupby(df_st_filtered.iloc[:, 1])[df_st_filtered.columns[10]].sum().to_dict()
+
+        overstock_results = []
         for _, row in df_gl3.iterrows():
-            qty_s = int(row.iloc[qty_idx])
-            if qty_s > 24:
-                load = qty_s - 24
-                if dict_st.get(row.iloc[sku_idx], 0) >= 7:
-                    load = int(np.ceil(load / 3))
-                over_list.append({"BIN": row.iloc[bin_idx], "SKU": row.iloc[sku_idx], "LOAD": load})
-        df_overstock_final = pd.DataFrame(over_list)
+            sku_os = str(row.iloc[2]).strip()
+            qty_gl3_sys = int(row.iloc[9])
+            
+            if qty_gl3_sys > 24:
+                sisa_load_os = qty_gl3_sys - 24
+                # Logic: If qtyTrans >= 7 Then RoundUp(sisaLoad / 3)
+                if dict_st.get(sku_os, 0) >= 7:
+                    sisa_load_os = math.ceil(sisa_load_os / 3)
+                
+                if sisa_load_os > 0:
+                    overstock_results.append({
+                        "BIN": row.iloc[1], "SKU": sku_os, "BRAND": row.iloc[3],
+                        "ITEM NAME": row.iloc[4], "VARIANT": row.iloc[5],
+                        "QTY BIN AMBIL": qty_gl3_sys, "LOAD": sisa_load_os
+                    })
+        df_overstock_final = pd.DataFrame(overstock_results)
 
     except Exception as e:
-        st.error(f"DEBUG: {str(e)}")
+        print(f"Error: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 # --- SIDEBAR NAVIGATION ---
