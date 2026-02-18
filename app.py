@@ -9,23 +9,6 @@ from python_calamine import CalamineWorkbook
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# 2. THE AUTHENTIC ADMINITY UI ENGINE
-Gue dapet poinnya. Masalahnya di Streamlit itu ada default padding sekitar 6rem di bagian atas sidebar yang bikin tulisan lo melorot ke bawah. Kita harus "tembak" pake CSS khusus buat ngehapus spasi itu sampai nol.
-
-Ini kode lengkapnya yang sudah gue sesuaikan. Silakan ganti seluruh bagian atas sampai menu routing pake ini:
-Python
-
-import pandas as pd
-import numpy as np
-import math
-import io
-import streamlit as st
-import plotly.express as px
-from python_calamine import CalamineWorkbook
-
-# 1. KONFIGURASI HALAMAN
-st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
-
 # 2. THE AUTHENTIC ADMINITY UI ENGINE (PENGATURAN SPASI ATAS & SIDEBAR)
 st.markdown("""
     <style>
