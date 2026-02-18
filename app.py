@@ -67,15 +67,17 @@ if menu == "📊 Dashboard Overview":
     }
 
     # 4. TAMPILAN YANG MENYESUAIKAN LAYAR
-    # rm=minimal + chrome=false buat ngebersihin UI Google
-    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false"
+    url_pilihan = dash_links[pilih_dash]
+    url_final = f"{url_pilihan}&rm=minimal&chrome=false"
 
-    # Pake height=80vh (80% dari tinggi layar user) biar pas & proporsional
-    st.components.v1.iframe(url_final, height=800, scrolling=True)
+    # --- BAGIAN YANG TADI ERROR (PASTIKAN LURUS) ---
+    if "pubhtml" in url_final:
+        # Tinggi 800 sudah proporsional untuk dashboard lo
+        st.components.v1.iframe(url_final, height=800, scrolling=True)
     else:
-        st.error("Link tidak valid. Pastikan link adalah link 'Publish to Web' dari Google Sheets.")
+        st.error("Waduh, link tidak valid! Pastikan link Publish to Web sudah benar.")
         
-    st.info(f"💡 Menampilkan: {pilih_dash}. Perubahan di Google Sheets akan update otomatis dalam beberapa detik.")
+    st.info(f"💡 Menampilkan: {pilih_dash}. Data akan terupdate otomatis dari Google Sheets.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
