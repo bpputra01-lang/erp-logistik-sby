@@ -60,7 +60,7 @@ with st.sidebar:
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
 
-# 4. LOGIKA MODUL (WAJIB PAKAI 'if' PERTAMA KALI)
+# 4. LOGIKA MODUL
 if menu == "📊 Dashboard Overview":
     st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
     
@@ -68,13 +68,15 @@ if menu == "📊 Dashboard Overview":
     with c1:
         pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE"])
     with c2:
-        zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
+        # Kita set default zoom lebih kecil (0.27 sesuai gambar lo) biar pas di mata
+        zoom = st.slider("ZOOM", 0.1, 1.0, 0.27)
 
+    # PERBAIKAN UTAMA: Tinggi container & iframe disesuaikan
     st.markdown(f'''
         <div class="dash-container">
-            <div style="overflow: auto; width: 100%; height: 600px; border-radius: 10px;">
+            <div style="overflow: auto; width: 100%; height: 500px; border-radius: 10px; background: #0b242d;">
                 <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true&rm=minimal" 
-                style="width: 4000px; height: 2500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
+                style="width: 3800px; height: 1800px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
             </div>
         </div>
     ''', unsafe_allow_html=True)
