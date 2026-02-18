@@ -180,7 +180,7 @@ with st.sidebar:
 
 # --- MENU PUTAWAY SYSTEM (UPDATED WITH 2 MACROS) ---
 if menu == "📥 Putaway System":
-    st.markdown('<div class="hero-header"><h1>📥 PUTAWAY SYSTEM PRO (MACRO LOGIC)</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📥 PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
