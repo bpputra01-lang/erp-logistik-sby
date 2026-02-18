@@ -50,27 +50,27 @@ if menu == "📊 Dashboard Overview":
                               ["WORKING REPORT", "PERSONAL PERFOMANCE", 
                                "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
 
-    # Mapping link GID (bisa lo dapet dari URL pas klik tab di GSheets)
-    # Ganti GID_XXXX pake angka gid yang ada di bar browser lo pas buka tab itu
+    # Mapping link GID (Link lo sudah gue bersihin dari typo 'h' di depan)
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
-        "PERSONAL PERFOMANCE": "hhttps://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
+        "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
         "CYCLE COUNT DAN KERAPIHAN": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    url_aktif = dash_links[pilih_dash]
-
-    # --- TAMPILAN FULL SCREEN ---
-    st.components.v1.iframe(url_aktif, height=900, scrolling=True)
+    # Ambil link berdasarkan dropdown
+    url_pilihan = dash_links[pilih_dash]
     
-    if "pubhtml" in link_publish_dashboard:
-        # Kita bungkus pake komponen IFrame biar dia nampil utuh
-        st.components.v1.iframe(link_publish_dashboard, height=800, scrolling=True)
+    # Tambahin parameter &rm=minimal biar gak ada menu bar Google (Full Screen Bersih)
+    url_final = f"{url_pilihan}&rm=minimal"
+
+    # --- TAMPILAN DASHBOARD ---
+    if "pubhtml" in url_final:
+        st.components.v1.iframe(url_final, height=900, scrolling=True)
     else:
-        st.warning("💡 Cara Mirroring Gampang: Di GSheets klik File > Share > Publish to Web. Pilih tab Dashboard, Copy linknya ke sini!")
+        st.error("Link tidak valid. Pastikan link adalah link 'Publish to Web' dari Google Sheets.")
         
-    st.info("Setiap perubahan di Google Sheets akan terupdate di sini dalam beberapa detik (Live Mirror).")
+    st.info(f"💡 Menampilkan: {pilih_dash}. Perubahan di Google Sheets akan update otomatis dalam beberapa detik.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
