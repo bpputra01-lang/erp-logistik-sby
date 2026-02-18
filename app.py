@@ -78,7 +78,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
         
         df_st_filtered = pd.DataFrame(st_result)
 
-        # --- SUB 3: CREATE REFILL SHEET (Logic VBA) ---
+     # --- SUB 3: CREATE REFILL SHEET (Logic VBA + Anti-LIVE) ---
         # SKU = Col C (Indeks 2), QTY = Col J (Indeks 9)
         dictGL3 = {}
         if not df_gl3.empty:
@@ -87,12 +87,11 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
                 qty = int(float(row[9])) if not pd.isna(row[9]) else 0
                 dictGL3[sku] = dictGL3.get(sku, 0) + qty
 
-        # SKU Target Refill
+        # SKU Target Refill (Qty < 3 di GL3 atau ga ada sama sekali)
         dictSKUs_Target = {}
         for sku, total_qty in dictGL3.items():
             if total_qty < 3: dictSKUs_Target[sku] = True
         
-        # SKU di GL4 tapi ga ada di GL3
         if not df_gl4.empty:
             for row in df_gl4.values:
                 sku_g4 = str(row[2]).strip()
@@ -105,6 +104,12 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
                 q_gl3_val = dictGL3.get(sku, 0)
                 sisaLoad = 12
                 for i in range(len(dataGL4)):
+                    # --- TAMBAHAN FILTER LIVE DISINI ---
+                    bin_sumber = str(dataGL4[i][1]).upper() if not pd.isna(dataGL4[i][1]) else ""
+                    if "LIVE" in bin_sumber: 
+                        continue # Kalo ada kata LIVE, skip bin ini, cari bin lain
+                    # ----------------------------------
+
                     if str(dataGL4[i][2]).strip() == sku:
                         q_g4 = int(float(dataGL4[i][9])) if not pd.isna(dataGL4[i][9]) else 0
                         if q_g4 > 0 and sisaLoad > 0:
