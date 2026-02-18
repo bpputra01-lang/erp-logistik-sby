@@ -38,7 +38,7 @@ if menu == "📊 Dashboard Overview":
             .stApp { margin-top: -80px; }
             .custom-wrapper {
                 width: 100vw;
-                height: 92vh; 
+                height: 95vh; 
                 overflow: hidden;
                 position: relative;
                 background: #0e1117;
@@ -58,7 +58,7 @@ if menu == "📊 Dashboard Overview":
         pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
     with c2:
         # Geser slider ini buat ngilangin space putih di kanan/kiri!
-        zoom_val = st.slider("ZOOM", 0.20, 0.80, 0.35, 0.01)
+        zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
 
     # 3. MAPPING LINK
     dash_links = {
@@ -71,22 +71,21 @@ if menu == "📊 Dashboard Overview":
     # 4. PROSES TAMPILAN
     url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
     
-    # Hitung lebar frame otomatis berdasarkan zoom agar space kosong hilang
-    width_perc = (1 / zoom_val) * 100
+    # RUMUS SAKTI: Frame akan melar secara proporsional sesuai zoom
+    # Biar space kosong di kanan ilang dan tinggi pas
+    calc_ratio = (1 / zoom_val) * 100
 
-    # Tampilkan Dashboard tanpa blok IF-ELSE yang bikin error
+    # Tampilkan Dashboard (Langsung tembak tanpa IF-ELSE biar anti-error)
     st.markdown(f"""
         <div class="custom-wrapper">
             <iframe src="{url_final}" 
-                    style="width: {width_perc}%; height: {width_perc}%; transform: scale({zoom_val});">
+                    style="width: {calc_ratio}%; height: {calc_ratio}%; transform: scale({zoom_val});">
             </iframe>
         </div>
     """, unsafe_allow_html=True)
-    else:
-        st.error("Link GSheets lo bermasalah, Bos!")
 
-    # Info ditaruh bawah tipis aja
-    st.caption(f"📍 View: {pilih_dash} | Auto-update aktif.")
+    # Info tipis di bawah
+    st.caption(f"📍 View: {pilih_dash} | Gunakan slider ZOOM untuk menyesuaikan lebar dan tinggi halaman.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
