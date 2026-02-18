@@ -11,150 +11,151 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # 2. CUSTOM CSS GLOBAL
 # GANTI BAGIAN CUSTOM CSS (NOMOR 2) DENGAN TEMPLATE INI:
 
+# --- 2. THE ULTIMATE ENTERPRISE TEMPLATE ---
 st.markdown("""
     <style>
-    /* 1. FONT & BASE */
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Outfit', sans-serif;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap');
 
-    /* 2. MAIN BACKGROUND */
+    /* Global Body */
     .stApp {
-        background-color: #F8FAFC !important; /* Putih Platinum (Nggak bikin silau) */
+        background: #fdfdfd;
+        font-family: 'Plus Jakarta Sans', sans-serif;
     }
 
-    /* 3. HERO HEADER (GELAP ELEGANT) */
+    /* Sidebar - Modern Dark Nav */
+    [data-testid="stSidebar"] {
+        background: #0f172a !important;
+        box-shadow: 5px 0 15px rgba(0,0,0,0.1);
+    }
+    [data-testid="stSidebarNav"] {
+        padding-top: 2rem;
+    }
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: #94a3b8 !important;
+        font-size: 14px;
+    }
+
+    /* Hero Header - Enterprise Style */
     .hero-header {
-        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-        color: #FFFFFF;
-        padding: 35px;
-        border-radius: 20px;
-        margin-bottom: 30px;
-        border-bottom: 5px solid #EAB308; /* Aksen Gold */
-        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border-radius: 24px;
+        padding: 40px;
+        margin-bottom: 35px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .hero-header::after {
+        content: "";
+        position: absolute;
+        top: -50%; right: -20%;
+        width: 300px; height: 300px;
+        background: rgba(59, 130, 246, 0.1);
+        border-radius: 50%;
+        filter: blur(50px);
+    }
+    .hero-header h1 {
+        font-weight: 800 !important;
+        color: white !important;
+        font-size: 2.5rem !important;
+        letter-spacing: -1px !important;
+        margin: 0 !important;
     }
 
-    /* 4. DARK METRIC BOXES */
+    /* Metric Box - Glass Card */
     .m-box { 
-        background: #1E293B !important; 
-        color: white !important;
-        padding: 25px !important; 
-        border-radius: 15px !important; 
+        background: #1e293b !important; 
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        padding: 30px !important; 
+        border-radius: 20px !important; 
         text-align: left !important; 
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2) !important;
-        border: 1px solid #334155 !important;
-        margin-bottom: 20px !important;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        position: relative;
+    }
+    .m-box:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        border-color: #3b82f6 !important;
     }
     .m-val { 
-        font-size: 38px !important; 
+        font-size: 42px !important; 
         font-weight: 800 !important; 
-        color: #FACC15 !important; /* Gold terang */
-        letter-spacing: -1px;
+        color: #3b82f6 !important; /* Neon Blue */
+        display: block !important;
+        text-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
     }
     .m-lbl { 
         font-size: 12px !important; 
-        color: #94A3B8 !important; 
+        color: #cbd5e1 !important; 
         text-transform: uppercase !important; 
-        font-weight: 600 !important; 
+        font-weight: 700 !important; 
         letter-spacing: 2px !important;
-        margin-bottom: 5px;
-        display: block;
+        opacity: 0.8;
     }
 
-    /* 5. DARK INPUT & DROPDOWN */
+    /* Input & Dropdown - Dark Chrome Look */
     div[data-baseweb="select"] > div, 
     div[data-baseweb="input"] > div,
-    div[data-baseweb="base-input"],
-    .stTextInput>div>div {
-        background-color: #0F172A !important; /* Super Dark */
-        color: #FFFFFF !important;
+    .stTextInput input {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
         border: 1px solid #334155 !important;
-        border-radius: 12px !important;
-        height: 48px !important;
+        border-radius: 14px !important;
+        padding: 12px !important;
+        transition: 0.3s;
     }
-    
-    /* Text Input Color Fix */
-    input {
-        color: #FFFFFF !important;
+    div[data-baseweb="select"]:focus-within, 
+    .stTextInput:focus-within {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2) !important;
     }
 
-    /* Dropdown Hover & List */
-    div[role="listbox"] {
-        background-color: #0F172A !important;
-        border: 1px solid #334155 !important;
-    }
-    div[role="option"] {
-        color: #FFFFFF !important;
-    }
-    div[role="option"]:hover {
-        background-color: #334155 !important;
-    }
-
-    /* 6. PREMIUM BUTTONS (FULL WIDTH & GOLD) */
+    /* Buttons - Glow Action */
     .stButton>button {
-        background: #0F172A !important;
-        color: #FACC15 !important;
-        border: 2px solid #FACC15 !important;
+        background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%) !important;
+        color: white !important;
+        border: none !important;
+        padding: 12px 28px !important;
+        border-radius: 14px !important;
         font-weight: 700 !important;
-        border-radius: 12px !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1px !important;
-        transition: 0.3s all ease;
-        padding: 10px 20px !important;
+        font-size: 16px !important;
+        width: 100%;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
     .stButton>button:hover {
-        background: #FACC15 !important;
-        color: #0F172A !important;
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(250, 204, 21, 0.4);
+        box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.5);
+        transform: scale(1.02);
     }
 
-    /* 7. MODERN TABS */
+    /* Tabs Customization */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 15px;
-        background-color: #E2E8F0;
+        gap: 10px;
+        background: #f1f5f9;
         padding: 8px;
-        border-radius: 15px;
+        border-radius: 16px;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: transparent;
-        border-radius: 10px;
-        color: #475569;
+        border-radius: 12px;
+        padding: 10px 20px;
         font-weight: 600;
-        border: none;
+        color: #64748b;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #0F172A !important;
-        color: #FACC15 !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        background-color: white !important;
+        color: #0f172a !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
 
-    /* 8. DATAFRAME CLEAN LOOK */
+    /* Dataframe Styling */
     [data-testid="stDataFrame"] {
-        background-color: white;
-        padding: 10px;
-        border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        border: 1px solid #E2E8F0;
-    }
-
-    /* 9. SIDEBAR CUSTOM */
-    [data-testid="stSidebar"] {
-        background-image: linear-gradient(180deg, #0F172A 0%, #1E293B 100%) !important;
-    }
-    [data-testid="stSidebarNav"] span {
-        color: white !important;
-        font-weight: 500;
-    }
-
-    /* 10. FILE UPLOADER */
-    [data-testid="stFileUploader"] {
-        background-color: #FFFFFF;
-        border: 2px dashed #CBD5E1;
-        border-radius: 15px;
-        padding: 10px;
+        background: white;
+        padding: 15px;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
     }
     </style>
     """, unsafe_allow_html=True)
