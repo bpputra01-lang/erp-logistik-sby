@@ -29,55 +29,62 @@ with st.sidebar:
     # Menu Utama
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
     
-# --- 3. SIDEBAR (DIPERBAIKI: LAPORAN JADI SUB-MENU PERSIS DI BAWAH DASHBOARD OVERVIEW) ---
+# --- 3. SIDEBAR (VERSI MENU & SUB-MENU COLLAPSIBLE) ---
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
     
-    st.markdown("<p style='color: #8ecad4; font-size: 0.8rem; font-weight: bold;'>MODUL UTAMA</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #8ecad4; font-size: 0.8rem; font-weight: bold;'>NAVIGASI</p>", unsafe_allow_html=True)
     
-    # 1. Menu Utama Pertama
-    menu_utama = st.radio("PILIH MODUL:", 
-                         ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"],
-                         label_visibility="collapsed")
-    
-    # 2. LOGIKA SUB-MENU: Muncul persis di bawah jika Dashboard Overview dipilih
-    if menu_utama == "📊 Dashboard Overview":
-        st.markdown("""
-            <div style='margin-left: 20px; margin-top: 10px;'>
-                <p style='color: #FFD700; font-size: 0.75rem; font-weight: bold; margin-bottom: 0px;'>📂 DAFTAR LAPORAN:</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Pake Radio lagi tapi dikasih identitas sub-menu
+    # MENU UTAMA 1: Pake Expander biar bisa di-klik & melar ke bawah
+    with st.sidebar.expander("📊 DASHBOARD OVERVIEW", expanded=True):
+        # SUB-MENU: Pake radio atau button di dalemnya
         pilih_dash = st.radio(
-            "Sub-Menu",
-            ["   ↳ WORKING REPORT", "   ↳ PERSONAL PERFOMANCE", 
-             "   ↳ CYCLE COUNT", "   ↳ MOVING STOCK"],
+            "Pilih Laporan:",
+            ["WORKING REPORT", "PERSONAL PERFOMANCE", 
+             "CYCLE COUNT", "MOVING STOCK"],
             label_visibility="collapsed"
         )
-        
-        # Bersihkan string untuk mapping URL nanti
-        pilih_dash_clean = pilih_dash.replace("   ↳ ", "")
-    else:
-        pilih_dash_clean = None
+        # Indikator biar sistem tau kita lagi di modul Dashboard
+        menu_utama = "📊 Dashboard Overview"
 
-# --- MODUL DASHBOARD OVERVIEW (PENYESUAIAN MAPPING) ---
+    st.divider()
+
+    # MENU UTAMA LAINNYA (Menu tunggal)
+    if st.sidebar.button("⛔ STOCK MINUS", use_container_width=True):
+        menu_utama = "⛔ Stock Minus"
+        st.rerun()
+        
+    if st.sidebar.button("📦 DATABASE ARTIKEL", use_container_width=True):
+        menu_utama = "📦 Database Artikel"
+        st.rerun()
+
+# --- PENYESUAIAN MODUL DASHBOARD ---
 if menu_utama == "📊 Dashboard Overview":
-    # MAPPING LINK (Sesuaikan key dengan nama sub-menu baru)
+    # MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
         "CYCLE COUNT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
         "MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
-
-    # Header & Iframe tetap sama kayak sebelumnya...
+    
+    # Header Biru Profesional (Biar gak kosong melompong)
     st.markdown(f"""
-        <div style="background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); padding: 20px; border-radius: 0 0 15px 15px; border-bottom: 3px solid #FFD700; margin-bottom: 20px;">
-            <h1 style="color: white; margin: 0; font-size: 20px;">📊 {pilih_dash_clean}</h1>
+        <div style="background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); 
+                    padding: 20px; border-radius: 0 0 15px 15px; 
+                    border-bottom: 3px solid #FFD700; margin-bottom: 20px;">
+            <h1 style="color: white; margin: 0; font-size: 22px;">📊 {pilih_dash}</h1>
         </div>
     """, unsafe_allow_html=True)
+    
+    # Eksekusi Iframe lo (pake zoom 0.35 kayak biasa)
+    url_final = f"{dash_links[pilih_dash]}&rm=minimal"
+    st.markdown(f'''
+        <div style="width: 100%; height: 80vh; overflow: auto; border: 1px solid #3b82f6; border-radius: 10px;">
+            <iframe src="{url_final}" style="width: 3500px; height: 2500px; transform: scale(0.35); transform-origin: 0 0; border: none;"></iframe>
+        </div>
+    ''', unsafe_allow_html=True)
     
     # (Sisa kode iframe lo yang tadi tinggal lanjutin di sini)
     
