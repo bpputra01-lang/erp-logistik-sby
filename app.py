@@ -29,12 +29,40 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    st.markdown("<h2 style='text-align: center; color: #1e3a47;'>LOGISTIC OPERATION DASHBOARD (LIVE MIRROR)</h2>", unsafe_allow_html=True)
-    
-    # 1. LINK PUBLISH SPREADSHEET (Bukan link edit biasa)
-    # Cara dapetnya: Di GSheets klik File -> Share -> Publish to Web -> Pilih Link (bukan Embed)
-    # Pastiin pilih sheet/tab "DASHBOARD" lo aja, jangan seluruh dokumen.
-    link_publish_dashboard = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml"
+    # --- SETUP LAYOUT FULL SCREEN ---
+    st.markdown("""
+        <style>
+            .main .block-container {
+                padding-top: 1rem;
+                padding-right: 1rem;
+                padding-left: 1rem;
+                padding-bottom: 1rem;
+                max-width: 100%;
+            }
+            iframe { border: none; border-radius: 10px; box-shadow: 0px 4px 15px rgba(0,0,0,0.3); }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<h2 style='text-align: center; color: #1e3a47;'>🚀 LOGISTIC REAL-TIME MONITORING</h2>", unsafe_allow_html=True)
+
+    # --- DROPDOWN NAVIGASI RAPI ---
+    pilih_dash = st.selectbox("PILIH VIEW DASHBOARD:", 
+                              ["WORKING REPORT", "PERSONAL PERFOMANCE", 
+                               "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
+
+    # Mapping link GID (bisa lo dapet dari URL pas klik tab di GSheets)
+    # Ganti GID_XXXX pake angka gid yang ada di bar browser lo pas buka tab itu
+    dash_links = {
+        "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
+        "PERSONAL PERFOMANCE": "hhttps://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
+        "CYCLE COUNT DAN KERAPIHAN": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
+        "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
+    }
+
+    url_aktif = dash_links[pilih_dash]
+
+    # --- TAMPILAN FULL SCREEN ---
+    st.components.v1.iframe(url_aktif, height=900, scrolling=True)
     
     if "pubhtml" in link_publish_dashboard:
         # Kita bungkus pake komponen IFrame biar dia nampil utuh
