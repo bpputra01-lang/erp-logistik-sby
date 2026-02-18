@@ -30,61 +30,47 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI
+    # 1. CSS SAKTI: Paksa Streamlit pake seluruh sisa layar
     st.markdown("""
         <style>
-            .main .block-container { padding: 0rem !important; max-width: 100% !important; }
+            /* Hilangkan padding default Streamlit agar mentok kiri-kanan */
+            .main .block-container { 
+                padding: 0rem !important; 
+                max-width: 100% !important; 
+            }
             header { visibility: hidden; }
-            .stApp { margin-top: -80px; }
-            .custom-wrapper {
-                width: 100vw; height: 92vh; 
-                overflow: hidden; position: relative; background: #0e1117;
+            .stApp { margin-top: -75px; } /* Tarik ke atas biar gak ada space kosong di atas */
+            
+            /* Container Dashboard: Tinggi otomatis mengikuti layar (95% height) */
+            .dashboard-container {
+                width: 100vw;
+                height: 95vh; 
+                overflow: hidden;
+                position: relative;
+                background: #0e1117;
             }
-            .custom-wrapper iframe {
-                position: absolute; top: 0; left: 0; border: none; transform-origin: 0 0;
-            }
-            /* Styling Tombol Download Merah */
-            .btn-export {
-                display: inline-block;
-                width: 100%;
-                background-color: #ff4b4b;
-                color: white !important;
-                padding: 10px;
-                text-align: center;
-                text-decoration: none;
-                font-weight: bold;
-                border-radius: 5px;
+            .dashboard-container iframe {
+                position: absolute;
+                top: 0; 
+                left: 0;
+                border: none;
+                transform-origin: 0 0;
             }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL
-    c1, c2, c3 = st.columns([2, 1, 1])
+    # 2. PANEL KONTROL (Hanya Dropdown & Zoom Slider)
+    c1, c2 = st.columns([3, 1])
     with c1:
-        pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
+        pilih_dash = st.selectbox("", 
+                                ["WORKING REPORT", "PERSONAL PERFOMANCE", 
+                                 "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], 
+                                label_visibility="collapsed")
     with c2:
-        zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
-    with c3:
-        # MAP GID UNTUK EXPORT
-        gid_map = {
-            "WORKING REPORT": "864743695",
-            "PERSONAL PERFOMANCE": "251294539",
-            "CYCLE COUNT DAN KERAPIHAN": "1743896821",
-            "DASHBOARD MOVING STOCK": "1671817510"
-        }
-        
-        # ID Google Sheets lo (diambil dari link)
-        sheet_id = "1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_"
-        gid_now = gid_map[pilih_dash]
-        
-        # URL EXPORT KHUSUS (Buka Tab Baru Langsung Menu Print Google)
-        # Setting: A4, Landscape, No Gridlines, Fit to Width
-        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/print?gid={gid_now}&fzr=true&portrait=false&size=A4&gridlines=false&attachment=false"
+        # Slider Zoom buat ngepasin grafik yang kepotong
+        zoom_val = st.slider("PASIN TAMPILAN (ZOOM)", 0.20, 1.0, 0.33, 0.01)
 
-        # Tampilkan Tombol Download
-        st.markdown(f'<a href="{export_url}" target="_blank" class="btn-export">📥 EXPORT PDF</a>', unsafe_allow_html=True)
-
-    # 3. MAPPING LINK TAMPILAN
+    # 3. MAPPING LINK (Gue lurusin biar gak ada SyntaxError)
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -92,19 +78,22 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. TAMPILAN DASHBOARD
+    # 4. EKSEKUSI TAMPILAN
     url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
-    calc_ratio = (1 / zoom_val) * 100
+    
+    # RUMUS DINAMIS: Supaya lebar & tinggi melar proporsional sesuai zoom lo
+    calc_scale = (1 / zoom_val) * 100
 
     st.markdown(f"""
-        <div class="custom-wrapper">
+        <div class="dashboard-container">
             <iframe src="{url_final}" 
-                    style="width: {calc_ratio}%; height: {calc_ratio}%; transform: scale({zoom_val});">
+                    style="width: {calc_scale}%; height: {calc_scale}%; transform: scale({zoom_val});">
             </iframe>
         </div>
     """, unsafe_allow_html=True)
 
-    st.caption(f"📍 View: {pilih_dash} | Klik 'EXPORT PDF' untuk cetak laporan via Google Print.")
+    # Info tipis di bawah buat monitoring
+    st.caption(f"📍 Mode View: {pilih_dash} | Atur slider jika ada bagian yang kepotong.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
