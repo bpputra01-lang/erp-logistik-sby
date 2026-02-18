@@ -6,13 +6,9 @@ import plotly.express as px
 from python_calamine import CalamineWorkbook
 
 # 1. KONFIGURASI HALAMAN
-st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
-
-# 2. CUSTOM CSS GLOBAL
-# 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# 2. THE AUTHENTIC ADMINITY UI ENGINE (HANYA SIDEBAR & VISUAL)
+# 2. THE AUTHENTIC ADMINITY UI ENGINE
 st.markdown("""
     <style>
     /* Background Page */
@@ -52,17 +48,17 @@ st.markdown("""
         margin-bottom: 25px;
     }
 
-    /* Adminity Metric Cards */
-    .m-card {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 5px solid #3a7bd5;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-        text-align: left;
+    /* Adminity Metric Cards / Boxes */
+    .m-box {
+        background: #1e1e2f;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 5px solid #ffce00;
+        margin-bottom: 10px;
+        text-align: center;
     }
-    .m-label { color: #6c757d; font-size: 12px; font-weight: 700; text-transform: uppercase; }
-    .m-value { color: #2d3436; font-size: 24px; font-weight: 800; display: block; }
+    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
+    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
 
     /* Custom Radio Button Styling (Adminity Style) */
     div.row-widget.stRadio > div {
@@ -80,91 +76,53 @@ st.markdown("""
         background: rgba(255,255,255,0.05);
         color: white !important;
     }
+    /* Hide the radio circle */
+    [data-testid="stWidgetLabel"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNGSI LOGIKA PUTAWAY SYSTEM ---
+# --- FUNGSI LOGIKA (TETAP SAMA) ---
 def process_putaway_system(df_putaway, df_asal_bin):
     working_bin = df_asal_bin.copy()
-    results_compare = []
-    results_putaway_list = []
-    results_kurang_setup = []
-
+    results_compare, results_putaway_list, results_kurang_setup = [], [], []
     for _, row_ds in df_putaway.iterrows():
-        bin_tujuan_ds = str(row_ds.iloc[0]).strip()
-        sku_ds = str(row_ds.iloc[1]).strip()
-        qty_needed = int(row_ds.iloc[2])
+        bin_tujuan_ds, sku_ds, qty_needed = str(row_ds.iloc[0]).strip(), str(row_ds.iloc[1]).strip(), int(row_ds.iloc[2])
         diff_qty = qty_needed
-        
         while diff_qty > 0:
-            allocated = False
-            bin_ketemu = ""
-            qty_found_in_bin = 0
-
+            allocated = False; bin_ketemu = ""; qty_found_in_bin = 0
             def try_allocate(prio_type):
                 nonlocal diff_qty, allocated, bin_ketemu, qty_found_in_bin
                 for idx, row_bin in working_bin.iterrows():
-                    b_code = str(row_bin.iloc[1]).strip().upper() 
-                    s_code = str(row_bin.iloc[2]).strip()         
-                    q_avail = int(row_bin.iloc[9])                
-                    
+                    b_code, s_code, q_avail = str(row_bin.iloc[1]).strip().upper(), str(row_bin.iloc[2]).strip(), int(row_bin.iloc[9])
                     if s_code == sku_ds and q_avail > 0:
                         is_match = False
-                        if prio_type == 1: 
-                            if "STAGGING LT.3" in b_code or "STAGING LT.3" in b_code: is_match = True
-                        elif prio_type == 2: 
-                            if ("STAGGING" in b_code or "STAGING" in b_code or "KARANTINA" in b_code) and "LT.3" not in b_code: is_match = True
-                        elif prio_type == 3: 
-                            if "STAGGING" not in b_code and "STAGING" not in b_code and "KARANTINA" not in b_code: is_match = True
-                        
+                        if prio_type == 1: is_match = "STAGGING LT.3" in b_code or "STAGING LT.3" in b_code
+                        elif prio_type == 2: is_match = ("STAGGING" in b_code or "STAGING" in b_code or "KARANTINA" in b_code) and "LT.3" not in b_code
+                        elif prio_type == 3: is_match = "STAGGING" not in b_code and "STAGING" not in b_code and "KARANTINA" not in b_code
                         if is_match:
-                            take = min(q_avail, diff_qty)
-                            working_bin.iat[idx, 9] = q_avail - take 
-                            qty_found_in_bin = take
-                            bin_ketemu = b_code
-                            allocated = True
-                            return True
+                            take = min(q_avail, diff_qty); working_bin.iat[idx, 9] = q_avail - take
+                            qty_found_in_bin, bin_ketemu, allocated = take, b_code, True; return True
                 return False
-
             if not try_allocate(1):
-                if not try_allocate(2):
-                    try_allocate(3)
-
+                if not try_allocate(2): try_allocate(3)
             if allocated:
                 note = "FULLY SETUP" if (diff_qty - qty_found_in_bin) == 0 else "PARTIAL SETUP"
-                results_compare.append({
-                    "BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_needed,
-                    "BIN DITEMUKAN": bin_ketemu, "QTY BIN SYSTEM": qty_found_in_bin,
-                    "DIFF": diff_qty - qty_found_in_bin, "NOTE": note
-                })
-                results_putaway_list.append({
-                    "BIN AWAL": bin_ketemu, "BIN TUJUAN": bin_tujuan_ds,
-                    "SKU": sku_ds, "QUANTITY": qty_found_in_bin, "NOTES": "PUTAWAY"
-                })
+                results_compare.append({"BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_needed, "BIN DITEMUKAN": bin_ketemu, "QTY BIN SYSTEM": qty_found_in_bin, "DIFF": diff_qty - qty_found_in_bin, "NOTE": note})
+                results_putaway_list.append({"BIN AWAL": bin_ketemu, "BIN TUJUAN": bin_tujuan_ds, "SKU": sku_ds, "QUANTITY": qty_found_in_bin, "NOTES": "PUTAWAY"})
                 diff_qty -= qty_found_in_bin
             else:
-                results_compare.append({
-                    "BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_needed,
-                    "BIN DITEMUKAN": "(NO BIN)", "QTY BIN SYSTEM": 0,
-                    "DIFF": diff_qty, "NOTE": "PERLU CARI STOCK MANUAL"
-                })
-                results_kurang_setup.append({"BIN": bin_tujuan_ds, "SKU": sku_ds, "QTY": diff_qty})
-                break
-
+                results_compare.append({"BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_needed, "BIN DITEMUKAN": "(NO BIN)", "QTY BIN SYSTEM": 0, "DIFF": diff_qty, "NOTE": "PERLU CARI STOCK MANUAL"})
+                results_kurang_setup.append({"BIN": bin_tujuan_ds, "SKU": sku_ds, "QTY": diff_qty}); break
     df_comp_final = pd.DataFrame(results_compare)
     df_sum = df_comp_final[df_comp_final['NOTE'].str.contains("SETUP", na=False)].copy()
     if not df_sum.empty:
-        df_sum = df_sum[['BIN DITEMUKAN', 'BIN ASAL', 'SKU', 'QTY BIN SYSTEM']]
-        df_sum.columns = ['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QTY PUTAWAY']
+        df_sum = df_sum[['BIN DITEMUKAN', 'BIN ASAL', 'SKU', 'QTY BIN SYSTEM']]; df_sum.columns = ['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QTY PUTAWAY']
         df_sum['SISA BIN AWAL'] = df_sum.apply(lambda r: working_bin[(working_bin.iloc[:, 1].str.upper() == r['BIN AWAL']) & (working_bin.iloc[:, 2] == r['SKU'])].iloc[:, 9].sum(), axis=1)
-
     mask_lt3 = (working_bin.iloc[:, 9] != 0) & (working_bin.iloc[:, 1].str.contains("STAGGING LT.3", case=False, na=False))
     df_lt3 = working_bin[mask_lt3].iloc[:, [1, 2, 4, 3, 6, 5, 9]].copy() if any(mask_lt3) else pd.DataFrame()
     if not df_lt3.empty: df_lt3.columns = ["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"]
-
     return df_comp_final, pd.DataFrame(results_putaway_list), pd.DataFrame(results_kurang_setup), df_sum, df_lt3, working_bin
 
-# --- FUNGSI LOGIKA SCAN OUT ---
 def process_scan_out(df_scan, df_history, df_stock):
     df_scan.columns = [str(c).strip().upper() for c in df_scan.columns]
     df_scan['BIN_CLEAN'] = df_scan.iloc[:, 0].astype(str).str.strip()
@@ -197,29 +155,37 @@ def process_scan_out(df_scan, df_history, df_stock):
         results.append({"BIN": bin_scan, "SKU": sku, "QTY": qty, "Keterangan": keterangan, "Total Qty Setup/Terjual": total_qty_setup_terjual, "Bin After Set Up": bin_after_setup, "Invoice": invoice})
     return pd.DataFrame(results), pd.DataFrame(draft_setup)
 
-# --- SIDEBAR ---
-# --- SIDEBAR NAVIGASI ADMINITY (INI YANG DIUBAH) ---
+# --- SIDEBAR NAVIGATION (FIXED NameError) ---
 with st.sidebar:
     st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-bottom: 20px;'>🚀 ERP ADMINITY</h2>", unsafe_allow_html=True)
     
-    # Kategori 1: MAIN
+    # Gabungkan semua menu ke satu variabel 'menu' agar logic IF di bawah tidak error
     st.markdown('<p class="nav-header">MAIN DASHBOARD</p>', unsafe_allow_html=True)
-    main_menu = st.radio("Main", ["📊 Overview", "📓 Database Master"], label_visibility="collapsed")
+    m1 = ["📊 Dashboard Overview", "📓 Database Master"]
     
-    # Kategori 2: INVENTORY
     st.markdown('<p class="nav-header">INVENTORY TOOLS</p>', unsafe_allow_html=True)
-    inv_tool = st.radio("Inventory", ["📥 Putaway System", "📤 Scan Out Validasi", "⛔ Stock Minus"], label_visibility="collapsed")
+    m2 = ["📥 Putaway System", "📤 Scan Out Validasi", "⛔ Stock Minus"]
+    
+    # Render semua pilihan dalam satu radio
+    menu = st.radio("Navigation", m1 + m2, label_visibility="collapsed")
     
     st.divider()
     st.caption("Adminity v2.4 | Surabaya Branch")
 
-# --- MENU LOGIC ---
-if menu == "📥 Putaway System":
+# --- MENU ROUTING ---
+if menu == "📊 Dashboard Overview":
+    st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
+    c1, c2 = st.columns([3, 1])
+    with c1: pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
+    with c2: zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
+    dash_links = {"WORKING REPORT": "864743695", "PERSONAL PERFORMANCE": "251294539", "CYCLE COUNT DAN KERAPIHAN": "1743896821", "DASHBOARD MOVING STOCK": "1671817510"}
+    st.markdown(f'''<div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"><div style="width: 100%; height: 600px; overflow: auto;"><iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links[pilih]}&single=true&rm=minimal" style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe></div></div>''', unsafe_allow_html=True)
+
+elif menu == "📥 Putaway System":
     st.markdown('<div class="hero-header"><h1>📥 PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
-    
     if up_ds and up_asal:
         if st.button("⚡ JALANKAN PROSES PUTAWAY"):
             try:
@@ -235,21 +201,13 @@ if menu == "📥 Putaway System":
                 with t5: st.dataframe(df_lt3, use_container_width=True)
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_comp.to_excel(writer, sheet_name='COMPARE PUTAWAY', index=False); df_plist.to_excel(writer, sheet_name='PUTAWAY LIST', index=False)
-                    df_kurang.to_excel(writer, sheet_name='REKAP KURANG SETUP', index=False); df_sum.to_excel(writer, sheet_name='SUMMARY PUTAWAY', index=False)
-                    df_lt3.to_excel(writer, sheet_name='STAGGING LT.3 OUTSTANDING', index=False); df_updated_bin.to_excel(writer, sheet_name='UPDATED ASAL BIN', index=False)
-                st.download_button("📥 DOWNLOAD LAPORAN PUTAWAY", data=output.getvalue(), file_name="REPORT_PUTAWAY_SYSTEM.xlsx")
-            except Exception as e: st.error(f"Gagal memproses: {e}")
+                    df_comp.to_excel(writer, sheet_name='COMPARE', index=False); df_plist.to_excel(writer, sheet_name='LIST', index=False)
+                    df_kurang.to_excel(writer, sheet_name='KURANG', index=False); df_sum.to_excel(writer, sheet_name='SUMMARY', index=False)
+                    df_updated_bin.to_excel(writer, sheet_name='UPDATED_BIN', index=False)
+                st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REPORT_PUTAWAY.xlsx")
+            except Exception as e: st.error(f"Gagal: {e}")
 
-elif menu == "📊 Dashboard Overview":
-    st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([3, 1])
-    with c1: pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
-    with c2: zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
-    dash_links = {"WORKING REPORT": "864743695", "PERSONAL PERFORMANCE": "251294539", "CYCLE COUNT DAN KERAPIHAN": "1743896821", "DASHBOARD MOVING STOCK": "1671817510"}
-    st.markdown(f'''<div class="dash-container"><div style="width: 100%; height: 500px; overflow: auto;"><iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links[pilih]}&single=true&rm=minimal" style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe></div></div>''', unsafe_allow_html=True)
-
-elif menu == "📤 Scan Out":
+elif menu == "📤 Scan Out Validasi":
     st.markdown('<div class="hero-header"><h1>📤 SCAN OUT & VALIDASI</h1></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     with col1: up_scan = st.file_uploader("Upload DATA SCAN", type=['xlsx', 'csv'])
@@ -267,27 +225,26 @@ elif menu == "📤 Scan Out":
                 st.subheader("📝 DRAFT SET UP"); st.dataframe(df_draft, use_container_width=True)
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_res.to_excel(writer, sheet_name='DATA SCAN', index=False); df_draft.to_excel(writer, sheet_name='DRAFT SET UP', index=False)
-                st.download_button("📥 DOWNLOAD HASIL SCAN OUT", data=output.getvalue(), file_name="HASIL_SCAN_OUT.xlsx")
+                    df_res.to_excel(writer, sheet_name='DATA SCAN', index=False); df_draft.to_excel(writer, sheet_name='DRAFT', index=False)
+                st.download_button("📥 DOWNLOAD SCAN OUT", data=output.getvalue(), file_name="SCAN_OUT_RESULT.xlsx")
             except Exception as e: st.error(f"Error: {e}")
 
-elif menu == "📝 Dashboard Database":
-    st.title("📓 Check Detail Dashboard")
-    raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", placeholder="https://docs.google.com/spreadsheets/d/...")
+elif menu == "📓 Database Master":
+    st.markdown('<div class="hero-header"><h1>📓 DATABASE MASTER CHECKER</h1></div>', unsafe_allow_html=True)
+    raw_url = st.text_input("LINK GOOGLE SPREADSHEET:", placeholder="https://docs.google.com/spreadsheets/d/...")
     if raw_url and "/d/" in raw_url:
         try:
             file_id = raw_url.split("/d/")[1].split("/")[0]
             xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
             all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
-            selected_sheet = st.selectbox("PILIH TAB / SHEET:", list(all_sheets.keys()))
+            selected_sheet = st.selectbox("PILIH TAB:", list(all_sheets.keys()))
             if selected_sheet:
                 df_master = pd.read_excel(xlsx_url, sheet_name=selected_sheet, engine='calamine')
-                st.markdown(f"### 📊 Summary: {selected_sheet}")
                 c1, c2, c3, c4 = st.columns(4)
-                with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-                with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-                with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
-                with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">ENGINE</span><span class="m-val">CALAMINE</span></div>', unsafe_allow_html=True)
+                with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+                with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+                with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">LIVE</span></div>', unsafe_allow_html=True)
+                with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">ENGINE</span><span class="m-val">PRO</span></div>', unsafe_allow_html=True)
                 st.dataframe(df_master, use_container_width=True, height=500)
         except Exception as e: st.error(f"Error: {e}")
 
@@ -296,22 +253,18 @@ elif menu == "⛔ Stock Minus":
     uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
     if uploaded_file:
         try:
-            # GANTI LOGIK PEMBACAAN AGAR TIDAK ERROR "CANNOT DETECT FORMAT"
             if uploaded_file.name.endswith('.csv'): df = pd.read_csv(uploaded_file)
             else:
                 try: df = pd.read_excel(uploaded_file, engine="calamine")
                 except: df = pd.read_excel(uploaded_file)
-                
             col_sku, col_bin = 'SKU', 'BIN'
             col_qty = next((c for c in df.columns if 'QTY SYS' in str(c).upper()), 'QTY SYSTEM')
-            
             if st.button("🔃 PROSES DATA"):
-                with st.spinner('Sedang memproses...'):
+                with st.spinner('Memproses...'):
                     df_minus_awal = df[df[col_qty] < 0].copy()
                     qty_arr = pd.to_numeric(df[col_qty], errors='coerce').fillna(0).values
                     sku_arr, bin_arr = df[col_sku].astype(str).values, df[col_bin].astype(str).values
                     prior_bins = ["RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC", "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3", "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"]
-                    
                     pos_map = {}
                     for i, q in enumerate(qty_arr):
                         if q > 0:
@@ -320,7 +273,6 @@ elif menu == "⛔ Stock Minus":
                             b = bin_arr[i].upper()
                             if b not in pos_map[s]: pos_map[s][b] = []
                             pos_map[s][b].append(i)
-                    
                     set_up_results = []
                     minus_indices = np.where(qty_arr < 0)[0]
                     for idx in minus_indices:
@@ -356,12 +308,11 @@ elif menu == "⛔ Stock Minus":
                                     set_up_results.append({"BIN AWAL": bin_arr[found_idx], "BIN TUJUAN": bin_arr[idx], "SKU": sku_target, "QUANTITY": take, "NOTES": "STOCK MINUS"})
                                     qty_needed -= take
                                 else: break
-                    
                     df_final = df.copy(); df_final[col_qty] = qty_arr; df_need_adj = df_final[df_final[col_qty] < 0].copy()
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df_minus_awal.to_excel(writer, sheet_name='STOCK MINUS AWAL', index=False)
-                        if set_up_results: pd.DataFrame(set_up_results).to_excel(writer, sheet_name='SET UP STOCK MINUS', index=False)
-                        if not df_need_adj.empty: df_need_adj.to_excel(writer, sheet_name='NEED JUSTIFIKASI', index=False)
-                    st.success(f"✅ Done! {len(set_up_results)} item direlokasi."); st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
+                        df_minus_awal.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
+                        if set_up_results: pd.DataFrame(set_up_results).to_excel(writer, sheet_name='SET_UP', index=False)
+                        if not df_need_adj.empty: df_need_adj.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
+                    st.success("✅ Berhasil diproses!"); st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="HASIL_STOCK_MINUS.xlsx")
         except Exception as e: st.error(f"Error: {e}")
