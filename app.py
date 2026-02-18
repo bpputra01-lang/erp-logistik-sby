@@ -11,46 +11,63 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
-    /* 1. BODY TETAP PUTIH */
-    .stApp { background-color: #ffffff; }
+    /* 1. BACKGROUND UTAMA TETAP PUTIH */
+    .stApp { background-color: #ffffff; color: #31333f; }
     
-    /* 2. SIDEBAR TULISAN PUTIH */
+    /* 2. SIDEBAR (Tulisan Putih Bersih di atas BG Gelap) */
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    [data-testid="stSidebar"] * { color: white !important; }
+    /* Memaksa semua teks di sidebar jadi putih */
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] span { 
+        color: white !important; 
+        font-weight: 500; 
+    }
 
-    /* 3. KOTAK SUMMARY (DEEP NAVY SOLID) */
+    /* 3. ELEMEN INPUT (DARK THEME) - DROPDOWN & SEARCH BAR */
+    /* Kotak Dropdown & Input */
+    div[data-baseweb="select"] > div, 
+    div[data-testid="stTextInput"] input {
+        background-color: #1e1e2f !important; /* Warna Gelap */
+        color: #ffffff !important; /* Tulisan Putih */
+        border: 1px solid #3b82f6 !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Icon dropdown dan teks pilihan */
+    div[data-baseweb="select"] svg { fill: white !important; }
+    div[data-baseweb="select"] span { color: white !important; }
+
+    /* 4. TABEL / DATAFRAME (DARK MODE) */
+    [data-testid="stDataFrame"] {
+        background-color: #1e1e2f !important;
+        border: 1px solid #3b82f6 !important;
+        border-radius: 10px !important;
+        padding: 5px;
+    }
+
+    /* 5. SUMMARY BOX (Warna Cerah Elegan di Latar Putih) */
     .m-box { 
-        background-color: #1e1e2f !important; /* Warna Biru Navy Solid */
-        border: 2px solid #3b82f6; 
-        border-left: 8px solid #FFD700 !important; /* Aksen Emas Tebal */
-        padding: 20px; 
-        border-radius: 12px; 
+        background: #ffffff; 
+        border: 1px solid #e0e0e0;
+        border-left: 5px solid #1e3a8a; 
+        padding: 15px; 
+        border-radius: 10px; 
         text-align: center; 
-        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 10px;
     }
-    .m-val { 
-        font-size: 28px; font-weight: 800; 
-        color: #FFD700 !important; /* Angka Emas */
-        display: block; 
-    }
-    .m-lbl { 
-        font-size: 13px; font-weight: 700;
-        color: #ffffff !important; /* Label Putih */
-        text-transform: uppercase; 
-    }
+    .m-val { font-size: 22px; font-weight: 800; color: #1e3a8a; display: block; }
+    .m-lbl { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
 
-    /* 4. DROPDOWN & SEARCH (DARK MODE) */
-    div[data-baseweb="select"] > div, div[data-testid="stTextInput"] input {
-        background-color: #1e1e2f !important;
-        color: white !important;
-        border: 1px solid #3b82f6 !important;
-    }
-    div[data-baseweb="select"] * { color: white !important; }
-
-    /* 5. TABEL DARK */
-    [data-testid="stDataFrame"] { background-color: #1e1e2f !important; border-radius: 10px; }
-    </style>
+    /* 6. HERO HEADER */
+    .hero-header {
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white; padding: 1.5rem 2rem;
+        border-bottom: 4px solid #FFD700;
+        border-radius: 10px;
+        margin-bottom: 15px;
+    } </style>
     """, unsafe_allow_html=True)
 # --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
 with st.sidebar:
