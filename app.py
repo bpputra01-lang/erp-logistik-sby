@@ -30,10 +30,10 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS ULTRA-PRESS: Buang spasi kosong & paksa dashboard mentok kanan-kiri
+    # 1. CSS ULTRA-STRETCH: Hilangkan space kosong kiri-kanan & Press maksimal
     st.markdown("""
         <style>
-            /* Buang semua padding bawaan Streamlit agar mentok */
+            /* 1. Paksa container Streamlit mentok ke pinggir layar */
             .main .block-container {
                 padding: 0rem !important;
                 max-width: 100% !important;
@@ -41,20 +41,20 @@ if menu == "📊 Dashboard Overview":
             header { visibility: hidden; }
             .stApp { margin-top: -85px; } 
             
-            /* Container utama yang presisi */
-            .ultra-press-wrapper {
-                width: 100%;
+            /* 2. Container yang menampung frame */
+            .extreme-press-wrapper {
+                width: 100vw; /* Paksa lebar sesuai lebar jendela browser */
                 height: 98vh; 
-                overflow: hidden; /* Anti geser-geser */
+                overflow: hidden;
                 position: relative;
-                background: #0e1117;
+                background: #0e1117; /* Warna gelap biar nyatu sama dashboard lo */
             }
             
-            /* RAHASIA: Zoom 38% & Lebar 263% biar space kosong hilang */
-            .ultra-press-wrapper iframe {
-                width: 263.2%; /* Kompensasi agar mentok kanan-kiri pas di-zoom */
-                height: 263.2%;
-                transform: scale(0.38); /* KECILIN LAGI BIAR SEMUA GRAFIK MASUK */
+            /* 3. TEKNIK STRETCH: Zoom 31% & Lebar 322% agar space kosong hilang */
+            .extreme-press-wrapper iframe {
+                width: 322.5%; /* Menghilangkan space kosong di kiri-kanan */
+                height: 322.5%;
+                transform: scale(0.31); /* PERKECIL LAGI BIAR SEMUA MASUK SATU LAYAR */
                 transform-origin: 0 0;
                 border: none;
                 position: absolute;
@@ -78,14 +78,13 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # Hilangkan tab bawah agar area makin luas
     url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
 
-    # 4. TAMPILIN (Pastikan blok IF lurus agar tidak SyntaxError)
+    # 4. TAMPILIN (Pastikan blok IF sejajar)
     if "pubhtml" in url_final:
-        st.markdown(f'<div class="ultra-press-wrapper"><iframe src="{url_final}"></iframe></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="extreme-press-wrapper"><iframe src="{url_final}"></iframe></div>', unsafe_allow_html=True)
     else:
-        st.error("Link Gak Valid!")
+        st.error("Link GSheets lo bermasalah, Bos!")
 
     # Info ditaruh bawah tipis aja
     st.caption(f"📍 View: {pilih_dash} | Auto-update aktif.")
