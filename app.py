@@ -30,31 +30,31 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS ULTIMATE: Press dashboard biar muat satu layar tanpa sisa space
+    # 1. CSS ULTRA-PRESS: Buang spasi kosong & paksa dashboard mentok kanan-kiri
     st.markdown("""
         <style>
-            /* Buang semua margin putih di pinggir ERP */
+            /* Buang semua padding bawaan Streamlit agar mentok */
             .main .block-container {
                 padding: 0rem !important;
                 max-width: 100% !important;
             }
             header { visibility: hidden; }
-            .stApp { margin-top: -85px; } /* Tarik lebih ke atas */
+            .stApp { margin-top: -85px; } 
             
-            /* Container Dashboard */
-            .iframe-press-container {
+            /* Container utama yang presisi */
+            .ultra-press-wrapper {
                 width: 100%;
-                height: 98vh; /* Hampir satu layar penuh */
-                overflow: hidden; /* Anti geser-geser jancok */
+                height: 98vh; 
+                overflow: hidden; /* Anti geser-geser */
                 position: relative;
                 background: #0e1117;
             }
             
-            /* TEKNIK PRESS TOTAL: Zoom out ke 48% agar semua grafik muat */
-            .iframe-press-container iframe {
-                width: 208.4%; /* Kompensasi lebar agar mentok kanan-kiri */
-                height: 208.4%;
-                transform: scale(0.48); /* KECILIN LAGI BIAR GAK KEPOTONG */
+            /* RAHASIA: Zoom 38% & Lebar 263% biar space kosong hilang */
+            .ultra-press-wrapper iframe {
+                width: 263.2%; /* Kompensasi agar mentok kanan-kiri pas di-zoom */
+                height: 263.2%;
+                transform: scale(0.38); /* KECILIN LAGI BIAR SEMUA GRAFIK MASUK */
                 transform-origin: 0 0;
                 border: none;
                 position: absolute;
@@ -78,12 +78,12 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # Tambahin parameter biar bersih (Tab bawah ilang)
+    # Hilangkan tab bawah agar area makin luas
     url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
 
-    # 4. TAMPILIN (Lurus & Gak Error)
+    # 4. TAMPILIN (Pastikan blok IF lurus agar tidak SyntaxError)
     if "pubhtml" in url_final:
-        st.markdown(f'<div class="iframe-press-container"><iframe src="{url_final}"></iframe></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ultra-press-wrapper"><iframe src="{url_final}"></iframe></div>', unsafe_allow_html=True)
     else:
         st.error("Link Gak Valid!")
 
