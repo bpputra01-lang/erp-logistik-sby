@@ -27,38 +27,33 @@ with st.sidebar:
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
 
-# --- MODUL DASHBOARD OVERVIEW ---
+
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS biar area kerja Streamlit benar-benar mepet tapi tetap proporsional
+    # 1. CSS SAKTI: Menghapus semua margin, padding, dan elemen Streamlit
     st.markdown("""
         <style>
+            /* Menghapus padding container utama agar mentok ke pinggir */
             .main .block-container {
-                padding-top: 0.5rem !important;
-                padding-bottom: 0rem !important;
-                padding-right: 0.5rem !important;
-                padding-left: 0.5rem !important;
+                padding: 0rem !important;
                 max-width: 100% !important;
             }
-            iframe {
-                border: 1px solid #e6e9ef;
-                border-radius: 8px;
-            }
+            /* Menghilangkan header hitam Streamlit di atas */
             header {visibility: hidden;}
+            /* Menghilangkan spasi putih di paling atas halaman */
+            .stApp { margin-top: -60px; }
+            /* Memastikan iframe tidak punya border dan memenuhi lebar */
+            iframe { border: none; width: 100vw; height: 95vh; }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. DROPDOWN (Pake kolom biar gak makan tempat ke bawah)
-    col_tittle, col_select = st.columns([2, 1])
-    with col_tittle:
-        st.markdown(f"### 📈 {pilih_dash if 'pilih_dash' in locals() else 'WORKING REPORT'}")
-    with col_select:
-        pilih_dash = st.selectbox("", 
+    # 2. DROPDOWN (Dibuat minimalis di atas)
+    pilih_dash = st.selectbox("PILIH VIEW DASHBOARD:", 
                               ["WORKING REPORT", "PERSONAL PERFOMANCE", 
                                "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
                               label_visibility="collapsed")
 
-    # 3. MAPPING LINK
+    # 3. MAPPING LINK (Gue lurusin biar gak SyntaxError)
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -66,16 +61,17 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. TAMPILAN YANG MENYESUAIKAN LAYAR
+    # 4. PROSES TAMPILAN (Lurus & Gak Error)
     url_pilihan = dash_links[pilih_dash]
-    url_final = f"{url_pilihan}&rm=minimal&chrome=false"
+    
+    # RAHASIA: &rm=minimal &chrome=false &widget=false untuk buang tab bawah
+    url_final = f"{url_pilihan}&rm=minimal&chrome=false&widget=false"
 
-    # --- BAGIAN YANG TADI ERROR (PASTIKAN LURUS) ---
     if "pubhtml" in url_final:
-        # Tinggi 800 sudah proporsional untuk dashboard lo
-        st.components.v1.iframe(url_final, height=800, scrolling=True)
+        # Menampilkan iframe dengan tinggi hampir 100% layar (95vh)
+        st.components.v1.iframe(url_final, height=None) # Height diatur via CSS iframe di atas
     else:
-        st.error("Waduh, link tidak valid! Pastikan link Publish to Web sudah benar.")
+        st.error("Link tidak valid, Bos!")
         
     st.info(f"💡 Menampilkan: {pilih_dash}. Data akan terupdate otomatis dari Google Sheets.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
