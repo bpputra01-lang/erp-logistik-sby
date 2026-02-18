@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import math
 import io
 import streamlit as st
 import plotly.express as px
@@ -28,80 +29,104 @@ st.markdown("""
 
 # --- FUNGSI LOGIKA ASLI (TETAP SAMA) ---
 def process_refill_overstock(df_all_data, df_stock_tracking):
-    # 1. Standarisasi Header biar gak sensitif spasi/huruf besar kecil
-    df_all_data.columns = [str(c).strip().upper() for c in df_all_data.columns]
-    df_stock_tracking.columns = [str(c).strip().upper() for c in df_stock_tracking.columns]
+    # Inisialisasi awal
+    df_gl3, df_gl4 = pd.DataFrame(), pd.DataFrame()
+    df_refill_final, df_overstock_final = pd.DataFrame(), pd.DataFrame()
 
-    # 2. Cari Kolom Kunci (Biar gak salah tembak indeks lagi)
-    # Kita cari kolom yang ada kata 'LOCATION', 'BARCODE', dan 'QTY'
-    col_bin = next((c for c in df_all_data.columns if 'LOCATION' in c), None)
-    col_sku = next((c for c in df_all_data.columns if 'BARCODE' in c or 'SKU' in c), None)
-    col_qty = next((c for c in df_all_data.columns if 'QTY' in c), None)
+    try:
+        # 1. AMBIL DATA DARI DATAFRAME KE ARRAY (srcArr)
+        # Kita paksa ambil kolom yang bener sesuai urutan SS lo:
+        # A=0(Inv), B=1(Barcode), C=2(Brand), D=3(Name), E=4(Color), F=5(Size), G=6(Location), K=10(Qty)
+        srcArr = df_all_data.values
+        outGL3 = []
+        outGL4 = []
 
-    # Backup jika nama kolom beda banget (Pakai indeks SS lo: G=6, B=1, K=10)
-    if not col_bin: col_bin = df_all_data.columns[6] 
-    if not col_sku: col_sku = df_all_data.columns[1]
-    if not col_qty: col_qty = df_all_data.columns[10]
+        # --- SUB: FILTER ALL DATA (Logic VBA lo) ---
+        for i in range(len(srcArr)):
+            # VBA: binCode = UCase(srcArr(i, 2)) -> Di SS lo Location ada di Kolom G (Indeks 6)
+            # Kalo lo tetep pake indeks 1, dia baca Barcode, makanya hasil cuma dikit/0
+            binCode = str(srcArr[i][6]).upper().strip() if not pd.isna(srcArr[i][6]) else ""
+            
+            # Logic GL3
+            if "GL3" in binCode and "LIVE" not in binCode:
+                outGL3.append(srcArr[i])
+            
+            # Logic GL4
+            if "GL4" in binCode and not any(x in binCode for x in ["DEFECT", "REJECT", "ONLINE", "RAK"]):
+                outGL4.append(srcArr[i])
 
-    # 3. Paksa Qty jadi angka (penting biar itungan gak 0)
-    df_all_data[col_qty] = pd.to_numeric(df_all_data[col_qty], errors='coerce').fillna(0).astype(int)
-    df_stock_tracking[col_qty] = pd.to_numeric(df_stock_tracking.iloc[:, 10], errors='coerce').fillna(0).astype(int)
+        df_gl3 = pd.DataFrame(outGL3)
+        df_gl4 = pd.DataFrame(outGL4)
 
-    # 4. FILTERING (Pake Location Code yang bener)
-    # Filter GL3: Harus ada GL3 tapi gak boleh ada LIVE
-    mask_gl3 = (df_all_data[col_bin].astype(str).str.contains("GL3", case=False, na=False)) & \
-               (~df_all_data[col_bin].astype(str).str.contains("LIVE", case=False, na=False))
-    
-    # Filter GL4: Harus ada GL4 dan bersih dari reject dkk
-    mask_gl4 = (df_all_data[col_bin].astype(str).str.contains("GL4", case=False, na=False)) & \
-               (~df_all_data[col_bin].astype(str).str.contains("DEFECT|REJECT|ONLINE|RAK", case=False, na=False))
+        if df_gl3.empty:
+            return df_gl3, df_gl4, df_refill_final, df_overstock_final
 
-    df_gl3 = df_all_data[mask_gl3].copy()
-    df_gl4 = df_all_data[mask_gl4].copy()
+        # --- SUB: CREATE REFILL SHEET (Logic VBA lo) ---
+        # dataGL3(i, 3) = SKU (Indeks 2), dataGL3(i, 10) = Qty (Indeks 10)
+        dictGL3 = {}
+        for row in df_gl3.values:
+            sku = str(row[2]).strip() # Kolom C
+            qty = int(row[10]) if not pd.isna(row[10]) else 0 # Kolom K
+            dictGL3[sku] = dictGL3.get(sku, 0) + qty
 
-    # --- SISA LOGIC REFILL & OVERSTOCK (Pake dictionary biar cepet) ---
-    res_refill = []
-    res_over = []
-    
-    if not df_gl3.empty:
-        # Grouping GL3 buat tau stok per SKU di GL3
-        summary_gl3 = df_gl3.groupby(col_sku)[col_qty].sum().to_dict()
+        # SKU yang butuh refill (Qty < 3 di GL3)
+        dictSKUs_To_Refill = {}
+        for sku, total_qty in dictGL3.items():
+            if total_qty < 3:
+                dictSKUs_To_Refill[sku] = True
         
-        # Logic Refill
-        # SKU yang di GL3 < 3 atau SKU yang ada di GL4 tapi ga ada di GL3
-        skus_to_check = set([sku for sku, q in summary_gl3.items() if q < 3] + list(df_gl4[col_sku].unique()))
+        # Tambah SKU yang ada di GL4 tapi GAK ADA di GL3 sama sekali
+        for row in df_gl4.values:
+            sku_g4 = str(row[2]).strip()
+            qty_g4 = int(row[10]) if not pd.isna(row[10]) else 0
+            if qty_g4 > 0 and sku_g4 not in dictGL3:
+                dictSKUs_To_Refill[sku_g4] = True
+
+        refill_results = []
+        for sku in dictSKUs_To_Refill.keys():
+            qtyGL3_val = dictGL3.get(sku, 0)
+            sisaLoad = 12
+            # Cari di GL4 (Looping per BIN kayak VBA)
+            for row_g4 in df_gl4.values:
+                if str(row_g4[2]).strip() == sku:
+                    q_v = int(row_g4[10]) if not pd.isna(row_g4[10]) else 0
+                    if q_v > 0 and sisaLoad > 0:
+                        take = min(q_v, sisaLoad)
+                        # BIN (G=6), SKU (C=2), BRAND (D=3), NAME (E=4), VAR (F=5), QTY_BIN, LOAD, Q_GL3
+                        refill_results.append([row_g4[6], sku, row_g4[3], row_g4[4], row_g4[5], q_v, take, qtyGL3_val])
+                        sisaLoad -= take
+                        if sisaLoad <= 0: break
         
-        for sku in skus_to_check:
-            q_gl3 = summary_gl3.get(sku, 0)
-            if q_gl3 < 3 or sku not in summary_gl3:
-                sisa_load = 12
-                sources = df_gl4[df_gl4[col_sku] == sku]
-                for _, row in sources.iterrows():
-                    q_g4 = row[col_qty]
-                    if q_g4 > 0 and sisa_load > 0:
-                        take = min(q_g4, sisa_load)
-                        res_refill.append([row[col_bin], sku, row.get('BRAND',''), row.get('PRODUCT NAME',''), row.get('COLOR',''), q_g4, take, q_gl3])
-                        sisa_load -= take
-                        if sisa_load <= 0: break
+        df_refill_final = pd.DataFrame(refill_results, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD", "QTY GL3"])
 
-        # Logic Overstock (Sesuai VBA lo)
-        # Filter Stock Tracking (Indeks 0 bukan INV, Indeks 6 ada DC)
-        st_filtered = df_stock_tracking[(~df_stock_tracking.iloc[:,0].astype(str).str.contains("INV", case=False)) & 
-                                        (df_stock_tracking.iloc[:,6].astype(str).str.contains("DC", case=False))]
-        dict_st = st_filtered.groupby(st_filtered.columns[1])[st_filtered.columns[10]].sum().to_dict()
+        # --- SUB: CREATE OVERSTOCK SHEET (Logic VBA lo) ---
+        # dataTrans(i, 2) = Barcode (Indeks 1), dataTrans(i, 11) = Qty (Indeks 10)
+        # Filter: INV not in A(0), DC in G(6)
+        dictTrans = {}
+        for st_row in df_stock_tracking.values:
+            if "INV" not in str(st_row[0]).upper() and "DC" in str(st_row[6]).upper():
+                s_sku = str(st_row[1]).strip()
+                s_qty = int(st_row[10]) if not pd.isna(st_row[10]) else 0
+                dictTrans[s_sku] = dictTrans.get(s_sku, 0) + s_qty
 
-        for _, row in df_gl3.iterrows():
-            q_sys = row[col_qty]
-            if q_sys > 24:
-                load = q_sys - 24
-                if dict_st.get(row[col_sku], 0) >= 7:
-                    load = math.ceil(load / 3)
-                if load > 0:
-                    res_over.append([row[col_bin], row[col_sku], row.get('BRAND',''), row.get('PRODUCT NAME',''), row.get('COLOR',''), q_sys, load])
+        overstock_results = []
+        for row_g3 in df_gl3.values:
+            sku_g3 = str(row_g3[2]).strip()
+            qty_sys = int(row_g3[10]) # dataGL3(i, 10)
+            
+            if qty_sys > 24:
+                load_os = qty_sys - 24
+                # Cek ke Stock Tracking (VBA: If dictTrans(SKU) >= 7)
+                if dictTrans.get(sku_g3, 0) >= 7:
+                    load_os = math.ceil(load_os / 3)
+                
+                if load_os > 0:
+                    overstock_results.append([row_g3[6], sku_g3, row_g3[3], row_g3[4], row_g3[5], qty_sys, load_os])
 
-    # Convert back to DataFrame
-    df_refill_final = pd.DataFrame(res_refill, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD", "QTY GL3"])
-    df_overstock_final = pd.DataFrame(res_over, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD"])
+        df_overstock_final = pd.DataFrame(overstock_results, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD"])
+
+    except Exception as e:
+        print(f"Error Detail: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 # --- SIDEBAR NAVIGATION ---
