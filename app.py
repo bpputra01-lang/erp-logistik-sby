@@ -8,68 +8,43 @@ from python_calamine import CalamineWorkbook
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
-# 2. CUSTOM CSS GLOBAL
-# 2. CUSTOM CSS GLOBAL
+# 2. CUSTOM CSS GLOBAL (FIXED NAVY)
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #31333f; }
-    
-    /* SIDEBAR TULISAN PUTIH */
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p, 
     [data-testid="stSidebar"] label, 
     [data-testid="stSidebar"] span { color: white !important; font-weight: 500; }
 
-    /* DROPDOWN & INPUT DARK THEME */
-    div[data-baseweb="select"] > div, div[data-testid="stTextInput"] input {
-        background-color: #1e1e2f !important;
-        color: #ffffff !important;
-        border: 1px solid #3b82f6 !important;
-        border-radius: 8px !important;
-    }
-    div[data-baseweb="select"] svg { fill: white !important; }
-
-    /* TABEL DARK MODE */
-    [data-testid="stDataFrame"] {
-        background-color: #1e1e2f !important;
-        border: 1px solid #3b82f6 !important;
-        border-radius: 10px !important;
-    }
-
-    /* SUMMARY BOX BIRU NAVY (INI YANG LO MAU) */
+    /* SUMMARY BOX NAVY SOLID */
     .m-box { 
-        background-color: #1e1e2f !important; /* BIRU NAVY SOLID */
+        background-color: #1e1e2f !important; 
         border: 2px solid #3b82f6;
-        border-left: 8px solid #FFD700 !important; /* AKSEN EMAS */
-        padding: 20px; 
-        border-radius: 12px; 
-        text-align: center; 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        margin-bottom: 10px;
+        border-left: 8px solid #FFD700 !important;
+        padding: 20px; border-radius: 12px; text-align: center; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2); margin-bottom: 10px;
     }
     .m-val { font-size: 26px; font-weight: 800; color: #FFD700 !important; display: block; }
-    .m-lbl { font-size: 12px; color: #ffffff !important; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+    .m-lbl { font-size: 12px; color: #ffffff !important; text-transform: uppercase; font-weight: 700; }
 
     .hero-header {
         background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
         color: white; padding: 1.5rem 2rem;
-        border-bottom: 4px solid #FFD700;
-        border-radius: 10px;
-        margin-bottom: 15px;
+        border-bottom: 4px solid #FFD700; border-radius: 10px; margin-bottom: 15px;
     }
     </style>
     """, unsafe_allow_html=True)
-# --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
+
+# 3. SIDEBAR
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
-    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
+    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "📝 Dashboard Database", "⛔ Stock Minus"])
 
-# --- 4. LOGIKA MODUL ---
-
+# 4. LOGIKA MODUL
 if menu == "📊 Dashboard Overview":
     st.markdown("""<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1><p>Analytic Reports Logistics Surabaya</p></div>""", unsafe_allow_html=True)
-    
     c1, c2 = st.columns([2, 1])
     with c1:
         pilih_dash = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
@@ -82,29 +57,22 @@ if menu == "📊 Dashboard Overview":
         "CYCLE COUNT DAN KERAPIHAN": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
-    
-    st.markdown(f'<div class="scroll-wrapper"><iframe src="{dash_links[pilih_dash]}&rm=minimal" style="width: 3500px; height: 2500px; transform: scale({zoom_val});"></iframe></div>', unsafe_allow_html=True)
-
-elif menu == "⛔ Stock Minus":
-    st.title("⛔ Stock Minus Clearance")
-    uploaded_file = st.file_uploader("Upload File Jezpro", type=["xlsx", "xlsm"])
-    # ... (Gunakan logic processing lo yang lama di sini, sudah aman)
+    st.markdown(f'<div style="overflow:hidden;"><iframe src="{dash_links[pilih_dash]}&rm=minimal" style="width: 3500px; height: 2500px; transform: scale({zoom_val}); transform-origin: 0 0; border: none;"></iframe></div>', unsafe_allow_html=True)
 
 elif menu == "📝 Dashboard Database":
     st.markdown("""<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1><p>Automatic Sync with Google Sheets Master</p></div>""", unsafe_allow_html=True)
     
-    # LINK GOOGLE SHEET LO
+    # LINK MASTER
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
     
-    # FUNGSI CACHE (BIAR SAT-SET)
-    @st.cache_data(ttl=600) # Simpan data di memori selama 10 menit
+    @st.cache_data(ttl=600)
     def load_data_pro(url):
         file_id = url.split("/d/")[1].split("/")[0]
         xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
         return pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
 
     try:
-        with st.spinner('Lagi sinkronisasi data...'):
+        with st.spinner('Sinkronisasi Database...'):
             all_sheets = load_data_pro(SHEET_URL)
         
         selected_sheet = st.selectbox("📂 PILIH TAB DATABASE:", list(all_sheets.keys()))
@@ -112,26 +80,21 @@ elif menu == "📝 Dashboard Database":
         if selected_sheet:
             df_master = all_sheets[selected_sheet].copy()
             
-            # --- SUMMARY BOX (BIRU NAVY SEJAJAR) ---
+            # Summary Box
             c1, c2, c3 = st.columns(3)
-            with c1:
-                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master):,}</span></div>', unsafe_allow_html=True)
-            with c2:
-                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-            with c3:
-                st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
-
-            # --- SEARCH & TABLE ---
+            with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master):,}</span></div>', unsafe_allow_html=True)
+            with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+            with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
             st.divider()
             search = st.text_input("🔍 Cari Data Cepat:", placeholder="Ketik nama atau SKU...")
-            
+   
             if search:
-                # Filter data tanpa reload (instan)
+   
                 mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
                 st.dataframe(df_master[mask], use_container_width=True, height=500)
             else:
                 st.dataframe(df_master, use_container_width=True, height=500)
-
+   
     except Exception as e:
         st.error(f"Gagal narik data: {e}")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
