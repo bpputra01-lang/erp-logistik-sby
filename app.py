@@ -30,56 +30,49 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI
+    # 1. CSS & SCRIPT UNTUK FOTO OTOMATIS
     st.markdown("""
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <script>
+            function takeScreenshot() {
+                const element = document.querySelector(".custom-wrapper");
+                html2canvas(element, {useCORS: true}).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = 'Dashboard_Report.png';
+                    link.href = canvas.toDataURL();
+                    link.click();
+                });
+            }
+        </script>
         <style>
             .main .block-container { padding: 0rem !important; max-width: 100% !important; }
             header { visibility: hidden; }
             .stApp { margin-top: -80px; }
             .custom-wrapper {
-                width: 100vw;
-                height: 92vh; 
-                overflow: hidden;
-                position: relative;
-                background: #0e1117;
+                width: 100vw; height: 92vh; 
+                overflow: hidden; position: relative; background: #0e1117;
             }
             .custom-wrapper iframe {
-                position: absolute;
-                top: 0; left: 0;
-                border: none;
-                transform-origin: 0 0;
+                position: absolute; top: 0; left: 0; border: none; transform-origin: 0 0;
+            }
+            .btn-download {
+                background-color: #ff4b4b; color: white; padding: 8px 15px;
+                border-radius: 5px; text-align: center; font-weight: bold;
+                cursor: pointer; border: none; width: 100%;
             }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL (Dropdown, Zoom, & Export)
+    # 2. PANEL KONTROL
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
         pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
     with c2:
         zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
     with c3:
-        # TRIK BARU: Pake Link Download Langsung (Bukan window.print)
-        # Ambil GID dari link dashboard yang dipilih
-        gid_map = {
-            "WORKING REPORT": "864743695",
-            "PERSONAL PERFOMANCE": "251294539",
-            "CYCLE COUNT DAN KERAPIHAN": "1743896821",
-            "DASHBOARD MOVING STOCK": "1671817510"
-        }
-        gid_now = gid_map[pilih_dash]
-        
-        # URL Export PDF Langsung (Landscape, Fit to Page)
-        pdf_url = f"https://docs.google.com/spreadsheets/d/1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/export?format=pdf&gid={gid_now}&size=A4&portrait=false&fitw=true&gridlines=false"
-        
-        # Tombol Download Asli Streamlit (Pasti Muncul & Pasti Bisa)
-        st.markdown(f'''
-            <a href="{pdf_url}" target="_blank" style="text-decoration: none;">
-                <div style="background-color: #ff4b4b; color: white; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; cursor: pointer;">
-                    📥 DOWNLOAD PDF
-                </div>
-            </a>
-        ''', unsafe_allow_html=True)
+        # Tombol Screenshot (Pasti aman dari error Google)
+        st.markdown('<button class="btn-download" onclick="takeScreenshot()">📸 DOWNLOAD REPORT</button>', unsafe_allow_html=True)
+
     # 3. MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
@@ -89,10 +82,7 @@ if menu == "📊 Dashboard Overview":
     }
 
     # 4. PROSES TAMPILAN
-    url_aktif = dash_links[pilih_dash]
-    url_final = f"{url_aktif}&rm=minimal&chrome=false&widget=false"
-    
-    # Kalkulasi rasio agar space kanan hilang
+    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
     calc_ratio = (1 / zoom_val) * 100
 
     st.markdown(f"""
