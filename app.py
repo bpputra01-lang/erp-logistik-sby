@@ -54,34 +54,48 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. SIDEBAR
+# --- BAGIAN MENU SIDEBAR (Gue tambahin biar lengkap) ---
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
 
-# 4. LOGIKA MODUL
+# --- 4. LOGIKA MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
     st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
     
     c1, c2 = st.columns([3, 1])
     with c1:
-        pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE"])
+        # 1. DISINI GUE TAMBAHIN JADI 4 PILIHAN SESUAI PERMINTAAN
+        pilih = st.selectbox("PILIH LAPORAN", [
+            "WORKING REPORT", 
+            "PERSONAL PERFORMANCE", 
+            "CYCLE COUNT DAN KERAPIHAN", 
+            "DASHBOARD MOVING STOCK"
+        ])
     with c2:
         zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
 
-    # SOLUSI: Kurangi height iframe (dari 2500px ke 1000px atau sesuai data lo)
-    # Dan set overflow: hidden di container utama biar ga ada sisa scroll
+    # 2. MAPPING LINK (Biar dropdown-nya jalan sesuai pilihan)
+    dash_links = {
+        "WORKING REPORT": "864743695",
+        "PERSONAL PERFORMANCE": "251294539",
+        "CYCLE COUNT DAN KERAPIHAN": "1743896821",
+        "DASHBOARD MOVING STOCK": "1671817510"
+    }
+    gid = dash_links[pilih]
+
+    # 3. TAMPILAN (Frame anti-scroll kejauhan)
     st.markdown(f'''
-        <div class="dash-container" style="height: auto; min-height: 400px; overflow: hidden; margin-bottom: 0px;">
-            <div style="width: 100%; height: 450px; overflow: auto; border-radius: 10px; background: #f8f9fa;">
-                <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true&rm=minimal" 
-                style="width: 4000px; height: 1400px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
+        <div class="dash-container" style="height: auto; overflow: hidden;">
+            <div style="width: 100%; height: 500px; overflow: auto; border-radius: 10px; background: #f8f9fa;">
+                <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={gid}&single=true&rm=minimal" 
+                style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
             </div>
         </div>
-        <div style="margin-bottom: -100px;"></div> 
-    ''', unsafe_allow_html=True)
 
+    ''', unsafe_allow_html=True)
+    
 elif menu == "📝 Dashboard Database":
     st.markdown('<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1></div>', unsafe_allow_html=True)
     
