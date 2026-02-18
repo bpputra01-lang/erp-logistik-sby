@@ -30,30 +30,46 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI: Menghapus semua margin, padding, dan elemen Streamlit
+    # 1. CSS ULTIMATE: Maksa Full Screen & Auto Scaling
     st.markdown("""
         <style>
-            /* Menghapus padding container utama agar mentok ke pinggir */
+            /* Buang semua margin putih di pinggir */
             .main .block-container {
                 padding: 0rem !important;
                 max-width: 100% !important;
             }
-            /* Menghilangkan header hitam Streamlit di atas */
             header {visibility: hidden;}
-            /* Menghilangkan spasi putih di paling atas halaman */
-            .stApp { margin-top: -60px; }
-            /* Memastikan iframe tidak punya border dan memenuhi lebar */
-            iframe { border: none; width: 100vw; height: 95vh; }
+            .stApp { margin-top: -70px; }
+            
+            /* Container buat maksa dashboard masuk satu layar */
+            .dashboard-wrapper {
+                width: 100%;
+                height: 92vh; /* Tinggi pas di layar */
+                overflow: hidden;
+                position: relative;
+            }
+            
+            /* TEKNIK ZOOM OUT: Mengecilkan dashboard agar tidak kepotong */
+            .dashboard-wrapper iframe {
+                width: 142%; /* Dilebarkan dulu */
+                height: 142%; /* Ditinggikan dulu */
+                transform: scale(0.7); /* DIKECILKAN ke 70% agar muat semua */
+                transform-origin: 0 0;
+                border: none;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. DROPDOWN (Dibuat minimalis di atas)
+    # 2. DROPDOWN (Pilih Dashboard)
     pilih_dash = st.selectbox("PILIH VIEW DASHBOARD:", 
                               ["WORKING REPORT", "PERSONAL PERFOMANCE", 
                                "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
                               label_visibility="collapsed")
 
-    # 3. MAPPING LINK (Gue lurusin biar gak SyntaxError)
+    # 3. MAPPING LINK (Tetap pake link lo)
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -61,19 +77,22 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. PROSES TAMPILAN (Lurus & Gak Error)
     url_pilihan = dash_links[pilih_dash]
-    
-    # RAHASIA: &rm=minimal &chrome=false &widget=false untuk buang tab bawah
+    # Ditambah rm=minimal agar UI Google hilang
     url_final = f"{url_pilihan}&rm=minimal&chrome=false&widget=false"
 
+    # 4. TAMPILAN (Pake HTML agar Scaling Jalan)
     if "pubhtml" in url_final:
-        # Menampilkan iframe dengan tinggi hampir 100% layar (95vh)
-        st.components.v1.iframe(url_final, height=None) # Height diatur via CSS iframe di atas
+        st.markdown(f"""
+            <div class="dashboard-wrapper">
+                <iframe src="{url_final}"></iframe>
+            </div>
+        """, unsafe_allow_html=True)
     else:
-        st.error("Link tidak valid, Bos!")
-        
-    st.info(f"💡 Menampilkan: {pilih_dash}. Data akan terupdate otomatis dari Google Sheets.")
+        st.error("Link Gak Valid!")
+
+    # Info ditaruh bawah tipis aja
+    st.caption(f"📍 View: {pilih_dash} | Auto-update aktif.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
