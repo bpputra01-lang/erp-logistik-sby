@@ -95,35 +95,51 @@ if menu == "📊 Dashboard Overview":
         </div>
 
     ''', unsafe_allow_html=True)
-    
+
 elif menu == "📝 Dashboard Database":
     st.markdown('<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1></div>', unsafe_allow_html=True)
     
-    raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", placeholder="Paste link di sini...")
+    # --- LINK DATABASE UTAMA (DIKUNCI) ---
+    FILE_ID = "1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY"
+    XLSX_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=xlsx"
     
-    if raw_url:
-        try:
-            if "/d/" in raw_url:
-                file_id = raw_url.split("/d/")[1].split("/")[0]
-                xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
-                
-                all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
-                selected_sheet = st.selectbox("PILIH TAB / SHEET:", list(all_sheets.keys()))
-                
-                if selected_sheet:
-                    df_master = all_sheets[selected_sheet]
-                    
-                    # BOX SUMMARY NAVY (Gambar 2 yang lo mau)
-                    c1, c2, c3 = st.columns(3)
-                    with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-                    with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-                    with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+    try:
+        # Load data otomatis pakai engine Calamine (Speed Demon)
+        all_sheets = pd.read_excel(XLSX_URL, sheet_name=None, engine='calamine')
+        sheet_names = list(all_sheets.keys())
+        
+        # Dropdown buat pilih Tab saja
+        selected_sheet = st.selectbox("📂 PILIH TAB DATABASE:", sheet_names)
+        
+        if selected_sheet:
+            # 1. Ambil data mentah
+            df_master = all_sheets[selected_sheet]
+            
+            # 2. Pembersihan Data Otomatis (Format Tanggal & Kolom)
+            df_master = df_master.loc[:, ~df_master.columns.astype(str).str.contains('^Unnamed')]
+            df_master = df_master.dropna(how='all').reset_index(drop=True)
 
-                    st.divider()
-                    st.dataframe(df_master, use_container_width=True, height=500)
-        except Exception as e:
-            st.error(f"Gagal narik data: {e}")
+            # --- SUMMARY BOX NAVY GALAK (GAMBAR 2 VIBES) ---
+            c1, c2, c3 = st.columns(3)
+            with c1: 
+                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+            with c2: 
+                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+            with c3: 
+                st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
 
+            st.divider()
+
+            # --- SEARCH & DATA VIEW ---
+            search = st.text_input("🔍 Cari Data Tertentu (SKU / Nama / Bin)...")
+            if search:
+                mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
+                st.dataframe(df_master[mask], use_container_width=True, height=500)
+            else:
+                st.dataframe(df_master, use_container_width=True, height=500)
+
+    except Exception as e:
+        st.error(f"❌ Koneksi Terputus atau Link Salah: {e}")
 elif menu == "⛔ Stock Minus":
     st.markdown('<div class="hero-header"><h1>⛔ STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
