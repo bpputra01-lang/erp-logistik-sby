@@ -5,3 +5,4 @@ mysql-connector-python
 python-calamine
 xlsxwriter
 altair<5
+plotly
