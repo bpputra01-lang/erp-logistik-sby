@@ -66,7 +66,7 @@ elif menu == "⛔ Stock Minus":
     # ... (Gunakan logic processing lo yang lama di sini, sudah aman)
 
 elif menu == "📝 Dashboard Database":
-    st.title("📓 Detail Dashboard Analytics")
+    st.title("📓 Check Detail Dashboard")
     # 1. HEADER MEWAH
     st.markdown("""<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1><p>Automatic Sync with Google Sheets Master</p></div>""", unsafe_allow_html=True)
     
