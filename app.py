@@ -54,12 +54,82 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- BAGIAN MENU SIDEBAR (Gue tambahin biar lengkap) ---
+# --- 3. SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
 
+# --- BAGIAN BARU: GLOBAL HEADER STATS (MUNCUL DI SEMUA MENU) ---
+# Ini biar bagian atas nggak kosong di menu mana pun
+st.markdown('<div style="margin-top: -30px;"></div>', unsafe_allow_html=True) # Narik ke atas dikit
+mq1, mq2, mq3, mq4 = st.columns(4)
+with mq1:
+    st.markdown(f'<div class="m-box" style="padding:15px !important;"><span class="m-lbl">📍 LOCATION</span><span class="m-val" style="font-size:20px !important;">SURABAYA DC</span></div>', unsafe_allow_html=True)
+with mq2:
+    st.markdown(f'<div class="m-box" style="padding:15px !important;"><span class="m-lbl">📅 PERIODE</span><span class="m-val" style="font-size:20px !important;">FEB 2026</span></div>', unsafe_allow_html=True)
+with mq3:
+    st.markdown(f'<div class="m-box" style="padding:15px !important;"><span class="m-lbl">⏱️ LAST SYNC</span><span class="m-val" style="font-size:20px !important;">REAL-TIME</span></div>', unsafe_allow_html=True)
+with mq4:
+    st.markdown(f'<div class="m-box" style="padding:15px !important;"><span class="m-lbl">🚀 STATUS</span><span class="m-val" style="font-size:20px !important;">OPTIMIZED</span></div>', unsafe_allow_html=True)
+
+st.divider()
+
+# --- 4. LOGIKA MODUL ---
+if menu == "📊 Dashboard Overview":
+    st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
+    
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        pilih = st.selectbox("PILIH LAPORAN", [
+            "WORKING REPORT", 
+            "PERSONAL PERFORMANCE", 
+            "CYCLE COUNT DAN KERAPIHAN", 
+            "DASHBOARD MOVING STOCK"
+        ])
+    with c2:
+        zoom = st.slider("ZOOM", 0.1, 1.0, 0.27)
+
+    dash_links = {
+        "WORKING REPORT": "864743695",
+        "PERSONAL PERFORMANCE": "251294539",
+        "CYCLE COUNT DAN KERAPIHAN": "1743896821",
+        "DASHBOARD MOVING STOCK": "1671817510"
+    }
+    gid = dash_links[pilih]
+
+    st.markdown(f'''
+        <div class="dash-container" style="height: auto; overflow: hidden;">
+            <div style="width: 100%; height: 500px; overflow: auto; border-radius: 10px; background: #0b242d;">
+                <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={gid}&single=true&rm=minimal" 
+                style="width: 4000px; height: 1600px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
+            </div>
+        </div>
+    ''', unsafe_allow_html=True)
+
+elif menu == "📝 Dashboard Database":
+    st.markdown('<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1></div>', unsafe_allow_html=True)
+    
+    # ID Spreadsheet lo
+    FILE_ID = "1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY"
+    XLSX_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=xlsx"
+    
+    try:
+        all_sheets = pd.read_excel(XLSX_URL, sheet_name=None, engine='calamine')
+        selected_sheet = st.selectbox("📂 PILIH TAB DATABASE:", list(all_sheets.keys()))
+        
+        if selected_sheet:
+            df_master = all_sheets[selected_sheet]
+            df_master = df_master.loc[:, ~df_master.columns.astype(str).str.contains('^Unnamed')]
+            
+            # Tabel view tetap pakai summary lokal juga di bawahnya
+            st.dataframe(df_master, use_container_width=True, height=500)
+    except Exception as e:
+        st.error(f"Gagal narik data: {e}")
+
+elif menu == "⛔ Stock Minus":
+    st.markdown('<div class="hero-header"><h1>⛔ STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
+    # ... Sisa kode stock minus lo ...
 # --- 4. LOGIKA MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
     st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
