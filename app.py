@@ -66,31 +66,78 @@ elif menu == "⛔ Stock Minus":
                 qty_arr = pd.to_numeric(df[col_qty], errors='coerce').fillna(0).values
                 sku_arr, bin_arr = df[col_sku].astype(str).values, df[col_bin].astype(str).values
                 
+                # --- LOGIKA PRIORITAS BIN DARI MACRO ---
+                prior_bins = ["RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC", 
+                              "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3", 
+                              "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"]
+
                 # 3. Mapping posisi stok positif
-                pos_map = {sku: [] for sku in np.unique(sku_arr)}
+                pos_map = {}
                 for i, q in enumerate(qty_arr):
-                    if q > 0: pos_map[sku_arr[i]].append(i)
+                    if q > 0:
+                        s = sku_arr[i]
+                        if s not in pos_map: pos_map[s] = {}
+                        b = bin_arr[i].upper()
+                        if b not in pos_map[s]: pos_map[s][b] = []
+                        pos_map[s][b].append(i)
 
                 set_up_results = []
                 minus_indices = np.where(qty_arr < 0)[0]
                 
                 # 4. Proses Relokasi
                 for idx in minus_indices:
-                    sku_target, qty_needed, bin_tujuan = sku_arr[idx], abs(qty_arr[idx]), bin_arr[idx]
+                    sku_target = sku_arr[idx]
+                    qty_needed = abs(qty_arr[idx])
+                    bin_tujuan = bin_arr[idx].upper()
+                    
                     if sku_target in pos_map:
-                        for p_idx in pos_map[sku_target]:
-                            if qty_needed <= 0: break
-                            if qty_arr[p_idx] > 0:
-                                take = min(qty_needed, qty_arr[p_idx])
-                                qty_arr[p_idx] -= take
+                        sku_bins = pos_map[sku_target]
+                        
+                        while qty_needed > 0:
+                            found_idx = -1
+                            
+                            # CROSS-CHECK: TOKO vs AREA LT.2/GL2-STORE
+                            if bin_tujuan == "TOKO":
+                                for b_name, indices in sku_bins.items():
+                                    if ("LT.2" in b_name or "GL2-STORE" in b_name):
+                                        for p_idx in indices:
+                                            if qty_arr[p_idx] > 0: found_idx = p_idx; break
+                                    if found_idx != -1: break
+                            
+                            elif "LT.2" in bin_tujuan or "GL2-STORE" in bin_tujuan:
+                                if "TOKO" in sku_bins:
+                                    for p_idx in sku_bins["TOKO"]:
+                                        if qty_arr[p_idx] > 0: found_idx = p_idx; break
+
+                            # JALANKAN PRIORITAS BIN
+                            if found_idx == -1:
+                                for pb in prior_bins:
+                                    if pb in sku_bins:
+                                        for p_idx in sku_bins[pb]:
+                                            if qty_arr[p_idx] > 0: found_idx = p_idx; break
+                                    if found_idx != -1: break
+
+                            # CARI BIN LAIN (KECUALI REJECT)
+                            if found_idx == -1:
+                                for b_name, indices in sku_bins.items():
+                                    if b_name != "REJECT DEFECT":
+                                        for p_idx in indices:
+                                            if qty_arr[p_idx] > 0: found_idx = p_idx; break
+                                    if found_idx != -1: break
+
+                            if found_idx != -1:
+                                take = min(qty_needed, qty_arr[found_idx])
+                                qty_arr[found_idx] -= take
                                 qty_arr[idx] += take
                                 set_up_results.append({
-                                    "BIN AWAL": bin_arr[p_idx], "BIN TUJUAN": bin_tujuan,
+                                    "BIN AWAL": bin_arr[found_idx], "BIN TUJUAN": bin_arr[idx],
                                     "SKU": sku_target, "QUANTITY": take, "NOTES": "STOCK MINUS"
                                 })
                                 qty_needed -= take
+                            else:
+                                break
 
-                # 5. LOGIC NEED JUSTIFIKASI (Stok yang tetep minus setelah diproses)
+                # 5. LOGIC NEED JUSTIFIKASI
                 df_final_state = df.copy()
                 df_final_state[col_qty] = qty_arr
                 df_need_adj = df_final_state[df_final_state[col_qty] < 0].copy()
