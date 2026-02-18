@@ -101,71 +101,82 @@ def process_scan_out(df_scan, df_history, df_stock):
 
 # --- FUNGSI BARU: REFILL & OVERSTOCK (Sesuai Logic VBA) ---
 def process_refill_overstock(df_all_data, df_stock_tracking):
-    # 1. Inisialisasi awal agar return tidak error
+    # 1. Inisialisasi awal
     df_gl3 = pd.DataFrame()
     df_gl4 = pd.DataFrame()
     df_refill_final = pd.DataFrame()
     df_overstock_final = pd.DataFrame()
 
     try:
-        # Pre-cleaning: Hilangkan spasi di nama kolom & paksa jadi Upper
-        df_all_data.columns = [str(c).strip().upper() for c in df_all_data.columns]
-        df_stock_tracking.columns = [str(c).strip().upper() for c in df_stock_tracking.columns]
+        # CLEANING DATA AWAL (PENTING!)
+        # Buang baris yang bener-bener kosong dan kolom yang nggak ada namanya
+        df_all_data = df_all_data.dropna(how='all').reset_index(drop=True)
+        df_stock_tracking = df_stock_tracking.dropna(how='all').reset_index(drop=True)
 
-        # FIX KRUSIAL: Konversi kolom Quantity (Indeks 10) ke Integer (Sama kayak CLng di VBA)
-        # Kita pakai .fillna(0) supaya baris kosong jadi 0, bukan NaN
+        # DEBUG: Biar lo liat isi 5 baris pertama, kalo kosong berarti upload lo salah baris
+        # st.write("Preview All Data:", df_all_data.head()) 
+
+        # Paksa konversi Qty System (Kolom K / Indeks 10) jadi angka
+        # Di VBA lo: CLng(dataGL3(i, 10))
         df_all_data.iloc[:, 10] = pd.to_numeric(df_all_data.iloc[:, 10], errors='coerce').fillna(0).astype(int)
         df_stock_tracking.iloc[:, 10] = pd.to_numeric(df_stock_tracking.iloc[:, 10], errors='coerce').fillna(0).astype(int)
 
-        # 2. FILTER GL3 & GL4 (Sama dengan logic Sub Filter_ALL_DATA... VBA lo)
-        # Kolom B = Indeks 1
-        bin_col = df_all_data.iloc[:, 1].astype(str).str.upper()
+        # 2. FILTER GL3 & GL4 (Sesuai Sub Filter_ALL_DATA... VBA lo)
+        # Kolom B (Bin) = Indeks 1. Kita paksa jadi String & Upper.
+        bin_col = df_all_data.iloc[:, 1].astype(str).str.strip().str.upper()
         
-        # GL3 Logic: InStr(binCode, "GL3") > 0 And InStr(binCode, "LIVE") = 0
+        # Filter GL3: InStr(binCode, "GL3") > 0 And InStr(binCode, "LIVE") = 0
         mask_gl3 = (bin_col.str.contains("GL3", na=False)) & (~bin_col.str.contains("LIVE", na=False))
         
-        # GL4 Logic: InStr(binCode, "GL4") > 0 And No Defect, Reject, Online, Rak
+        # Filter GL4: InStr(binCode, "GL4") > 0 And No Defect, Reject, Online, Rak
         exclude_gl4 = "DEFECT|REJECT|ONLINE|RAK"
         mask_gl4 = (bin_col.str.contains("GL4", na=False)) & (~bin_col.str.contains(exclude_gl4, na=False))
         
         df_gl3 = df_all_data[mask_gl3].copy()
         df_gl4 = df_all_data[mask_gl4].copy()
 
-        # 3. REFILL LOGIC (Sama dengan Sub CreateRefillSheet VBA lo)
+        # JIKA GL3/GL4 KOSONG, BERHENTI DI SINI BIAR GAK ERROR
+        if df_gl3.empty and df_gl4.empty:
+            st.warning("Data GL3 atau GL4 tidak ditemukan setelah difilter. Cek format kolom BIN (Kolom B).")
+            return df_gl3, df_gl4, df_refill_final, df_overstock_final
+
+        # 3. REFILL LOGIC (Sesuai Sub CreateRefillSheet VBA lo)
         # SKU = Indeks 2 (Kolom C)
         dict_gl3 = df_gl3.groupby(df_gl3.iloc[:, 2])[df_gl3.columns[10]].sum().to_dict()
         
-        # Ambil semua SKU unik dari GL4 yang Qty > 0
+        # Ambil semua SKU di GL4 yang QTY-nya > 0
         skus_gl4 = df_gl4[df_gl4.iloc[:, 10] > 0].iloc[:, 2].unique()
         
         refill_list = []
         for sku in skus_gl4:
             sku_str = str(sku).strip()
-            qty_gl3 = dict_gl3.get(sku_str, 0)
+            qty_gl3_current = dict_gl3.get(sku, 0)
             
-            # Logic VBA: If dictGL3(sku) < 3 Or Not dictGL3.Exists(sku)
-            if qty_gl3 < 3:
+            # Logic VBA: If qtyGL3 < 3
+            if qty_gl3_current < 3:
                 sisa_load = 12
-                items_in_gl4 = df_gl4[df_gl4.iloc[:, 2] == sku]
+                # Ambil item dari GL4 untuk SKU ini
+                rows_gl4_sku = df_gl4[df_gl4.iloc[:, 2] == sku]
                 
-                for _, row in items_in_gl4.iterrows():
+                for _, row in rows_gl4_sku.iterrows():
                     qty_gl4 = int(row.iloc[10])
                     if qty_gl4 > 0 and sisa_load > 0:
                         load_qty = min(qty_gl4, sisa_load)
                         refill_list.append({
                             "BIN": row.iloc[1], "SKU": sku_str, "BRAND": row.iloc[3],
                             "ITEM NAME": row.iloc[4], "VARIANT": row.iloc[5],
-                            "QTY BIN AMBIL": qty_gl4, "LOAD": load_qty, "QTY GL3": qty_gl3
+                            "QTY BIN AMBIL": qty_gl4, "LOAD": load_qty, "QTY GL3": qty_gl3_current
                         })
                         sisa_load -= load_qty
                         if sisa_load <= 0: break
         
         df_refill_final = pd.DataFrame(refill_list)
 
-        # 4. OVERSTOCK LOGIC (Sama dengan Sub CreateOverstockSheet VBA lo)
-        # Filter Stock Tracking: No "INV" di Col A, Ada "DC" di Col G (Indeks 6)
-        mask_st = (~df_stock_tracking.iloc[:, 0].astype(str).str.contains("INV", case=False, na=False)) & \
-                  (df_stock_tracking.iloc[:, 6].astype(str).str.contains("DC", case=False, na=False))
+        # 4. OVERSTOCK LOGIC (Sesuai Sub CreateOverstockSheet VBA lo)
+        # Filter Stock Tracking: No "INV" di Col A (Idx 0), Ada "DC" di Col G (Idx 6)
+        st_col_a = df_stock_tracking.iloc[:, 0].astype(str).str.upper()
+        st_col_g = df_stock_tracking.iloc[:, 6].astype(str).str.upper()
+        mask_st = (~st_col_a.str.contains("INV", na=False)) & (st_col_g.str.contains("DC", na=False))
         df_st_filtered = df_stock_tracking[mask_st].copy()
         
         # Dictionary Stock Tracking Sum (Group by Barcode Kolom B = Indeks 1)
@@ -192,8 +203,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
         df_overstock_final = pd.DataFrame(overstock_list)
 
     except Exception as e:
-        import traceback
-        st.error(f"Error Detail: {traceback.format_exc()}")
+        st.error(f"KONTOL ADA ERROR LAGI: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 # --- SIDEBAR NAVIGATION ---
