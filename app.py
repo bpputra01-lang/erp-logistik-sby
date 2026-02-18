@@ -21,50 +21,49 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. SIDEBAR
+# --- 3. SIDEBAR (DIPERBAIKI DENGAN SUB-MENU) ---
 with st.sidebar:
-    st.markdown("<h2> ERP SURABAYA</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: white;'>🚀 ERP SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
+    
+    # Sub-menu Dashboard muncul otomatis di Sidebar kalau Modul Dashboard dipilih
+    if menu == "📊 Dashboard Overview":
+        st.markdown("---")
+        st.markdown("<p style='color: #FFD700; font-weight: bold;'>PILIH LAPORAN:</p>", unsafe_allow_html=True)
+        pilih_dash = st.selectbox(
+            "", 
+            ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
+            label_visibility="collapsed"
+        )
+    else:
+        pilih_dash = None
 
-
-# --- MODUL DASHBOARD OVERVIEW ---
+# --- MODUL DASHBOARD OVERVIEW (PERBAIKAN HEADER & LAYOUT) ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI: Kasih izin Scrollbar Muncul
-    st.markdown("""
+    # 1. HEADER BIRU PROFESIONAL (Sesuai gaya Stock Minus lo)
+    st.markdown(f"""
+        <div style="background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); 
+                    padding: 20px; border-radius: 0px 0px 15px 15px; 
+                    border-bottom: 3px solid #FFD700; margin-bottom: 20px;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">📊 {pilih_dash}</h1>
+            <p style="color: #cbd5e1; margin: 0; font-size: 13px;">Logistic Monitoring System • Surabaya Warehouse Operations</p>
+        </div>
         <style>
-            .main .block-container { padding: 0rem !important; max-width: 100% !important; }
-            header { visibility: hidden; }
-            .stApp { margin-top: -75px; }
-            
-            /* Container Utama: Kita kasih scrollbar (overflow: auto) */
-            .scroll-wrapper {
-                width: 100vw;
-                height: 90vh; 
-                overflow: auto; /* BIAR BISA DI-SCROLL KE BAWAH/SAMPING */
-                position: relative;
-                background: #0e1117;
-                border: 2px solid #333;
-            }
-            
-            /* Iframe: Kita bikin ukurannya JAUH LEBIH GEDE dari layarnya */
-            .scroll-wrapper iframe {
-                border: none;
-                transform-origin: 0 0;
-            }
+            .main .block-container {{ padding-top: 0rem !important; }}
+            header {{ visibility: hidden; }}
+            .scroll-wrapper {{
+                width: 100%; height: 85vh; overflow: auto; 
+                position: relative; background: #0e1117;
+                border-radius: 10px; border: 1px solid #3b82f6;
+            }}
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        pilih_dash = st.selectbox("", 
-                                ["WORKING REPORT", "PERSONAL PERFOMANCE", 
-                                 "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], 
-                                label_visibility="collapsed")
+    # 2. PANEL KONTROL (Hanya Zoom, karena Menu sudah di Sidebar)
+    _, c2 = st.columns([3, 1])
     with c2:
-        # Gue naikin range-nya biar lo bisa pasin mentok
-        zoom_val = st.slider("PASIN UKURAN", 0.10, 1.0, 0.35, 0.01)
+        zoom_val = st.slider("PASIN UKURAN DASHBOARD", 0.10, 1.0, 0.35, 0.01)
 
     # 3. MAPPING LINK
     dash_links = {
@@ -75,16 +74,13 @@ if menu == "📊 Dashboard Overview":
     }
 
     # 4. EKSEKUSI TAMPILAN
-    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
-    
-    # Supaya iframe-nya super lebar & tinggi buat nampung semua grafik
-    width_px = int(3500) # Kita paksa lebar 3500px
-    height_px = int(2500) # Kita paksa tinggi 2500px
+    url_final = f"{dash_links[pilih_dash]}&rm=minimal"
+    width_px, height_px = 3500, 2500
 
     st.markdown(f"""
         <div class="scroll-wrapper">
             <iframe src="{url_final}" 
-                    style="width: {width_px}px; height: {height_px}px; transform: scale({zoom_val});">
+                    style="width: {width_px}px; height: {height_px}px; transform: scale({zoom_val}); transform-origin: 0 0;">
             </iframe>
         </div>
     """, unsafe_allow_html=True)
