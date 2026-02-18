@@ -30,20 +30,36 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI: Full Screen + No Padding + Zoom Out
+    # 1. CSS ULTIMATE: Press dashboard biar muat satu layar tanpa sisa space
     st.markdown("""
         <style>
-            .main .block-container { padding: 0rem !important; max-width: 100% !important; }
-            header { visibility: hidden; }
-            .stApp { margin-top: -70px; }
-            .iframe-wrapper {
-                width: 100%; height: 95vh; overflow: hidden; position: relative; background: #0e1117;
+            /* Buang semua margin putih di pinggir ERP */
+            .main .block-container {
+                padding: 0rem !important;
+                max-width: 100% !important;
             }
-            .iframe-wrapper iframe {
-                width: 166.6%; height: 166.6%;
-                transform: scale(0.6); /* PAKSA ZOOM OUT BIAR GAK KEPOTONG */
+            header { visibility: hidden; }
+            .stApp { margin-top: -85px; } /* Tarik lebih ke atas */
+            
+            /* Container Dashboard */
+            .iframe-press-container {
+                width: 100%;
+                height: 98vh; /* Hampir satu layar penuh */
+                overflow: hidden; /* Anti geser-geser jancok */
+                position: relative;
+                background: #0e1117;
+            }
+            
+            /* TEKNIK PRESS TOTAL: Zoom out ke 48% agar semua grafik muat */
+            .iframe-press-container iframe {
+                width: 208.4%; /* Kompensasi lebar agar mentok kanan-kiri */
+                height: 208.4%;
+                transform: scale(0.48); /* KECILIN LAGI BIAR GAK KEPOTONG */
                 transform-origin: 0 0;
-                border: none; position: absolute; top: 0; left: 0;
+                border: none;
+                position: absolute;
+                top: 0;
+                left: 0;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -54,7 +70,7 @@ if menu == "📊 Dashboard Overview":
                                "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
                               label_visibility="collapsed")
 
-    # 3. MAPPING LINK
+    # 3. MAPPING LINK (Tetap pake link lo)
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -62,15 +78,14 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. TAMPILIN (Pake cara aman biar gak SyntaxError)
-    url_pilihan = dash_links[pilih_dash]
-    url_final = f"{url_pilihan}&rm=minimal&chrome=false&widget=false"
+    # Tambahin parameter biar bersih (Tab bawah ilang)
+    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
 
-    # Pastikan blok di bawah ini lurus spasinya!
+    # 4. TAMPILIN (Lurus & Gak Error)
     if "pubhtml" in url_final:
-        st.markdown(f'<div class="iframe-wrapper"><iframe src="{url_final}"></iframe></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="iframe-press-container"><iframe src="{url_final}"></iframe></div>', unsafe_allow_html=True)
     else:
-        st.error("Link Gak Valid, Cek GSheets lo!")
+        st.error("Link Gak Valid!")
 
     # Info ditaruh bawah tipis aja
     st.caption(f"📍 View: {pilih_dash} | Auto-update aktif.")
