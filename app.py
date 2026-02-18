@@ -154,7 +154,7 @@ elif menu == "⛔ Stock Minus":
                 st.success(f"✅ Kelar! {len(set_up_results)} item direlokasi. {len(df_need_adj)} SKU butuh justifikasi.")
                 st.download_button("📥 DOWNLOAD HASIL LENGKAP", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
 
-# --- MODUL DATABASE ARTIKEL (FIX DUPLICATE COLUMNS & AUTO-CLEAN) ---
+# --- MODUL DATABASE ARTIKEL (FIX HEADER HILANG & FORMAT WAKTU) ---
 elif menu == "📦 Database Artikel":
     st.title("📦 Master Database : Google Sheets Sync")
     
@@ -167,63 +167,62 @@ elif menu == "📦 Database Artikel":
                 file_id = raw_url.split("/d/")[1].split("/")[0]
                 xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
                 
-                # Tarik data pake calamine
+                # Tarik semua sheet pake calamine
                 all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
                 sheet_names = list(all_sheets.keys())
                 selected_sheet = st.selectbox("PILIH TAB / SHEET:", sheet_names)
                 
                 if selected_sheet:
-                    # 1. Ambil data mentah tanpa header dulu buat kita olah manual
-                    df_raw = all_sheets[selected_sheet]
+                    # 1. Tarik mentah total tanpa header biar kita filter manual
+                    df_raw = pd.read_excel(xlsx_url, sheet_name=selected_sheet, header=None, engine='calamine')
                     
-                    # 2. Cari baris mana yang beneran Header (nyari yang isinya string, bukan angka/kosong)
-                    # Kita cari baris yang punya kata 'Name' atau 'AVERAGE'
-                    header_row_idx = 0
-                    for i in range(min(len(df_raw), 15)):
-                        row_values = df_raw.iloc[i].astype(str).str.upper().tolist()
-                        if 'NAME' in row_values or 'AVERAGE' in row_values:
-                            header_row_idx = i
+                    # 2. CARI HEADER ASLI: Kita cari baris yang isinya 'NAME', 'DATE', atau 'TOTAL'
+                    # Ini buat nendang baris sampah kayak "GALIH PAMUNGKAS" ke bawah
+                    header_row = 0
+                    for i, row in df_raw.head(20).iterrows():
+                        row_str = row.astype(str).str.upper().tolist()
+                        if any(x in ["NAME", "DATE", "TANGGAL", "AVERAGE", "TOTAL"] for x in row_str):
+                            header_row = i
                             break
                     
-                    # 3. Reload data dengan header yang bener
+                    # 3. Reload dengan baris header yang bener
                     df_master = pd.read_excel(xlsx_url, sheet_name=selected_sheet, 
-                                             header=header_row_idx + 1, engine='calamine')
+                                             header=header_row, engine='calamine')
 
-                    # --- FIX DUPLICATE COLUMNS (MANGLE NAMES) ---
-                    # Ini biar gak error 'Duplicate column names found'
+                    # 4. FIX DUPLICATE COLUMNS
                     cols = pd.Series(df_master.columns)
                     for dup in cols[cols.duplicated()].unique(): 
-                        cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range(sum(cols == dup))]
+                        cols[cols == dup] = [f"{dup}_{idx}" if idx != 0 else dup for idx in range(sum(cols == dup))]
                     df_master.columns = cols
 
-                    # 4. Bersihkan kolom hantu & baris kosong
+                    # 5. BERSIHIN FORMAT TANGGAL & WAKTU ANEH
+                    for col in df_master.columns:
+                        col_name = str(col).upper()
+                        # Bersihin Tanggal (Buang 00:00:00)
+                        if any(x in col_name for x in ["DATE", "TANGGAL", "MONTH"]):
+                            df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
+                        # Bersihin Waktu (Buang Tanggal hantu 1970)
+                        elif any(x in col_name for x in ["TIME", "AVERAGE", "MOVE", "QC", "PACK"]):
+                            df_master[col] = df_master[col].astype(str).str.split().str[-1]
+                            df_master[col] = df_master[col].replace(['nan', 'None', 'NaT'], '')
+
+                    # 6. Buang kolom 'Unnamed' dan baris kosong
                     df_master = df_master.loc[:, ~df_master.columns.astype(str).str.contains('^Unnamed')]
                     df_master = df_master.dropna(how='all').reset_index(drop=True)
-
-                    # 5. FIX TANGGAL & JAM (BUANG 00:00:00)
-                    for col in df_master.columns:
-                        col_str = str(col).upper()
-                        # Jika kolom tanggal
-                        if "DATE" in col_str or "MONTH" in col_str or "TANGGAL" in col_str:
-                            df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
-                        # Jika kolom jam (format time)
-                        elif "AVERAGE" in col_str or "TIME" in col_str:
-                            # Biar tetep kebaca sebagai jam tanpa tanggal hantu
-                            df_master[col] = df_master[col].astype(str).str.replace('01-01-1970 ', '')
 
                     # --- SUMMARY BOX ---
                     st.markdown(f"### 📊 Summary: {selected_sheet}")
                     c1, c2, c3, c4 = st.columns(4)
                     with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
                     with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-                    with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">LAST SYNC</span><span class="m-val">LIVE</span></div>', unsafe_allow_html=True)
-                    with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+                    with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+                    with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">ENGINE</span><span class="m-val">CALAMINE</span></div>', unsafe_allow_html=True)
 
                     st.divider()
 
                     # --- TABLE VIEW ---
                     st.subheader(f"📑 Table View: {selected_sheet}")
-                    search = st.text_input(f"Cari data...")
+                    search = st.text_input(f"Cari data di sini...")
                     if search:
                         mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
                         st.dataframe(df_master[mask], use_container_width=True, height=500)
@@ -233,5 +232,4 @@ elif menu == "📦 Database Artikel":
                 st.error("Link-nya kagak valid!")
 
         except Exception as e:
-            st.error(f"Error: {e}")
-            st.info("Pastiin link sudah 'Anyone with the link' (Viewer).")
+            st.error(f"Error: {e}") # Pastiin kurungnya cuma satu di akhir
