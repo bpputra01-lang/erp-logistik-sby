@@ -28,7 +28,7 @@ with st.sidebar:
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
 
 
-# --- MODUL DASHBOARD OVERVIEW ---
+## --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
     # 1. CSS SAKTI
     st.markdown("""
@@ -59,14 +59,25 @@ if menu == "📊 Dashboard Overview":
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL (Dropdown, Zoom, & Download)
+    # 2. MAPPING LINK (Dipindah ke atas agar variabel url_pilihan tersedia untuk tombol)
+    dash_links = {
+        "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
+        "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
+        "CYCLE COUNT DAN KERAPIHAN": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
+        "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
+    }
+
+    # 3. PANEL KONTROL (Dropdown, Zoom, & Download)
     c1, c2, c3 = st.columns([2, 1, 1])
+    
     with c1:
-        pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
+        pilih_dash = st.selectbox("", list(dash_links.keys()), label_visibility="collapsed")
+        url_pilihan = dash_links[pilih_dash] # Simpan URL yang dipilih
+
     with c2:
         zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
+
     with c3:
-        with c3:
         # TOMBOL EXPORT LANGSUNG KE PDF GOOGLE
         if st.button("📥 EXPORT TO PDF"):
             # Kita ubah URL 'pubhtml' jadi 'export?format=pdf'
@@ -80,16 +91,8 @@ if menu == "📊 Dashboard Overview":
                 <p style="color: #00ff00;">⏳ Sedang menyiapkan PDF, tunggu sebentar...</p>
             """, unsafe_allow_html=True)
 
-    # 3. MAPPING LINK
-    dash_links = {
-        "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
-        "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
-        "CYCLE COUNT DAN KERAPIHAN": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
-        "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
-    }
-
     # 4. PROSES TAMPILAN
-    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
+    url_final = f"{url_pilihan}&rm=minimal&chrome=false&widget=false"
     calc_ratio = (1 / zoom_val) * 100
 
     st.markdown(f"""
