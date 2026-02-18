@@ -22,7 +22,7 @@ st.markdown("""
     div.row-widget.stRadio > div { background-color: transparent !important; padding: 5px; }
     div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; transition: 0.3s; }
     div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; }
-    [data-testid="stWidgetLabel"] { display: none; }
+    [data-testid="stWidgetLabel"] p
     </style>
     """, unsafe_allow_html=True)
 
