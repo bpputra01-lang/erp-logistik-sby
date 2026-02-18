@@ -154,7 +154,7 @@ elif menu == "⛔ Stock Minus":
                 st.success(f"✅ Kelar! {len(set_up_results)} item direlokasi. {len(df_need_adj)} SKU butuh justifikasi.")
                 st.download_button("📥 DOWNLOAD HASIL LENGKAP", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
 
-# --- MODUL DATABASE ARTIKEL (VERSI ANTI-ERROR TOTAL) ---
+# --- MODUL DATABASE ARTIKEL (FIX DUPLICATE COLUMNS & AUTO-CLEAN) ---
 elif menu == "📦 Database Artikel":
     st.title("📦 Master Database : Google Sheets Sync")
     
@@ -167,52 +167,56 @@ elif menu == "📦 Database Artikel":
                 file_id = raw_url.split("/d/")[1].split("/")[0]
                 xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
                 
-                # Pakai engine calamine biar gak minta install openpyxl lagi
+                # Tarik data pake calamine
                 all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
                 sheet_names = list(all_sheets.keys())
                 selected_sheet = st.selectbox("PILIH TAB / SHEET:", sheet_names)
                 
                 if selected_sheet:
-                    # Ambil data mentah
+                    # 1. Ambil data mentah tanpa header dulu buat kita olah manual
                     df_raw = all_sheets[selected_sheet]
                     
-                    # --- LOGIC AUTO-SEARCH HEADER ---
-                    # Kita cari baris mana yang isinya paling banyak teks (bukan null)
-                    # Ini buat ngehindarin error 'float' pas bersih-bersih kolom
-                    df_raw = df_raw.dropna(how='all').reset_index(drop=True)
-                    
-                    # Cari index baris yang kemungkinan besar adalah Header
-                    header_idx = 0
-                    for i in range(min(len(df_raw), 10)):
-                        # Kalau baris ini punya lebih banyak data dibanding baris 0, kita geser headernya
-                        if df_raw.iloc[i].notnull().sum() > df_raw.iloc[0].notnull().sum():
-                            header_idx = i
+                    # 2. Cari baris mana yang beneran Header (nyari yang isinya string, bukan angka/kosong)
+                    # Kita cari baris yang punya kata 'Name' atau 'AVERAGE'
+                    header_row_idx = 0
+                    for i in range(min(len(df_raw), 15)):
+                        row_values = df_raw.iloc[i].astype(str).str.upper().tolist()
+                        if 'NAME' in row_values or 'AVERAGE' in row_values:
+                            header_row_idx = i
                             break
                     
-                    # Reset Dataframe pake baris header yang ditemuin
-                    new_header = df_raw.iloc[header_idx]
-                    df_master = df_raw[header_idx + 1:].copy()
-                    df_master.columns = new_header
-                    
-                    # Bersihkan kolom yang namanya NaN atau Unnamed
-                    df_master = df_master.loc[:, df_master.columns.notnull()]
-                    df_master = df_master.loc[:, ~df_master.columns.astype(str).str.contains('^Unnamed')]
+                    # 3. Reload data dengan header yang bener
+                    df_master = pd.read_excel(xlsx_url, sheet_name=selected_sheet, 
+                                             header=header_row_idx + 1, engine='calamine')
 
-                    # --- FIX FORMAT TANGGAL (BUANG JAM 00:00:00) ---
+                    # --- FIX DUPLICATE COLUMNS (MANGLE NAMES) ---
+                    # Ini biar gak error 'Duplicate column names found'
+                    cols = pd.Series(df_master.columns)
+                    for dup in cols[cols.duplicated()].unique(): 
+                        cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range(sum(cols == dup))]
+                    df_master.columns = cols
+
+                    # 4. Bersihkan kolom hantu & baris kosong
+                    df_master = df_master.loc[:, ~df_master.columns.astype(str).str.contains('^Unnamed')]
+                    df_master = df_master.dropna(how='all').reset_index(drop=True)
+
+                    # 5. FIX TANGGAL & JAM (BUANG 00:00:00)
                     for col in df_master.columns:
                         col_str = str(col).upper()
-                        if "DATE" in col_str or "TANGGAL" in col_str:
+                        # Jika kolom tanggal
+                        if "DATE" in col_str or "MONTH" in col_str or "TANGGAL" in col_str:
                             df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
+                        # Jika kolom jam (format time)
+                        elif "AVERAGE" in col_str or "TIME" in col_str:
+                            # Biar tetep kebaca sebagai jam tanpa tanggal hantu
+                            df_master[col] = df_master[col].astype(str).str.replace('01-01-1970 ', '')
 
                     # --- SUMMARY BOX ---
                     st.markdown(f"### 📊 Summary: {selected_sheet}")
                     c1, c2, c3, c4 = st.columns(4)
                     with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
                     with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-                    with c3:
-                        num_cols = df_master.select_dtypes(include=[np.number]).columns
-                        val_sum = f"{int(df_master[num_cols[0]].sum()):,}" if not num_cols.empty else "N/A"
-                        st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL VALUE</span><span class="m-val">{val_sum}</span></div>', unsafe_allow_html=True)
+                    with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">LAST SYNC</span><span class="m-val">LIVE</span></div>', unsafe_allow_html=True)
                     with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
 
                     st.divider()
@@ -229,5 +233,5 @@ elif menu == "📦 Database Artikel":
                 st.error("Link-nya kagak valid!")
 
         except Exception as e:
-            st.error(f"Kelar lo! Error: {e}")
-            st.info("PASTIIN: Link Google Sheets sudah 'Anyone with the link' (Viewer).")
+            st.error(f"Error: {e}")
+            st.info("Pastiin link sudah 'Anyone with the link' (Viewer).")
