@@ -52,21 +52,34 @@ if menu == "📊 Dashboard Overview":
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL
+    # 2. PANEL KONTROL (Dropdown, Zoom, & Export)
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
         pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
     with c2:
         zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
     with c3:
-        # --- PERBAIKAN SPASI DI SINI ---
-        if st.button("📥 EXPORT TO PDF"):
-            # Ambil link asli GSheets lo (sebelum di-pubhtml)
-            # Karena GSheets pubhtml gak bisa langsung di-replace ke export, 
-            # kita arahin ke print mode biar user tinggal 'Save as PDF' dengan rapi.
-            st.warning("Silakan pilih 'Save as PDF' pada menu yang muncul.")
-            st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
-
+        # TRIK BARU: Pake Link Download Langsung (Bukan window.print)
+        # Ambil GID dari link dashboard yang dipilih
+        gid_map = {
+            "WORKING REPORT": "864743695",
+            "PERSONAL PERFOMANCE": "251294539",
+            "CYCLE COUNT DAN KERAPIHAN": "1743896821",
+            "DASHBOARD MOVING STOCK": "1671817510"
+        }
+        gid_now = gid_map[pilih_dash]
+        
+        # URL Export PDF Langsung (Landscape, Fit to Page)
+        pdf_url = f"https://docs.google.com/spreadsheets/d/1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/export?format=pdf&gid={gid_now}&size=A4&portrait=false&fitw=true&gridlines=false"
+        
+        # Tombol Download Asli Streamlit (Pasti Muncul & Pasti Bisa)
+        st.markdown(f'''
+            <a href="{pdf_url}" target="_blank" style="text-decoration: none;">
+                <div style="background-color: #ff4b4b; color: white; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; cursor: pointer;">
+                    📥 DOWNLOAD PDF
+                </div>
+            </a>
+        ''', unsafe_allow_html=True)
     # 3. MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
@@ -89,7 +102,7 @@ if menu == "📊 Dashboard Overview":
             </iframe>
         </div>
     """, unsafe_allow_html=True)
-    
+
     # Info tipis di bawah
     st.caption(f"📍 View: {pilih_dash} | Gunakan slider ZOOM untuk menyesuaikan lebar dan tinggi halaman.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
