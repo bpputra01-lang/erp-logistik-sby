@@ -29,27 +29,28 @@ st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 # 2. THE AUTHENTIC ADMINITY UI ENGINE (PENGATURAN SPASI ATAS & SIDEBAR)
 st.markdown("""
     <style>
-    /* 1. MENGHAPUS SPACE KOSONG DI ATAS SIDEBAR & BODY */
+    /* MENGHAPUS SPACE KOSONG DI ATAS SIDEBAR & BODY */
     .block-container { padding-top: 1rem !important; }
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
-    [data-testid="stSidebarNav"] { display: none; } /* Sembunyikan nav default jika ada */
+    [data-testid="stSidebarNav"] { display: none; } 
     
-    /* 2. STYLE JUDUL ERP (NAIK KE ATAS) */
+    /* STYLE JUDUL ERP (PAKSA NAIK KE ATAS) */
     .sidebar-title { 
         color: #00d2ff; 
         text-align: center; 
         font-family: 'Inter', sans-serif;
         font-weight: 800;
         font-size: 20px;
-        margin-top: -50px; /* Menarik judul ke area paling atas */
+        margin-top: -45px; /* Menarik judul ke paling atas */
         padding-bottom: 15px;
         border-bottom: 1px solid #2d2d44;
         margin-bottom: 10px;
     }
 
-    /* 3. STYLE MENU & HEADER */
+    /* STYLE MENU & HEADER */
     .stApp { background-color: #f4f7f6; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
+    
     .nav-header { 
         font-size: 11px; 
         text-transform: uppercase; 
@@ -58,6 +59,7 @@ st.markdown("""
         padding: 15px 0 5px 10px; 
         font-weight: 700; 
     }
+    
     .hero-header { 
         background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
         color: white; 
@@ -66,18 +68,16 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
         margin-bottom: 25px; 
     }
-    
-    /* Dashboard Metrics style */
+
+    /* Metric Box */
     .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
     .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
     .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
-    
+
     /* Radio Button styling */
     div.row-widget.stRadio > div { background-color: transparent !important; }
     div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
-    div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; }
-    
-    </style>
+    div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; } </style>
     """, unsafe_allow_html=True)
 
 # --- FUNGSI LOGIKA ASLI (TETAP SAMA) ---
