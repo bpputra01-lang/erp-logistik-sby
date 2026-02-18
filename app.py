@@ -121,7 +121,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
         
         df_refill_final = pd.DataFrame(refill_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD", "QTY GL3"])
 
-        # --- SUB 4: CREATE OVERSTOCK SHEET (Logic VBA) ---
+        # --- SUB 4: CREATE OVERSTOCK SHEET (Logic VBA + Anti-RAK) ---
         # Stock Tracking: SKU = Col B (Indeks 1), Qty = Col K (Indeks 10)
         dictTrans = {}
         if not df_st_filtered.empty:
@@ -133,6 +133,12 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
         overstock_output = []
         if not df_gl3.empty:
             for row in df_gl3.values:
+                # --- TAMBAHAN FILTER RAK DISINI ---
+                bin_over = str(row[1]).upper() if not pd.isna(row[1]) else ""
+                if "RAK" in bin_over:
+                    continue # Kalo ada kata RAK, skip, jangan masukin ke list Overstock
+                # ----------------------------------
+
                 sku_g3 = str(row[2]).strip()
                 qty_sys = int(float(row[9]))
                 if qty_sys > 24:
@@ -140,6 +146,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
                     if dictTrans.get(sku_g3, 0) >= 7:
                         load_os = math.ceil(load_os / 3)
                     if load_os > 0:
+                        # Ambil data: BIN(1), SKU(2), BRAND(3), NAME(4), VAR(5), Q_SYS(9), LOAD
                         overstock_output.append([row[1], sku_g3, row[3], row[4], row[5], qty_sys, load_os])
 
         df_overstock_final = pd.DataFrame(overstock_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD"])
