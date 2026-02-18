@@ -222,7 +222,7 @@ elif menu == "⛔ Stock Minus":
 
 # --- MODUL DATABASE ARTIKEL (FIX HEADER HILANG & FORMAT WAKTU) ---
 elif menu == "📝 Dashboard Database":
-    st.title("📓 Detail Input Dashboard Overview")
+    st.title("📓 Check Detail Dashboard")
     
     raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", 
                              placeholder="https://docs.google.com/spreadsheets/d/ID_FILE/edit...")
