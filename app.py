@@ -60,37 +60,69 @@ with st.sidebar:
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
 
-# --- GLOBAL TOP BAR (WARNA BIRU & EMAS) ---
-# Ini adalah header paling atas yang muncul di SEMUA menu
+# --- GLOBAL TOP BAR (FULL BIRU NAVY TOTAL & EMAS) ---
 st.markdown("""
     <div style="
-        background: linear-gradient(90deg, #1e1e2f 0%, #1e3a8a 50%, #1e1e2f 100%);
-        padding: 10px;
-        border-radius: 15px;
-        border-top: 3px solid #FFD700;
-        border-bottom: 3px solid #FFD700;
-        margin-bottom: 25px;
+        background-color: #1e3a8a;
+        padding: 15px;
+        border-radius: 10px;
+        border-bottom: 5px solid #FFD700;
+        margin-bottom: 20px;
         text-align: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     ">
-        <span style="color: #FFD700; font-weight: 800; letter-spacing: 2px; font-size: 14px;">
-            💎 SURABAYA LOGISTICS COMMAND CENTER — PRESTIGE EDITION 💎
-        </span>
+        <h2 style="color: #FFD700; margin: 0; font-weight: 800; letter-spacing: 3px;">
+            SURABAYA LOGISTICS COMMAND CENTER
+        </h2>
+        <p style="color: white; margin: 0; font-size: 12px; opacity: 0.8;">PRESTIGE SYSTEM v2.0</p>
     </div>
 """, unsafe_allow_html=True)
 
-# --- GLOBAL STAT CARDS ---
+# --- GLOBAL STAT CARDS (TETAP ADA BIAR GAK KOSONG) ---
 mq1, mq2, mq3, mq4 = st.columns(4)
 with mq1:
-    st.markdown(f'<div class="m-box" style="padding:15px !important; border-top: 4px solid #3b82f6;"><span class="m-lbl">📍 LOCATION</span><span class="m-val" style="font-size:20px !important;">SURABAYA DC</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="m-box" style="padding:15px !important;"><span class="m-lbl">📍 LOCATION</span><span class="m-val" style="font-size:20px !important;">SURABAYA DC</span></div>', unsafe_allow_html=True)
 with mq2:
-    st.markdown(f'<div class="m-box" style="padding:15px !important; border-top: 4px solid #FFD700;"><span class="m-lbl">📅 PERIODE</span><span class="m-val" style="font-size:20px !important;">FEB 2026</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="m-box" style="padding:15px !important;"><span class="m-lbl">📅 PERIODE</span><span class="m-val" style="font-size:20px !important;">FEB 2026</span></div>', unsafe_allow_html=True)
 with mq3:
-    st.markdown(f'<div class="m-box" style="padding:15px !important; border-top: 4px solid #3b82f6;"><span class="m-lbl">⏱️ LAST SYNC</span><span class="m-val" style="font-size:20px !important;">REAL-TIME</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="m-box" style="padding:15px !important;"><span class="m-lbl">⏱️ LAST SYNC</span><span class="m-val" style="font-size:20px !important;">REAL-TIME</span></div>', unsafe_allow_html=True)
 with mq4:
-    st.markdown(f'<div class="m-box" style="padding:15px !important; border-top: 4px solid #FFD700;"><span class="m-lbl">🚀 STATUS</span><span class="m-val" style="font-size:20px !important;">OPTIMIZED</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="m-box" style="padding:15px !important;"><span class="m-lbl">🚀 STATUS</span><span class="m-val" style="font-size:20px !important;">OPTIMIZED</span></div>', unsafe_allow_html=True)
 
 st.divider()
+
+# --- 4. LOGIKA MODUL ---
+if menu == "📊 Dashboard Overview":
+    # Dropdown Laporan Tetap Ada
+    pilih = st.selectbox("PILIH LAPORAN ANALYTICS", [
+        "WORKING REPORT", 
+        "PERSONAL PERFORMANCE", 
+        "CYCLE COUNT DAN KERAPIHAN", 
+        "DASHBOARD MOVING STOCK"
+    ])
+
+    # Mapping GID
+    dash_links = {
+        "WORKING REPORT": "864743695",
+        "PERSONAL PERFORMANCE": "251294539",
+        "CYCLE COUNT DAN KERAPIHAN": "1743896821",
+        "DASHBOARD MOVING STOCK": "1671817510"
+    }
+    gid = dash_links[pilih]
+
+    # FRAME DASHBOARD (ZOOM DIHAPUS, UKURAN FIXED)
+    st.markdown(f'''
+        <div class="dash-container" style="height: auto; overflow: hidden; border: 3px solid #1e3a8a;">
+            <div style="width: 100%; height: 650px; overflow: auto; border-radius: 10px; background: #0b242d;">
+                <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={gid}&single=true&rm=minimal" 
+                style="width: 100%; height: 1500px; border: none;"></iframe>
+            </div>
+        </div>
+    ''', unsafe_allow_html=True)
+
+elif menu == "📝 Dashboard Database":
+    # ... (Kode Database lo yang otomatis link tadi)
+    pass
 
 
 # --- 4. LOGIKA MODUL DASHBOARD OVERVIEW ---
