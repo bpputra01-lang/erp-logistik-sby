@@ -28,29 +28,37 @@ with st.sidebar:
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
 
 # --- MODUL DASHBOARD OVERVIEW ---
+# --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # --- SETUP LAYOUT FULL SCREEN ---
+    # 1. CSS biar area kerja Streamlit benar-benar mepet tapi tetap proporsional
     st.markdown("""
         <style>
             .main .block-container {
-                padding-top: 1rem;
-                padding-right: 1rem;
-                padding-left: 1rem;
-                padding-bottom: 1rem;
-                max-width: 100%;
+                padding-top: 0.5rem !important;
+                padding-bottom: 0rem !important;
+                padding-right: 0.5rem !important;
+                padding-left: 0.5rem !important;
+                max-width: 100% !important;
             }
-            iframe { border: none; border-radius: 10px; box-shadow: 0px 4px 15px rgba(0,0,0,0.3); }
+            iframe {
+                border: 1px solid #e6e9ef;
+                border-radius: 8px;
+            }
+            header {visibility: hidden;}
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<h2 style='text-align: center; color: #1e3a47;'>🚀 LOGISTIC REAL-TIME MONITORING</h2>", unsafe_allow_html=True)
-
-    # --- DROPDOWN NAVIGASI RAPI ---
-    pilih_dash = st.selectbox("PILIH VIEW DASHBOARD:", 
+    # 2. DROPDOWN (Pake kolom biar gak makan tempat ke bawah)
+    col_tittle, col_select = st.columns([2, 1])
+    with col_tittle:
+        st.markdown(f"### 📈 {pilih_dash if 'pilih_dash' in locals() else 'WORKING REPORT'}")
+    with col_select:
+        pilih_dash = st.selectbox("", 
                               ["WORKING REPORT", "PERSONAL PERFOMANCE", 
-                               "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
+                               "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
+                              label_visibility="collapsed")
 
-    # Mapping link GID (Link lo sudah gue bersihin dari typo 'h' di depan)
+    # 3. MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -58,15 +66,12 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # Ambil link berdasarkan dropdown
-    url_pilihan = dash_links[pilih_dash]
-    
-    # Tambahin parameter &rm=minimal biar gak ada menu bar Google (Full Screen Bersih)
-    url_final = f"{url_pilihan}&rm=minimal"
+    # 4. TAMPILAN YANG MENYESUAIKAN LAYAR
+    # rm=minimal + chrome=false buat ngebersihin UI Google
+    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false"
 
-    # --- TAMPILAN DASHBOARD ---
-    if "pubhtml" in url_final:
-        st.components.v1.iframe(url_final, height=900, scrolling=True)
+    # Pake height=80vh (80% dari tinggi layar user) biar pas & proporsional
+    st.components.v1.iframe(url_final, height=800, scrolling=True)
     else:
         st.error("Link tidak valid. Pastikan link adalah link 'Publish to Web' dari Google Sheets.")
         
