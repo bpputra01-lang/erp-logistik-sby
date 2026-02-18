@@ -8,9 +8,15 @@ from python_calamine import CalamineWorkbook
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
-# 2. CUSTOM CSS GLOBAL (NAVY MEWAH & FIX DROPDOWN)
+# 2. CUSTOM CSS GLOBAL (NAVY MEWAH & MEPET ATAS)
 st.markdown("""
     <style>
+    /* Menghilangkan padding bawaan Streamlit agar header bisa mepet atas */
+    .block-container {
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+        max-width: 100% !important;
+    }
     .stApp { background-color: #ffffff; color: #31333f; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: white !important; }
@@ -20,63 +26,79 @@ st.markdown("""
         background-color: #1e1e2f !important;
         color: #FFD700 !important;
         border: 2px solid #3b82f6 !important;
-        z-index: 999999 !important;
     }
-    div[role="listbox"] ul { background-color: #1e1e2f !important; }
-    div[role="option"] { color: white !important; }
 
-    /* SUMMARY BOX NAVY GALAK (GAMBAR 11 VIBES) */
+    /* SUMMARY BOX NAVY GALAK */
     .m-box { 
         background-color: #1e1e2f !important; 
         border: 2px solid #3b82f6 !important;
         border-left: 12px solid #FFD700 !important;
-        padding: 25px !important; 
+        padding: 20px !important; 
         border-radius: 15px !important; 
         text-align: center !important; 
         box-shadow: 0 8px 20px rgba(0,0,0,0.3) !important;
-        margin-bottom: 15px !important;
+        margin-bottom: 10px !important;
     }
-    .m-val { font-size: 32px !important; font-weight: 800 !important; color: #FFD700 !important; display: block !important; }
-    .m-lbl { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase !important; font-weight: 700 !important; letter-spacing: 1.5px !important; }
+    .m-val { font-size: 28px !important; font-weight: 800 !important; color: #FFD700 !important; display: block !important; }
+    .m-lbl { font-size: 12px !important; color: #ffffff !important; text-transform: uppercase !important; font-weight: 700 !important; }
 
-    /* HEADER & FRAME */
-    .hero-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 1.5rem 2rem;
-        border-bottom: 5px solid #FFD700; border-radius: 15px; margin-bottom: 20px;
+    /* HEADER FULL BIRU MEPET ATAS */
+    .top-command-bar {
+        background-color: #1e3a8a;
+        padding: 20px;
+        border-bottom: 5px solid #FFD700;
+        margin-left: -5rem;
+        margin-right: -5rem;
+        margin-top: -1rem;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        margin-bottom: 20px;
     }
+
     .dash-container {
-        border: 5px solid #1e3a8a; border-radius: 15px;
-        padding: 10px; background: #f8f9fa;
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
+        border: 3px solid #1e3a8a; border-radius: 15px;
+        padding: 5px; background: #f8f9fa;
         overflow: hidden;
+    }
+    
+    /* DEKORASI BIRU ELEGANT POLOS */
+    .blue-line {
+        background: #1e3a8a; 
+        height: 8px; 
+        width: 100%; 
+        border-radius: 10px; 
+        border-bottom: 2px solid #FFD700;
+        margin-top: 10px;
+        margin-bottom: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BAGIAN MENU SIDEBAR (Gue tambahin biar lengkap) ---
+# 3. SIDEBAR
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
 
-# --- 4. LOGIKA MODUL DASHBOARD OVERVIEW ---
+# --- HEADER OTOMATIS DI SEMUA MENU ---
+st.markdown("""
+    <div class="top-command-bar">
+        <h1 style="color: #FFD700; margin: 0; font-weight: 800; letter-spacing: 5px; font-size: 32px;">
+            SURABAYA LOGISTICS COMMAND CENTER
+        </h1>
+        <p style="color: white; margin: 0; font-size: 13px; font-weight: 600; opacity: 0.9;">PRESTIGE SYSTEM v2.0</p>
+    </div>
+""", unsafe_allow_html=True)
+
+# 4. LOGIKA MODUL
 if menu == "📊 Dashboard Overview":
-    st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
-    
     c1, c2 = st.columns([3, 1])
     with c1:
-        # 1. DISINI GUE TAMBAHIN JADI 4 PILIHAN SESUAI PERMINTAAN
         pilih = st.selectbox("PILIH LAPORAN", [
-            "WORKING REPORT", 
-            "PERSONAL PERFORMANCE", 
-            "CYCLE COUNT DAN KERAPIHAN", 
-            "DASHBOARD MOVING STOCK"
+            "WORKING REPORT", "PERSONAL PERFORMANCE", 
+            "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"
         ])
-    with c2:
-        zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
-
-    # 2. MAPPING LINK (Biar dropdown-nya jalan sesuai pilihan)
+    
     dash_links = {
         "WORKING REPORT": "864743695",
         "PERSONAL PERFORMANCE": "251294539",
@@ -85,57 +107,42 @@ if menu == "📊 Dashboard Overview":
     }
     gid = dash_links[pilih]
 
-    # 3. TAMPILAN (Frame anti-scroll kejauhan)
+    # Dekorasi Biru Elegant Polos
+    st.markdown('<div class="blue-line"></div>', unsafe_allow_html=True)
+
+    # Tampilan Iframe (No Zoom - Ukuran Pas)
     st.markdown(f'''
-        <div class="dash-container" style="height: auto; overflow: hidden;">
-            <div style="width: 100%; height: 500px; overflow: auto; border-radius: 10px; background: #f8f9fa;">
+        <div class="dash-container">
+            <div style="width: 100%; height: 600px; overflow: auto;">
                 <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={gid}&single=true&rm=minimal" 
-                style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
+                style="width: 100%; height: 1500px; border: none;"></iframe>
             </div>
         </div>
-
     ''', unsafe_allow_html=True)
-    # --- DEKORASI BIRU ELEGANT (POLOS) ---
-st.markdown("""
-    <div style="
-        background: #1e3a8a; 
-        height: 8px; 
-        width: 100%; 
-        border-radius: 10px; 
-        border-bottom: 2px solid #FFD700;
-        margin-top: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    "></div>
-""", unsafe_allow_html=True)
-    
-elif menu == "📝 Dashboard Database":
-    st.markdown('<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1></div>', unsafe_allow_html=True)
-    
-    raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", placeholder="Paste link di sini...")
-    
-    if raw_url:
-        try:
-            if "/d/" in raw_url:
-                file_id = raw_url.split("/d/")[1].split("/")[0]
-                xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
-                
-                all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
-                selected_sheet = st.selectbox("PILIH TAB / SHEET:", list(all_sheets.keys()))
-                
-                if selected_sheet:
-                    df_master = all_sheets[selected_sheet]
-                    
-                    # BOX SUMMARY NAVY (Gambar 2 yang lo mau)
-                    c1, c2, c3 = st.columns(3)
-                    with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-                    with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-                    with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
 
-                    st.divider()
-                    st.dataframe(df_master, use_container_width=True, height=500)
-        except Exception as e:
-            st.error(f"Gagal narik data: {e}")
+elif menu == "📝 Dashboard Database":
+    # LINK OTOMATIS (Sesuai permintaan: Langsung Nge-link)
+    FILE_ID = "1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY"
+    xlsx_url = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=xlsx"
+    
+    try:
+        all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+        selected_sheet = st.selectbox("PILIH TAB / SHEET:", list(all_sheets.keys()))
+        
+        if selected_sheet:
+            df_master = all_sheets[selected_sheet]
+            df_master = df_master.loc[:, ~df_master.columns.astype(str).str.contains('^Unnamed')]
+
+            # Summary Box
+            c1, c2, c3 = st.columns(3)
+            with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+            with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+            with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+
+            st.divider()
+            st.dataframe(df_master, use_container_width=True, height=500)
+    except Exception as e:
+        st.error(f"Koneksi Gagal: {e}")
 
 elif menu == "⛔ Stock Minus":
     st.markdown('<div class="hero-header"><h1>⛔ STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
