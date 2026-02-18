@@ -12,18 +12,36 @@ st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 # 2. THE AUTHENTIC ADMINITY UI ENGINE
 st.markdown("""
     <style>
+    /* Naikin konten sidebar ke paling atas */
+    [data-testid="stSidebarNav"] { padding-top: 0rem; }
+    .st-emotion-cache-16p9v06 { padding-top: 0rem; }
+    
     .stApp { background-color: #f4f7f6; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
     [data-testid="stSidebar"] .stMarkdown p { color: #aeb1b5 !important; font-family: 'Inter', sans-serif; }
-    .nav-header { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #6c757d; padding: 20px 0 10px 10px; font-weight: 700; border-bottom: 1px solid #2d2d44; margin-bottom: 10px; }
-    .hero-header { background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); color: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 25px; }
+    
+    .sidebar-title { 
+        color: #00d2ff; 
+        text-align: center; 
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        margin-top: -50px; /* Tarik judul ke atas */
+        padding-bottom: 20px;
+        border-bottom: 1px solid #2d2d44;
+    }
+
+    .nav-header { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #6c757d; padding: 10px 0 5px 10px; font-weight: 700; }
+    .hero-header { background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 25px; }
+    
     .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
     .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
     .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
+    
     div.row-widget.stRadio > div { background-color: transparent !important; padding: 5px; }
     div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; transition: 0.3s; }
     div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; }
-    [data-testid="stWidgetLabel"] p
+    
     </style>
     """, unsafe_allow_html=True)
 
