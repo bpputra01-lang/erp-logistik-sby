@@ -221,8 +221,4 @@ elif menu == "⛔ Stock Minus":
                 st.success("Proses Selesai")
                 if set_up_results:
                     st.dataframe(pd.DataFrame(set_up_results), use_container_width=True)
-            else:
-                st.error("Link-nya kagak valid!")
-
-        except Exception as e:
-            st.error(f"Error: {e}") # Pastiin kurungnya cuma satu di akhir
+                    
