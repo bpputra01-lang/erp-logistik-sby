@@ -4,5 +4,6 @@ numpy
 mysql-connector-python
 python-calamine
 xlsxwriter
+openpyxl
 altair<5
 plotly
