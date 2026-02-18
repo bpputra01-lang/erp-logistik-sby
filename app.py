@@ -9,65 +9,55 @@ from python_calamine import CalamineWorkbook
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
 # 2. CUSTOM CSS GLOBAL
+# 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
-    /* 1. BACKGROUND UTAMA TETAP PUTIH */
     .stApp { background-color: #ffffff; color: #31333f; }
     
-    /* 2. SIDEBAR (Tulisan Putih Bersih di atas BG Gelap) */
+    /* SIDEBAR TULISAN PUTIH */
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    /* Memaksa semua teks di sidebar jadi putih */
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p, 
     [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] span { 
-        color: white !important; 
-        font-weight: 500; 
-    }
+    [data-testid="stSidebar"] span { color: white !important; font-weight: 500; }
 
-    /* 3. ELEMEN INPUT (DARK THEME) - DROPDOWN & SEARCH BAR */
-    /* Kotak Dropdown & Input */
-    div[data-baseweb="select"] > div, 
-    div[data-testid="stTextInput"] input {
-        background-color: #1e1e2f !important; /* Warna Gelap */
-        color: #ffffff !important; /* Tulisan Putih */
+    /* DROPDOWN & INPUT DARK THEME */
+    div[data-baseweb="select"] > div, div[data-testid="stTextInput"] input {
+        background-color: #1e1e2f !important;
+        color: #ffffff !important;
         border: 1px solid #3b82f6 !important;
         border-radius: 8px !important;
     }
-    
-    /* Icon dropdown dan teks pilihan */
     div[data-baseweb="select"] svg { fill: white !important; }
-    div[data-baseweb="select"] span { color: white !important; }
 
-    /* 4. TABEL / DATAFRAME (DARK MODE) */
+    /* TABEL DARK MODE */
     [data-testid="stDataFrame"] {
         background-color: #1e1e2f !important;
         border: 1px solid #3b82f6 !important;
         border-radius: 10px !important;
-        padding: 5px;
     }
 
-    /* 5. SUMMARY BOX (Warna Cerah Elegan di Latar Putih) */
+    /* SUMMARY BOX BIRU NAVY (INI YANG LO MAU) */
     .m-box { 
-        background: #ffffff; 
-        border: 1px solid #e0e0e0;
-        border-left: 5px solid #1e3a8a; 
-        padding: 15px; 
-        border-radius: 10px; 
+        background-color: #1e1e2f !important; /* BIRU NAVY SOLID */
+        border: 2px solid #3b82f6;
+        border-left: 8px solid #FFD700 !important; /* AKSEN EMAS */
+        padding: 20px; 
+        border-radius: 12px; 
         text-align: center; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         margin-bottom: 10px;
     }
-    .m-val { font-size: 22px; font-weight: 800; color: #1e3a8a; display: block; }
-    .m-lbl { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
+    .m-val { font-size: 26px; font-weight: 800; color: #FFD700 !important; display: block; }
+    .m-lbl { font-size: 12px; color: #ffffff !important; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
 
-    /* 6. HERO HEADER */
     .hero-header {
         background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
         color: white; padding: 1.5rem 2rem;
         border-bottom: 4px solid #FFD700;
         border-radius: 10px;
         margin-bottom: 15px;
-    } </style>
+    }
+    </style>
     """, unsafe_allow_html=True)
 # --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
 with st.sidebar:
@@ -101,53 +91,49 @@ elif menu == "⛔ Stock Minus":
     # ... (Gunakan logic processing lo yang lama di sini, sudah aman)
 
 elif menu == "📝 Dashboard Database":
-    st.title("📓 Check Detail Dashboard")
-    # 1. HEADER MEWAH
     st.markdown("""<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1><p>Automatic Sync with Google Sheets Master</p></div>""", unsafe_allow_html=True)
     
-    # 2. LINK OTOMATIS (Gak perlu input manual lagi)
+    # LINK GOOGLE SHEET LO
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
     
-    try:
-        # Extract File ID secara otomatis
-        file_id = SHEET_URL.split("/d/")[1].split("/")[0]
+    # FUNGSI CACHE (BIAR SAT-SET)
+    @st.cache_data(ttl=600) # Simpan data di memori selama 10 menit
+    def load_data_pro(url):
+        file_id = url.split("/d/")[1].split("/")[0]
         xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+        return pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+
+    try:
+        with st.spinner('Lagi sinkronisasi data...'):
+            all_sheets = load_data_pro(SHEET_URL)
         
-        # Tarik semua sheet
-        all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+        selected_sheet = st.selectbox("📂 PILIH TAB DATABASE:", list(all_sheets.keys()))
         
-        # Pilihan Sheet/Tab
-        sel_sheet = st.selectbox("📂 PILIH TAB DATABASE:", list(all_sheets.keys()))
-        
-        if sel_sheet:
-            df_master = all_sheets[sel_sheet]
+        if selected_sheet:
+            df_master = all_sheets[selected_sheet].copy()
             
-            # --- CLEANING DATA ---
-            for col in df_master.columns:
-                col_name = str(col).upper()
-                # Fix Tanggal
-                if any(x in col_name for x in ["DATE", "TANGGAL"]):
-                    df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
-                # Fix Waktu/Jam (Jika ada)
-                elif any(x in col_name for x in ["TIME", "AVERAGE"]):
-                    df_master[col] = df_master[col].astype(str).str.split().str[-1]
-
-            # --- SUMMARY BOX (Biar keren) ---
+            # --- SUMMARY BOX (BIRU NAVY SEJAJAR) ---
             c1, c2, c3 = st.columns(3)
-            with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-            with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-            with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">SYNC STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+            with c1:
+                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master):,}</span></div>', unsafe_allow_html=True)
+            with c2:
+                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+            with c3:
+                st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
 
-            # --- SEARCH BAR ---
-            search = st.text_input("🔍 Cari Data di Tabel:", placeholder="Ketik nama atau SKU...")
+            # --- SEARCH & TABLE ---
+            st.divider()
+            search = st.text_input("🔍 Cari Data Cepat:", placeholder="Ketik nama atau SKU...")
+            
             if search:
+                # Filter data tanpa reload (instan)
                 mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
                 st.dataframe(df_master[mask], use_container_width=True, height=500)
             else:
                 st.dataframe(df_master, use_container_width=True, height=500)
 
     except Exception as e:
-        st.error(f"❌ Gagal koneksi ke database: {e}")
+        st.error(f"Gagal narik data: {e}")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
