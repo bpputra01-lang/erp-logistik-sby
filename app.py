@@ -30,35 +30,20 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS ULTIMATE: Maksa Container Jadi Kanvas Full
+    # 1. CSS SAKTI: Full Screen + No Padding + Zoom Out
     st.markdown("""
         <style>
-            /* Buang semua spasi sisa Streamlit */
-            .main .block-container {
-                padding: 0rem !important;
-                max-width: 100% !important;
+            .main .block-container { padding: 0rem !important; max-width: 100% !important; }
+            header { visibility: hidden; }
+            .stApp { margin-top: -70px; }
+            .iframe-wrapper {
+                width: 100%; height: 95vh; overflow: hidden; position: relative; background: #0e1117;
             }
-            header {visibility: hidden;}
-            .stApp { margin-top: -80px; }
-            
-            /* KONTROL ZOOM: Di sini kuncinya biar gak kepotong */
-            .zoom-container {
-                width: 100%;
-                height: 95vh;
-                overflow: hidden; /* Matiin scroll geser-geser jancok itu */
-                position: relative;
-                background: #0e1117;
-            }
-            
-            .zoom-container iframe {
-                /* Kita bikin frame 2x lipat lebih gede biar resolusi tajam */
-                width: 200%; 
-                height: 200%;
-                /* Terus kita paksa KECILIN (Scale) sampe muat di layar lo */
-                transform: scale(0.5); /* Coba 0.5 dulu, kalau kurang kecil ganti 0.4 */
+            .iframe-wrapper iframe {
+                width: 166.6%; height: 166.6%;
+                transform: scale(0.6); /* PAKSA ZOOM OUT BIAR GAK KEPOTONG */
                 transform-origin: 0 0;
-                border: none;
-                position: absolute;
+                border: none; position: absolute; top: 0; left: 0;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -77,17 +62,15 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # Bersihin link biar tab bawah Google ilang
-    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
+    # 4. TAMPILIN (Pake cara aman biar gak SyntaxError)
+    url_pilihan = dash_links[pilih_dash]
+    url_final = f"{url_pilihan}&rm=minimal&chrome=false&widget=false"
 
-    # 4. TAMPILIN (Pake Wrapper CSS)
-    st.markdown(f"""
-        <div class="zoom-container">
-            <iframe src="{url_final}"></iframe>
-        </div>
-    """, unsafe_allow_html=True)
+    # Pastikan blok di bawah ini lurus spasinya!
+    if "pubhtml" in url_final:
+        st.markdown(f'<div class="iframe-wrapper"><iframe src="{url_final}"></iframe></div>', unsafe_allow_html=True)
     else:
-        st.error("Link Gak Valid!")
+        st.error("Link Gak Valid, Cek GSheets lo!")
 
     # Info ditaruh bawah tipis aja
     st.caption(f"📍 View: {pilih_dash} | Auto-update aktif.")
