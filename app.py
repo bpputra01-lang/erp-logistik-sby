@@ -8,149 +8,82 @@ from python_calamine import CalamineWorkbook
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
-# 2. CUSTOM CSS (KEMBALIKAN STYLE LO & FIX FONT)
+# 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
     .stApp { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    [data-testid="stSidebar"] * { color: white !important; }
     header[data-testid="stHeader"] { background-color: rgba(30, 30, 47, 0.85) !important; backdrop-filter: blur(12px); border-bottom: 2px solid #FFD700; }
-    .m-box { background-color: #164e58; border: 1px solid #288494; padding: 10px; border-radius: 5px; text-align: center; color: white; margin-bottom: 10px; }
-    .m-val { font-size: 1.2rem; font-weight: 800; color: #FFD700; display: block; }
-    .m-lbl { font-size: 0.7rem; color: #8ecad4; text-transform: uppercase; }
+    
+    /* Style Header Biru Dashboard */
+    .hero-header {
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white; padding: 1.5rem 2rem;
+        border-bottom: 4px solid #FFD700;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        border-radius: 0 0 15px 15px;
+        margin-bottom: 15px;
+    }
+    .hero-header h1 { margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; color: white !important; }
+    
+    .scroll-wrapper {
+        width: 100%; height: 80vh; overflow: auto;
+        background: #0e1117; border: 1px solid #3b82f6; border-radius: 10px;
+    }
+    .scroll-wrapper iframe { border: none; transform-origin: 0 0; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MODUL DASHBOARD OVERVIEW (VERSI PROFESIONAL & RAPI) ---
-if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI: Header Biru, Layout Presisi & Scrollbar
-    st.markdown("""
-        <style>
-            /* Reset Padding */
-            .main .block-container { padding: 0rem !important; max-width: 100% !important; }
-            header { visibility: hidden; }
-            .stApp { margin-top: -75px; }
-
-            /* HEADER BIRU PREMIUM (Sama gaya dengan Stock Minus lo) */
-            .hero-header {
-                background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-                color: white;
-                padding: 1.5rem 2rem;
-                border-bottom: 4px solid #FFD700; /* Garis Emas Profesional */
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                border-radius: 0 0 15px 15px;
-            }
-            .hero-header h1 { margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-            .hero-header p { margin: 5px 0 0 0; font-size: 13px; opacity: 0.8; }
-
-            /* PANEL KONTROL */
-            .control-panel {
-                background-color: #1e1e2f; 
-                padding: 15px 25px; 
-                border-bottom: 1px solid #333;
-                margin-top: 10px;
-            }
-
-            /* CONTAINER DASHBOARD */
-            .scroll-wrapper {
-                width: 100%;
-                height: 80vh; 
-                overflow: auto;
-                background: #0e1117;
-                position: relative;
-                border: 1px solid #3b82f6;
-                margin-top: 5px;
-            }
-            .scroll-wrapper iframe { border: none; transform-origin: 0 0; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # 2. HEADER PROFESIONAL (Biar gak kosong melompong)
-    st.markdown(f"""
-        <div class="hero-header">
-            <h1>📊 DASHBOARD ANALYTICS</h1>
-            <p>Warehouse Management System Surabaya • Logistic Operation Monitor</p>
-        </div>
-    """, unsafe_allow_html=True)
-# --- 3. SIDEBAR (PASTIKAN INI DI ATAS) ---
+# --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
-    # Variabel 'menu' didefinisikan di sini
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
 
-# --- MODUL DASHBOARD OVERVIEW (VERSI PROFESIONAL & RAPI) ---
+# --- 4. LOGIKA MODUL ---
+
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI
-    st.markdown("""
-        <style>
-            .main .block-container { padding: 0rem !important; max-width: 100% !important; }
-            header { visibility: hidden; }
-            .stApp { margin-top: -75px; }
-
-            .hero-header {
-                background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-                color: white; padding: 1.5rem 2rem;
-                border-bottom: 4px solid #FFD700;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                border-radius: 0 0 15px 15px;
-            }
-            .hero-header h1 { margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; }
-            
-            .control-panel {
-                background-color: #1e1e2f; padding: 15px 25px; 
-                border-bottom: 1px solid #333; margin-top: 10px;
-            }
-
-            .scroll-wrapper {
-                width: 100%; height: 80vh; overflow: auto;
-                background: #0e1117; position: relative;
-                border: 1px solid #3b82f6; margin-top: 5px;
-            }
-            .scroll-wrapper iframe { border: none; transform-origin: 0 0; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # 2. HEADER
-    st.markdown(f"""
-        <div class="hero-header">
-            <h1>📊 DASHBOARD ANALYTICS</h1>
-            <p>Warehouse Management System Surabaya • Logistic Operation Monitor</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # 3. PANEL KONTROL
-    st.markdown('<div class="control-panel">', unsafe_allow_html=True)
+    st.markdown("""<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1><p>Warehouse Management System Surabaya</p></div>""", unsafe_allow_html=True)
+    
     c1, c2 = st.columns([2, 1])
     with c1:
-        pilih_dash = st.selectbox("PILIH LAPORAN OPERASIONAL", 
-                                ["WORKING REPORT", "PERSONAL PERFOMANCE", 
-                                 "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
+        pilih_dash = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
     with c2:
-        zoom_val = st.slider("PASIN UKURAN TAMPILAN", 0.10, 1.0, 0.35, 0.01)
-    st.markdown('</div>', unsafe_allow_html=True)
+        zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
 
-    # 4. MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
         "CYCLE COUNT DAN KERAPIHAN": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
+    
+    st.markdown(f'<div class="scroll-wrapper"><iframe src="{dash_links[pilih_dash]}&rm=minimal" style="width: 3500px; height: 2500px; transform: scale({zoom_val});"></iframe></div>', unsafe_allow_html=True)
 
-    # 5. TAMPILAN
-    url_final = f"{dash_links[pilih_dash]}&rm=minimal"
-    st.markdown(f"""
-        <div class="scroll-wrapper">
-            <iframe src="{url_final}" 
-                    style="width: 3500px; height: 2500px; transform: scale({zoom_val});">
-            </iframe>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.caption(f"📍 Sedang Menampilkan: {pilih_dash} | Gunakan mouse untuk scroll jika dashboard melebihi layar.")
-    
-    st.info("💡 Jika masih kepotong, gunakan mouse untuk scroll ke bawah/samping di dalam dashboard.")
+elif menu == "⛔ Stock Minus":
+    st.title("⛔ Stock Minus Clearance")
+    uploaded_file = st.file_uploader("Upload File Jezpro", type=["xlsx", "xlsm"])
+    # ... (Gunakan logic processing lo yang lama di sini, sudah aman)
+
+elif menu == "📦 Database Artikel":
+    st.title("📦 Google Sheets Sync")
+    raw_url = st.text_input("LINK SPREADSHEET:")
+    if raw_url and "/d/" in raw_url:
+        try:
+            file_id = raw_url.split("/d/")[1].split("/")[0]
+            xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+            all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+            sel_sheet = st.selectbox("PILIH TAB:", list(all_sheets.keys()))
+            
+            df_master = all_sheets[sel_sheet]
+            # Fix format tanggal/waktu (Cleaning Minimalis)
+            for col in df_master.columns:
+                if any(x in str(col).upper() for x in ["DATE", "TANGGAL"]):
+                    df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
+            
+            st.dataframe(df_master, use_container_width=True)
+        except Exception as e:
+            st.error(f"Error: {e}")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
