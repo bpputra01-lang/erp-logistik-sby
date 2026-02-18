@@ -154,49 +154,73 @@ elif menu == "⛔ Stock Minus":
                 st.success(f"✅ Kelar! {len(set_up_results)} item direlokasi. {len(df_need_adj)} SKU butuh justifikasi.")
                 st.download_button("📥 DOWNLOAD HASIL LENGKAP", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
 
-# --- MODUL DATABASE ARTIKEL (FITUR SYNC GOOGLE SHEETS) ---
+# --- MODUL DATABASE ARTIKEL (VERSI FIX ERROR & MULTI-SHEET) ---
 elif menu == "📦 Database Artikel":
     st.title("📦 Master Database : Google Sheets Sync")
     
-    # Input link spreadsheet
-    gsheet_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET (Pastikan Akses Open/Anyone with link):")
+    # 1. Input link spreadsheet
+    raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", 
+                             placeholder="https://docs.google.com/spreadsheets/d/ID_FILE/edit...")
     
-    if gsheet_url:
+    if raw_url:
         try:
-            # Logic convert link edit ke link export CSV
-            file_id = gsheet_url.split("/d/")[1].split("/")[0]
-            # Kita buat fungsi narik list sheet kalau mau detail, tapi ini default narik sheet pertama (gid=0)
-            sheet_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv"
-            
-            df_master = pd.read_csv(sheet_url)
-            
-            # --- TEMPAT ISIAN DETAIL NYA (LO TENTUIN SENDIRI NARIKNYA) ---
-            st.markdown("### 📊 Summary Data Spreadsheet")
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-            with c2:
-                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-            with c3:
-                # Contoh narik data spesifik: Total Qty (asumsi ada kolom namanya 'QTY' atau 'STOK')
-                col_sum = next((c for c in df_master.columns if 'QTY' in c.upper() or 'STOK' in c.upper()), None)
-                val_sum = f"{int(df_master[col_sum].sum()):,}" if col_sum else "N/A"
-                st.markdown(f'<div class="m-box"><span class="m-lbl">SUM {col_sum if col_sum else "STOCK"}</span><span class="m-val">{val_sum}</span></div>', unsafe_allow_html=True)
-            with c4:
-                st.markdown(f'<div class="m-box"><span class="m-lbl">LAST SYNC</span><span class="m-val">LIVE</span></div>', unsafe_allow_html=True)
+            # Fungsi buat bersihin link biar narik data murni (CSV), bukan HTML
+            if "/d/" in raw_url:
+                file_id = raw_url.split("/d/")[1].split("/")[0]
+                # Step 1: Tarik Metadata buat dapetin nama-nama Sheet (Tab)
+                # Kita pake trik export ke Excel biar bisa baca semua sheet sekaligus
+                xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+                
+                # Baca file Excel dari link tersebut
+                all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+                sheet_names = list(all_sheets.keys())
+                
+                # 2. DROPDOWN PILIH SHEET (Biar Header & Kolom gak ketuker)
+                selected_sheet = st.selectbox("PILIH TAB / SHEET:", sheet_names)
+                
+                if selected_sheet:
+                    df_master = all_sheets[selected_sheet]
+                    
+                    # --- TEMPAT ISIAN DETAIL DINAMIS ---
+                    st.markdown(f"### 📊 Summary: {selected_sheet}")
+                    c1, c2, c3, c4 = st.columns(4)
+                    
+                    with c1:
+                        st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+                    with c2:
+                        st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+                    with c3:
+                        # Otomatis cari kolom yang ada angka buat di-Sum (Contoh: Stok/Qty)
+                        num_cols = df_master.select_dtypes(include=[np.number]).columns
+                        if not num_cols.empty:
+                            target_col = num_cols[0] # Ambil kolom angka pertama
+                            total_val = f"{int(df_master[target_col].sum()):,}"
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL {target_col}</span><span class="m-val">{total_val}</span></div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL DATA</span><span class="m-val">N/A</span></div>', unsafe_allow_html=True)
+                    with c4:
+                        st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
 
-            st.divider()
-            
-            # --- TAMPILAN TABEL DINAMIS (HEADER & KOLOM IKUT SPREADSHEET) ---
-            st.subheader("📑 Data View")
-            # Search filter buat nyari data di database
-            search = st.text_input("Cari data di database...")
-            if search:
-                df_master = df_master[df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)]
-            
-            st.dataframe(df_master, use_container_width=True, height=600)
-            
+                    st.divider()
+
+                    # 3. TAMPILAN TABEL DINAMIS (HEADER & KOLOM PERSIS SPREADSHEET)
+                    st.subheader(f"📑 Table View: {selected_sheet}")
+                    
+                    # Filter search biar gampang nyari artikel
+                    search = st.text_input(f"Cari di dalam {selected_sheet}...")
+                    if search:
+                        # Filter semua kolom yang mengandung kata kunci
+                        mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
+                        df_display = df_master[mask]
+                    else:
+                        df_display = df_master
+
+                    st.dataframe(df_display, use_container_width=True, height=500)
+            else:
+                st.error("Link-nya kagak valid, Bos! Pastiin formatnya link Google Sheets.")
+
         except Exception as e:
-            st.error(f"Gagal narik data. Pastikan link bener dan Spreadsheet sudah di Share ke 'Anyone with the link'. Error: {e}")
+            st.error(f"ERROR: {e}")
+            st.info("PASTIIN: Link Spreadsheet udah di-set ke 'Anyone with the link' (Viewer).")
     else:
-        st.info("💡 Masukkan link Google Spreadsheet lo di atas buat nampilin database secara live.")
+        st.info("💡 Tempel link Spreadsheet lo di atas, entar semua Sheet/Tab-nya muncul otomatis.")
