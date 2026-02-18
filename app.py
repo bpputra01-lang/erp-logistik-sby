@@ -194,7 +194,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 
 
 with st.sidebar:
-    st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-top: -20px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #00d2ff; text-align: left; margin-top: -70px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
     
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
