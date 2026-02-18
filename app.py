@@ -193,46 +193,45 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 
 
-# --- SIDEBAR NAVIGATION ---
 with st.sidebar:
-    # 1. Judul ERP (Ditarik mepet ke atas)
-    st.markdown("""
-        <div style='color: #00d2ff; text-align: left; font-size: 20px; font-weight: 800; 
-                    margin-top: -80px; border-bottom: 1px solid #2d2d44; padding-bottom: 15px; margin-bottom: 10px;'>
-            🚚 ERP LOGISTIC<br>SURABAYA
-        </div>
-    """, unsafe_allow_html=True)
-
-    # 2. Daftar Menu (Gabungin semua jadi satu list)
-    m1 = ["📊 Dashboard Overview", "📓 Database Master"]
-    m2 = ["📥 Putaway System", "📤 Scan Out Validasi", "🔄 Refill & Overstock", "⛔ Stock Minus"]
-    all_menus = m1 + m2
-
-    # 3. MAGIC CSS (Nyelipin Header di dalem Radio Button)
-    st.markdown("""
-        <style>
-        /* Header MAIN MENU di atas item pertama */
-        div.row-widget.stRadio div[role="radiogroup"] > div:nth-child(1)::before {
-            content: "MAIN MENU";
-            display: block; font-size: 11px; font-weight: 700; color: #6c757d;
-            margin-top: 5px; margin-bottom: 5px; letter-spacing: 2px;
-        }
-
-        /* Header OPERATIONAL sebelum item ketiga (Putaway System) */
-        div.row-widget.stRadio div[role="radiogroup"] > div:nth-child(3)::before {
-            content: "OPERATIONAL TOOLS";
-            display: block; font-size: 11px; font-weight: 700; color: #6c757d;
-            margin-top: 25px; margin-bottom: 5px; letter-spacing: 2px;
-        }
-        
-        /* Menghapus padding atas bawaan sidebar */
-        [data-testid="stSidebarUserContent"] { padding-top: 1rem !important; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # 4. Radio Button (Satu variabel utama)
-    menu = st.radio("Navigation", all_menus, label_visibility="collapsed")
+    st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-top: -20px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
     
+    # --- KELOMPOK 1 ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: -10px;">MAIN MENU</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-weight: bold; color: #808495;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
+    
+    m1_options = ["📊 Dashboard Overview", "📓 Database Master"]
+    
+    # --- KELOMPOK 2 ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 20px;">OPERATIONAL</p>', unsafe_allow_html=True)
+    m2_options = ["📥 Putaway System", "📤 Scan Out Validasi", "🔄 Refill & Overstock", "⛔ Stock Minus"]
+
+    # --- LOGIC AGAR BISA PINDAH ANTAR KELOMPOK ---
+    # Kita pakai Session State supaya saat m1 dipilih, m2 reset (dan sebaliknya)
+    if 'menu_pilihan' not in st.session_state:
+        st.session_state.menu_pilihan = m1_options[0]
+
+    # Render Radio Kelompok 1
+    def update_m1():
+        st.session_state.menu_pilihan = st.session_state.m1_key
+    
+    # Cari index buat mempertahankan pilihan jika user klik di kelompok ini
+    idx1 = m1_options.index(st.session_state.menu_pilihan) if st.session_state.menu_pilihan in m1_options else 0
+    
+    sel_m1 = st.radio("Group1", m1_options, index=idx1, key="m1_key", on_change=update_m1, label_visibility="collapsed")
+
+    # Render Radio Kelompok 2
+    def update_m2():
+        st.session_state.menu_pilihan = st.session_state.m2_key
+
+    idx2 = m2_options.index(st.session_state.menu_pilihan) if st.session_state.menu_pilihan in m2_options else None
+    
+    # Jika idx2 None (karena lagi milih m1), kita paksa None agar tidak ada yang terpilih di m2
+    sel_m2 = st.radio("Group2", m2_options, index=idx2, key="m2_key", on_change=update_m2, label_visibility="collapsed")
+
+    # Final Menu yang dipakai untuk logic halaman
+    menu = st.session_state.menu_pilihan
+
     st.divider()
     st.caption("ERP Logistic Surabaya v2.1")
 
