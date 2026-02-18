@@ -176,7 +176,7 @@ with st.sidebar:
     m1 = ["📊 Dashboard Overview", "📓 Database Master"]
     st.markdown('<p class="nav-header">INVENTORY TOOLS</p>', unsafe_allow_html=True)
     m2 = ["📥 Putaway System", "📤 Scan Out Validasi", "🔄 Refill & Overstock", "⛔ Stock Minus"]
-    menu = st.radio("Navigation", m1 + m2, label_visibility="collapsed")
+    menu = st.radio("Navigation", m1 + m2, label_visibility="visible")
     st.divider()
     st.caption("ERP Logistic Surabaya v2.1 | Surabaya Branch")
 
