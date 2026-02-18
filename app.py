@@ -36,14 +36,14 @@ st.markdown("""
 
 # --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
 with st.sidebar:
-    st.markdown("<h2 style='color: white;'>🚀 ERP SURABAYA</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
-    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
+    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📦 Dashboard Database","⛔ Stock Minus"])
 
 # --- 4. LOGIKA MODUL ---
 
 if menu == "📊 Dashboard Overview":
-    st.markdown("""<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1><p>Warehouse Management System Surabaya</p></div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1><p>Analytic Reports Logistics Surabaya</p></div>""", unsafe_allow_html=True)
     
     c1, c2 = st.columns([2, 1])
     with c1:
@@ -65,7 +65,7 @@ elif menu == "⛔ Stock Minus":
     uploaded_file = st.file_uploader("Upload File Jezpro", type=["xlsx", "xlsm"])
     # ... (Gunakan logic processing lo yang lama di sini, sudah aman)
 
-elif menu == "📦 Database Artikel":
+elif menu == "📦 Dashboord Database":
     st.title("📦 Google Sheets Sync")
     raw_url = st.text_input("LINK SPREADSHEET:")
     if raw_url and "/d/" in raw_url:
@@ -94,7 +94,7 @@ elif menu == "⛔ Stock Minus":
         col_sku, col_bin = 'SKU', 'BIN'
         col_qty = next((c for c in df.columns if 'QTY SYS' in str(c).upper()), 'QTY SYSTEM')
 
-        if st.button("🚀 PROSES DATA SPEED DEMON"):
+        if st.button("🔃 PROSES DATA"):
             with st.spinner('Sedang memproses...'):
                 # 1. Backup Data Awal
                 df_minus_awal = df[df[col_qty] < 0].copy()
@@ -188,7 +188,7 @@ elif menu == "⛔ Stock Minus":
                     if not df_need_adj.empty:
                         df_need_adj.to_excel(writer, sheet_name='NEED JUSTIFIKASI', index=False)
 
-                st.success(f"✅ Kelar! {len(set_up_results)} item direlokasi. {len(df_need_adj)} SKU butuh justifikasi.")
+                st.success(f"✅ Done! {len(set_up_results)} item direlokasi. {len(df_need_adj)} Item Butuh Adjusment.")
                 st.download_button("📥 DOWNLOAD HASIL LENGKAP", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
 
 # --- MODUL DATABASE ARTIKEL (FIX HEADER HILANG & FORMAT WAKTU) ---
