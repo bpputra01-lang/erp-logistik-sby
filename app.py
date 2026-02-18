@@ -11,60 +11,61 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
-    /* 1. BACKGROUND UTAMA (Lebih Gelap & Elegan) */
-    .stApp { background-color: #0e1117; color: #e0e0e0; }
+    /* 1. BACKGROUND UTAMA TETAP PUTIH */
+    .stApp { background-color: #ffffff; color: #31333f; }
     
-    /* 2. SIDEBAR (Tulisan Putih & BG Dark) */
+    /* 2. SIDEBAR (Tulisan Putih Bersih) */
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] label { color: white !important; font-weight: 600; }
+    [data-testid="stSidebar"] * { color: white !important; }
+    /* Pastikan radio button tetap kelihatan putih */
     [data-testid="stSidebar"] .stRadio div { color: white !important; }
 
-    /* 3. HEADER & DROPDOWN (Biar gak silau) */
-    header[data-testid="stHeader"] { background-color: rgba(30, 30, 47, 0.9) !important; border-bottom: 2px solid #FFD700; }
+    /* 3. HEADER & DROPDOWN ELEGAN (Bukan Putih Terang) */
+    header[data-testid="stHeader"] { background-color: rgba(255, 255, 255, 0.9) !important; border-bottom: 2px solid #FFD700; }
     
-    /* Style Dropdown / Selectbox */
+    /* Style Dropdown / Selectbox (Warna Abu-abu Lembut agar Elegan) */
     div[data-baseweb="select"] > div {
-        background-color: #1e1e2f !important;
+        background-color: #f0f2f6 !important;
         border: 1px solid #3b82f6 !important;
-        color: white !important;
+        color: #1e1e2f !important;
     }
-    div[data-testid="stSelectbox"] label { color: #FFD700 !important; font-weight: bold; }
     
-    /* Input Text / Search Bar */
+    /* Search Bar / Input Text */
     div[data-testid="stTextInput"] input {
-        background-color: #1e1e2f !important;
-        color: white !important;
+        background-color: #f0f2f6 !important;
+        color: #1e1e2f !important;
         border: 1px solid #3b82f6 !important;
     }
 
-    /* 4. SUMMARY BOX (Gaya Glassmorphism Dark) */
+    /* 4. SUMMARY BOX (Warna Cerah tapi Professional) */
     .m-box { 
-        background: rgba(255, 255, 255, 0.05); 
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-left: 5px solid #FFD700; 
+        background: #ffffff; 
+        border: 1px solid #e0e0e0;
+        border-left: 5px solid #1e3a8a; 
         padding: 15px; 
         border-radius: 10px; 
         text-align: center; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 10px;
     }
-    .m-val { font-size: 22px; font-weight: 800; color: #FFD700; display: block; }
-    .m-lbl { font-size: 11px; color: #a0a0a0; text-transform: uppercase; font-weight: 600; }
+    .m-val { font-size: 22px; font-weight: 800; color: #1e3a8a; display: block; }
+    .m-lbl { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
 
-    /* 5. TABEL (Warna Dark Elegan) */
+    /* 5. TABEL (Kotak dan Rapih) */
     [data-testid="stDataFrame"] {
-        background-color: #1e1e2f !important;
-        border-radius: 10px;
-        border: 1px solid #3b82f6;
+        border: 1px solid #e0e0e0;
+        border-radius: 5px;
     }
 
-    /* 6. HERO HEADER */
+    /* 6. HERO HEADER BIRU (Tetap di Latar Putih) */
     .hero-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #000000 100%);
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
         color: white; padding: 1.5rem 2rem;
         border-bottom: 4px solid #FFD700;
-        border-radius: 0 0 15px 15px;
+        border-radius: 10px;
         margin-bottom: 15px;
     }
+    .hero-header h1 { color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 # --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
