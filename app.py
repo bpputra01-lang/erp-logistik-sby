@@ -11,77 +11,22 @@ st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 # 2. THE AUTHENTIC ADMINITY UI ENGINE
 st.markdown("""
     <style>
-    /* Background Page */
     .stApp { background-color: #f4f7f6; }
-
-    /* Sidebar Adminity Style */
-    [data-testid="stSidebar"] {
-        background-color: #1e1e2f !important;
-        border-right: 1px solid #2d2d44;
-    }
-    
-    /* Sidebar Text & Menu */
-    [data-testid="stSidebar"] .stMarkdown p {
-        color: #aeb1b5 !important;
-        font-family: 'Inter', sans-serif;
-    }
-
-    /* Sidebar Navigation Category Header */
-    .nav-header {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        color: #6c757d;
-        padding: 20px 0 10px 10px;
-        font-weight: 700;
-        border-bottom: 1px solid #2d2d44;
-        margin-bottom: 10px;
-    }
-
-    /* Hero Banner Adminity */
-    .hero-header {
-        background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%);
-        color: white;
-        padding: 2rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        margin-bottom: 25px;
-    }
-
-    /* Adminity Metric Cards / Boxes */
-    .m-box {
-        background: #1e1e2f;
-        padding: 15px;
-        border-radius: 8px;
-        border-left: 5px solid #ffce00;
-        margin-bottom: 10px;
-        text-align: center;
-    }
+    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
+    [data-testid="stSidebar"] .stMarkdown p { color: #aeb1b5 !important; font-family: 'Inter', sans-serif; }
+    .nav-header { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #6c757d; padding: 20px 0 10px 10px; font-weight: 700; border-bottom: 1px solid #2d2d44; margin-bottom: 10px; }
+    .hero-header { background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); color: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 25px; }
+    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
     .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
     .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
-
-    /* Custom Radio Button Styling (Adminity Style) */
-    div.row-widget.stRadio > div {
-        background-color: transparent !important;
-        padding: 5px;
-    }
-    div.row-widget.stRadio label {
-        color: #d1d1d1 !important;
-        font-size: 14px !important;
-        padding: 8px 15px !important;
-        border-radius: 5px;
-        transition: 0.3s;
-    }
-    div.row-widget.stRadio label:hover {
-        background: rgba(255,255,255,0.05);
-        color: white !important;
-    }
-    /* Hide the radio circle */
+    div.row-widget.stRadio > div { background-color: transparent !important; padding: 5px; }
+    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; transition: 0.3s; }
+    div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; }
     [data-testid="stWidgetLabel"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNGSI LOGIKA (TETAP SAMA) ---
+# --- FUNGSI LOGIKA ASLI (TETAP SAMA) ---
 def process_putaway_system(df_putaway, df_asal_bin):
     working_bin = df_asal_bin.copy()
     results_compare, results_putaway_list, results_kurang_setup = [], [], []
@@ -146,7 +91,6 @@ def process_scan_out(df_scan, df_history, df_stock):
             match_stock_any = df_stock[df_stock.iloc[:, 1].astype(str).str.strip() == sku]
             if not match_stock_any.empty: keterangan = "ITEM TERJUAL (BIN MISSMATCH)"; total_qty_setup_terjual = match_stock_any.iloc[0, 10]; invoice = match_stock_any.iloc[0, 0]; found_stock = True
         if not found_stock and not found_history: keterangan = "ITEM BELUM TERSETUP & TIDAK TERJUAL"
-        
         if keterangan == "DONE SETUP (QTY MISSMATCH)": draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": bin_after_setup, "SKU": sku, "QUANTITY": qty - total_qty_setup_terjual, "NOTES": "WAITING OFFLINE"})
         elif keterangan == "ITEM BELUM TERSETUP & TIDAK TERJUAL": draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": "KARANTINA", "SKU": sku, "QUANTITY": qty, "NOTES": "WAITING OFFLINE"})
         elif keterangan == "DONE SET UP (BIN MISSMATCH)":
@@ -155,22 +99,86 @@ def process_scan_out(df_scan, df_history, df_stock):
         results.append({"BIN": bin_scan, "SKU": sku, "QTY": qty, "Keterangan": keterangan, "Total Qty Setup/Terjual": total_qty_setup_terjual, "Bin After Set Up": bin_after_setup, "Invoice": invoice})
     return pd.DataFrame(results), pd.DataFrame(draft_setup)
 
-# --- SIDEBAR NAVIGATION (FIXED NameError) ---
+# --- FUNGSI BARU: REFILL & OVERSTOCK (Sesuai Logic VBA) ---
+def process_refill_overstock(df_all_data, df_stock_tracking):
+    # Step 1: Filter ALL DATA to GL3 & GL4 (UltraFast Filter Logic)
+    # VBA Col B index 1 (Bin), Col C index 2 (SKU), Col K index 10 (Qty System)
+    df_all_data.columns = [str(c).upper() for c in df_all_data.columns]
+    
+    def filter_gl3(row):
+        bin_code = str(row.iloc[1]).upper()
+        return "GL3" in bin_code and "LIVE" not in bin_code
+
+    def filter_gl4(row):
+        bin_code = str(row.iloc[1]).upper()
+        exclude = ["DEFECT", "REJECT", "ONLINE", "RAK"]
+        return "GL4" in bin_code and not any(x in bin_code for x in exclude)
+
+    df_gl3 = df_all_data[df_all_data.apply(filter_gl3, axis=1)].copy()
+    df_gl4 = df_all_data[df_all_data.apply(filter_gl4, axis=1)].copy()
+
+    # Step 2: DeleteRowsNotMatchingCriteria (Stock Tracking Filter)
+    # VBA: No "INV" in Col A (0) and "DC" in Col G (6)
+    df_st = df_stock_tracking.copy()
+    df_st.columns = [str(c).upper() for c in df_st.columns]
+    mask_st = (~df_st.iloc[:, 0].astype(str).str.contains("INV", case=False, na=False)) & \
+              (df_st.iloc[:, 6].astype(str).str.contains("DC", case=False, na=False))
+    df_st_filtered = df_st[mask_st].copy()
+
+    # Step 3: Create Refill Logic (QTY GL3 < 3 or New)
+    sum_gl3 = df_gl3.groupby(df_gl3.iloc[:, 2])[df_gl3.columns[10]].sum().to_dict()
+    refill_skus = {sku for sku, qty in sum_gl3.items() if qty < 3}
+    gl4_skus = set(df_gl4.iloc[:, 2].unique())
+    for s in gl4_skus:
+        if s not in sum_gl3: refill_skus.add(s)
+
+    refill_list = []
+    for sku in refill_skus:
+        qty_gl3 = sum_gl3.get(sku, 0)
+        sisa_load = 12
+        items_in_gl4 = df_gl4[df_gl4.iloc[:, 2] == sku]
+        for _, row in items_in_gl4.iterrows():
+            qty_gl4 = int(row.iloc[10])
+            if qty_gl4 > 0 and sisa_load > 0:
+                load_qty = min(qty_gl4, sisa_load)
+                refill_list.append({
+                    "BIN": row.iloc[1], "SKU": sku, "BRAND": row.iloc[3],
+                    "ITEM NAME": row.iloc[4], "VARIANT": row.iloc[5],
+                    "QTY BIN AMBIL": qty_gl4, "LOAD": load_qty, "QTY GL3": qty_gl3
+                })
+                sisa_load -= load_qty
+                if sisa_load <= 0: break
+
+    # Step 4: Create Overstock Logic (QTY GL3 > 24)
+    # VBA: if Stock Tracking >= 7, Roundup(sisa/3)
+    dict_st = df_st_filtered.groupby(df_st_filtered.iloc[:, 1])[df_st_filtered.columns[10]].sum().to_dict()
+    overstock_list = []
+    for _, row in df_gl3.iterrows():
+        sku = str(row.iloc[2])
+        qty_gl3_sys = int(row.iloc[10])
+        if qty_gl3_sys > 24:
+            sisa_load = qty_gl3_sys - 24
+            if dict_st.get(sku, 0) >= 7:
+                sisa_load = int(np.ceil(sisa_load / 3))
+            if sisa_load > 0:
+                overstock_list.append({
+                    "BIN": row.iloc[1], "SKU": sku, "BRAND": row.iloc[3],
+                    "ITEM NAME": row.iloc[4], "VARIANT": row.iloc[5],
+                    "QTY BIN AMBIL": qty_gl3_sys, "LOAD": sisa_load
+                })
+    
+    return df_gl3, df_gl4, pd.DataFrame(refill_list), pd.DataFrame(overstock_list)
+
+# --- SIDEBAR NAVIGATION ---
 with st.sidebar:
     st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-bottom: 20px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
-    
-    # Gabungkan semua menu ke satu variabel 'menu' agar logic IF di bawah tidak error
     st.markdown('<p class="nav-header">MAIN MENU</p>', unsafe_allow_html=True)
     m1 = ["📊 Dashboard Overview", "📓 Database Master"]
-    
     st.markdown('<p class="nav-header">INVENTORY TOOLS</p>', unsafe_allow_html=True)
-    m2 = ["📥 Putaway System", "📤 Scan Out Validasi", "⛔ Stock Minus"]
-    
-    # Render semua pilihan dalam satu radio
+    m2 = ["📥 Putaway System", "📤 Scan Out Validasi", "🔄 Refill & Overstock", "⛔ Stock Minus"]
     menu = st.radio("Navigation", m1 + m2, label_visibility="collapsed")
-    
     st.divider()
-    st.caption("ERP Logistic Surabaya v2.0 | Surabaya Branch")
+    st.caption("ERP Logistic Surabaya v2.1 | Surabaya Branch")
 
 # --- MENU ROUTING ---
 if menu == "📊 Dashboard Overview":
@@ -229,6 +237,37 @@ elif menu == "📤 Scan Out Validasi":
                 st.download_button("📥 DOWNLOAD SCAN OUT", data=output.getvalue(), file_name="SCAN_OUT_RESULT.xlsx")
             except Exception as e: st.error(f"Error: {e}")
 
+elif menu == "🔄 Refill & Overstock":
+    st.markdown('<div class="hero-header"><h1>🔄 REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1: up_all = st.file_uploader("Upload ALL DATA STOCK", type=['xlsx'])
+    with c2: up_track = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
+    if up_all and up_track:
+        if st.button("🚀 PROSES REFILL & OVERSTOCK"):
+            try:
+                with st.spinner("Processing..."):
+                    df_all = pd.read_excel(up_all, engine='calamine')
+                    df_track = pd.read_excel(up_track, engine='calamine')
+                    res_gl3, res_gl4, res_refill, res_over = process_refill_overstock(df_all, df_track)
+                    st.success("Data Berhasil di Filter!")
+                    m1, m2, m3 = st.columns(3)
+                    m1.markdown(f'<div class="m-box"><span class="m-lbl">REFILL ITEMS</span><span class="m-val">{len(res_refill)}</span></div>', unsafe_allow_html=True)
+                    m2.markdown(f'<div class="m-box"><span class="m-lbl">OVERSTOCK ITEMS</span><span class="m-val">{len(res_over)}</span></div>', unsafe_allow_html=True)
+                    m3.markdown(f'<div class="m-box"><span class="m-lbl">GL3/GL4 ROWS</span><span class="m-val">{len(res_gl3)+len(res_gl4)}</span></div>', unsafe_allow_html=True)
+                    t1, t2, t3, t4 = st.tabs(["📦 REFILL", "⚠️ OVERSTOCK", "📑 GL3 DATA", "📑 GL4 DATA"])
+                    with t1: st.dataframe(res_refill, use_container_width=True)
+                    with t2: st.dataframe(res_over, use_container_width=True)
+                    with t3: st.dataframe(res_gl3, use_container_width=True)
+                    with t4: st.dataframe(res_gl4, use_container_width=True)
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        res_refill.to_excel(writer, sheet_name='REFILL', index=False)
+                        res_over.to_excel(writer, sheet_name='OVERSTOCK', index=False)
+                        res_gl3.to_excel(writer, sheet_name='GL3', index=False)
+                        res_gl4.to_excel(writer, sheet_name='GL4', index=False)
+                    st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REFILL_OVERSTOCK_REPORT.xlsx")
+            except Exception as e: st.error(f"Error: {e}")
+
 elif menu == "📓 Database Master":
     st.markdown('<div class="hero-header"><h1>📓 DATABASE MASTER CHECKER</h1></div>', unsafe_allow_html=True)
     raw_url = st.text_input("LINK GOOGLE SPREADSHEET:", placeholder="https://docs.google.com/spreadsheets/d/...")
@@ -253,10 +292,7 @@ elif menu == "⛔ Stock Minus":
     uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
     if uploaded_file:
         try:
-            if uploaded_file.name.endswith('.csv'): df = pd.read_csv(uploaded_file)
-            else:
-                try: df = pd.read_excel(uploaded_file, engine="calamine")
-                except: df = pd.read_excel(uploaded_file)
+            df = pd.read_excel(uploaded_file, engine="calamine")
             col_sku, col_bin = 'SKU', 'BIN'
             col_qty = next((c for c in df.columns if 'QTY SYS' in str(c).upper()), 'QTY SYSTEM')
             if st.button("🔃 PROSES DATA"):
