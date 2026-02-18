@@ -23,7 +23,7 @@ st.markdown("""
 
 # 3. SIDEBAR
 with st.sidebar:
-    st.markdown("<h2>🚛 ERP SURABAYA</h2>", unsafe_allow_html=True)
+    st.markdown("<h2> ERP SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
 
@@ -153,3 +153,50 @@ elif menu == "⛔ Stock Minus":
 
                 st.success(f"✅ Kelar! {len(set_up_results)} item direlokasi. {len(df_need_adj)} SKU butuh justifikasi.")
                 st.download_button("📥 DOWNLOAD HASIL LENGKAP", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
+
+# --- MODUL DATABASE ARTIKEL (FITUR SYNC GOOGLE SHEETS) ---
+elif menu == "📦 Database Artikel":
+    st.title("📦 Master Database : Google Sheets Sync")
+    
+    # Input link spreadsheet
+    gsheet_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET (Pastikan Akses Open/Anyone with link):")
+    
+    if gsheet_url:
+        try:
+            # Logic convert link edit ke link export CSV
+            file_id = gsheet_url.split("/d/")[1].split("/")[0]
+            # Kita buat fungsi narik list sheet kalau mau detail, tapi ini default narik sheet pertama (gid=0)
+            sheet_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv"
+            
+            df_master = pd.read_csv(sheet_url)
+            
+            # --- TEMPAT ISIAN DETAIL NYA (LO TENTUIN SENDIRI NARIKNYA) ---
+            st.markdown("### 📊 Summary Data Spreadsheet")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+            with c2:
+                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+            with c3:
+                # Contoh narik data spesifik: Total Qty (asumsi ada kolom namanya 'QTY' atau 'STOK')
+                col_sum = next((c for c in df_master.columns if 'QTY' in c.upper() or 'STOK' in c.upper()), None)
+                val_sum = f"{int(df_master[col_sum].sum()):,}" if col_sum else "N/A"
+                st.markdown(f'<div class="m-box"><span class="m-lbl">SUM {col_sum if col_sum else "STOCK"}</span><span class="m-val">{val_sum}</span></div>', unsafe_allow_html=True)
+            with c4:
+                st.markdown(f'<div class="m-box"><span class="m-lbl">LAST SYNC</span><span class="m-val">LIVE</span></div>', unsafe_allow_html=True)
+
+            st.divider()
+            
+            # --- TAMPILAN TABEL DINAMIS (HEADER & KOLOM IKUT SPREADSHEET) ---
+            st.subheader("📑 Data View")
+            # Search filter buat nyari data di database
+            search = st.text_input("Cari data di database...")
+            if search:
+                df_master = df_master[df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)]
+            
+            st.dataframe(df_master, use_container_width=True, height=600)
+            
+        except Exception as e:
+            st.error(f"Gagal narik data. Pastikan link bener dan Spreadsheet sudah di Share ke 'Anyone with the link'. Error: {e}")
+    else:
+        st.info("💡 Masukkan link Google Spreadsheet lo di atas buat nampilin database secara live.")
