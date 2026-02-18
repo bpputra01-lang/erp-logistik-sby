@@ -53,14 +53,22 @@ st.markdown("""
 
 # --- FUNGSI LOGIKA PUTAWAY SYSTEM (TRANSLASI MACRO COMPAREPUTAWAY) ---
 def process_putaway_system(df_putaway, df_asal_bin):
+    # Buat copy agar data asli tidak rusak
     working_bin = df_asal_bin.copy()
-    results_compare = []
     
-    # Loop DS PUTAWAY
+    # Standarisasi kolom (VBA: Kolom B=2, Kolom C=3, Kolom J=10)
+    # Di Python index mulai dari 0: Kolom B=1, Kolom C=2, Kolom J=9
+    
+    results_compare = []
+    results_putaway_list = []
+    results_kurang_setup = []
+
+    # Loop DS PUTAWAY (A:BIN_ASAL, B:SKU, C:QTY)
     for _, row_ds in df_putaway.iterrows():
         bin_tujuan_ds = str(row_ds.iloc[0]).strip()
         sku_ds = str(row_ds.iloc[1]).strip()
         qty_needed = int(row_ds.iloc[2])
+        
         diff_qty = qty_needed
         
         while diff_qty > 0:
@@ -68,65 +76,70 @@ def process_putaway_system(df_putaway, df_asal_bin):
             bin_ketemu = ""
             qty_found_in_bin = 0
 
-            # Logic Priority 1: LT.3, 2: STAGING UMUM, 3: NORMAL
-            for prio_type in [1, 2, 3]:
+            # Logic Priority Function
+            def try_allocate(prio_type):
+                nonlocal diff_qty, allocated, bin_ketemu, qty_found_in_bin
                 for idx, row_bin in working_bin.iterrows():
-                    b_code = str(row_bin.iloc[1]).strip().upper()
-                    s_code = str(row_bin.iloc[2]).strip()
-                    q_avail = int(row_bin.iloc[9])
+                    b_code = str(row_bin.iloc[1]).strip().upper() # Kolom B
+                    s_code = str(row_bin.iloc[2]).strip()         # Kolom C
+                    q_avail = int(row_bin.iloc[9])                # Kolom J (QTY SYSTEM)
                     
                     if s_code == sku_ds and q_avail > 0:
                         is_match = False
-                        if prio_type == 1:
-                            if "STAGGING LT.3" in b_code or "STAGING LT.3" in b_code: is_match = True
-                        elif prio_type == 2:
-                            if ("STAGGING" in b_code or "STAGING" in b_code or "KARANTINA" in b_code) and "LT.3" not in b_code: is_match = True
-                        elif prio_type == 3:
-                            if all(x not in b_code for x in ["STAGGING", "STAGING", "KARANTINA"]): is_match = True
+                        if prio_type == 1: # STAGGING LT.3
+                            if "STAGGING LT.3" in b_code or "STAGING LT.3" in b_code:
+                                is_match = True
+                        elif prio_type == 2: # STAGING/KARANTINA UMUM (SELAIN LT.3)
+                            if ("STAGGING" in b_code or "STAGING" in b_code or "KARANTINA" in b_code) and "LT.3" not in b_code:
+                                is_match = True
+                        elif prio_type == 3: # NORMAL BINS
+                            if "STAGGING" not in b_code and "STAGING" not in b_code and "KARANTINA" not in b_code:
+                                is_match = True
                         
                         if is_match:
                             take = min(q_avail, diff_qty)
-                            working_bin.iat[idx, 9] = q_avail - take
+                            working_bin.iat[idx, 9] = q_avail - take # Potong Stok
                             qty_found_in_bin = take
                             bin_ketemu = b_code
-                            allocated = True; break
-                if allocated: break
+                            allocated = True
+                            return True
+                return False
+
+            # Jalankan Priority 1 -> 2 -> 3
+            if not try_allocate(1):
+                if not try_allocate(2):
+                    try_allocate(3)
 
             if allocated:
+                note = "FULLY SETUP" if (diff_qty - qty_found_in_bin) == 0 else "PARTIAL SETUP"
+                # COMPARE PUTAWAY: "BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QTY BIN SYSTEM", "DIFF", "NOTE"
                 results_compare.append({
-                    "BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_found_in_bin,
+                    "BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_needed,
                     "BIN DITEMUKAN": bin_ketemu, "QTY BIN SYSTEM": qty_found_in_bin,
-                    "DIFF": diff_qty - qty_found_in_bin, 
-                    "NOTE": "FULLY SETUP" if (diff_qty - qty_found_in_bin) == 0 else "PARTIAL SETUP"
+                    "DIFF": diff_qty - qty_found_in_bin, "NOTE": note
+                })
+                
+                # PUTAWAY LIST: "BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"
+                results_putaway_list.append({
+                    "BIN AWAL": bin_ketemu, "BIN TUJUAN": bin_tujuan_ds,
+                    "SKU": sku_ds, "QUANTITY": qty_found_in_bin, "NOTES": "PUTAWAY"
                 })
                 diff_qty -= qty_found_in_bin
             else:
+                # PERLU CARI STOCK MANUAL
                 results_compare.append({
-                    "BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": diff_qty,
-                    "BIN DITEMUKAN": "(NO BIN)", "QTY BIN SYSTEM": 0, "DIFF": diff_qty, "NOTE": "CARI MANUAL"
+                    "BIN ASAL": bin_tujuan_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_needed,
+                    "BIN DITEMUKAN": "(NO BIN)", "QTY BIN SYSTEM": 0,
+                    "DIFF": diff_qty, "NOTE": "PERLU CARI STOCK MANUAL"
+                })
+                # REKAP KURANG SETUP: "BIN", "SKU", "QTY"
+                results_kurang_setup.append({
+                    "BIN": bin_tujuan_ds, "SKU": sku_ds, "QTY": diff_qty
                 })
                 break
-    
-    df_comp = pd.DataFrame(results_compare)
 
-    # --- LOGIC MACRO 1: SUMMARY PUTAWAY (SUMIFS) ---
-    df_sum = df_comp[df_comp['NOTE'].str.contains("SETUP", na=False)].copy()
-    if not df_sum.empty:
-        df_sum = df_sum[['BIN DITEMUKAN', 'BIN ASAL', 'SKU', 'QTY PUTAWAY']]
-        df_sum.columns = ['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QTY PUTAWAY']
-        # Hitung Sisa Bin Awal (Equivalent to SumIfs)
-        def get_sisa(row):
-            return working_bin[(working_bin.iloc[:, 1].str.upper() == row['BIN AWAL']) & 
-                               (working_bin.iloc[:, 2] == row['SKU'])].iloc[:, 9].sum()
-        df_sum['SISA BIN AWAL'] = df_sum.apply(get_sisa, axis=1)
+    return pd.DataFrame(results_compare), pd.DataFrame(results_putaway_list), pd.DataFrame(results_kurang_setup), working_bin
 
-    # --- LOGIC MACRO 2: STAGGING LT.3 OUTSTANDING ---
-    mask_lt3 = (working_bin.iloc[:, 9] != 0) & (working_bin.iloc[:, 1].str.contains("STAGGING LT.3|STAGING LT.3", case=False, na=False))
-    df_lt3 = working_bin[mask_lt3].iloc[:, [1, 2, 4, 3, 6, 5, 9]].copy() if any(mask_lt3) else pd.DataFrame()
-    if not df_lt3.empty:
-        df_lt3.columns = ["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"]
-
-    return df_comp, df_sum, df_lt3, working_bin
 # --- FUNGSI LOGIKA SCAN OUT ---
 def process_scan_out(df_scan, df_history, df_stock):
     df_scan.columns = [str(c).strip().upper() for c in df_scan.columns]
@@ -168,6 +181,7 @@ with st.sidebar:
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "📥 Putaway System", "📤 Scan Out", "📝 Dashboard Database", "⛔ Stock Minus"])
 
 # --- MENU PUTAWAY SYSTEM (NEW LOGIC) ---
+# --- UPDATE DI MENU PUTAWAY SYSTEM ---
 if menu == "📥 Putaway System":
     st.markdown('<div class="hero-header"><h1>📥 PUTAWAY SYSTEM PRO (MACRO LOGIC)</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -177,30 +191,38 @@ if menu == "📥 Putaway System":
     if up_ds and up_asal:
         if st.button("⚡ JALANKAN PROSES PUTAWAY"):
             try:
-                # Loader Otomatis (CSV/Excel)
-                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='calamine')
-                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='calamine')
+                # FIX: Deteksi format file secara otomatis
+                if up_ds.name.endswith('.csv'):
+                    df_ds_p = pd.read_csv(up_ds)
+                else:
+                    df_ds_p = pd.read_excel(up_ds, engine='calamine')
                 
-                # Jalankan Logic Terpadu
-                df_comp, df_sum, df_lt3, df_updated_bin = process_putaway_system(df_ds_p, df_asal_p)
+                if up_asal.name.endswith('.csv'):
+                    df_asal_p = pd.read_csv(up_asal)
+                else:
+                    df_asal_p = pd.read_excel(up_asal, engine='calamine')
                 
-                st.success("Proses Putaway & Macro Selesai!")
-                t1, t2, t3 = st.tabs(["📋 Compare Putaway", "📊 Summary Putaway", "📦 LT.3 Outstanding"])
+                # Panggil fungsi logika utama lo
+                df_comp, df_plist, df_kurang, df_updated_bin = process_putaway_system(df_ds_p, df_asal_p)
+                
+                st.success("Proses Putaway Selesai!")
+                t1, t2, t3 = st.tabs(["📋 Compare Putaway", "📝 Putaway List", "⚠️ Kurang Setup"])
                 with t1: st.dataframe(df_comp, use_container_width=True)
-                with t2: st.dataframe(df_sum, use_container_width=True)
-                with t3: st.dataframe(df_lt3, use_container_width=True)
+                with t2: st.dataframe(df_plist, use_container_width=True)
+                with t3: st.dataframe(df_kurang, use_container_width=True)
                 
-                # Export Multiple Sheets
+                # Export ke Excel
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     df_comp.to_excel(writer, sheet_name='COMPARE PUTAWAY', index=False)
-                    df_sum.to_excel(writer, sheet_name='SUMMARY PUTAWAY', index=False)
-                    df_lt3.to_excel(writer, sheet_name='STAGGING LT.3 OUTSTANDING', index=False)
+                    df_plist.to_excel(writer, sheet_name='PUTAWAY LIST', index=False)
+                    df_kurang.to_excel(writer, sheet_name='REKAP KURANG SETUP', index=False)
                     df_updated_bin.to_excel(writer, sheet_name='UPDATED ASAL BIN', index=False)
                 
-                st.download_button("📥 DOWNLOAD REPORT COMPLETE", data=output.getvalue(), file_name="REPORT_PUTAWAY_SYSTEM.xlsx")
+                st.download_button("📥 DOWNLOAD LAPORAN PUTAWAY", data=output.getvalue(), file_name="REPORT_PUTAWAY_SYSTEM.xlsx")
                 
             except Exception as e:
+                # Ini yang muncul di screenshot lo tadi
                 st.error(f"Gagal memproses: {e}")
 
 # --- MENU LAINNYA (TETAP SAMA) ---
