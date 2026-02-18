@@ -38,7 +38,7 @@ st.markdown("""
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
-    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📦 Dashboard Database","⛔ Stock Minus"])
+    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
 
 # --- 4. LOGIKA MODUL ---
 
