@@ -95,6 +95,19 @@ if menu == "📊 Dashboard Overview":
         </div>
 
     ''', unsafe_allow_html=True)
+    # --- DEKORASI BIRU ELEGANT (POLOS) ---
+st.markdown("""
+    <div style="
+        background: #1e3a8a; 
+        height: 8px; 
+        width: 100%; 
+        border-radius: 10px; 
+        border-bottom: 2px solid #FFD700;
+        margin-top: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    "></div>
+""", unsafe_allow_html=True)
     
 elif menu == "📝 Dashboard Database":
     st.markdown('<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1></div>', unsafe_allow_html=True)
