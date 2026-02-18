@@ -344,24 +344,50 @@ elif menu == "🔄 Refill & Overstock":
             except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "📓 Database Master":
-    st.markdown('<div class="hero-header"><h1>📓 DATABASE MASTER CHECKER</h1></div>', unsafe_allow_html=True)
-    raw_url = st.text_input("LINK GOOGLE SPREADSHEET:", placeholder="https://docs.google.com/spreadsheets/d/...")
-    if raw_url and "/d/" in raw_url:
-        try:
-            file_id = raw_url.split("/d/")[1].split("/")[0]
-            xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+    # Link Google Sheets lo yang sudah dikunci
+    SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
+    
+    st.markdown('<div class="hero-header"><h1>📓 DATABASE MASTER CHECKER</h1><p>Koneksi Otomatis ke Master Data ERP</p></div>', unsafe_allow_html=True)
+    
+    try:
+        # Ekstrak File ID secara otomatis dari link
+        file_id = "1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY"
+        xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+        
+        with st.spinner("Sedang mengambil data terbaru..."):
+            # Baca semua sheet (tab) yang ada
             all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
-            selected_sheet = st.selectbox("PILIH TAB:", list(all_sheets.keys()))
+            
+            # Pilihan Tab/Sheet
+            tab_names = list(all_sheets.keys())
+            c_select, c_empty = st.columns([1, 2])
+            with c_select:
+                selected_sheet = st.selectbox("PILIH TAB DATA:", tab_names)
+            
             if selected_sheet:
-                df_master = pd.read_excel(xlsx_url, sheet_name=selected_sheet, engine='calamine')
+                df_master = all_sheets[selected_sheet]
+                
+                # Baris metrik informasi data
                 c1, c2, c3, c4 = st.columns(4)
-                with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-                with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-                with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">LIVE</span></div>', unsafe_allow_html=True)
-                with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">ENGINE</span><span class="m-val">PRO</span></div>', unsafe_allow_html=True)
-                st.dataframe(df_master, use_container_width=True, height=500)
-        except Exception as e: st.error(f"Error: {e}")
+                with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+                with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+                with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+                with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">SOURCE</span><span class="m-val">G-SHEET</span></div>', unsafe_allow_html=True)
+                
+                # Tampilkan tabel data
+                st.dataframe(df_master, use_container_width=True, height=600)
+                
+                # Tombol Download kalau sewaktu-waktu butuh offline
+                csv = df_master.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 DOWNLOAD TAB INI (.CSV)",
+                    data=csv,
+                    file_name=f"Master_{selected_sheet}.csv",
+                    mime='text/csv',
+                )
 
+    except Exception as e:
+        st.error(f"⚠️ Gagal terhubung ke Google Sheets. Pastikan aksesnya sudah 'Anyone with the link'. Error: {e}")
 elif menu == "⛔ Stock Minus":
     st.markdown('<div class="hero-header"><h1>⛔ STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
