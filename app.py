@@ -157,10 +157,10 @@ def process_scan_out(df_scan, df_history, df_stock):
 
 # --- SIDEBAR NAVIGATION (FIXED NameError) ---
 with st.sidebar:
-    st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-bottom: 20px;'>🚀 ERP ADMINITY</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-bottom: 20px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
     
     # Gabungkan semua menu ke satu variabel 'menu' agar logic IF di bawah tidak error
-    st.markdown('<p class="nav-header">MAIN DASHBOARD</p>', unsafe_allow_html=True)
+    st.markdown('<p class="nav-header">MAIN MENU</p>', unsafe_allow_html=True)
     m1 = ["📊 Dashboard Overview", "📓 Database Master"]
     
     st.markdown('<p class="nav-header">INVENTORY TOOLS</p>', unsafe_allow_html=True)
@@ -170,7 +170,7 @@ with st.sidebar:
     menu = st.radio("Navigation", m1 + m2, label_visibility="collapsed")
     
     st.divider()
-    st.caption("Adminity v2.4 | Surabaya Branch")
+    st.caption("ERP Logistic Surabaya v2.0 | Surabaya Branch")
 
 # --- MENU ROUTING ---
 if menu == "📊 Dashboard Overview":
