@@ -65,7 +65,7 @@ elif menu == "⛔ Stock Minus":
     uploaded_file = st.file_uploader("Upload File Jezpro", type=["xlsx", "xlsm"])
     # ... (Gunakan logic processing lo yang lama di sini, sudah aman)
 
-elif menu == "📦 Dashbord Database":
+elif menu == "📦 Dashboard Database":
     st.title("📦 Google Sheets Sync")
     raw_url = st.text_input("LINK SPREADSHEET:")
     if raw_url and "/d/" in raw_url:
