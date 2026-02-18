@@ -68,17 +68,18 @@ if menu == "📊 Dashboard Overview":
     with c1:
         pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE"])
     with c2:
-        # Kita set default zoom lebih kecil (0.27 sesuai gambar lo) biar pas di mata
-        zoom = st.slider("ZOOM", 0.1, 1.0, 0.27)
+        zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
 
-    # PERBAIKAN UTAMA: Tinggi container & iframe disesuaikan
+    # SOLUSI: Kurangi height iframe (dari 2500px ke 1000px atau sesuai data lo)
+    # Dan set overflow: hidden di container utama biar ga ada sisa scroll
     st.markdown(f'''
-        <div class="dash-container">
-            <div style="overflow: auto; width: 100%; height: 500px; border-radius: 10px; background: #0b242d;">
+        <div class="dash-container" style="height: auto; min-height: 400px; overflow: hidden; margin-bottom: 0px;">
+            <div style="width: 100%; height: 550px; overflow: auto; border-radius: 10px; background: #f8f9fa;">
                 <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true&rm=minimal" 
-                style="width: 3800px; height: 1800px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
+                style="width: 4000px; height: 1400px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
             </div>
         </div>
+        <div style="margin-bottom: -100px;"></div> 
     ''', unsafe_allow_html=True)
 
 elif menu == "📝 Dashboard Database":
