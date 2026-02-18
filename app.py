@@ -194,7 +194,28 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 
 
 with st.sidebar:
-    st.markdown("<h2 style='color: #00d2ff; text-align: left; margin-top: -70px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
+        
+        .elegant-header {
+            font-family: 'Inter', sans-serif;
+            color: #E2E8F0; /* Slate Gray Light yang mewah */
+            text-align: left;
+            margin-top: -70px;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            padding-bottom: 10px;
+        }
+    </style>
+    <div class="elegant-header">
+        🚚 ERP LOGISTIC<br>SURABAYA
+    </div>
+""", unsafe_allow_html=True)
     
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
