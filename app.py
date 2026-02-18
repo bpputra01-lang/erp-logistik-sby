@@ -198,11 +198,13 @@ elif menu == "📦 Database Artikel":
                     # 5. BERSIHIN FORMAT TANGGAL & WAKTU ANEH
                     for col in df_master.columns:
                         col_name = str(col).upper()
-                        # Bersihin Tanggal (Buang 00:00:00)
+                        
+                        # Bersihin Tanggal & Jam (Pake Indentasi yang bener)
                         if any(x in col_name for x in ["DATE", "TANGGAL", "MONTH"]):
-                           # Biar tanggal dan jam (Menit & Detik) muncul semua
-                        df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
-                        # Bersihin Waktu (Buang Tanggal hantu 1970)
+                            # Baris ini harus menjorok ke dalam (4 spasi dari 'if')
+                            df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # Bersihin Waktu (Sejajarin 'elif' dengan 'if')
                         elif any(x in col_name for x in ["TIME", "AVERAGE", "MOVE", "QC", "PACK"]):
                             df_master[col] = df_master[col].astype(str).str.split().str[-1]
                             df_master[col] = df_master[col].replace(['nan', 'None', 'NaT'], '')
