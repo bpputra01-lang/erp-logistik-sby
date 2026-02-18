@@ -21,51 +21,55 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. SIDEBAR (DIPERBAIKI DENGAN SUB-MENU) ---
+# --- 3. SIDEBAR (DIPERBAIKI DENGAN SUB-MENU LAPORAN) ---
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
+    
+    # Menu Utama
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "⛔ Stock Minus", "📦 Database Artikel"])
     
-    # Sub-menu Dashboard muncul otomatis di Sidebar kalau Modul Dashboard dipilih
+    # LOGIKA SUB-MENU: Hanya muncul jika 'Dashboard Overview' dipilih
     if menu == "📊 Dashboard Overview":
         st.markdown("---")
-        st.markdown("<p style='color: #FFD700; font-weight: bold;'>PILIH LAPORAN:</p>", unsafe_allow_html=True)
-        pilih_dash = st.selectbox(
-            "", 
+        st.markdown("<p style='color: #FFD700; font-weight: bold; margin-bottom: 0px;'>📂 DAFTAR LAPORAN:</p>", unsafe_allow_html=True)
+        
+        # Ini adalah Sub-Menu lo, Bos
+        pilih_dash = st.radio(
+            "Pilih salah satu:",
             ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
             label_visibility="collapsed"
         )
     else:
         pilih_dash = None
 
-# --- MODUL DASHBOARD OVERVIEW (PERBAIKAN HEADER & LAYOUT) ---
+# --- MODUL DASHBOARD OVERVIEW (PERBAIKAN TAMPILAN) ---
 if menu == "📊 Dashboard Overview":
-    # 1. HEADER BIRU PROFESIONAL (Sesuai gaya Stock Minus lo)
+    # HEADER BIRU PROFESIONAL (Biar gak kosong melompong)
     st.markdown(f"""
         <div style="background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); 
                     padding: 20px; border-radius: 0px 0px 15px 15px; 
                     border-bottom: 3px solid #FFD700; margin-bottom: 20px;">
-            <h1 style="color: white; margin: 0; font-size: 24px;">📊 {pilih_dash}</h1>
-            <p style="color: #cbd5e1; margin: 0; font-size: 13px;">Logistic Monitoring System • Surabaya Warehouse Operations</p>
+            <h1 style="color: white; margin: 0; font-size: 22px;">📊 {pilih_dash}</h1>
+            <p style="color: #cbd5e1; margin: 0; font-size: 12px;">Logistic Analytics System • Operational Dashboard</p>
         </div>
         <style>
             .main .block-container {{ padding-top: 0rem !important; }}
             header {{ visibility: hidden; }}
+            /* Wadah Dashboard */
             .scroll-wrapper {{
-                width: 100%; height: 85vh; overflow: auto; 
-                position: relative; background: #0e1117;
-                border-radius: 10px; border: 1px solid #3b82f6;
+                width: 100%; height: 80vh; overflow: auto; 
+                background: #0e1117; border-radius: 10px; border: 1px solid #3b82f6;
             }}
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL (Hanya Zoom, karena Menu sudah di Sidebar)
+    # PANEL ZOOM (Taruh di pojok kanan)
     _, c2 = st.columns([3, 1])
     with c2:
-        zoom_val = st.slider("PASIN UKURAN DASHBOARD", 0.10, 1.0, 0.35, 0.01)
+        zoom_val = st.slider("PASIN UKURAN", 0.10, 1.0, 0.35, 0.01)
 
-    # 3. MAPPING LINK
+    # MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -73,14 +77,13 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. EKSEKUSI TAMPILAN
+    # TAMPILKAN DASHBOARD
     url_final = f"{dash_links[pilih_dash]}&rm=minimal"
-    width_px, height_px = 3500, 2500
-
+    
     st.markdown(f"""
         <div class="scroll-wrapper">
             <iframe src="{url_final}" 
-                    style="width: {width_px}px; height: {height_px}px; transform: scale({zoom_val}); transform-origin: 0 0;">
+                    style="width: 3500px; height: 2500px; transform: scale({zoom_val}); transform-origin: 0 0; border: none;">
             </iframe>
         </div>
     """, unsafe_allow_html=True)
