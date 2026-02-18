@@ -101,97 +101,100 @@ def process_scan_out(df_scan, df_history, df_stock):
 
 # --- FUNGSI BARU: REFILL & OVERSTOCK (Sesuai Logic VBA) ---
 def process_refill_overstock(df_all_data, df_stock_tracking):
-    # 1. Inisialisasi awal (Wajib)
+    # 1. Inisialisasi awal agar return tidak error
     df_gl3 = pd.DataFrame()
     df_gl4 = pd.DataFrame()
     df_refill_final = pd.DataFrame()
     df_overstock_final = pd.DataFrame()
 
     try:
-        # PEMBERSIHAN HEADER & DATA
+        # Pre-cleaning: Hilangkan spasi di nama kolom & paksa jadi Upper
         df_all_data.columns = [str(c).strip().upper() for c in df_all_data.columns]
         df_stock_tracking.columns = [str(c).strip().upper() for c in df_stock_tracking.columns]
-        
-        # Paksa QTY System jadi numerik (Kolom K = Indeks 10)
-        df_all_data.iloc[:, 10] = pd.to_numeric(df_all_data.iloc[:, 10], errors='coerce').fillna(0)
 
-        # STEP 1: Filter_ALL_DATA_to_GL3_GL4 (Sesuai Sub VBA lo)
-        # Filter GL3: Ada "GL3" & Gak ada "LIVE" (Indeks 1 = Kolom B)
-        mask_gl3 = (df_all_data.iloc[:, 1].astype(str).str.contains("GL3", case=False, na=False)) & \
-                   (~df_all_data.iloc[:, 1].astype(str).str.contains("LIVE", case=False, na=False))
+        # FIX KRUSIAL: Konversi kolom Quantity (Indeks 10) ke Integer (Sama kayak CLng di VBA)
+        # Kita pakai .fillna(0) supaya baris kosong jadi 0, bukan NaN
+        df_all_data.iloc[:, 10] = pd.to_numeric(df_all_data.iloc[:, 10], errors='coerce').fillna(0).astype(int)
+        df_stock_tracking.iloc[:, 10] = pd.to_numeric(df_stock_tracking.iloc[:, 10], errors='coerce').fillna(0).astype(int)
+
+        # 2. FILTER GL3 & GL4 (Sama dengan logic Sub Filter_ALL_DATA... VBA lo)
+        # Kolom B = Indeks 1
+        bin_col = df_all_data.iloc[:, 1].astype(str).str.upper()
         
-        # Filter GL4: Ada "GL4", Gak ada "DEFECT", "REJECT", "ONLINE", "RAK"
+        # GL3 Logic: InStr(binCode, "GL3") > 0 And InStr(binCode, "LIVE") = 0
+        mask_gl3 = (bin_col.str.contains("GL3", na=False)) & (~bin_col.str.contains("LIVE", na=False))
+        
+        # GL4 Logic: InStr(binCode, "GL4") > 0 And No Defect, Reject, Online, Rak
         exclude_gl4 = "DEFECT|REJECT|ONLINE|RAK"
-        mask_gl4 = (df_all_data.iloc[:, 1].astype(str).str.contains("GL4", case=False, na=False)) & \
-                   (~df_all_data.iloc[:, 1].astype(str).str.contains(exclude_gl4, case=False, na=False))
+        mask_gl4 = (bin_col.str.contains("GL4", na=False)) & (~bin_col.str.contains(exclude_gl4, na=False))
         
         df_gl3 = df_all_data[mask_gl3].copy()
         df_gl4 = df_all_data[mask_gl4].copy()
 
-        # STEP 2: DeleteRowsNotMatchingCriteria (Filter Stock Tracking)
-        # VBA: No "INV" di Col A (0) AND "DC" di Col G (6)
-        st_qty_col = 10 # Kolom K di Stock Tracking
-        df_stock_tracking.iloc[:, st_qty_col] = pd.to_numeric(df_stock_tracking.iloc[:, st_qty_col], errors='coerce').fillna(0)
+        # 3. REFILL LOGIC (Sama dengan Sub CreateRefillSheet VBA lo)
+        # SKU = Indeks 2 (Kolom C)
+        dict_gl3 = df_gl3.groupby(df_gl3.iloc[:, 2])[df_gl3.columns[10]].sum().to_dict()
         
+        # Ambil semua SKU unik dari GL4 yang Qty > 0
+        skus_gl4 = df_gl4[df_gl4.iloc[:, 10] > 0].iloc[:, 2].unique()
+        
+        refill_list = []
+        for sku in skus_gl4:
+            sku_str = str(sku).strip()
+            qty_gl3 = dict_gl3.get(sku_str, 0)
+            
+            # Logic VBA: If dictGL3(sku) < 3 Or Not dictGL3.Exists(sku)
+            if qty_gl3 < 3:
+                sisa_load = 12
+                items_in_gl4 = df_gl4[df_gl4.iloc[:, 2] == sku]
+                
+                for _, row in items_in_gl4.iterrows():
+                    qty_gl4 = int(row.iloc[10])
+                    if qty_gl4 > 0 and sisa_load > 0:
+                        load_qty = min(qty_gl4, sisa_load)
+                        refill_list.append({
+                            "BIN": row.iloc[1], "SKU": sku_str, "BRAND": row.iloc[3],
+                            "ITEM NAME": row.iloc[4], "VARIANT": row.iloc[5],
+                            "QTY BIN AMBIL": qty_gl4, "LOAD": load_qty, "QTY GL3": qty_gl3
+                        })
+                        sisa_load -= load_qty
+                        if sisa_load <= 0: break
+        
+        df_refill_final = pd.DataFrame(refill_list)
+
+        # 4. OVERSTOCK LOGIC (Sama dengan Sub CreateOverstockSheet VBA lo)
+        # Filter Stock Tracking: No "INV" di Col A, Ada "DC" di Col G (Indeks 6)
         mask_st = (~df_stock_tracking.iloc[:, 0].astype(str).str.contains("INV", case=False, na=False)) & \
                   (df_stock_tracking.iloc[:, 6].astype(str).str.contains("DC", case=False, na=False))
         df_st_filtered = df_stock_tracking[mask_st].copy()
-
-        # STEP 3: CreateRefillSheet (Logic QTY < 3)
-        # Dictionary QTY GL3 (Group by SKU di Indeks 2)
-        dict_gl3 = df_gl3.groupby(df_gl3.iloc[:, 2])[df_gl3.columns[10]].sum().to_dict()
         
-        # List SKU yang butuh refill (QTY < 3 atau SKU baru dari GL4)
-        refill_skus = [sku for sku, qty in dict_gl3.items() if qty < 3]
-        for sku_gl4 in df_gl4.iloc[:, 2].unique():
-            if sku_gl4 not in dict_gl3:
-                refill_skus.append(sku_gl4)
-        
-        refill_list = []
-        for sku in set(refill_skus):
-            qty_gl3_current = dict_gl3.get(sku, 0)
-            sisa_load = 12
-            
-            # Cari di GL4
-            items_in_gl4 = df_gl4[df_gl4.iloc[:, 2] == sku]
-            for _, row in items_in_gl4.iterrows():
-                qty_gl4 = int(row.iloc[10])
-                if qty_gl4 > 0 and sisa_load > 0:
-                    take = min(qty_gl4, sisa_load)
-                    refill_list.append({
-                        "BIN": row.iloc[1], "SKU": sku, "BRAND": row.iloc[3],
-                        "ITEM NAME": row.iloc[4], "VARIANT": row.iloc[5],
-                        "QTY BIN AMBIL": qty_gl4, "LOAD": take, "QTY GL3": qty_gl3_current
-                    })
-                    sisa_load -= take
-                    if sisa_load <= 0: break
-        df_refill_final = pd.DataFrame(refill_list)
-
-        # STEP 4: CreateOverstockSheet (Logic QTY > 24)
-        # Dictionary Stock Tracking (Sum Qty per SKU di Indeks 1)
-        dict_st_sum = df_st_filtered.groupby(df_st_filtered.iloc[:, 1])[df_st_filtered.columns[10]].sum().to_dict()
+        # Dictionary Stock Tracking Sum (Group by Barcode Kolom B = Indeks 1)
+        dict_st = df_st_filtered.groupby(df_st_filtered.iloc[:, 1])[df_st_filtered.columns[10]].sum().to_dict()
         
         overstock_list = []
         for _, row in df_gl3.iterrows():
-            sku = str(row.iloc[2])
+            sku = str(row.iloc[2]).strip()
             qty_gl3_sys = int(row.iloc[10])
             
             if qty_gl3_sys > 24:
-                sisa_load_os = qty_gl3_sys - 24
-                # Cek Stock Tracking >= 7 (Logic VBA lo)
-                if dict_st_sum.get(sku, 0) >= 7:
-                    sisa_load_os = int(np.ceil(sisa_load_os / 3))
+                over_qty = qty_gl3_sys - 24
+                # Logic VBA: If qtyTrans >= 7 Then sisaLoad = RoundUp(sisaLoad / 3)
+                if dict_st.get(sku, 0) >= 7:
+                    over_qty = int(np.ceil(over_qty / 3))
                 
-                if sisa_load_os > 0:
+                if over_qty > 0:
                     overstock_list.append({
                         "BIN": row.iloc[1], "SKU": sku, "BRAND": row.iloc[3],
                         "ITEM NAME": row.iloc[4], "VARIANT": row.iloc[5],
-                        "QTY BIN AMBIL": qty_gl3_sys, "LOAD": sisa_load_os
+                        "QTY BIN AMBIL": qty_gl3_sys, "LOAD": over_qty
                     })
+        
         df_overstock_final = pd.DataFrame(overstock_list)
 
     except Exception as e:
-        st.error(f"Error Logic: {e}")
+        import traceback
+        st.error(f"Error Detail: {traceback.format_exc()}")
+
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 # --- SIDEBAR NAVIGATION ---
 with st.sidebar:
