@@ -11,42 +11,46 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
-    /* Latar Putih */
-    .stApp { background-color: #ffffff; }
-    
-    /* Sidebar Putih */
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p, 
-    [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] span { color: white !important; }
+    /* 1. KOTAK SUMMARY (DEEP DARK NAVY) */
+    .m-box { 
+        background-color: #1e1e2f !important; /* Biru Gelap Tegas */
+        border: 2px solid #3b82f6; 
+        border-left: 8px solid #FFD700 !important; /* Aksen Emas Tebal */
+        padding: 20px; 
+        border-radius: 12px; 
+        text-align: center; 
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        margin-bottom: 15px;
+    }
 
-    /* Input & Dropdown Dark */
+    /* 2. ANGKA (GOLD) */
+    .m-val { 
+        font-size: 28px; 
+        font-weight: 800; 
+        color: #FFD700 !important; /* Warna Emas */
+        display: block;
+        margin-top: 5px;
+    }
+
+    /* 3. LABEL (PUTIH/ABU TERANG) */
+    .m-lbl { 
+        font-size: 13px; 
+        color: #ffffff !important; /* Teks Label Putih biar kebaca di Box Gelap */
+        text-transform: uppercase; 
+        font-weight: 700;
+        letter-spacing: 1.5px;
+    }
+
+    /* CSS Tambahan buat Table & Dropdown tetap Dark */
     div[data-baseweb="select"] > div, div[data-testid="stTextInput"] input {
         background-color: #1e1e2f !important;
         color: white !important;
         border: 1px solid #3b82f6 !important;
     }
-
-    /* KOTAK SUMMARY DARK ELEGAN */
-    .m-box { 
-        background: linear-gradient(135deg, #1e1e2f 0%, #0e1117 100%); 
-        border: 1px solid #3b82f6;
-        border-left: 5px solid #FFD700;
-        padding: 20px; 
-        border-radius: 12px; 
-        text-align: center; 
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        margin-bottom: 15px;
-    }
-    .m-val { font-size: 26px; font-weight: 800; color: #FFD700 !important; display: block; }
-    .m-lbl { font-size: 12px; color: #8892b0 !important; text-transform: uppercase; font-weight: 700; letter-spacing: 2px; }
-
-    /* Tabel Dark */
+    
     [data-testid="stDataFrame"] {
         background-color: #1e1e2f !important;
-        border: 1px solid #3b82f6 !important;
-    }
-    </style>
+    } </style>
     """, unsafe_allow_html=True)
 # --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
 with st.sidebar:
