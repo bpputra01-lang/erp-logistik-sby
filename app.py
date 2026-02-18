@@ -29,24 +29,20 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    st.markdown("<h2 style='text-align: center; color: #1e3a47;'>LOGISTIC OPERATION DASHBOARD</h2>", unsafe_allow_html=True)
-    row1 = st.columns(6)
-    metrics = [("KOLI RECEIVED", "5378 KOLI"), ("REFILL & WD", "31733 ITEMS"), ("STOCK MINUS", "1898 ITEMS"), ("LEAD TIME", "11 HOURS"), ("TOTAL REFILL", "4212 ITEMS"), ("WITHDRAW", "30 ITEMS")]
-    for i, (lbl, val) in enumerate(metrics):
-        row1[i].markdown(f'<div class="m-box"><span class="m-lbl">{lbl}</span><span class="m-val">{val}</span></div>', unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #1e3a47;'>LOGISTIC OPERATION DASHBOARD (LIVE MIRROR)</h2>", unsafe_allow_html=True)
     
-    c_side, c_mid, c_right = st.columns([1, 2.5, 2])
-    with c_side:
-        st.markdown('<div class="m-box"><span class="m-lbl">TOTAL RTO</span><span class="m-val">1,614</span></div>', unsafe_allow_html=True)
-        st.markdown('<div class="m-box"><span class="m-lbl">DIFF SMG</span><span class="m-val">9 (99%)</span></div>', unsafe_allow_html=True)
-        st.markdown('<div class="m-box"><span class="m-lbl">DIFF SDA</span><span class="m-val">0 (100%)</span></div>', unsafe_allow_html=True)
-    with c_mid:
-        df_g = pd.DataFrame({'Cat': ['A', 'B', 'C', 'D'], 'Val': [2, 1, 3, 5]})
-        st.plotly_chart(px.bar(df_g, x='Cat', y='Val', title="LEAD TIME GR BY CATEGORY", height=250), use_container_width=True)
-    with c_right:
-        st.subheader("🏆 PERSONNEL MVP")
-        st.info("🏅 LOGISTIC: Yudi Sujud P.\n\n🏅 PICK: Reyvaldo Zakaria I.\n\n🏅 PACK: N. Hamzah")
-
+    # 1. LINK PUBLISH SPREADSHEET (Bukan link edit biasa)
+    # Cara dapetnya: Di GSheets klik File -> Share -> Publish to Web -> Pilih Link (bukan Embed)
+    # Pastiin pilih sheet/tab "DASHBOARD" lo aja, jangan seluruh dokumen.
+    link_publish_dashboard = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml"
+    
+    if "pubhtml" in link_publish_dashboard:
+        # Kita bungkus pake komponen IFrame biar dia nampil utuh
+        st.components.v1.iframe(link_publish_dashboard, height=800, scrolling=True)
+    else:
+        st.warning("💡 Cara Mirroring Gampang: Di GSheets klik File > Share > Publish to Web. Pilih tab Dashboard, Copy linknya ke sini!")
+        
+    st.info("Setiap perubahan di Google Sheets akan terupdate di sini dalam beberapa detik (Live Mirror).")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
