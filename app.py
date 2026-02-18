@@ -193,16 +193,62 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 
 
-# --- SIDEBAR NAVIGATION ---
+# --- SIDEBAR NAVIGATION (PERBAIKAN TOTAL) ---
 with st.sidebar:
-    st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-bottom: 20px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
-    st.markdown('<p class="nav-header">MAIN MENU</p>', unsafe_allow_html=True)
-    st.markdown('<p class="nav-header">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
+    # 1. JUDUL UTAMA (Ditarik ke atas agar tidak ada space kosong)
+    st.markdown("""
+        <div style='color: #00d2ff; text-align: center; font-size: 22px; font-weight: 800; 
+                    margin-top: -40px; border-bottom: 1px solid #2d2d44; padding-bottom: 15px;'>
+            🚚 ERP LOGISTIC<br>SURABAYA
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 2. LIST SEMUA MENU
     m1 = ["📊 Dashboard Overview", "📓 Database Master"]
-    st.markdown('<p class="nav-header">OPERTIONAL</p>', unsafe_allow_html=True)
     m2 = ["📥 Putaway System", "📤 Scan Out Validasi", "🔄 Refill & Overstock", "⛔ Stock Minus"]
-    menu = st.radio("Navigation", m1 + m2, label_visibility="visible")
+    all_menus = m1 + m2
+
+    # 3. TRIK CSS UNTUK NYELIPIN JUDUL DI TENGAH RADIO BUTTON
+    st.markdown("""
+        <style>
+        /* Hilangkan padding default agar mepet atas */
+        [data-testid="stSidebarUserContent"] { padding-top: 0.5rem !important; }
+
+        /* Selipkan tulisan MAIN MENU sebelum item pertama */
+        div.row-widget.stRadio div[role="radiogroup"] > div:first-child::before {
+            content: "MAIN MENU";
+            display: block; font-size: 11px; font-weight: 700; color: #6c757d;
+            margin-top: 15px; margin-bottom: 5px; letter-spacing: 2px; padding-left: 10px;
+        }
+
+        /* Selipkan tulisan OPERATION TOOLS sebelum item ketiga (Putaway) */
+        div.row-widget.stRadio div[role="radiogroup"] > div:nth-child(3)::before {
+            content: "OPERATIONAL TOOLS";
+            display: block; font-size: 11px; font-weight: 700; color: #6c757d;
+            margin-top: 25px; margin-bottom: 5px; letter-spacing: 2px; padding-left: 10px;
+        }
+        
+        /* Gaya Radio Button agar lebih clean */
+        div.row-widget.stRadio label {
+            background-color: transparent !important;
+            padding: 5px 10px !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 4. RADIO BUTTON (Satu variabel biar navigasi gak konflik)
+    menu = st.radio("Navigation", all_menus, label_visibility="collapsed")
+    
     st.divider()
+    st.caption("ERP Logistic Surabaya v2.1 | Surabaya Branch")
+
+# --- LOGIC HEADER DINAMIS (REQUEST LO) ---
+if menu == "📊 Dashboard Overview":
+    st.markdown('<div class="hero-header"><h1>📊 DASHBOARD SUMMARY</h1><p>Visualisasi & Analitik Data</p></div>', unsafe_allow_html=True)
+else:
+    # Ambil nama menu tanpa emoji untuk sub-header
+    clean_menu = menu.split(" ", 1)[-1].upper()
+    st.markdown(f'<div class="hero-header"><h1>⚙️ OPERATION</h1><p style="margin:0;">MENU: {clean_menu}</p></div>', unsafe_allow_html=True)
     st.caption("ERP Logistic Surabaya v2.1 | Surabaya Branch")
 
 # --- MENU ROUTING ---
