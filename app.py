@@ -9,44 +9,152 @@ from python_calamine import CalamineWorkbook
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
 # 2. CUSTOM CSS GLOBAL
+# GANTI BAGIAN CUSTOM CSS (NOMOR 2) DENGAN TEMPLATE INI:
+
 st.markdown("""
     <style>
-    .stApp { background-color: #ffffff; color: #31333f; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: white !important; }
-
-    div[data-baseweb="select"] > div {
-        background-color: #1e1e2f !important;
-        color: #FFD700 !important;
-        border: 2px solid #3b82f6 !important;
-        z-index: 999999 !important;
+    /* 1. FONT & BASE */
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Outfit', sans-serif;
     }
-    div[role="listbox"] ul { background-color: #1e1e2f !important; }
-    div[role="option"] { color: white !important; }
 
+    /* 2. MAIN BACKGROUND */
+    .stApp {
+        background-color: #F8FAFC !important; /* Putih Platinum (Nggak bikin silau) */
+    }
+
+    /* 3. HERO HEADER (GELAP ELEGANT) */
+    .hero-header {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        color: #FFFFFF;
+        padding: 35px;
+        border-radius: 20px;
+        margin-bottom: 30px;
+        border-bottom: 5px solid #EAB308; /* Aksen Gold */
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    }
+
+    /* 4. DARK METRIC BOXES */
     .m-box { 
-        background-color: #1e1e2f !important; 
-        border: 2px solid #3b82f6 !important;
-        border-left: 12px solid #FFD700 !important;
+        background: #1E293B !important; 
+        color: white !important;
         padding: 25px !important; 
         border-radius: 15px !important; 
-        text-align: center !important; 
-        box-shadow: 0 8px 20px rgba(0,0,0,0.3) !important;
-        margin-bottom: 15px !important;
+        text-align: left !important; 
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2) !important;
+        border: 1px solid #334155 !important;
+        margin-bottom: 20px !important;
     }
-    .m-val { font-size: 32px !important; font-weight: 800 !important; color: #FFD700 !important; display: block !important; }
-    .m-lbl { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase !important; font-weight: 700 !important; letter-spacing: 1.5px !important; }
+    .m-val { 
+        font-size: 38px !important; 
+        font-weight: 800 !important; 
+        color: #FACC15 !important; /* Gold terang */
+        letter-spacing: -1px;
+    }
+    .m-lbl { 
+        font-size: 12px !important; 
+        color: #94A3B8 !important; 
+        text-transform: uppercase !important; 
+        font-weight: 600 !important; 
+        letter-spacing: 2px !important;
+        margin-bottom: 5px;
+        display: block;
+    }
 
-    .hero-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 1.5rem 2rem;
-        border-bottom: 5px solid #FFD700; border-radius: 15px; margin-bottom: 20px;
+    /* 5. DARK INPUT & DROPDOWN */
+    div[data-baseweb="select"] > div, 
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="base-input"],
+    .stTextInput>div>div {
+        background-color: #0F172A !important; /* Super Dark */
+        color: #FFFFFF !important;
+        border: 1px solid #334155 !important;
+        border-radius: 12px !important;
+        height: 48px !important;
     }
-    .dash-container {
-        border: 5px solid #1e3a8a; border-radius: 15px;
-        padding: 10px; background: #f8f9fa;
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
-        overflow: hidden;
+    
+    /* Text Input Color Fix */
+    input {
+        color: #FFFFFF !important;
+    }
+
+    /* Dropdown Hover & List */
+    div[role="listbox"] {
+        background-color: #0F172A !important;
+        border: 1px solid #334155 !important;
+    }
+    div[role="option"] {
+        color: #FFFFFF !important;
+    }
+    div[role="option"]:hover {
+        background-color: #334155 !important;
+    }
+
+    /* 6. PREMIUM BUTTONS (FULL WIDTH & GOLD) */
+    .stButton>button {
+        background: #0F172A !important;
+        color: #FACC15 !important;
+        border: 2px solid #FACC15 !important;
+        font-weight: 700 !important;
+        border-radius: 12px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        transition: 0.3s all ease;
+        padding: 10px 20px !important;
+    }
+    .stButton>button:hover {
+        background: #FACC15 !important;
+        color: #0F172A !important;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(250, 204, 21, 0.4);
+    }
+
+    /* 7. MODERN TABS */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 15px;
+        background-color: #E2E8F0;
+        padding: 8px;
+        border-radius: 15px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent;
+        border-radius: 10px;
+        color: #475569;
+        font-weight: 600;
+        border: none;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #0F172A !important;
+        color: #FACC15 !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    /* 8. DATAFRAME CLEAN LOOK */
+    [data-testid="stDataFrame"] {
+        background-color: white;
+        padding: 10px;
+        border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border: 1px solid #E2E8F0;
+    }
+
+    /* 9. SIDEBAR CUSTOM */
+    [data-testid="stSidebar"] {
+        background-image: linear-gradient(180deg, #0F172A 0%, #1E293B 100%) !important;
+    }
+    [data-testid="stSidebarNav"] span {
+        color: white !important;
+        font-weight: 500;
+    }
+
+    /* 10. FILE UPLOADER */
+    [data-testid="stFileUploader"] {
+        background-color: #FFFFFF;
+        border: 2px dashed #CBD5E1;
+        border-radius: 15px;
+        padding: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
