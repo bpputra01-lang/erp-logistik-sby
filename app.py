@@ -30,7 +30,7 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI: Hilangkan semua margin Streamlit
+    # 1. CSS SAKTI
     st.markdown("""
         <style>
             .main .block-container { padding: 0rem !important; max-width: 100% !important; }
@@ -38,7 +38,7 @@ if menu == "📊 Dashboard Overview":
             .stApp { margin-top: -80px; }
             .custom-wrapper {
                 width: 100vw;
-                height: 95vh; 
+                height: 92vh; 
                 overflow: hidden;
                 position: relative;
                 background: #0e1117;
@@ -49,16 +49,27 @@ if menu == "📊 Dashboard Overview":
                 border: none;
                 transform-origin: 0 0;
             }
+            /* Styling tombol download agar mencolok */
+            .stButton>button {
+                width: 100%;
+                background-color: #1e3a47;
+                color: white;
+                border-radius: 5px;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL (Dropdown & Zoom Slider)
-    c1, c2 = st.columns([3, 1])
+    # 2. PANEL KONTROL (Dropdown, Zoom, & Download)
+    c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
         pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
     with c2:
-        # Geser slider ini buat ngilangin space putih di kanan/kiri!
         zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
+    with c3:
+        # FITUR EXPORT: Membuka fungsi print browser
+        if st.button("📥 EXPORT REPORT"):
+            st.markdown('<script>window.print();</script>', unsafe_allow_html=True)
+            st.info("Pilih 'Save as PDF' di menu printer untuk mendownload grafik.")
 
     # 3. MAPPING LINK
     dash_links = {
@@ -70,12 +81,8 @@ if menu == "📊 Dashboard Overview":
 
     # 4. PROSES TAMPILAN
     url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
-    
-    # RUMUS SAKTI: Frame akan melar secara proporsional sesuai zoom
-    # Biar space kosong di kanan ilang dan tinggi pas
     calc_ratio = (1 / zoom_val) * 100
 
-    # Tampilkan Dashboard (Langsung tembak tanpa IF-ELSE biar anti-error)
     st.markdown(f"""
         <div class="custom-wrapper">
             <iframe src="{url_final}" 
