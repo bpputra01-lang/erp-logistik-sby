@@ -11,26 +11,17 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # 2. CUSTOM CSS GLOBAL
 st.markdown("""
     <style>
-    .stApp { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    header[data-testid="stHeader"] { background-color: rgba(30, 30, 47, 0.85) !important; backdrop-filter: blur(12px); border-bottom: 2px solid #FFD700; }
-    
-    /* Style Header Biru Dashboard */
-    .hero-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 1.5rem 2rem;
-        border-bottom: 4px solid #FFD700;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        border-radius: 0 0 15px 15px;
-        margin-bottom: 15px;
+    /* Box container untuk summary */
+    .m-box { 
+        background-color: rgba(30, 58, 138, 0.1); 
+        border: 1px solid #3b82f6; 
+        padding: 15px; 
+        border-radius: 10px; 
+        text-align: center; 
+        margin-bottom: 20px;
     }
-    .hero-header h1 { margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; color: white !important; }
-    
-    .scroll-wrapper {
-        width: 100%; height: 80vh; overflow: auto;
-        background: #0e1117; border: 1px solid #3b82f6; border-radius: 10px;
-    }
-    .scroll-wrapper iframe { border: none; transform-origin: 0 0; }
+    .m-val { font-size: 24px; font-weight: 800; color: #1e3a8a; display: block; }
+    .m-lbl { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
     </style>
     """, unsafe_allow_html=True)
 
