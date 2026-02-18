@@ -154,7 +154,7 @@ elif menu == "⛔ Stock Minus":
                 st.success(f"✅ Kelar! {len(set_up_results)} item direlokasi. {len(df_need_adj)} SKU butuh justifikasi.")
                 st.download_button("📥 DOWNLOAD HASIL LENGKAP", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
 
-# --- MODUL DATABASE ARTIKEL (VERSI ANTI-ERROR & AUTO-CLEAN) ---
+# --- MODUL DATABASE ARTIKEL (FIX OPENPYXL & AUTO-HEADER) ---
 elif menu == "📦 Database Artikel":
     st.title("📦 Master Database : Google Sheets Sync")
     
@@ -165,72 +165,58 @@ elif menu == "📦 Database Artikel":
         try:
             if "/d/" in raw_url:
                 file_id = raw_url.split("/d/")[1].split("/")[0]
+                # Gunakan format export XLSX agar bisa membaca multiple sheets
                 xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
                 
-                # 1. Tarik semua sheet
-                all_sheets = pd.read_excel(xlsx_url, sheet_name=None)
+                # FIX: Gunakan engine='calamine' karena openpyxl lo error 
+                all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
                 sheet_names = list(all_sheets.keys())
                 selected_sheet = st.selectbox("PILIH TAB / SHEET:", sheet_names)
                 
                 if selected_sheet:
-                    # Ambil data mentah dulu
+                    # 1. Deteksi Baris Header Otomatis (Buang sampah 'Unnamed' di atas) 
                     df_raw = all_sheets[selected_sheet]
                     
-                    # --- LOGIC PERBAIKAN HEADER (AUTO-SKIP SAMPAH) ---
-                    # Cari baris pertama yang nggak banyak NaN-nya (asumsi itu Header)
-                    if df_raw.iloc[0].isnull().sum() > (len(df_raw.columns) / 2):
-                        # Jika baris 0 isinya sampah, cari baris berikutnya yang punya isi
-                        df_raw = pd.read_excel(xlsx_url, sheet_name=selected_sheet, header=1)
+                    # Cari baris pertama yang isinya beneran data (bukan null terbanyak)
+                    first_valid_row = df_raw.notnull().sum(axis=1).idxmax()
                     
-                    # Bersihin kolom 'Unnamed' (buang kolom kosong di kanan/kiri)
-                    df_master = df_raw.loc[:, ~df_raw.columns.str.contains('^Unnamed')].copy()
-                    # Buang baris yang kosong semua
+                    # Reload dengan header yang benar
+                    df_master = pd.read_excel(xlsx_url, sheet_name=selected_sheet, 
+                                             header=first_valid_row + 1, engine='calamine')
+                    
+                    # 2. Bersihkan kolom hantu & baris kosong 
+                    df_master = df_master.loc[:, ~df_master.columns.str.contains('^Unnamed')]
                     df_master = df_master.dropna(how='all').reset_index(drop=True)
 
-                    # --- FIX FORMAT TANGGAL (BUANG 00:00:00) ---
+                    # 3. FIX FORMAT TANGGAL (Buang 00:00:00) 
                     for col in df_master.columns:
-                        # Cek kalau kolomnya isinya tanggal/datetime
-                        if pd.api.types.is_datetime64_any_dtype(df_master[col]) or "DATE" in str(col).upper() or "TANGGAL" in str(col).upper():
+                        if "DATE" in str(col).upper() or "TANGGAL" in str(col).upper():
                             df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
 
-                    # --- TEMPAT ISIAN DETAIL DINAMIS ---
+                    # --- SUMMARY DISPLAY ---
                     st.markdown(f"### 📊 Summary: {selected_sheet}")
                     c1, c2, c3, c4 = st.columns(4)
-                    
-                    with c1:
-                        st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-                    with c2:
-                        st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+                    with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+                    with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
                     with c3:
-                        # Cari kolom angka buat totalan
                         num_cols = df_master.select_dtypes(include=[np.number]).columns
-                        if not num_cols.empty:
-                            target_col = num_cols[0]
-                            total_val = f"{int(df_master[target_col].sum()):,}"
-                            st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL {target_col}</span><span class="m-val">{total_val}</span></div>', unsafe_allow_html=True)
-                        else:
-                            st.markdown(f'<div class="m-box"><span class="m-lbl">DATA</span><span class="m-val">OK</span></div>', unsafe_allow_html=True)
-                    with c4:
-                        st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+                        val_sum = f"{int(df_master[num_cols[0]].sum()):,}" if not num_cols.empty else "N/A"
+                        st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL VALUE</span><span class="m-val">{val_sum}</span></div>', unsafe_allow_html=True)
+                    with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
 
                     st.divider()
 
-                    # 3. TAMPILAN TABEL
+                    # 4. TABLE VIEW DENGAN SEARCH
                     st.subheader(f"📑 Table View: {selected_sheet}")
-                    search = st.text_input(f"Cari SKU / Nama Artikel...")
-                    
+                    search = st.text_input(f"Cari data di {selected_sheet}...")
                     if search:
                         mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
-                        df_display = df_master[mask]
+                        st.dataframe(df_master[mask], use_container_width=True, height=500)
                     else:
-                        df_display = df_master
-
-                    st.dataframe(df_display, use_container_width=True, height=500)
+                        st.dataframe(df_master, use_container_width=True, height=500)
             else:
-                st.error("Link-nya kagak valid, Bos!")
+                st.error("Link Spreadsheet gak valid!")
 
         except Exception as e:
-            st.error(f"ERROR: {e}")
-            st.info("PASTIIN: Link Spreadsheet sudah 'Anyone with the link' (Viewer).")
-    else:
-        st.info("💡 Tempel link Spreadsheet lo di atas.")
+            st.error(f"Kelar lo! Error: {e}")
+            st.info("PASTIIN: Link Google Sheets sudah 'Anyone with the link' (Viewer).")
