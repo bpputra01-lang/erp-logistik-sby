@@ -154,33 +154,45 @@ elif menu == "⛔ Stock Minus":
                 st.success(f"✅ Kelar! {len(set_up_results)} item direlokasi. {len(df_need_adj)} SKU butuh justifikasi.")
                 st.download_button("📥 DOWNLOAD HASIL LENGKAP", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
 
-# --- MODUL DATABASE ARTIKEL (VERSI FIX ERROR & MULTI-SHEET) ---
+# --- MODUL DATABASE ARTIKEL (VERSI ANTI-ERROR & AUTO-CLEAN) ---
 elif menu == "📦 Database Artikel":
     st.title("📦 Master Database : Google Sheets Sync")
     
-    # 1. Input link spreadsheet
     raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", 
                              placeholder="https://docs.google.com/spreadsheets/d/ID_FILE/edit...")
     
     if raw_url:
         try:
-            # Fungsi buat bersihin link biar narik data murni (CSV), bukan HTML
             if "/d/" in raw_url:
                 file_id = raw_url.split("/d/")[1].split("/")[0]
-                # Step 1: Tarik Metadata buat dapetin nama-nama Sheet (Tab)
-                # Kita pake trik export ke Excel biar bisa baca semua sheet sekaligus
                 xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
                 
-                # Baca file Excel dari link tersebut
-                all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+                # 1. Tarik semua sheet
+                all_sheets = pd.read_excel(xlsx_url, sheet_name=None)
                 sheet_names = list(all_sheets.keys())
-                
-                # 2. DROPDOWN PILIH SHEET (Biar Header & Kolom gak ketuker)
                 selected_sheet = st.selectbox("PILIH TAB / SHEET:", sheet_names)
                 
                 if selected_sheet:
-                    df_master = all_sheets[selected_sheet]
+                    # Ambil data mentah dulu
+                    df_raw = all_sheets[selected_sheet]
                     
+                    # --- LOGIC PERBAIKAN HEADER (AUTO-SKIP SAMPAH) ---
+                    # Cari baris pertama yang nggak banyak NaN-nya (asumsi itu Header)
+                    if df_raw.iloc[0].isnull().sum() > (len(df_raw.columns) / 2):
+                        # Jika baris 0 isinya sampah, cari baris berikutnya yang punya isi
+                        df_raw = pd.read_excel(xlsx_url, sheet_name=selected_sheet, header=1)
+                    
+                    # Bersihin kolom 'Unnamed' (buang kolom kosong di kanan/kiri)
+                    df_master = df_raw.loc[:, ~df_raw.columns.str.contains('^Unnamed')].copy()
+                    # Buang baris yang kosong semua
+                    df_master = df_master.dropna(how='all').reset_index(drop=True)
+
+                    # --- FIX FORMAT TANGGAL (BUANG 00:00:00) ---
+                    for col in df_master.columns:
+                        # Cek kalau kolomnya isinya tanggal/datetime
+                        if pd.api.types.is_datetime64_any_dtype(df_master[col]) or "DATE" in str(col).upper() or "TANGGAL" in str(col).upper():
+                            df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
+
                     # --- TEMPAT ISIAN DETAIL DINAMIS ---
                     st.markdown(f"### 📊 Summary: {selected_sheet}")
                     c1, c2, c3, c4 = st.columns(4)
@@ -190,26 +202,24 @@ elif menu == "📦 Database Artikel":
                     with c2:
                         st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
                     with c3:
-                        # Otomatis cari kolom yang ada angka buat di-Sum (Contoh: Stok/Qty)
+                        # Cari kolom angka buat totalan
                         num_cols = df_master.select_dtypes(include=[np.number]).columns
                         if not num_cols.empty:
-                            target_col = num_cols[0] # Ambil kolom angka pertama
+                            target_col = num_cols[0]
                             total_val = f"{int(df_master[target_col].sum()):,}"
                             st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL {target_col}</span><span class="m-val">{total_val}</span></div>', unsafe_allow_html=True)
                         else:
-                            st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL DATA</span><span class="m-val">N/A</span></div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">DATA</span><span class="m-val">OK</span></div>', unsafe_allow_html=True)
                     with c4:
                         st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
 
                     st.divider()
 
-                    # 3. TAMPILAN TABEL DINAMIS (HEADER & KOLOM PERSIS SPREADSHEET)
+                    # 3. TAMPILAN TABEL
                     st.subheader(f"📑 Table View: {selected_sheet}")
+                    search = st.text_input(f"Cari SKU / Nama Artikel...")
                     
-                    # Filter search biar gampang nyari artikel
-                    search = st.text_input(f"Cari di dalam {selected_sheet}...")
                     if search:
-                        # Filter semua kolom yang mengandung kata kunci
                         mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
                         df_display = df_master[mask]
                     else:
@@ -217,10 +227,10 @@ elif menu == "📦 Database Artikel":
 
                     st.dataframe(df_display, use_container_width=True, height=500)
             else:
-                st.error("Link-nya kagak valid, Bos! Pastiin formatnya link Google Sheets.")
+                st.error("Link-nya kagak valid, Bos!")
 
         except Exception as e:
             st.error(f"ERROR: {e}")
-            st.info("PASTIIN: Link Spreadsheet udah di-set ke 'Anyone with the link' (Viewer).")
+            st.info("PASTIIN: Link Spreadsheet sudah 'Anyone with the link' (Viewer).")
     else:
-        st.info("💡 Tempel link Spreadsheet lo di atas, entar semua Sheet/Tab-nya muncul otomatis.")
+        st.info("💡 Tempel link Spreadsheet lo di atas.")
