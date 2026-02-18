@@ -65,25 +65,54 @@ elif menu == "⛔ Stock Minus":
     uploaded_file = st.file_uploader("Upload File Jezpro", type=["xlsx", "xlsm"])
     # ... (Gunakan logic processing lo yang lama di sini, sudah aman)
 
-elif menu == "📦 Dashboard Database":
-    st.title("📦 Google Sheets Sync")
-    raw_url = st.text_input("LINK SPREADSHEET:")
-    if raw_url and "/d/" in raw_url:
-        try:
-            file_id = raw_url.split("/d/")[1].split("/")[0]
-            xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
-            all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
-            sel_sheet = st.selectbox("PILIH TAB:", list(all_sheets.keys()))
-            
+elif menu == "📝 Dashboard Database":
+    st.title("📓 Detail Dashboard Analytics")
+    # 1. HEADER MEWAH
+    st.markdown("""<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1><p>Automatic Sync with Google Sheets Master</p></div>""", unsafe_allow_html=True)
+    
+    # 2. LINK OTOMATIS (Gak perlu input manual lagi)
+    SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
+    
+    try:
+        # Extract File ID secara otomatis
+        file_id = SHEET_URL.split("/d/")[1].split("/")[0]
+        xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+        
+        # Tarik semua sheet
+        all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
+        
+        # Pilihan Sheet/Tab
+        sel_sheet = st.selectbox("📂 PILIH TAB DATABASE:", list(all_sheets.keys()))
+        
+        if sel_sheet:
             df_master = all_sheets[sel_sheet]
-            # Fix format tanggal/waktu (Cleaning Minimalis)
-            for col in df_master.columns:
-                if any(x in str(col).upper() for x in ["DATE", "TANGGAL"]):
-                    df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
             
-            st.dataframe(df_master, use_container_width=True)
-        except Exception as e:
-            st.error(f"Error: {e}")
+            # --- CLEANING DATA ---
+            for col in df_master.columns:
+                col_name = str(col).upper()
+                # Fix Tanggal
+                if any(x in col_name for x in ["DATE", "TANGGAL"]):
+                    df_master[col] = pd.to_datetime(df_master[col], errors='coerce').dt.date
+                # Fix Waktu/Jam (Jika ada)
+                elif any(x in col_name for x in ["TIME", "AVERAGE"]):
+                    df_master[col] = df_master[col].astype(str).str.split().str[-1]
+
+            # --- SUMMARY BOX (Biar keren) ---
+            c1, c2, c3 = st.columns(3)
+            with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+            with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+            with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">SYNC STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+
+            # --- SEARCH BAR ---
+            search = st.text_input("🔍 Cari Data di Tabel:", placeholder="Ketik nama atau SKU...")
+            if search:
+                mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
+                st.dataframe(df_master[mask], use_container_width=True, height=500)
+            else:
+                st.dataframe(df_master, use_container_width=True, height=500)
+
+    except Exception as e:
+        st.error(f"❌ Gagal koneksi ke database: {e}")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
