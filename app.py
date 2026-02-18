@@ -221,8 +221,8 @@ elif menu == "⛔ Stock Minus":
                 st.download_button("📥 DOWNLOAD HASIL LENGKAP", data=output.getvalue(), file_name="PENYELESAIAN_STOCK_MINUS.xlsx")
 
 # --- MODUL DATABASE ARTIKEL (FIX HEADER HILANG & FORMAT WAKTU) ---
-elif menu == "📦 Database Artikel":
-    st.title("📦 Master Database : Google Sheets Sync")
+elif menu == "📝 Dashboard Database":
+    st.title("📓 Detail Input Dashboard Overview")
     
     raw_url = st.text_input("MASUKKAN LINK GOOGLE SPREADSHEET LO:", 
                              placeholder="https://docs.google.com/spreadsheets/d/ID_FILE/edit...")
