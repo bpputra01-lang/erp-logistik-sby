@@ -74,7 +74,7 @@ if menu == "📊 Dashboard Overview":
     # Dan set overflow: hidden di container utama biar ga ada sisa scroll
     st.markdown(f'''
         <div class="dash-container" style="height: auto; min-height: 400px; overflow: hidden; margin-bottom: 0px;">
-            <div style="width: 100%; height: 3000px; overflow: auto; border-radius: 10px; background: #f8f9fa;">
+            <div style="width: 100%; height: 300px; overflow: auto; border-radius: 10px; background: #f8f9fa;">
                 <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true&rm=minimal" 
                 style="width: 4000px; height: 1400px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
             </div>
