@@ -88,7 +88,9 @@ elif menu == "📊 Dashboard Overview":
             </div>
         </div>
         <p style="font-size: 10px; color: gray; margin-top: 5px;">*Gunakan scrollbar di dalam kotak untuk geser laporan</p>
-    ''', unsafe_allow_html=True)elif menu == "📝 Dashboard Database":
+    ''', unsafe_allow_html=True)
+    
+elif menu == "📝 Dashboard Database":
     st.markdown("""<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1><p>Automatic Sync with Google Sheets Master</p></div>""", unsafe_allow_html=True)
     
     # Link lo tadi
