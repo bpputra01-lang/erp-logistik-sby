@@ -12,151 +12,90 @@ st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 # GANTI BAGIAN CUSTOM CSS (NOMOR 2) DENGAN TEMPLATE INI:
 
 # --- 2. THE ULTIMATE ENTERPRISE TEMPLATE ---
+# 2. THE PRO-ADMIN EXECUTIVE CSS
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-    /* Global Body */
+    /* Font Global */
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Background Utama Platinum */
     .stApp {
-        background: #fdfdfd;
-        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #F8FAFC !important;
     }
 
-    /* Sidebar - Modern Dark Nav */
+    /* Sidebar - Deep Admin Blue */
     [data-testid="stSidebar"] {
-        background: #0f172a !important;
-        box-shadow: 5px 0 15px rgba(0,0,0,0.1);
-    }
-    [data-testid="stSidebarNav"] {
-        padding-top: 2rem;
-    }
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-        color: #94a3b8 !important;
-        font-size: 14px;
+        background-color: #1E293B !important;
+        min-width: 280px !important;
     }
 
-    /* Hero Header - Enterprise Style */
-    .hero-header {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border-radius: 24px;
-        padding: 40px;
-        margin-bottom: 35px;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        border: 1px solid rgba(255,255,255,0.1);
+    /* Kategori Navigasi di Sidebar (Kunci tampilan Adminty) */
+    .nav-category {
+        color: #64748B !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1.5px !important;
+        padding: 25px 0 10px 20px !important;
     }
-    .hero-header::after {
-        content: "";
-        position: absolute;
-        top: -50%; right: -20%;
-        width: 300px; height: 300px;
-        background: rgba(59, 130, 246, 0.1);
-        border-radius: 50%;
-        filter: blur(50px);
+
+    /* Hero Header Style */
+    .hero-header {
+        background: #FFFFFF;
+        padding: 25px 35px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border-left: 6px solid #3B82F6; /* Aksen Biru */
     }
     .hero-header h1 {
-        font-weight: 800 !important;
-        color: white !important;
-        font-size: 2.5rem !important;
-        letter-spacing: -1px !important;
+        color: #1E293B !important;
+        font-weight: 700 !important;
+        font-size: 28px !important;
         margin: 0 !important;
     }
 
-    /* Metric Box - Glass Card */
+    /* Box Metrik / Card */
     .m-box { 
-        background: #1e293b !important; 
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        padding: 30px !important; 
-        border-radius: 20px !important; 
-        text-align: left !important; 
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        position: relative;
+        background-color: #FFFFFF !important; 
+        padding: 25px !important; 
+        border-radius: 12px !important; 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+        border: 1px solid #E2E8F0 !important;
+        transition: 0.3s;
     }
     .m-box:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        border-color: #3b82f6 !important;
-    }
-    .m-val { 
-        font-size: 42px !important; 
-        font-weight: 800 !important; 
-        color: #3b82f6 !important; /* Neon Blue */
-        display: block !important;
-        text-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
-    }
-    .m-lbl { 
-        font-size: 12px !important; 
-        color: #cbd5e1 !important; 
-        text-transform: uppercase !important; 
-        font-weight: 700 !important; 
-        letter-spacing: 2px !important;
-        opacity: 0.8;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
     }
 
-    /* Input & Dropdown - Dark Chrome Look */
+    /* DARK INPUTS & DROPDOWN (Tetap Gelap Sesuai Request) */
     div[data-baseweb="select"] > div, 
     div[data-baseweb="input"] > div,
     .stTextInput input {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
+        background-color: #0F172A !important;
+        color: #FFFFFF !important;
         border: 1px solid #334155 !important;
-        border-radius: 14px !important;
-        padding: 12px !important;
-        transition: 0.3s;
+        border-radius: 8px !important;
     }
-    div[data-baseweb="select"]:focus-within, 
-    .stTextInput:focus-within {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2) !important;
+    
+    /* Text Fix */
+    div[data-baseweb="select"] span, input {
+        color: #FFFFFF !important;
     }
 
-    /* Buttons - Glow Action */
+    /* Premium Button */
     .stButton>button {
-        background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%) !important;
+        background: #3B82F6 !important;
         color: white !important;
         border: none !important;
-        padding: 12px 28px !important;
-        border-radius: 14px !important;
-        font-weight: 700 !important;
-        font-size: 16px !important;
-        width: 100%;
-        transition: all 0.3s ease;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .stButton>button:hover {
-        box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.5);
-        transform: scale(1.02);
-    }
-
-    /* Tabs Customization */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        background: #f1f5f9;
-        padding: 8px;
-        border-radius: 16px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: transparent;
-        border-radius: 12px;
-        padding: 10px 20px;
-        font-weight: 600;
-        color: #64748b;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: white !important;
-        color: #0f172a !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    /* Dataframe Styling */
-    [data-testid="stDataFrame"] {
-        background: white;
-        padding: 15px;
-        border-radius: 20px;
-        border: 1px solid #e2e8f0;
-    }
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        padding: 0.6rem 1.2rem !important;
+        width: 100%;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -283,9 +222,23 @@ def process_scan_out(df_scan, df_history, df_stock):
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: white; padding-left: 20px;'>🚀 ERP SBY</h2>", unsafe_allow_html=True)
     st.divider()
-    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "📥 Putaway System", "📤 Scan Out", "📝 Dashboard Database", "⛔ Stock Minus"])
+    
+    # --- KATEGORI 1 ---
+    st.markdown('<p class="nav-category">MAIN ANALYTICS</p>', unsafe_allow_html=True)
+    menu_main = st.radio("", ["📊 Dashboard Overview", "📝 Dashboard Database"], label_visibility="collapsed")
+    
+    # --- KATEGORI 2 ---
+    st.markdown('<p class="nav-category">OPERATIONAL TOOLS</p>', unsafe_allow_html=True)
+    menu_ops = st.radio("", ["📥 Putaway System", "📤 Scan Out", "⛔ Stock Minus"], label_visibility="collapsed")
+
+    # Logika Penentuan Menu (Bridge)
+    # Karena kita pakai 2 radio, kita butuh trigger sederhana:
+    if menu_main == "📊 Dashboard Overview" and menu_ops == "📥 Putaway System":
+        # Ini default awal, pilih menu_main
+        menu = menu_main
+    # (Lo bisa gabungin jadi satu radio saja, tapi tetep pake label Kategori di atasnya biar rapi)
 
 # --- MENU PUTAWAY SYSTEM (UPDATED WITH 2 MACROS) ---
 if menu == "📥 Putaway System":
