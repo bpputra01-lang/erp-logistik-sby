@@ -30,43 +30,35 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI: Kasih izin Scrollbar Muncul
     st.markdown("""
         <style>
-            .main .block-container { padding: 0rem !important; max-width: 100% !important; }
-            header { visibility: hidden; }
-            .stApp { margin-top: -75px; }
-            
-            /* Container Utama: Kita kasih scrollbar (overflow: auto) */
-            .scroll-wrapper {
-                width: 100vw;
-                height: 90vh; 
-                overflow: auto; /* BIAR BISA DI-SCROLL KE BAWAH/SAMPING */
-                position: relative;
-                background: #0e1117;
-                border: 2px solid #333;
+            /* Paksa Streamlit Full Width */
+            .main .block-container { 
+                padding: 0rem !important; 
+                max-width: 100% !important; 
             }
+            header { visibility: hidden; }
+            .stApp { margin-top: -70px; }
             
-            /* Iframe: Kita bikin ukurannya JAUH LEBIH GEDE dari layarnya */
-            .scroll-wrapper iframe {
+            /* Container Dashboard tanpa batasan tinggi */
+            .final-wrapper {
+                width: 100%;
+                height: 2000px; /* Kita kasih ruang 2000 pixel ke bawah */
+                background: #0e1117;
+            }
+            iframe {
+                width: 100%;
+                height: 100%;
                 border: none;
-                transform-origin: 0 0;
             }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        pilih_dash = st.selectbox("", 
-                                ["WORKING REPORT", "PERSONAL PERFOMANCE", 
-                                 "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], 
-                                label_visibility="collapsed")
-    with c2:
-        # Gue naikin range-nya biar lo bisa pasin mentok
-        zoom_val = st.slider("PASIN UKURAN", 0.10, 1.0, 0.35, 0.01)
+    pilih_dash = st.selectbox("", 
+                            ["WORKING REPORT", "PERSONAL PERFOMANCE", 
+                             "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], 
+                            label_visibility="collapsed")
 
-    # 3. MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -74,20 +66,9 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. EKSEKUSI TAMPILAN
-    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
-    
-    # Supaya iframe-nya super lebar & tinggi buat nampung semua grafik
-    width_px = int(3500) # Kita paksa lebar 3500px
-    height_px = int(2500) # Kita paksa tinggi 2500px
+    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false"
 
-    st.markdown(f"""
-        <div class="scroll-wrapper">
-            <iframe src="{url_final}" 
-                    style="width: {width_px}px; height: {height_px}px; transform: scale({zoom_val});">
-            </iframe>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<div class="final-wrapper"><iframe src="{url_final}"></iframe></div>', unsafe_allow_html=True)
     
     st.info("💡 Jika masih kepotong, gunakan mouse untuk scroll ke bawah/samping di dalam dashboard.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
