@@ -30,28 +30,30 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI: Paksa Streamlit pake seluruh sisa layar
+    # 1. CSS TOTAL: Menghapus semua batasan tinggi & scrollbar
     st.markdown("""
         <style>
-            /* Hilangkan padding default Streamlit agar mentok kiri-kanan */
+            /* Reset Margin & Padding Streamlit */
             .main .block-container { 
                 padding: 0rem !important; 
                 max-width: 100% !important; 
             }
             header { visibility: hidden; }
-            .stApp { margin-top: -75px; } /* Tarik ke atas biar gak ada space kosong di atas */
+            .stApp { margin-top: -75px; }
             
-            /* Container Dashboard: Tinggi otomatis mengikuti layar (95% height) */
-            .dashboard-container {
+            /* Container Utama: Overflow dibikin visible biar gak kepotong */
+            .main-frame-wrapper {
                 width: 100vw;
-                height: 95vh; 
+                height: 100vh;
                 overflow: hidden;
                 position: relative;
                 background: #0e1117;
             }
-            .dashboard-container iframe {
+            
+            /* Iframe: Transformasi dengan origin yang dikunci di pojok kiri atas */
+            .main-frame-wrapper iframe {
                 position: absolute;
-                top: 0; 
+                top: 0;
                 left: 0;
                 border: none;
                 transform-origin: 0 0;
@@ -59,7 +61,7 @@ if menu == "📊 Dashboard Overview":
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. PANEL KONTROL (Hanya Dropdown & Zoom Slider)
+    # 2. PANEL KONTROL
     c1, c2 = st.columns([3, 1])
     with c1:
         pilih_dash = st.selectbox("", 
@@ -67,10 +69,10 @@ if menu == "📊 Dashboard Overview":
                                  "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], 
                                 label_visibility="collapsed")
     with c2:
-        # Slider Zoom buat ngepasin grafik yang kepotong
-        zoom_val = st.slider("PASIN TAMPILAN (ZOOM)", 0.20, 1.0, 0.33, 0.01)
+        # Gue set default ke 0.33 biar langsung kelihatan lebar
+        zoom_val = st.slider("PASIN TAMPILAN", 0.15, 1.0, 0.33, 0.01)
 
-    # 3. MAPPING LINK (Gue lurusin biar gak ada SyntaxError)
+    # 3. MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -78,16 +80,16 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. EKSEKUSI TAMPILAN
+    # 4. EKSEKUSI TAMPILAN (RUMUS BARU)
     url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
     
-    # RUMUS DINAMIS: Supaya lebar & tinggi melar proporsional sesuai zoom lo
-    calc_scale = (1 / zoom_val) * 100
+    # Rasio sakti: Semakin kecil zoom, wadah (iframe) harus semakin besar secara matematik
+    perc_size = (1 / zoom_val) * 100
 
     st.markdown(f"""
-        <div class="dashboard-container">
+        <div class="main-frame-wrapper">
             <iframe src="{url_final}" 
-                    style="width: {calc_scale}%; height: {calc_scale}%; transform: scale({zoom_val});">
+                    style="width: {perc_size}%; height: {perc_size}%; transform: scale({zoom_val});">
             </iframe>
         </div>
     """, unsafe_allow_html=True)
