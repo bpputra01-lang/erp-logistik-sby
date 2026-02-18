@@ -14,30 +14,39 @@ st.markdown("""
     /* 1. BACKGROUND UTAMA TETAP PUTIH */
     .stApp { background-color: #ffffff; color: #31333f; }
     
-    /* 2. SIDEBAR (Tulisan Putih Bersih) */
+    /* 2. SIDEBAR (Tulisan Putih Bersih di atas BG Gelap) */
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    [data-testid="stSidebar"] * { color: white !important; }
-    /* Pastikan radio button tetap kelihatan putih */
-    [data-testid="stSidebar"] .stRadio div { color: white !important; }
-
-    /* 3. HEADER & DROPDOWN ELEGAN (Bukan Putih Terang) */
-    header[data-testid="stHeader"] { background-color: rgba(255, 255, 255, 0.9) !important; border-bottom: 2px solid #FFD700; }
-    
-    /* Style Dropdown / Selectbox (Warna Abu-abu Lembut agar Elegan) */
-    div[data-baseweb="select"] > div {
-        background-color: #f0f2f6 !important;
-        border: 1px solid #3b82f6 !important;
-        color: #1e1e2f !important;
+    /* Memaksa semua teks di sidebar jadi putih */
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] span { 
+        color: white !important; 
+        font-weight: 500; 
     }
-    
-    /* Search Bar / Input Text */
+
+    /* 3. ELEMEN INPUT (DARK THEME) - DROPDOWN & SEARCH BAR */
+    /* Kotak Dropdown & Input */
+    div[data-baseweb="select"] > div, 
     div[data-testid="stTextInput"] input {
-        background-color: #f0f2f6 !important;
-        color: #1e1e2f !important;
+        background-color: #1e1e2f !important; /* Warna Gelap */
+        color: #ffffff !important; /* Tulisan Putih */
         border: 1px solid #3b82f6 !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Icon dropdown dan teks pilihan */
+    div[data-baseweb="select"] svg { fill: white !important; }
+    div[data-baseweb="select"] span { color: white !important; }
+
+    /* 4. TABEL / DATAFRAME (DARK MODE) */
+    [data-testid="stDataFrame"] {
+        background-color: #1e1e2f !important;
+        border: 1px solid #3b82f6 !important;
+        border-radius: 10px !important;
+        padding: 5px;
     }
 
-    /* 4. SUMMARY BOX (Warna Cerah tapi Professional) */
+    /* 5. SUMMARY BOX (Warna Cerah Elegan di Latar Putih) */
     .m-box { 
         background: #ffffff; 
         border: 1px solid #e0e0e0;
@@ -51,22 +60,14 @@ st.markdown("""
     .m-val { font-size: 22px; font-weight: 800; color: #1e3a8a; display: block; }
     .m-lbl { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; }
 
-    /* 5. TABEL (Kotak dan Rapih) */
-    [data-testid="stDataFrame"] {
-        border: 1px solid #e0e0e0;
-        border-radius: 5px;
-    }
-
-    /* 6. HERO HEADER BIRU (Tetap di Latar Putih) */
+    /* 6. HERO HEADER */
     .hero-header {
         background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
         color: white; padding: 1.5rem 2rem;
         border-bottom: 4px solid #FFD700;
         border-radius: 10px;
         margin-bottom: 15px;
-    }
-    .hero-header h1 { color: white !important; }
-    </style>
+    } </style>
     """, unsafe_allow_html=True)
 # --- 3. SIDEBAR (WAJIB DI ATAS AGAR VARIABEL 'MENU' TERDEFINISI) ---
 with st.sidebar:
