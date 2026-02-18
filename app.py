@@ -10,36 +10,71 @@ from python_calamine import CalamineWorkbook
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
 # 2. THE AUTHENTIC ADMINITY UI ENGINE
+Gue dapet poinnya. Masalahnya di Streamlit itu ada default padding sekitar 6rem di bagian atas sidebar yang bikin tulisan lo melorot ke bawah. Kita harus "tembak" pake CSS khusus buat ngehapus spasi itu sampai nol.
+
+Ini kode lengkapnya yang sudah gue sesuaikan. Silakan ganti seluruh bagian atas sampai menu routing pake ini:
+Python
+
+import pandas as pd
+import numpy as np
+import math
+import io
+import streamlit as st
+import plotly.express as px
+from python_calamine import CalamineWorkbook
+
+# 1. KONFIGURASI HALAMAN
+st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
+
+# 2. THE AUTHENTIC ADMINITY UI ENGINE (PENGATURAN SPASI ATAS & SIDEBAR)
 st.markdown("""
     <style>
-    /* Naikin konten sidebar ke paling atas */
-    [data-testid="stSidebarNav"] { padding-top: 0rem; }
-    .st-emotion-cache-16p9v06 { padding-top: 0rem; }
+    /* 1. MENGHAPUS SPACE KOSONG DI ATAS SIDEBAR & BODY */
+    .block-container { padding-top: 1rem !important; }
+    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+    [data-testid="stSidebarNav"] { display: none; } /* Sembunyikan nav default jika ada */
     
-    .stApp { background-color: #f4f7f6; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
-    [data-testid="stSidebar"] .stMarkdown p { color: #aeb1b5 !important; font-family: 'Inter', sans-serif; }
-    
+    /* 2. STYLE JUDUL ERP (NAIK KE ATAS) */
     .sidebar-title { 
         color: #00d2ff; 
         text-align: center; 
         font-family: 'Inter', sans-serif;
         font-weight: 800;
-        font-size: 22px;
-        margin-top: -50px; /* Tarik judul ke atas */
-        padding-bottom: 20px;
+        font-size: 20px;
+        margin-top: -50px; /* Menarik judul ke area paling atas */
+        padding-bottom: 15px;
         border-bottom: 1px solid #2d2d44;
+        margin-bottom: 10px;
     }
 
-    .nav-header { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #6c757d; padding: 10px 0 5px 10px; font-weight: 700; }
-    .hero-header { background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 25px; }
+    /* 3. STYLE MENU & HEADER */
+    .stApp { background-color: #f4f7f6; }
+    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
+    .nav-header { 
+        font-size: 11px; 
+        text-transform: uppercase; 
+        letter-spacing: 2px; 
+        color: #6c757d; 
+        padding: 15px 0 5px 10px; 
+        font-weight: 700; 
+    }
+    .hero-header { 
+        background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
+        color: white; 
+        padding: 1.5rem; 
+        border-radius: 12px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+        margin-bottom: 25px; 
+    }
     
+    /* Dashboard Metrics style */
     .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
     .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
     .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
     
-    div.row-widget.stRadio > div { background-color: transparent !important; padding: 5px; }
-    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; transition: 0.3s; }
+    /* Radio Button styling */
+    div.row-widget.stRadio > div { background-color: transparent !important; }
+    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
     div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; }
     
     </style>
@@ -179,8 +214,9 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 with st.sidebar:
     st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-bottom: 20px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
     st.markdown('<p class="nav-header">MAIN MENU</p>', unsafe_allow_html=True)
+    st.markdown('<p class="nav-header">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
     m1 = ["📊 Dashboard Overview", "📓 Database Master"]
-    st.markdown('<p class="nav-header">INVENTORY TOOLS</p>', unsafe_allow_html=True)
+    st.markdown('<p class="nav-header">OPERTIONAL</p>', unsafe_allow_html=True)
     m2 = ["📥 Putaway System", "📤 Scan Out Validasi", "🔄 Refill & Overstock", "⛔ Stock Minus"]
     menu = st.radio("Navigation", m1 + m2, label_visibility="visible")
     st.divider()
