@@ -30,35 +30,35 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS ULTIMATE: Maksa Full Screen & Auto Scaling
+    # 1. CSS ULTIMATE: Maksa Container Jadi Kanvas Full
     st.markdown("""
         <style>
-            /* Buang semua margin putih di pinggir */
+            /* Buang semua spasi sisa Streamlit */
             .main .block-container {
                 padding: 0rem !important;
                 max-width: 100% !important;
             }
             header {visibility: hidden;}
-            .stApp { margin-top: -70px; }
+            .stApp { margin-top: -80px; }
             
-            /* Container buat maksa dashboard masuk satu layar */
-            .dashboard-wrapper {
+            /* KONTROL ZOOM: Di sini kuncinya biar gak kepotong */
+            .zoom-container {
                 width: 100%;
-                height: 92vh; /* Tinggi pas di layar */
-                overflow: hidden;
+                height: 95vh;
+                overflow: hidden; /* Matiin scroll geser-geser jancok itu */
                 position: relative;
+                background: #0e1117;
             }
             
-            /* TEKNIK ZOOM OUT: Mengecilkan dashboard agar tidak kepotong */
-            .dashboard-wrapper iframe {
-                width: 142%; /* Dilebarkan dulu */
-                height: 142%; /* Ditinggikan dulu */
-                transform: scale(0.7); /* DIKECILKAN ke 70% agar muat semua */
+            .zoom-container iframe {
+                /* Kita bikin frame 2x lipat lebih gede biar resolusi tajam */
+                width: 200%; 
+                height: 200%;
+                /* Terus kita paksa KECILIN (Scale) sampe muat di layar lo */
+                transform: scale(0.5); /* Coba 0.5 dulu, kalau kurang kecil ganti 0.4 */
                 transform-origin: 0 0;
                 border: none;
                 position: absolute;
-                top: 0;
-                left: 0;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -69,7 +69,7 @@ if menu == "📊 Dashboard Overview":
                                "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
                               label_visibility="collapsed")
 
-    # 3. MAPPING LINK (Tetap pake link lo)
+    # 3. MAPPING LINK
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -77,17 +77,15 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    url_pilihan = dash_links[pilih_dash]
-    # Ditambah rm=minimal agar UI Google hilang
-    url_final = f"{url_pilihan}&rm=minimal&chrome=false&widget=false"
+    # Bersihin link biar tab bawah Google ilang
+    url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
 
-    # 4. TAMPILAN (Pake HTML agar Scaling Jalan)
-    if "pubhtml" in url_final:
-        st.markdown(f"""
-            <div class="dashboard-wrapper">
-                <iframe src="{url_final}"></iframe>
-            </div>
-        """, unsafe_allow_html=True)
+    # 4. TAMPILIN (Pake Wrapper CSS)
+    st.markdown(f"""
+        <div class="zoom-container">
+            <iframe src="{url_final}"></iframe>
+        </div>
+    """, unsafe_allow_html=True)
     else:
         st.error("Link Gak Valid!")
 
