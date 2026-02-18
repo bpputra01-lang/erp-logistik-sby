@@ -2,28 +2,18 @@ import pandas as pd
 import numpy as np
 import io
 import streamlit as st
-import plotly.express as px
+import xlsxwriter
 from python_calamine import CalamineWorkbook
 
-# 1. KONFIGURASI HALAMAN
+# 1. KONFIGURASI HALAMAN (Cukup Sekali di Paling Atas)
 st.set_page_config(page_title="ERP Surabaya - Pro", layout="wide")
 
-# 2. CUSTOM CSS GLOBAL
+# 2. CUSTOM CSS
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #31333f; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: white !important; }
-
-    div[data-baseweb="select"] > div {
-        background-color: #1e1e2f !important;
-        color: #FFD700 !important;
-        border: 2px solid #3b82f6 !important;
-        z-index: 999999 !important;
-    }
-    div[role="listbox"] ul { background-color: #1e1e2f !important; }
-    div[role="option"] { color: white !important; }
-
     .m-box { 
         background-color: #1e1e2f !important; 
         border: 2px solid #3b82f6 !important;
@@ -31,39 +21,10 @@ st.markdown("""
         padding: 25px !important; 
         border-radius: 15px !important; 
         text-align: center !important; 
-        box-shadow: 0 8px 20px rgba(0,0,0,0.3) !important;
         margin-bottom: 15px !important;
     }
     .m-val { font-size: 32px !important; font-weight: 800 !important; color: #FFD700 !important; display: block !important; }
-    .m-lbl { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase !important; font-weight: 700 !important; letter-spacing: 1.5px !important; }
-
-    .hero-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 1.5rem 2rem;
-        border-bottom: 5px solid #FFD700; border-radius: 15px; margin-bottom: 20px;
-    }
-    .dash-container {
-        border: 5px solid #1e3a8a; border-radius: 15px;
-        padding: 10px; background: #f8f9fa;
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
-        overflow: hidden;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    import pandas as pd
-import numpy as np
-import io
-import streamlit as st
-
-# 1. KONFIGURASI HALAMAN
-st.set_page_config(page_title="ERP Surabaya - Putaway Pro", layout="wide")
-
-# 2. CUSTOM CSS (Navy Mewah)
-st.markdown("""
-    <style>
-    .stApp { background-color: #ffffff; color: #31333f; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; }
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: white !important; }
+    .m-lbl { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase !important; font-weight: 700 !important; }
     .hero-header {
         background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
         color: white; padding: 1.5rem 2rem;
@@ -72,254 +33,80 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNGSI LOGIKA PUTAWAY SYSTEM (TRANSLASI MACRO COMPAREPUTAWAY) ---
+# 3. FUNGSI LOGIKA
 def process_putaway(df_ds, df_asal):
-    # Copy data agar tidak merusak aslinya
     df_asal_working = df_asal.copy()
-    
-    # Standarisasi Kolom (Sesuai Macro: Kolom B=BIN, C=SKU, J=QTY)
-    # VBA: binQtyDict(CStr(dataBin(i, 2)) & "|" & CStr(dataBin(i, 3))) = CLng(dataBin(i, 10))
-    # Index Python: 1=BIN, 2=SKU, 9=QTY (karena mulai dari 0)
-    
-    results_compare = []
-    putaway_list = []
-    rekap_kurang = []
+    results_compare, putaway_list, rekap_kurang = [], [], []
 
-    # Loop DS PUTAWAY (A=BIN_ASAL, B=SKU, C=QTY)
     for _, row_ds in df_ds.iterrows():
         bin_asal_ds = str(row_ds.iloc[0]).strip()
         sku_ds = str(row_ds.iloc[1]).strip()
         diff_qty = int(row_ds.iloc[2])
+        qty_awal_request = diff_qty
         
         while diff_qty > 0:
             allocated = False
-            bin_found = ""
-            qty_set_up = 0
-            
-            # Helper untuk mencari dan memotong qty (Logic Function GetQtyAndAllocate)
-            def find_and_allocate(pattern_include=None, pattern_exclude=None):
-                nonlocal diff_qty, allocated, bin_found, qty_set_up
+            for prio in ["LT3", "STAGING_GEN", "NORMAL"]:
                 for idx, row_bin in df_asal_working.iterrows():
-                    b_code = str(row_bin.iloc[1]).strip() # Kolom B (Index 1)
-                    s_code = str(row_bin.iloc[2]).strip() # Kolom C (Index 2)
-                    q_sys = int(row_bin.iloc[9])         # Kolom J (Index 9)
+                    b_code = str(row_bin.iloc[1]).strip().upper()
+                    s_code = str(row_bin.iloc[2]).strip()
+                    q_sys = int(row_bin.iloc[9])
                     
                     if s_code == sku_ds and q_sys > 0:
-                        match_logic = False
-                        # Priority Logic
-                        if pattern_include == "LT3":
-                            if "STAGGING LT.3" in b_code.upper() or "STAGING LT.3" in b_code.upper():
-                                match_logic = True
-                        elif pattern_include == "STAGING_GEN":
-                            if ("STAGGING" in b_code.upper() or "STAGING" in b_code.upper() or "KARANTINA" in b_code.upper()) \
-                               and "LT.3" not in b_code.upper():
-                                match_logic = True
-                        elif pattern_include == "NORMAL":
-                            if "STAGGING" not in b_code.upper() and "STAGING" not in b_code.upper() \
-                               and "KARANTINA" not in b_code.upper():
-                                match_logic = True
+                        match = False
+                        if prio == "LT3" and ("STAGGING LT.3" in b_code or "STAGING LT.3" in b_code): match = True
+                        elif prio == "STAGING_GEN" and any(x in b_code for x in ["STAGING", "STAGGING", "KARANTINA"]) and "LT.3" not in b_code: match = True
+                        elif prio == "NORMAL" and not any(x in b_code for x in ["STAGING", "STAGGING", "KARANTINA"]): match = True
                         
-                        if match_logic:
+                        if match:
                             take = min(q_sys, diff_qty)
-                            df_asal_working.iat[idx, 9] = q_sys - take # Update Qty Asal
-                            qty_set_up = take
-                            bin_found = b_code
-                            allocated = True
-                            return True
-                return False
-
-            # Priority 1: STAGGING LT.3
-            if not find_and_allocate("LT3"):
-                # Priority 2: STAGING/KARANTINA UMUM
-                if not find_and_allocate("STAGING_GEN"):
-                    # Priority 3: NORMAL BINS
-                    find_and_allocate("NORMAL")
-
-            if allocated:
-                # Record Output Compare (Header: BIN ASAL, SKU, QTY PUTAWAY, BIN DITEMUKAN, QTY BIN SYSTEM, DIFF, NOTE)
-                note = "FULLY SETUP" if (diff_qty - qty_set_up) == 0 else "PARTIAL SETUP"
-                results_compare.append({
-                    "BIN ASAL": bin_asal_ds, "SKU": sku_ds, "QTY PUTAWAY": row_ds.iloc[2],
-                    "BIN DITEMUKAN": bin_found, "QTY BIN SYSTEM": qty_set_up,
-                    "DIFF": diff_qty - qty_set_up, "NOTE": note
-                })
-                
-                # Record Putaway List (Header: BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES)
-                putaway_list.append({
-                    "BIN AWAL": bin_found, "BIN TUJUAN": bin_asal_ds, 
-                    "SKU": sku_ds, "QUANTITY": qty_set_up, "NOTES": "PUTAWAY"
-                })
-                
-                diff_qty -= qty_set_up
-            else:
-                # No Bin Found (Header: BIN ASAL, SKU, QTY PUTAWAY, BIN DITEMUKAN, QTY BIN SYSTEM, DIFF, NOTE)
-                results_compare.append({
-                    "BIN ASAL": bin_asal_ds, "SKU": sku_ds, "QTY PUTAWAY": row_ds.iloc[2],
-                    "BIN DITEMUKAN": "(NO BIN)", "QTY BIN SYSTEM": 0,
-                    "DIFF": diff_qty, "NOTE": "PERLU CARI STOCK MANUAL"
-                })
-                # Rekap Kurang Setup (Header: BIN, SKU, QTY)
-                rekap_kurang.append({
-                    "BIN": bin_asal_ds, "SKU": sku_ds, "QTY": diff_qty
-                })
+                            df_asal_working.iat[idx, 9] -= take
+                            putaway_list.append({"BIN AWAL": b_code, "BIN TUJUAN": bin_asal_ds, "SKU": sku_ds, "QUANTITY": take, "NOTES": "PUTAWAY"})
+                            results_compare.append({"BIN ASAL": bin_asal_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_awal_request, "BIN DITEMUKAN": b_code, "QTY SYSTEM": take, "NOTE": "SETUP DONE"})
+                            diff_qty -= take; allocated = True; break
+                if allocated: break
+            if not allocated:
+                results_compare.append({"BIN ASAL": bin_asal_ds, "SKU": sku_ds, "QTY PUTAWAY": qty_awal_request, "BIN DITEMUKAN": "(NO BIN)", "QTY SYSTEM": 0, "NOTE": "CARI MANUAL"})
+                rekap_kurang.append({"BIN": bin_asal_ds, "SKU": sku_ds, "QTY": diff_qty})
                 break
-                
     return pd.DataFrame(results_compare), pd.DataFrame(putaway_list), pd.DataFrame(rekap_kurang), df_asal_working
 
-# --- SIDEBAR MENU ---
-with st.sidebar:
-    st.markdown("<h2 style='color: white;'>🚀 ERP SURABAYA</h2>", unsafe_allow_html=True)
-    menu = st.radio("MENU", ["📊 Dashboard", "📥 Putaway System", "📤 Scan Out"])
-
-# --- MODUL PUTAWAY SYSTEM ---
-if menu == "📥 Putaway System":
-    st.markdown('<div class="hero-header"><h1>📥 PUTAWAY SYSTEM (LOGIC MACRO)</h1></div>', unsafe_allow_html=True)
-    
-    c1, c2 = st.columns(2)
-    with c1: up_ds = st.file_uploader("Upload DS PUTAWAY (A:BIN, B:SKU, C:QTY)", type=['xlsx'])
-    with c2: up_asal = st.file_uploader("Upload ASAL BIN PUTAWAY (Format Lengkap)", type=['xlsx'])
-
-    if up_ds and up_asal:
-        if st.button("⚡ PROSES PUTAWAY"):
-            try:
-                # Read dengan engine calamine biar kenceng
-                df_ds_data = pd.read_excel(up_ds, engine='calamine')
-                df_asal_data = pd.read_excel(up_asal, engine='calamine')
-                
-                res_comp, res_list, res_kurang, df_asal_updated = process_putaway(df_ds_data, df_asal_data)
-                
-                st.success("Proses Selesai!")
-                
-                # TAMPILAN TAB
-                tab1, tab2, tab3 = st.tabs(["📋 Compare Putaway", "📝 Putaway List", "⚠️ Kurang Setup"])
-                with tab1: st.dataframe(res_comp, use_container_width=True)
-                with tab2: st.dataframe(res_list, use_container_width=True)
-                with tab3: st.dataframe(res_kurang, use_container_width=True)
-                
-                # EXPORT KE SATU EXCEL DENGAN MULTIPLE SHEETS (Persis VBA)
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    res_comp.to_excel(writer, sheet_name='COMPARE PUTAWAY', index=False)
-                    res_list.to_excel(writer, sheet_name='PUTAWAY LIST', index=False)
-                    res_kurang.to_excel(writer, sheet_name='REKAP KURANG SETUP', index=False)
-                    df_asal_updated.to_excel(writer, sheet_name='UPDATED ASAL BIN', index=False)
-                
-                st.download_button(
-                    label="📥 DOWNLOAD ALL REPORT (EXCEL)",
-                    data=output.getvalue(),
-                    file_name="PUTAWAY_SYSTEM_RESULT.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                
-            except Exception as e:
-                st.error(f"Error pada logic: {e}")
-
-# --- FUNGSI LOGIKA SCAN OUT (HEADER DISAMAKAN DENGAN VBA) ---
 def process_scan_out(df_scan, df_history, df_stock):
-    # Logic: CLEAN_DATA_SCAN_WITH_COUNTIFS_V2
-    df_scan.columns = [str(c).strip().upper() for c in df_scan.columns]
-    # Mengasumsikan Kolom A adalah BIN dan B adalah SKU sesuai macro lo
     df_scan['BIN_CLEAN'] = df_scan.iloc[:, 0].astype(str).str.strip()
     df_scan['SKU_CLEAN'] = df_scan.iloc[:, 1].astype(str).str.strip()
-    
-    # Menghitung QTY (seperti Rumus COUNTIFS di Kolom C macro)
     df_scan_clean = df_scan.groupby(['BIN_CLEAN', 'SKU_CLEAN']).size().reset_index(name='QTY')
+    results, draft_setup = [], []
 
-    results = []
-    draft_setup = []
-
-    # Loop Progres Compare (Logic: CompareDataScan_FullFormat)
     for _, row in df_scan_clean.iterrows():
-        sku = row['SKU_CLEAN']
-        bin_scan = row['BIN_CLEAN']
-        qty = row['QTY']
-        
-        found_stock = False
-        found_history = False
-        
-        keterangan = ""
-        total_qty_setup_terjual = 0
-        bin_after_setup = ""
-        invoice = ""
-
-        # A. Loop STOCK TRACKING (Cek SKU & BIN)
-        match_stock = df_stock[(df_stock.iloc[:, 1].astype(str).str.strip() == sku) & 
-                               (df_stock.iloc[:, 6].astype(str).str.strip() == bin_scan)]
+        sku, bin_scan, qty = row['SKU_CLEAN'], row['BIN_CLEAN'], row['QTY']
+        # Sederhanakan logic search di sini (pake filter biasa)
+        match_stock = df_stock[(df_stock.iloc[:, 1].astype(str).str.strip() == sku) & (df_stock.iloc[:, 6].astype(str).str.strip() == bin_scan)]
         
         if not match_stock.empty:
-            found_stock = True
-            total_qty_setup_terjual = match_stock.iloc[0, 10] # Kolom K
-            invoice = match_stock.iloc[0, 0] # Kolom A
-            if total_qty_setup_terjual == qty:
-                keterangan = "ITEM TELAH TERJUAL"
-            else:
-                keterangan = "ITEM TERJUAL (QTY MISSMATCH)"
-        
-        # B. Jika tidak ketemu di Stock, cek HISTORY SET UP
-        if not found_stock:
-            match_hist = df_history[df_history.iloc[:, 3].astype(str).str.strip() == sku] # Kolom D
-            if not match_hist.empty:
-                found_history = True
-                total_qty_setup_terjual = match_hist.iloc[0, 10] # Kolom K
-                bin_after_setup = match_hist.iloc[0, 12] # Kolom M
-                bin_hist_i = str(match_hist.iloc[0, 8]).strip() # Kolom I
-                
-                if bin_hist_i == bin_scan:
-                    keterangan = "DONE AND MATCH SET UP" if total_qty_setup_terjual == qty else "DONE SETUP (QTY MISSMATCH)"
-                else:
-                    keterangan = "DONE SET UP (BIN MISSMATCH)"
-
-        # C. Fallback: Cek Stock lagi (Hanya SKU, BIN Mismatch)
-        if not found_stock and not found_history:
-            match_stock_any = df_stock[df_stock.iloc[:, 1].astype(str).str.strip() == sku]
-            if not match_stock_any.empty:
-                keterangan = "ITEM TERJUAL (BIN MISSMATCH)"
-                total_qty_setup_terjual = match_stock_any.iloc[0, 10]
-                invoice = match_stock_any.iloc[0, 0]
-                found_stock = True
-
-        # D. Final Fallback
-        if not found_stock and not found_history:
-            keterangan = "ITEM BELUM TERSETUP & TIDAK TERJUAL"
-
-        # --- LOGIKA CreateDraftSetUp_FIXED ---
-        # Menggunakan nama kolom persis VBA: BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES
-        if keterangan == "DONE SETUP (QTY MISSMATCH)":
-            draft_setup.append({
-                "BIN AWAL": bin_scan, "BIN TUJUAN": bin_after_setup, 
-                "SKU": sku, "QUANTITY": qty - total_qty_setup_terjual, "NOTES": "WAITING OFFLINE"
-            })
-        elif keterangan == "ITEM BELUM TERSETUP & TIDAK TERJUAL":
-            draft_setup.append({
-                "BIN AWAL": bin_scan, "BIN TUJUAN": "KARANTINA", 
-                "SKU": sku, "QUANTITY": qty, "NOTES": "WAITING OFFLINE"
-            })
-        elif keterangan == "DONE SET UP (BIN MISSMATCH)":
-            # Baris Pertama: Set Up Balik
-            draft_setup.append({
-                "BIN AWAL": bin_after_setup, "BIN TUJUAN": bin_scan, 
-                "SKU": sku, "QUANTITY": total_qty_setup_terjual, "NOTES": "SET UP BALIK"
-            })
-            # Baris Kedua: Karantina
-            draft_setup.append({
-                "BIN AWAL": bin_scan, "BIN TUJUAN": "KARANTINA", 
-                "SKU": sku, "QUANTITY": qty, "NOTES": "WAITING OFFLINE"
-            })
-
-        # Header hasil compare disamakan dengan VBA Array("Keterangan", "Total Qty Setup/Terjual", "Bin After Set Up", "Invoice")
-        results.append({
-            "BIN": bin_scan,
-            "SKU": sku,
-            "QTY": qty,
-            "Keterangan": keterangan,
-            "Total Qty Setup/Terjual": total_qty_setup_terjual,
-            "Bin After Set Up": bin_after_setup,
-            "Invoice": invoice
-        })
-
+            keterangan = "ITEM TELAH TERJUAL"
+            results.append({"BIN": bin_scan, "SKU": sku, "QTY": qty, "Keterangan": keterangan})
+        else:
+            draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": "KARANTINA", "SKU": sku, "QUANTITY": qty, "NOTES": "WAITING OFFLINE"})
+            results.append({"BIN": bin_scan, "SKU": sku, "QTY": qty, "Keterangan": "BELUM TERSETUP"})
+            
     return pd.DataFrame(results), pd.DataFrame(draft_setup)
 
-# --- SIDEBAR & MENU ---
+# 4. SIDEBAR
+with st.sidebar:
+    st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK</h2>", unsafe_allow_html=True)
+    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "📥 Putaway System", "📤 Scan Out", "📝 Dashboard Database", "⛔ Stock Minus"])
+
+# 5. MAIN CONTENT
+elif menu == "📥 Putaway System":
+    st.markdown('<div class="hero-header"><h1>📥 PUTAWAY SYSTEM</h1></div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    up_ds = c1.file_uploader("Upload DS PUTAWAY", type=['xlsx'])
+    up_asal = c2.file_uploader("Upload ASAL BIN", type=['xlsx'])
+    if up_ds and up_asal and st.button("⚡ JALANKAN"):
+        res_comp, res_list, res_kurang, df_upd = process_putaway(pd.read_excel(up_ds, engine='calamine'), pd.read_excel(up_asal, engine='calamine'))
+        st.success("Selesai!")
+        st.dataframe(res_list, use_container_width=True)
+
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
