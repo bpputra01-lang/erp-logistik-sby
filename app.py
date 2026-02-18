@@ -30,7 +30,7 @@ with st.sidebar:
 
 # --- MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
-    # 1. CSS SAKTI: Biar tampilan bersih pas di-print
+    # 1. CSS SAKTI
     st.markdown("""
         <style>
             .main .block-container { padding: 0rem !important; max-width: 100% !important; }
@@ -43,31 +43,48 @@ if menu == "📊 Dashboard Overview":
             .custom-wrapper iframe {
                 position: absolute; top: 0; left: 0; border: none; transform-origin: 0 0;
             }
-            
-            /* Sembunyikan tombol & slider pas lagi di-print biar hasilnya bersih */
-            @media print {
-                .no-print { display: none !important; }
-                .custom-wrapper { height: 100vh !important; }
+            /* Styling Tombol Download Merah */
+            .btn-export {
+                display: inline-block;
+                width: 100%;
+                background-color: #ff4b4b;
+                color: white !important;
+                padding: 10px;
+                text-align: center;
+                text-decoration: none;
+                font-weight: bold;
+                border-radius: 5px;
             }
         </style>
     """, unsafe_allow_html=True)
 
     # 2. PANEL KONTROL
-    # Kita bungkus kolom dalam div 'no-print' biar gak ikut kefoto
-    st.markdown('<div class="no-print">', unsafe_allow_html=True)
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
         pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
     with c2:
         zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
     with c3:
-        # PAKE TOMBOL STREAMLIT MURNI BIAR BISA DIKLIK
-        if st.button("📥 EXPORT TO PDF"):
-            # Memicu print browser lewat komponen komponen html
-            st.components.v1.html("<script>window.print();</script>", height=0)
-    st.markdown('</div>', unsafe_allow_html=True)
+        # MAP GID UNTUK EXPORT
+        gid_map = {
+            "WORKING REPORT": "864743695",
+            "PERSONAL PERFOMANCE": "251294539",
+            "CYCLE COUNT DAN KERAPIHAN": "1743896821",
+            "DASHBOARD MOVING STOCK": "1671817510"
+        }
+        
+        # ID Google Sheets lo (diambil dari link)
+        sheet_id = "1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_"
+        gid_now = gid_map[pilih_dash]
+        
+        # URL EXPORT KHUSUS (Buka Tab Baru Langsung Menu Print Google)
+        # Setting: A4, Landscape, No Gridlines, Fit to Width
+        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/print?gid={gid_now}&fzr=true&portrait=false&size=A4&gridlines=false&attachment=false"
 
-    # 3. MAPPING LINK
+        # Tampilkan Tombol Download
+        st.markdown(f'<a href="{export_url}" target="_blank" class="btn-export">📥 EXPORT PDF</a>', unsafe_allow_html=True)
+
+    # 3. MAPPING LINK TAMPILAN
     dash_links = {
         "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
         "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
@@ -75,7 +92,7 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. TAMPILAN
+    # 4. TAMPILAN DASHBOARD
     url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
     calc_ratio = (1 / zoom_val) * 100
 
@@ -87,8 +104,7 @@ if menu == "📊 Dashboard Overview":
         </div>
     """, unsafe_allow_html=True)
 
-    # Info tipis di bawah
-    st.caption(f"📍 View: {pilih_dash} | Gunakan slider ZOOM untuk menyesuaikan lebar dan tinggi halaman.")
+    st.caption(f"📍 View: {pilih_dash} | Klik 'EXPORT PDF' untuk cetak laporan via Google Print.")
 # --- MODUL STOCK MINUS (FULL LOGIC BALIK!) ---
 elif menu == "⛔ Stock Minus":
     st.title("⛔ Inventory : Stock Minus Clearance")
