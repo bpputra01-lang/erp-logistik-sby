@@ -70,36 +70,25 @@ with st.sidebar:
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
 
 # 4. LOGIKA MODUL
-if menu == "📊 Dashboard Overview":
-    st.markdown("""<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1><p>Analytic Reports Logistics Surabaya</p></div>""", unsafe_allow_html=True)
+elif menu == "📊 Dashboard Overview":
+    st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
     
-    # Kontrol di atas iframe
-    c1, c2 = st.columns([2, 1])
+    c1, c2 = st.columns([3, 1])
     with c1:
-        pilih_dash = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
+        pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE"])
     with c2:
-        zoom_val = st.slider("ZOOM", 0.10, 1.0, 0.35, 0.01)
+        zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
 
-    dash_links = {
-        "WORKING REPORT": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true",
-        "PERSONAL PERFOMANCE": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=251294539&single=true",
-        "CYCLE COUNT DAN KERAPIHAN": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1743896821&single=true",
-        "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
-    }
-    
-    # Wrapper Dashboard dengan Border Mewah
+    # DISINI KUNCINYA: height di div container kita batasi (misal 600px)
     st.markdown(f'''
-        <div class="dashboard-frame">
-            <div style="width: 100%; overflow: auto;">
-                <iframe src="{dash_links[pilih_dash]}&rm=minimal" 
-                        style="width: 3500px; height: 2500px; border: none;
-                        transform: scale({zoom_val}); transform-origin: 0 0;">
-                </iframe>
+        <div class="dash-container">
+            <div style="overflow: auto; width: 100%; height: 600px; border-radius: 10px;">
+                <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true&rm=minimal" 
+                style="width: 4000px; height: 2500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
             </div>
         </div>
-    ''', unsafe_allow_html=True)
-
-elif menu == "📝 Dashboard Database":
+        <p style="font-size: 10px; color: gray; margin-top: 5px;">*Gunakan scrollbar di dalam kotak untuk geser laporan</p>
+    ''', unsafe_allow_html=True)elif menu == "📝 Dashboard Database":
     st.markdown("""<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1><p>Automatic Sync with Google Sheets Master</p></div>""", unsafe_allow_html=True)
     
     # Link lo tadi
