@@ -79,7 +79,7 @@ if menu == "📊 Dashboard Overview":
                 style="width: 4000px; height: 1400px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
             </div>
         </div>
-        <div style="margin-bottom: -100px;"></div> 
+        <div style="margin-bottom: -50px;"></div> 
     ''', unsafe_allow_html=True)
 
 elif menu == "📝 Dashboard Database":
