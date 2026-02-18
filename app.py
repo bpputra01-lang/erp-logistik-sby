@@ -168,7 +168,6 @@ with st.sidebar:
     menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "📥 Putaway System", "📤 Scan Out", "📝 Dashboard Database", "⛔ Stock Minus"])
 
 # --- MENU PUTAWAY SYSTEM (NEW LOGIC) ---
-# --- UPDATE DI MENU PUTAWAY SYSTEM ---
 if menu == "📥 Putaway System":
     st.markdown('<div class="hero-header"><h1>📥 PUTAWAY SYSTEM PRO (MACRO LOGIC)</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -178,38 +177,30 @@ if menu == "📥 Putaway System":
     if up_ds and up_asal:
         if st.button("⚡ JALANKAN PROSES PUTAWAY"):
             try:
-                # FIX: Deteksi format file secara otomatis
-                if up_ds.name.endswith('.csv'):
-                    df_ds_p = pd.read_csv(up_ds)
-                else:
-                    df_ds_p = pd.read_excel(up_ds, engine='calamine')
+                # Loader Otomatis (CSV/Excel)
+                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='calamine')
+                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='calamine')
                 
-                if up_asal.name.endswith('.csv'):
-                    df_asal_p = pd.read_csv(up_asal)
-                else:
-                    df_asal_p = pd.read_excel(up_asal, engine='calamine')
+                # Jalankan Logic Terpadu
+                df_comp, df_sum, df_lt3, df_updated_bin = process_putaway_system(df_ds_p, df_asal_p)
                 
-                # Panggil fungsi logika utama lo
-                df_comp, df_plist, df_kurang, df_updated_bin = process_putaway_system(df_ds_p, df_asal_p)
-                
-                st.success("Proses Putaway Selesai!")
-                t1, t2, t3 = st.tabs(["📋 Compare Putaway", "📝 Putaway List", "⚠️ Kurang Setup"])
+                st.success("Proses Putaway & Macro Selesai!")
+                t1, t2, t3 = st.tabs(["📋 Compare Putaway", "📊 Summary Putaway", "📦 LT.3 Outstanding"])
                 with t1: st.dataframe(df_comp, use_container_width=True)
-                with t2: st.dataframe(df_plist, use_container_width=True)
-                with t3: st.dataframe(df_kurang, use_container_width=True)
+                with t2: st.dataframe(df_sum, use_container_width=True)
+                with t3: st.dataframe(df_lt3, use_container_width=True)
                 
-                # Export ke Excel
+                # Export Multiple Sheets
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     df_comp.to_excel(writer, sheet_name='COMPARE PUTAWAY', index=False)
-                    df_plist.to_excel(writer, sheet_name='PUTAWAY LIST', index=False)
-                    df_kurang.to_excel(writer, sheet_name='REKAP KURANG SETUP', index=False)
+                    df_sum.to_excel(writer, sheet_name='SUMMARY PUTAWAY', index=False)
+                    df_lt3.to_excel(writer, sheet_name='STAGGING LT.3 OUTSTANDING', index=False)
                     df_updated_bin.to_excel(writer, sheet_name='UPDATED ASAL BIN', index=False)
                 
-                st.download_button("📥 DOWNLOAD LAPORAN PUTAWAY", data=output.getvalue(), file_name="REPORT_PUTAWAY_SYSTEM.xlsx")
+                st.download_button("📥 DOWNLOAD REPORT COMPLETE", data=output.getvalue(), file_name="REPORT_PUTAWAY_SYSTEM.xlsx")
                 
             except Exception as e:
-                # Ini yang muncul di screenshot lo tadi
                 st.error(f"Gagal memproses: {e}")
 
 # --- MENU LAINNYA (TETAP SAMA) ---
