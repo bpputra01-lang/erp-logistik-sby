@@ -36,11 +36,9 @@ if menu == "📊 Dashboard Overview":
             .main .block-container { padding: 0rem !important; max-width: 100% !important; }
             header { visibility: hidden; }
             .stApp { margin-top: -80px; }
-            
-            /* Container Dashboard */
             .custom-wrapper {
                 width: 100vw;
-                height: 88vh; /* Tinggi area dashboard */
+                height: 92vh; 
                 overflow: hidden;
                 position: relative;
                 background: #0e1117;
@@ -55,13 +53,12 @@ if menu == "📊 Dashboard Overview":
     """, unsafe_allow_html=True)
 
     # 2. PANEL KONTROL (Dropdown & Zoom Slider)
-    # Kita buat kolom biar gak makan tempat
     c1, c2 = st.columns([3, 1])
     with c1:
         pilih_dash = st.selectbox("", ["WORKING REPORT", "PERSONAL PERFOMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"], label_visibility="collapsed")
     with c2:
-        # FITUR ZOOM MANUAL: Lo bisa geser-geser sampe space kanan-kiri ilang!
-        zoom_val = st.slider("ZOOM LEVEL", 0.20, 1.0, 0.30, 0.01)
+        # Geser slider ini buat ngilangin space putih di kanan/kiri!
+        zoom_val = st.slider("ZOOM", 0.20, 0.80, 0.35, 0.01)
 
     # 3. MAPPING LINK
     dash_links = {
@@ -71,16 +68,17 @@ if menu == "📊 Dashboard Overview":
         "DASHBOARD MOVING STOCK": "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=1671817510&single=true"
     }
 
-    # 4. ITUNG-ITUNGAN OTOMATIS (Biar gak ada space kosong)
-    # Rumus: Lebar Frame = 100 / Zoom
-    width_calc = (1 / zoom_val) * 100
+    # 4. PROSES TAMPILAN
     url_final = f"{dash_links[pilih_dash]}&rm=minimal&chrome=false&widget=false"
+    
+    # Hitung lebar frame otomatis berdasarkan zoom agar space kosong hilang
+    width_perc = (1 / zoom_val) * 100
 
-    # 5. EKSEKUSI TAMPILAN
+    # Tampilkan Dashboard tanpa blok IF-ELSE yang bikin error
     st.markdown(f"""
         <div class="custom-wrapper">
             <iframe src="{url_final}" 
-                    style="width: {width_calc}%; height: {width_calc}%; transform: scale({zoom_val});">
+                    style="width: {width_perc}%; height: {width_perc}%; transform: scale({zoom_val});">
             </iframe>
         </div>
     """, unsafe_allow_html=True)
