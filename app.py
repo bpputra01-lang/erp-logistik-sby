@@ -54,11 +54,76 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- BAGIAN MENU SIDEBAR (Gue tambahin biar lengkap) ---
+# --- FUNGSI LOGIKA SCAN OUT (TRANSLASI VBA) ---
+def process_scan_out(df_scan, df_history, df_stock):
+    # 1. CLEAN_DATA_SCAN logic (Group & Count)
+    df_scan['BIN'] = df_scan.iloc[:, 0].astype(str).str.strip()
+    df_scan['SKU'] = df_scan.iloc[:, 1].astype(str).str.strip()
+    df_scan_clean = df_scan.groupby(['BIN', 'SKU']).size().reset_index(name='QTY_SCAN')
+
+    results = []
+    draft_setup = []
+
+    # 2. CompareDataScan logic
+    for _, row in df_scan_clean.iterrows():
+        sku, bin_scan, qty_scan = row['SKU'], row['BIN'], row['QTY_SCAN']
+        
+        # Cari di Stock Tracking (Logic 1: Item Terjual)
+        match_stock = df_stock[(df_stock.iloc[:, 1].astype(str) == sku) & (df_stock.iloc[:, 6].astype(str) == bin_scan)]
+        
+        keterangan = ""
+        qty_ref = 0
+        bin_ref = "-"
+        inv_ref = "-"
+
+        if not match_stock.empty:
+            qty_ref = float(match_stock.iloc[0, 10]) # Kolom K
+            inv_ref = match_stock.iloc[0, 0] # Kolom A
+            keterangan = "ITEM TELAH TERJUAL" if qty_ref == qty_scan else "ITEM TERJUAL (QTY MISSMATCH)"
+        else:
+            # Logic 2: Cek di History Set Up
+            match_hist = df_history[df_history.iloc[:, 3].astype(str) == sku] # Kolom D
+            if not match_hist.empty:
+                qty_ref = float(match_hist.iloc[0, 10]) # Kolom K
+                bin_ref = match_hist.iloc[0, 12] # Kolom M
+                bin_hist_i = match_hist.iloc[0, 8] # Kolom I
+                
+                if str(bin_hist_i) == bin_scan:
+                    keterangan = "DONE AND MATCH SET UP" if qty_ref == qty_scan else "DONE SETUP (QTY MISSMATCH)"
+                else:
+                    keterangan = "DONE SET UP (BIN MISSMATCH)"
+            else:
+                # Logic 3: Fallback Stock Mismatch
+                match_stock_any = df_stock[df_stock.iloc[:, 1].astype(str) == sku]
+                if not match_stock_any.empty:
+                    keterangan = "ITEM TERJUAL (BIN MISSMATCH)"
+                    qty_ref = float(match_stock_any.iloc[0, 10])
+                    inv_ref = match_stock_any.iloc[0, 0]
+                else:
+                    keterangan = "ITEM BELUM TERSETUP & TIDAK TERJUAL"
+
+        # 3. CreateDraftSetUp logic
+        if keterangan == "DONE SETUP (QTY MISSMATCH)":
+            draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": bin_ref, "SKU": sku, "QUANTITY": qty_scan - qty_ref, "NOTES": "WAITING OFFLINE"})
+        elif keterangan == "ITEM BELUM TERSETUP & TIDAK TERJUAL":
+            draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": "KARANTINA", "SKU": sku, "QUANTITY": qty_scan, "NOTES": "WAITING OFFLINE"})
+        elif keterangan == "DONE SET UP (BIN MISSMATCH)":
+            draft_setup.append({"BIN AWAL": bin_ref, "BIN TUJUAN": bin_scan, "SKU": sku, "QUANTITY": qty_ref, "NOTES": "SET UP BALIK"})
+            draft_setup.append({"BIN AWAL": bin_scan, "BIN TUJUAN": "KARANTINA", "SKU": sku, "QUANTITY": qty_scan, "NOTES": "WAITING OFFLINE"})
+
+        results.append({
+            "BIN": bin_scan, "SKU": sku, "QTY SCAN": qty_scan,
+            "KETERANGAN": keterangan, "QTY REF": qty_ref, "BIN REF": bin_ref, "INVOICE": inv_ref
+        })
+
+    return pd.DataFrame(results), pd.DataFrame(draft_setup)
+
+# --- BAGIAN MENU SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 style='color: white;'>🚀 ERP LOGISTIK SURABAYA</h2>", unsafe_allow_html=True)
     st.divider()
-    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview","📝 Dashboard Database","⛔ Stock Minus"])
+    # TAMBAHKAN "📤 Scan Out" DI LIST RADIO
+    menu = st.radio("MODUL UTAMA", ["📊 Dashboard Overview", "📤 Scan Out", "📝 Dashboard Database", "⛔ Stock Minus"])
 
 # --- 4. LOGIKA MODUL DASHBOARD OVERVIEW ---
 if menu == "📊 Dashboard Overview":
@@ -66,7 +131,6 @@ if menu == "📊 Dashboard Overview":
     
     c1, c2 = st.columns([3, 1])
     with c1:
-        # 1. DISINI GUE TAMBAHIN JADI 4 PILIHAN SESUAI PERMINTAAN
         pilih = st.selectbox("PILIH LAPORAN", [
             "WORKING REPORT", 
             "PERSONAL PERFORMANCE", 
@@ -76,7 +140,6 @@ if menu == "📊 Dashboard Overview":
     with c2:
         zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
 
-    # 2. MAPPING LINK (Biar dropdown-nya jalan sesuai pilihan)
     dash_links = {
         "WORKING REPORT": "864743695",
         "PERSONAL PERFORMANCE": "251294539",
@@ -85,7 +148,6 @@ if menu == "📊 Dashboard Overview":
     }
     gid = dash_links[pilih]
 
-    # 3. TAMPILAN (Frame anti-scroll kejauhan)
     st.markdown(f'''
         <div class="dash-container" style="height: auto; overflow: hidden;">
             <div style="width: 100%; height: 500px; overflow: auto; border-radius: 10px; background: #f8f9fa;">
@@ -93,54 +155,50 @@ if menu == "📊 Dashboard Overview":
                 style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe>
             </div>
         </div>
-
     ''', unsafe_allow_html=True)
-    
-    
-elif menu == "📝 Dashboard Database":
-    st.markdown('<div class="hero-header"><h1>📓 DETAIL DATABASE ANALYTICS</h1></div>', unsafe_allow_html=True)
-    
-    # --- LINK DATABASE UTAMA (DIKUNCI) ---
-    FILE_ID = "1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY"
-    XLSX_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=xlsx"
-    
-    try:
-        # Load data otomatis pakai engine Calamine (Speed Demon)
-        all_sheets = pd.read_excel(XLSX_URL, sheet_name=None, engine='calamine')
-        sheet_names = list(all_sheets.keys())
-        
-        # Dropdown buat pilih Tab saja
-        selected_sheet = st.selectbox("📂 PILIH TAB DATABASE:", sheet_names)
-        
-        if selected_sheet:
-            # 1. Ambil data mentah
-            df_master = all_sheets[selected_sheet]
-            
-            # 2. Pembersihan Data Otomatis (Format Tanggal & Kolom)
-            df_master = df_master.loc[:, ~df_master.columns.astype(str).str.contains('^Unnamed')]
-            df_master = df_master.dropna(how='all').reset_index(drop=True)
 
-            # --- SUMMARY BOX NAVY GALAK (GAMBAR 2 VIBES) ---
-            c1, c2, c3 = st.columns(3)
-            with c1: 
-                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
-            with c2: 
-                st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
-            with c3: 
-                st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+# --- 📤 MODUL BARU: SCAN OUT ---
+elif menu == "📤 Scan Out":
+    st.markdown('<div class="hero-header"><h1>📤 SCAN OUT & VALIDASI</h1></div>', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1: up_scan = st.file_uploader("Upload DATA SCAN (A=BIN, B=SKU)", type=['xlsx', 'csv'])
+    with col2: up_hist = st.file_uploader("Upload HISTORY SET UP", type=['xlsx'])
+    with col3: up_stock = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
 
-            st.divider()
+    if up_scan and up_hist and up_stock:
+        if st.button("🚀 JALANKAN PROSES VALIDASI"):
+            with st.spinner("Mencocokkan data sesuai logika Macro..."):
+                try:
+                    df_s = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
+                    df_h = pd.read_excel(up_hist)
+                    df_st = pd.read_excel(up_stock)
 
-            # --- SEARCH & DATA VIEW ---
-            search = st.text_input("🔍 Cari Data Tertentu (SKU / Nama / Bin)...")
-            if search:
-                mask = df_master.apply(lambda row: row.astype(str).str.contains(search, case=False).any(), axis=1)
-                st.dataframe(df_master[mask], use_container_width=True, height=500)
-            else:
-                st.dataframe(df_master, use_container_width=True, height=500)
+                    df_res, df_draft = process_scan_out(df_s, df_h, df_st)
 
-    except Exception as e:
-        st.error(f"❌ Koneksi Terputus atau Link Salah: {e}")
+                    st.success("Analisis Selesai!")
+                    
+                    # Highlight Error Logic (Merah untuk Mismatch/Belum Setup)
+                    def highlight_errors(val):
+                        color = 'red' if 'MISSMATCH' in str(val) or 'BELUM' in str(val) else 'black'
+                        return f'color: {color}; font-weight: bold'
+
+                    st.subheader("📋 HASIL COMPARE SCAN")
+                    st.dataframe(df_res.style.applymap(highlight_errors, subset=['KETERANGAN']), use_container_width=True)
+
+                    st.subheader("📝 DRAFT SET UP (EKSEKUSI)")
+                    st.dataframe(df_draft, use_container_width=True)
+
+                    # Export Download
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        df_res.to_excel(writer, sheet_name='DATA_SCAN_RESULT', index=False)
+                        df_draft.to_excel(writer, sheet_name='DRAFT_SET_UP', index=False)
+                    
+                    st.download_button("📥 DOWNLOAD LAPORAN LENGKAP", data=output.getvalue(), file_name="HASIL_SCAN_OUT_FINAL.xlsx")
+                except Exception as e:
+                    st.error(f"Gagal memproses file: {e}")
+
 elif menu == "⛔ Stock Minus":
     st.markdown('<div class="hero-header"><h1>⛔ STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
