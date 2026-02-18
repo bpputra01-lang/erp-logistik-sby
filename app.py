@@ -196,41 +196,40 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 with st.sidebar:
     st.markdown("<h2 style='color: #00d2ff; text-align: center; margin-top: -20px;'>🚛 ERP LOGISTIC SURABAYA</h2>", unsafe_allow_html=True)
     
-    # --- KELOMPOK 1 ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: -10px;">MAIN MENU</p>', unsafe_allow_html=True)
-    st.markdown('<p style="font-weight: bold; color: #808495;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
-    
-    m1_options = ["📊 Dashboard Overview", "📓 Database Master"]
-    
-    # --- KELOMPOK 2 ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 20px;">OPERATIONAL</p>', unsafe_allow_html=True)
-    m2_options = ["📥 Putaway System", "📤 Scan Out Validasi", "🔄 Refill & Overstock", "⛔ Stock Minus"]
+    # Inisialisasi session state agar menu tersinkron
+    if 'main_menu' not in st.session_state:
+        st.session_state.main_menu = "📊 Dashboard Overview"
 
-    # --- LOGIC AGAR BISA PINDAH ANTAR KELOMPOK ---
-    # Kita pakai Session State supaya saat m1 dipilih, m2 reset (dan sebaliknya)
-    if 'menu_pilihan' not in st.session_state:
-        st.session_state.menu_pilihan = m1_options[0]
-
-    # Render Radio Kelompok 1
-    def update_m1():
-        st.session_state.menu_pilihan = st.session_state.m1_key
+    # --- KELOMPOK 1: DASHBOARD SUMMARY ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
     
-    # Cari index buat mempertahankan pilihan jika user klik di kelompok ini
-    idx1 = m1_options.index(st.session_state.menu_pilihan) if st.session_state.menu_pilihan in m1_options else 0
+    m1_list = ["📊 Dashboard Overview", "📓 Database Master"]
     
-    sel_m1 = st.radio("Group1", m1_options, index=idx1, key="m1_key", on_change=update_m1, label_visibility="collapsed")
+    # Cek apakah pilihan sekarang ada di kelompok 1
+    def change_m1():
+        st.session_state.main_menu = st.session_state.m1_key
 
-    # Render Radio Kelompok 2
-    def update_m2():
-        st.session_state.menu_pilihan = st.session_state.m2_key
-
-    idx2 = m2_options.index(st.session_state.menu_pilihan) if st.session_state.menu_pilihan in m2_options else None
+    # Jika menu yang terpilih ada di Kelompok 2, maka radio ini kita "kosongkan" secara visual (atau pilih default)
+    idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
     
-    # Jika idx2 None (karena lagi milih m1), kita paksa None agar tidak ada yang terpilih di m2
-    sel_m2 = st.radio("Group2", m2_options, index=idx2, key="m2_key", on_change=update_m2, label_visibility="collapsed")
+    menu_1 = st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
 
-    # Final Menu yang dipakai untuk logic halaman
-    menu = st.session_state.menu_pilihan
+    # --- KELOMPOK 2: OPERATIONAL ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
+    
+    m2_list = ["📥 Putaway System", "📤 Scan Out Validasi", "🔄 Refill & Overstock", "⛔ Stock Minus"]
+    
+    def change_m2():
+        st.session_state.main_menu = st.session_state.m2_key
+
+    # Jika menu yang terpilih ada di Kelompok 2, arahkan indexnya. Jika tidak, biarkan di posisi default tapi jangan bentrok
+    idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
+    
+    menu_2 = st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
+
+    # Final Menu Variable untuk dipakai di konten utama
+    menu = st.session_state.main_menu
 
     st.divider()
     st.caption("ERP Logistic Surabaya v2.1")
