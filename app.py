@@ -108,7 +108,7 @@ with st.sidebar:
         <div class="sidebar-divider"></div>
     """, unsafe_allow_html=True)
     
-    st.markdown("<p style='color:white; opacity:0.6; font-size:0.8rem; font-weight:bold;'>MODUL UTAMA</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:white; opacity:0.6; font-size:0.8rem; font-weight:bold;'>INVENTORY</p>", unsafe_allow_html=True)
     
     menu = st.radio(
         "Pilih Modul:", 
