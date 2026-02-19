@@ -217,7 +217,7 @@ with st.sidebar:
         section[data-testid="stSidebar"] label p,
         section[data-testid="stSidebar"] .stCaption p {
             color: #FFFFFF !important;
-            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            
             font-family: 'Inter', sans-serif;
             font-size: 14px;
             opacity: 1 !important;
