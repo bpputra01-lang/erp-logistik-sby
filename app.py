@@ -222,6 +222,18 @@ with st.sidebar:
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+        /* 2. STYLE UNTUK INPUT FIELD & DROPDOWN (BIRU EMAS) */
+        /* Mengubah warna border dan background input */
+        div[data-baseweb="input"], div[data-baseweb="select"] > div {
+            background-color: #1a2634 !important; /* Biru Navy Gelap */
+            border: 1px solid #C5A059 !important;   /* Border Emas */
+            border-radius: 8px !important;
+        }
+        /* Efek Hover/Fokus (Emas Bersinar) */
+        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+            border: 1px solid #FFD700 !important;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
+        }
     </style>
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
