@@ -214,7 +214,7 @@ with st.sidebar:
         /* PAKSA SEMUA SUB-MENU & LABEL JADI PUTIH BERSIH */
         section[data-testid="stSidebar"] label p,
         section[data-testid="stSidebar"] .stCaption p {
-            color: #FFFFFF !important;
+            color: #E2E8F0; /* Slate Gray Light yang mewah */
             font-family: 'Inter', sans-serif;
             opacity: 1 !important;
         }
