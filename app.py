@@ -211,6 +211,14 @@ with st.sidebar:
             -webkit-text-fill-color: transparent;
             padding-bottom: 10px;
         }
+        /* PAKSA SEMUA SUB-MENU & LABEL JADI PUTIH BERSIH */
+        section[data-testid="stSidebar"] label p, 
+        section[data-testid="stSidebar"] .stMarkdown p,
+        section[data-testid="stSidebar"] .stCaption p {
+            color: #FFFFFF !important;
+            font-family: 'Inter', sans-serif;
+            opacity: 1 !important;
+        }
     </style>
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
