@@ -252,6 +252,7 @@ with st.sidebar:
             background-color: #1a2634 !important;
             border: 2px dashed #C5A059 !important;
             border-radius: 10px !important;
+           
         }
 
         [data-testid="stFileUploaderText"] > span,
@@ -276,12 +277,7 @@ with st.sidebar:
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
-        /* 4. FILE UPLOADER - TAMBAHAN BORDER GOLD */
-        [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important;
-            border: 2px dashed #C5A059 !important; /* INI BORDER GOLD NYA */
-            border-radius: 10px !important;
-        }
+        
 
     </style>
     <div class="elegant-header">
