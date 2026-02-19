@@ -216,12 +216,14 @@ with st.sidebar:
         /* 2. SUB-MENU & LABEL (PUTIH/SLATE) */
         section[data-testid="stSidebar"] label p,
         section[data-testid="stSidebar"] .stCaption p {
-            color: #FFFFFF !important;
-            
+            color: #00d2ff,!important;
             font-family: 'Inter', sans-serif;
             font-size: 14px;
-            opacity: 1 !important;
-            -webkit-text-fill-color: initial !important; /* Hapus gradient di menu biar jelas */
+           background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            padding-bottom: 10px;
+            line-height: 1.2;
         }
 
         /* 3. INPUT FIELD & DROPDOWN (BIRU EMAS) */
