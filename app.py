@@ -250,15 +250,7 @@ with st.sidebar:
         -webkit-text-fill-color: #1a2634 !important;
         font-weight: 700 !important;
     }
-
-    /* 3. SIDEBAR MENU - PUTIH SOLID */
-    section[data-testid="stSidebar"] label p {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-        font-weight: 400 !important;
-        background: none !important;
-    }
-
+    
     /* 4. BOX DRAG & DROP DENGAN BORDER EMAS */
     [data-testid="stFileUploaderSection"] {
         background-color: #1a2634 !important;
@@ -281,11 +273,6 @@ with st.sidebar:
         border: none !important;
     }
 
-    /* Input Field & Dropdown */
-    div[data-baseweb="input"], div[data-baseweb="select"] > div {
-        background-color: #1a2634 !important;
-        border: 1px solid #C5A059 !important;
-    }
         </style>
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
