@@ -230,7 +230,7 @@ with st.sidebar:
     
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
-        st.session_state.main_menu = "📊 Dashboard Overview"
+        st.session_state.main_menu = "Dashboard Overview"
 
     # --- KELOMPOK 1: DASHBOARD SUMMARY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
@@ -267,21 +267,21 @@ with st.sidebar:
     st.caption("ERP Logistic Surabaya v2.1")
 
 # --- MENU ROUTING ---
-if menu == "📊 Dashboard Overview":
-    st.markdown('<div class="hero-header"><h1>📊 DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
+if menu == "Dashboard Overview":
+    st.markdown('<div class="hero-header"><h1>DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns([3, 1])
     with c1: pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
     with c2: zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
     dash_links = {"WORKING REPORT": "864743695", "PERSONAL PERFORMANCE": "251294539", "CYCLE COUNT DAN KERAPIHAN": "1743896821", "DASHBOARD MOVING STOCK": "1671817510"}
     st.markdown(f'''<div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"><div style="width: 100%; height: 600px; overflow: auto;"><iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links[pilih]}&single=true&rm=minimal" style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe></div></div>''', unsafe_allow_html=True)
 
-elif menu == "📥 Putaway System":
-    st.markdown('<div class="hero-header"><h1>📥 PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
+elif menu == "Putaway System":
+    st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
     if up_ds and up_asal:
-        if st.button("⚡ JALANKAN PROSES PUTAWAY"):
+        if st.button("⚡COMPARE PUTAWAY"):
             try:
                 df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='calamine')
                 df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='calamine')
@@ -301,14 +301,14 @@ elif menu == "📥 Putaway System":
                 st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REPORT_PUTAWAY.xlsx")
             except Exception as e: st.error(f"Gagal: {e}")
 
-elif menu == "📤 Scan Out Validasi":
-    st.markdown('<div class="hero-header"><h1>📤 SCAN OUT & VALIDASI</h1></div>', unsafe_allow_html=True)
+elif menu == "📤 Scan Out Validation":
+    st.markdown('<div class="hero-header"><h1> COMPARE AND ANLYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     with col1: up_scan = st.file_uploader("Upload DATA SCAN", type=['xlsx', 'csv'])
     with col2: up_hist = st.file_uploader("Upload HISTORY SET UP", type=['xlsx'])
     with col3: up_stock = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
     if up_scan and up_hist and up_stock:
-        if st.button("🚀 JALANKAN PROSES VALIDASI"):
+        if st.button("🚀 COMPARE DATA SCAN OUT"):
             try:
                 df_s = pd.read_excel(up_scan, engine='calamine') if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
                 df_h = pd.read_excel(up_hist, engine='calamine'); df_st = pd.read_excel(up_stock, engine='calamine')
@@ -323,8 +323,8 @@ elif menu == "📤 Scan Out Validasi":
                 st.download_button("📥 DOWNLOAD SCAN OUT", data=output.getvalue(), file_name="SCAN_OUT_RESULT.xlsx")
             except Exception as e: st.error(f"Error: {e}")
 
-elif menu == "🔄 Refill & Overstock":
-    st.markdown('<div class="hero-header"><h1>🔄 REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
+elif menu == "Refill & Overstock":
+    st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1: up_all = st.file_uploader("Upload ALL DATA STOCK", type=['xlsx'])
     with c2: up_track = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
@@ -354,11 +354,11 @@ elif menu == "🔄 Refill & Overstock":
                     st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REFILL_OVERSTOCK_REPORT.xlsx")
             except Exception as e: st.error(f"Error: {e}")
 
-elif menu == "📓 Database Master":
+elif menu == "Database Master":
     # Link Google Sheets lo yang sudah dikunci
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
     
-    st.markdown('<div class="hero-header"><h1>📓 DATABASE MASTER CHECKER</h1><p>Koneksi Otomatis ke Master Data ERP</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>DATABASE MASTER CHECKER</h1><p>Koneksi Otomatis ke Master Data ERP</p></div>', unsafe_allow_html=True)
     
     try:
         # Ekstrak File ID secara otomatis dari link
@@ -399,8 +399,8 @@ elif menu == "📓 Database Master":
 
     except Exception as e:
         st.error(f"⚠️ Gagal terhubung ke Google Sheets. Pastikan aksesnya sudah 'Anyone with the link'. Error: {e}")
-elif menu == "⛔ Stock Minus":
-    st.markdown('<div class="hero-header"><h1>⛔ STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
+elif menu == "Stock Minus":
+    st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
     if uploaded_file:
         try:
