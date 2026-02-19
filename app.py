@@ -228,6 +228,15 @@ with st.sidebar:
             background-color: #1a2634 !important; /* Biru Navy Gelap */
             border: 1px solid #C5A059 !important;   /* Border Emas */
             border-radius: 8px !important;
+            /* Warna teks saat mengetik */
+        input {
+            color: #FFFFFF !important;
+        }
+
+        /* Warna teks label di atas input */
+        div[data-testid="stMarkdownContainer"] p {
+            color: #FFFFFF !important;
+            font-family: 'Inter', sans-serif;
         }
         /* Efek Hover/Fokus (Emas Bersinar) */
         div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
