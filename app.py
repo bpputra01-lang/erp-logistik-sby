@@ -242,27 +242,8 @@ with st.sidebar:
         div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
             border: 1px solid #FFD700 !important;
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
+            sadas
         }
-        /* FIX WARNA BOX UPLOAD & BROWSE */
-            /* Kotak Drag & Drop */
-            [data-testid="stFileUploaderSection"] {
-                background-color: #0e1621 !important;
-                border: 2px dashed #C5A059 !important;
-                border-radius: 10px !important;
-            }
-            
-            /* Teks 'Drag and drop' & 'Limit file' */
-            [data-testid="stFileUploaderText"] {
-                color: #FFFFFF !important;
-            }
-
-            /* Tombol BROWSE FILES */
-            [data-testid="stFileUploader"] button {
-                background-color: #C5A059 !important;
-                color: #0e1621 !important;
-                border-radius: 5px !important;
-                font-weight: bold !important;
-            }
             /* 2. TEKS KETERANGAN DI ATAS BOX (BALIKIN KE HITAM) */
     .stWidgetLabel p, .stMarkdown p {
         color: #1a2634 !important;
