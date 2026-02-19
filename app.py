@@ -244,34 +244,40 @@ with st.sidebar:
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
             sadas
         }
-            /* 2. TEKS KETERANGAN DI ATAS BOX (BALIKIN KE HITAM) */
-    .stWidgetLabel p, .stMarkdown p {
-        color: #1a2634 !important;
-        -webkit-text-fill-color: #1a2634 !important;
-        font-weight: 700 !important;
-    }
-    
-    /* 4. BOX DRAG & DROP DENGAN BORDER EMAS */
-    [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important;
-        border: 2px dashed #C5A059 !important;
-        border-radius: 12px !important;
-        padding: 15px !important;
-    }
+     /* 4. FILE UPLOADER (DRAG & DROP) */
+        /* Kotak Drag & Drop */
+        [data-testid="stFileUploaderSection"] {
+            background-color: #1a2634 !important;
+            border: 2px dashed #C5A059 !important;
+            border-radius: 10px !important;
+        }
 
-    /* Teks di dalam box upload */
-    [data-testid="stFileUploaderText"] > span {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }
+        /* Teks Instruksi & Limit File */
+        [data-testid="stFileUploaderText"] > span,
+        [data-testid="stFileUploaderText"] > small {
+            color: #FFFFFF !important;
+        }
 
-    /* Tombol Browse */
-    [data-testid="stFileUploader"] button {
-        background-color: #C5A059 !important;
-        color: #1a2634 !important;
-        font-weight: bold !important;
-        border: none !important;
-    }
+        /* TOMBOL BROWSE FILES */
+        [data-testid="stFileUploader"] button {
+            background-color: #C5A059 !important; /* EMAS */
+            color: #1a2634 !important; /* NAVY */
+            border-radius: 5px !important;
+            font-weight: bold !important;
+            border: none !important;
+            padding: 5px 15px !important;
+        }
+
+        /* Hover Tombol Browse */
+        [data-testid="stFileUploader"] button:hover {
+            background-color: #FFD700 !important;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
+        }
+
+        /* Ikon Cloud Upload */
+        [data-testid="stFileUploader"] svg {
+            fill: #C5A059 !important;
+        }
 
         </style>
     <div class="elegant-header">
