@@ -198,7 +198,7 @@ with st.sidebar:
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
         
-        /* 1. HEADER UTAMA */
+        /* 1. HEADER LOGO */
         .elegant-header {
             font-family: 'Inter', sans-serif;
             text-align: left;
@@ -209,57 +209,62 @@ with st.sidebar:
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             padding-bottom: 10px;
+            line-height: 1.2;
         }
 
-        /* 2. FIX TEKS KETERANGAN (DI ATAS BOX) - JADI HITAM */
-        /* Tembak label widget agar tidak putih/hilang di bg terang */
-        .stWidgetLabel p, .stMarkdown p {
-            color: #1a2634 !important;
-            -webkit-text-fill-color: #1a2634 !important;
+        /* 2. TEKS LABEL DI ATAS BOX (PENTING: BIAR GAK PUTIH/HILANG) */
+        /* Kita tembak spesifik label uploader dan markdown di luar sidebar */
+        [data-testid="stWidgetLabel"] p, 
+        .stMarkdown p {
+            color: #1E293B !important; /* Hitam Navy biar keliatan di bg putih */
+            -webkit-text-fill-color: #1E293B !important;
             font-weight: 700 !important;
-            background: none !important;
         }
 
-        /* 3. SIDEBAR MENU - TETAP PUTIH/SLATE */
+        /* 3. SIDEBAR MENU (BIAR TETAP PUTIH/GRADIENT) */
         section[data-testid="stSidebar"] label p {
             color: #FFFFFF !important;
             -webkit-text-fill-color: white !important;
-            font-weight: 400 !important;
+            background: none !important;
         }
 
-        /* 4. FILE UPLOADER - BOX GELAP DENGAN BORDER EMAS */
+        /* 4. BOX DRAG & DROP DENGAN BORDER EMAS */
         [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important; /* Box Gelap */
-            border: 2px dashed #C5A059 !important; /* BORDER EMAS TEGAS */
+            background-color: #1a2634 !important; /* Box jadi Gelap */
+            border: 2px dashed #C5A059 !important; /* BORDER EMASNYA DISINI */
             border-radius: 12px !important;
-            padding: 15px !important;
+            padding: 10px !important;
         }
 
-        /* Teks di dalam box (Drag and drop) - TETAP PUTIH */
+        /* Teks di DALAM Box (Drag & Drop here) */
         [data-testid="stFileUploaderText"] > span {
             color: #FFFFFF !important;
             -webkit-text-fill-color: white !important;
         }
 
-        /* TOMBOL BROWSE */
+        /* Tombol BROWSE */
         [data-testid="stFileUploader"] button {
             background-color: #C5A059 !important;
             color: #1a2634 !important;
-            border: none !important;
             font-weight: bold !important;
+            border: none !important;
         }
 
-        /* DROPDOWN & INPUT */
+        /* Input & Dropdown */
         div[data-baseweb="input"], div[data-baseweb="select"] > div {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
+            border-radius: 8px !important;
         }
+        
+        input { color: white !important; }
     </style>
     
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
     </div>
     """, unsafe_allow_html=True)
+    
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
         st.session_state.main_menu = "Dashboard Overview"
