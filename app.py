@@ -194,7 +194,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 
 
 with st.sidebar:
-st.markdown("""
+    st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
         
