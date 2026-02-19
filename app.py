@@ -216,7 +216,7 @@ with st.sidebar:
         section[data-testid="stSidebar"] .stCaption p {
             color: #E2E8F0; /* Slate Gray Light yang mewah */
             font-family: 'Inter', sans-serif;
-             font-size: 10px;
+             font-size: 13px;
             opacity: 1 !important;
         }
     </style>
