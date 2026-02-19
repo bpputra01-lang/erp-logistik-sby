@@ -224,6 +224,7 @@ with st.sidebar:
             -webkit-text-fill-color: transparent;
             padding-bottom: 10px;
             line-height: 1.2;
+            font-weight: 300;
         }
 
         /* 3. INPUT FIELD & DROPDOWN (BIRU EMAS) */
