@@ -212,7 +212,7 @@ with st.sidebar:
             padding-bottom: 10px;
         }
         /* PAKSA SEMUA SUB-MENU & LABEL JADI PUTIH BERSIH */
-        section[data-testid="stSidebar"] label p, 
+        
         section[data-testid="stSidebar"] .stMarkdown p,
         section[data-testid="stSidebar"] .stCaption p {
             color: #FFFFFF !important;
