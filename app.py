@@ -243,44 +243,26 @@ with st.sidebar:
             border: 1px solid #FFD700 !important;
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
         }
-/* 1. KOTAK DRAG & DROP UTAMA */
-        [data-testid="stFileUploader"] {
-            background-color: #0e1621 !important;
-            border: 2px dashed #C5A059 !important; /* Garis Putus Emas */
-            border-radius: 12px !important;
-            padding: 15px !important;
-        }
+        /* FIX WARNA BOX UPLOAD & BROWSE */
+            /* Kotak Drag & Drop */
+            [data-testid="stFileUploaderSection"] {
+                background-color: #0e1621 !important;
+                border: 2px dashed #C5A059 !important;
+                border-radius: 10px !important;
+            }
+            
+            /* Teks 'Drag and drop' & 'Limit file' */
+            [data-testid="stFileUploaderText"] {
+                color: #FFFFFF !important;
+            }
 
-        /* 2. MENGUBAH WARNA TOMBOL 'BROWSE FILES' */
-        [data-testid="stFileUploader"] button {
-            background-color: #C5A059 !important; /* Emas */
-            color: #0e1621 !important; /* Teks Navy */
-            border: 1px solid #C5A059 !important;
-            font-weight: bold !important;
-            padding: 0.5rem 1rem !important;
-        }
-        
-        [data-testid="stFileUploader"] button:hover {
-            background-color: #FFD700 !important; /* Emas Terang */
-            border-color: #FFD700 !important;
-        }
-
-        /* 3. MENGUBAH SEMUA TEKS DI DALAM BOX UPLOADER */
-        /* Teks 'Drag and drop file here' */
-        [data-testid="stFileUploader"] section div div span {
-            color: #FFFFFF !important;
-            font-weight: 600 !important;
-        }
-
-        /* Teks Limit File (200MB dll) */
-        [data-testid="stFileUploader"] small {
-            color: #94A3B8 !important;
-        }
-
-        /* Ikon Awan Upload */
-        [data-testid="stFileUploader"] svg {
-            fill: #C5A059 !important;
-        }
+            /* Tombol BROWSE FILES */
+            [data-testid="stFileUploader"] button {
+                background-color: #C5A059 !important;
+                color: #0e1621 !important;
+                border-radius: 5px !important;
+                font-weight: bold !important;
+            }
     </style>
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
