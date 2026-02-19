@@ -218,6 +218,9 @@ with st.sidebar:
             font-family: 'Inter', sans-serif;
              font-size: 13px;
             opacity: 1 !important;
+            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
     </style>
     <div class="elegant-header">
