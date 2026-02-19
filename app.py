@@ -243,6 +243,40 @@ with st.sidebar:
             border: 1px solid #FFD700 !important;
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
         }
+        /* 2. BOX DRAG & DROP (FILE UPLOADER) */
+        /* Kotak luar Drag & Drop */
+        [data-testid="stFileUploader"] {
+            background-color: #0e1621 !important;
+            border: 1px dashed #C5A059 !important; /* Garis putus-putus Emas */
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        /* Teks instruksi (Drag and drop file here) */
+        [data-testid="stFileUploader"] section > div > div > span {
+            color: #FFFFFF !important;
+        }
+
+        /* Ukuran file limit (200MB dll) */
+        [data-testid="stFileUploader"] small {
+            color: #94A3B8 !important;
+        }
+
+        /* TOMBOL BROWSE FILES */
+        [data-testid="stFileUploader"] button {
+            background-color: #C5A059 !important; /* Tombol jadi Emas */
+            color: #0e1621 !important; /* Teks tombol jadi Navy Gelap */
+            border: none !important;
+            font-weight: 700 !important;
+            border-radius: 5px !important;
+            transition: 0.3s;
+        }
+
+        /* Efek Hover Tombol Browse */
+        [data-testid="stFileUploader"] button:hover {
+            background-color: #FFD700 !important; /* Emas lebih terang saat disentuh */
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.5) !important;
+        }
     </style>
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
