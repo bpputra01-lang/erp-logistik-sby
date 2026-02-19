@@ -263,6 +263,48 @@ with st.sidebar:
                 border-radius: 5px !important;
                 font-weight: bold !important;
             }
+            /* 2. TEKS KETERANGAN DI ATAS BOX (BALIKIN KE HITAM) */
+    .stWidgetLabel p, .stMarkdown p {
+        color: #1a2634 !important;
+        -webkit-text-fill-color: #1a2634 !important;
+        font-weight: 700 !important;
+    }
+
+    /* 3. SIDEBAR MENU - PUTIH SOLID */
+    section[data-testid="stSidebar"] label p {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-weight: 400 !important;
+        background: none !important;
+    }
+
+    /* 4. BOX DRAG & DROP DENGAN BORDER EMAS */
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a2634 !important;
+        border: 2px dashed #C5A059 !important;
+        border-radius: 12px !important;
+        padding: 15px !important;
+    }
+
+    /* Teks di dalam box upload */
+    [data-testid="stFileUploaderText"] > span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+
+    /* Tombol Browse */
+    [data-testid="stFileUploader"] button {
+        background-color: #C5A059 !important;
+        color: #1a2634 !important;
+        font-weight: bold !important;
+        border: none !important;
+    }
+
+    /* Input Field & Dropdown */
+    div[data-baseweb="input"], div[data-baseweb="select"] > div {
+        background-color: #1a2634 !important;
+        border: 1px solid #C5A059 !important;
+    }
         </style>
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
