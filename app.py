@@ -221,7 +221,7 @@ with st.sidebar:
             font-family: 'Inter', sans-serif;
             font-size: 14px;
             opacity: 1 !important;
-
+            -webkit-text-fill-color: initial !important; /* Hapus gradient di menu biar jelas */
         }
 
         /* 3. INPUT FIELD & DROPDOWN (BIRU EMAS) */
@@ -273,18 +273,10 @@ with st.sidebar:
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
-        
-        * 2. BOX DRAG AND DROP - KASIH BORDER EMAS MEWAH */
-    [data-testid="stFileUploaderSection"] {
-        background-color: #f8fafc !important; /* Tetap terang biar teks di dalemnya keliatan */
-        border: 2px dashed #C5A059 !important; /* BORDER EMAS SESUAI REQUEST */
-        border-radius: 12px !important;
-        padding: 15px !important;
-        transition: all 0.3s ease;
 
         /* Label di atas box input */
         div[data-testid="stMarkdownContainer"] p {
-            color: #1a2634 !important;
+            color: #FFFFFF !important;
         }
     </style>
     <div class="elegant-header">
