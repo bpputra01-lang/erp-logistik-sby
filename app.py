@@ -210,12 +210,28 @@ with st.sidebar:
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             padding-bottom: 10px;
-        }
-    </style>
-    <div class="elegant-header">
-        🚚 ERP LOGISTIC<br>SURABAYA
-    </div>
-""", unsafe_allow_html=True)
+      /* HANYA SUB-MENU & LABEL YANG JADI PUTIH BERSIH */
+            section[data-testid="stSidebar"] label p, /* Teks di dalam Radio Button */
+            .sub-label,                               /* Judul Kelompok */
+            section[data-testid="stSidebar"] .stCaption { /* Teks bawah */
+                color: #FFFFFF !important;
+                font-family: 'Inter', sans-serif;
+                opacity: 1 !important;
+            }
+
+            .sub-label {
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 1.5px;
+                margin-top: 20px;
+                margin-bottom: 5px;
+                text-transform: uppercase;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                padding-bottom: 5px;
+            }
+        </style>
+        <div class="elegant-header">🚚 ERP LOGISTIC<br>SURABAYA</div>
+    """, unsafe_allow_html=True)
     
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
