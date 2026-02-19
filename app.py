@@ -301,7 +301,7 @@ elif menu == "Putaway System":
                 st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REPORT_PUTAWAY.xlsx")
             except Exception as e: st.error(f"Gagal: {e}")
 
-elif menu == "📤 Scan Out Validation":
+elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANLYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     with col1: up_scan = st.file_uploader("Upload DATA SCAN", type=['xlsx', 'csv'])
