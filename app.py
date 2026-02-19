@@ -198,90 +198,74 @@ with st.sidebar:
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         
+        /* 1. HEADER LOGO */
         .elegant-header {
             font-family: 'Inter', sans-serif;
-            color: #E2E8F0;
             text-align: left;
             margin-top: -70px;
             font-size: 22px;
             font-weight: 800;
-            letter-spacing: -0.5px;
             background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             padding-bottom: 10px;
         }
 
-        section[data-testid="stSidebar"] label p,
-        section[data-testid="stSidebar"] .stCaption p {
-            color: #E2E8F0;
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            opacity: 1 !important;
-            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        /* 2. LABEL DI ATAS BOX (JADI HITAM BIAR JELAS) */
+        div[data-testid="stWidgetLabel"] p {
+            color: #1a2634 !important;
+            -webkit-text-fill-color: #1a2634 !important;
+            font-weight: 700 !important;
         }
 
-        /* FIX 1: TUTUP KURUNG & HAPUS TEKS ACAK */
+        /* 3. INPUT & DROPDOWN */
         div[data-baseweb="input"], div[data-baseweb="select"] > div {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
             border-radius: 8px !important;
-        } 
-
-        input {
-            color: #FFFFFF !important;
         }
+        input { color: white !important; }
 
-        /* FIX 2: LABEL DI ATAS BOX JADI HITAM (BIAR KELIHATAN) */
-        div[data-testid="stWidgetLabel"] p {
-            color: #000000 !important;
-            -webkit-text-fill-color: #000000 !important;
-            font-family: 'Inter', sans-serif;
-            font-weight: bold;
-        }
-
-        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
-            border: 1px solid #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
-
-        /* 4. FILE UPLOADER - SEKARANG JALAN KARENA ATASNYA SUDAH FIX */
+        /* 4. FILE UPLOADER - SENTUHAN BORDER EMAS */
         [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important;
-            border: 2px dashed #C5A059 !important;
-            border-radius: 10px !important;
+            background-color: #1a2634 !important; /* Box Gelap */
+            border: 2px dashed #C5A059 !important; /* BORDER EMASNYA DISINI */
+            border-radius: 12px !important;
+            padding: 15px !important;
+            transition: 0.3s;
         }
 
-        [data-testid="stFileUploaderText"] > span,
+        /* Efek Glow saat kursor di atas box */
+        [data-testid="stFileUploaderSection"]:hover {
+            border: 2px solid #FFD700 !important;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.3) !important;
+        }
+
+        /* Teks Instruksi di dalam box */
+        [data-testid="stFileUploaderText"] > span, 
         [data-testid="stFileUploaderText"] > small {
             color: #FFFFFF !important;
         }
 
+        /* Tombol BROWSE EMAS */
         [data-testid="stFileUploader"] button {
             background-color: #C5A059 !important;
             color: #1a2634 !important;
-            border-radius: 5px !important;
             font-weight: bold !important;
             border: none !important;
-            padding: 5px 15px !important;
+            border-radius: 6px !important;
         }
 
-        [data-testid="stFileUploader"] button:hover {
-            background-color: #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
-
+        /* Ikon Cloud jadi Emas */
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
-
     </style>
+    
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
