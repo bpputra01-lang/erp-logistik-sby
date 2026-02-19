@@ -196,74 +196,78 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 with st.sidebar:
     st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         
-        /* 1. HEADER LOGO */
         .elegant-header {
             font-family: 'Inter', sans-serif;
+            color: #E2E8F0; /* Slate Gray Light yang mewah */
             text-align: left;
             margin-top: -70px;
             font-size: 22px;
             font-weight: 800;
+            letter-spacing: -0.5px;
             background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             padding-bottom: 10px;
-            line-height: 1.2;
         }
-
-        /* 2. TEKS LABEL DI ATAS BOX (PENTING: BIAR GAK PUTIH/HILANG) */
-        /* Kita tembak spesifik label uploader dan markdown di luar sidebar */
-        [data-testid="stWidgetLabel"] p, 
-        .stMarkdown p {
-            color: #1E293B !important; /* Hitam Navy biar keliatan di bg putih */
-            -webkit-text-fill-color: #1E293B !important;
-            font-weight: 700 !important;
+        /* PAKSA SEMUA SUB-MENU & LABEL JADI PUTIH BERSIH */
+        section[data-testid="stSidebar"] label p,
+        section[data-testid="stSidebar"] .stCaption p {
+            color: #E2E8F0; /* Slate Gray Light yang mewah */
+            font-family: 'Inter', sans-serif;
+             font-size: 13px;
+            opacity: 1 !important;
+            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-
-        /* 3. SIDEBAR MENU (BIAR TETAP PUTIH/GRADIENT) */
-        section[data-testid="stSidebar"] label p {
-            color: #FFFFFF !important;
-            -webkit-text-fill-color: white !important;
-            background: none !important;
-        }
-
-        /* 4. BOX DRAG & DROP DENGAN BORDER EMAS */
-        [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important; /* Box jadi Gelap */
-            border: 2px dashed #C5A059 !important; /* BORDER EMASNYA DISINI */
-            border-radius: 12px !important;
-            padding: 10px !important;
-        }
-
-        /* Teks di DALAM Box (Drag & Drop here) */
-        [data-testid="stFileUploaderText"] > span {
-            color: #FFFFFF !important;
-            -webkit-text-fill-color: white !important;
-        }
-
-        /* Tombol BROWSE */
-        [data-testid="stFileUploader"] button {
-            background-color: #C5A059 !important;
-            color: #1a2634 !important;
-            font-weight: bold !important;
-            border: none !important;
-        }
-
-        /* Input & Dropdown */
+        /* 2. STYLE UNTUK INPUT FIELD & DROPDOWN (BIRU EMAS) */
+        /* Mengubah warna border dan background input */
         div[data-baseweb="input"], div[data-baseweb="select"] > div {
-            background-color: #1a2634 !important;
-            border: 1px solid #C5A059 !important;
+            background-color: #1a2634 !important; /* Biru Navy Gelap */
+            border: 1px solid #C5A059 !important;   /* Border Emas */
             border-radius: 8px !important;
+            /* Warna teks saat mengetik */
+        input {
+            color: #FFFFFF !important;
         }
-        
-        input { color: white !important; }
-    </style>
-    
+
+        /* Warna teks label di atas input */
+        div[data-testid="stMarkdownContainer"] p {
+            color: #FFFFFF !important;
+            font-family: 'Inter', sans-serif;
+        }
+        /* Efek Hover/Fokus (Emas Bersinar) */
+        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+            border: 1px solid #FFD700 !important;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
+        }
+        /* FIX WARNA BOX UPLOAD & BROWSE */
+            /* Kotak Drag & Drop */
+            [data-testid="stFileUploaderSection"] {
+                background-color: #0e1621 !important;
+                border: 2px dashed #C5A059 !important;
+                border-radius: 10px !important;
+            }
+            
+            /* Teks 'Drag and drop' & 'Limit file' */
+            [data-testid="stFileUploaderText"] {
+                color: #FFFFFF !important;
+            }
+
+            /* Tombol BROWSE FILES */
+            [data-testid="stFileUploader"] button {
+                background-color: #C5A059 !important;
+                color: #0e1621 !important;
+                border-radius: 5px !important;
+                font-weight: bold !important;
+            }
+        </style>
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
     
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
