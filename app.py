@@ -273,7 +273,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
     
-    # Inisialisasi session state agar menu tersinkron
+    # --- INISIALISASI SESSION STATE ---
     if 'main_menu' not in st.session_state:
         st.session_state.main_menu = "Dashboard Overview"
 
@@ -283,14 +283,11 @@ st.markdown("""
     
     m1_list = ["Dashboard Overview", "Database Master"]
     
-    # Cek apakah pilihan sekarang ada di kelompok 1
     def change_m1():
         st.session_state.main_menu = st.session_state.m1_key
 
-    # Jika menu yang terpilih ada di Kelompok 2, maka radio ini kita "kosongkan" secara visual (atau pilih default)
     idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
-    
-    menu_1 = st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
+    st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
 
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
@@ -300,12 +297,10 @@ st.markdown("""
     def change_m2():
         st.session_state.main_menu = st.session_state.m2_key
 
-    # Jika menu yang terpilih ada di Kelompok 2, arahkan indexnya. Jika tidak, biarkan di posisi default tapi jangan bentrok
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
-    
-    menu_2 = st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
+    st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
 
-    # Final Menu Variable untuk dipakai di konten utama
+    # Final Menu Variable
     menu = st.session_state.main_menu
 
     st.divider()
