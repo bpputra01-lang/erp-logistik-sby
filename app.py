@@ -198,7 +198,6 @@ with st.sidebar:
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         
-        /* HEADER LOGO ERP */
         .elegant-header {
             font-family: 'Inter', sans-serif;
             color: #E2E8F0;
@@ -206,13 +205,25 @@ with st.sidebar:
             margin-top: -70px;
             font-size: 22px;
             font-weight: 800;
+            letter-spacing: -0.5px;
             background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             padding-bottom: 10px;
         }
 
-        /* 1. TULISAN DI DALAM DROPDOWN / SELECTBOX (WAJIB PUTIH) */
+        section[data-testid="stSidebar"] label p,
+        section[data-testid="stSidebar"] .stCaption p {
+            color: #E2E8F0;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            opacity: 1 !important;
+            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+     /* 1. TULISAN DI DALAM DROPDOWN / SELECTBOX (WAJIB PUTIH) */
         /* Mengincar teks yang terpilih dan teks di dalam list */
         div[data-baseweb="select"] div, 
         div[data-baseweb="select"] span, 
@@ -226,63 +237,92 @@ with st.sidebar:
             background-color: #1e1e2f !important;
         }
 
-        /* 2. BORDER EMAS FILE UPLOADER (DRAG & DROP AREA) */
-        [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important;
-            border: 2px dashed #C5A059 !important; /* EMAS */
-            border-radius: 12px !important;
-            padding: 10px !important;
-        }
-
-        /* Teks "Drag and drop file here" */
-        [data-testid="stFileUploaderText"] > span {
-            color: #FFFFFF !important;
-            -webkit-text-fill-color: white !important;
-        }
-
-        /* Tombol Browse */
-        [data-testid="stFileUploader"] button {
-            background-color: #C5A059 !important;
-            color: #1a2634 !important;
-            font-weight: bold !important;
-            border: none !important;
-        }
-
-        /* Label Widget di Sidebar (Main Menu, Dashboard Summary, dll) */
-        section[data-testid="stSidebar"] .stMarkdown p {
-            color: #808495 !important;
+        /* FIX 2: LABEL DI ATAS BOX JADI HITAM (BIAR KELIHATAN) */
+        div[data-testid="stWidgetLabel"] p {
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
+            font-family: 'Inter', sans-serif;
             font-weight: bold;
         }
 
-        /* Radio Button Text */
-        div.row-widget.stRadio label {
-            color: #d1d1d1 !important;
+        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+            border: 1px solid #FFD700 !important;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
         }
+
+        /* 4. FILE UPLOADER - SEKARANG JALAN KARENA ATASNYA SUDAH FIX */
+        [data-testid="stFileUploaderSection"] {
+            background-color: #1a2634 !important;
+            border: 2px dashed #C5A059 !important;
+            border-radius: 10px !important;
+           
+        }
+
+        [data-testid="stFileUploaderText"] > span,
+        [data-testid="stFileUploaderText"] > small {
+            color: #FFFFFF !important;
+        }
+
+        [data-testid="stFileUploader"] button {
+            background-color: #C5A059 !important;
+            color: #1a2634 !important;
+            border-radius: 5px !important;
+            font-weight: bold !important;
+            border: none !important;
+            padding: 5px 15px !important;
+        }
+
+        [data-testid="stFileUploader"] button:hover {
+            background-color: #FFD700 !important;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
+        }
+
+        [data-testid="stFileUploader"] svg {
+            fill: #C5A059 !important;
+        }
+        
+
     </style>
-    
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
     
+    # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
         st.session_state.main_menu = "Dashboard Overview"
 
-    st.markdown('<p style="margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
-    st.markdown('<p style="margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
+    # --- KELOMPOK 1: DASHBOARD SUMMARY ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
     
     m1_list = ["Dashboard Overview", "Database Master"]
-    def change_m1(): st.session_state.main_menu = st.session_state.m1_key
+    
+    # Cek apakah pilihan sekarang ada di kelompok 1
+    def change_m1():
+        st.session_state.main_menu = st.session_state.m1_key
+
+    # Jika menu yang terpilih ada di Kelompok 2, maka radio ini kita "kosongkan" secara visual (atau pilih default)
     idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
-    st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
+    
+    menu_1 = st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
 
-    st.markdown('<p style="margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
+    # --- KELOMPOK 2: OPERATIONAL ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
+    
     m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Stock Minus"]
-    def change_m2(): st.session_state.main_menu = st.session_state.m2_key
-    idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
-    st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
+    
+    def change_m2():
+        st.session_state.main_menu = st.session_state.m2_key
 
+    # Jika menu yang terpilih ada di Kelompok 2, arahkan indexnya. Jika tidak, biarkan di posisi default tapi jangan bentrok
+    idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
+    
+    menu_2 = st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
+
+    # Final Menu Variable untuk dipakai di konten utama
     menu = st.session_state.main_menu
+
     st.divider()
     st.caption("ERP Logistic Surabaya v2.1")
 
