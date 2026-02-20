@@ -60,35 +60,7 @@ st.markdown("""
     /* Radio Button styling */
     div.row-widget.stRadio > div { background-color: transparent !important; }
     div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
-    div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; }
-
-    /* --- FIX ORDER: DROPDOWN & UPLOADER --- */
-
-    /* 1. TULISAN DI DALAM DROPDOWN (SELECTBOX) JADI PUTIH */
-    /* Ini nembak teks yang udah dipilih maupun list pas diklik */
-    div[data-baseweb="select"] * {
-        color: white !important;
-        -webkit-text-fill-color: white !important;
-    }
-    
-    /* Background list dropdown biar gak putih (biar tulisan putihnya kelihatan) */
-    ul[role="listbox"] {
-        background-color: #1a2634 !important;
-    }
-
-    /* 2. BORDER EMAS UNTUK FILE UPLOADER (DRAG & DROP) */
-    [data-testid="stFileUploaderSection"] {
-        border: 2px dashed #C5A059 !important;
-        background-color: #1a2634 !important;
-        border-radius: 12px !important;
-    }
-
-    /* Teks 'Drag and drop file here' jadi putih juga biar konsisten */
-    [data-testid="stFileUploaderText"] > span {
-        color: white !important;
-    }
-
-    </style>
+    div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; } </style>
     """, unsafe_allow_html=True)
 
 # --- FUNGSI LOGIKA ASLI (TETAP SAMA) ---
