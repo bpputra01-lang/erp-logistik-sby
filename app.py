@@ -236,8 +236,8 @@ with st.sidebar:
 
         /* FIX 2: LABEL DI ATAS BOX JADI HITAM (BIAR KELIHATAN) */
         div[data-testid="stWidgetLabel"] p {
-            color: ##FFFFFF !important;
-            -webkit-text-fill-color: #FFFFFF !important;
+            color: #FFFFFF !important;
+            -webkit-text-fill-color: #00000 !important;
             font-family: 'Inter', sans-serif;
             font-weight: bold;
         }
