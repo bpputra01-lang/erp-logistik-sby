@@ -193,100 +193,85 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 
 
-with st.sidebar:
-    st.markdown("""
+st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
-        
-        .elegant-header {
-            font-family: 'Inter', sans-serif;
-            color: #E2E8F0;
-            text-align: left;
-            margin-top: -70px;
-            font-size: 22px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            padding-bottom: 10px;
-        }
+    /* 1. GLOBAL & CONTAINER SETUP */
+    .block-container { padding-top: 1rem !important; }
+    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+    [data-testid="stSidebarNav"] { display: none; } 
+    .stApp { background-color: #f4f7f6; } /* Background body utama tetap abu terang */
 
-        section[data-testid="stSidebar"] label p,
-        section[data-testid="stSidebar"] .stCaption p {
-            color: #E2E8F0;
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            opacity: 1 !important;
-            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+    /* 2. SIDEBAR DARK MODE & TITLING */
+    [data-testid="stSidebar"] { 
+        background-color: #1e1e2f !important; 
+        border-right: 1px solid #2d2d44; 
+    }
+    .sidebar-title { 
+        color: #00d2ff; text-align: center; font-family: 'Inter', sans-serif;
+        font-weight: 800; font-size: 20px; margin-top: -45px; 
+        padding-bottom: 15px; border-bottom: 1px solid #2d2d44; margin-bottom: 10px;
+    }
 
-     /* 1. TULISAN DI DALAM DROPDOWN / SELECTBOX (WAJIB PUTIH) */
-        /* Mengincar teks yang terpilih dan teks di dalam list */
-        div[data-baseweb="select"] div, 
-        div[data-baseweb="select"] span, 
-        li[role="option"] {
-            color: white !important;
-            -webkit-text-fill-color: white !important;
-        }
+    /* 3. FIX: DROPDOWN (SELECTBOX) TETAP GELAP & TEKS PUTIH */
+    /* Area box dropdown */
+    div[data-baseweb="select"] > div {
+        background-color: #1a2634 !important;
+        border: 1px solid #C5A059 !important; /* BORDER EMAS */
+        color: white !important;
+    }
 
-        /* Background list dropdown biar tulisan putihnya kelihatan */
-        ul[role="listbox"] {
-            background-color: #1e1e2f !important;
-        }
+    /* Teks di dalam box yang sudah terpilih */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
 
-        /* FIX 2: LABEL DI ATAS BOX JADI HITAM (BIAR KELIHATAN) */
-        div[data-testid="stWidgetLabel"] p {
-            color: #000000 !important;
-            -webkit-text-fill-color: #000000 !important;
-            font-family: 'Inter', sans-serif;
-            font-weight: bold;
-        }
+    /* List pilihan pas dropdown diklik */
+    ul[role="listbox"] {
+        background-color: #1a2634 !important;
+        border: 1px solid #C5A059 !important;
+    }
+    li[role="option"] {
+        color: white !important;
+        background-color: transparent !important;
+    }
+    li[role="option"]:hover {
+        background-color: #C5A059 !important;
+        color: #1a2634 !important;
+    }
 
-        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
-            border: 1px solid #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
+    /* 4. FIX: FILE UPLOADER TETAP GELAP & BORDER EMAS */
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a2634 !important; /* BACKDROP GELAP */
+        border: 2px dashed #C5A059 !important; /* BORDER EMAS DASHED */
+        border-radius: 12px !important;
+    }
 
-        /* 4. FILE UPLOADER - SEKARANG JALAN KARENA ATASNYA SUDAH FIX */
-        [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important;
-            border: 2px dashed #C5A059 !important;
-            border-radius: 10px !important;
-           
-        }
+    /* Teks 'Drag and drop file here' & 'Limit...' */
+    [data-testid="stFileUploaderText"] > span, 
+    [data-testid="stFileUploaderText"] > small {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
 
-        [data-testid="stFileUploaderText"] > span,
-        [data-testid="stFileUploaderText"] > small {
-            color: #FFFFFF !important;
-        }
+    /* Icon Upload */
+    [data-testid="stFileUploaderSection"] svg {
+        fill: #C5A059 !important;
+    }
 
-        [data-testid="stFileUploader"] button {
-            background-color: #C5A059 !important;
-            color: #1a2634 !important;
-            border-radius: 5px !important;
-            font-weight: bold !important;
-            border: none !important;
-            padding: 5px 15px !important;
-        }
+    /* 5. LABELS (JUDUL DI ATAS INPUT) */
+    [data-testid="stWidgetLabel"] p {
+        color: #1e1e2f !important; /* Biar kontras dengan background putih body */
+        font-weight: bold !important;
+    }
 
-        [data-testid="stFileUploader"] button:hover {
-            background-color: #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
-
-        [data-testid="stFileUploader"] svg {
-            fill: #C5A059 !important;
-        }
-        
-
+    /* Metric Box & Radio (Tetap Gelap) */
+    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
+    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
+    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
+    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; }
     </style>
-    <div class="elegant-header">
-        🚚 ERP LOGISTIC<br>SURABAYA
-    </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
