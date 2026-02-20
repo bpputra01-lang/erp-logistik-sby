@@ -223,7 +223,7 @@ with st.sidebar:
             -webkit-text-fill-color: transparent;
         }
 
-        /* FIX 1: TUTUP KURUNG & HAPUS TEKS ACAK */
+        /* FIX 1: INPUT & DROPDOWN */
         div[data-baseweb="input"], div[data-baseweb="select"] > div {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
@@ -234,12 +234,12 @@ with st.sidebar:
             color: #FFFFFF !important;
         }
 
-        /* FIX 2: LABEL DI ATAS BOX JADI PUTIH (GUE BENERIN TYPO ## NYA) */
-        div[data-testid="stWidgetLabel"] p {
+        /* FIX 2: LABEL DI ATAS BOX JADI PUTIH (Gue benerin typo ## jadi #) */
+        div[data-testid="stWidgetLabel"] p, label {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
             font-family: 'Inter', sans-serif;
-            font-weight: bold;
+            font-weight: bold !important;
         }
 
         div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
@@ -247,21 +247,25 @@ with st.sidebar:
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
         }
 
-        /* 4. FILE UPLOADER - SEKARANG JALAN KARENA BORDER DIPAKSA !IMPORTANT */
-        [data-testid="stFileUploaderSection"] {
+        /* 4. FILE UPLOADER - PAKSA BORDER EMAS MUNCUL */
+        /* Kita pasang di kontainer paling luar biar pasti kelihatan */
+        [data-testid="stFileUploader"] {
+            border: 2px dashed #C5A059 !important;
+            border-radius: 12px !important;
+            padding: 8px !important;
             background-color: #1a2634 !important;
-            border: 2px dashed #C5A059 !important; /* Border Gold */
-            border-radius: 10px !important;
         }
-        
-        /* Tambahan buat maksa border muncul di beberapa versi browser */
-        [data-testid="stFileUploaderSection"] > div {
+
+        /* Hilangkan border bawaan dalemnya biar gak double */
+        [data-testid="stFileUploaderSection"] {
             border: none !important;
+            background-color: transparent !important;
         }
 
         [data-testid="stFileUploaderText"] > span,
         [data-testid="stFileUploaderText"] > small {
             color: #FFFFFF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
         }
 
         [data-testid="stFileUploader"] button {
@@ -281,7 +285,6 @@ with st.sidebar:
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
-
     </style>
     <div class="elegant-header">
         🚚 ERP LOGISTIC<br>SURABAYA
