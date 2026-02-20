@@ -12,63 +12,37 @@ st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 # 2. THE AUTHENTIC ADMINITY UI ENGINE (PENGATURAN SPASI ATAS & SIDEBAR)
 st.markdown("""
     <style>
-    /* 1. MENGHAPUS SPACE KOSONG DI ATAS SIDEBAR & BODY */
+    /* MENGHAPUS SPACE KOSONG DI ATAS SIDEBAR & BODY */
     .block-container { padding-top: 1rem !important; }
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarNav"] { display: none; } 
     
-    /* 2. STYLE JUDUL ERP (PAKSA NAIK KE ATAS) */
+    /* STYLE JUDUL ERP (PAKSA NAIK KE ATAS) */
     .sidebar-title { 
         color: #00d2ff; 
         text-align: center; 
         font-family: 'Inter', sans-serif;
         font-weight: 800;
         font-size: 20px;
-        margin-top: -45px;
+        margin-top: -45px; /* Menarik judul ke paling atas */
         padding-bottom: 15px;
         border-bottom: 1px solid #2d2d44;
         margin-bottom: 10px;
     }
 
-    /* 3. STYLE MENU & HEADER */
+    /* STYLE MENU & HEADER */
     .stApp { background-color: #f4f7f6; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
     
-    /* 4. FIX TULISAN LABEL (Upload DATA SCAN dll) JADI PUTIH */
-    /* Kita tembak semua p di dalam widget label sidebar */
-    [data-testid="stSidebar"] div[data-testid="stWidgetLabel"] p,
-    [data-testid="stSidebar"] label p { 
-        color: #FFFFFF !important; 
-        -webkit-text-fill-color: #FFFFFF !important;
-        font-weight: bold !important;
-        opacity: 1 !important;
-    }
-
-    /* 5. FIX BORDER EMAS PADA FILE UPLOADER */
-    [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important;
-        border: 2px dashed #C5A059 !important; /* INI BORDER EMASNYA */
-        border-radius: 12px !important;
-    }
-
-    /* Teks instruksi di dalam kotak upload */
-    [data-testid="stFileUploaderText"] > span {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }
-
-    /* 6. STYLE TOMBOL BROWSE & INPUT */
-    div[data-baseweb="input"] {
-        background-color: #1a2634 !important;
-        border: 1px solid #C5A059 !important;
+    .nav-header { 
+        font-size: 11px; 
+        text-transform: uppercase; 
+        letter-spacing: 2px; 
+        color: #6c757d; 
+        padding: 15px 0 5px 10px; 
+        font-weight: 700; 
     }
     
-    [data-testid="stFileUploader"] button {
-        background-color: #C5A059 !important;
-        color: #1e1e2f !important;
-        font-weight: bold !important;
-    }
-
     .hero-header { 
         background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
         color: white; 
@@ -86,9 +60,36 @@ st.markdown("""
     /* Radio Button styling */
     div.row-widget.stRadio > div { background-color: transparent !important; }
     div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
-    div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; } 
+    div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; }
+
+    /* --- FIX ORDER: DROPDOWN & UPLOADER --- */
+
+    /* 1. TULISAN DI DALAM DROPDOWN (SELECTBOX) JADI PUTIH */
+    /* Ini nembak teks yang udah dipilih maupun list pas diklik */
+    div[data-baseweb="select"] * {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
+    
+    /* Background list dropdown biar gak putih (biar tulisan putihnya kelihatan) */
+    ul[role="listbox"] {
+        background-color: #1a2634 !important;
+    }
+
+    /* 2. BORDER EMAS UNTUK FILE UPLOADER (DRAG & DROP) */
+    [data-testid="stFileUploaderSection"] {
+        border: 2px dashed #C5A059 !important;
+        background-color: #1a2634 !important;
+        border-radius: 12px !important;
+    }
+
+    /* Teks 'Drag and drop file here' jadi putih juga biar konsisten */
+    [data-testid="stFileUploaderText"] > span {
+        color: white !important;
+    }
+
     </style>
-    """, unsafe_allow_html=True)SAD
+    """, unsafe_allow_html=True)
 
 # --- FUNGSI LOGIKA ASLI (TETAP SAMA) ---
 import pandas as pd
