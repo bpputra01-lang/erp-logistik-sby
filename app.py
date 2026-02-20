@@ -9,7 +9,7 @@ from python_calamine import CalamineWorkbook
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# 2. THE AUTHENTIC ADMINITY UI ENGINE (PENGATURAN SPASI ATAS & SIDEBAR)
+# 2. THE AUTHENTIC ADMINITY UI ENGINE (Hanya memperbaiki CSS agar tulisan Putih)
 st.markdown("""
     <style>
     /* MENGHAPUS SPACE KOSONG DI ATAS SIDEBAR & BODY */
@@ -17,41 +17,22 @@ st.markdown("""
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarNav"] { display: none; } 
     
-    /* STYLE JUDUL ERP (PAKSA NAIK KE ATAS) */
+    /* STYLE JUDUL ERP */
     .sidebar-title { 
         color: #00d2ff; 
         text-align: center; 
         font-family: 'Inter', sans-serif;
         font-weight: 800;
         font-size: 20px;
-        margin-top: -45px; /* Menarik judul ke paling atas */
+        margin-top: -45px; 
         padding-bottom: 15px;
         border-bottom: 1px solid #2d2d44;
         margin-bottom: 10px;
     }
 
-    /* STYLE MENU & HEADER */
     .stApp { background-color: #f4f7f6; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
     
-    .nav-header { 
-        font-size: 11px; 
-        text-transform: uppercase; 
-        letter-spacing: 2px; 
-        color: #6c757d; 
-        padding: 15px 0 5px 10px; 
-        font-weight: 700; 
-    }
-    
-    .hero-header { 
-        background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
-        color: white; 
-        padding: 1.5rem; 
-        border-radius: 12px; 
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
-        margin-bottom: 25px; 
-    }
-
     /* Metric Box */
     .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
     .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
@@ -60,10 +41,43 @@ st.markdown("""
     /* Radio Button styling */
     div.row-widget.stRadio > div { background-color: transparent !important; }
     div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
-    div.row-widget.stRadio label:hover { background: rgba(255,255,255,0.05); color: white !important; } </style>
+    
+    /* --- PERBAIKAN TULISAN PUTIH DI SINI --- */
+    
+    /* SELECTBOX / DROPDOWN - BOX GELAP & TULISAN PUTIH */
+    div[data-baseweb="select"] > div {
+        background-color: #1a2634 !important;
+        border: 1px solid #C5A059 !important;
+        border-radius: 8px !important;
+    }
+    /* Memaksa teks di dalam dropdown jadi putih */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
+
+    /* FILE UPLOADER - BOX GELAP & TULISAN PUTIH */
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a2634 !important;
+        border: 2px dashed #C5A059 !important;
+        border-radius: 10px !important;
+    }
+    /* Memaksa teks di uploader (Browse file / Drag and drop) jadi putih */
+    [data-testid="stFileUploaderText"] > span, 
+    [data-testid="stFileUploaderText"] > small {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
+    
+    /* Tombol Browse File */
+    [data-testid="stFileUploader"] button {
+        background-color: #C5A059 !important;
+        color: #1a2634 !important;
+        font-weight: bold !important;
+    }
+    </style>
     """, unsafe_allow_html=True)
 
-# --- FUNGSI LOGIKA ASLI (TETAP SAMA) ---
 import pandas as pd
 import numpy as np
 import math
