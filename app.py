@@ -234,7 +234,7 @@ with st.sidebar:
             color: #FFFFFF !important;
         }
 
-        /* FIX 2: LABEL DI ATAS BOX JADI HITAM (BIAR KELIHATAN) */
+        /* FIX 2: LABEL DI ATAS BOX JADI PUTIH (GUE BENERIN TYPO ## NYA) */
         div[data-testid="stWidgetLabel"] p {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
@@ -247,12 +247,16 @@ with st.sidebar:
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
         }
 
-        /* 4. FILE UPLOADER - SEKARANG JALAN KARENA ATASNYA SUDAH FIX */
+        /* 4. FILE UPLOADER - SEKARANG JALAN KARENA BORDER DIPAKSA !IMPORTANT */
         [data-testid="stFileUploaderSection"] {
             background-color: #1a2634 !important;
-            border: 2px dashed #C5A059 !important;
+            border: 2px dashed #C5A059 !important; /* Border Gold */
             border-radius: 10px !important;
-           
+        }
+        
+        /* Tambahan buat maksa border muncul di beberapa versi browser */
+        [data-testid="stFileUploaderSection"] > div {
+            border: none !important;
         }
 
         [data-testid="stFileUploaderText"] > span,
@@ -277,7 +281,6 @@ with st.sidebar:
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
-        
 
     </style>
     <div class="elegant-header">
