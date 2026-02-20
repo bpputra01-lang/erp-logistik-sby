@@ -193,16 +193,15 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 
 
-# --- 2. CSS & STYLING (HANYA UNTUK TAMPILAN) ---
 st.markdown("""
     <style>
-    /* GLOBAL & CONTAINER SETUP */
+    /* 1. GLOBAL & CONTAINER SETUP */
     .block-container { padding-top: 1rem !important; }
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarNav"] { display: none; } 
-    .stApp { background-color: #f4f7f6; } 
+    .stApp { background-color: #f4f7f6; } /* Background body utama tetap abu terang */
 
-    /* SIDEBAR DARK MODE & TITLING */
+    /* 2. SIDEBAR DARK MODE & TITLING */
     [data-testid="stSidebar"] { 
         background-color: #1e1e2f !important; 
         border-right: 1px solid #2d2d44; 
@@ -213,78 +212,104 @@ st.markdown("""
         padding-bottom: 15px; border-bottom: 1px solid #2d2d44; margin-bottom: 10px;
     }
 
-    /* DROPDOWN (SELECTBOX) DARK & GOLD BORDER */
+    /* 3. FIX: DROPDOWN (SELECTBOX) TETAP GELAP & TEKS PUTIH */
+    /* Area box dropdown */
     div[data-baseweb="select"] > div {
         background-color: #1a2634 !important;
-        border: 1px solid #C5A059 !important;
+        border: 1px solid #C5A059 !important; /* BORDER EMAS */
         color: white !important;
     }
+
+    /* Teks di dalam box yang sudah terpilih */
     div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
 
-    /* FILE UPLOADER DARK & GOLD */
-    [data-testid="stFileUploaderSection"] {
+    /* List pilihan pas dropdown diklik */
+    ul[role="listbox"] {
         background-color: #1a2634 !important;
-        border: 2px dashed #C5A059 !important;
+        border: 1px solid #C5A059 !important;
+    }
+    li[role="option"] {
+        color: white !important;
+        background-color: transparent !important;
+    }
+    li[role="option"]:hover {
+        background-color: #C5A059 !important;
+        color: #1a2634 !important;
+    }
+
+    /* 4. FIX: FILE UPLOADER TETAP GELAP & BORDER EMAS */
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a2634 !important; /* BACKDROP GELAP */
+        border: 2px dashed #C5A059 !important; /* BORDER EMAS DASHED */
         border-radius: 12px !important;
     }
+
+    /* Teks 'Drag and drop file here' & 'Limit...' */
     [data-testid="stFileUploaderText"] > span, 
     [data-testid="stFileUploaderText"] > small {
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
 
-    /* LABELS & RADIO */
+    /* Icon Upload */
+    [data-testid="stFileUploaderSection"] svg {
+        fill: #C5A059 !important;
+    }
+
+    /* 5. LABELS (JUDUL DI ATAS INPUT) */
     [data-testid="stWidgetLabel"] p {
-        color: #1e1e2f !important;
+        color: #1e1e2f !important; /* Biar kontras dengan background putih body */
         font-weight: bold !important;
     }
-    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; }
 
-    /* HERO HEADER */
-    .hero-header { 
-        background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
-        color: white; padding: 1.5rem; border-radius: 12px; 
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 25px; 
-    }
+    /* Metric Box & Radio (Tetap Gelap) */
+    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
+    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
+    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
+    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; }
     </style>
     """, unsafe_allow_html=True)
-
-# --- 3. SIDEBAR NAVIGATION LOGIC (PYTHON CODE - HARUS DI LUAR MARKDOWN) ---
-with st.sidebar:
-    st.markdown('<div class="sidebar-title">🚚 ERP LOGISTIC<br>SURABAYA</div>', unsafe_allow_html=True)
     
+    # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
         st.session_state.main_menu = "Dashboard Overview"
 
-    # DASHBOARD SUMMARY
+    # --- KELOMPOK 1: DASHBOARD SUMMARY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
     st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
     
     m1_list = ["Dashboard Overview", "Database Master"]
+    
+    # Cek apakah pilihan sekarang ada di kelompok 1
     def change_m1():
         st.session_state.main_menu = st.session_state.m1_key
 
+    # Jika menu yang terpilih ada di Kelompok 2, maka radio ini kita "kosongkan" secara visual (atau pilih default)
     idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
-    st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
+    
+    menu_1 = st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
 
-    # OPERATIONAL
+    # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
     
     m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Stock Minus"]
+    
     def change_m2():
         st.session_state.main_menu = st.session_state.m2_key
 
+    # Jika menu yang terpilih ada di Kelompok 2, arahkan indexnya. Jika tidak, biarkan di posisi default tapi jangan bentrok
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
-    st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
+    
+    menu_2 = st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
 
+    # Final Menu Variable untuk dipakai di konten utama
     menu = st.session_state.main_menu
+
     st.divider()
     st.caption("ERP Logistic Surabaya v2.1")
-
-# --- 4. MENU ROUTING (Lanjut ke if menu == "Dashboard Overview" dst...) ---
 
 # --- MENU ROUTING ---
 if menu == "Dashboard Overview":
