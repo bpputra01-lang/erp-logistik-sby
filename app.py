@@ -32,7 +32,21 @@ st.markdown("""
 
     .stApp { background-color: #f4f7f6; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
-    
+
+    /* --- RESTORASI HERO HEADER (YANG TADI ILANG) --- */
+    .hero-header { 
+        background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
+        color: white !important; 
+        padding: 1.5rem; 
+        border-radius: 12px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+        margin-bottom: 25px; 
+    }
+    .hero-header h1 { 
+        color: white !important; 
+        margin: 0; 
+    }
+
     /* Metric Box */
     .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
     .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
