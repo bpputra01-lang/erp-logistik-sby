@@ -223,66 +223,45 @@ with st.sidebar:
             -webkit-text-fill-color: transparent;
         }
 
-        /* FIX 1: INPUT & DROPDOWN */
+        /* 1. INPUT & DROPDOWN */
         div[data-baseweb="input"], div[data-baseweb="select"] > div {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
             border-radius: 8px !important;
         } 
+        input { color: #FFFFFF !important; }
 
-        input {
-            color: #FFFFFF !important;
-        }
-
-        /* FIX 2: LABEL DI ATAS BOX JADI PUTIH (Gue benerin typo ## jadi #) */
-        div[data-testid="stWidgetLabel"] p, label {
-            color: #FFFFFF !important;
-            -webkit-text-fill-color: #FFFFFF !important;
+        /* 2. FIX: TULISAN DI ATAS BOX (UPLOAD DATA SCAN) JADI PUTIH */
+        /* Gue tembak pake class universal biar ga bisa kabur */
+        .stWidgetLabel p, label, .stMarkdown p {
+            color: white !important;
+            -webkit-text-fill-color: white !important;
             font-family: 'Inter', sans-serif;
             font-weight: bold !important;
         }
 
-        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
-            border: 1px solid #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
-
-        /* 4. FILE UPLOADER - PAKSA BORDER EMAS MUNCUL */
-        /* Kita pasang di kontainer paling luar biar pasti kelihatan */
-        [data-testid="stFileUploader"] {
-            border: 2px dashed #C5A059 !important;
-            border-radius: 12px !important;
-            padding: 8px !important;
+        /* 3. FIX: BORDER EMAS DI AREA DRAG & DROP */
+        /* Gue tembak pake wildcard class agar semua versi Streamlit kena */
+        div[class*="stFileUploaderSection"] {
             background-color: #1a2634 !important;
+            border: 2px dashed #C5A059 !important; /* EMAS PUTUS-PUTUS */
+            border-radius: 12px !important;
         }
 
-        /* Hilangkan border bawaan dalemnya biar gak double */
-        [data-testid="stFileUploaderSection"] {
-            border: none !important;
-            background-color: transparent !important;
+        /* 4. TOMBOL BROWSE & TEKS DALAM BOX */
+        div[data-testid="stFileUploaderText"] > span {
+            color: white !important;
+            -webkit-text-fill-color: white !important;
         }
 
-        [data-testid="stFileUploaderText"] > span,
-        [data-testid="stFileUploaderText"] > small {
-            color: #FFFFFF !important;
-            -webkit-text-fill-color: #FFFFFF !important;
-        }
-
-        [data-testid="stFileUploader"] button {
+        button[kind="secondary"] {
             background-color: #C5A059 !important;
             color: #1a2634 !important;
-            border-radius: 5px !important;
-            font-weight: bold !important;
             border: none !important;
-            padding: 5px 15px !important;
+            font-weight: bold !important;
         }
 
-        [data-testid="stFileUploader"] button:hover {
-            background-color: #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
-
-        [data-testid="stFileUploader"] svg {
+        svg {
             fill: #C5A059 !important;
         }
     </style>
