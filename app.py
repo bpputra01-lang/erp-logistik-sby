@@ -105,36 +105,10 @@ if not st.session_state.logged_in:
             display: none !important;
         }
 
-        /* --- TAMBAHAN BIAR LABEL GAK NANGKRING ITEM & ESTETIK --- */
-        /* 1. Hilangkan label bawaan yang nangkring hitam di atas kotak */
-        div[data-testid="stWidgetLabel"] {
-            display: none !important;
-        }
-
-        /* 2. Style kotak input biar mirip dashboard lu */
-        div[data-baseweb="input"] {
-            background-color: #1a2634 !important;
-            border: 1px solid #C5A059 !important;
-            border-radius: 8px !important;
-        }
-
-        /* 3. Pastikan teks di dalam kotak warnanya putih */
-        input {
-            color: white !important;
-            -webkit-text-fill-color: white !important;
-        }
-
-        /* Container Kotak Login */
-        .login-card {
-            background: rgba(30, 30, 47, 0.95);
-            padding: 40px;
-            border-radius: 15px;
-            border: 1px solid #C5A059;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-            text-align: center;
-            max-width: 400px;
-            margin: 15vh auto;
-        }
+        /* TEMBAK LANGSUNG WARNA LABEL JADI PUTIH */
+[data-testid="stWidgetLabel"] p {
+    color: white !important;
+}
         </style>
     """, unsafe_allow_html=True)
 
@@ -145,9 +119,8 @@ if not st.session_state.logged_in:
         st.markdown('<h2 style="color: #C5A059; margin-bottom: 0;">📦 LOGISTIC SURABAYA ERP </h2>', unsafe_allow_html=True)
         st.markdown('<p style="color: white; font-size: 13px;">Surabaya Logistics System</p>', unsafe_allow_html=True)
         
-        # Tambahkan placeholder agar user tau kotak itu untuk apa karena label sudah di-hide
-        user_input = st.text_input("Username", key="input_user", placeholder="Username")
-        pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
+        user_input = st.text_input("Username", key="input_user")
+        pass_input = st.text_input("Password", type="password", key="input_pass")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
