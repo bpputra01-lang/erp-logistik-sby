@@ -7,237 +7,121 @@ import math
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# INISIALISASI SESSION STATE
+# FIX: Inisialisasi harus dilakukan SEBELUM dipanggil oleh logika apapun
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN
+# KONDISI 1: TAMPILAN LOGIN (FIXED & NO SCROLL)
 # ==========================================
 if not st.session_state.logged_in:
-    # CSS LOGIN (Hanya muncul jika belum login)
     st.markdown("""
         <style>
-        html, body, [data-testid="stAppViewContainer"], 
-        [data-testid="stMainViewContainer"], .main, .block-container {
+        /* 1. KUNCI LAYAR (MATIKAN SCROLL) */
+        html, body, [data-testid="stAppViewContainer"] {
             overflow: hidden !important;
             height: 100vh !important;
-            position: fixed !important;
-            width: 100% !important;
         }
+
+        /* 2. SEMBUNYIKAN ELEMEN BAWAAN */
+        [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
+        
+        /* 3. BACKGROUND FULL SCREEN */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
-            background-size: cover; background-position: center;
-        }
-        [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
-        [data-testid="stVerticalBlockBorderWrapper"] {
-            background: rgba(30, 30, 47, 0.98) !important;
-            padding: 30px !important;
-            border-radius: 15px !important;
-            border: 1px solid rgba(197, 160, 89, 0.5) !important;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.9) !important;
-            max-width: 420px !important;
-            margin: 0 auto !important;
-            margin-top: 15vh !important;
+            background-size: cover; 
+            background-position: center;
         }
 
-        /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
-    .block-container { 
-        padding-top: 3.5rem !important; /* Tambah padding supaya judul gak kelindes toolbar atas */
-        padding-bottom: 0rem !important;
-    }
-    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
-    [data-testid="stSidebarNav"] { display: none; } 
-    
-    /* 2. STYLE JUDUL ERP DI SIDEBAR */
-    .sidebar-title { 
-        color: #00d2ff; 
-        text-align: center; 
-        font-family: 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 20px;
-        margin-top: -45px; 
-        padding-bottom: 15px;
-        border-bottom: 1px solid #2d2d44;
-        margin-bottom: 10px;
-    }
+        /* 4. CONTAINER UTAMA LOGIN (DIPERTAHANKAN POSISI TETAP) */
+        .main-login-container {
+            position: fixed;
+            top: 40%; /* Posisi dinaikkan agar tidak terlalu ke bawah */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            z-index: 9999;
+            text-align: center;
+        
+        }
 
-    .stApp { background-color: #f4f7f6; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
+        .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
+        .header-logo { font-size: 28px; display: inline-block; vertical-align: middle; }
+        .header-text { display: inline-block; vertical-align: middle; margin-left: 10px; }
+        .header-title { color: #C5A059; font-size: 18px; font-weight: 800; line-height: 1.1; }
+        .header-subtitle { color: #aaaaaa; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
 
-    /* 3. HERO HEADER - SLIM & MENGIKUTI PANJANG TEKS (GAK KEPOTONG) */
-    .hero-header { 
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-        color: white !important; 
-        padding: 8px 18px !important; /* Padding pas, gak kegedean */
-        border-radius: 8px; 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-        margin-top: 0px !important; /* Reset margin biar gak nyundul ke atas */
-        margin-bottom: 25px !important;
-        display: inline-block; /* Agar background cuma sepanjang tulisan */
-        width: auto;
-    }
-    .hero-header h1 { 
-        color: white !important; 
-        font-size: 20px !important; /* Ukuran font pas */
-        font-weight: 800 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px;
-        line-height: 1.2;
-    }
-
-    /* Metric Box */
-    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
-    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
-    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
-
-    /* Radio Button styling */
-    div.row-widget.stRadio > div { background-color: transparent !important; }
-    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
-    
-    /* --- INPUT BOX STYLE (TULISAN PUTIH TETAP AMAN) --- */
-    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important;
-        border: 1px solid #C5A059 !important;
-        border-radius: 8px !important;
-    }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
-    [data-testid="stFileUploaderText"] > span, 
-    [data-testid="stFileUploaderText"] > small {
-        color: white !important;
-        -webkit-text-fill-color: white !important;
-    }
-    
-    [data-testid="stFileUploader"] button {
-        background-color: #C5A059 !important;
-        color: #1a2634 !important;
-        font-weight: bold !important;
-    }
-        /* JUDUL USERNAME & PASSWORD PUTIH */
-        label { color: #FFFFFF !important; font-weight: 700 !important; }
-        /* INPUT BOX PUTIH FULL */
+        /* 6. STYLE INPUT STREAMLIT */
         div[data-baseweb="input"] { 
-            background-color: #FFFFFF !important; 
-            border-radius: 50px !important; 
-            overflow: hidden !important;
-            padding-right: 10px !important;
+            background-color: rgba(255, 255, 255, 0.05) !important; 
+            border: 1px solid rgba(197, 160, 89, 0.3) !important; 
+            border-radius: 8px !important; 
         }
-        input { 
-            color: #000000 !important; 
-            -webkit-text-fill-color: #000000 !important; 
-            background-color: transparent !important;
-        }
-        button[aria-label="Show password"] { color: #1a2634 !important; }
+        input { color: white !important; }
+        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; text-align: left !important; display: block !important;}
+
+        /* 7. TOMBOL LOGIN */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
-            color: #1a2634 !important; font-weight: 800 !important; 
-            width: 100% !important; height: 45px !important;
+            color: #1a2634 !important; font-weight: 800 !important; width: 100% !important;
+            border-radius: 8px !important; margin-top: 15px; border: none !important;
+            height: 45px;
+        }
+
+        /* MATIKAN BOX BIRU/ABU STREAMLIT */
+        [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] {
+            background-color: transparent !important;
+            border: none !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    _, center_col, _ = st.columns([1, 1, 1])
-    with center_col:
-        with st.container(border=True):
-            st.markdown('<div style="color: #C5A059; font-size: 18px; font-weight: 800; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; margin-bottom: 20px;">📦 ERP LOGISTIC SURABAYA</div>', unsafe_allow_html=True)
-            user = st.text_input("Username", key="u_login")
-            password = st.text_input("Password", type="password", key="p_login")
-            if st.button("ENTER SYSTEM", type="primary"):
-                if user == "logsby" and password == "surabaya123":
-                    st.session_state.logged_in = True
-                    else:
-    # 1. CSS DASHBOARD - KEMBALIKAN TEMA BLUE DARK & GOLD
+    # RENDER VISUAL CARD & FORM
     st.markdown("""
-        <style>
-        /* BALIKIN SIDEBAR & HAPUS BACKGROUND LOGIN */
-        [data-testid="stSidebar"] { display: block !important; visibility: visible !important; }
-        header { display: flex !important; }
-        
-        /* BACKGROUND UTAMA - BLUE DARK */
-        .stApp { 
-            background-color: #0e1117 !important; 
-            background-image: none !important; 
-        }
-
-        /* SIDEBAR STYLE - DARKER BLUE */
-        [data-testid="stSidebar"] {
-            background-color: #1a2634 !important;
-            border-right: 1px solid #C5A059;
-        }
-
-        /* FIX TULISAN DI SIDEBAR & MAIN CONTENT BIAR JADI GOLD/PUTIH */
-        section[data-testid="stSidebar"] .stMarkdown p, 
-        section[data-testid="stSidebar"] label p,
-        section[data-testid="stSidebar"] span,
-        .main .stMarkdown p, 
-        .main label p {
-            color: #E2E8F0 !important;
-        }
-
-        /* HERO HEADER - TETAP GOLD/BLUE STYLE */
-        .hero-header { 
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-            color: white !important; 
-            padding: 10px 20px; 
-            border-radius: 10px; 
-            border-left: 5px solid #C5A059;
-            margin-bottom: 25px;
-        }
-        .hero-header h1 { color: #C5A059 !important; font-size: 24px !important; }
-
-        /* INPUT BOX & SELECTBOX - THEME CONSISTENT */
-        div[data-baseweb="input"], div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important;
-            border: 1px solid #C5A059 !important;
-            border-radius: 8px !important;
-        }
-        
-        /* TEXT DALAM INPUT */
-        input { color: #FFFFFF !important; }
-        
-        /* METRIC BOX - GOLD ACCENT */
-        .m-box { 
-            background: #1a2634; 
-            padding: 15px; 
-            border-radius: 8px; 
-            border: 1px solid #C5A059; 
-            text-align: center; 
-        }
-        .m-lbl { color: #ffffff; font-size: 11px; font-weight: 700; }
-        .m-val { color: #C5A059; font-size: 22px; font-weight: 800; }
-
-        /* DATAFRAME FIX - BIAR GAK SILAU */
-        [data-testid="stTable"], [data-testid="stDataFrame"] {
-            background-color: #1a2634 !important;
-        }
-        </style>
+        <div class="main-login-container">
+            <div class="login-card">
+                <div class="header-container">
+                    <div class="header-logo">📦</div>
+                    <div class="header-text">
+                        <div class="header-title">ERP LOGISTIC</div>
+                        <div class="header-subtitle">Secure System Access</div>
+                    </div>
+                </div>
+                <div id="input-placeholder" style="height: 180px;"></div>
+            </div>
+        </div>
     """, unsafe_allow_html=True)
 
-    # 2. LOGIC SIDEBAR (NAVIGASI)
-    with st.sidebar:
-        st.markdown('<div class="elegant-header">🚚 ERP LOGISTIC<br>SURABAYA</div>', unsafe_allow_html=True)
+    # FORM LOGIN (Diletakkan di atas placeholder dengan columns)
+    _, center_col, _ = st.columns([1, 2.5, 1])
+    with center_col:
+        # Spacer untuk menyesuaikan posisi input di dalam card
+        st.markdown('<div style="height: 195px;"></div>', unsafe_allow_html=True)
+        user = st.text_input("Username", key="u_login")
+        password = st.text_input("Password", type="password", key="p_login")
         
-        st.markdown('<p style="color: #C5A059; font-weight: bold; margin-top: 20px;">MAIN MENU</p>', unsafe_allow_html=True)
-        
-        # Inisialisasi session state agar menu tersinkron
-        if 'main_menu' not in st.session_state:
-            st.session_state.main_menu = "Dashboard Overview"
+        if st.button("ENTER SYSTEM", type="primary"):
+            if user == "admin" and password == "surabaya123":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Credential Gagal!")
+    
+    st.stop()
 
-        # Gabungkan semua menu jadi satu Radio biar gak tumpang tindih
-        menu = st.radio(
-            "PILIH NAVIGASI:",
-            ["Dashboard Overview", "Database Master", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Stock Minus"],
-            key="nav_radio",
-            label_visibility="collapsed"
-        )
+# ==========================================
+# DASHBOARD
+# ==========================================
+else:
+    st.success("Berhasil Masuk!")
+    if st.sidebar.button("LOGOUT"):
+        st.session_state.logged_in = False
+        st.rerun()
 
-        st.divider()
-        if st.button("🚪 LOGOUT SYSTEM", use_container_width=True):
-            st.session_state.logged_in = False
-            st.rerun()
-    st.stop() # WAJIB DI SINI
-
+import pandas as pd
+import numpy as np
+import math
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
