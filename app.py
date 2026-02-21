@@ -49,7 +49,7 @@ if not st.session_state.logged_in:
 
         /* STYLE INPUT: Perbaikan agar Password & Username Full */
         div[data-baseweb="input"] { 
-            background-color: #FFFFFF !important; /* Paksa background putih solid agar teks hitam terlihat jelas */
+            background-color: #000000 !important; /* Paksa background putih solid agar teks hitam terlihat jelas */
             border: 1px solid rgba(197, 160, 89, 0.3) !important; 
             border-radius: 50px !important; 
             overflow: hidden !important; /* Memastikan background putih mengikuti bentuk lengkungan */
