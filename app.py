@@ -225,47 +225,49 @@ import pandas as pd
 import numpy as np
 
 # --- TARUH ENGINE INI DI ATAS BIAR DIBACA DULUAN ---
-def engine_ds_rto_ultrafast(df_ds, df_app):
-    # 1. Cleaning Kolom
-    df_ds.columns = df_ds.columns.str.strip().str.upper()
-    df_app.columns = df_app.columns.str.strip().str.upper()
-
-    # 2. Standarisasi SKU
-    df_ds['SKU'] = df_ds['SKU'].astype(str).str.strip().str.upper()
+def engine_vba_style(df_ds, df_app):
+    # --- 1. LOGIKA LOAD DATA (Sesuai arrApp = Range("A1:Q")) ---
+    # Di VBA lo: Status musti 'DONE' atau 'KURANG AMBIL'
+    # Kolom 9 (I) atau 15 (O) adalah SKU
+    # Qty = Kolom 13 (M) + Kolom 17 (Q)
     
-    # Ambil SKU Appsheet (Kolom I atau O / Index 8 atau 14)
-    s9 = df_app.iloc[:, 8].astype(str).str.strip().str.upper().replace(['NAN', '', 'NONE'], np.nan)
-    s15 = df_app.iloc[:, 14].astype(str).str.strip().str.upper().replace(['NAN', '', 'NONE'], np.nan)
-    df_app['SKU_FINAL'] = s9.fillna(s15)
-
-    # 3. Filter Status Done / Kurang Ambil (Kolom B / Index 1)
-    allowed_status = ['DONE', 'KURANG AMBIL']
-    mask_status = df_app.iloc[:, 1].astype(str).str.upper().str.strip().isin(allowed_status)
-    df_app_filtered = df_app[mask_status].copy()
-
-    # 4. Hitung Total Qty (M + Q / Index 12 + 16)
-    qty_m = pd.to_numeric(df_app_filtered.iloc[:, 12], errors='coerce').fillna(0)
-    qty_q = pd.to_numeric(df_app_filtered.iloc[:, 16], errors='coerce').fillna(0)
-    df_app_filtered['TOTAL_QTY_APPSHEET'] = qty_m + qty_q
-
-    qty_summary = df_app_filtered.groupby('SKU_FINAL')['TOTAL_QTY_APPSHEET'].sum().reset_index()
-
-    # 5. Merge (VLOOKUP)
-    # Pastiin di DS ada kolom 'QTY SCAN'
-    result = pd.merge(df_ds, qty_summary, left_on='SKU', right_on='SKU_FINAL', how='left').fillna(0)
-
-    # 6. Logika Note
-    result['SELISIH'] = result['QTY SCAN'] - result['TOTAL_QTY_APPSHEET']
-    conditions = [
-        (result['SELISIH'] > 0),
-        (result['SELISIH'] < 0),
-        (result['SELISIH'] == 0)
-    ]
-    choices = ['KELEBIHAN SCAN', 'KURANG SCAN', 'SESUAI']
-    result['NOTE'] = np.select(conditions, choices, default='TIDAK ADA DATA')
+    df_app.columns = [str(i) for i in range(1, len(df_app.columns) + 1)] # Pakai angka biar sama kayak VBA
     
-    return result
+    # Filter Status (Kolom B / 2)
+    mask = df_app['2'].str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
+    df_filtered = df_app[mask].copy()
+    
+    # Hitung Qty per SKU (Logic Dictionary dictQty di VBA)
+    summary_dict = {}
+    for _, row in df_filtered.iterrows():
+        # Ambil SKU dari Kolom 9, kalau kosong ambil dari Kolom 15
+        sku = str(row['9']).strip() if str(row['9']).strip() != "" else str(row['15']).strip()
+        
+        if sku and sku != 'nan':
+            # Sum Qty dari Kolom 13 dan 17
+            qty = pd.to_numeric(row['13'], errors='coerce', default=0) + \
+                  pd.to_numeric(row['17'], errors='coerce', default=0)
+            summary_dict[sku] = summary_dict.get(sku, 0) + qty
 
+    # --- 2. UPDATE DS RTO (Logic Write DS) ---
+    df_ds_res = df_ds.copy()
+    # Pastikan kolom QTY SCAN (Kolom 2) adalah angka
+    df_ds_res.iloc[:, 1] = pd.to_numeric(df_ds_res.iloc[:, 1], errors='coerce').fillna(0)
+    
+    # VLOOKUP QTY AMBIL dari dictionary
+    df_ds_res['QTY AMBIL'] = df_ds_res.iloc[:, 0].astype(str).str.strip().map(summary_dict).fillna(0)
+    
+    # LOGIKA NOTE (Sesuai Request VBA lo)
+    def get_note(row):
+        scan = row.iloc[1] # Kolom B
+        ambil = row['QTY AMBIL']
+        if scan > ambil: return "KELEBIHAN AMBIL"
+        elif scan < ambil: return "KURANG AMBIL"
+        else: return "SESUAI"
+    
+    df_ds_res['NOTE'] = df_ds_res.apply(get_note, axis=1)
+    
+    return df_ds_res, summary_dict
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Bersihkan nama kolom (buang spasi)
@@ -943,10 +945,10 @@ elif menu == "Compare RTO":
             )
      # --- PASTIKAN BARIS INI SEJAJAR DENGAN IF SEBELUMNYA ---
    # --- LOGIKA REFRESH SAKTI (VBA STYLE) ---
-        # --- LOGIKA REFRESH SAKTI (VBA STYLE) ---
-        if st.button("🔄 REFRESH & SYNC DATA DROP", use_container_width=True):
-            if st.session_state.hasil_ds_vs_app is not None:
-                try:
+       if st.button("🔄 REFRESH & SYNC DATA (VBA LOGIC)", use_container_width=True):
+    if st.session_state.data_ds is not None and st.session_state.data_app is not None:
+        # 1. Jalankan Engine dengan Logika VBA
+        hasil_vba, dict_qty = engine_vba_style(st.session_state.data_ds, st.session_state.data_app)
                     # 1. Ambil hasil compare terakhir (yang ada selisihnya)
                     df_current = st.session_state.hasil_ds_vs_app.copy()
                     
@@ -976,6 +978,55 @@ elif menu == "Compare RTO":
             else:
                 st.error("Jalankan Proses Awal dulu biar datanya muncul!")    
     st.divider()
+
+    # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
+    st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
+    
+    # --- 5. STEP 2: FINAL COMPARE ---
+    if st.session_state.step_cleared:
+        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
+            if st.session_state.data_draft is not None:
+                # 1. AMBIL DATA TERUPDATE (Hasil Sync Refresh tadi)
+                df_actual = st.session_state.data_ds.copy()
+                df_draft = st.session_state.data_draft.copy()
+
+                # 2. PROSES MATCHING (VLOOKUP STYLE)
+                # Pastikan nama kolom di file Draft lo adalah 'SKU' dan 'QTY'
+                df_draft.columns = df_draft.columns.str.strip().str.upper()
+                
+                summary = pd.merge(
+                    df_actual, 
+                    df_draft, 
+                    on='SKU', 
+                    how='outer', 
+                    suffixes=('_ACTUAL', '_DRAFT')
+                ).fillna(0)
+
+                # Hitung Selisih Akhir antara Actual vs Draft
+                # Sesuaikan 'QTY' dengan nama kolom qty di file Draft RTO lo
+                if 'QTY' in summary.columns:
+                    summary['DIFF_FINAL'] = summary['QTY SCAN'] - summary['QTY']
+                    summary['STATUS'] = summary['DIFF_FINAL'].apply(lambda x: 'MATCH ✅' if x == 0 else 'SELISIH ❌')
+
+                # 3. TAMPILKAN TABEL SUMMARY (INI YANG LO CARI)
+                st.success("🏆 PROSES FINAL MATCHING BERHASIL!")
+                st.dataframe(summary, use_container_width=True)
+
+                # 4. TOMBOL DOWNLOAD (INI JUGA YANG LO CARI)
+                csv = summary.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 DOWNLOAD HASIL SUMMARY (CSV)",
+                    data=csv,
+                    file_name="Summary_RTO_Final.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
+                st.balloons()
+            else:
+                st.error("Woy, File Draft RTO (File 3) belum lo upload!")
+    else:
+        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 sampai semua status 'SESUAI'.")
 
     # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
     st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
