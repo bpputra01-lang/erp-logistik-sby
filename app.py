@@ -189,6 +189,15 @@ div.stFormSubmitButton > button {
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.stop()
+st.stop()
+
+# --- DASHBOARD UTAMA (Jalan setelah login) ---
+
+# Cek apakah notifikasi sudah pernah muncul
+if 'login_success' not in st.session_state:
+    st.toast("Berhasil Login! Selamat datang di dashboard.", icon="🔓")
+    # Set True supaya pas klik menu lain di dashboard, pop-up gak muncul terus-terusan
+    st.session_state.login_success = True
 
 
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
