@@ -51,7 +51,7 @@ if not st.session_state.logged_in:
         div[data-baseweb="input"] { 
             background-color: rgba(255, 255, 255, 0.05) !important; 
             border: 1px solid rgba(197, 160, 89, 0.3) !important; 
-            border-radius: 8px !important; 
+            border-radius: 2px !important; 
         }
         /* Warna teks saat mengetik username & password jadi hitam */
 input { 
