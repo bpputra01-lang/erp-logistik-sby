@@ -1,7 +1,10 @@
 import pandas as pd
 import numpy as np
+import math
+import io
 import streamlit as st
 import plotly.express as px
+from python_calamine import CalamineWorkbook
 
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
@@ -11,124 +14,115 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (BERSIH TOTAL)
+# KONDISI 1: BELUM LOGIN (TAMPILAN LOGIN SAJA)
 # ==========================================
 if not st.session_state.logged_in:
+    # CSS KHUSUS LOGIN - SIDEBAR DIHAPUS DARI LAYAR
     st.markdown("""
         <style>
-        /* 1. SEMBUNYIKAN SEMUA ELEMEN BAWAAN & MATIKAN SCROLL */
-        [data-testid="stSidebar"], header, .stDeployButton { display: none !important; }
+        [data-testid="stSidebar"] { display: none !important; } /* Sidebar Hilang Total */
+        .stApp { background-color: #1a2634; } /* Background Gelap */
         
-        /* 2. PEMBASMI BOX BIRU/HITAM DI TENGAH (PENTING!) */
-        .main, .block-container, [data-testid="stVerticalBlock"] {
-            background: transparent !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
-            border: none !important;
-        }
-
-        .main .block-container {
-            max-width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-
-        /* 3. BACKGROUND GUDANG FULL SCREEN */
-        .stApp {
-            background: linear-gradient(rgba(10, 10, 20, 0.85), rgba(10, 10, 20, 0.85)), 
-                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            overflow: hidden !important;
-        }
-
-        /* 4. CONTAINER LOGIN CARD YANG ASLI */
         .login-card {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 9999;
-            width: 420px;
-            background: rgba(30, 30, 47, 0.95) !important;
-            backdrop-filter: blur(20px);
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid rgba(197, 160, 89, 0.4);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+            background: #1e1e2f;
+            padding: 3rem;
+            border-radius: 15px;
+            border: 1px solid #C5A059;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             text-align: center;
+            max-width: 450px;
+            margin: 100px auto; /* Kotak di tengah agak ke atas */
         }
-
-        .login-logo { font-size: 60px; margin-bottom: 10px; }
-        .login-title { color: #C5A059; font-size: 26px; font-weight: 800; margin-bottom: 5px; }
-        .login-subtitle { color: #aaaaaa; font-size: 14px; margin-bottom: 30px; }
-
-        /* 5. STYLE INPUT & LABEL */
-        div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(197, 160, 89, 0.3) !important;
-            border-radius: 10px !important;
+        .login-title {
+            color: #C5A059;
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 25px;
+            font-family: 'Inter', sans-serif;
         }
+        /* Style Input */
+        div[data-baseweb="input"] { background-color: #1a2634 !important; border: 1px solid #2d2d44 !important; }
         input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700 !important; text-align: left !important; display: block !important; }
-
-        /* 6. TOMBOL LOGIN */
+        label { color: #d1d1d1 !important; }
+        
+        /* Button Login Gold */
         button[kind="primary"] {
-            background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
+            background-color: #C5A059 !important;
             color: #1a2634 !important;
-            font-weight: 800 !important;
-            width: 100% !important;
-            border-radius: 10px !important;
-            padding: 12px !important;
-            margin-top: 20px;
             border: none !important;
+            font-weight: bold !important;
+            width: 100%;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # MULAI RENDER CARD LOGIN
+    # UI LOGIN
     st.markdown('<div class="login-card">', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">🚚 ERP LOGISTIC SYSTEM</div>', unsafe_allow_html=True)
     
-    st.markdown("""
-        <div class="login-logo">📦</div>
-        <div class="login-title">ERP LOGISTIC</div>
-        <div class="login-subtitle">Secure System Access</div>
-    """, unsafe_allow_html=True)
-
-    user = st.text_input("Username", key="u_log")
-    password = st.text_input("Password", type="password", key="p_log")
+    u = st.text_input("Username", key="u_field")
+    p = st.text_input("Password", type="password", key="p_field")
     
-    if st.button("L O G I N", type="primary"):
-        if user == "admin" and password == "surabaya123":
+    if st.button("ENTER SYSTEM", type="primary"):
+        if u == "admin" and p == "surabaya123":
             st.session_state.logged_in = True
             st.rerun()
         else:
-            st.error("Credential Gagal!")
-
+            st.error("Access Denied!")
     st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()
 
 # ==========================================
-# KONDISI 2: DASHBOARD (SETELAH LOGIN)
+# KONDISI 2: SUDAH LOGIN (DASHBOARD MUNCUL)
 # ==========================================
 else:
-    # Reset Background Dashboard biar gak gelap terus
+    # SEMUA CSS ASLI LO TARUH DI SINI
     st.markdown("""
         <style>
-        .stApp { background: #f4f7f6 !important; overflow: auto !important; }
-        [data-testid="stSidebar"] { display: block !important; }
+        /* CSS ASLI LO YANG SUDAH SESUAI */
+        .block-container { padding-top: 3.5rem !important; }
+        [data-testid="stSidebarNav"] { display: none; } 
+        .stApp { background-color: #f4f7f6; }
+        [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; display: block !important; }
+        
+        .sidebar-title { 
+            color: #00d2ff; text-align: center; font-weight: 800; font-size: 20px; 
+            margin-top: -45px; padding-bottom: 15px; border-bottom: 1px solid #2d2d44;
+        }
+
+        .hero-header { 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+            color: white !important; padding: 8px 18px !important; 
+            border-radius: 8px; display: inline-block;
+        }
+        .hero-header h1 { color: white !important; font-size: 20px !important; margin: 0; }
+
+        /* Box & Input styling tetap putih */
+        div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
+            background-color: #1a2634 !important; border: 1px solid #C5A059 !important;
+        }
+        div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+            color: white !important; -webkit-text-fill-color: white !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
+    # SIDEBAR & MENU
     with st.sidebar:
-        st.markdown('<h2 style="color:#00d2ff; text-align:center;">🚚 ERP LOGISTIC</h2>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-title">🚚 ERP LOGISTIC</div>', unsafe_allow_html=True)
+        # Sisa menu lo...
         if st.button("LOGOUT"):
             st.session_state.logged_in = False
             st.rerun()
 
-    st.title("DASHBOARD ANALYTICS")
-    st.success("Selamat datang di sistem.")
+    # CONTENT
+    st.markdown("""
+        <div class="hero-header">
+            <h1>DASHBOARD ANALYTICS ITEM SCAN</h1>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.success("Berhasil Login! Silakan kelola data.")
+    
 
 import pandas as pd
 import numpy as np
