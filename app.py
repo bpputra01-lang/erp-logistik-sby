@@ -222,56 +222,48 @@ import math
 
 import pandas as pd
 import numpy as np
-import io
 
-def engine_rto_complete(df_ds, df_app, df_draft):
-    # 1. CLEANING HEADERS & DATA
-    for df in [df_ds, df_app, df_draft]:
-        df.columns = df.columns.str.strip().str.upper()
+# --- TARUH ENGINE INI DI ATAS BIAR DIBACA DULUAN ---
+def engine_ds_rto_ultrafast(df_ds, df_app):
+    # 1. Cleaning Kolom
+    df_ds.columns = df_ds.columns.str.strip().str.upper()
+    df_app.columns = df_app.columns.str.strip().str.upper()
 
-    # 2. STANDARISASI SKU
+    # 2. Standarisasi SKU
     df_ds['SKU'] = df_ds['SKU'].astype(str).str.strip().str.upper()
-    df_draft['SKU'] = df_draft['SKU'].astype(str).str.strip().str.upper()
     
-    # Ambil SKU Appsheet (Kolom I atau O)
+    # Ambil SKU Appsheet (Kolom I atau O / Index 8 atau 14)
     s9 = df_app.iloc[:, 8].astype(str).str.strip().str.upper().replace(['NAN', '', 'NONE'], np.nan)
     s15 = df_app.iloc[:, 14].astype(str).str.strip().str.upper().replace(['NAN', '', 'NONE'], np.nan)
     df_app['SKU_FINAL'] = s9.fillna(s15)
 
-    # 3. FILTER APPSHEET (DONE / KURANG AMBIL) & SUM QTY
+    # 3. Filter Status Done / Kurang Ambil (Kolom B / Index 1)
     allowed_status = ['DONE', 'KURANG AMBIL']
-    mask = df_app.iloc[:, 1].astype(str).str.upper().str.strip().isin(allowed_status)
-    df_app_filt = df_app[mask].copy()
-    
-    # Qty Appsheet (M + Q)
-    qty_m = pd.to_numeric(df_app_filt.iloc[:, 12], errors='coerce').fillna(0)
-    qty_q = pd.to_numeric(df_app_filt.iloc[:, 16], errors='coerce').fillna(0)
-    df_app_filt['TOTAL_APP'] = qty_m + qty_q
-    
-    app_summary = df_app_filt.groupby('SKU_FINAL')['TOTAL_APP'].sum().reset_index()
+    mask_status = df_app.iloc[:, 1].astype(str).str.upper().str.strip().isin(allowed_status)
+    df_app_filtered = df_app[mask_status].copy()
 
-    # 4. MERGE DRAFT + DS (Biar tau Bin-nya)
-    # Kita asumsikan Draft punya kolom 'SKU' dan 'BIN'
-    combined = pd.merge(df_draft[['SKU', 'BIN']], df_ds[['SKU', 'QTY SCAN']], on='SKU', how='left').fillna(0)
+    # 4. Hitung Total Qty (M + Q / Index 12 + 16)
+    qty_m = pd.to_numeric(df_app_filtered.iloc[:, 12], errors='coerce').fillna(0)
+    qty_q = pd.to_numeric(df_app_filtered.iloc[:, 16], errors='coerce').fillna(0)
+    df_app_filtered['TOTAL_QTY_APPSHEET'] = qty_m + qty_q
 
-    # 5. MERGE DENGAN APPSHEET
-    final = pd.merge(combined, app_summary, left_on='SKU', right_on='SKU_FINAL', how='left').fillna(0)
+    qty_summary = df_app_filtered.groupby('SKU_FINAL')['TOTAL_QTY_APPSHEET'].sum().reset_index()
 
-    # 6. LOGIKA NOTE
-    final['SELISIH'] = final['QTY SCAN'] - final['TOTAL_APP']
-    
+    # 5. Merge (VLOOKUP)
+    # Pastiin di DS ada kolom 'QTY SCAN'
+    result = pd.merge(df_ds, qty_summary, left_on='SKU', right_on='SKU_FINAL', how='left').fillna(0)
+
+    # 6. Logika Note
+    result['SELISIH'] = result['QTY SCAN'] - result['TOTAL_QTY_APPSHEET']
     conditions = [
-        (final['SELISIH'] > 0),
-        (final['SELISIH'] < 0),
-        (final['SELISIH'] == 0)
+        (result['SELISIH'] > 0),
+        (result['SELISIH'] < 0),
+        (result['SELISIH'] == 0)
     ]
     choices = ['KELEBIHAN SCAN', 'KURANG SCAN', 'SESUAI']
-    final['NOTE'] = np.select(conditions, choices, default='TIDAK ADA DATA')
+    result['NOTE'] = np.select(conditions, choices, default='TIDAK ADA DATA')
     
-    # Tambah kolom Rekon kosongan
-    final['REKONSILIASI'] = "BELUM DICEK"
-    
-    return final[['SKU', 'BIN', 'QTY SCAN', 'TOTAL_APP', 'SELISIH', 'NOTE', 'REKONSILIASI']]
+    return result
 
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
