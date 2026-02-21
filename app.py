@@ -11,25 +11,24 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (ZERO BOX POLICY)
+# KONDISI 1: TAMPILAN LOGIN (TOTAL CLEANUP)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* 1. HAPUS SEMUA SAMPAH VISUAL STREAMLIT */
+        /* 1. SEMBUNYIKAN SEMUA ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
         
-        /* 2. PEMBASMI BOX BIRU/HITAM MELINTANG (FORCE TRANSPARENT) */
-        .main, .block-container, [data-testid="stVerticalBlock"], 
-        [data-testid="stVerticalBlockBorderWrapper"], .stVerticalBlock {
+        /* 2. MATIKAN DISPLAY CONTAINER UTAMA (INI KUNCINYA AGAR BOX BIRU ILANG) */
+        /* Kita buat container utama jadi transparan dan tanpa dimensi agar tidak ngerender box */
+        .main .block-container {
             background: transparent !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
-            border: none !important;
             padding: 0 !important;
+            max-width: 0 !important;
+            max-height: 0 !important;
         }
-
-        /* 3. BACKGROUND GUDANG FULL SCREEN */
+        
+        /* 3. BACKGROUND GUDANG FULL SCREEN PADA BODY */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
@@ -39,28 +38,24 @@ if not st.session_state.logged_in:
             overflow: hidden !important;
         }
 
-        /* 4. LOGIN CARD - MELAYANG PAS DI TENGAH AGAK ATAS */
+        /* 4. LOGIN CARD - POSISI ABSOLUTE & FIXED */
         .login-card {
             position: fixed;
             top: 40%; 
             left: 50%;
             transform: translate(-50%, -50%);
-            z-index: 10000;
+            z-index: 999999;
             width: 400px;
-            background: rgba(30, 30, 47, 0.95);
+            background: rgba(30, 30, 47, 0.98) !important;
             backdrop-filter: blur(20px);
-            padding: 50px 40px;
+            padding: 40px;
             border-radius: 20px;
             border: 1px solid rgba(197, 160, 89, 0.5);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9);
             text-align: center;
         }
 
-        .login-logo { font-size: 50px; margin-bottom: 10px; }
-        .login-title { color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px; }
-        .login-subtitle { color: #aaaaaa; font-size: 14px; margin-bottom: 30px; }
-
-        /* 5. STYLE INPUT (TULISAN PUTIH & BORDER EMAS) */
+        /* 5. STYLE INPUT (TULISAN PUTIH) */
         div[data-baseweb="input"] {
             background-color: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(197, 160, 89, 0.3) !important;
@@ -69,7 +64,7 @@ if not st.session_state.logged_in:
         input { color: white !important; }
         label { color: #C5A059 !important; font-weight: 700 !important; text-align: left !important; display: block; }
 
-        /* 6. TOMBOL LOGIN EMAS PERSIS SCREENSHOT */
+        /* 6. TOMBOL LOGIN EMAS */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important;
@@ -79,28 +74,32 @@ if not st.session_state.logged_in:
             padding: 12px !important;
             margin-top: 20px;
             border: none !important;
-            box-shadow: 0 4px 15px rgba(197, 160, 89, 0.2) !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # RENDER CARD
-    st.markdown('<div class="login-card">', unsafe_allow_html=True)
-    st.markdown('<div class="login-logo">📦</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">ERP LOGISTIC</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-subtitle">Silakan login untuk mengakses sistem.</div>', unsafe_allow_html=True)
+    # RENDER FORM
+    # Pakai st.container agar elemen Python (input) punya tempat, tapi CSS di atas bikin dia ga keliatan
+    with st.container():
+        st.markdown(f"""
+            <div class="login-card">
+                <div style="font-size: 50px; margin-bottom: 10px;">📦</div>
+                <div style="color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px;">ERP LOGISTIC</div>
+                <div style="color: #aaaaaa; font-size: 14px; margin-bottom: 30px;">Secure System Access</div>
+        """, unsafe_allow_html=True)
 
-    user = st.text_input("Username", key="u_login")
-    password = st.text_input("Password", type="password", key="p_login")
+        user = st.text_input("Username", key="u_login")
+        password = st.text_input("Password", type="password", key="p_login")
+        
+        if st.button("ENTER SYSTEM", type="primary"):
+            if user == "admin" and password == "surabaya123":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Credential Gagal!")
+
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    if st.button("ENTER SYSTEM", type="primary"):
-        if user == "admin" and password == "surabaya123":
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Credential Gagal!")
-
-    st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
 # ==========================================
@@ -109,7 +108,7 @@ if not st.session_state.logged_in:
 else:
     st.markdown("""
         <style>
-        .block-container { padding-top: 1rem !important; }
+        .block-container { padding-top: 1rem !important; max-width: 100% !important; max-height: 100% !important; }
         [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
         [data-testid="stSidebarNav"] { display: none; } 
         .stApp { background-color: #f4f7f6; background-image: none !important; }
