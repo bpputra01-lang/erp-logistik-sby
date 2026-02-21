@@ -1,155 +1,94 @@
-import pandas as pd
-import numpy as np
-import math
-import io
-import streamlit as st
-import plotly.express as px
-from python_calamine import CalamineWorkbook
-
-# 1. KONFIGURASI HALAMAN
-st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
-
-# --- KUNCI PINTU UTAMA ---
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (BOX DI TENGAH)
+# KONDISI 1: TAMPILAN LOGIN (BOX DI TENGAH TOTAL)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* Sembunyikan semua elemen bawaan Streamlit */
+        /* SEMBUNYIKAN SIDEBAR & HEADER PAKSA */
         [data-testid="stSidebar"], header, .stDeployButton { display: none !important; }
         
-        /* Background Utama */
+        /* BACKGROUND GUDANG FULL SCREEN */
         .stApp {
-            background: linear-gradient(rgba(30, 30, 47, 0.9), rgba(30, 30, 47, 0.9)), 
-                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070'); /* Background Logistik */
+            background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover;
             background-position: center;
+            background-attachment: fixed;
         }
 
-        /* Container Login Box agar pas di tengah */
-        .main-login-container {
+        /* BOX LOGIN DI TENGAH (FIXED POS) */
+        .login-wrapper {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            width: 100%;
             display: flex;
             justify-content: center;
-            align-items: center;
-            height: 80vh;
         }
 
         .login-card {
-            background: rgba(26, 38, 52, 0.85); /* Efek Transparan Dark */
-            backdrop-filter: blur(10px); /* Efek Blur di belakang box */
-            padding: 3rem;
+            background: rgba(30, 30, 47, 0.85); /* Glassmorphism */
+            backdrop-filter: blur(15px);
+            padding: 40px;
             border-radius: 20px;
-            border: 1px solid rgba(197, 160, 89, 0.3); /* Border Emas Halus */
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-            text-align: center;
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
             width: 400px;
+            text-align: center;
         }
 
-        .login-logo {
-            font-size: 40px;
-            margin-bottom: 10px;
-        }
+        .login-logo { font-size: 50px; margin-bottom: 10px; }
+        .login-title { color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px; }
+        .login-subtitle { color: #d1d1d1; font-size: 14px; margin-bottom: 30px; }
 
-        .login-title {
-            color: #C5A059;
-            font-size: 22px;
-            font-weight: 800;
-            margin-bottom: 5px;
-            letter-spacing: 1px;
-        }
-
-        .login-subtitle {
-            color: #d1d1d1;
-            font-size: 14px;
-            margin-bottom: 30px;
-        }
-
-        /* Input Styling */
+        /* INPUT FIELD AGAR LEBARNYA PAS */
         div[data-baseweb="input"] {
             background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(197, 160, 89, 0.5) !important;
+            border: 1px solid rgba(197, 160, 89, 0.4) !important;
             border-radius: 10px !important;
+            margin-bottom: 5px;
         }
         input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 600 !important; }
-        
-        /* Button Style */
+        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 14px !important; }
+
+        /* TOMBOL LOGIN EMAS */
         button[kind="primary"] {
-            background: linear-gradient(135deg, #C5A059 0%, #A6803B 100%) !important;
+            background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important;
             border: none !important;
             font-weight: 800 !important;
-            padding: 0.6rem 2rem !important;
-            width: 100%;
+            width: 100% !important;
             border-radius: 10px !important;
-            margin-top: 10px;
+            padding: 10px !important;
+            margin-top: 20px;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Menampilkan Box Login
-    st.markdown('<div class="main-login-container">', unsafe_allow_html=True)
-    with st.container():
-        st.markdown("""
+    # OUTPUT HTML BOX
+    st.markdown("""
+        <div class="login-wrapper">
             <div class="login-card">
                 <div class="login-logo">📦</div>
                 <div class="login-title">ERP LOGISTIC</div>
                 <div class="login-subtitle">Silakan login terlebih dahulu.</div>
-        """, unsafe_allow_html=True)
-        
-        user = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        
-        if st.button("L O G I N", type="primary"):
-            if user == "admin" and password == "surabaya123":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Credential Salah!")
-                
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.stop() # Paksa berhenti agar dashboard tidak muncul di belakang
-
-# ==========================================
-# KONDISI 2: SUDAH LOGIN (ERP DASHBOARD)
-# ==========================================
-else:
-    st.markdown("""
-        <style>
-        .block-container { padding-top: 3.5rem !important; }
-        [data-testid="stSidebarNav"] { display: none; } 
-        .stApp { background: #f4f7f6; }
-        [data-testid="stSidebar"] { background-color: #1e1e2f !important; display: block !important; }
-        
-        .sidebar-title { 
-            color: #00d2ff; text-align: center; font-weight: 800; font-size: 20px; 
-            margin-top: -45px; padding-bottom: 15px; border-bottom: 1px solid #2d2d44;
-        }
-
-        .hero-header { 
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-            color: white !important; padding: 8px 18px !important; 
-            border-radius: 8px; display: inline-block;
-        }
-        .hero-header h1 { color: white !important; font-size: 20px !important; margin: 0; }
-        </style>
     """, unsafe_allow_html=True)
 
-    with st.sidebar:
-        st.markdown('<div class="sidebar-title">🚚 ERP LOGISTIC</div>', unsafe_allow_html=True)
-        if st.button("LOGOUT"):
-            st.session_state.logged_in = False
-            st.rerun()
-
-    st.markdown('<div class="hero-header"><h1>DASHBOARD ANALYTICS ITEM SCAN</h1></div>', unsafe_allow_html=True)
-    st.success("Selamat datang, Admin!")
+    # INPUT FIELD (Tetap pake komponen Streamlit biar gampang ditangkep datanya)
+    u = st.text_input("Username")
+    p = st.text_input("Password", type="password")
     
+    if st.button("L O G I N", type="primary"):
+        if u == "admin" and p == "surabaya123":
+            st.session_state.logged_in = True
+            st.rerun()
+        else:
+            st.error("Credential Gagal!")
+
+    st.markdown('</div></div>', unsafe_allow_html=True)
+    st.stop()   
 
 import pandas as pd
 import numpy as np
