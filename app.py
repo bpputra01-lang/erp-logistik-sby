@@ -18,11 +18,17 @@ if not st.session_state.logged_in:
     st.markdown("""
         <style>
         /* 1. KUNCI LAYAR (MATIKAN SCROLL) */
-        html, body, [data-testid="stAppViewContainer"] {
+      html, body, [data-testid="stAppViewContainer"], 
+        [data-testid="stVerticalBlock"], 
+        [data-testid="stVerticalBlockBorderWrapper"],
+        .main .block-container {
             overflow: hidden !important;
             height: 100vh !important;
+            max-height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
-
+        
         /* 2. SEMBUNYIKAN ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
         
