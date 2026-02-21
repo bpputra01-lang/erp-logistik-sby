@@ -5,82 +5,62 @@ import io
 import math
 
 # ==========================================
-# LANJUTAN TAMPILAN LOGIN (THEMA GUDANG)
+# LOGIKA LOGIN (THEMA GUDANG)
 # ==========================================
 
+# Pastikan session state sudah ada
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
 if not st.session_state.logged_in:
-    # CSS Khusus Background Login & Centering
+    # CSS Tambahan khusus Halaman Login (Tanpa ganggu CSS lu di atas)
     st.markdown("""
         <style>
-        /* Mengatur background gambar gudang full screen */
+        /* Background Gudang khusus saat login */
         .stApp {
-            background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
-                              url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
+            background-size: cover !important;
+            background-position: center !important;
         }
-
-        /* Menghilangkan Header & Sidebar saat Login */
-        [data-testid="stHeader"], [data-testid="stSidebar"] {
-            display: none;
-        }
-
-        /* Container Box Login (Glassmorphism) */
-        .login-card {
-            background: rgba(30, 38, 52, 0.85);
-            backdrop-filter: blur(10px);
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid rgba(197, 160, 89, 0.3);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-            text-align: center;
-            max-width: 400px;
-            margin: auto;
-        }
+        /* Sembunyikan elemen dashboard pas login */
+        [data-testid="stHeader"], [data-testid="stSidebar"] { display: none !important; }
         
-        /* Animasi masuk */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .login-section {
-            animation: fadeIn 0.8s ease-out;
-            margin-top: 10vh;
+        /* Container Form Login */
+        .login-card {
+            background: rgba(26, 38, 52, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            border: 1px solid #C5A059;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            margin-top: 15vh;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Tampilan Form Login
-    st.markdown('<div class="login-section">', unsafe_allow_html=True)
+    # UI Login
+    _, col_login, _ = st.columns([1, 1.5, 1])
     
-    _, center_col, _ = st.columns([1, 2, 1])
-    
-    with center_col:
-        st.markdown("""
-            <div class="login-card">
-                <h1 style="color: #C5A059; font-size: 28px; margin-bottom: 5px;">ADMINITY PRO</h1>
-                <p style="color: #d1d1d1; font-size: 14px; margin-bottom: 30px;">ERP Logistic Surabaya System</p>
-            </div>
-        """, unsafe_allow_html=True)
+    with col_login:
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        st.markdown('<h1 style="color: #C5A059; text-align: center; margin-bottom: 0;">📦 ERP SYSTEM</h1>', unsafe_allow_html=True)
+        st.markdown('<p style="color: white; text-align: center; font-size: 14px; margin-bottom: 30px;">Adminity Pro - Surabaya Logistics</p>', unsafe_allow_html=True)
         
-        # Form Login menggunakan widget Streamlit di dalam kolom
-        with st.container():
-            username = st.text_input("👤 Username", placeholder="Input username...")
-            password = st.text_input("🔑 Password", type="password", placeholder="Input password...")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
-                if username == "logsby" and password == "surabaya123":
-                    st.session_state.logged_in = True
-                    st.success("Login Berhasil!")
-                    st.rerun()
-                else:
-                    st.error("Kredensial salah. Silakan coba lagi.")
-                    
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.stop() # Menahan sisa kode dashboard agar tidak jalan sebelum login
+        user_input = st.text_input("Username", key="user_login")
+        pass_input = st.text_input("Password", type="password", key="pass_login")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("SIGN IN", use_container_width=True, type="primary"):
+            if user_input == "logsby" and pass_input == "surabaya123":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("User atau Password salah")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Stop biar kode dashboard di bawah gak jalan kalo belum login
+    st.stop()
 import pandas as pd
 import numpy as np
 import math
