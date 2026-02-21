@@ -4,6 +4,9 @@ import streamlit as st
 import io
 import math
 
+st.set_page_config(
+    page_title="LogsbyERP.id")
+  
 st.markdown("""
     <style>
     /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
