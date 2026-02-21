@@ -53,7 +53,11 @@ if not st.session_state.logged_in:
             border: 1px solid rgba(197, 160, 89, 0.3) !important; 
             border-radius: 8px !important; 
         }
-        input { color: white !important; }
+        /* Warna teks saat mengetik username & password jadi hitam */
+input { 
+    color: #000000 !important; 
+    -webkit-text-fill-color: #000000 !important; 
+}
         label { color: #C5A059 !important; font-weight: 700 !important; }
 
         /* TOMBOL */
