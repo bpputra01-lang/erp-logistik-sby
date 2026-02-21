@@ -46,6 +46,12 @@ if not st.session_state.logged_in:
             margin: 0 auto !important;
             margin-top: 15vh !important; /* Posisi naik ke atas */
         }
+        /* 1. JUDUL (LABEL) USERNAME & PASSWORD BALIK PUTIH/EMAS */
+        label { 
+            color: #FFFFFF !important; /* Ganti jadi #C5A059 kalau mau tetep Emas */
+            font-weight: 700 !important; 
+            margin-bottom: 8px !important;
+            display: block !important;
 
         /* STYLE INPUT: Perbaikan agar Password & Username Full */
         div[data-baseweb="input"] { 
@@ -58,7 +64,7 @@ if not st.session_state.logged_in:
 
         /* Memastikan input field-nya sendiri transparan agar mengikuti background putih di atas */
         input { 
-            color: #FFFFFF !important; 
+            color: #000000 !important; 
             -webkit-text-fill-color: #000000 !important; 
             background-color: transparent !important;
             border: none !important;
