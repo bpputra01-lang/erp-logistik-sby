@@ -152,13 +152,22 @@ if not st.session_state.logged_in:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # TOMBOL SIGN IN
-        if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
-            if user_input == "admin" and pass_input == "surabaya123":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Kredensial Salah!")
+        # Bungkus pake form biar bisa ENTER otomatis
+        with st.form("login_form", clear_on_submit=False):
+            user_input = st.text_input("Username", key="input_user", placeholder="Username")
+            pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Tombol login di dalam form jadi 'form_submit_button'
+            submit_button = st.form_submit_button("SIGN IN TO SYSTEM", use_container_width=True)
+            
+            if submit_button:
+                if user_input == "admin" and pass_input == "surabaya123":
+                    st.session_state.logged_in = True
+                    st.rerun()
+                else:
+                    st.error("Username/Password Salah!")
         
         # Tutup Container Card
         st.markdown('</div>', unsafe_allow_html=True)
