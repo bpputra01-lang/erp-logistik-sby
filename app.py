@@ -17,8 +17,9 @@ if 'logged_in' not in st.session_state:
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* 1. KUNCI LAYAR (MATIKAN SCROLL) */
-      html, body, [data-testid="stAppViewContainer"], 
+        /* 1. KUNCI LAYAR (MATIKAN SCROLL) - PERBAIKAN DI SINI */
+        html, body, [data-testid="stAppViewContainer"], 
+        [data-testid="stMainViewContainer"],
         [data-testid="stVerticalBlock"], 
         [data-testid="stVerticalBlockBorderWrapper"],
         .main .block-container {
@@ -40,16 +41,15 @@ if not st.session_state.logged_in:
             background-position: center;
         }
 
-        /* 4. CONTAINER UTAMA LOGIN (DIPERTAHANKAN POSISI TETAP) */
+        /* 4. CONTAINER UTAMA LOGIN - PERBAIKAN POSISI NAIK */
         .main-login-container {
             position: fixed;
-            top: 40%; /* Posisi dinaikkan agar tidak terlalu ke bawah */
+            top: 35%; /* Diubah dari 40% ke 35% agar lebih naik */
             left: 50%;
             transform: translate(-50%, -50%);
             width: 400px;
             z-index: 9999;
             text-align: center;
-        
         }
 
         .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
@@ -103,7 +103,7 @@ if not st.session_state.logged_in:
     _, center_col, _ = st.columns([1, 2.5, 1])
     with center_col:
         # Spacer untuk menyesuaikan posisi input di dalam card
-        st.markdown('<div style="height: 195px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height: 150px;"></div>', unsafe_allow_html=True)
         user = st.text_input("Username", key="u_login")
         password = st.text_input("Password", type="password", key="p_login")
         
@@ -391,7 +391,7 @@ if menu == "Dashboard Overview":
     with c1: pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
     with c2: zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
     dash_links = {"WORKING REPORT": "864743695", "PERSONAL PERFORMANCE": "251294539", "CYCLE COUNT DAN KERAPIHAN": "1743896821", "DASHBOARD MOVING STOCK": "1671817510"}
-    st.markdown(f'''<div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"><div style="width: 100%; height: 600px; overflow: hidden;"><iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links[pilih]}&single=true&rm=minimal" style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe></div></div>''', unsafe_allow_html=True)
+    st.markdown(f'''<div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"><div style="width: 100%; height: 600px; overflow: auto;"><iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links[pilih]}&single=true&rm=minimal" style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe></div></div>''', unsafe_allow_html=True)
 
 elif menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
