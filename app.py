@@ -942,37 +942,38 @@ elif menu == "Compare RTO":
                 disabled=["SKU", "QTY SCAN", "SKU_FINAL", "TOTAL_QTY_APPSHEET", "SELISIH", "NOTE"]
             )
      # --- PASTIKAN BARIS INI SEJAJAR DENGAN IF SEBELUMNYA ---
+   # --- LOGIKA REFRESH SAKTI (VBA STYLE) ---
         if st.button("🔄 REFRESH & SYNC DATA DROP", use_container_width=True):
-            if st.session_state.data_ds is not None and st.session_state.data_app is not None:
+            if st.session_state.hasil_ds_vs_app is not None:
                 try:
-                    # 1. Ambil data asli dari memori
-                    df_ds = st.session_state.data_ds.copy()
-                    df_app = st.session_state.data_app.copy()
+                    # 1. Ambil hasil compare terakhir (yang ada selisihnya)
+                    df_current = st.session_state.hasil_ds_vs_app.copy()
                     
-                    # 2. Hitung kondisi saat ini menggunakan engine
-                    res = engine_ds_rto_ultrafast(df_ds, df_app)
+                    # 2. UPDATE: Paksa QTY SCAN jadi sama dengan QTY APPSHEET
+                    # Ini buat ngelepas selisih secara otomatis
+                    df_current['QTY SCAN'] = df_current['TOTAL_QTY_APPSHEET']
                     
-                    # 3. UPDATE: Paksa angka Fisik (DS) jadi sama dengan System (Appsheet)
-                    updated_ds = res.copy()
-                    updated_ds['QTY SCAN'] = updated_ds['TOTAL_QTY_APPSHEET']
+                    # 3. HAPUS ROW: Buang yang Qty-nya 0 sesuai request lo
+                    # Jadi data drop lo cuma sisa barang yang emang ada di Appsheet
+                    df_updated = df_current[df_current['TOTAL_QTY_APPSHEET'] > 0].copy()
                     
-                    # 4. FILTER: Buang baris yang Qty-nya 0 (Hapus row sesuai request lo)
-                    df_final_ds = updated_ds[updated_ds['TOTAL_QTY_APPSHEET'] > 0].copy()
+                    # 4. SINKRONKAN DATA FISIK (DS)
+                    # Kita balikin kolomnya ke format asli DS (SKU & QTY SCAN)
+                    st.session_state.data_ds = df_updated[['SKU', 'QTY SCAN']].copy()
                     
-                    # 5. SIMPAN KEMBALI KE SESSION STATE
-                    st.session_state.data_ds = df_final_ds
-                    
-                    # Jalankan ulang engine biar Note-nya jadi 'SESUAI' semua
-                    hasil_final = engine_ds_rto_ultrafast(df_final_ds, df_app)
+                    # 5. RE-CALCULATE: Hitung ulang pake engine biar Note-nya jadi 'SESUAI'
+                    hasil_final = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
                     st.session_state.hasil_ds_vs_app = hasil_final
                     
                     # 6. BUKA GEMBOK STEP 2
                     st.session_state.step_cleared = True
-                    st.success("✅ REFRESH BERHASIL: Data Drop sinkron & Baris 0 dibuang!")
+                    st.success("✅ DATA DROP UPDATED: Selisih disinkronkan & baris 0 dihapus!")
                     st.rerun()
                     
                 except Exception as e:
-                    st.error(f"Gagal Sync: {e}")
+                    st.error(f"Gagal Sync, Cok! Error: {e}")
+            else:
+                st.error("Jalankan Proses Awal dulu biar datanya muncul!")
     st.divider()
 
     # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
