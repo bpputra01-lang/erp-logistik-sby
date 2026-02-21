@@ -77,14 +77,7 @@ if not st.session_state.logged_in:
                 else:
                     st.error("Login Gagal")
     st.stop() # WAJIB DI SINI
-    
 
-# SIDEBAR
-with st.sidebar:
-    st.title("NAVIGASI")
-    if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.rerun()
 
 # ISI DASHBOARD
 st.markdown('<div class="hero-header"><h1>DATABASE MASTER CHECKER</h1></div>', unsafe_allow_html=True)
