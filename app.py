@@ -216,6 +216,60 @@ import math
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
+def engine_ds_rto_ultrafast(df_ds, df_app):
+    # 1. CLEANING KOLOM (Biar nggak sensitif spasi/huruf besar-kecil)
+    df_ds.columns = df_ds.columns.str.strip().str.upper()
+    df_app.columns = df_app.columns.str.strip().str.upper()
+
+    # 2. STANDARISASI DATA SKU & STATUS
+    df_ds['SKU'] = df_ds['SKU'].astype(str).str.strip().str.upper()
+    
+    # Ambil SKU dari Kolom I (index 8) atau O (index 14) sesuai logika macro lo
+    # Kita pake iloc biar aman kalau nama kolom di Appsheet agak berantakan
+    s9 = df_app.iloc[:, 8].astype(str).str.strip().str.upper().replace(['NAN', '', 'NONE'], np.nan)
+    s15 = df_app.iloc[:, 14].astype(str).str.strip().str.upper().replace(['NAN', '', 'NONE'], np.nan)
+    df_app['SKU_FINAL'] = s9.fillna(s15)
+
+    # 3. FILTER STATUS (DONE / KURANG AMBIL)
+    # Ambil kolom status di index 1 (Kolom B)
+    allowed_status = ['DONE', 'KURANG AMBIL']
+    mask_status = df_app.iloc[:, 1].astype(str).str.upper().str.strip().isin(allowed_status)
+    df_app_filtered = df_app[mask_status].copy()
+
+    # 4. HITUNG TOTAL QTY (M + Q)
+    # Index 12 (Kolom M) dan Index 16 (Kolom Q)
+    qty_m = pd.to_numeric(df_app_filtered.iloc[:, 12], errors='coerce').fillna(0)
+    qty_q = pd.to_numeric(df_app_filtered.iloc[:, 16], errors='coerce').fillna(0)
+    df_app_filtered['TOTAL_QTY_APPSHEET'] = qty_m + qty_q
+
+    # Aggregasi per SKU
+    qty_summary = df_app_filtered.groupby('SKU_FINAL')['TOTAL_QTY_APPSHEET'].sum().reset_index()
+
+    # 5. MERGE (VLOOKUP)
+    # Pastiin di df_ds ada kolom 'QTY SCAN'
+    result = pd.merge(df_ds, qty_summary, left_on='SKU', right_on='SKU_FINAL', how='left')
+    
+    # Isi data yang gak ketemu (NaN) dengan 0
+    result['TOTAL_QTY_APPSHEET'] = result['TOTAL_QTY_APPSHEET'].fillna(0)
+
+    # 6. LOGIKA NOTE & SELISIH
+    # Kita tambahin kolom SELISIH buat ringkasan rekonsiliasi nanti
+    result['SELISIH'] = result['QTY SCAN'] - result['TOTAL_QTY_APPSHEET']
+
+    conditions = [
+        (result['SELISIH'] > 0),
+        (result['SELISIH'] < 0),
+        (result['SELISIH'] == 0)
+    ]
+    choices = ['KELEBIHAN SCAN (DS > APP)', 'KURANG SCAN (DS < APP)', 'SESUAI']
+    result['NOTE'] = np.select(conditions, choices, default='TIDAK ADA DATA')
+
+    # Tambahin kolom kosong buat rekonsiliasi manual di Streamlit
+    result['KETERANGAN REKON'] = ""
+
+    return result
+
+
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Bersihkan nama kolom (buang spasi)
     df_all_data.columns = df_all_data.columns.str.strip().upper()
