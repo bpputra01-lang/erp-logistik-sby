@@ -121,7 +121,7 @@ else:
         </div>
     """, unsafe_allow_html=True)
     
-    st.success("Berhasil Login! Silakan kelola data.")A
+    st.success("Berhasil Login! Silakan kelola data.")
     
 
 import pandas as pd
