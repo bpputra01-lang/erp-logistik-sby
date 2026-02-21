@@ -214,6 +214,111 @@ import pandas as pd
 import numpy as np
 import math
 
+# --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
+
+def process_refill_overstock(df_all_data, df_stock_tracking):
+    # Bersihkan nama kolom (buang spasi)
+    df_all_data.columns = df_all_data.columns.str.strip().upper()
+    df_stock_tracking.columns = df_stock_tracking.columns.str.strip().upper()
+
+    # Mapping Kolom agar tidak hardcoded index (Cegah Error Indeks)
+    # Sesuaikan "LOCATION" atau "BIN" sesuai header file lo
+    col_bin = 'LOCATION' if 'LOCATION' in df_all_data.columns else 'BIN'
+    col_sku = 'SKU'
+    col_qty = 'QTY' if 'QTY' in df_all_data.columns else 'QUANTITY' 
+    # Note: Jika di file Jezpro namanya 'QTY SYSTEM', sesuaikan di atas.
+
+    # 1. FILTER GL3 & GL4
+    # GL3: Ada kata "GL3" tapi GAK ADA kata "LIVE"
+    df_gl3 = df_all_data[
+        (df_all_data[col_bin].str.contains("GL3", na=False, case=False)) & 
+        (~df_all_data[col_bin].str.contains("LIVE", na=False, case=False))
+    ].copy()
+
+    # GL4: Ada kata "GL4" tapi GAK ADA kata terlarang
+    forbidden_gl4 = ["DEFECT", "REJECT", "ONLINE", "RAK"]
+    regex_forbidden = '|'.join(forbidden_gl4)
+    df_gl4 = df_all_data[
+        (df_all_data[col_bin].str.contains("GL4", na=False, case=False)) & 
+        (~df_all_data[col_bin].str.contains(regex_forbidden, na=False, case=False))
+    ].copy()
+
+    # 2. FILTER STOCK TRACKING (Cek Transaksi DC)
+    # VBA: Col A no "INV" and Col G has "DC"
+    # Kita asumsikan Col A itu indeks 0, Col G indeks 6
+    st_val = df_stock_tracking.values
+    st_filtered_list = []
+    for row in st_val:
+        col_a = str(row[0]).upper()
+        col_g = str(row[6]).upper()
+        if "INV" not in col_a and "DC" in col_g:
+            st_filtered_list.append(row)
+    
+    df_st_filtered = pd.DataFrame(st_filtered_list, columns=df_stock_tracking.columns)
+
+    # 3. LOGIC REFILL
+    dict_gl3_qty = df_gl3.groupby(col_sku)[col_qty].sum().to_dict()
+    
+    # Ambil SKU yang qty-nya < 3 di GL3 atau 0
+    refill_skus = [sku for sku, q in dict_gl3_qty.items() if q < 3]
+    # Tambahkan SKU yang ada di GL4 tapi ga ada di GL3
+    sku_gl4_only = set(df_gl4[col_sku].unique()) - set(dict_gl3_qty.keys())
+    refill_skus.extend(list(sku_gl4_only))
+
+    refill_output = []
+    for sku in refill_skus:
+        q_gl3_val = dict_gl3_qty.get(sku, 0)
+        sisa_load = 12
+        
+        # Cari barangnya di GL4 untuk ditarik ke GL3
+        df_source = df_gl4[df_gl4[col_sku] == sku]
+        for _, row in df_source.iterrows():
+            # Tambahan Filter ANTI-LIVE di sumber pengambilan
+            if "LIVE" in str(row[col_bin]).upper():
+                continue
+                
+            q_bin = row[col_qty]
+            if q_bin > 0 and sisa_load > 0:
+                take = min(q_bin, sisa_load)
+                refill_output.append([
+                    row[col_bin], sku, row.get('BRAND', '-'), 
+                    row.get('ITEM NAME', row.get('NAME', '-')), 
+                    row.get('VARIANT', '-'), q_bin, take, q_gl3_val
+                ])
+                sisa_load -= take
+                if sisa_load <= 0: break
+
+    # 4. LOGIC OVERSTOCK
+    dict_trans = df_st_filtered.groupby(col_sku).size().to_dict() # Hitung frekuensi transaksi
+    overstock_output = []
+    
+    for _, row in df_gl3.iterrows():
+        # Tambahan Filter ANTI-RAK
+        if "RAK" in str(row[col_bin]).upper():
+            continue
+            
+        sku = row[col_sku]
+        qty_sys = row[col_qty]
+        
+        if qty_sys > 24:
+            load_os = qty_sys - 24
+            # Jika transaksi tinggi (>=7), ambil dikit aja (sepertiganya)
+            if dict_trans.get(sku, 0) >= 7:
+                load_os = math.ceil(load_os / 3)
+            
+            if load_os > 0:
+                overstock_output.append([
+                    row[col_bin], sku, row.get('BRAND', '-'), 
+                    row.get('ITEM NAME', row.get('NAME', '-')), 
+                    row.get('VARIANT', '-'), qty_sys, load_os
+                ])
+
+    # Convert ke DataFrame
+    res_refill = pd.DataFrame(refill_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN", "LOAD", "QTY GL3"])
+    res_over = pd.DataFrame(overstock_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN", "LOAD"])
+
+    return df_gl3, df_gl4, res_refill, res_over
+    
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
     df_gl3 = pd.DataFrame()
