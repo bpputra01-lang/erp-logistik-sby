@@ -1,132 +1,140 @@
 import pandas as pd
 import numpy as np
-import math
-import io
 import streamlit as st
 import plotly.express as px
-from python_calamine import CalamineWorkbook
 
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# --- KUNCI PINTU UTAMA ---
+# 2. INISIALISASI SESSION STATE
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: BELUM LOGIN (TAMPILAN LOGIN SAJA)
+# KONDISI 1: TAMPILAN LOGIN (ZERO BOX POLICY)
 # ==========================================
 if not st.session_state.logged_in:
-    # CSS KHUSUS LOGIN - SIDEBAR DIHAPUS DARI LAYAR
     st.markdown("""
         <style>
-        [data-testid="stSidebar"] { display: none !important; } /* Sidebar Hilang Total */
-        header { display: none !important; } /* Hilangkan Header Streamlit */
-        .stApp { background-color: #1a2634; } /* Background Gelap */
+        /* 1. HAPUS SEMUA SAMPAH VISUAL STREAMLIT */
+        [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
         
-        .login-card {
-            background: #1e1e2f;
-            padding: 3rem;
-            border-radius: 15px;
-            border: 1px solid #C5A059;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            text-align: center;
-            max-width: 450px;
-            margin: 100px auto; /* Kotak di tengah agak ke atas */
-        }
-        .login-title {
-            color: #C5A059;
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 25px;
-            font-family: 'Inter', sans-serif;
-        }
-        /* Style Input */
-        div[data-baseweb="input"] { background-color: #1a2634 !important; border: 1px solid #2d2d44 !important; }
-        input { color: white !important; }
-        label { color: #d1d1d1 !important; }
-        
-        /* Button Login Gold */
-        button[kind="primary"] {
-            background-color: #C5A059 !important;
-            color: #1a2634 !important;
+        /* 2. PEMBASMI BOX BIRU/HITAM MELINTANG (FORCE TRANSPARENT) */
+        .main, .block-container, [data-testid="stVerticalBlock"], 
+        [data-testid="stVerticalBlockBorderWrapper"], .stVerticalBlock {
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
             border: none !important;
-            font-weight: bold !important;
-            width: 100%;
+            padding: 0 !important;
+        }
+
+        /* 3. BACKGROUND GUDANG FULL SCREEN */
+        .stApp {
+            background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            overflow: hidden !important;
+        }
+
+        /* 4. LOGIN CARD - MELAYANG PAS DI TENGAH AGAK ATAS */
+        .login-card {
+            position: fixed;
+            top: 40%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10000;
+            width: 400px;
+            background: rgba(30, 30, 47, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 50px 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(197, 160, 89, 0.5);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+            text-align: center;
+        }
+
+        .login-logo { font-size: 50px; margin-bottom: 10px; }
+        .login-title { color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px; }
+        .login-subtitle { color: #aaaaaa; font-size: 14px; margin-bottom: 30px; }
+
+        /* 5. STYLE INPUT (TULISAN PUTIH & BORDER EMAS) */
+        div[data-baseweb="input"] {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(197, 160, 89, 0.3) !important;
+            border-radius: 10px !important;
+        }
+        input { color: white !important; }
+        label { color: #C5A059 !important; font-weight: 700 !important; text-align: left !important; display: block; }
+
+        /* 6. TOMBOL LOGIN EMAS PERSIS SCREENSHOT */
+        button[kind="primary"] {
+            background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
+            color: #1a2634 !important;
+            font-weight: 800 !important;
+            width: 100% !important;
+            border-radius: 10px !important;
+            padding: 12px !important;
+            margin-top: 20px;
+            border: none !important;
+            box-shadow: 0 4px 15px rgba(197, 160, 89, 0.2) !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # UI LOGIN
+    # RENDER CARD
     st.markdown('<div class="login-card">', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">🚚 ERP LOGISTIC SYSTEM</div>', unsafe_allow_html=True)
-    
-    u = st.text_input("Username", key="u_field")
-    p = st.text_input("Password", type="password", key="p_field")
+    st.markdown('<div class="login-logo">📦</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">ERP LOGISTIC</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-subtitle">Silakan login untuk mengakses sistem.</div>', unsafe_allow_html=True)
+
+    user = st.text_input("Username", key="u_login")
+    password = st.text_input("Password", type="password", key="p_login")
     
     if st.button("ENTER SYSTEM", type="primary"):
-        if u == "admin" and p == "surabaya123":
+        if user == "admin" and password == "surabaya123":
             st.session_state.logged_in = True
             st.rerun()
         else:
-            st.error("Access Denied!")
+            st.error("Credential Gagal!")
+
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # --- KUNCI UTAMA: STOP DI SINI AGAR DASHBOARD DI BAWAH TIDAK JALAN ---
     st.stop()
 
 # ==========================================
-# KONDISI 2: SUDAH LOGIN (DASHBOARD MUNCUL)
+# KONDISI 2: DASHBOARD (ADMINITY UI)
 # ==========================================
 else:
-    # SEMUA CSS ASLI LO TARUH DI SINI
     st.markdown("""
         <style>
-        /* CSS ASLI LO YANG SUDAH SESUAI */
-        .block-container { padding-top: 3.5rem !important; }
+        .block-container { padding-top: 1rem !important; }
+        [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
         [data-testid="stSidebarNav"] { display: none; } 
-        .stApp { background-color: #f4f7f6; }
-        [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; display: block !important; }
+        .stApp { background-color: #f4f7f6; background-image: none !important; }
+        [data-testid="stSidebar"] { background-color: #1e1e2f !important; display: block !important; }
         
         .sidebar-title { 
             color: #00d2ff; text-align: center; font-weight: 800; font-size: 20px; 
             margin-top: -45px; padding-bottom: 15px; border-bottom: 1px solid #2d2d44;
         }
-
         .hero-header { 
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-            color: white !important; padding: 8px 18px !important; 
-            border-radius: 8px; display: inline-block;
+            background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
+            color: white !important; padding: 1.5rem; border-radius: 12px; margin-bottom: 25px; 
         }
-        .hero-header h1 { color: white !important; font-size: 20px !important; margin: 0; }
-
-        /* Box & Input styling tetap putih */
-        div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important; border: 1px solid #C5A059 !important;
-        }
-        div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
-            color: white !important; -webkit-text-fill-color: white !important;
-        }
+        .hero-header h1 { color: white !important; margin: 0; }
         </style>
     """, unsafe_allow_html=True)
 
-    # SIDEBAR & MENU
     with st.sidebar:
         st.markdown('<div class="sidebar-title">🚚 ERP LOGISTIC</div>', unsafe_allow_html=True)
-        # Sisa menu lo...
-        if st.button("LOGOUT"):
+        if st.sidebar.button("LOGOUT"):
             st.session_state.logged_in = False
             st.rerun()
 
-    # CONTENT
-    st.markdown("""
-        <div class="hero-header">
-            <h1>DASHBOARD ANALYTICS ITEM SCAN</h1>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.success("Berhasil Login! Silakan kelola data.")
-    
+    st.markdown('<div class="hero-header"><h1>DASHBOARD OVERVIEW</h1></div>', unsafe_allow_html=True)
+    st.success("Selamat Datang, Admin!")
 
 import pandas as pd
 import numpy as np
