@@ -980,13 +980,48 @@ elif menu == "Compare RTO":
     # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
     st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
     
+    # --- 5. STEP 2: FINAL COMPARE ---
     if st.session_state.step_cleared:
         if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
             if st.session_state.data_draft is not None:
-                st.write("### 🏆 PROSES FINAL MATCHING DRAFT BERJALAN...")
-                # Masukkan fungsi engine compare draft lo di sini
+                # 1. AMBIL DATA TERUPDATE (Hasil Sync Refresh tadi)
+                df_actual = st.session_state.data_ds.copy()
+                df_draft = st.session_state.data_draft.copy()
+
+                # 2. PROSES MATCHING (VLOOKUP STYLE)
+                # Pastikan nama kolom di file Draft lo adalah 'SKU' dan 'QTY'
+                df_draft.columns = df_draft.columns.str.strip().str.upper()
+                
+                summary = pd.merge(
+                    df_actual, 
+                    df_draft, 
+                    on='SKU', 
+                    how='outer', 
+                    suffixes=('_ACTUAL', '_DRAFT')
+                ).fillna(0)
+
+                # Hitung Selisih Akhir antara Actual vs Draft
+                # Sesuaikan 'QTY' dengan nama kolom qty di file Draft RTO lo
+                if 'QTY' in summary.columns:
+                    summary['DIFF_FINAL'] = summary['QTY SCAN'] - summary['QTY']
+                    summary['STATUS'] = summary['DIFF_FINAL'].apply(lambda x: 'MATCH ✅' if x == 0 else 'SELISIH ❌')
+
+                # 3. TAMPILKAN TABEL SUMMARY (INI YANG LO CARI)
+                st.success("🏆 PROSES FINAL MATCHING BERHASIL!")
+                st.dataframe(summary, use_container_width=True)
+
+                # 4. TOMBOL DOWNLOAD (INI JUGA YANG LO CARI)
+                csv = summary.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 DOWNLOAD HASIL SUMMARY (CSV)",
+                    data=csv,
+                    file_name="Summary_RTO_Final.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
                 st.balloons()
             else:
-                st.error("File Draft (File 3) belum ada!")
+                st.error("Woy, File Draft RTO (File 3) belum lo upload!")
     else:
         st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 sampai semua status 'SESUAI'.")
