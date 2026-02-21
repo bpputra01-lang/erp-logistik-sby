@@ -368,33 +368,35 @@ with st.sidebar:
 # --- TOMBOL LOGOUT ELEGAN (Taruh di paling bawah) ---
 
 with st.sidebar:
-    # CSS khusus untuk mempercantik tombol logout agar tidak kontras norak
+    # Jarak tipis dari menu terakhir
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+    
+    # CSS khusus Logout Elegan
     st.markdown("""
         <style>
-        /* Styling tombol logout agar menyatu dengan sidebar gelap */
-        div.stButton > button:first-child {
-            background-color: transparent !important;
+        /* Target tombol logout spesifik agar tidak kontras */
+        div.stButton > button {
+            background-color: rgba(255, 255, 255, 0.05) !important;
             color: #d1d1d1 !important;
             border: 1px solid #2d2d44 !important;
             border-radius: 8px !important;
-            transition: all 0.3s ease;
+            padding: 0.5rem 1rem !important;
+            transition: all 0.3s ease !important;
             font-size: 14px !important;
-            font-weight: 500 !important;
-            margin-top: -100px; /* Jarak dari menu atas */
+            width: 100% !important;
         }
         
-        /* Efek hover pas mouse di atas tombol */
-        div.stButton > button:first-child:hover {
+        /* Hover effect: Soft Red */
+        div.stButton > button:hover {
             border-color: #ff4b4b !important;
             color: #ff4b4b !important;
-            background-color: rgba(255, 75, 75, 0.05) !important;
+            background-color: rgba(255, 75, 75, 0.1) !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Menaruh tombol di paling bawah sidebar
-    st.markdown("---") # Garis pemisah tipis
-    if st.button("Logout Session", use_container_width=True):
+    if st.button("Logout Session"):
         st.session_state.logged_in = False
         st.rerun()
 
