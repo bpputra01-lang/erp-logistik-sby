@@ -3,7 +3,6 @@ import numpy as np
 import streamlit as st
 import io
 import math
-import streamlit as st
 
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
@@ -13,60 +12,51 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (CSS HANYA DI SINI)
+# KONDISI 1: TAMPILAN LOGIN (CSS KHUSUS LOGIN)
 # ==========================================
 if not st.session_state.logged_in:
-    # CSS ini HANYA akan jalan pas belum login
     st.markdown("""
         <style>
-        /* CSS Login lu yang kemarin di sini... */
-        html, body, [data-testid="stAppViewContainer"] { 
-            overflow: hidden !important; 
+        /* CSS KHUSUS LOGIN - BIAR GAK BOCOR KE DASHBOARD */
+        html, body, [data-testid="stAppViewContainer"], 
+        [data-testid="stMainViewContainer"], .main, .block-container {
+            overflow: hidden !important;
+            height: 100vh !important;
+            position: fixed !important;
+            width: 100% !important;
         }
-        [data-testid="stSidebar"], header { display: none !important; }
-        
-        /* WARNA JUDUL (LABEL) - KUNCI BIAR GAK ITEM */
-        label { 
-            color: #FFFFFF !important; 
-            font-weight: 700 !important; 
-        }
-        </style>
-    """, unsafe_allow_html=True)
 
-        /* 2. BACKGROUND */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover; background-position: center;
         }
+        
+        /* SEMBUNYIKAN SIDEBAR PAS LOGIN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
 
-        /* 3. SULAP CONTAINER JADI KARTU LOGIN */
+        /* KARTU LOGIN */
         [data-testid="stVerticalBlockBorderWrapper"] {
             background: rgba(30, 30, 47, 0.98) !important;
             padding: 30px !important;
             border-radius: 15px !important;
             border: 1px solid rgba(197, 160, 89, 0.5) !important;
             box-shadow: 0 25px 50px rgba(0,0,0,0.9) !important;
-            max-width: 420px !important; /* Lebar kartu */
+            max-width: 420px !important;
             margin: 0 auto !important;
-            margin-top: 15vh !important; /* Posisi naik ke atas */
+            margin-top: 15vh !important;
         }
-        /* 1. JUDUL (LABEL) USERNAME & PASSWORD BALIK PUTIH/EMAS */
-        label { 
-            color: #FFFFFF !important; /* Ganti jadi #C5A059 kalau mau tetep Emas */
-         }
 
-        /* STYLE INPUT: Perbaikan agar Password & Username Full */
+        label { color: #FFFFFF !important; font-weight: 700 !important; }
+
         div[data-baseweb="input"] { 
-            background-color: #FFFFFF !important; /* Paksa background putih solid agar teks hitam terlihat jelas */
+            background-color: #FFFFFF !important; 
             border: 1px solid rgba(197, 160, 89, 0.3) !important; 
             border-radius: 50px !important; 
-            overflow: hidden !important; /* Memastikan background putih mengikuti bentuk lengkungan */
-            padding-right: 10px !important; /* Memberi ruang untuk tombol mata password */
+            overflow: hidden !important;
+            padding-right: 10px !important;
         }
 
-        /* Memastikan input field-nya sendiri transparan agar mengikuti background putih di atas */
         input { 
             color: #000000 !important; 
             -webkit-text-fill-color: #000000 !important; 
@@ -74,12 +64,8 @@ if not st.session_state.logged_in:
             border: none !important;
         }
 
-        /* Khusus untuk tombol mata password agar tetap terlihat dan rapi */
-        button[aria-label="Show password"] {
-            background-color: transparent !important;
-            color: #1a2634 !important;
-        }
-        /* TOMBOL */
+        button[aria-label="Show password"] { color: #1a2634 !important; }
+
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important; font-weight: 800 !important; 
@@ -96,10 +82,9 @@ if not st.session_state.logged_in:
         </style>
     """, unsafe_allow_html=True)
 
-    # RENDER FORM
+    # RENDER FORM LOGIN
     _, center_col, _ = st.columns([1, 1, 1])
     with center_col:
-        # Container ini yang disulap jadi kartu via CSS di atas
         with st.container(border=True):
             st.markdown("""
                 <div class="login-header">
@@ -110,10 +95,8 @@ if not st.session_state.logged_in:
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-            
             user = st.text_input("Username", key="u_login")
             password = st.text_input("Password", type="password", key="p_login")
-            
             if st.button("ENTER SYSTEM", type="primary"):
                 if user == "logsby" and password == "surabaya123":
                     st.session_state.logged_in = True
@@ -123,13 +106,70 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# KONTEN SETELAH LOGIN (TAMPILAN UTAMA)
+# KONDISI 2: DASHBOARD (CSS BEFORE LU)
 # ==========================================
-st.sidebar.title("Navigasi")
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.rerun()
+# CSS ini baru akan aktif setelah Login Berhasil
+st.markdown("""
+    <style>
+    /* 1. BALIKIN JARAK DASHBOARD */
+    .block-container { 
+        padding-top: 3.5rem !important; 
+        padding-bottom: 0rem !important;
+        max-width: 100% !important;
+        position: relative !important; /* Hapus Fixed pasca login */
+        height: auto !important;
+        overflow: auto !important;
+    }
+    html, body { overflow: auto !important; height: auto !important; position: relative !important; }
 
+    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+    [data-testid="stSidebarNav"] { display: none; } 
+    
+    /* 2. STYLE SIDEBAR */
+    .sidebar-title { 
+        color: #00d2ff; text-align: center; font-family: 'Inter', sans-serif;
+        font-weight: 800; font-size: 20px; margin-top: -45px; 
+        padding-bottom: 15px; border-bottom: 1px solid #2d2d44; margin-bottom: 10px;
+    }
+    .stApp { background-color: #f4f7f6; }
+    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; display: block !important; }
+    header { display: flex !important; } /* Balikin Header */
+
+    /* 3. HERO HEADER DASHBOARD */
+    .hero-header { 
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+        color: white !important; padding: 8px 18px !important;
+        border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        margin-bottom: 25px !important; display: inline-block; width: auto;
+    }
+    .hero-header h1 { color: white !important; font-size: 20px !important; font-weight: 800 !important; margin: 0 !important; }
+
+    /* Metric Box */
+    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
+    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
+    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
+
+    /* Input Box Dashboard */
+    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
+        background-color: #1a2634 !important; border: 1px solid #C5A059 !important; border-radius: 8px !important;
+    }
+    /* RESET WARNA TEKS DASHBOARD BIAR GAK ITEM KAYAK LOGIN */
+    div[data-testid="stSelectbox"] * { color: white !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# SIDEBAR CONTENT
+with st.sidebar:
+    st.markdown('<div class="sidebar-title">ERP LOGISTIC</div>', unsafe_allow_html=True)
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.rerun()
+
+# HERO HEADER
+st.markdown('<div class="hero-header"><h1>DATABASE MASTER CHECKER</h1></div>', unsafe_allow_html=True)
+
+# DASHBOARD CONTENT LU...
+st.write("welcome!")
 
 
 import pandas as pd
