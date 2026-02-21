@@ -80,7 +80,7 @@ if not st.session_state.logged_in:
                         <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
                     </div>
                 </div>
-                <div style="height: 10px;"></div>
+                <div style="height: 0px;"></div>
             </div>
         </div>
     """, unsafe_allow_html=True)
