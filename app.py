@@ -7,61 +7,49 @@ import math
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
+# FIX: Inisialisasi harus dilakukan SEBELUM dipanggil oleh logika apapun
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (FIXED & TOTAL NO SCROLL)
+# KONDISI 1: TAMPILAN LOGIN (FIXED & NO SCROLL)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* 1. KUNCI TOTAL SEMUA LAYER DARI ATAS SAMPAI BAWAH */
-        html, body, [data-testid="stAppViewContainer"], 
-        [data-testid="stMainViewContainer"],
-        .main, .block-container, .stApp {
+        /* 1. KUNCI LAYAR (MATIKAN SCROLL) */
+      html, body, [data-testid="stAppViewContainer"], 
+        [data-testid="stVerticalBlock"], 
+        [data-testid="stVerticalBlockBorderWrapper"],
+        .main .block-container {
             overflow: hidden !important;
             height: 100vh !important;
             max-height: 100vh !important;
             margin: 0 !important;
             padding: 0 !important;
         }
-
-        /* Hapus scrollbar untuk Chrome/Safari/Edge */
-        ::-webkit-scrollbar {
-            display: none !important;
-        }
-
+        
         /* 2. SEMBUNYIKAN ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
         
         /* 3. BACKGROUND FULL SCREEN */
         .stApp {
-            background: linear-gradient(rgba(10, 10, 20, 0.85), rgba(10, 10, 20, 0.85)), 
+            background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover; 
             background-position: center;
         }
 
-        /* 4. CONTAINER UTAMA LOGIN - POSISI NAIK (TOP: 35%) */
+        /* 4. CONTAINER UTAMA LOGIN (DIPERTAHANKAN POSISI TETAP) */
         .main-login-container {
             position: fixed;
-            top: 35%; 
+            top: 40%; /* Posisi dinaikkan agar tidak terlalu ke bawah */
             left: 50%;
             transform: translate(-50%, -50%);
             width: 400px;
             z-index: 9999;
             text-align: center;
-        }
-
-        /* 5. CARD VISUAL */
-        .login-card {
-            background: rgba(30, 30, 47, 0.98);
-            backdrop-filter: blur(20px);
-            padding: 30px;
-            border-radius: 15px;
-            border: 1px solid rgba(197, 160, 89, 0.5);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.9);
+        
         }
 
         .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
@@ -70,15 +58,16 @@ if not st.session_state.logged_in:
         .header-title { color: #C5A059; font-size: 18px; font-weight: 800; line-height: 1.1; }
         .header-subtitle { color: #aaaaaa; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* 6. STYLE INPUT & TOMBOL */
+        /* 6. STYLE INPUT STREAMLIT */
         div[data-baseweb="input"] { 
             background-color: rgba(255, 255, 255, 0.05) !important; 
             border: 1px solid rgba(197, 160, 89, 0.3) !important; 
             border-radius: 8px !important; 
         }
         input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; text-align: left !important; }
+        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; text-align: left !important; display: block !important;}
 
+        /* 7. TOMBOL LOGIN */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important; font-weight: 800 !important; width: 100% !important;
@@ -86,16 +75,15 @@ if not st.session_state.logged_in:
             height: 45px;
         }
 
-        /* HILANGKAN EXTRA SPACE DARI STREAMLIT */
+        /* MATIKAN BOX BIRU/ABU STREAMLIT */
         [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] {
             background-color: transparent !important;
             border: none !important;
-            gap: 0 !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # RENDER VISUAL CARD
+    # RENDER VISUAL CARD & FORM
     st.markdown("""
         <div class="main-login-container">
             <div class="login-card">
@@ -106,15 +94,16 @@ if not st.session_state.logged_in:
                         <div class="header-subtitle">Secure System Access</div>
                     </div>
                 </div>
-                <div style="height: 180px;"></div> </div>
+                <div id="input-placeholder" style="height: 180px;"></div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # POSISI INPUT (Dinaikkan manual pakai columns dan margin negatif)
+    # FORM LOGIN (Diletakkan di atas placeholder dengan columns)
     _, center_col, _ = st.columns([1, 2.5, 1])
     with center_col:
-        # Menarik input ke atas agar masuk ke dalam card yang di-fixed
-        st.markdown('<div style="margin-top: -38vh;"></div>', unsafe_allow_html=True)
+        # Spacer untuk menyesuaikan posisi input di dalam card
+        st.markdown('<div style="height: 195px;"></div>', unsafe_allow_html=True)
         user = st.text_input("Username", key="u_login")
         password = st.text_input("Password", type="password", key="p_login")
         
