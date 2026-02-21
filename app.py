@@ -180,7 +180,7 @@ div.stFormSubmitButton > button {
             if submit_button:
                 if user_input == "admin" and pass_input == "surabaya123":
                     st.session_state.logged_in = True
-                    st.toast("Berhasil Login! Selamat datang kembali.", icon="🔓")
+                    st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
                     st.rerun()
                 else:
                     st.error("Username atau Password salah!")
@@ -189,12 +189,18 @@ div.stFormSubmitButton > button {
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.stop()
+st.stop()
+
 # --- DASHBOARD UTAMA (Jalan setelah login) ---
 
 # Cek apakah notifikasi sudah pernah muncul
 if 'login_success' not in st.session_state:
-    st.toast("Berhasil Login! Selamat datang di dashboard.", icon="🔓")
-    # Set True supaya pas klik menu lain di dashboard, pop-up gak muncul terus-terusan
+    # Bikin placeholder biar notifikasinya bisa ilang sendiri
+    msg_container = st.empty()
+    with msg_container:
+        st.success("✅Berhasil Login! Selamat datang di dashboard Surabaya Logistics.")
+    
+    # Set penanda biar gak muncul lagi
     st.session_state.login_success = True
 
 
