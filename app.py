@@ -1053,8 +1053,8 @@ elif menu == "Compare RTO":
     st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
     
     if st.session_state.step_cleared:
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True, key="btn_final_compare"):
-            if st.session_state.data_draft is not None:
+        if st.button("🚀 PROSES VALIDASI AWAL", use_container_width=True, key="btn_proses_awal"):
+        if file_ds is not None and file_app is not None:
                 df_actual = st.session_state.data_ds.copy()
                 df_draft = st.session_state.data_draft.copy()
                 df_draft.columns = df_draft.columns.str.strip().str.upper()
