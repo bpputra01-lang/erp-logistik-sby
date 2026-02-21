@@ -125,7 +125,7 @@ if not st.session_state.logged_in:
             <h2 style="
                 color: #C5A059; 
                 margin-top: -30px; 
-                margin-bottom: -15px; 
+                margin-bottom: -30px; 
                 font-family: 'Inter', sans-serif; 
                 font-weight: 800; 
                 letter-spacing: 1px;
