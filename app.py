@@ -111,45 +111,44 @@ if not st.session_state.logged_in:
 }
         </style>
     """, unsafe_allow_html=True)
-
 # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
-        # Semua di dalam sini harus menjorok (indent) secara konsisten
+        # 1. Buka Container Card
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
         
-     # JUDUL (Dibuat lebih rapet ke bawah)
-    st.markdown("""
-        <h2 style="
-            color: #C5A059; 
-            margin-bottom: -15px; 
-            font-family: 'Inter', sans-serif; 
-            font-weight: 800; 
-            letter-spacing: 1px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            text-align: center;
-        ">📦 LOGISTIC SURABAYA ERP</h2>
-    """, unsafe_allow_html=True)
+        # 2. JUDUL (Menjorok sejajar)
+        st.markdown("""
+            <h2 style="
+                color: #C5A059; 
+                margin-bottom: -15px; 
+                font-family: 'Inter', sans-serif; 
+                font-weight: 800; 
+                letter-spacing: 1px;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                text-align: center;
+            ">📦 LOGISTIC SURABAYA ERP</h2>
+        """, unsafe_allow_html=True)
 
-    # SUB-JUDUL (Warna dipertajam ke Silver-White biar kelihatan)
-    st.markdown("""
-        <p style="
-            color: #E0E0E0; 
-            font-size: 14px; 
-            font-weight: 500; 
-            letter-spacing: 0.8px;
-            margin-bottom: 25px;
-            text-align: center;
-        ">Surabaya Logistics Management System</p>
-    """, unsafe_allow_html=True)
+        # 3. SUB-JUDUL (Menjorok sejajar)
+        st.markdown("""
+            <p style="
+                color: #E0E0E0; 
+                font-size: 14px; 
+                font-weight: 500; 
+                letter-spacing: 0.8px;
+                margin-bottom: 25px;
+                text-align: center;
+            ">Surabaya Logistics Management System</p>
+        """, unsafe_allow_html=True)
 
-        # INPUT (Cukup tulis sekali di sini)
+        # 4. INPUT (Menjorok sejajar)
         user_input = st.text_input("Username", key="input_user", placeholder="Username")
         pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # TOMBOL SIGN IN (Cukup sekali di sini)
+        # 5. TOMBOL (Menjorok sejajar)
         if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
             if user_input == "admin" and pass_input == "surabaya123":
                 st.session_state.logged_in = True
@@ -157,10 +156,10 @@ if not st.session_state.logged_in:
             else:
                 st.error("Kredensial Salah!")
         
-        # Menutup div login-card
+        # 6. Tutup Container Card
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # PAKSA BERHENTI DI SINI (Keluar dari blok 'with', sejajar dengan 'if not st.session_state.logged_in')
+    # 7. STOP (Sejajar dengan kolom/with di luar)
     st.stop()
 # --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
