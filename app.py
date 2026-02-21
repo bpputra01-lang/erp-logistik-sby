@@ -981,99 +981,101 @@ elif menu == "Compare RTO":
         st.divider()
 
     # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
+    # --- 3. STEP 1: COMPARE SCAN VS APPSHEET ---
+    st.subheader("🟢 STEP 1: VALIDASI SCAN VS APPSHEET")
+    
+    # Tombol Proses Awal (Ganti key biar gak bentrok)
+    if st.button("🚀 PROSES VALIDASI AWAL", use_container_width=True, key="btn_proses_awal"):
+        if file_ds is not None and file_app is not None:
+            try:
+                st.session_state.data_ds = smart_read(file_ds)
+                st.session_state.data_app = smart_read(file_app)
+                if file_draft is not None:
+                    st.session_state.data_draft = smart_read(file_draft)
+
+                hasil = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
+                st.session_state.hasil_ds_vs_app = hasil
+                
+                mismatch = hasil[hasil['NOTE'] != 'SESUAI']
+                st.session_state.step_cleared = (len(mismatch) == 0)
+                
+                if st.session_state.step_cleared:
+                    st.success("✅ DATA SINKRON! Lanjut Step 2.")
+                else:
+                    st.error(f"❌ Ada {len(mismatch)} SKU Selisih!")
+            except Exception as e:
+                st.error(f"Gagal, Cok! {e}")
+        else:
+            st.error("File 1 & 2 belum ada!")
+
+    # --- 4. AREA REKONSILIASI ---
+    if st.session_state.hasil_ds_vs_app is not None:
+        df_res = st.session_state.hasil_ds_vs_app
+        df_mismatch = df_res[df_res['NOTE'] != 'SESUAI'].copy()
+        
+        if len(df_mismatch) > 0:
+            st.divider()
+            st.subheader(f"⚠️ DAFTAR SELISIH ({len(df_mismatch)} SKU)")
+            if 'KETERANGAN' not in df_mismatch.columns:
+                df_mismatch['KETERANGAN'] = ""
+
+            st.data_editor(
+                df_mismatch,
+                use_container_width=True,
+                key="editor_rekon_live",
+                hide_index=True,
+                disabled=["SKU", "QTY SCAN", "SKU_FINAL", "TOTAL_QTY_APPSHEET", "SELISIH", "NOTE"]
+            )
+
+            # --- REFRESH LOGIKA VBA (SINKRONISASI) ---
+            if st.button("🔄 REFRESH & SYNC DATA (VBA LOGIC)", use_container_width=True, key="btn_refresh_vba"):
+                try:
+                    # Jalankan engine VBA logic
+                    df_ds_hasil, _ = engine_vba_style(st.session_state.data_ds, st.session_state.data_app)
+                    
+                    # Update & Hapus yang 0
+                    df_sync = df_ds_hasil.copy()
+                    df_sync['QTY SCAN'] = df_sync['QTY AMBIL']
+                    df_updated = df_sync[df_sync['QTY AMBIL'] > 0].copy()
+                    
+                    # Simpan ke memori
+                    st.session_state.data_ds = df_updated[['SKU', 'QTY SCAN']].copy()
+                    df_updated['NOTE'] = 'SESUAI'
+                    st.session_state.hasil_ds_vs_app = df_updated
+                    st.session_state.step_cleared = True
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Gagal Sync: {e}")
+
+    st.divider()
+
+    # --- 5. STEP 2: COMPARE DRAFT RTO ---
     st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
     
-    # --- 5. STEP 2: FINAL COMPARE ---
     if st.session_state.step_cleared:
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
+        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True, key="btn_final_compare"):
             if st.session_state.data_draft is not None:
-                # 1. AMBIL DATA TERUPDATE (Hasil Sync Refresh tadi)
                 df_actual = st.session_state.data_ds.copy()
                 df_draft = st.session_state.data_draft.copy()
-
-                # 2. PROSES MATCHING (VLOOKUP STYLE)
-                # Pastikan nama kolom di file Draft lo adalah 'SKU' dan 'QTY'
                 df_draft.columns = df_draft.columns.str.strip().str.upper()
                 
-                summary = pd.merge(
-                    df_actual, 
-                    df_draft, 
-                    on='SKU', 
-                    how='outer', 
-                    suffixes=('_ACTUAL', '_DRAFT')
-                ).fillna(0)
+                # Merge Data
+                summary = pd.merge(df_actual, df_draft, on='SKU', how='outer', suffixes=('_ACT', '_DFT')).fillna(0)
 
-                # Hitung Selisih Akhir antara Actual vs Draft
-                # Sesuaikan 'QTY' dengan nama kolom qty di file Draft RTO lo
-                if 'QTY' in summary.columns:
-                    summary['DIFF_FINAL'] = summary['QTY SCAN'] - summary['QTY']
+                # Logika Selisih Draft
+                qty_col = 'QTY' if 'QTY' in summary.columns else (summary.columns[2] if len(summary.columns) > 2 else None)
+                if qty_col:
+                    summary['DIFF_FINAL'] = summary['QTY SCAN'] - summary[qty_col]
                     summary['STATUS'] = summary['DIFF_FINAL'].apply(lambda x: 'MATCH ✅' if x == 0 else 'SELISIH ❌')
 
-                # 3. TAMPILKAN TABEL SUMMARY (INI YANG LO CARI)
-                st.success("🏆 PROSES FINAL MATCHING BERHASIL!")
+                st.success("🏆 MATCHING BERHASIL!")
                 st.dataframe(summary, use_container_width=True)
 
-                # 4. TOMBOL DOWNLOAD (INI JUGA YANG LO CARI)
+                # Tombol Download
                 csv = summary.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 DOWNLOAD HASIL SUMMARY (CSV)",
-                    data=csv,
-                    file_name="Summary_RTO_Final.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-                
+                st.download_button("📥 DOWNLOAD HASIL (CSV)", csv, "Summary_RTO.csv", "text/csv", use_container_width=True)
                 st.balloons()
             else:
-                st.error("Woy, File Draft RTO (File 3) belum lo upload!")
+                st.error("File Draft (File 3) belum diupload!")
     else:
-        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 sampai semua status 'SESUAI'.")
-
-    # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
-    st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
-    
-    # --- 5. STEP 2: FINAL COMPARE ---
-    if st.session_state.step_cleared:
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
-            if st.session_state.data_draft is not None:
-                # 1. AMBIL DATA TERUPDATE (Hasil Sync Refresh tadi)
-                df_actual = st.session_state.data_ds.copy()
-                df_draft = st.session_state.data_draft.copy()
-
-                # 2. PROSES MATCHING (VLOOKUP STYLE)
-                # Pastikan nama kolom di file Draft lo adalah 'SKU' dan 'QTY'
-                df_draft.columns = df_draft.columns.str.strip().str.upper()
-                
-                summary = pd.merge(
-                    df_actual, 
-                    df_draft, 
-                    on='SKU', 
-                    how='outer', 
-                    suffixes=('_ACTUAL', '_DRAFT')
-                ).fillna(0)
-
-                # Hitung Selisih Akhir antara Actual vs Draft
-                # Sesuaikan 'QTY' dengan nama kolom qty di file Draft RTO lo
-                if 'QTY' in summary.columns:
-                    summary['DIFF_FINAL'] = summary['QTY SCAN'] - summary['QTY']
-                    summary['STATUS'] = summary['DIFF_FINAL'].apply(lambda x: 'MATCH ✅' if x == 0 else 'SELISIH ❌')
-
-                # 3. TAMPILKAN TABEL SUMMARY (INI YANG LO CARI)
-                st.success("🏆 PROSES FINAL MATCHING BERHASIL!")
-                st.dataframe(summary, use_container_width=True)
-
-                # 4. TOMBOL DOWNLOAD (INI JUGA YANG LO CARI)
-                csv = summary.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 DOWNLOAD HASIL SUMMARY (CSV)",
-                    data=csv,
-                    file_name="Summary_RTO_Final.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-                
-                st.balloons()
-            else:
-                st.error("Woy, File Draft RTO (File 3) belum lo upload!")
-    else:
-        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 sampai semua status 'SESUAI'.")
+        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 (Refresh) sampai SESUAI semua.")
