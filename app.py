@@ -128,7 +128,7 @@ else:
             st.rerun()
 
     st.title("DASHBOARD ANALYTICS")
-    st.success("Selamat datang di sistem.")A
+    st.success("Selamat datang di sistem.")
 
 import pandas as pd
 import numpy as np
