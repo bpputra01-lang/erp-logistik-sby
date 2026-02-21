@@ -817,9 +817,9 @@ elif menu == "Compare RTO":
         st.header("Proses DS RTO vs Appsheet")
         col1, col2 = st.columns(2)
         with col1:
-            file_ds = st.file_uploader("Upload DS RTO (Excel)", type=['xlsx'], key="ds_rto")
+            file_ds = st.file_uploader("Upload DS RTO (Excel)", type=['xlsx', 'csv'], key="ds_rto")
         with col2:
-            file_app = st.file_uploader("Upload Appsheet RTO (Excel)", type=['xlsx'], key="app_rto_1")
+            file_app = st.file_uploader("Upload Appsheet RTO (Excel)", type=['xlsx', 'csv'], key="app_rto_1")
 
         if st.button("🚀 RUN ENGINE DS RTO"):
             if file_ds and file_app:
