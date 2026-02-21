@@ -49,9 +49,7 @@ if not st.session_state.logged_in:
         /* 1. JUDUL (LABEL) USERNAME & PASSWORD BALIK PUTIH/EMAS */
         label { 
             color: #FFFFFF !important; /* Ganti jadi #C5A059 kalau mau tetep Emas */
-            font-weight: 700 !important; 
-            margin-bottom: 8px !important;
-            display: block !important;
+         }
 
         /* STYLE INPUT: Perbaikan agar Password & Username Full */
         div[data-baseweb="input"] { 
@@ -100,7 +98,7 @@ if not st.session_state.logged_in:
             st.markdown("""
                 <div class="login-header">
                     <span style="font-size: 28px; vertical-align: middle;">📦</span>
-                    <div style="display: inline-block; vertical-align: middle; margin-left: 50px;">
+                    <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
                         <div style="color: #C5A059; font-size: 18px; font-weight: 800;">ERP LOGISTIC SURABAYA</div>
                         <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
                     </div>
