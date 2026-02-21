@@ -12,13 +12,11 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (TOTAL LOCK & NO ERROR)
+# KONDISI 1: TAMPILAN LOGIN
 # ==========================================
 if not st.session_state.logged_in:
-    # 1. CSS UNTUK KUNCI SCROLL DAN FIX POSISI
     st.markdown("""
         <style>
-        /* MATIKAN SCROLL TOTAL */
         html, body, [data-testid="stAppViewContainer"], 
         [data-testid="stMainViewContainer"], .main, .block-container {
             overflow: hidden !important;
@@ -26,18 +24,12 @@ if not st.session_state.logged_in:
             position: fixed !important;
             width: 100% !important;
         }
-
-        /* SEMBUNYIKAN ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
-        
-        /* BACKGROUND */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover; background-position: center;
         }
-
-        /* CARD LOGIN POSITIONING */
         [data-testid="stVerticalBlockBorderWrapper"] {
             background: rgba(30, 30, 47, 0.98) !important;
             padding: 30px !important;
@@ -46,10 +38,8 @@ if not st.session_state.logged_in:
             box-shadow: 0 25px 50px rgba(0,0,0,0.9) !important;
             max-width: 400px !important;
             margin: 0 auto !important;
-            margin-top: 15vh !important; /* Menaikkan posisi ke atas */
+            margin-top: 15vh !important;
         }
-
-        /* STYLE INPUT & LABEL */
         div[data-baseweb="input"] { 
             background-color: rgba(255, 255, 255, 0.05) !important; 
             border: 1px solid rgba(197, 160, 89, 0.3) !important; 
@@ -57,15 +47,11 @@ if not st.session_state.logged_in:
         }
         input { color: white !important; }
         label { color: #C5A059 !important; font-weight: 700 !important; }
-
-        /* TOMBOL */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important; font-weight: 800 !important; width: 100% !important;
             border-radius: 8px !important; border: none !important; height: 45px;
         }
-
-        /* HEADER TEXT DI DALAM CARD */
         .login-header {
             text-align: left;
             border-bottom: 1px solid rgba(197, 160, 89, 0.2);
@@ -75,12 +61,9 @@ if not st.session_state.logged_in:
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. FORM LOGIN (DIBUNGKUS DALAM CONTAINER AGAR OTOMATIS JADI CARD)
     _, center_col, _ = st.columns([1, 1, 1])
-    
     with center_col:
         with st.container(border=True):
-            # Header manual di dalam container
             st.markdown("""
                 <div class="login-header">
                     <span style="font-size: 28px; vertical-align: middle;">📦</span>
@@ -90,32 +73,27 @@ if not st.session_state.logged_in:
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-            
             user = st.text_input("Username", key="u_login")
             password = st.text_input("Password", type="password", key="p_login")
-            
             if st.button("ENTER SYSTEM", type="primary"):
                 if user == "admin" and password == "surabaya123":
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
                     st.error("Credential Gagal!")
-    
     st.stop()
 
 # ==========================================
-# KONTEN SETELAH LOGIN (TAMPILAN UTAMA)
+# KONTEN SETELAH LOGIN (DASHBOARD)
 # ==========================================
-st.title("Selamat Datang di Dashboard ERP")
-st.write("Berhasil login!")
-# ==========================================
-# DASHBOARD
-# ==========================================
-else:
-    st.success("Berhasil Masuk!")
-    if st.sidebar.button("LOGOUT"):
-        st.session_state.logged_in = False
-        st.rerun()
+st.sidebar.success(f"Logged in as: Admin")
+if st.sidebar.button("LOGOUT"):
+    st.session_state.logged_in = False
+    st.rerun()
+
+st.title(" Selamat Datang di Dashboard ERP")
+st.info("Sistem siap digunakan.")
+
 
 import pandas as pd
 import numpy as np
