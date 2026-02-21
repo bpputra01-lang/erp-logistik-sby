@@ -75,12 +75,12 @@ if not st.session_state.logged_in:
     st.markdown("""
                 <div class="header-container">
                     <span style="font-size: 28px;">📦</span>
-                    <div style="display: inline-block; vertical-align: top; margin-left: 10px;">
+                    <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
                         <div class="header-title">ERP LOGISTIC</div>
                         <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
                     </div>
                 </div>
-                <div style="height: 0px;"></div>
+                <div style="height: 10px;"></div>
             </div>
         </div>
     """, unsafe_allow_html=True)
