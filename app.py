@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
+import io
+import math
 
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
@@ -9,44 +11,67 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (NO ERROR VERSION)
+# KONDISI 1: TAMPILAN LOGIN (BOX BIRU KILLED)
 # ==========================================
 if not st.session_state.logged_in:
-    # SEMUA CSS DIGABUNG DISINI
     st.markdown("""
         <style>
+        /* 1. SEMBUNYIKAN ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
+        
+        /* 2. MATIKAN CONTAINER UTAMA */
         .main .block-container { background: transparent !important; padding: 0 !important; }
+        
+        /* 3. BACKGROUND FULL SCREEN */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover; background-position: center; background-attachment: fixed;
         }
-        /* CARD WRAPPER */
+
+        /* 4. PEMBANTAI BOX BIRU/ABU DI TENGAH */
+        [data-testid="stVerticalBlockBorderWrapper"], 
+        [data-testid="stVerticalBlock"],
+        [data-testid="stHorizontalBlock"],
+        div[data-testid="stExpander"] {
+            border: none !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+        }
+
+        /* 5. LOGIN CARD */
         .login-card {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%);
             width: 380px; background: rgba(30, 30, 47, 0.98); backdrop-filter: blur(20px);
             padding: 30px; border-radius: 15px; border: 1px solid rgba(197, 160, 89, 0.5);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.9); z-index: 1000;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9); z-index: 9999;
         }
-        /* LOGO & JUDUL DI ATAS USERNAME */
+
+        /* HEADER DALAM CARD (Logo & Title) */
         .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
         .header-logo { font-size: 28px; display: inline-block; vertical-align: middle; }
         .header-text { display: inline-block; vertical-align: middle; margin-left: 10px; }
         .header-title { color: #C5A059; font-size: 18px; font-weight: 800; line-height: 1.1; }
-        .header-subtitle { color: #aaaaaa; font-size: 10px; text-transform: uppercase; }
-        
-        /* INPUT STYLE */
+        .header-subtitle { color: #aaaaaa; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* 6. STYLE INPUT */
         div[data-baseweb="input"] { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(197, 160, 89, 0.3) !important; border-radius: 8px !important; }
         input { color: white !important; }
         label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; }
+
+        /* 7. TOMBOL LOGIN */
+        button[kind="primary"] {
+            background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
+            color: #1a2634 !important; font-weight: 800 !important; width: 100% !important;
+            border-radius: 8px !important; margin-top: 10px; border: none !important;
+        }
         
-        /* PEMBASMI BOX BIRU MELINTANG */
-        [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] { border: none !important; background: transparent !important; }
+        /* 8. POSISI INPUT BIAR PRESISI DI DALAM CARD */
+        .stTextInput { margin-top: -10px; }
         </style>
     """, unsafe_allow_html=True)
 
-    # RENDER HEADER DI DALAM DIV AGAR TIDAK ADA ERROR SYNTAX
+    # RENDER VISUAL CARD
     st.markdown("""
         <div class="login-card">
             <div class="header-container">
@@ -59,23 +84,22 @@ if not st.session_state.logged_in:
         </div>
     """, unsafe_allow_html=True)
 
-    # INPUT & BUTTON (Ditaruh di bawah Markdown tapi secara visual akan masuk ke card karena CSS Fixed)
-    # Kita pakai container terpisah biar editor nggak bingung tag HTML
-    with st.container():
-        # Buat kolom buat nengahin input biar presisi di atas card
-        _, col, _ = st.columns([1, 2, 1])
-        with col:
-            # Gunakan st.empty atau spacer kalau perlu, tapi dengan CSS fixed di atas harusnya aman
-            user = st.text_input("Username", key="u_login")
-            password = st.text_input("Password", type="password", key="p_login")
-            
-            if st.button("ENTER SYSTEM", type="primary", use_container_width=True):
-                if user == "admin" and password == "surabaya123":
-                    st.session_state.logged_in = True
-                    st.rerun()
-                else:
-                    st.error("Gagal!")
-    st.stop()
+    # FORM LOGIN (Pake columns biar layout block birunya pecah/hilang)
+    _, center_col, _ = st.columns([1, 2, 1])
+    with center_col:
+        # Pake container kosong buat narik input ke posisi card (Fixed Position)
+        # Input Python akan render di atas visual card tadi
+        st.markdown('<div style="height: 220px;"></div>', unsafe_allow_html=True) # Spacer
+        user = st.text_input("Username", key="u_login")
+        password = st.text_input("Password", type="password", key="p_login")
+        
+        if st.button("ENTER SYSTEM", type="primary"):
+            if user == "admin" and password == "surabaya123":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Credential Gagal!")
+    st.stop()a
 
 # ==========================================
 # DASHBOARD
