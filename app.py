@@ -358,7 +358,14 @@ with st.sidebar:
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
-        # --- TOMBOL LOGOUT (Taruh di sidebar dashboard lu) ---
+        
+
+    </style>
+    <div class="elegant-header">
+        🚚 ERP LOGISTIC<br>SURABAYA
+    </div>
+""", unsafe_allow_html=True)
+# --- TOMBOL LOGOUT (Taruh di sidebar dashboard lu) ---
 
 with st.sidebar:
     # Lu udah punya judul sidebar di CSS lu (.sidebar-title), 
@@ -370,13 +377,6 @@ with st.sidebar:
         st.rerun()
 
 # --- LANJUTKAN KONTEN DASHBOARD LU DI BAWAH ---
-        
-
-    </style>
-    <div class="elegant-header">
-        🚚 ERP LOGISTIC<br>SURABAYA
-    </div>
-""", unsafe_allow_html=True)
     
     # Inisialisasi session state agar menu tersinkron
     if 'main_menu' not in st.session_state:
