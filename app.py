@@ -47,19 +47,28 @@ if not st.session_state.logged_in:
             margin-top: 15vh !important; /* Posisi naik ke atas */
         }
 
-        /* STYLE INPUT */
+        /* STYLE INPUT: Perbaikan agar Password & Username Full */
         div[data-baseweb="input"] { 
-            background-color: rgba(255, 255, 255, 0.05) !important; 
+            background-color: #FFFFFF !important; /* Paksa background putih solid agar teks hitam terlihat jelas */
             border: 1px solid rgba(197, 160, 89, 0.3) !important; 
             border-radius: 50px !important; 
+            overflow: hidden !important; /* Memastikan background putih mengikuti bentuk lengkungan */
+            padding-right: 10px !important; /* Memberi ruang untuk tombol mata password */
         }
-        /* Warna teks saat mengetik username & password jadi hitam */
-input { 
-    color: #000000 !important; 
-    -webkit-text-fill-color: #000000 !important; 
-}
-        label { color: #C5A059 !important; font-weight: 700 !important; }
 
+        /* Memastikan input field-nya sendiri transparan agar mengikuti background putih di atas */
+        input { 
+            color: #000000 !important; 
+            -webkit-text-fill-color: #000000 !important; 
+            background-color: transparent !important;
+            border: none !important;
+        }
+
+        /* Khusus untuk tombol mata password agar tetap terlihat dan rapi */
+        button[aria-label="Show password"] {
+            background-color: transparent !important;
+            color: #1a2634 !important;
+        }
         /* TOMBOL */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
