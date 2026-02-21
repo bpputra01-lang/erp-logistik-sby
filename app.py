@@ -99,7 +99,7 @@ if not st.session_state.logged_in:
                 st.rerun()
             else:
                 st.error("Credential Gagal!")
-    st.stop()a
+    st.stop()
 
 # ==========================================
 # DASHBOARD
