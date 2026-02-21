@@ -807,15 +807,30 @@ elif menu == "Stock Minus":
                     st.success("✅ Berhasil diproses!"); st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="HASIL_STOCK_MINUS.xlsx")
         except Exception as e: st.error(f"Error: {e}")
 
-        elif menu == "RTO Engine":  # INI MENU BARU LO
+elif menu == "RTO Engine":  # Pastikan elif ini sejajar dengan if di atas
     st.title("📦 SURABAYA LOGISTICS ENGINE")
     
     tab1, tab2 = st.tabs(["Update DS RTO", "Compare Jezpro"])
     
     with tab1:
         st.header("Proses DS RTO vs Appsheet")
-        # Taruh code upload file_ds & file_app di sini sesuai draft lo tadi
-        
+        col1, col2 = st.columns(2)
+        with col1:
+            file_ds = st.file_uploader("Upload DS RTO", type=['xlsx'], key="ds_rto")
+        with col2:
+            file_app = st.file_uploader("Upload Appsheet", type=['xlsx'], key="app_rto")
+
+        if st.button("RUN ENGINE RTO"):
+            if file_ds and file_app:
+                # Panggil fungsi engine lo di sini
+                df_ds = pd.read_excel(file_ds)
+                df_app = pd.read_excel(file_app)
+                hasil = engine_ds_rto_ultrafast(df_ds, df_app)
+                st.success("Jancok Selesai!")
+                st.dataframe(hasil)
+            else:
+                st.error("Filenya mana, Cok?")
+
     with tab2:
         st.header("Compare Draft Jezpro")
-        # Taruh code jezpro lo di sini
+        # ... isi logika jezpro ...
