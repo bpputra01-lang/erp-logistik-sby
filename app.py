@@ -115,9 +115,28 @@ if not st.session_state.logged_in:
     # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #C5A059; margin-bottom: 0;">📦 LOGISTIC SURABAYA ERP </h2>', unsafe_allow_html=True)
-        st.markdown('<p style="color: white; font-size: 13px;">Surabaya Logistics System</p>', unsafe_allow_html=True)
+st.markdown("""
+    <h2 style="
+        color: #C5A059; 
+        margin-bottom: 0; 
+        font-family: 'Inter', sans-serif; 
+        font-weight: 800; 
+        letter-spacing: 1px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    ">📦 LOGISTIC SURABAYA ERP</h2>
+""", unsafe_allow_html=True)
+
+# SUB-JUDUL: Pake warna abu-abu terang (Muted White) biar gak terlalu kontras norak
+st.markdown("""
+    <p style="
+        color: #A0A0A0; 
+        font-size: 14px; 
+        font-weight: 400; 
+        letter-spacing: 0.5px;
+        margin-top: 5px;
+        margin-bottom: 30px;
+    ">Surabaya Logistics Management System</p>
+""", unsafe_allow_html=True)
         
         user_input = st.text_input("Username", key="input_user")
         pass_input = st.text_input("Password", type="password", key="input_pass")
