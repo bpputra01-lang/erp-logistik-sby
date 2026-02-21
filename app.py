@@ -119,27 +119,26 @@ if not st.session_state.logged_in:
             border-radius: 10px !important;
             color: white !important;
         }
+/* TEMBAK MATI BIAR GAK PUTIH LAGI */
+button[data-testid="stFormSubmitButton"] {
+    background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+    color: white !important; /* Warna tulisan di dalam tombol */
+    border: 1px solid rgba(197, 160, 89, 0.5) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+}
 
-        /* Tombol Sign In Elegan Modern */
-        button[data-testid="stFormSubmitButton"] {
-            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
-            color: white !important;
-            border: none !important;
-            padding: 12px 0 !important;
-            font-weight: 700 !important;
-            letter-spacing: 1px !important;
-            border-radius: 10px !important;
-            width: 100% !important;
-            transition: all 0.3s ease !important;
-            box-shadow: 0 4px 15px rgba(197, 160, 89, 0.3) !important;
-            margin-top: 10px !important;
-        }
+/* Pastikan pas di-hover (disentuh mouse) warnanya gak balik putih */
+button[data-testid="stFormSubmitButton"]:hover {
+    background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
+    color: #1e1e2f !important; /* Tulisan jadi gelap pas di-hover biar kontras */
+    border: 1px solid #C5A059 !important;
+}
 
-        /* Efek Hover Tombol */
-        button[data-testid="stFormSubmitButton"]:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 6px 20px rgba(197, 160, 89, 0.5) !important;
-            filter: brightness(1.1);
+/* Hilangkan border biru bawaan Streamlit saat diklik */
+button[data-testid="stFormSubmitButton"]:focus:not(:active) {
+    border-color: #C5A059 !important;
+    color: white !important;
+}
         }
         </style>
     """, unsafe_allow_html=True)
@@ -181,6 +180,7 @@ if not st.session_state.logged_in:
             st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
             
             submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
+            
             
             if submit_button:
                 if user_input == "admin" and pass_input == "surabaya123":
