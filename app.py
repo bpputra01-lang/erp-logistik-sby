@@ -220,58 +220,58 @@ import math
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
-def engine_ds_rto_ultrafast(df_ds, df_app):
-    # 1. CLEANING KOLOM (Biar nggak sensitif spasi/huruf besar-kecil)
-    df_ds.columns = df_ds.columns.str.strip().str.upper()
-    df_app.columns = df_app.columns.str.strip().str.upper()
+import pandas as pd
+import numpy as np
+import io
 
-    # 2. STANDARISASI DATA SKU & STATUS
+def engine_rto_complete(df_ds, df_app, df_draft):
+    # 1. CLEANING HEADERS & DATA
+    for df in [df_ds, df_app, df_draft]:
+        df.columns = df.columns.str.strip().str.upper()
+
+    # 2. STANDARISASI SKU
     df_ds['SKU'] = df_ds['SKU'].astype(str).str.strip().str.upper()
+    df_draft['SKU'] = df_draft['SKU'].astype(str).str.strip().str.upper()
     
-    # Ambil SKU dari Kolom I (index 8) atau O (index 14) sesuai logika macro lo
-    # Kita pake iloc biar aman kalau nama kolom di Appsheet agak berantakan
+    # Ambil SKU Appsheet (Kolom I atau O)
     s9 = df_app.iloc[:, 8].astype(str).str.strip().str.upper().replace(['NAN', '', 'NONE'], np.nan)
     s15 = df_app.iloc[:, 14].astype(str).str.strip().str.upper().replace(['NAN', '', 'NONE'], np.nan)
     df_app['SKU_FINAL'] = s9.fillna(s15)
 
-    # 3. FILTER STATUS (DONE / KURANG AMBIL)
-    # Ambil kolom status di index 1 (Kolom B)
+    # 3. FILTER APPSHEET (DONE / KURANG AMBIL) & SUM QTY
     allowed_status = ['DONE', 'KURANG AMBIL']
-    mask_status = df_app.iloc[:, 1].astype(str).str.upper().str.strip().isin(allowed_status)
-    df_app_filtered = df_app[mask_status].copy()
-
-    # 4. HITUNG TOTAL QTY (M + Q)
-    # Index 12 (Kolom M) dan Index 16 (Kolom Q)
-    qty_m = pd.to_numeric(df_app_filtered.iloc[:, 12], errors='coerce').fillna(0)
-    qty_q = pd.to_numeric(df_app_filtered.iloc[:, 16], errors='coerce').fillna(0)
-    df_app_filtered['TOTAL_QTY_APPSHEET'] = qty_m + qty_q
-
-    # Aggregasi per SKU
-    qty_summary = df_app_filtered.groupby('SKU_FINAL')['TOTAL_QTY_APPSHEET'].sum().reset_index()
-
-    # 5. MERGE (VLOOKUP)
-    # Pastiin di df_ds ada kolom 'QTY SCAN'
-    result = pd.merge(df_ds, qty_summary, left_on='SKU', right_on='SKU_FINAL', how='left')
+    mask = df_app.iloc[:, 1].astype(str).str.upper().str.strip().isin(allowed_status)
+    df_app_filt = df_app[mask].copy()
     
-    # Isi data yang gak ketemu (NaN) dengan 0
-    result['TOTAL_QTY_APPSHEET'] = result['TOTAL_QTY_APPSHEET'].fillna(0)
+    # Qty Appsheet (M + Q)
+    qty_m = pd.to_numeric(df_app_filt.iloc[:, 12], errors='coerce').fillna(0)
+    qty_q = pd.to_numeric(df_app_filt.iloc[:, 16], errors='coerce').fillna(0)
+    df_app_filt['TOTAL_APP'] = qty_m + qty_q
+    
+    app_summary = df_app_filt.groupby('SKU_FINAL')['TOTAL_APP'].sum().reset_index()
 
-    # 6. LOGIKA NOTE & SELISIH
-    # Kita tambahin kolom SELISIH buat ringkasan rekonsiliasi nanti
-    result['SELISIH'] = result['QTY SCAN'] - result['TOTAL_QTY_APPSHEET']
+    # 4. MERGE DRAFT + DS (Biar tau Bin-nya)
+    # Kita asumsikan Draft punya kolom 'SKU' dan 'BIN'
+    combined = pd.merge(df_draft[['SKU', 'BIN']], df_ds[['SKU', 'QTY SCAN']], on='SKU', how='left').fillna(0)
 
+    # 5. MERGE DENGAN APPSHEET
+    final = pd.merge(combined, app_summary, left_on='SKU', right_on='SKU_FINAL', how='left').fillna(0)
+
+    # 6. LOGIKA NOTE
+    final['SELISIH'] = final['QTY SCAN'] - final['TOTAL_APP']
+    
     conditions = [
-        (result['SELISIH'] > 0),
-        (result['SELISIH'] < 0),
-        (result['SELISIH'] == 0)
+        (final['SELISIH'] > 0),
+        (final['SELISIH'] < 0),
+        (final['SELISIH'] == 0)
     ]
-    choices = ['KELEBIHAN SCAN (DS > APP)', 'KURANG SCAN (DS < APP)', 'SESUAI']
-    result['NOTE'] = np.select(conditions, choices, default='TIDAK ADA DATA')
-
-    # Tambahin kolom kosong buat rekonsiliasi manual di Streamlit
-    result['KETERANGAN REKON'] = ""
-
-    return result
+    choices = ['KELEBIHAN SCAN', 'KURANG SCAN', 'SESUAI']
+    final['NOTE'] = np.select(conditions, choices, default='TIDAK ADA DATA')
+    
+    # Tambah kolom Rekon kosongan
+    final['REKONSILIASI'] = "BELUM DICEK"
+    
+    return final[['SKU', 'BIN', 'QTY SCAN', 'TOTAL_APP', 'SELISIH', 'NOTE', 'REKONSILIASI']]
 
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
@@ -867,81 +867,97 @@ elif menu == "Stock Minus":
 
 # --- PASTIKAN NAMA DI SINI SAMA DENGAN DI SIDEBAR ---
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>REKONSILIASI RTO ENGINE</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📦 RTO RECONCILIATION ENGINE</h1></div>', unsafe_allow_html=True)
     
-    # --- 1. SESSION STATE (Biar Data Gak Ilang Pas Refresh) ---
-    if 'data_ds' not in st.session_state: st.session_state.data_ds = None
-    if 'data_app' not in st.session_state: st.session_state.data_app = None
+    # --- 1. SESSION STATE ---
     if 'hasil_final' not in st.session_state: st.session_state.hasil_final = None
+    if 'data_ds' not in st.session_state: st.session_state.data_ds = None
+    if 'data_draft' not in st.session_state: st.session_state.data_draft = None
 
-    # --- 2. PREPARE DATA SOURCE ---
-    c1, c2 = st.columns(2)
+    # --- 2. MULTI-UPLOADER AREA ---
+    st.subheader("🛠️ Step 1: Upload Semua File Source")
+    c1, c2, c3 = st.columns(3)
     with c1:
-        file_ds = st.file_uploader("Upload DS RTO", type=['xlsx'], key="ds")
+        file_ds = st.file_uploader("1. Upload DS RTO", type=['xlsx'], key="ds_u")
     with c2:
-        file_app = st.file_uploader("Master APPSHEET RTO", type=['xlsx'], key="app")
+        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx'], key="app_u")
+    with c3:
+        file_draft = st.file_uploader("3. Draft RTO (Jezpro)", type=['xlsx'], key="draft_u")
 
-    # --- 3. TOMBOL PROSES & REFRESH ---
-    btn_col1, btn_col2 = st.columns(2)
+    st.divider()
+
+    # --- 3. ACTION BUTTONS ---
+    st.subheader("🚀 Step 2: Proses & Sinkronisasi")
+    b1, b2 = st.columns(2)
     
-    with btn_col1:
-        if st.button("🚀 JALANKAN PROSES AWAL", use_container_width=True):
-            if file_ds and file_app:
-                st.session_state.data_ds = pd.read_excel(file_ds)
-                st.session_state.data_app = pd.read_excel(file_app)
-                # Jalankan Engine
-                st.session_state.hasil_final = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
-                st.success("Data Berhasil Diolah!")
+    with b1:
+        if st.button("🔥 RUN FULL PROCESS", use_container_width=True):
+            if file_ds and file_app and file_draft:
+                with st.spinner('Mikir keras...'):
+                    st.session_state.data_ds = pd.read_excel(file_ds)
+                    st.session_state.data_draft = pd.read_excel(file_draft)
+                    df_app_raw = pd.read_excel(file_app)
+                    
+                    # Jalankan Engine
+                    st.session_state.hasil_final = engine_rto_complete(
+                        st.session_state.data_ds, df_app_raw, st.session_state.data_draft
+                    )
+                    st.success("Proses Selesai, Jancok!")
             else:
-                st.error("Upload filenya dulu, Jancok!")
+                st.error("Filenya belum lengkap, Boss!")
 
-    with btn_col2:
-        if st.button("🔄 REFRESH DATA (RE-RUN)", use_container_width=True):
+    with b2:
+        if st.button("🔄 REFRESH APPSHEET ONLY", use_container_width=True):
             if st.session_state.data_ds is not None and file_app:
-                # Update data Appsheet saja (pencarian ulang)
-                st.session_state.data_app = pd.read_excel(file_app)
-                st.session_state.hasil_final = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
-                st.toast("Data Diperbarui!", icon='✅')
+                with st.spinner('Update data Appsheet...'):
+                    df_app_new = pd.read_excel(file_app)
+                    # Re-run engine pake data DS & Draft yang lama di memori
+                    st.session_state.hasil_final = engine_rto_complete(
+                        st.session_state.data_ds, df_app_new, st.session_state.data_draft
+                    )
+                    st.toast("Data Berhasil di-Update!", icon='✅')
             else:
-                st.warning("Belum ada data untuk di-refresh.")
+                st.warning("Jalanin 'Full Process' dulu sekali baru bisa Refresh.")
 
-    # --- 4. RINGKASAN SELISIH (RECONCILIATION AREA) ---
+    # --- 4. RECONCILIATION TABLE (EDITABLE) ---
     if st.session_state.hasil_final is not None:
         df_res = st.session_state.hasil_final
-        
-        # Filter hanya yang SELISIH (Mismatch)
-        df_selisih = df_res[df_res['NOTE'] != 'SESUAI'].copy()
+        # Tampilkan hanya yang selisih
+        df_mismatch = df_res[df_res['NOTE'] != 'SESUAI'].copy()
         
         st.divider()
-        st.subheader(f"⚠️ RINGKASAN SELISIH ({len(df_selisih)} SKU)")
-        
-        # Tampilan Rekonsiliasi (Bisa Diedit Langsung)
-        # st.data_editor bikin tabelnya bisa diketik kayak Excel
-        edited_df = st.data_editor(
-            df_selisih,
+        st.subheader(f"⚠️ Ringkasan Selisih ({len(df_mismatch)} SKU)")
+        st.info("💡 Ketik hasil pengecekan gudang di kolom 'REKONSILIASI'. Data ini bisa diedit langsung.")
+
+        # Fitur Spreadsheet di Browser
+        edited_rekon = st.data_editor(
+            df_mismatch,
+            key="editor_rto_final",
             column_config={
-                "NOTE": st.column_config.TextColumn("Status", disabled=True),
                 "REKONSILIASI": st.column_config.SelectboxColumn(
                     "Tindakan Rekon",
-                    help="Pilih hasil pencarian ulang",
-                    options=["BIN LAIN DITEMUKAN", "BARANG HILANG", "SALAH SCAN", "SUDAH DIBENERIN"],
-                    required=True,
-                )
+                    options=["BARANG NYELIP", "BELUM SCAN OUT", "BARANG HILANG", "SALAH BIN", "SUDAH OK"],
+                    required=True
+                ),
+                "SKU": st.column_config.TextColumn("SKU", disabled=True),
+                "SELISIH": st.column_config.NumberColumn("Selisih", disabled=True),
             },
-            disabled=["SKU", "QTY SCAN", "TOTAL_QTY_AMBIL"],
             hide_index=True,
-            use_container_width=True,
-            key="rekon_editor"
+            use_container_width=True
         )
 
-        # --- 5. DOWNLOAD HASIL REKON ---
-        if st.button("💾 SIMPAN HASIL REKONSILIASI"):
-            # Gabungkan kembali data yang sudah direkon ke data utama
-            st.success("Hasil Rekonsiliasi Tersimpan di Memori!")
-            
+        # --- 5. DOWNLOAD ---
+        if st.button("💾 DOWNLOAD LAPORAN AKHIR"):
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_res.to_excel(writer, index=False, sheet_name='ALL_DATA')
-                edited_df.to_excel(writer, index=False, sheet_name='REKON_ONLY')
+                # Simpan semua data & data yang sudah direkon
+                df_res.to_excel(writer, index=False, sheet_name='SEMUA_DATA')
+                edited_rekon.to_excel(writer, index=False, sheet_name='REKONSILIASI_ONLY')
             
-            st.download_button("📥 DOWNLOAD LAPORAN REKON", output.getvalue(), "Laporan_Rekon_RTO.xlsx", use_container_width=True)
+            st.download_button(
+                label="📥 Klik untuk Download Excel",
+                data=output.getvalue(),
+                file_name=f"REKON_RTO_{pd.Timestamp.now().strftime('%d%m%Y')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
