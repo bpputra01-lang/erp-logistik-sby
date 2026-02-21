@@ -5,8 +5,8 @@ import io
 import math
 
 st.set_page_config(
-    page_title="LogsbyERP.id")
-    page_icon="🚛"
+    page_title="LogsbyERP.id"
+    page_icon="🚛")
   
 st.markdown("""
     <style>
