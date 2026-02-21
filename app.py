@@ -943,6 +943,7 @@ elif menu == "Compare RTO":
             )
      # --- PASTIKAN BARIS INI SEJAJAR DENGAN IF SEBELUMNYA ---
    # --- LOGIKA REFRESH SAKTI (VBA STYLE) ---
+        # --- LOGIKA REFRESH SAKTI (VBA STYLE) ---
         if st.button("🔄 REFRESH & SYNC DATA DROP", use_container_width=True):
             if st.session_state.hasil_ds_vs_app is not None:
                 try:
@@ -973,7 +974,7 @@ elif menu == "Compare RTO":
                 except Exception as e:
                     st.error(f"Gagal Sync, Cok! Error: {e}")
             else:
-                st.error("Jalankan Proses Awal dulu biar datanya muncul!")
+                st.error("Jalankan Proses Awal dulu biar datanya muncul!")    
     st.divider()
 
     # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
