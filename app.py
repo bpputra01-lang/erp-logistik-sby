@@ -373,7 +373,7 @@ with st.sidebar:
         <style>
         /* Hilangkan padding bawaan container tombol agar bisa mepet */
         [data-testid="stVerticalBlock"] > div:has(div.stButton) {
-            margin-top: -35px !important; 
+            margin-top: -10px !important; 
         }
 
         /* Styling tombol logout */
