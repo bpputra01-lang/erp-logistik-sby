@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-import plotly.express as px
 
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
@@ -19,8 +18,7 @@ if not st.session_state.logged_in:
         /* 1. SEMBUNYIKAN SEMUA ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
         
-        /* 2. MATIKAN DISPLAY CONTAINER UTAMA (INI KUNCINYA AGAR BOX BIRU ILANG) */
-        /* Kita buat container utama jadi transparan dan tanpa dimensi agar tidak ngerender box */
+        /* 2. MATIKAN DISPLAY CONTAINER UTAMA */
         .main .block-container {
             background: transparent !important;
             padding: 0 !important;
@@ -28,7 +26,7 @@ if not st.session_state.logged_in:
             max-height: 0 !important;
         }
         
-        /* 3. BACKGROUND GUDANG FULL SCREEN PADA BODY */
+        /* 3. BACKGROUND GUDANG FULL SCREEN */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
@@ -38,31 +36,42 @@ if not st.session_state.logged_in:
             overflow: hidden !important;
         }
 
-        /* 4. LOGIN CARD - POSISI ABSOLUTE & FIXED */
+        /* 4. LOGIN CARD - POSISI FIXED */
         .login-card {
             position: fixed;
-            top: 40%; 
+            top: 45%; 
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 999999;
-            width: 400px;
+            width: 380px;
             background: rgba(30, 30, 47, 0.98) !important;
             backdrop-filter: blur(20px);
-            padding: 40px;
-            border-radius: 20px;
+            padding: 30px;
+            border-radius: 15px;
             border: 1px solid rgba(197, 160, 89, 0.5);
             box-shadow: 0 25px 50px rgba(0,0,0,0.9);
-            text-align: center;
         }
 
-        /* 5. STYLE INPUT (TULISAN PUTIH) */
+        /* HEADER DI DALAM CARD (Logo & Title Kecil di Atas Username) */
+        .header-container {
+            text-align: left;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(197, 160, 89, 0.2);
+            padding-bottom: 15px;
+        }
+        .header-logo { font-size: 30px; margin-bottom: 0px; display: inline-block; vertical-align: middle; }
+        .header-text { display: inline-block; vertical-align: middle; margin-left: 10px; }
+        .header-title { color: #C5A059; font-size: 18px; font-weight: 800; line-height: 1.1; }
+        .header-subtitle { color: #aaaaaa; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* 5. STYLE INPUT */
         div[data-baseweb="input"] {
             background-color: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(197, 160, 89, 0.3) !important;
-            border-radius: 10px !important;
+            border-radius: 8px !important;
         }
-        input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700 !important; text-align: left !important; display: block; }
+        input { color: white !important; padding: 10px !important; }
+        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; text-align: left !important; display: block; margin-bottom: 5px; }
 
         /* 6. TOMBOL LOGIN EMAS */
         button[kind="primary"] {
@@ -70,22 +79,26 @@ if not st.session_state.logged_in:
             color: #1a2634 !important;
             font-weight: 800 !important;
             width: 100% !important;
-            border-radius: 10px !important;
-            padding: 12px !important;
-            margin-top: 20px;
+            border-radius: 8px !important;
+            padding: 10px !important;
+            margin-top: 10px;
             border: none !important;
+            text-transform: uppercase;
         }
         </style>
     """, unsafe_allow_html=True)
 
     # RENDER FORM
-    # Pakai st.container agar elemen Python (input) punya tempat, tapi CSS di atas bikin dia ga keliatan
     with st.container():
         st.markdown(f"""
             <div class="login-card">
-                <div style="font-size: 50px; margin-bottom: 10px;">📦</div>
-                <div style="color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px;">ERP LOGISTIC</div>
-                <div style="color: #aaaaaa; font-size: 14px; margin-bottom: 30px;">Secure System Access</div>
+                <div class="header-container">
+                    <div class="header-logo">📦</div>
+                    <div class="header-text">
+                        <div class="header-title">ERP LOGISTIC</div>
+                        <div class="header-subtitle">Secure System Access</div>
+                    </div>
+                </div>
         """, unsafe_allow_html=True)
 
         user = st.text_input("Username", key="u_login")
@@ -106,18 +119,13 @@ if not st.session_state.logged_in:
 # KONDISI 2: DASHBOARD (ADMINITY UI)
 # ==========================================
 else:
+    # Dashboard code tetap sama
     st.markdown("""
         <style>
         .block-container { padding-top: 1rem !important; max-width: 100% !important; max-height: 100% !important; }
-        [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
         [data-testid="stSidebarNav"] { display: none; } 
         .stApp { background-color: #f4f7f6; background-image: none !important; }
         [data-testid="stSidebar"] { background-color: #1e1e2f !important; display: block !important; }
-        
-        .sidebar-title { 
-            color: #00d2ff; text-align: center; font-weight: 800; font-size: 20px; 
-            margin-top: -45px; padding-bottom: 15px; border-bottom: 1px solid #2d2d44;
-        }
         .hero-header { 
             background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
             color: white !important; padding: 1.5rem; border-radius: 12px; margin-bottom: 25px; 
@@ -127,7 +135,7 @@ else:
     """, unsafe_allow_html=True)
 
     with st.sidebar:
-        st.markdown('<div class="sidebar-title">🚚 ERP LOGISTIC</div>', unsafe_allow_html=True)
+        st.markdown('<h2 style="color:#00d2ff; text-align:center;">🚚 ERP LOGISTIC</h2>', unsafe_allow_html=True)
         if st.sidebar.button("LOGOUT"):
             st.session_state.logged_in = False
             st.rerun()
