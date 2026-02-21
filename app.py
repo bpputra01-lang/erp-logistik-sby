@@ -167,7 +167,7 @@ div.stFormSubmitButton > button {
             ">Surabaya Logistics Management System</p>
         """, unsafe_allow_html=True)
 
-        # BUNGKUS FORM
+       # BUNGKUS FORM
         with st.form("login_form"):
             user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
             pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
@@ -176,10 +176,10 @@ div.stFormSubmitButton > button {
             
             submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
             
-           if submit_button:
+            # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
+            if submit_button:
                 if user_input == "admin" and pass_input == "surabaya123":
                     st.session_state.logged_in = True
-                    # TARUH DI SINI BIAR MUNCUL PAS KLIK
                     st.toast("Berhasil Login! Selamat datang kembali.", icon="🔓")
                     st.rerun()
                 else:
