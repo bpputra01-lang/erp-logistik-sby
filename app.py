@@ -82,77 +82,94 @@ st.markdown("""
     """, unsafe_allow_html=True)
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
 
-# FUNGSI LOGIN (DIPERBAIKI BIAR SINKRON SAMA ESTETIKA DASHBOARD)
-st.markdown("""
+import streamlit as st
+
+# Inisialisasi session state login supaya tidak error
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+# FUNGSI LOGIN (DIPERBAIKI: NO LABEL NANGKRING & WARNA SINKRON)
+if not st.session_state.logged_in:
+    st.markdown("""
         <style>
+        /* 1. Background Gudang */
         .stApp {
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
             background-size: cover !important;
+            background-position: center !important;
         }
-        [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
+        
+        /* 2. Sembunyikan Navigasi */
+        [data-testid="stSidebar"], [data-testid="stHeader"] {
+            display: none !important;
+        }
 
+        /* 3. Kotak Login */
         .login-card {
-            background: #1e1e2f;
+            background: rgba(30, 30, 47, 0.95);
             padding: 40px;
             border-radius: 15px;
-            border: 1px solid #2d2d44;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            border: 1px solid #C5A059;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
             text-align: center;
             max-width: 400px;
             margin: 15vh auto;
         }
 
-        /* HILANGIN LABEL YANG NANGKRING DI ATAS KOTAK */
+        /* 4. HAPUS LABEL NANGKRING (Username/Password teks hitam diatas kotak) */
         div[data-testid="stWidgetLabel"] {
             display: none !important;
         }
 
-        /* STYLE KOTAK INPUT BIAR SAMA KAYAK DASHBOARD LU */
+        /* 5. STYLE INPUT BOX (Warna teks putih, border emas) */
         div[data-baseweb="input"] {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
             border-radius: 8px !important;
             height: 45px;
-            margin-bottom: -10px; /* Biar gak terlalu renggang */
+            margin-bottom: 10px;
         }
         
+        /* Pastikan teks yang diketik warnanya putih, bukan hitam */
         input {
             color: white !important;
             -webkit-text-fill-color: white !important;
-            font-family: 'Inter', sans-serif;
         }
 
-        /* Button SIGN IN */
+        /* Tombol Sign In biar Emas */
         button[kind="primary"] {
             background-color: #C5A059 !important;
             color: #1e1e2f !important;
             border: none !important;
             font-weight: 800 !important;
             height: 45px !important;
-            margin-top: 10px;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # UI Login
+    # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        st.markdown('<h1 style="color: #00d2ff; font-family: \'Inter\'; font-weight: 800; font-size: 24px; margin-bottom: 5px;">ADMINITY PRO</h1>', unsafe_allow_html=True)
-        st.markdown('<p style="color: #d1d1d1; font-size: 12px; margin-bottom: 25px;">Logistics Management System</p>', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #C5A059; margin-bottom: 0;">📦 ADMINITY PRO</h2>', unsafe_allow_html=True)
+        st.markdown('<p style="color: white; font-size: 13px; margin-bottom: 25px;">Surabaya Logistics System</p>', unsafe_allow_html=True)
         
-        # Pake placeholder biar user tau mana username mana password tanpa label nangkring
+        # Pake placeholder biar user tau input apa tanpa perlu label nangkring
         user_input = st.text_input("Username", key="input_user", placeholder="Username")
         pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         
         if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
             if user_input == "admin" and pass_input == "surabaya123":
                 st.session_state.logged_in = True
                 st.rerun()
             else:
-                st.error("Gagal Login!")
+                st.error("Kredensial Salah!")
         st.markdown('</div>', unsafe_allow_html=True)
+
+    st.stop()
 
 # --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
