@@ -21,6 +21,7 @@ if not st.session_state.logged_in:
     st.markdown("""
         <style>
         [data-testid="stSidebar"] { display: none !important; } /* Sidebar Hilang Total */
+        header { display: none !important; } /* Hilangkan Header Streamlit */
         .stApp { background-color: #1a2634; } /* Background Gelap */
         
         .login-card {
@@ -70,6 +71,9 @@ if not st.session_state.logged_in:
         else:
             st.error("Access Denied!")
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    # --- KUNCI UTAMA: STOP DI SINI AGAR DASHBOARD DI BAWAH TIDAK JALAN ---
+    st.stop()
 
 # ==========================================
 # KONDISI 2: SUDAH LOGIN (DASHBOARD MUNCUL)
