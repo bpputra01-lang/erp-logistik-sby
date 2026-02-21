@@ -368,38 +368,36 @@ with st.sidebar:
 # --- TOMBOL LOGOUT ELEGAN (Taruh di paling bawah) ---
 
 with st.sidebar:
-    # Jarak tipis dari menu terakhir
-    st.markdown("<div style='margin-top: -500px;'></div>", unsafe_allow_html=True)
-    
-    # CSS khusus Logout Elegan
+    # CSS khusus biar tombol Logout naik mepet menu
     st.markdown("""
         <style>
-        /* Target tombol logout spesifik agar tidak kontras */
+        /* Hilangkan padding bawaan container tombol agar bisa mepet */
+        [data-testid="stVerticalBlock"] > div:has(div.stButton) {
+            margin-top: -35px !important; 
+        }
+
+        /* Styling tombol logout */
         div.stButton > button {
-            background-color: rgba(255, 255, 255, 0.05) !important;
+            background-color: transparent !important;
             color: #d1d1d1 !important;
             border: 1px solid #2d2d44 !important;
             border-radius: 8px !important;
-            padding: 0.5rem 1rem !important;
             transition: all 0.3s ease !important;
-            font-size: 14px !important;
-            width: 100% !important;
+            font-size: 13px !important;
+            height: 35px !important;
         }
         
-        /* Hover effect: Soft Red */
         div.stButton > button:hover {
             border-color: #ff4b4b !important;
             color: #ff4b4b !important;
             background-color: rgba(255, 75, 75, 0.1) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
         </style>
     """, unsafe_allow_html=True)
 
-    if st.button("Logout Session"):
+    if st.button("Logout Session", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
-
 # --- LANJUTKAN KONTEN DASHBOARD LU DI BAWAH ---
     
     # Inisialisasi session state agar menu tersinkron
