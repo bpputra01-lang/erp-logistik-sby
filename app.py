@@ -4,6 +4,13 @@ import streamlit as st
 import io
 import math
 
+# 1. KONFIGURASI HALAMAN
+st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
+
+# FIX: Inisialisasi harus dilakukan SEBELUM dipanggil oleh logika apapun
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
 # ==========================================
 # KONDISI 1: TAMPILAN LOGIN (FIXED & NO SCROLL)
 # ==========================================
