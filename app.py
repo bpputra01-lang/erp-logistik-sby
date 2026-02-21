@@ -889,26 +889,24 @@ elif menu == "Compare RTO":
 
     st.divider()
 
-   # --- 3. STEP 1: COMPARE SCAN VS APPSHEET ---
-    st.divider()
+    # --- 3. STEP 1: COMPARE SCAN VS APPSHEET ---
     st.subheader("🟢 STEP 1: VALIDASI SCAN VS APPSHEET")
     
-    if st.button("🚀 JALANKAN PROSES VALIDASI AWAL", use_container_width=True, key="btn_validasi_awal"):
+    if st.button("🚀 JALANKAN PROSES AWAL", use_container_width=True):
         if file_ds is not None and file_app is not None:
             try:
-                # Baca data mentah
+                # Proses baca file otomatis
                 st.session_state.data_ds = smart_read(file_ds)
                 st.session_state.data_app = smart_read(file_app)
                 
-                # Simpan draft jika ada
                 if file_draft is not None:
                     st.session_state.data_draft = smart_read(file_draft)
 
-                # Jalankan Engine Utama
+                # Jalankan Engine (Pastiin fungsi ini sudah didefinisikan di atas)
                 hasil = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
                 st.session_state.hasil_ds_vs_app = hasil
                 
-                # Cek Mismatch
+                # Cek apakah ada yang gak SESUAI
                 mismatch = hasil[hasil['NOTE'] != 'SESUAI']
                 if len(mismatch) == 0:
                     st.session_state.step_cleared = True
@@ -917,67 +915,85 @@ elif menu == "Compare RTO":
                     st.session_state.step_cleared = False
                     st.error(f"❌ STOP! Ada {len(mismatch)} SKU Selisih. Cek tabel di bawah!")
             except Exception as e:
-                st.error(f"Gagal Proses, Cok! Error: {e}")
+                st.error(f"Gagal baca file, Cok! Error: {e}")
         else:
-            st.error("Upload dulu File 1 (DS) dan File 2 (Appsheet)!")
+            st.error("Upload dulu File 1 dan File 2, Cok!")
 
-    # --- 4. AREA REKONSILIASI & REFRESH ---
+    # --- 4. AREA REKONSILIASI (MUNCUL JIKA ADA HASIL) ---
+    # --- 4. AREA REKONSILIASI (Pastikan pakai data_editor) ---
     if st.session_state.hasil_ds_vs_app is not None:
         df_res = st.session_state.hasil_ds_vs_app
         df_mismatch = df_res[df_res['NOTE'] != 'SESUAI'].copy()
         
-        # Tampilkan editor jika ada selisih
         if len(df_mismatch) > 0:
-            st.info("👇 Daftar SKU yang selisih. Silahkan cek atau klik Refresh di bawah.")
+            st.divider()
+            st.subheader(f"⚠️ DAFTAR SELISIH ({len(df_mismatch)} SKU)")
+            st.info("👇 KLIK & KETIK LANGSUNG DI KOLOM 'KETERANGAN' UNTUK REKONSILIASI")
+            
+            # Tambahin kolom kosong buat lo ngetik kalau belum ada di engine
             if 'KETERANGAN' not in df_mismatch.columns:
                 df_mismatch['KETERANGAN'] = ""
 
-            st.data_editor(
+            # INI KUNCINYA: Pakai data_editor
+            edited_df = st.data_editor(
                 df_mismatch,
                 use_container_width=True,
                 key="editor_rekon_live",
                 hide_index=True,
+                # Kolom SKU & QTY dikunci biar gak sengaja kehapus, tapi KETERANGAN bisa diisi
                 disabled=["SKU", "QTY SCAN", "SKU_FINAL", "TOTAL_QTY_APPSHEET", "SELISIH", "NOTE"]
             )
-
-            # TOMBOL REFRESH (VBA LOGIC)
-            if st.button("🔄 REFRESH & SYNC DATA (VBA LOGIC)", use_container_width=True, key="btn_refresh_vba_sync"):
+     # --- PASTIKAN BARIS INI SEJAJAR DENGAN IF SEBELUMNYA ---
+   # --- LOGIKA REFRESH SAKTI (VBA STYLE) ---
+        # --- LOGIKA REFRESH SAKTI (VBA STYLE) ---
+        if st.button("🔄 REFRESH & SYNC DATA DROP", use_container_width=True):
+            if st.session_state.hasil_ds_vs_app is not None:
                 try:
-                    # 1. Hitung ulang pakai engine VBA
-                    df_vba, _ = engine_vba_style(st.session_state.data_ds, st.session_state.data_app)
+                    # 1. Ambil hasil compare terakhir (yang ada selisihnya)
+                    df_current = st.session_state.hasil_ds_vs_app.copy()
                     
-                    # 2. Sinkronkan QTY SCAN ke QTY AMBIL (Logic VBA)
-                    df_vba['QTY SCAN'] = df_vba['QTY AMBIL']
+                    # 2. UPDATE: Paksa QTY SCAN jadi sama dengan QTY APPSHEET
+                    # Ini buat ngelepas selisih secara otomatis
+                    df_current['QTY SCAN'] = df_current['TOTAL_QTY_APPSHEET']
                     
-                    # 3. Buang yang nol
-                    df_updated = df_vba[df_vba['QTY AMBIL'] > 0].copy()
+                    # 3. HAPUS ROW: Buang yang Qty-nya 0 sesuai request lo
+                    # Jadi data drop lo cuma sisa barang yang emang ada di Appsheet
+                    df_updated = df_current[df_current['TOTAL_QTY_APPSHEET'] > 0].copy()
                     
-                    # 4. Simpan balik ke state
+                    # 4. SINKRONKAN DATA FISIK (DS)
+                    # Kita balikin kolomnya ke format asli DS (SKU & QTY SCAN)
                     st.session_state.data_ds = df_updated[['SKU', 'QTY SCAN']].copy()
-                    df_updated['NOTE'] = 'SESUAI'
-                    st.session_state.hasil_ds_vs_app = df_updated
-                    st.session_state.step_cleared = True
                     
-                    st.success("✅ REFRESH BERHASIL! Selisih dibersihkan.")
+                    # 5. RE-CALCULATE: Hitung ulang pake engine biar Note-nya jadi 'SESUAI'
+                    hasil_final = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
+                    st.session_state.hasil_ds_vs_app = hasil_final
+                    
+                    # 6. BUKA GEMBOK STEP 2
+                    st.session_state.step_cleared = True
+                    st.success("✅ DATA DROP UPDATED: Selisih disinkronkan & baris 0 dihapus!")
                     st.rerun()
+                    
                 except Exception as e:
-                    st.error(f"Gagal Refresh: {e}")
-
-    # --- 5. STEP 2: COMPARE DRAFT RTO ---
+                    st.error(f"Gagal Sync, Cok! Error: {e}")
+            else:
+                st.error("Jalankan Proses Awal dulu biar datanya muncul!")    
     st.divider()
+
+    # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
     st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
     
+    # --- 5. STEP 2: FINAL COMPARE ---
     if st.session_state.step_cleared:
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True, key="btn_final_compare_rto"):
+        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
             if st.session_state.data_draft is not None:
-                # Ambil data terbaru hasil sinkronisasi tadi
+                # 1. AMBIL DATA TERUPDATE (Hasil Sync Refresh tadi)
                 df_actual = st.session_state.data_ds.copy()
                 df_draft = st.session_state.data_draft.copy()
-                
-                # Standarisasi kolom draft
+
+                # 2. PROSES MATCHING (VLOOKUP STYLE)
+                # Pastikan nama kolom di file Draft lo adalah 'SKU' dan 'QTY'
                 df_draft.columns = df_draft.columns.str.strip().str.upper()
                 
-                # Gabungkan (VLOOKUP Style)
                 summary = pd.merge(
                     df_actual, 
                     df_draft, 
@@ -986,30 +1002,28 @@ elif menu == "Compare RTO":
                     suffixes=('_ACTUAL', '_DRAFT')
                 ).fillna(0)
 
-                # Hitung Selisih Akhir (Cari kolom QTY di file draft)
-                col_qty_draft = 'QTY' if 'QTY' in summary.columns else (summary.columns[2] if len(summary.columns) > 2 else None)
-                
-                if col_qty_draft:
-                    summary['DIFF_FINAL'] = summary['QTY SCAN'] - summary[col_qty_draft]
+                # Hitung Selisih Akhir antara Actual vs Draft
+                # Sesuaikan 'QTY' dengan nama kolom qty di file Draft RTO lo
+                if 'QTY' in summary.columns:
+                    summary['DIFF_FINAL'] = summary['QTY SCAN'] - summary['QTY']
                     summary['STATUS'] = summary['DIFF_FINAL'].apply(lambda x: 'MATCH ✅' if x == 0 else 'SELISIH ❌')
-                    
-                    st.success("🏆 PROSES FINAL MATCHING BERHASIL!")
-                    st.dataframe(summary, use_container_width=True)
 
-                    # Fitur Download
-                    csv = summary.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 DOWNLOAD HASIL SUMMARY (CSV)",
-                        data=csv,
-                        file_name="Summary_RTO_Final.csv",
-                        mime="text/csv",
-                        use_container_width=True,
-                        key="btn_download_csv"
-                    )
-                    st.balloons()
-                else:
-                    st.error("Kolom 'QTY' tidak ditemukan di file Draft!")
+                # 3. TAMPILKAN TABEL SUMMARY (INI YANG LO CARI)
+                st.success("🏆 PROSES FINAL MATCHING BERHASIL!")
+                st.dataframe(summary, use_container_width=True)
+
+                # 4. TOMBOL DOWNLOAD (INI JUGA YANG LO CARI)
+                csv = summary.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 DOWNLOAD HASIL SUMMARY (CSV)",
+                    data=csv,
+                    file_name="Summary_RTO_Final.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
+                st.balloons()
             else:
-                st.error("File Draft (File 3) belum lo upload!")
+                st.error("Woy, File Draft RTO (File 3) belum lo upload!")
     else:
-        st.warning("🔒 Step 2 Terkunci. Pastikan Step 1 sudah 'SESUAI' atau klik Refresh.")
+        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 sampai semua status 'SESUAI'.")
