@@ -91,72 +91,60 @@ if 'logged_in' not in st.session_state:
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* 1. Background Full Screen */
+        /* 1. Background & Layout */
         .stApp {
-            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+            background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
             background-size: cover !important;
-            background-position: center !important;
         }
-        
-        /* 2. Sembunyikan Header & Sidebar */
-        [data-testid="stSidebar"], [data-testid="stHeader"] {
-            display: none !important;
-        }
+        [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
 
-        /* 3. STYLE KARTU LOGIN (Wajib ada biar elegan) */
+        /* 2. Container Card */
         .login-card {
-            background: rgba(20, 20, 30, 0.85) !important;
+            background: rgba(15, 15, 25, 0.9) !important;
             backdrop-filter: blur(15px);
-            padding: 50px 40px;
+            padding: 45px;
             border-radius: 20px;
-            border: 1px solid rgba(197, 160, 89, 0.3);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            border: 1px solid rgba(197, 160, 89, 0.4);
+            margin: 5vh auto;
             text-align: center;
-            max-width: 450px;
-            margin: 5vh auto; /* Jarak atas cuma 5vh biar NAIK */
+            box-shadow: 0 25px 50px rgba(0,0,0,0.7);
         }
 
-        /* 4. Warna Label Input Putih */
-        [data-testid="stWidgetLabel"] p {
-            color: #FFFFFF !important;
-            font-weight: 500 !important;
-            font-size: 14px !important;
+        /* 3. TOMBOL EMAS - KITA TEMBAK LANGSUNG KE CLASS TERDALAM */
+        button[data-testid="stFormSubmitButton"], 
+        div.stFormSubmitButton > button {
+            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 12px !important;
+            padding: 14px 0 !important;
+            font-weight: 800 !important;
+            font-size: 16px !important;
+            letter-spacing: 1px !important;
+            width: 100% !important;
+            box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
+            text-transform: uppercase !important;
         }
 
-        /* 5. Style Input Box */
+        /* Paksa warna tetep emas pas kursor nempel */
+        button[data-testid="stFormSubmitButton"]:hover {
+            background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
+            color: #1e1e2f !important;
+            box-shadow: 0 10px 25px rgba(197, 160, 89, 0.5) !important;
+            transform: translateY(-2px);
+        }
+
+        /* 4. Input Box biar gelap & elegan */
         div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.05) !important;
+            background-color: rgba(255, 255, 255, 0.03) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
             border-radius: 10px !important;
         }
-        
-        input {
-            color: white !important;
-        }
-
-        /* 6. TOMBOL LOGIN EMAS (ANTI-PUTIH) */
-        button[data-testid="stFormSubmitButton"] {
-            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
-            color: white !important;
-            border: none !important;
-            padding: 12px 0 !important;
-            font-weight: 800 !important;
-            letter-spacing: 1.2px !important;
-            border-radius: 10px !important;
-            width: 100% !important;
-            box-shadow: 0 4px 15px rgba(197, 160, 89, 0.4) !important;
-            transition: all 0.3s ease !important;
-        }
-
-        button[data-testid="stFormSubmitButton"]:hover {
-            transform: translateY(-2px) !important;
-            filter: brightness(1.2) !important;
-            box-shadow: 0 6px 20px rgba(197, 160, 89, 0.6) !important;
-        }
+        input { color: #C5A059 !important; font-weight: 600 !important; }
+        [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
-
     # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
