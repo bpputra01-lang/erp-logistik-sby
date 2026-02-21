@@ -33,18 +33,24 @@ st.markdown("""
     .stApp { background-color: #f4f7f6; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
 
-    /* --- RESTORASI HERO HEADER (YANG TADI ILANG) --- */
+   /* 3. FIX HERO HEADER - LEBIH NAIK, LEBIH SLIM, & SEJAJAR */
     .hero-header { 
-        background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); /* Biru Navy Pro */
         color: white !important; 
-        padding: 1.5rem; 
-        border-radius: 12px; 
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
-        margin-bottom: 25px; 
+        padding: 0.8rem 1.5rem !important; /* Padding dikecilkan biar slim */
+        border-radius: 8px; 
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        margin-top: -25px !important; /* Maksa judul naik ke atas */
+        margin-bottom: 20px !important;
+        display: flex;
+        align-items: center;
     }
     .hero-header h1 { 
         color: white !important; 
-        margin: 0; 
+        font-size: 22px !important; /* Ukuran font dikecilkan biar gak intimidasi */
+        font-weight: 800 !important;
+        margin: 0 !important;
+        letter-spacing: -0.5px;
     }
 
     /* Metric Box */
