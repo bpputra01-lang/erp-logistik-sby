@@ -124,8 +124,7 @@ if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
     st.rerun()
 
-st.title("Selamat Datang di Dashboard ERP")
-st.write("Sistem siap digunakan.")
+
 
 import pandas as pd
 import numpy as np
