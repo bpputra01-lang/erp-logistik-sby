@@ -146,9 +146,96 @@ if not st.session_state.logged_in:
             if st.button("ENTER SYSTEM", type="primary"):
                 if user == "logsby" and password == "surabaya123":
                     st.session_state.logged_in = True
-                    st.rerun()
-                else:
-                    st.error("Login Gagal")
+                    else:
+    # 1. CSS DASHBOARD - KEMBALIKAN TEMA BLUE DARK & GOLD
+    st.markdown("""
+        <style>
+        /* BALIKIN SIDEBAR & HAPUS BACKGROUND LOGIN */
+        [data-testid="stSidebar"] { display: block !important; visibility: visible !important; }
+        header { display: flex !important; }
+        
+        /* BACKGROUND UTAMA - BLUE DARK */
+        .stApp { 
+            background-color: #0e1117 !important; 
+            background-image: none !important; 
+        }
+
+        /* SIDEBAR STYLE - DARKER BLUE */
+        [data-testid="stSidebar"] {
+            background-color: #1a2634 !important;
+            border-right: 1px solid #C5A059;
+        }
+
+        /* FIX TULISAN DI SIDEBAR & MAIN CONTENT BIAR JADI GOLD/PUTIH */
+        section[data-testid="stSidebar"] .stMarkdown p, 
+        section[data-testid="stSidebar"] label p,
+        section[data-testid="stSidebar"] span,
+        .main .stMarkdown p, 
+        .main label p {
+            color: #E2E8F0 !important;
+        }
+
+        /* HERO HEADER - TETAP GOLD/BLUE STYLE */
+        .hero-header { 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+            color: white !important; 
+            padding: 10px 20px; 
+            border-radius: 10px; 
+            border-left: 5px solid #C5A059;
+            margin-bottom: 25px;
+        }
+        .hero-header h1 { color: #C5A059 !important; font-size: 24px !important; }
+
+        /* INPUT BOX & SELECTBOX - THEME CONSISTENT */
+        div[data-baseweb="input"], div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 8px !important;
+        }
+        
+        /* TEXT DALAM INPUT */
+        input { color: #FFFFFF !important; }
+        
+        /* METRIC BOX - GOLD ACCENT */
+        .m-box { 
+            background: #1a2634; 
+            padding: 15px; 
+            border-radius: 8px; 
+            border: 1px solid #C5A059; 
+            text-align: center; 
+        }
+        .m-lbl { color: #ffffff; font-size: 11px; font-weight: 700; }
+        .m-val { color: #C5A059; font-size: 22px; font-weight: 800; }
+
+        /* DATAFRAME FIX - BIAR GAK SILAU */
+        [data-testid="stTable"], [data-testid="stDataFrame"] {
+            background-color: #1a2634 !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 2. LOGIC SIDEBAR (NAVIGASI)
+    with st.sidebar:
+        st.markdown('<div class="elegant-header">🚚 ERP LOGISTIC<br>SURABAYA</div>', unsafe_allow_html=True)
+        
+        st.markdown('<p style="color: #C5A059; font-weight: bold; margin-top: 20px;">MAIN MENU</p>', unsafe_allow_html=True)
+        
+        # Inisialisasi session state agar menu tersinkron
+        if 'main_menu' not in st.session_state:
+            st.session_state.main_menu = "Dashboard Overview"
+
+        # Gabungkan semua menu jadi satu Radio biar gak tumpang tindih
+        menu = st.radio(
+            "PILIH NAVIGASI:",
+            ["Dashboard Overview", "Database Master", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Stock Minus"],
+            key="nav_radio",
+            label_visibility="collapsed"
+        )
+
+        st.divider()
+        if st.button("🚪 LOGOUT SYSTEM", use_container_width=True):
+            st.session_state.logged_in = False
+            st.rerun()
     st.stop() # WAJIB DI SINI
 
 
