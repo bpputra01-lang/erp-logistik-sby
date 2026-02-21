@@ -80,6 +80,71 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
+    # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
+
+import streamlit as st
+
+# Inisialisasi session state login supaya tidak error
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+# FUNGSI LOGIN (Hanya muncul jika belum logged_in)
+if not st.session_state.logged_in:
+    st.markdown("""
+        <style>
+        /* Paksa background gudang hanya di halaman login */
+        .stApp {
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
+            background-size: cover !important;
+            background-position: center !important;
+        }
+        
+        /* Sembunyikan sidebar dan header agar tidak merusak layout dashboard asli */
+        [data-testid="stSidebar"], [data-testid="stHeader"] {
+            display: none !important;
+        }
+
+        /* Container Kotak Login */
+        .login-card {
+            background: rgba(30, 30, 47, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            border: 1px solid #C5A059;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            text-align: center;
+            max-width: 400px;
+            margin: 15vh auto;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # UI Login Center
+    _, col_mid, _ = st.columns([1, 2, 1])
+    with col_mid:
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: #C5A059; margin-bottom: 0;">📦 ADMINITY PRO</h2>', unsafe_allow_html=True)
+        st.markdown('<p style="color: white; font-size: 13px;">Surabaya Logistics System</p>', unsafe_allow_html=True)
+        
+        user_input = st.text_input("Username", key="input_user")
+        pass_input = st.text_input("Password", type="password", key="input_pass")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
+            # Ganti username & password sesuai kebutuhan lu
+            if user_input == "admin" and pass_input == "surabaya123":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Kredensial Salah!")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # PAKSA BERHENTI DI SINI (Dashboard lu di bawah aman, gak bakal diproses)
+    st.stop()
+
+# --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
+# Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
 import pandas as pd
 import numpy as np
 import math
