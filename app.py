@@ -135,6 +135,17 @@ div.stFormSubmitButton > button {
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
             border-radius: 10px !important;
         }
+        /* Ubah background st.success jadi hijau solid */
+    div[data-testid="stNotification"] {
+        background-color: #1e7e34 !important; /* Hijau Tua Surabaya */
+        color: white !important;               /* Tulisan Putih */
+        border-radius: 10px !important;
+        border: 1px solid #C5A059 !important;  /* Kasih border emas dikit biar matching */
+    }
+    /* Pastikan ikon centangnya juga putih */
+    div[data-testid="stNotification"] svg {
+        fill: white !important;
+    }
         input { color: #C5A059 !important; font-weight: 600 !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
