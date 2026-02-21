@@ -7,98 +7,119 @@ import math
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# FIX: Inisialisasi harus dilakukan SEBELUM dipanggil oleh logika apapun
+# INISIALISASI SESSION STATE
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (TOTAL LOCK)
+# KONDISI 1: TAMPILAN LOGIN (FIXED, NO SCROLL, NAIK)
 # ==========================================
 if not st.session_state.logged_in:
-    # 1. CSS UNTUK MATIKAN VISUAL SCROLLBAR
+    # 1. CSS UNTUK KUNCI SCROLL DAN FIX TAMPILAN
     st.markdown("""
         <style>
-        /* MATIKAN SEMUA SCROLLBAR SECARA FISIK */
-        * {
-            scrollbar-width: none !important; /* Firefox */
-            -ms-overflow-style: none !important;  /* IE/Edge */
-        }
-        ::-webkit-scrollbar {
-            display: none !important; /* Chrome/Safari */
-        }
-
+        /* MATIKAN SCROLL TOTAL */
         html, body, [data-testid="stAppViewContainer"], 
         [data-testid="stMainViewContainer"], .main, .block-container {
             overflow: hidden !important;
             height: 100vh !important;
-            position: fixed !important; /* Paksa posisi tetap */
+            position: fixed !important;
             width: 100% !important;
         }
 
-        .main-login-container {
-            position: fixed;
-            top: 30% !important; /* Gw naikin lagi biar mantap */
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 400px;
-            z-index: 99999;
-        }
-        
-        /* Sisa CSS lu (tulis ulang persis di sini) */
+        /* SEMBUNYIKAN ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
+        
+        /* BACKGROUND */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover; background-position: center;
         }
-        .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
-        .header-title { color: #C5A059; font-size: 18px; font-weight: 800; }
-        div[data-baseweb="input"] { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(197, 160, 89, 0.3) !important; border-radius: 8px !important; }
+
+        /* CONTAINER KARTU LOGIN (DI-FIXED AGAR NAIK) */
+        .main-login-container {
+            position: fixed;
+            top: 35% !important; /* Posisi naik ke atas */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            z-index: 9999;
+            background: rgba(30, 30, 47, 0.98);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(197, 160, 89, 0.5);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9);
+            text-align: center;
+        }
+
+        .header-container { text-align: left; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; margin-bottom: 20px; }
+        .header-title { color: #C5A059; font-size: 18px; font-weight: 800; margin: 0; }
+        
+        /* STYLE INPUT AGAR TIDAK LEBAR/KEPOTONG */
+        div[data-baseweb="input"] { 
+            background-color: rgba(255, 255, 255, 0.05) !important; 
+            border: 1px solid rgba(197, 160, 89, 0.3) !important; 
+            border-radius: 8px !important; 
+        }
         input { color: white !important; }
         label { color: #C5A059 !important; font-weight: 700; display: block !important; text-align: left !important;}
-        button[kind="primary"] { background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important; color: #1a2634 !important; font-weight: 800 !important; width: 100% !important; height: 45px; border: none !important; margin-top: 15px;}
+
+        /* TOMBOL */
+        button[kind="primary"] {
+            background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
+            color: #1a2634 !important; font-weight: 800 !important; width: 100% !important;
+            border-radius: 8px !important; margin-top: 15px; border: none !important; height: 45px;
+        }
+
+        /* HILANGKAN EXTRA SPACE */
         [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] { background-color: transparent !important; border: none !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. JAVASCRIPT NUKLIR (KUNCI WINDOW AGAR TIDAK BISA GERAK)
+    # 2. JAVASCRIPT UNTUK FORCE NO-SCROLL
     st.components.v1.html("""
         <script>
             window.parent.document.body.style.overflow = 'hidden';
-            window.parent.document.addEventListener('scroll', function(e) {
-                window.parent.scrollTo(0, 0);
-            }, { passive: false });
+            window.parent.document.addEventListener('scroll', function(e) { window.parent.scrollTo(0, 0); }, { passive: false });
         </script>
     """, height=0)
 
-    # RENDER VISUAL CARD
+    # 3. RENDER KARTU LOGIN (HTML VISUAL)
     st.markdown("""
-                <div class="header-container">
-                    <span style="font-size: 28px;">📦</span>
-                    <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
-                        <div class="header-title">ERP LOGISTIC SURABAYA</div>
-                        <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
-                    </div>
+        <div class="main-login-container">
+            <div class="header-container">
+                <span style="font-size: 28px; vertical-align: middle;">📦</span>
+                <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
+                    <div class="header-title">ERP LOGISTIC SURABAYA</div>
+                    <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">Secure System Access</div>
                 </div>
-                <div style="height: 10px;"></div>
             </div>
-        </div>
+            <div style="height: 180px;"></div> </div>
     """, unsafe_allow_html=True)
 
-    # FORM LOGIN
+    # 4. RENDER INPUT (PYTHON WIDGET)
     _, center_col, _ = st.columns([1, 2.5, 1])
     with center_col:
-        st.markdown('<div style="height: 0px;"></div>', unsafe_allow_html=True)
+        # Menarik input Python ke dalam kartu HTML (menggunakan margin negatif)
+        st.markdown('<div style="margin-top: -33vh;"></div>', unsafe_allow_html=True)
         user = st.text_input("Username", key="u_login")
         password = st.text_input("Password", type="password", key="p_login")
+        
         if st.button("ENTER SYSTEM", type="primary"):
             if user == "admin" and password == "surabaya123":
                 st.session_state.logged_in = True
                 st.rerun()
             else:
-                st.error("Gagal!")
+                st.error("Credential Gagal!")
+    
     st.stop()
 
+# ==========================================
+# KONTEN SETELAH LOGIN (TAMPILAN UTAMA)
+# ==========================================
+st.title("Selamat Datang di Dashboard ERP")
+st.write("Berhasil login!")
 # ==========================================
 # DASHBOARD
 # ==========================================
