@@ -887,26 +887,30 @@ elif menu == "Compare RTO":
     # --- 3. STEP 1: COMPARE SCAN VS APPSHEET ---
     st.subheader("🟢 STEP 1: VALIDASI SCAN VS APPSHEET")
     
-    if st.button("🔍 CEK SELISIH SCAN", use_container_width=True):
-        if file_ds and file_app:
-            df_ds = pd.read_excel(file_ds)
-            df_app = pd.read_excel(file_app)
+    if st.button("🚀 JALANKAN PROSES AWAL", use_container_width=True):
+    # 1. VALIDASI: Pastiin user udah upload filenya
+    if file_ds is not None and file_app is not None:
+        try:
+            # 2. TAMBAHKAN ENGINE: Pake openpyxl atau calamine biar stabil
+            st.session_state.data_ds = pd.read_excel(file_ds, engine='openpyxl')
+            st.session_state.data_app = pd.read_excel(file_app, engine='openpyxl')
             
-            # Jalanin engine compare fisik vs appsheet dulu
-            res_fisik = engine_ds_rto_ultrafast(df_ds, df_app)
-            st.session_state.hasil_ds_vs_app = res_fisik
+            # Jika ada file draft juga, baca juga
+            if file_draft is not None:
+                st.session_state.data_draft = pd.read_excel(file_draft, engine='openpyxl')
+
+            # Jalankan Engine logic lo
+            st.session_state.hasil_final = engine_ds_rto_ultrafast(
+                st.session_state.data_ds, 
+                st.session_state.data_app
+            )
+            st.success("Data Berhasil Diolah!")
             
-            # Cek apakah ada selisih
-            mismatch_count = len(res_fisik[res_fisik['NOTE'] != 'SESUAI'])
-            
-            if mismatch_count == 0:
-                st.session_state.step_cleared = True
-                st.success("✅ DATA SCAN SINKRON! Silahkan lanjut ke Step 2.")
-            else:
-                st.session_state.step_cleared = False
-                st.error(f"❌ STOP! Ada {mismatch_count} SKU Selisih. Rekonsiliasi dulu baru bisa lanjut!")
-        else:
-            st.warning("Upload File 1 & 2 dulu, Cok!")
+        except Exception as e:
+            st.error(f"Gagal baca Excel! Pastiin filenya gak dipassword. Error: {e}")
+    else:
+        # Ini biar gak muncul ValueError kalau belum upload
+        st.error("Filenya di-upload dulu")
 
     # --- 4. AREA REKONSILIASI (MUNCUL JIKA ADA SELISIH) ---
     if st.session_state.hasil_final is not None:
