@@ -108,7 +108,7 @@ if not st.session_state.logged_in:
 
         /* 4. Warna Label Putih */
         [data-testid="stWidgetLabel"] p {
-            color: white !important;
+            color: gold !important;
             font-weight: 500 !important;
         }
 
