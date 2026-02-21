@@ -180,7 +180,7 @@ div.stFormSubmitButton > button {
             if submit_button:
                 if user_input == "admin" and pass_input == "surabaya123":
                     st.session_state.logged_in = True
-                    st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
+                    st.toast("✅Berhasil Login! Selamat datang di dashboard Surabaya Logistics.")
                     st.rerun()
                 else:
                     st.error("Username atau Password salah!")
