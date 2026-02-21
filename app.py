@@ -41,6 +41,79 @@ if not st.session_state.logged_in:
             margin: 0 auto !important;
             margin-top: 15vh !important;
         }
+
+        /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
+    .block-container { 
+        padding-top: 3.5rem !important; /* Tambah padding supaya judul gak kelindes toolbar atas */
+        padding-bottom: 0rem !important;
+    }
+    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+    [data-testid="stSidebarNav"] { display: none; } 
+    
+    /* 2. STYLE JUDUL ERP DI SIDEBAR */
+    .sidebar-title { 
+        color: #00d2ff; 
+        text-align: center; 
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 20px;
+        margin-top: -45px; 
+        padding-bottom: 15px;
+        border-bottom: 1px solid #2d2d44;
+        margin-bottom: 10px;
+    }
+
+    .stApp { background-color: #f4f7f6; }
+    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
+
+    /* 3. HERO HEADER - SLIM & MENGIKUTI PANJANG TEKS (GAK KEPOTONG) */
+    .hero-header { 
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+        color: white !important; 
+        padding: 8px 18px !important; /* Padding pas, gak kegedean */
+        border-radius: 8px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        margin-top: 0px !important; /* Reset margin biar gak nyundul ke atas */
+        margin-bottom: 25px !important;
+        display: inline-block; /* Agar background cuma sepanjang tulisan */
+        width: auto;
+    }
+    .hero-header h1 { 
+        color: white !important; 
+        font-size: 20px !important; /* Ukuran font pas */
+        font-weight: 800 !important;
+        margin: 0 !important;
+        letter-spacing: 0.5px;
+        line-height: 1.2;
+    }
+
+    /* Metric Box */
+    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
+    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
+    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
+
+    /* Radio Button styling */
+    div.row-widget.stRadio > div { background-color: transparent !important; }
+    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
+    
+    /* --- INPUT BOX STYLE (TULISAN PUTIH TETAP AMAN) --- */
+    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
+        background-color: #1a2634 !important;
+        border: 1px solid #C5A059 !important;
+        border-radius: 8px !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
+    [data-testid="stFileUploaderText"] > span, 
+    [data-testid="stFileUploaderText"] > small {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+    }
+    
+    [data-testid="stFileUploader"] button {
+        background-color: #C5A059 !important;
+        color: #1a2634 !important;
+        font-weight: bold !important;
+    }
         /* JUDUL USERNAME & PASSWORD PUTIH */
         label { color: #FFFFFF !important; font-weight: 700 !important; }
         /* INPUT BOX PUTIH FULL */
