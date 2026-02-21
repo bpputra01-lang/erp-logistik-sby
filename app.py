@@ -79,11 +79,6 @@ if not st.session_state.logged_in:
     st.stop() # WAJIB DI SINI
 
 
-# ISI DASHBOARD
-st.markdown('<div class="hero-header"><h1>DATABASE MASTER CHECKER</h1></div>', unsafe_allow_html=True)
-st.write("Berhasil Login! Dashboard aman sekarang.")
-
-
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
     df_gl3 = pd.DataFrame()
