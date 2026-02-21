@@ -109,18 +109,7 @@ if not st.session_state.logged_in:
         [data-testid="stWidgetLabel"] p {
             color: white !important;
             font-weight: 500 !important;
-        }
-
-        /* 4. KOTAK LOGIN NAIK KE ATAS (margin: 5vh) */
-        .login-card {
-            background: rgba(30, 30, 47, 0.95);
-            padding: 40px;
-            border-radius: 15px;
-            border: 1px solid #C5A059;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-            text-align: center;
-            max-width: 400px;
-            margin: 5vh auto; /* Menjaga posisi tetap di atas */
+        
         }
         </style>
     """, unsafe_allow_html=True)
