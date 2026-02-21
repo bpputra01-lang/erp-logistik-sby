@@ -12,12 +12,12 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (CSS KHUSUS LOGIN)
+# KONDISI 1: TAMPILAN LOGIN
 # ==========================================
 if not st.session_state.logged_in:
+    # CSS LOGIN (Hanya muncul jika belum login)
     st.markdown("""
         <style>
-        /* CSS KHUSUS LOGIN - BIAR GAK BOCOR KE DASHBOARD */
         html, body, [data-testid="stAppViewContainer"], 
         [data-testid="stMainViewContainer"], .main, .block-container {
             overflow: hidden !important;
@@ -25,17 +25,12 @@ if not st.session_state.logged_in:
             position: fixed !important;
             width: 100% !important;
         }
-
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover; background-position: center;
         }
-        
-        /* SEMBUNYIKAN SIDEBAR PAS LOGIN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
-
-        /* KARTU LOGIN */
         [data-testid="stVerticalBlockBorderWrapper"] {
             background: rgba(30, 30, 47, 0.98) !important;
             padding: 30px !important;
@@ -46,55 +41,33 @@ if not st.session_state.logged_in:
             margin: 0 auto !important;
             margin-top: 15vh !important;
         }
-
+        /* JUDUL USERNAME & PASSWORD PUTIH */
         label { color: #FFFFFF !important; font-weight: 700 !important; }
-
+        /* INPUT BOX PUTIH FULL */
         div[data-baseweb="input"] { 
             background-color: #FFFFFF !important; 
-            border: 1px solid rgba(197, 160, 89, 0.3) !important; 
             border-radius: 50px !important; 
             overflow: hidden !important;
             padding-right: 10px !important;
         }
-
         input { 
             color: #000000 !important; 
             -webkit-text-fill-color: #000000 !important; 
             background-color: transparent !important;
-            border: none !important;
         }
-
         button[aria-label="Show password"] { color: #1a2634 !important; }
-
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important; font-weight: 800 !important; 
             width: 100% !important; height: 45px !important;
-            border: none !important; margin-top: 10px;
-        }
-
-        .login-header {
-            text-align: left;
-            border-bottom: 1px solid rgba(197, 160, 89, 0.2);
-            padding-bottom: 15px;
-            margin-bottom: 20px;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # RENDER FORM LOGIN
     _, center_col, _ = st.columns([1, 1, 1])
     with center_col:
         with st.container(border=True):
-            st.markdown("""
-                <div class="login-header">
-                    <span style="font-size: 28px; vertical-align: middle;">📦</span>
-                    <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
-                        <div style="color: #C5A059; font-size: 18px; font-weight: 800;">ERP LOGISTIC SURABAYA</div>
-                        <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown('<div style="color: #C5A059; font-size: 18px; font-weight: 800; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; margin-bottom: 20px;">📦 ERP LOGISTIC SURABAYA</div>', unsafe_allow_html=True)
             user = st.text_input("Username", key="u_login")
             password = st.text_input("Password", type="password", key="p_login")
             if st.button("ENTER SYSTEM", type="primary"):
@@ -102,74 +75,47 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Password / Username salah")
-    st.stop()
+                    st.error("Login Gagal")
+    st.stop() # WAJIB DI SINI
 
 # ==========================================
-# KONDISI 2: DASHBOARD (CSS BEFORE LU)
+# KONDISI 2: DASHBOARD (TAMPILAN UTAMA)
 # ==========================================
-# CSS ini baru akan aktif setelah Login Berhasil
+# CSS RESET (Wajib buat balikin dashboard yang blank)
 st.markdown("""
     <style>
-    /* 1. BALIKIN JARAK DASHBOARD */
-    .block-container { 
-        padding-top: 3.5rem !important; 
-        padding-bottom: 0rem !important;
-        max-width: 100% !important;
-        position: relative !important; /* Hapus Fixed pasca login */
-        height: auto !important;
-        overflow: auto !important;
-    }
-    html, body { overflow: auto !important; height: auto !important; position: relative !important; }
-
-    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
-    [data-testid="stSidebarNav"] { display: none; } 
+    /* BALIKIN TAMPILAN YANG TADI DISEMBUNYIIN LOGIN */
+    [data-testid="stSidebar"] { display: block !important; }
+    header { display: flex !important; }
+    .stApp { background-color: #f4f7f6 !important; background-image: none !important; }
     
-    /* 2. STYLE SIDEBAR */
-    .sidebar-title { 
-        color: #00d2ff; text-align: center; font-family: 'Inter', sans-serif;
-        font-weight: 800; font-size: 20px; margin-top: -45px; 
-        padding-bottom: 15px; border-bottom: 1px solid #2d2d44; margin-bottom: 10px;
+    /* RESET POSISI AGAR TIDAK BLANK / FIXED */
+    html, body, [data-testid="stAppViewContainer"], .main, .block-container {
+        overflow: auto !important;
+        height: auto !important;
+        position: relative !important;
     }
-    .stApp { background-color: #f4f7f6; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; display: block !important; }
-    header { display: flex !important; } /* Balikin Header */
-
-    /* 3. HERO HEADER DASHBOARD */
+    
+    .block-container { padding-top: 3.5rem !important; }
+    
+    /* CSS DASHBOARD LU YANG ASLI */
     .hero-header { 
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-        color: white !important; padding: 8px 18px !important;
-        border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-        margin-bottom: 25px !important; display: inline-block; width: auto;
+        color: white !important; padding: 10px 20px; border-radius: 8px;
     }
-    .hero-header h1 { color: white !important; font-size: 20px !important; font-weight: 800 !important; margin: 0 !important; }
-
-    /* Metric Box */
-    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
-    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
-    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
-
-    /* Input Box Dashboard */
-    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important; border: 1px solid #C5A059 !important; border-radius: 8px !important;
-    }
-    /* RESET WARNA TEKS DASHBOARD BIAR GAK ITEM KAYAK LOGIN */
-    div[data-testid="stSelectbox"] * { color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# SIDEBAR CONTENT
+# SIDEBAR
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">ERP LOGISTIC</div>', unsafe_allow_html=True)
+    st.title("NAVIGASI")
     if st.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
 
-# HERO HEADER
+# ISI DASHBOARD
 st.markdown('<div class="hero-header"><h1>DATABASE MASTER CHECKER</h1></div>', unsafe_allow_html=True)
-
-# DASHBOARD CONTENT LU...
-st.write("welcome!")
+st.write("Berhasil Login! Dashboard aman sekarang.")
 
 
 import pandas as pd
