@@ -81,44 +81,65 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
-
 import streamlit as st
 
-# Inisialisasi session state login supaya tidak error
+# 1. Inisialisasi session state login
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-## --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
+# --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* 1. Background */
+        /* Background Full Screen dengan Overlay Gelap */
         .stApp {
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
             background-size: cover !important;
             background-position: center !important;
         }
         
-        /* 2. Sembunyikan Navigasi */
+        /* Sembunyikan Header & Sidebar */
         [data-testid="stSidebar"], [data-testid="stHeader"] {
             display: none !important;
         }
 
-
-        /* 4. Warna Label Putih */
+        /* Warna Label Input (Username/Password) */
         [data-testid="stWidgetLabel"] p {
-            color: gold !important;
+            color: #E0E0E0 !important;
             font-weight: 500 !important;
+            font-size: 14px !important;
+            margin-bottom: 5px !important;
         }
 
-        /* 5. Style Tombol Form agar Emas */
+        /* Style Input Box agar Match dengan Tema */
+        div[data-baseweb="input"] {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 10px !important;
+            color: white !important;
+        }
+
+        /* Tombol Sign In Elegan Modern */
         button[data-testid="stFormSubmitButton"] {
-            background-color: #C5A059 !important;
-            color: #1e1e2f !important;
+            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+            color: white !important;
             border: none !important;
-            font-weight: 800 !important;
+            padding: 12px 0 !important;
+            font-weight: 700 !important;
+            letter-spacing: 1px !important;
+            border-radius: 10px !important;
             width: 100% !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 15px rgba(197, 160, 89, 0.3) !important;
+            margin-top: 10px !important;
+        }
+
+        /* Efek Hover Tombol */
+        button[data-testid="stFormSubmitButton"]:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(197, 160, 89, 0.5) !important;
+            filter: brightness(1.1);
         }
         </style>
     """, unsafe_allow_html=True)
@@ -126,20 +147,38 @@ if not st.session_state.logged_in:
     # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
+        # Buka Container Card
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
         
         # JUDUL
-        st.markdown('<h2 style="color: #C5A059; margin-top: -20px; margin-bottom: -10px; font-family: \'Inter\'; font-weight: 800; text-align: center;">📦 LOGISTIC SURABAYA ERP</h2>', unsafe_allow_html=True)
+        st.markdown("""
+            <h2 style="
+                color: #C5A059; 
+                margin-top: -20px; 
+                margin-bottom: -5px; 
+                font-family: 'Inter', sans-serif; 
+                font-weight: 800; 
+                text-align: center;
+            ">📦 LOGISTIC SURABAYA ERP</h2>
+        """, unsafe_allow_html=True)
         
         # SUB-JUDUL
-        st.markdown('<p style="color: #E0E0E0; font-size: 14px; margin-bottom: 20px; text-align: center;">Surabaya Logistics Management System</p>', unsafe_allow_html=True)
+        st.markdown("""
+            <p style="
+                color: #A0A0A0; 
+                font-size: 14px; 
+                margin-bottom: 30px; 
+                text-align: center;
+            ">Surabaya Logistics Management System</p>
+        """, unsafe_allow_html=True)
 
-        # BUNGKUS FORM (HANYA SATU KALI INPUT DI SINI)
+        # BUNGKUS FORM (Bisa ENTER otomatis & Gak Error Duplicate Key)
         with st.form("login_form"):
-            user_input = st.text_input("Username", key="input_user", placeholder="Username")
-            pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
+            user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
+            pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
             
-            st.markdown("<br>", unsafe_allow_html=True)
+            # Spasi dikit
+            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
             
             submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
             
@@ -148,10 +187,12 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Username/Password Salah!")
+                    st.error("Username atau Password salah!")
         
+        # Tutup Container Card
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # PAKSA BERHENTI agar dashboard di bawah tidak tereksekusi sebelum login
     st.stop()
 # --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
