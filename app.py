@@ -941,43 +941,38 @@ elif menu == "Compare RTO":
                 # Kolom SKU & QTY dikunci biar gak sengaja kehapus, tapi KETERANGAN bisa diisi
                 disabled=["SKU", "QTY SCAN", "SKU_FINAL", "TOTAL_QTY_APPSHEET", "SELISIH", "NOTE"]
             )
-          if st.button("🔄 REFRESH & SYNC DATA DROP", use_container_width=True):
-                if st.session_state.data_ds is not None and st.session_state.data_app is not None:
-                    try:
-                        # 1. Jalankan engine buat nyari siapa aja yang selisih
-                        df_ds = st.session_state.data_ds.copy()
-                        df_app = st.session_state.data_app.copy()
-                        
-                        # Hitung kondisi saat ini
-                        res = engine_ds_rto_ultrafast(df_ds, df_app)
-                        
-                        # 2. LOGIKA UPDATE: Ambil angka System (Appsheet) buat nindih angka Fisik (DS)
-                        # Kita update QTY SCAN di data asli dengan angka dari Appsheet
-                        # (Ini seolah-olah lo benerin fisik di gudang biar sama kayak sistem)
-                        updated_ds = res.copy()
-                        updated_ds['QTY SCAN'] = updated_ds['TOTAL_QTY_APPSHEET']
-                        
-                        # 3. LOGIKA HAPUS ROW: Buang yang sudah SESUAI (Selisih 0)
-                        # Sesuai request lo: "kalau dia 0 langsung hapus row nya"
-                        # Tapi biasanya buat Compare ke Draft, lo butuh data yang emang mau di-RTO-kan
-                        df_final_ds = updated_ds[updated_ds['TOTAL_QTY_APPSHEET'] > 0].copy()
-                        
-                        # 4. UPDATE SESSION STATE (Data Drop lo sekarang sudah terupdate)
-                        st.session_state.data_ds = df_final_ds
-                        
-                        # Jalankan engine sekali lagi buat pastiin status Note-nya berubah jadi SESUAI semua
-                        hasil_final = engine_ds_rto_ultrafast(df_final_ds, df_app)
-                        st.session_state.hasil_ds_vs_app = hasil_final
-                        
-                        # 5. BUKA GEMBOK
-                        st.session_state.step_cleared = True
-                        st.success("✅ REFRESH BERHASIL: Data Drop sudah disinkronkan & baris 0 dihapus!")
-                        st.balloons()
-                        st.rerun()
-                        
-                    except Exception as e:
-                        st.error(f"Gagal Sync: {e}")
-
+     # --- PASTIKAN BARIS INI SEJAJAR DENGAN IF SEBELUMNYA ---
+        if st.button("🔄 REFRESH & SYNC DATA DROP", use_container_width=True):
+            if st.session_state.data_ds is not None and st.session_state.data_app is not None:
+                try:
+                    # 1. Ambil data asli dari memori
+                    df_ds = st.session_state.data_ds.copy()
+                    df_app = st.session_state.data_app.copy()
+                    
+                    # 2. Hitung kondisi saat ini menggunakan engine
+                    res = engine_ds_rto_ultrafast(df_ds, df_app)
+                    
+                    # 3. UPDATE: Paksa angka Fisik (DS) jadi sama dengan System (Appsheet)
+                    updated_ds = res.copy()
+                    updated_ds['QTY SCAN'] = updated_ds['TOTAL_QTY_APPSHEET']
+                    
+                    # 4. FILTER: Buang baris yang Qty-nya 0 (Hapus row sesuai request lo)
+                    df_final_ds = updated_ds[updated_ds['TOTAL_QTY_APPSHEET'] > 0].copy()
+                    
+                    # 5. SIMPAN KEMBALI KE SESSION STATE
+                    st.session_state.data_ds = df_final_ds
+                    
+                    # Jalankan ulang engine biar Note-nya jadi 'SESUAI' semua
+                    hasil_final = engine_ds_rto_ultrafast(df_final_ds, df_app)
+                    st.session_state.hasil_ds_vs_app = hasil_final
+                    
+                    # 6. BUKA GEMBOK STEP 2
+                    st.session_state.step_cleared = True
+                    st.success("✅ REFRESH BERHASIL: Data Drop sinkron & Baris 0 dibuang!")
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Gagal Sync: {e}")
     st.divider()
 
     # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
