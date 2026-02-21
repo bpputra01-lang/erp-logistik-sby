@@ -33,24 +33,24 @@ st.markdown("""
     .stApp { background-color: #f4f7f6; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
 
-   /* 3. FIX HERO HEADER - LEBIH NAIK, LEBIH SLIM, & SEJAJAR */
+    /* 3. FIX HERO HEADER - PAS DI ATAS, SLIM MENGIKUTI TULISAN, WARNA SELARAS */
     .hero-header { 
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); /* Biru Navy Pro */
         color: white !important; 
-        padding: 0.8rem 1.5rem !important; /* Padding dikecilkan biar slim */
+        padding: 6px 15px !important; /* Padding tipis biar slim */
         border-radius: 8px; 
         box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-        margin-top: -25px !important; /* Maksa judul naik ke atas */
+        margin-top: -10px !important; /* Pas, tidak terlalu naik sampai kepotong */
         margin-bottom: 20px !important;
-        display: flex;
-        align-items: center;
+        display: inline-block; /* KUNCI: Box mengikuti lebar tulisan saja */
     }
     .hero-header h1 { 
         color: white !important; 
-        font-size: 22px !important; /* Ukuran font dikecilkan biar gak intimidasi */
+        font-size: 18px !important; /* Ukuran font pas & profesional */
         font-weight: 800 !important;
         margin: 0 !important;
         letter-spacing: -0.5px;
+        line-height: 1.2;
     }
 
     /* Metric Box */
