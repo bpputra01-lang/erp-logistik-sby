@@ -98,18 +98,7 @@ if not st.session_state.logged_in:
             background-size: cover !important;
         }
         [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
-
-        /* 2. Container Card */
-        .login-card {
-            background: rgba(15, 15, 25, 0.9) !important;
-            backdrop-filter: blur(15px);
-            padding: 45px;
-            border-radius: 20px;
-            border: 1px solid rgba(197, 160, 89, 0.4);
-            margin: 5vh auto;
-            text-align: center;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.7);
-        }
+    
 
         /* 3. TOMBOL EMAS - KITA TEMBAK LANGSUNG KE CLASS TERDALAM */
         button[data-testid="stFormSubmitButton"], 
@@ -131,7 +120,7 @@ if not st.session_state.logged_in:
         button[data-testid="stFormSubmitButton"]:hover {
             background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
             color: #1e1e2f !important;
-            box-shadow: 0 10px 25px rgba(197, 160, 89, 0.5) !important;
+            box-shadow: 0 20px 25px rgba(197, 160, 89, 0.5) !important;
             transform: translateY(-2px);
         }
 
