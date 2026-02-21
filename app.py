@@ -12,108 +12,93 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (FIXED & NO SCROLL)
+# KONDISI 1: TAMPILAN LOGIN (TOTAL LOCK)
 # ==========================================
 if not st.session_state.logged_in:
+    # 1. CSS UNTUK MATIKAN VISUAL SCROLLBAR
     st.markdown("""
         <style>
-        /* 1. KUNCI LAYAR (MATIKAN SCROLL) - PERBAIKAN DI SINI */
-        html, body, [data-testid="stAppViewContainer"], 
-        [data-testid="stMainViewContainer"],
-        [data-testid="stVerticalBlock"], 
-        [data-testid="stVerticalBlockBorderWrapper"],
-        .main .block-container {
-            overflow: hidden !important;
-            height: 100vh !important;
-            max-height: 100vh !important;
-            margin: 0 !important;
-            padding: 0 !important;
+        /* MATIKAN SEMUA SCROLLBAR SECARA FISIK */
+        * {
+            scrollbar-width: none !important; /* Firefox */
+            -ms-overflow-style: none !important;  /* IE/Edge */
         }
-        
-        /* 2. SEMBUNYIKAN ELEMEN BAWAAN */
-        [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
-        
-        /* 3. BACKGROUND FULL SCREEN */
-        .stApp {
-            background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
-                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
-            background-size: cover; 
-            background-position: center;
+        ::-webkit-scrollbar {
+            display: none !important; /* Chrome/Safari */
         }
 
-        /* 4. CONTAINER UTAMA LOGIN - PERBAIKAN POSISI NAIK */
+        html, body, [data-testid="stAppViewContainer"], 
+        [data-testid="stMainViewContainer"], .main, .block-container {
+            overflow: hidden !important;
+            height: 100vh !important;
+            position: fixed !important; /* Paksa posisi tetap */
+            width: 100% !important;
+        }
+
         .main-login-container {
             position: fixed;
-            top: 35%; /* Diubah dari 40% ke 35% agar lebih naik */
+            top: 30% !important; /* Gw naikin lagi biar mantap */
             left: 50%;
             transform: translate(-50%, -50%);
             width: 400px;
-            z-index: 9999;
-            text-align: center;
+            z-index: 99999;
         }
-
+        
+        /* Sisa CSS lu (tulis ulang persis di sini) */
+        [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
+        .stApp {
+            background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
+            background-size: cover; background-position: center;
+        }
         .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
-        .header-logo { font-size: 28px; display: inline-block; vertical-align: middle; }
-        .header-text { display: inline-block; vertical-align: middle; margin-left: 10px; }
-        .header-title { color: #C5A059; font-size: 18px; font-weight: 800; line-height: 1.1; }
-        .header-subtitle { color: #aaaaaa; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* 6. STYLE INPUT STREAMLIT */
-        div[data-baseweb="input"] { 
-            background-color: rgba(255, 255, 255, 0.05) !important; 
-            border: 1px solid rgba(197, 160, 89, 0.3) !important; 
-            border-radius: 8px !important; 
-        }
+        .header-title { color: #C5A059; font-size: 18px; font-weight: 800; }
+        div[data-baseweb="input"] { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(197, 160, 89, 0.3) !important; border-radius: 8px !important; }
         input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; text-align: left !important; display: block !important;}
-
-        /* 7. TOMBOL LOGIN */
-        button[kind="primary"] {
-            background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
-            color: #1a2634 !important; font-weight: 800 !important; width: 100% !important;
-            border-radius: 8px !important; margin-top: 15px; border: none !important;
-            height: 45px;
-        }
-
-        /* MATIKAN BOX BIRU/ABU STREAMLIT */
-        [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] {
-            background-color: transparent !important;
-            border: none !important;
-        }
+        label { color: #C5A059 !important; font-weight: 700; display: block !important; text-align: left !important;}
+        button[kind="primary"] { background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important; color: #1a2634 !important; font-weight: 800 !important; width: 100% !important; height: 45px; border: none !important; margin-top: 15px;}
+        [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] { background-color: transparent !important; border: none !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # RENDER VISUAL CARD & FORM
+    # 2. JAVASCRIPT NUKLIR (KUNCI WINDOW AGAR TIDAK BISA GERAK)
+    st.components.v1.html("""
+        <script>
+            window.parent.document.body.style.overflow = 'hidden';
+            window.parent.document.addEventListener('scroll', function(e) {
+                window.parent.scrollTo(0, 0);
+            }, { passive: false });
+        </script>
+    """, height=0)
+
+    # RENDER VISUAL CARD
     st.markdown("""
         <div class="main-login-container">
-            <div class="login-card">
+            <div class="login-card" style="background: rgba(30, 30, 47, 0.98); padding: 30px; border-radius: 15px; border: 1px solid rgba(197, 160, 89, 0.5); box-shadow: 0 25px 50px rgba(0,0,0,0.9);">
                 <div class="header-container">
-                    <div class="header-logo">📦</div>
-                    <div class="header-text">
+                    <span style="font-size: 28px;">📦</span>
+                    <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
                         <div class="header-title">ERP LOGISTIC</div>
-                        <div class="header-subtitle">Secure System Access</div>
+                        <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
                     </div>
                 </div>
-                <div id="input-placeholder" style="height: 180px;"></div>
+                <div style="height: 150px;"></div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # FORM LOGIN (Diletakkan di atas placeholder dengan columns)
+    # FORM LOGIN
     _, center_col, _ = st.columns([1, 2.5, 1])
     with center_col:
-        # Spacer untuk menyesuaikan posisi input di dalam card
-        st.markdown('<div style="height: 150px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height: 125px;"></div>', unsafe_allow_html=True)
         user = st.text_input("Username", key="u_login")
         password = st.text_input("Password", type="password", key="p_login")
-        
         if st.button("ENTER SYSTEM", type="primary"):
             if user == "admin" and password == "surabaya123":
                 st.session_state.logged_in = True
                 st.rerun()
             else:
-                st.error("Credential Gagal!")
-    
+                st.error("Gagal!")
     st.stop()
 
 # ==========================================
