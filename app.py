@@ -100,21 +100,26 @@ if not st.session_state.logged_in:
         [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
     
 
-        /* 3. TOMBOL EMAS - KITA TEMBAK LANGSUNG KE CLASS TERDALAM */
-        button[data-testid="stFormSubmitButton"], 
-        div.stFormSubmitButton > button {
-            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
-            color: #ffffff !important;
-            border: none !important;
-            border-radius: 12px !important;
-            padding: 14px 0 !important;
-            font-weight: 800 !important;
-            font-size: 16px !important;
-            letter-spacing: 1px !important;
-            width: 100% !important;
-            box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
-            text-transform: uppercase !important;
-        }
+        /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
+button[data-testid="stFormSubmitButton"], 
+div.stFormSubmitButton > button {
+    background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    
+    /* GANTI BAGIAN INI */
+    padding: 18px 20px !important; /* Naikin dari 14px ke 18px biar lega */
+    line-height: 1.2 !important;   /* Pastikan teks di tengah vertikal */
+    height: auto !important;       /* Biar tinggi tombol ngikutin padding */
+    
+    font-weight: 800 !important;
+    font-size: 16px !important;
+    letter-spacing: 1px !important;
+    width: 100% !important;
+    box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
+    text-transform: uppercase !important;
+}
 
         /* Paksa warna tetep emas pas kursor nempel */
         button[data-testid="stFormSubmitButton"]:hover {
