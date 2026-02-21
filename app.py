@@ -105,17 +105,6 @@ if not st.session_state.logged_in:
             display: none !important;
         }
 
-        /* 3. Style Kartu Login */
-        .login-card {
-            background: rgba(30, 30, 47, 0.95);
-            padding: 40px;
-            border-radius: 15px;
-            border: 1px solid #C5A059;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-            text-align: center;
-            max-width: 400px;
-            margin: 5vh auto;
-        }
 
         /* 4. Warna Label Putih */
         [data-testid="stWidgetLabel"] p {
