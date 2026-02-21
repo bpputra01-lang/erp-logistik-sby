@@ -91,7 +91,7 @@ if 'logged_in' not in st.session_state:
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* Background Full Screen dengan Overlay Gelap */
+        /* 1. Background Full Screen */
         .stApp {
             background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
@@ -99,46 +99,60 @@ if not st.session_state.logged_in:
             background-position: center !important;
         }
         
-        /* Sembunyikan Header & Sidebar */
+        /* 2. Sembunyikan Header & Sidebar */
         [data-testid="stSidebar"], [data-testid="stHeader"] {
             display: none !important;
         }
 
-        /* Warna Label Input (Username/Password) */
-        [data-testid="stWidgetLabel"] p {
-            color: #E0E0E0 !important;
-            font-weight: 500 !important;
-            font-size: 14px !important;
-            margin-bottom: 5px !important;
+        /* 3. STYLE KARTU LOGIN (Wajib ada biar elegan) */
+        .login-card {
+            background: rgba(20, 20, 30, 0.85) !important;
+            backdrop-filter: blur(15px);
+            padding: 50px 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            text-align: center;
+            max-width: 450px;
+            margin: 5vh auto; /* Jarak atas cuma 5vh biar NAIK */
         }
 
-        /* Style Input Box agar Match dengan Tema */
+        /* 4. Warna Label Input Putih */
+        [data-testid="stWidgetLabel"] p {
+            color: #FFFFFF !important;
+            font-weight: 500 !important;
+            font-size: 14px !important;
+        }
+
+        /* 5. Style Input Box */
         div[data-baseweb="input"] {
             background-color: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
             border-radius: 10px !important;
+        }
+        
+        input {
             color: white !important;
         }
-/* TEMBAK MATI BIAR GAK PUTIH LAGI */
-button[data-testid="stFormSubmitButton"] {
-    background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
-    color: white !important; /* Warna tulisan di dalam tombol */
-    border: 1px solid rgba(197, 160, 89, 0.5) !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
-}
 
-/* Pastikan pas di-hover (disentuh mouse) warnanya gak balik putih */
-button[data-testid="stFormSubmitButton"]:hover {
-    background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
-    color: #1e1e2f !important; /* Tulisan jadi gelap pas di-hover biar kontras */
-    border: 1px solid #C5A059 !important;
-}
+        /* 6. TOMBOL LOGIN EMAS (ANTI-PUTIH) */
+        button[data-testid="stFormSubmitButton"] {
+            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+            color: white !important;
+            border: none !important;
+            padding: 12px 0 !important;
+            font-weight: 800 !important;
+            letter-spacing: 1.2px !important;
+            border-radius: 10px !important;
+            width: 100% !important;
+            box-shadow: 0 4px 15px rgba(197, 160, 89, 0.4) !important;
+            transition: all 0.3s ease !important;
+        }
 
-/* Hilangkan border biru bawaan Streamlit saat diklik */
-button[data-testid="stFormSubmitButton"]:focus:not(:active) {
-    border-color: #C5A059 !important;
-    color: white !important;
-}
+        button[data-testid="stFormSubmitButton"]:hover {
+            transform: translateY(-2px) !important;
+            filter: brightness(1.2) !important;
+            box-shadow: 0 6px 20px rgba(197, 160, 89, 0.6) !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -171,16 +185,14 @@ button[data-testid="stFormSubmitButton"]:focus:not(:active) {
             ">Surabaya Logistics Management System</p>
         """, unsafe_allow_html=True)
 
-        # BUNGKUS FORM (Bisa ENTER otomatis & Gak Error Duplicate Key)
+        # BUNGKUS FORM
         with st.form("login_form"):
             user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
             pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
             
-            # Spasi dikit
-            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+            st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
             
             submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
-            
             
             if submit_button:
                 if user_input == "admin" and pass_input == "surabaya123":
@@ -192,9 +204,10 @@ button[data-testid="stFormSubmitButton"]:focus:not(:active) {
         # Tutup Container Card
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # PAKSA BERHENTI agar dashboard di bawah tidak tereksekusi sebelum login
     st.stop()
+
 # --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
+st.success("Berhasil Login! Selamat datang di dashboard.")
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
 import pandas as pd
 import numpy as np
