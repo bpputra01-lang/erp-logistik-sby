@@ -88,7 +88,7 @@ if not st.session_state.logged_in:
     # FORM LOGIN
     _, center_col, _ = st.columns([1, 2.5, 1])
     with center_col:
-        st.markdown('<div style="height: 80px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height: 20px;"></div>', unsafe_allow_html=True)
         user = st.text_input("Username", key="u_login")
         password = st.text_input("Password", type="password", key="p_login")
         if st.button("ENTER SYSTEM", type="primary"):
