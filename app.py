@@ -113,7 +113,7 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Gagal!")
+                    st.error("Password / Username salah")
     st.stop()
 
 # ==========================================
