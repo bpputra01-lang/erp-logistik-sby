@@ -811,53 +811,70 @@ elif menu == "Stock Minus":
 elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>SURABAYA LOGISTICS ENGINE</h1></div>', unsafe_allow_html=True)
     
-    # --- STEP 1: UPLOAD APPSHEET SEKALI AJA ---
-    st.info("💡 Upload file Master APPSHEET RTO dulu di sini, baru pilih mau proses yang mana.")
-    file_master_app = st.file_uploader("📂 MASTER APPSHEET RTO (Wajib Upload)", type=['xlsx'], key="master_app")
+    st.subheader("🛠️ STEP 1: PREPARE DATA SOURCE")
+    # Langsung buka semua uploader di awal
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        file_ds = st.file_uploader("1. Upload DS RTO", type=['xlsx'], key="ds")
+    with c2:
+        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx'], key="app")
+    with c3:
+        file_draft = st.file_uploader("3. Draft RTO Jezpro", type=['xlsx'], key="draft")
 
-    if file_master_app:
-        # Load data appsheet sekali untuk semua engine
-        df_app_master = pd.read_excel(file_master_app)
-        st.success(f"✅ Master Appsheet Terpasang! ({len(df_app_master)} Baris)")
+    st.divider()
 
-        st.divider()
-
-        # --- STEP 2: PILIHAN PROSES ---
-        col_left, col_right = st.columns(2)
-
-        # -- SEBELAH KIRI: URUSAN DS RTO --
-        with col_left:
-            st.subheader("1. Update DS RTO")
-            file_ds = st.file_uploader("Upload DS RTO", type=['xlsx'], key="ds_rto")
-            if st.button("🚀 RUN ENGINE DS RTO", use_container_width=True):
-                if file_ds:
+    st.subheader("🚀 STEP 2: EXECUTE SEQUENCE")
+    # Satu tombol buat jalanin semua alur kayak Macro
+    if st.button("🔥 JALANKAN SEMUA PROSES (SEQUENCE)", use_container_width=True):
+        if file_ds and file_app and file_draft:
+            try:
+                # --- PROSES 1: LOAD SEMUA DATA ---
+                with st.status("Sedang memproses alur Macro...", expanded=True) as status:
+                    st.write("Reading files...")
                     df_ds = pd.read_excel(file_ds)
-                    # Panggil fungsi engine pake df_app_master yang udah di-load tadi
-                    hasil_ds = engine_ds_rto_ultrafast(df_ds, df_app_master)
-                    st.success("Selesai!")
-                    st.dataframe(hasil_ds, use_container_width=True)
-                else:
-                    st.error("Upload file DS RTO-nya mana?")
+                    df_app = pd.read_excel(file_app)
+                    df_draft = pd.read_excel(file_draft)
 
-        # -- SEBELAH KANAN: URUSAN DRAFT JEZPRO --
-        with col_right:
-            st.subheader("2. Compare Draft Jezpro")
-            file_draft = st.file_uploader("Upload DRAFT RTO JEZPRO", type=['xlsx'], key="draft_jez")
-            if st.button("🔥 COMPARE DRAFT JEZPRO", use_container_width=True):
-                if file_draft:
-                    with st.spinner('Lagi nyocokin data...'):
-                        df_draft = pd.read_excel(file_draft)
-                        # Panggil engine jezpro pake df_app_master yang sama
-                        hasil_jez = engine_compare_draft_jezpro(df_draft, df_app_master)
-                        st.success("Selesai!")
-                        st.dataframe(hasil_jez, use_container_width=True)
-                        
-                        # Download link
-                        output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                            hasil_jez.to_excel(writer, index=False, sheet_name='Hasil_Jezpro')
-                        st.download_button("📥 DOWNLOAD HASIL JEZPRO", output.getvalue(), "Hasil_Compare_Jezpro.xlsx")
-                else:
-                    st.error("Upload file Draft Jezpro-nya dulu!")
-    else:
-        st.warning("⚠️ Boss, upload file **APPSHEET RTO** dulu biar panel prosesnya kebuka!")
+                    # --- PROSES 2: ENGINE DS RTO (Macro Part 1) ---
+                    st.write("Running Engine DS RTO vs Appsheet...")
+                    hasil_ds = engine_ds_rto_ultrafast(df_ds, df_app)
+                    st.success("Step 1: DS RTO Comparison Beres!")
+
+                    # --- PROSES 3: ENGINE DRAFT JEZPRO (Macro Part 2) ---
+                    # Logic: Gunakan data Appsheet yang sama untuk compare Jezpro
+                    st.write("Running Engine Draft Jezpro vs Appsheet...")
+                    hasil_jez = engine_compare_draft_jezpro(df_draft, df_app)
+                    st.success("Step 2: Draft Jezpro Comparison Beres!")
+
+                    status.update(label="PROSES SELESAI, JANCOK!", state="complete", expanded=False)
+
+                # --- STEP 3: TAMPILKAN HASIL & DOWNLOAD ---
+                st.divider()
+                res1, res2 = st.columns(2)
+                
+                with res1:
+                    st.write("### HASIL DS RTO")
+                    st.dataframe(hasil_ds, height=300)
+                    
+                with res2:
+                    st.write("### HASIL DRAFT JEZPRO")
+                    st.dataframe(hasil_jez, height=300)
+                    
+                    # Tombol Download gabungan atau masing-masing
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        hasil_ds.to_excel(writer, index=False, sheet_name='Update_DS_RTO')
+                        hasil_jez.to_excel(writer, index=False, sheet_name='Draft_Jezpro_Final')
+                    
+                    st.download_button(
+                        label="📥 DOWNLOAD HASIL FINAL (SINGLE FILE)",
+                        data=output.getvalue(),
+                        file_name=f"FINAL_RTO_REPORT_{pd.Timestamp.now().strftime('%d%m%Y_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+
+            except Exception as e:
+                st.error(f"Error pas proses, Cok! Cek format kolomnya. Detail: {e}")
+        else:
+            st.error("Upload ketiga filenya dulu! Jangan ada yang ketinggalan.")
