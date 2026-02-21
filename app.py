@@ -872,13 +872,16 @@ elif menu == "Compare RTO":
     # --- 1. SESSION STATE ---
     if 'step_cleared' not in st.session_state: st.session_state.step_cleared = False
     if 'hasil_ds_vs_app' not in st.session_state: st.session_state.hasil_ds_vs_app = None
+    if 'data_ds' not in st.session_state: st.session_state.data_ds = None
+    if 'data_app' not in st.session_state: st.session_state.data_app = None
+    if 'data_draft' not in st.session_state: st.session_state.data_draft = None
 
     # --- 2. UPLOAD AREA ---
     c1, c2, c3 = st.columns(3)
     with c1:
-        file_ds = st.file_uploader("1. Upload DS RTO (Fisik)", type=['xlsx', 'csv'])
+        file_ds = st.file_uploader("1. Upload DS RTO (Fisik)", type=['xlsx','csv'])
     with c2:
-        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx', 'csv'])
+        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx','csv'])
     with c3:
         file_draft = st.file_uploader("3. Draft RTO (Rencana)", type=['xlsx','csv'])
 
@@ -888,64 +891,33 @@ elif menu == "Compare RTO":
     st.subheader("🟢 STEP 1: VALIDASI SCAN VS APPSHEET")
     
     if st.button("🚀 JALANKAN PROSES AWAL", use_container_width=True):
-    # 1. VALIDASI: Pastiin user udah upload filenya
-    if file_ds is not None and file_app is not None:
-        try:
-            # 2. TAMBAHKAN ENGINE: Pake openpyxl atau calamine biar stabil
-            st.session_state.data_ds = pd.read_excel(file_ds, engine='openpyxl')
-            st.session_state.data_app = pd.read_excel(file_app, engine='openpyxl')
-            
-            # Jika ada file draft juga, baca juga
-            if file_draft is not None:
-                st.session_state.data_draft = pd.read_excel(file_draft, engine='openpyxl')
-
-            # Jalankan Engine logic lo
-            st.session_state.hasil_final = engine_ds_rto_ultrafast(
-                st.session_state.data_ds, 
-                st.session_state.data_app
-            )
-            st.success("Data Berhasil Diolah!")
-            
-        except Exception as e:
-            st.error(f"Gagal baca Excel! Pastiin filenya gak dipassword. Error: {e}")
-    else:
-        # Ini biar gak muncul ValueError kalau belum upload
-        st.error("Filenya di-upload dulu")
-
-    # --- 4. AREA REKONSILIASI (MUNCUL JIKA ADA SELISIH) ---
-    # --- 3. STEP 1: COMPARE SCAN VS APPSHEET ---
-    st.subheader("🟢 STEP 1: VALIDASI SCAN VS APPSHEET")
-    
-    if st.button("🚀 JALANKAN PROSES AWAL", use_container_width=True):
-        # 1. VALIDASI: Pastiin user udah upload filenya
         if file_ds is not None and file_app is not None:
             try:
-                # 2. BACA EXCEL
+                # Proses baca file
                 st.session_state.data_ds = pd.read_excel(file_ds, engine='openpyxl')
                 st.session_state.data_app = pd.read_excel(file_app, engine='openpyxl')
                 
                 if file_draft is not None:
                     st.session_state.data_draft = pd.read_excel(file_draft, engine='openpyxl')
 
-                # 3. JALANKAN ENGINE (Simpan ke hasil_ds_vs_app biar konsisten)
+                # Jalankan Engine
                 hasil = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
                 st.session_state.hasil_ds_vs_app = hasil
                 
-                # Cek Mismatch
-                mismatch_count = len(hasil[hasil['NOTE'] != 'SESUAI'])
-                if mismatch_count == 0:
+                # Cek apakah ada yang gak SESUAI
+                mismatch = hasil[hasil['NOTE'] != 'SESUAI']
+                if len(mismatch) == 0:
                     st.session_state.step_cleared = True
-                    st.success("✅ DATA SCAN SINKRON! Silahkan lanjut ke Step 2.")
+                    st.success("✅ DATA SINKRON! Silahkan lanjut ke Step 2.")
                 else:
                     st.session_state.step_cleared = False
-                    st.error(f"❌ STOP! Ada {mismatch_count} SKU Selisih. Rekonsiliasi dulu!")
-                    
+                    st.error(f"❌ STOP! Ada {len(mismatch)} SKU Selisih. Cek tabel di bawah!")
             except Exception as e:
-                st.error(f"Gagal baca Excel! Error: {e}")
+                st.error(f"Gagal baca file: {e}")
         else:
-            st.error("Upload File 1 (DS) dan File 2 (Appsheet) dulu!")
+            st.error("Upload dulu File 1 dan File 2, Cok!")
 
-    # --- 4. AREA REKONSILIASI (MUNCUL JIKA ADA HASIL) ---
+    # --- 4. AREA REKONSILIASI ---
     if st.session_state.hasil_ds_vs_app is not None:
         df_res = st.session_state.hasil_ds_vs_app
         df_mismatch = df_res[df_res['NOTE'] != 'SESUAI'].copy()
@@ -953,27 +925,16 @@ elif menu == "Compare RTO":
         if len(df_mismatch) > 0:
             st.divider()
             st.subheader(f"⚠️ DAFTAR SELISIH ({len(df_mismatch)} SKU)")
-            st.info("💡 Update data di Appsheet, upload ulang file Master Appsheet, lalu klik Refresh di bawah.")
-            
-            # Tabel interaktif
             st.data_editor(df_mismatch, use_container_width=True, key="editor_rekon", hide_index=True)
             
             if st.button("🔄 REFRESH & RE-CHECK"):
                 if file_app is not None:
-                    # Baca ulang appsheet terbaru
                     df_app_new = pd.read_excel(file_app, engine='openpyxl')
-                    # Hitung ulang comparenya
                     hasil_baru = engine_ds_rto_ultrafast(st.session_state.data_ds, df_app_new)
                     st.session_state.hasil_ds_vs_app = hasil_baru
-                    
-                    # Update status step_cleared
-                    if len(hasil_baru[hasil_baru['NOTE'] != 'SESUAI']) == 0:
-                        st.session_state.step_cleared = True
-                    else:
-                        st.session_state.step_cleared = False
+                    # Update status gembok
+                    st.session_state.step_cleared = (len(hasil_baru[hasil_baru['NOTE'] != 'SESUAI']) == 0)
                     st.rerun()
-                else:
-                    st.error("Upload file Appsheet yang baru dulu!")
 
     st.divider()
 
@@ -982,13 +943,11 @@ elif menu == "Compare RTO":
     
     if st.session_state.step_cleared:
         if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
-            if file_draft:
-                # Disini lo bisa panggil fungsi engine jezpro lo
-                st.write("### 🏆 HASIL FINAL MATCHING DRAFT")
-                # hasil_final = engine_compare_draft_jezpro(st.session_state.data_draft, st.session_state.data_app)
-                # st.dataframe(hasil_final)
+            if st.session_state.data_draft is not None:
+                st.write("### 🏆 PROSES FINAL MATCHING...")
+                # Panggil engine jezpro lo di sini
                 st.balloons()
             else:
-                st.error("File Draft RTO (File 3) belum diupload!")
+                st.error("File Draft (File 3) belum ada!")
     else:
-        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 sampai tidak ada selisih (SESUAI semua).")
+        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 (Harus SESUAI semua).")
