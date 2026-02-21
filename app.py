@@ -4,92 +4,103 @@ import streamlit as st
 import io
 import math
 
-# 1. KONFIGURASI HALAMAN
-st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
-
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (BOX BIRU KILLED)
+# KONDISI 1: TAMPILAN LOGIN (FIXED & NO SCROLL)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* 1. SEMBUNYIKAN ELEMEN BAWAAN */
+        /* 1. KUNCI LAYAR (MATIKAN SCROLL) */
+        html, body, [data-testid="stAppViewContainer"] {
+            overflow: hidden !important;
+            height: 100vh !important;
+        }
+
+        /* 2. SEMBUNYIKAN ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
-        
-        /* 2. MATIKAN CONTAINER UTAMA */
-        .main .block-container { background: transparent !important; padding: 0 !important; }
         
         /* 3. BACKGROUND FULL SCREEN */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
-            background-size: cover; background-position: center; background-attachment: fixed;
+            background-size: cover; 
+            background-position: center;
         }
 
-        /* 4. PEMBANTAI BOX BIRU/ABU DI TENGAH */
-        [data-testid="stVerticalBlockBorderWrapper"], 
-        [data-testid="stVerticalBlock"],
-        [data-testid="stHorizontalBlock"],
-        div[data-testid="stExpander"] {
-            border: none !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
+        /* 4. CONTAINER UTAMA LOGIN (DIPERTAHANKAN POSISI TETAP) */
+        .main-login-container {
+            position: fixed;
+            top: 40%; /* Posisi dinaikkan agar tidak terlalu ke bawah */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            z-index: 9999;
+            text-align: center;
         }
 
-        /* 5. LOGIN CARD */
+        /* 5. CARD VISUAL */
         .login-card {
-            position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%);
-            width: 380px; background: rgba(30, 30, 47, 0.98); backdrop-filter: blur(20px);
-            padding: 30px; border-radius: 15px; border: 1px solid rgba(197, 160, 89, 0.5);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.9); z-index: 9999;
+            background: rgba(30, 30, 47, 0.98);
+            backdrop-filter: blur(20px);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(197, 160, 89, 0.5);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9);
+            margin-bottom: -200px; /* Menarik visual agar menyatu dengan input */
         }
 
-        /* HEADER DALAM CARD (Logo & Title) */
         .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
         .header-logo { font-size: 28px; display: inline-block; vertical-align: middle; }
         .header-text { display: inline-block; vertical-align: middle; margin-left: 10px; }
         .header-title { color: #C5A059; font-size: 18px; font-weight: 800; line-height: 1.1; }
         .header-subtitle { color: #aaaaaa; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* 6. STYLE INPUT */
-        div[data-baseweb="input"] { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(197, 160, 89, 0.3) !important; border-radius: 8px !important; }
+        /* 6. STYLE INPUT STREAMLIT */
+        div[data-baseweb="input"] { 
+            background-color: rgba(255, 255, 255, 0.05) !important; 
+            border: 1px solid rgba(197, 160, 89, 0.3) !important; 
+            border-radius: 8px !important; 
+        }
         input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; }
+        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; text-align: left !important; display: block !important;}
 
         /* 7. TOMBOL LOGIN */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important; font-weight: 800 !important; width: 100% !important;
-            border-radius: 8px !important; margin-top: 10px; border: none !important;
+            border-radius: 8px !important; margin-top: 15px; border: none !important;
+            height: 45px;
         }
-        
-        /* 8. POSISI INPUT BIAR PRESISI DI DALAM CARD */
-        .stTextInput { margin-top: -10px; }
+
+        /* MATIKAN BOX BIRU/ABU STREAMLIT */
+        [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] {
+            background-color: transparent !important;
+            border: none !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
-    # RENDER VISUAL CARD
+    # RENDER VISUAL CARD & FORM
     st.markdown("""
-        <div class="login-card">
-            <div class="header-container">
-                <div class="header-logo">📦</div>
-                <div class="header-text">
-                    <div class="header-title">ERP LOGISTIC</div>
-                    <div class="header-subtitle">Secure System Access</div>
+        <div class="main-login-container">
+            <div class="login-card">
+                <div class="header-container">
+                    <div class="header-logo">📦</div>
+                    <div class="header-text">
+                        <div class="header-title">ERP LOGISTIC</div>
+                        <div class="header-subtitle">Secure System Access</div>
+                    </div>
                 </div>
+                <div id="input-placeholder" style="height: 180px;"></div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # FORM LOGIN (Pake columns biar layout block birunya pecah/hilang)
-    _, center_col, _ = st.columns([1, 2, 1])
+    # FORM LOGIN (Diletakkan di atas placeholder dengan columns)
+    _, center_col, _ = st.columns([1, 2.5, 1])
     with center_col:
-        # Pake container kosong buat narik input ke posisi card (Fixed Position)
-        # Input Python akan render di atas visual card tadi
-        st.markdown('<div style="height: 220px;"></div>', unsafe_allow_html=True) # Spacer
+        # Spacer untuk menyesuaikan posisi input di dalam card
+        st.markdown('<div style="height: 195px;"></div>', unsafe_allow_html=True)
         user = st.text_input("Username", key="u_login")
         password = st.text_input("Password", type="password", key="p_login")
         
@@ -99,6 +110,7 @@ if not st.session_state.logged_in:
                 st.rerun()
             else:
                 st.error("Credential Gagal!")
+    
     st.stop()
 
 # ==========================================
