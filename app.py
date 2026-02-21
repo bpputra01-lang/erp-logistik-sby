@@ -365,14 +365,36 @@ with st.sidebar:
         🚚 ERP LOGISTIC<br>SURABAYA
     </div>
 """, unsafe_allow_html=True)
-# --- TOMBOL LOGOUT (Taruh di sidebar dashboard lu) ---
+# --- TOMBOL LOGOUT ELEGAN (Taruh di paling bawah) ---
 
 with st.sidebar:
-    # Lu udah punya judul sidebar di CSS lu (.sidebar-title), 
-    # kita tambahin sedikit space dan tombol logout di bawah menu navigasi
-    st.markdown("<br><br>", unsafe_allow_html=True) # Jarak biar nggak numpuk sama menu
-    
-    if st.button("🚪 LOGOUT", use_container_width=True):
+    # CSS khusus untuk mempercantik tombol logout agar tidak kontras norak
+    st.markdown("""
+        <style>
+        /* Styling tombol logout agar menyatu dengan sidebar gelap */
+        div.stButton > button:first-child {
+            background-color: transparent !important;
+            color: #d1d1d1 !important;
+            border: 1px solid #2d2d44 !important;
+            border-radius: 8px !important;
+            transition: all 0.3s ease;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            margin-top: 50px; /* Jarak dari menu atas */
+        }
+        
+        /* Efek hover pas mouse di atas tombol */
+        div.stButton > button:first-child:hover {
+            border-color: #ff4b4b !important;
+            color: #ff4b4b !important;
+            background-color: rgba(255, 75, 75, 0.05) !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Menaruh tombol di paling bawah sidebar
+    st.markdown("---") # Garis pemisah tipis
+    if st.button("Logout Session", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
 
