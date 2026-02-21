@@ -876,11 +876,11 @@ elif menu == "Compare RTO":
     # --- 2. UPLOAD AREA ---
     c1, c2, c3 = st.columns(3)
     with c1:
-        file_ds = st.file_uploader("1. Upload DS RTO (Fisik)", type=['xlsx'])
+        file_ds = st.file_uploader("1. Upload DS RTO (Fisik)", type=['xlsx', 'csv'])
     with c2:
-        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx'])
+        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx', 'csv'])
     with c3:
-        file_draft = st.file_uploader("3. Draft RTO (Rencana)", type=['xlsx'])
+        file_draft = st.file_uploader("3. Draft RTO (Rencana)", type=['xlsx','csv'])
 
     st.divider()
 
