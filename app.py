@@ -189,8 +189,6 @@ div.stFormSubmitButton > button {
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.stop()
-st.stop()
-
 # --- DASHBOARD UTAMA (Jalan setelah login) ---
 
 # Cek apakah notifikasi sudah pernah muncul
