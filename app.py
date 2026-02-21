@@ -70,22 +70,7 @@ if not st.session_state.logged_in:
             }, { passive: false });
         </script>
     """, height=0)
-
-    # RENDER VISUAL CARD
-    st.markdown("""
-        <div class="main-login-container">
-            <div class="login-card" style="background: rgba(30, 30, 47, 0.98); padding: 30px; border-radius: 15px; border: 1px solid rgba(197, 160, 89, 0.5); box-shadow: 0 25px 50px rgba(0,0,0,0.9);">
-                <div class="header-container">
-                    <span style="font-size: 28px;">📦</span>
-                    <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
-                        <div class="header-title">ERP LOGISTIC</div>
-                        <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
-                    </div>
-                </div>
-                <div style="height: 150px;"></div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    
 
     # FORM LOGIN
     _, center_col, _ = st.columns([1, 2.5, 1])
