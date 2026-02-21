@@ -88,11 +88,11 @@ import streamlit as st
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
+## --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* 1. Background Gudang Full Screen */
+        /* 1. Background */
         .stApp {
             background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
@@ -100,16 +100,36 @@ if not st.session_state.logged_in:
             background-position: center !important;
         }
         
-        /* 2. Sembunyikan Sidebar & Header */
+        /* 2. Sembunyikan Navigasi */
         [data-testid="stSidebar"], [data-testid="stHeader"] {
             display: none !important;
         }
 
-        /* 3. WARNA LABEL PUTIH */
+        /* 3. Style Kartu Login */
+        .login-card {
+            background: rgba(30, 30, 47, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            border: 1px solid #C5A059;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            text-align: center;
+            max-width: 400px;
+            margin: 5vh auto;
+        }
+
+        /* 4. Warna Label Putih */
         [data-testid="stWidgetLabel"] p {
             color: white !important;
             font-weight: 500 !important;
-        
+        }
+
+        /* 5. Style Tombol Form agar Emas */
+        button[data-testid="stFormSubmitButton"] {
+            background-color: #C5A059 !important;
+            color: #1e1e2f !important;
+            border: none !important;
+            font-weight: 800 !important;
+            width: 100% !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -117,50 +137,22 @@ if not st.session_state.logged_in:
     # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
-        # Buka Container Card
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
         
-        # JUDUL (Ditarik ke atas pake margin-top minus)
-        st.markdown("""
-            <h2 style="
-                color: #C5A059; 
-                margin-top: -30px; 
-                margin-bottom: -50px; 
-                font-family: 'Inter', sans-serif; 
-                font-weight: 800; 
-                letter-spacing: 1px;
-                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-                text-align: center;
-            ">📦 LOGISTIC SURABAYA ERP</h2>
-        """, unsafe_allow_html=True)
-
+        # JUDUL
+        st.markdown('<h2 style="color: #C5A059; margin-top: -20px; margin-bottom: -10px; font-family: \'Inter\'; font-weight: 800; text-align: center;">📦 LOGISTIC SURABAYA ERP</h2>', unsafe_allow_html=True)
+        
         # SUB-JUDUL
-        st.markdown("""
-            <p style="
-                color: #E0E0E0; 
-                font-size: 14px; 
-                font-weight: 500; 
-                letter-spacing: 0.8px;
-                margin-bottom: 25px;
-                text-align: center;
-            ">Surabaya Logistics Management System</p>
-        """, unsafe_allow_html=True)
+        st.markdown('<p style="color: #E0E0E0; font-size: 14px; margin-bottom: 20px; text-align: center;">Surabaya Logistics Management System</p>', unsafe_allow_html=True)
 
-        # INPUT (Username & Password)
-        user_input = st.text_input("Username", key="input_user", placeholder="Username")
-        pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Bungkus pake form biar bisa ENTER otomatis
-        with st.form("login_form", clear_on_submit=False):
+        # BUNGKUS FORM (HANYA SATU KALI INPUT DI SINI)
+        with st.form("login_form"):
             user_input = st.text_input("Username", key="input_user", placeholder="Username")
             pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Tombol login di dalam form jadi 'form_submit_button'
-            submit_button = st.form_submit_button("SIGN IN TO SYSTEM", use_container_width=True)
+            submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
             
             if submit_button:
                 if user_input == "admin" and pass_input == "surabaya123":
@@ -169,10 +161,8 @@ if not st.session_state.logged_in:
                 else:
                     st.error("Username/Password Salah!")
         
-        # Tutup Container Card
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # PAKSA BERHENTI (Agar konten dashboard tidak bocor)
     st.stop()
 # --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
