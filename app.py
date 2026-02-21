@@ -1,62 +1,66 @@
 import pandas as pd
 import numpy as np
-import streamlit as st # <--- INI HARUS DI ATAS
+import streamlit as st
 import plotly.express as px
 
-# 1. SET PAGE CONFIG (HARUS PALING PERTAMA SETELAH IMPORT)
+# 1. SET PAGE CONFIG
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# 2. INISIALISASI SESSION STATE (BIAR GAK NameError)
+# 2. INISIALISASI SESSION STATE
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (BOX DI TENGAH TOTAL)
+# KONDISI 1: TAMPILAN LOGIN (FULL CLEAN)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* SEMBUNYIKAN SIDEBAR & HEADER PAKSA */
+        /* SEMBUNYIKAN SEMUA ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, .stDeployButton { display: none !important; }
         
         /* BACKGROUND GUDANG FULL SCREEN */
         .stApp {
-            background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
+            background: linear-gradient(rgba(10, 10, 20, 0.85), rgba(10, 10, 20, 0.85)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
         }
 
-        /* BOX LOGIN DI TENGAH TOTAL TANPA SCROLL */
+        /* HILANGKAN SEMUA KOTAK DEFAULT STREAMLIT */
+        .main .block-container { background: transparent !important; }
+        [data-testid="stVerticalBlock"] { background: transparent !important; gap: 0rem !important; }
+
+        /* BOX LOGIN MELAYANG DI TENGAH */
         .login-wrapper {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 9999;
-            width: 400px;
+            width: 420px;
             text-align: center;
-            background: rgba(30, 30, 47, 0.85);
-            backdrop-filter: blur(15px);
-            padding: 40px;
+            background: rgba(30, 30, 47, 0.9); /* Gelap Solid & Elegant */
+            backdrop-filter: blur(20px);
+            padding: 50px 40px;
             border-radius: 20px;
-            border: 1px solid rgba(197, 160, 89, 0.3);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+            border: 1px solid rgba(197, 160, 89, 0.4); /* Border Gold */
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8);
         }
 
-        .login-logo { font-size: 50px; margin-bottom: 10px; }
-        .login-title { color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px; font-family: 'Inter', sans-serif; }
-        .login-subtitle { color: #d1d1d1; font-size: 14px; margin-bottom: 30px; }
+        .login-logo { font-size: 60px; margin-bottom: 15px; }
+        .login-title { color: #C5A059; font-size: 26px; font-weight: 800; margin-bottom: 5px; font-family: 'Inter', sans-serif; }
+        .login-subtitle { color: #aaaaaa; font-size: 14px; margin-bottom: 30px; }
 
         /* INPUT FIELD */
         div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(197, 160, 89, 0.4) !important;
+            background-color: rgba(0, 0, 0, 0.2) !important;
+            border: 1px solid rgba(197, 160, 89, 0.3) !important;
             border-radius: 10px !important;
         }
         input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700 !important; }
+        label { color: #C5A059 !important; font-weight: 700 !important; margin-bottom: 10px !important; }
 
         /* TOMBOL LOGIN */
         button[kind="primary"] {
@@ -64,37 +68,49 @@ if not st.session_state.logged_in:
             color: #1a2634 !important;
             font-weight: 800 !important;
             width: 100% !important;
-            border-radius: 10px !important;
-            padding: 10px !important;
-            margin-top: 20px;
+            border-radius: 12px !important;
+            padding: 12px !important;
+            border: none !important;
+            margin-top: 15px;
+            transition: 0.3s;
         }
+        button[kind="primary"]:hover { transform: scale(1.02); }
         </style>
     """, unsafe_allow_html=True)
 
-    # PEMBUNGKUS BOX LOGIN
-    st.markdown('<div class="login-wrapper">', unsafe_allow_html=True)
-    st.markdown('<div class="login-logo">📦</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">ERP LOGISTIC</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-subtitle">Silakan login terlebih dahulu.</div>', unsafe_allow_html=True)
+    # HTML UNTUK BOX LOGIN (Satu div Wrapper saja agar tidak ada kotak double)
+    st.markdown(f"""
+        <div class="login-wrapper">
+            <div class="login-logo">📦</div>
+            <div class="login-title">ERP LOGISTIC</div>
+            <div class="login-subtitle">Secure System Access</div>
+        </div>
+    """, unsafe_allow_html=True)
 
-    u = st.text_input("Username", key="user")
-    p = st.text_input("Password", type="password", key="pass")
-    
-    if st.button("L O G I N", type="primary"):
-        if u == "admin" and p == "surabaya123":
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Credential Gagal!")
+    # Menempatkan input di dalam wrapper secara visual menggunakan CSS fixed di atas
+    # Kita bungkus input dalam kolom kosong agar tidak ngerender kotak default
+    _, center, _ = st.columns([1, 2, 1])
+    with center:
+        # Trik: Gunakan kontainer kosong agar input "jatuh" ke posisi wrapper CSS
+        # Tapi karena wrapper kita pakai 'fixed', kita buat form loginnya di sini
+        st.write("") # Spacer
+        u = st.text_input("Username", key="user")
+        p = st.text_input("Password", type="password", key="pass")
+        
+        if st.button("ENTER SYSTEM", type="primary"):
+            if u == "admin" and p == "surabaya123":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Credential Gagal!")
 
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.stop() # <--- BERHENTI BIAR SIDEBAR GAK MUNCUL
+    st.stop()
 
 # ==========================================
 # KONDISI 2: DASHBOARD (JALAN SETELAH LOGIN)
 # ==========================================
 else:
-    # Taruh CSS Dashboard lo dan Konten lo di sini
+    # Kode Dashboard lo tetap sama
     st.sidebar.title("ERP LOGISTIC")
     if st.sidebar.button("LOGOUT"):
         st.session_state.logged_in = False
