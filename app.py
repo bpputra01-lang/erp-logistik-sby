@@ -917,6 +917,7 @@ elif menu == "Compare RTO":
             st.error("Upload dulu File 1 dan File 2, Cok!")
 
     # --- 4. AREA REKONSILIASI (MUNCUL JIKA ADA HASIL) ---
+    # --- 4. AREA REKONSILIASI (Pastikan pakai data_editor) ---
     if st.session_state.hasil_ds_vs_app is not None:
         df_res = st.session_state.hasil_ds_vs_app
         df_mismatch = df_res[df_res['NOTE'] != 'SESUAI'].copy()
@@ -924,11 +925,21 @@ elif menu == "Compare RTO":
         if len(df_mismatch) > 0:
             st.divider()
             st.subheader(f"⚠️ DAFTAR SELISIH ({len(df_mismatch)} SKU)")
-            st.info("💡 Lakukan Update di Appsheet, upload ulang file master, lalu klik Refresh di bawah.")
+            st.info("👇 KLIK & KETIK LANGSUNG DI KOLOM 'KETERANGAN' UNTUK REKONSILIASI")
             
-            # Tabel interaktif biar bisa dilihat selisihnya
-            st.data_editor(df_mismatch, use_container_width=True, key="editor_rekon", hide_index=True)
-            
+            # Tambahin kolom kosong buat lo ngetik kalau belum ada di engine
+            if 'KETERANGAN' not in df_mismatch.columns:
+                df_mismatch['KETERANGAN'] = ""
+
+            # INI KUNCINYA: Pakai data_editor
+            edited_df = st.data_editor(
+                df_mismatch,
+                use_container_width=True,
+                key="editor_rekon_live",
+                hide_index=True,
+                # Kolom SKU & QTY dikunci biar gak sengaja kehapus, tapi KETERANGAN bisa diisi
+                disabled=["SKU", "QTY SCAN", "SKU_FINAL", "TOTAL_QTY_APPSHEET", "SELISIH", "NOTE"]
+            )
             if st.button("🔄 REFRESH & RE-CHECK"):
                 if file_app is not None:
                     try:
