@@ -380,7 +380,7 @@ with st.sidebar:
             transition: all 0.3s ease;
             font-size: 14px !important;
             font-weight: 500 !important;
-            margin-top: 0px; /* Jarak dari menu atas */
+            margin-top: -100px; /* Jarak dari menu atas */
         }
         
         /* Efek hover pas mouse di atas tombol */
