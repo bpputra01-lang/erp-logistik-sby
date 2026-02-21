@@ -10,16 +10,26 @@ st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# ==========================================
-# KONDISI 1: TAMPILAN LOGIN (LOGO DI ATAS INPUT)
-# ==========================================
-if not st.session_state.logged_in:
-    st.markdown("""
+st.markdown("""
         <style>
-        /* SEMBUNYIKAN SEMUA ELEMEN BAWAAN */
+        /* 1. SEMBUNYIKAN SEMUA ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, .stDeployButton { display: none !important; }
         
-        /* BACKGROUND GUDANG FULL SCREEN */
+        /* 2. WADAH PEMBASMI BOX BIRU/ABU DI TENGAH (PENTING!) */
+        .main {
+            background: transparent !important;
+        }
+        .block-container {
+            max-width: 100% !important;
+            padding: 0 !important;
+            background: transparent !important;
+        }
+        [data-testid="stVerticalBlock"] {
+            background: transparent !important;
+            gap: 0rem !important;
+        }
+
+        /* 3. BACKGROUND GUDANG FULL SCREEN */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.85), rgba(10, 10, 20, 0.85)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
@@ -28,7 +38,7 @@ if not st.session_state.logged_in:
             background-attachment: fixed;
         }
 
-        /* CONTAINER LOGIN UTAMA (Penyatu Logo & Form) */
+        /* 4. CONTAINER LOGIN CARD (Tetap Estetik) */
         .login-card {
             position: fixed;
             top: 50%;
@@ -36,7 +46,7 @@ if not st.session_state.logged_in:
             transform: translate(-50%, -50%);
             z-index: 9999;
             width: 450px;
-            background: rgba(30, 30, 47, 0.9); 
+            background: rgba(30, 30, 47, 0.95); /* Sedikit lebih gelap biar kontras */
             backdrop-filter: blur(20px);
             padding: 40px;
             border-radius: 20px;
@@ -49,7 +59,7 @@ if not st.session_state.logged_in:
         .login-title { color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px; }
         .login-subtitle { color: #aaaaaa; font-size: 14px; margin-bottom: 30px; }
 
-        /* STYLE INPUT AGAR MASUK KE THEMA */
+        /* 5. STYLE INPUT */
         div[data-baseweb="input"] {
             background-color: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(197, 160, 89, 0.3) !important;
@@ -58,7 +68,7 @@ if not st.session_state.logged_in:
         input { color: white !important; }
         label { color: #C5A059 !important; font-weight: 700 !important; text-align: left !important; display: block; }
 
-        /* TOMBOL LOGIN */
+        /* 6. TOMBOL LOGIN */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important;
@@ -69,38 +79,8 @@ if not st.session_state.logged_in:
             margin-top: 20px;
             border: none !important;
         }
-
-        /* Hapus space putih Streamlit di dalam box */
-        [data-testid="stVerticalBlock"] { gap: 0.5rem !important; }
         </style>
     """, unsafe_allow_html=True)
-
-    # Buka Div Card
-    st.markdown('<div class="login-card">', unsafe_allow_html=True)
-    
-    # Bagian Atas (Logo & Judul)
-    st.markdown("""
-        <div class="login-logo">📦</div>
-        <div class="login-title">ERP LOGISTIC</div>
-        <div class="login-subtitle">Secure System Access</div>
-    """, unsafe_allow_html=True)
-
-    # Bagian Form (Username & Password)
-    # Kita pakai container agar input Streamlit ngerender di sini
-    u = st.text_input("Username", key="user")
-    p = st.text_input("Password", type="password", key="pass")
-    
-    if st.button("ENTER SYSTEM", type="primary"):
-        if u == "admin" and p == "surabaya123":
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Credential Gagal!")
-
-    # Tutup Div Card
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.stop()
 
 # ==========================================
 # KONDISI 2: DASHBOARD
