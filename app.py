@@ -138,7 +138,7 @@ if not st.session_state.logged_in:
                 font-size: 14px; 
                 font-weight: 400; 
                 letter-spacing: 0.5px;
-                margin-top: 5px;
+                margin-top: 0px;
                 margin-bottom: 30px;
                 text-align: center;
             ">Surabaya Logistics Management System</p>
