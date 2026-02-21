@@ -189,7 +189,16 @@ div.stFormSubmitButton > button {
     st.stop()
 
 # --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
-st.success("Berhasil Login! Selamat datang di dashboard.")
+
+# Cek apakah ini baru pertama kali masuk setelah login
+if 'login_success_shown' not in st.session_state:
+    st.toast("Berhasil Login! Selamat datang di dashboard.", icon="🚀")
+    # Atau kalau tetap mau pakai box hijau yang elegan tapi bisa hilang sendiri:
+    # st.success("Berhasil Login! Selamat datang di dashboard.") 
+    
+    # Set penanda supaya tidak muncul lagi di rerun berikutnya
+    st.session_state.login_success_shown = True
+
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
 import pandas as pd
 import numpy as np
