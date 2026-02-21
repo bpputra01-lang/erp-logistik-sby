@@ -9,83 +9,149 @@ from python_calamine import CalamineWorkbook
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# 2. THE AUTHENTIC ADMINITY UI ENGINE (Hanya memperbaiki CSS agar tulisan Putih)
-st.markdown("""
-    <style>
-    /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
-    .block-container { 
-        padding-top: 3.5rem !important; /* Tambah padding supaya judul gak kelindes toolbar atas */
-        padding-bottom: 0rem !important;
-    }
-    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
-    [data-testid="stSidebarNav"] { display: none; } 
-    
-    /* 2. STYLE JUDUL ERP DI SIDEBAR */
-    .sidebar-title { 
-        color: #00d2ff; 
-        text-align: center; 
-        font-family: 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 20px;
-        margin-top: -45px; 
-        padding-bottom: 15px;
-        border-bottom: 1px solid #2d2d44;
-        margin-bottom: 10px;
-    }
+# --- SISTEM LOGIN (Satu Tema dengan ERP) ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 
-    .stApp { background-color: #f4f7f6; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
-
-    /* 3. HERO HEADER - SLIM & MENGIKUTI PANJANG TEKS (GAK KEPOTONG) */
-    .hero-header { 
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-        color: white !important; 
-        padding: 8px 18px !important; /* Padding pas, gak kegedean */
-        border-radius: 8px; 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-        margin-top: 0px !important; /* Reset margin biar gak nyundul ke atas */
-        margin-bottom: 25px !important;
-        display: inline-block; /* Agar background cuma sepanjang tulisan */
-        width: auto;
-    }
-    .hero-header h1 { 
-        color: white !important; 
-        font-size: 20px !important; /* Ukuran font pas */
-        font-weight: 800 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px;
-        line-height: 1.2;
-    }
-
-    /* Metric Box */
-    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
-    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
-    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
-
-    /* Radio Button styling */
-    div.row-widget.stRadio > div { background-color: transparent !important; }
-    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
-    
-    /* --- INPUT BOX STYLE (TULISAN PUTIH TETAP AMAN) --- */
-    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important;
-        border: 1px solid #C5A059 !important;
-        border-radius: 8px !important;
-    }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
-    [data-testid="stFileUploaderText"] > span, 
-    [data-testid="stFileUploaderText"] > small {
-        color: white !important;
-        -webkit-text-fill-color: white !important;
-    }
-    
-    [data-testid="stFileUploader"] button {
-        background-color: #C5A059 !important;
-        color: #1a2634 !important;
-        font-weight: bold !important;
-    }
-    </style>
+def login_page():
+    st.markdown("""
+        <style>
+        .stApp { background-color: #1e1e2f; }
+        .login-card {
+            background: #1a2634;
+            padding: 3rem;
+            border-radius: 15px;
+            border: 1px solid #C5A059;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        .login-title {
+            color: #C5A059;
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style Input Login biar Putih */
+        div[data-baseweb="input"] { background-color: #1e1e2f !important; border: 1px solid #2d2d44 !important; }
+        input { color: white !important; }
+        label { color: #d1d1d1 !important; }
+        </style>
     """, unsafe_allow_html=True)
+    
+    empty1, col_login, empty2 = st.columns([1, 1.5, 1])
+    with col_login:
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        st.markdown('<div class="login-title">🚚 ERP LOGISTIC LOGIN</div>', unsafe_allow_html=True)
+        
+        user = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        
+        # Tombol Login pake warna Emas biar selaras
+        if st.button("LOG IN", type="primary", use_container_width=True):
+            if user == "admin" and password == "surabaya123":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Credential Salah!")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# LOGIKA HALAMAN
+if not st.session_state.logged_in:
+    login_page()
+else:
+    # 2. THE AUTHENTIC ADMINITY UI ENGINE (KODE ASLI LO TANPA UBAHAN)
+    st.markdown("""
+        <style>
+        /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
+        .block-container { 
+            padding-top: 3.5rem !important; 
+            padding-bottom: 0rem !important;
+        }
+        [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+        [data-testid="stSidebarNav"] { display: none; } 
+        
+        /* 2. STYLE JUDUL ERP DI SIDEBAR */
+        .sidebar-title { 
+            color: #00d2ff; 
+            text-align: center; 
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 20px;
+            margin-top: -45px; 
+            padding-bottom: 15px;
+            border-bottom: 1px solid #2d2d44;
+            margin-bottom: 10px;
+        }
+
+        .stApp { background-color: #f4f7f6; }
+        [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
+
+        /* 3. HERO HEADER - SLIM & MENGIKUTI PANJANG TEKS (GAK KEPOTONG) */
+        .hero-header { 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+            color: white !important; 
+            padding: 8px 18px !important; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+            margin-top: 0px !important; 
+            margin-bottom: 25px !important;
+            display: inline-block; 
+            width: auto;
+        }
+        .hero-header h1 { 
+            color: white !important; 
+            font-size: 20px !important; 
+            font-weight: 800 !important;
+            margin: 0 !important;
+            letter-spacing: 0.5px;
+            line-height: 1.2;
+        }
+
+        /* Metric Box */
+        .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
+        .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
+        .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
+
+        /* Radio Button styling */
+        div.row-widget.stRadio > div { background-color: transparent !important; }
+        div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
+        
+        /* --- INPUT BOX STYLE (TULISAN PUTIH TETAP AMAN) --- */
+        div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 8px !important;
+        }
+        div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
+        [data-testid="stFileUploaderText"] > span, 
+        [data-testid="stFileUploaderText"] > small {
+            color: white !important;
+            -webkit-text-fill-color: white !important;
+        }
+        
+        [data-testid="stFileUploader"] button {
+            background-color: #C5A059 !important;
+            color: #1a2634 !important;
+            font-weight: bold !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+    # --- KONTEN SIDEBAR ---
+    with st.sidebar:
+        st.markdown('<div class="sidebar-title">🚚 ERP LOGISTIC</div>', unsafe_allow_html=True)
+        if st.button("LOGOUT"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    # --- KONTEN UTAMA ---
+    st.markdown("""
+        <div class="hero-header">
+            <h1>DASHBOARD ANALYTICS ITEM SCAN</h1>
+        </div>
+    """, unsafe_allow_html=True)
+    
 
 import pandas as pd
 import numpy as np
