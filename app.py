@@ -16,47 +16,78 @@ if 'logged_in' not in st.session_state:
 # ==========================================
 if not st.session_state.logged_in:
     # 1. CSS UNTUK MATIKAN VISUAL SCROLLBAR
-    st.markdown("""
+st.markdown("""
         <style>
-        /* MATIKAN SEMUA SCROLLBAR SECARA FISIK */
-        * {
-            scrollbar-width: none !important; /* Firefox */
-            -ms-overflow-style: none !important;  /* IE/Edge */
-        }
-        ::-webkit-scrollbar {
-            display: none !important; /* Chrome/Safari */
-        }
+        /* 1. KUNCI SCROLL TOTAL */
+        * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+        ::-webkit-scrollbar { display: none !important; }
 
         html, body, [data-testid="stAppViewContainer"], 
         [data-testid="stMainViewContainer"], .main, .block-container {
             overflow: hidden !important;
             height: 100vh !important;
-            position: fixed !important; /* Paksa posisi tetap */
+            position: fixed !important;
             width: 100% !important;
         }
 
-        .main-login-container {
-            position: fixed;
-            top: 30% !important; /* Gw naikin lagi biar mantap */
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 400px;
-            z-index: 99999;
-        }
-        
-        /* Sisa CSS lu (tulis ulang persis di sini) */
+        /* 2. BACKGROUND & SIDEBAR */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover; background-position: center;
         }
-        .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
+
+        /* 3. FIX INPUT (AGAR TIDAK PUTIH SEPARUH / LEBAR KELUAR) */
+        /* Kita paksa kontainer input Streamlit agar lebarnya maksimal seukuran kartu login lu */
+        [data-testid="stColumn"] div[data-testid="stVerticalBlock"] {
+            width: 400px !important; 
+            margin: 0 auto !important;
+        }
+        
+        div[data-baseweb="input"] { 
+            background-color: rgba(255, 255, 255, 0.05) !important; 
+            border: 1px solid rgba(197, 160, 89, 0.3) !important; 
+            border-radius: 8px !important;
+            width: 100% !important;
+        }
+
+        input { color: white !important; width: 100% !important; }
+        
+        label { 
+            color: #C5A059 !important; 
+            font-weight: 700; 
+            display: block !important; 
+            text-align: left !important;
+            margin-bottom: 5px !important;
+        }
+
+        /* 4. TOMBOL */
+        button[kind="primary"] { 
+            background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important; 
+            color: #1a2634 !important; font-weight: 800 !important; 
+            width: 100% !important; height: 45px; border: none !important; 
+            margin-top: 10px;
+        }
+
+        /* 5. POSISI KARTU (BIAR NAIK) */
+        .main-login-container {
+            position: fixed;
+            top: 35% !important;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            z-index: 99999;
+            background: rgba(30, 30, 47, 0.98);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(197, 160, 89, 0.5);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9);
+        }
+
+        .header-container { text-align: left; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; margin-bottom: 20px; }
         .header-title { color: #C5A059; font-size: 18px; font-weight: 800; }
-        div[data-baseweb="input"] { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(197, 160, 89, 0.3) !important; border-radius: 8px !important; }
-        input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700; display: block !important; text-align: left !important;}
-        button[kind="primary"] { background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important; color: #1a2634 !important; font-weight: 800 !important; width: 100% !important; height: 45px; border: none !important; margin-top: 15px;}
+        
         [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] { background-color: transparent !important; border: none !important; }
         </style>
     """, unsafe_allow_html=True)
@@ -75,7 +106,7 @@ if not st.session_state.logged_in:
     st.markdown("""
                 <div class="header-container">
                     <span style="font-size: 28px;">📦</span>
-                    <div style="display: inline-block; vertical-align: middle; margin-left: 50px;">
+                    <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
                         <div class="header-title">ERP LOGISTIC SURABAYA</div>
                         <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
                     </div>
