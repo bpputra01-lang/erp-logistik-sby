@@ -82,49 +82,70 @@ st.markdown("""
     """, unsafe_allow_html=True)
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
 
-import streamlit as st
-
-# Inisialisasi session state login supaya tidak error
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
-# FUNGSI LOGIN (Hanya muncul jika belum logged_in)
+# FUNGSI LOGIN (DIPERBAIKI BIAR SINKRON SAMA ESTETIKA DASHBOARD)
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* Paksa background gudang hanya di halaman login */
+        /* 1. Background Full Gudang */
         .stApp {
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
             background-size: cover !important;
             background-position: center !important;
         }
         
-        /* Sembunyikan sidebar dan header agar tidak merusak layout dashboard asli */
-        [data-testid="stSidebar"], [data-testid="stHeader"] {
-            display: none !important;
-        }
+        /* 2. Sembunyikan Navigasi Pas Login */
+        [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
 
-        /* Container Kotak Login */
+        /* 3. Card Login Elegan (Adminity Style) */
         .login-card {
-            background: rgba(30, 30, 47, 0.95);
-            padding: 40px;
+            background: #1e1e2f; /* Warna background sama kaya sidebar lu */
+            padding: 45px;
             border-radius: 15px;
-            border: 1px solid #C5A059;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            border: 1px solid #2d2d44;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
             text-align: center;
             max-width: 400px;
-            margin: 15vh auto;
+            margin: 12vh auto;
+        }
+
+        /* 4. PERBAIKAN INPUT BOX (Biar Putih & Emas) */
+        div[data-baseweb="input"], div[data-baseweb="base-input"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 8px !important;
+        }
+        
+        /* Warna teks input biar putih bersih */
+        input {
+            color: white !important;
+            -webkit-text-fill-color: white !important;
+        }
+
+        /* Warna label biar emas (Adminity Style) */
+        label p {
+            color: #C5A059 !important;
+            font-weight: 700 !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+        
+        /* Tombol Sign In biar Emas Solid */
+        button[kind="primary"] {
+            background-color: #C5A059 !important;
+            color: #1e1e2f !important;
+            border: none !important;
+            font-weight: 800 !important;
+            height: 45px !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # UI Login Center
+    # UI Login
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: #C5A059; margin-bottom: 0;">📦 ADMINITY PRO</h2>', unsafe_allow_html=True)
-        st.markdown('<p style="color: white; font-size: 13px;">Surabaya Logistics System</p>', unsafe_allow_html=True)
+        st.markdown('<h1 style="color: #00d2ff; font-family: \'Inter\'; font-weight: 800; font-size: 26px; margin-bottom: 0;">ADMINITY PRO</h1>', unsafe_allow_html=True)
+        st.markdown('<p style="color: #d1d1d1; font-size: 13px; margin-bottom: 30px;">Surabaya Logistics System</p>', unsafe_allow_html=True)
         
         user_input = st.text_input("Username", key="input_user")
         pass_input = st.text_input("Password", type="password", key="input_pass")
@@ -132,7 +153,6 @@ if not st.session_state.logged_in:
         st.markdown("<br>", unsafe_allow_html=True)
         
         if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
-            # Ganti username & password sesuai kebutuhan lu
             if user_input == "admin" and pass_input == "surabaya123":
                 st.session_state.logged_in = True
                 st.rerun()
@@ -140,7 +160,6 @@ if not st.session_state.logged_in:
                 st.error("Kredensial Salah!")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # PAKSA BERHENTI DI SINI (Dashboard lu di bawah aman, gak bakal diproses)
     st.stop()
 
 # --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
