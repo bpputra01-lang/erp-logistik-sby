@@ -808,57 +808,59 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 # --- PASTIKAN NAMA DI SINI SAMA DENGAN DI SIDEBAR ---
-elif menu == "Compare RTO":  
+elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>SURABAYA LOGISTICS ENGINE</h1></div>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["Update DS RTO", "Compare Jezpro"])
-    
-    with tab1:
-        st.header("Proses DS RTO vs Appsheet")
+    # --- SECTION 1: DS RTO VS APPSHEET ---
+    with st.container():
+        st.subheader("1. Update DS RTO vs Appsheet")
+        st.caption("Gunakan ini untuk sinkronisasi Qty Scan DS dengan data Appsheet.")
+        
         col1, col2 = st.columns(2)
         with col1:
-            file_ds = st.file_uploader("Upload DS RTO (Excel)", type=['xlsx', 'csv'], key="ds_rto")
+            file_ds = st.file_uploader("Upload DS RTO (Excel)", type=['xlsx'], key="ds_rto")
         with col2:
-            file_app = st.file_uploader("Upload Appsheet RTO (Excel)", type=['xlsx', 'csv'], key="app_rto_1")
+            file_app1 = st.file_uploader("Upload Appsheet RTO (Excel)", type=['xlsx'], key="app_rto_1")
 
-        if st.button("🚀 RUN ENGINE DS RTO"):
-            if file_ds and file_app:
+        if st.button("🚀 RUN ENGINE DS RTO", use_container_width=True):
+            if file_ds and file_app1:
                 df_ds = pd.read_excel(file_ds)
-                df_app = pd.read_excel(file_app)
-                # Panggil fungsi engine lo di sini
-                hasil = engine_ds_rto_ultrafast(df_ds, df_app)
-                st.success("✅ Proses Compare DS Selesai!")
-                st.dataframe(hasil)
+                df_app = pd.read_excel(file_app1)
+                hasil_ds = engine_ds_rto_ultrafast(df_ds, df_app)
+                st.success("✅ Compare DS Selesai!")
+                st.dataframe(hasil_ds, use_container_width=True)
             else:
-                st.error("Upload kedua file dulu, Jancok!")
+                st.error("Upload kedua file (DS & Appsheet) dulu!")
 
-    with tab2:
-        st.header("Compare Draft Jezpro vs Appsheet")
-        st.info("Logika: Mencocokkan Draft RTO Jezpro dengan data Appsheet (Cari BIN Lain Otomatis)")
+    st.divider() # Garis pembatas biar gak bingung
+
+    # --- SECTION 2: DRAFT JEZPRO VS APPSHEET ---
+    with st.container():
+        st.subheader("2. Compare Draft Jezpro vs Appsheet")
+        st.caption("Logika Makro: Mencocokkan Draft Jezpro, cek Qty, dan cari BIN lain otomatis.")
         
-        c1, c2 = st.columns(2)
-        with c1:
+        col3, col4 = st.columns(2)
+        with col3:
             file_draft = st.file_uploader("Upload DRAFT RTO JEZPRO", type=['xlsx'], key="draft_jez")
-        with c2:
-            file_app_jez = st.file_uploader("Upload APPSHEET RTO", type=['xlsx'], key="app_jez")
+        with col4:
+            file_app2 = st.file_uploader("Upload APPSHEET RTO", type=['xlsx'], key="app_jez_2")
 
-        if st.button("🔥 COMPARE DRAFT JEZPRO"):
-            if file_draft and file_app_jez:
-                with st.spinner('Lagi mikir keras...'):
+        if st.button("🔥 COMPARE DRAFT JEZPRO", use_container_width=True):
+            if file_draft and file_app2:
+                with st.spinner('Lagi nyari BIN lain...'):
                     df_draft = pd.read_excel(file_draft)
-                    df_app = pd.read_excel(file_app_jez)
+                    df_app_jez = pd.read_excel(file_app2)
                     
-                    # --- DISINI LOGIKA MAKRO VBA LO (Draft vs Appsheet) ---
-                    # Pastikan fungsi engine_compare_draft_jezpro sudah lo buat di bagian atas
-                    hasil_jez = engine_compare_draft_jezpro(df_draft, df_app)
+                    # Eksekusi engine Draft vs Appsheet
+                    hasil_jez = engine_compare_draft_jezpro(df_draft, df_app_jez)
                     
                     st.success("✅ Compare Draft Berhasil!")
-                    st.dataframe(hasil_jez)
+                    st.dataframe(hasil_jez, use_container_width=True)
                     
-                    # Tombol Download Hasil
+                    # Download link
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        hasil_jez.to_excel(writer, index=False, sheet_name='HASIL_COMPARE')
+                        hasil_jez.to_excel(writer, index=False, sheet_name='Hasil_Jezpro')
                     st.download_button("📥 DOWNLOAD HASIL JEZPRO", output.getvalue(), "Hasil_Compare_Jezpro.xlsx")
             else:
                 st.error("Filenya belum lengkap, Boss!")
