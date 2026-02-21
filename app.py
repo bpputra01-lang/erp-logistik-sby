@@ -369,7 +369,7 @@ with st.sidebar:
 
 with st.sidebar:
     # Jarak tipis dari menu terakhir
-    st.markdown("<div style='margin-top: 0px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: -500px;'></div>", unsafe_allow_html=True)
     
     # CSS khusus Logout Elegan
     st.markdown("""
