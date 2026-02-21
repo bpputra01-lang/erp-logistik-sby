@@ -14,79 +14,118 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: BELUM LOGIN (TAMPILAN LOGIN SAJA)
+# KONDISI 1: TAMPILAN LOGIN (BOX DI TENGAH)
 # ==========================================
 if not st.session_state.logged_in:
-    # CSS KHUSUS LOGIN - SIDEBAR DIHAPUS DARI LAYAR
     st.markdown("""
         <style>
-        [data-testid="stSidebar"] { display: none !important; } /* Sidebar Hilang Total */
-        header { display: none !important; } /* Hilangkan Header Streamlit */
-        .stApp { background-color: #1a2634; } /* Background Gelap */
+        /* Sembunyikan semua elemen bawaan Streamlit */
+        [data-testid="stSidebar"], header, .stDeployButton { display: none !important; }
         
-        .login-card {
-            background: #1e1e2f;
-            padding: 3rem;
-            border-radius: 15px;
-            border: 1px solid #C5A059;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            text-align: center;
-            max-width: 450px;
-            margin: 100px auto; /* Kotak di tengah agak ke atas */
+        /* Background Utama */
+        .stApp {
+            background: linear-gradient(rgba(30, 30, 47, 0.9), rgba(30, 30, 47, 0.9)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070'); /* Background Logistik */
+            background-size: cover;
+            background-position: center;
         }
+
+        /* Container Login Box agar pas di tengah */
+        .main-login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 80vh;
+        }
+
+        .login-card {
+            background: rgba(26, 38, 52, 0.85); /* Efek Transparan Dark */
+            backdrop-filter: blur(10px); /* Efek Blur di belakang box */
+            padding: 3rem;
+            border-radius: 20px;
+            border: 1px solid rgba(197, 160, 89, 0.3); /* Border Emas Halus */
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 400px;
+        }
+
+        .login-logo {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
         .login-title {
             color: #C5A059;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 800;
-            margin-bottom: 25px;
-            font-family: 'Inter', sans-serif;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
         }
-        /* Style Input */
-        div[data-baseweb="input"] { background-color: #1a2634 !important; border: 1px solid #2d2d44 !important; }
+
+        .login-subtitle {
+            color: #d1d1d1;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        /* Input Styling */
+        div[data-baseweb="input"] {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(197, 160, 89, 0.5) !important;
+            border-radius: 10px !important;
+        }
         input { color: white !important; }
-        label { color: #d1d1d1 !important; }
+        label { color: #C5A059 !important; font-weight: 600 !important; }
         
-        /* Button Login Gold */
+        /* Button Style */
         button[kind="primary"] {
-            background-color: #C5A059 !important;
+            background: linear-gradient(135deg, #C5A059 0%, #A6803B 100%) !important;
             color: #1a2634 !important;
             border: none !important;
-            font-weight: bold !important;
+            font-weight: 800 !important;
+            padding: 0.6rem 2rem !important;
             width: 100%;
+            border-radius: 10px !important;
+            margin-top: 10px;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # UI LOGIN
-    st.markdown('<div class="login-card">', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">🚚 ERP LOGISTIC SYSTEM</div>', unsafe_allow_html=True)
-    
-    u = st.text_input("Username", key="u_field")
-    p = st.text_input("Password", type="password", key="p_field")
-    
-    if st.button("ENTER SYSTEM", type="primary"):
-        if u == "admin" and p == "surabaya123":
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Access Denied!")
+    # Menampilkan Box Login
+    st.markdown('<div class="main-login-container">', unsafe_allow_html=True)
+    with st.container():
+        st.markdown("""
+            <div class="login-card">
+                <div class="login-logo">📦</div>
+                <div class="login-title">ERP LOGISTIC</div>
+                <div class="login-subtitle">Silakan login terlebih dahulu.</div>
+        """, unsafe_allow_html=True)
+        
+        user = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        
+        if st.button("L O G I N", type="primary"):
+            if user == "admin" and password == "surabaya123":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Credential Salah!")
+                
+        st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # --- KUNCI UTAMA: STOP DI SINI AGAR DASHBOARD DI BAWAH TIDAK JALAN ---
-    st.stop()
+    st.stop() # Paksa berhenti agar dashboard tidak muncul di belakang
 
 # ==========================================
-# KONDISI 2: SUDAH LOGIN (DASHBOARD MUNCUL)
+# KONDISI 2: SUDAH LOGIN (ERP DASHBOARD)
 # ==========================================
 else:
-    # SEMUA CSS ASLI LO TARUH DI SINI
     st.markdown("""
         <style>
-        /* CSS ASLI LO YANG SUDAH SESUAI */
         .block-container { padding-top: 3.5rem !important; }
         [data-testid="stSidebarNav"] { display: none; } 
-        .stApp { background-color: #f4f7f6; }
-        [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; display: block !important; }
+        .stApp { background: #f4f7f6; }
+        [data-testid="stSidebar"] { background-color: #1e1e2f !important; display: block !important; }
         
         .sidebar-title { 
             color: #00d2ff; text-align: center; font-weight: 800; font-size: 20px; 
@@ -99,33 +138,17 @@ else:
             border-radius: 8px; display: inline-block;
         }
         .hero-header h1 { color: white !important; font-size: 20px !important; margin: 0; }
-
-        /* Box & Input styling tetap putih */
-        div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important; border: 1px solid #C5A059 !important;
-        }
-        div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
-            color: white !important; -webkit-text-fill-color: white !important;
-        }
         </style>
     """, unsafe_allow_html=True)
 
-    # SIDEBAR & MENU
     with st.sidebar:
         st.markdown('<div class="sidebar-title">🚚 ERP LOGISTIC</div>', unsafe_allow_html=True)
-        # Sisa menu lo...
         if st.button("LOGOUT"):
             st.session_state.logged_in = False
             st.rerun()
 
-    # CONTENT
-    st.markdown("""
-        <div class="hero-header">
-            <h1>DASHBOARD ANALYTICS ITEM SCAN</h1>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.success("Berhasil Login! Silakan kelola data.")
+    st.markdown('<div class="hero-header"><h1>DASHBOARD ANALYTICS ITEM SCAN</h1></div>', unsafe_allow_html=True)
+    st.success("Selamat datang, Admin!")
     
 
 import pandas as pd
