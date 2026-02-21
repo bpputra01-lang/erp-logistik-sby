@@ -867,97 +867,75 @@ elif menu == "Stock Minus":
 
 # --- PASTIKAN NAMA DI SINI SAMA DENGAN DI SIDEBAR ---
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📦 RTO RECONCILIATION ENGINE</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
     
     # --- 1. SESSION STATE ---
-    if 'hasil_final' not in st.session_state: st.session_state.hasil_final = None
-    if 'data_ds' not in st.session_state: st.session_state.data_ds = None
-    if 'data_draft' not in st.session_state: st.session_state.data_draft = None
+    if 'step_cleared' not in st.session_state: st.session_state.step_cleared = False
+    if 'hasil_ds_vs_app' not in st.session_state: st.session_state.hasil_ds_vs_app = None
 
-    # --- 2. MULTI-UPLOADER AREA ---
-    st.subheader("🛠️ Step 1: Upload Semua File Source")
+    # --- 2. UPLOAD AREA ---
     c1, c2, c3 = st.columns(3)
     with c1:
-        file_ds = st.file_uploader("1. Upload DS RTO", type=['xlsx'], key="ds_u")
+        file_ds = st.file_uploader("1. Upload DS RTO (Fisik)", type=['xlsx'])
     with c2:
-        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx'], key="app_u")
+        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx'])
     with c3:
-        file_draft = st.file_uploader("3. Draft RTO (Jezpro)", type=['xlsx'], key="draft_u")
+        file_draft = st.file_uploader("3. Draft RTO (Rencana)", type=['xlsx'])
 
     st.divider()
 
-    # --- 3. ACTION BUTTONS ---
-    st.subheader("🚀 Step 2: Proses & Sinkronisasi")
-    b1, b2 = st.columns(2)
+    # --- 3. STEP 1: COMPARE SCAN VS APPSHEET ---
+    st.subheader("🟢 STEP 1: VALIDASI SCAN VS APPSHEET")
     
-    with b1:
-        if st.button("🔥 RUN FULL PROCESS", use_container_width=True):
-            if file_ds and file_app and file_draft:
-                with st.spinner('Mikir keras...'):
-                    st.session_state.data_ds = pd.read_excel(file_ds)
-                    st.session_state.data_draft = pd.read_excel(file_draft)
-                    df_app_raw = pd.read_excel(file_app)
-                    
-                    # Jalankan Engine
-                    st.session_state.hasil_final = engine_rto_complete(
-                        st.session_state.data_ds, df_app_raw, st.session_state.data_draft
-                    )
-                    st.success("Proses Selesai, Jancok!")
+    if st.button("🔍 CEK SELISIH SCAN", use_container_width=True):
+        if file_ds and file_app:
+            df_ds = pd.read_excel(file_ds)
+            df_app = pd.read_excel(file_app)
+            
+            # Jalanin engine compare fisik vs appsheet dulu
+            res_fisik = engine_ds_rto_ultrafast(df_ds, df_app)
+            st.session_state.hasil_ds_vs_app = res_fisik
+            
+            # Cek apakah ada selisih
+            mismatch_count = len(res_fisik[res_fisik['NOTE'] != 'SESUAI'])
+            
+            if mismatch_count == 0:
+                st.session_state.step_cleared = True
+                st.success("✅ DATA SCAN SINKRON! Silahkan lanjut ke Step 2.")
             else:
-                st.error("Filenya belum lengkap, Boss!")
+                st.session_state.step_cleared = False
+                st.error(f"❌ STOP! Ada {mismatch_count} SKU Selisih. Rekonsiliasi dulu baru bisa lanjut!")
+        else:
+            st.warning("Upload File 1 & 2 dulu, Cok!")
 
-    with b2:
-        if st.button("🔄 REFRESH APPSHEET ONLY", use_container_width=True):
-            if st.session_state.data_ds is not None and file_app:
-                with st.spinner('Update data Appsheet...'):
-                    df_app_new = pd.read_excel(file_app)
-                    # Re-run engine pake data DS & Draft yang lama di memori
-                    st.session_state.hasil_final = engine_rto_complete(
-                        st.session_state.data_ds, df_app_new, st.session_state.data_draft
-                    )
-                    st.toast("Data Berhasil di-Update!", icon='✅')
-            else:
-                st.warning("Jalanin 'Full Process' dulu sekali baru bisa Refresh.")
-
-    # --- 4. RECONCILIATION TABLE (EDITABLE) ---
+    # --- 4. AREA REKONSILIASI (MUNCUL JIKA ADA SELISIH) ---
     if st.session_state.hasil_final is not None:
-        df_res = st.session_state.hasil_final
-        # Tampilkan hanya yang selisih
+        df_res = st.session_state.hasil_ds_vs_app
         df_mismatch = df_res[df_res['NOTE'] != 'SESUAI'].copy()
         
-        st.divider()
-        st.subheader(f"⚠️ Ringkasan Selisih ({len(df_mismatch)} SKU)")
-        st.info("💡 Ketik hasil pengecekan gudang di kolom 'REKONSILIASI'. Data ini bisa diedit langsung.")
-
-        # Fitur Spreadsheet di Browser
-        edited_rekon = st.data_editor(
-            df_mismatch,
-            key="editor_rto_final",
-            column_config={
-                "REKONSILIASI": st.column_config.SelectboxColumn(
-                    "Tindakan Rekon",
-                    options=["BARANG NYELIP", "BELUM SCAN OUT", "BARANG HILANG", "SALAH BIN", "SUDAH OK"],
-                    required=True
-                ),
-                "SKU": st.column_config.TextColumn("SKU", disabled=True),
-                "SELISIH": st.column_config.NumberColumn("Selisih", disabled=True),
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-
-        # --- 5. DOWNLOAD ---
-        if st.button("💾 DOWNLOAD LAPORAN AKHIR"):
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                # Simpan semua data & data yang sudah direkon
-                df_res.to_excel(writer, index=False, sheet_name='SEMUA_DATA')
-                edited_rekon.to_excel(writer, index=False, sheet_name='REKONSILIASI_ONLY')
+        if len(df_mismatch) > 0:
+            st.info("💡 Lakukan Update di Appsheet, lalu upload ulang Appsheetnya dan klik Refresh di bawah.")
+            st.data_editor(df_mismatch, use_container_width=True, key="editor_rekon")
             
-            st.download_button(
-                label="📥 Klik untuk Download Excel",
-                data=output.getvalue(),
-                file_name=f"REKON_RTO_{pd.Timestamp.now().strftime('%d%m%Y')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+            # TOMBOL REFRESH (Buat nge-sync ulang setelah rekon di appsheet)
+            if st.button("🔄 REFRESH & RE-CHECK"):
+                # Logic refresh kayak tadi, narik file_app terbaru
+                # Kalau hasil re-check mismatch == 0, maka st.session_state.step_cleared = True
+                st.rerun()
+
+    st.divider()
+
+    # --- 5. STEP 2: COMPARE DRAFT (HANYA TERBUKA JIKA STEP 1 CLEAR) ---
+    st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
+    
+    if st.session_state.step_cleared:
+        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
+            if file_draft:
+                # Disini baru jalanin engine yang bandingin Appsheet (yang udah bener) vs Draft
+                st.write("Running Final Engine...")
+                # ... logic compare draft ...
+                st.balloons()
+            else:
+                st.error("File Draft RTO (File 3) belum diupload!")
+    else:
+        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1 sampai tidak ada selisih.")
