@@ -4,82 +4,83 @@ import streamlit as st
 import io
 import math
 
-st.markdown("""
-    <style>
-    /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
-    .block-container { 
-        padding-top: 3.5rem !important; /* Tambah padding supaya judul gak kelindes toolbar atas */
-        padding-bottom: 0rem !important;
-    }
-    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
-    [data-testid="stSidebarNav"] { display: none; } 
-    
-    /* 2. STYLE JUDUL ERP DI SIDEBAR */
-    .sidebar-title { 
-        color: #00d2ff; 
-        text-align: center; 
-        font-family: 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 20px;
-        margin-top: -45px; 
-        padding-bottom: 15px;
-        border-bottom: 1px solid #2d2d44;
-        margin-bottom: 10px;
-    }
+# ==========================================
+# LANJUTAN TAMPILAN LOGIN (THEMA GUDANG)
+# ==========================================
 
-    .stApp { background-color: #f4f7f6; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
+if not st.session_state.logged_in:
+    # CSS Khusus Background Login & Centering
+    st.markdown("""
+        <style>
+        /* Mengatur background gambar gudang full screen */
+        .stApp {
+            background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), 
+                              url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
 
-    /* 3. HERO HEADER - SLIM & MENGIKUTI PANJANG TEKS (GAK KEPOTONG) */
-    .hero-header { 
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-        color: white !important; 
-        padding: 8px 18px !important; /* Padding pas, gak kegedean */
-        border-radius: 8px; 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-        margin-top: 0px !important; /* Reset margin biar gak nyundul ke atas */
-        margin-bottom: 25px !important;
-        display: inline-block; /* Agar background cuma sepanjang tulisan */
-        width: auto;
-    }
-    .hero-header h1 { 
-        color: white !important; 
-        font-size: 20px !important; /* Ukuran font pas */
-        font-weight: 800 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px;
-        line-height: 1.2;
-    }
+        /* Menghilangkan Header & Sidebar saat Login */
+        [data-testid="stHeader"], [data-testid="stSidebar"] {
+            display: none;
+        }
 
-    /* Metric Box */
-    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
-    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
-    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
-
-    /* Radio Button styling */
-    div.row-widget.stRadio > div { background-color: transparent !important; }
-    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
-    
-    /* --- INPUT BOX STYLE (TULISAN PUTIH TETAP AMAN) --- */
-    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important;
-        border: 1px solid #C5A059 !important;
-        border-radius: 8px !important;
-    }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
-    [data-testid="stFileUploaderText"] > span, 
-    [data-testid="stFileUploaderText"] > small {
-        color: white !important;
-        -webkit-text-fill-color: white !important;
-    }
-    
-    [data-testid="stFileUploader"] button {
-        background-color: #C5A059 !important;
-        color: #1a2634 !important;
-        font-weight: bold !important;
-    }
-    </style>
+        /* Container Box Login (Glassmorphism) */
+        .login-card {
+            background: rgba(30, 38, 52, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            text-align: center;
+            max-width: 400px;
+            margin: auto;
+        }
+        
+        /* Animasi masuk */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .login-section {
+            animation: fadeIn 0.8s ease-out;
+            margin-top: 10vh;
+        }
+        </style>
     """, unsafe_allow_html=True)
+
+    # Tampilan Form Login
+    st.markdown('<div class="login-section">', unsafe_allow_html=True)
+    
+    _, center_col, _ = st.columns([1, 2, 1])
+    
+    with center_col:
+        st.markdown("""
+            <div class="login-card">
+                <h1 style="color: #C5A059; font-size: 28px; margin-bottom: 5px;">ADMINITY PRO</h1>
+                <p style="color: #d1d1d1; font-size: 14px; margin-bottom: 30px;">ERP Logistic Surabaya System</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Form Login menggunakan widget Streamlit di dalam kolom
+        with st.container():
+            username = st.text_input("👤 Username", placeholder="Input username...")
+            password = st.text_input("🔑 Password", type="password", placeholder="Input password...")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
+                if username == "logsby" and password == "surabaya123":
+                    st.session_state.logged_in = True
+                    st.success("Login Berhasil!")
+                    st.rerun()
+                else:
+                    st.error("Kredensial salah. Silakan coba lagi.")
+                    
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.stop() # Menahan sisa kode dashboard agar tidak jalan sebelum login
 import pandas as pd
 import numpy as np
 import math
