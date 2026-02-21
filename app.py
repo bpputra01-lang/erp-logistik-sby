@@ -40,7 +40,7 @@ st.markdown("""
         padding: 0.8rem 1.5rem !important; /* Padding dikecilkan biar slim */
         border-radius: 8px; 
         box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-        margin-top: -25px !important; /* Maksa judul naik ke atas */
+        margin-top: -10px !important; /* Maksa judul naik ke atas */
         margin-bottom: 20px !important;
         display: flex;
         align-items: center;
