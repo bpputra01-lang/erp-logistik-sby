@@ -43,17 +43,7 @@ if not st.session_state.logged_in:
             width: 400px;
             z-index: 9999;
             text-align: center;
-        }
-
-        /* 5. CARD VISUAL */
-        .login-card {
-            background: rgba(30, 30, 47, 0.98);
-            backdrop-filter: blur(20px);
-            padding: 30px;
-            border-radius: 15px;
-            border: 1px solid rgba(197, 160, 89, 0.5);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.9);
-            margin-bottom: -200px; /* Menarik visual agar menyatu dengan input */
+        
         }
 
         .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
