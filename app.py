@@ -58,8 +58,8 @@ if not st.session_state.logged_in:
 
         /* Memastikan input field-nya sendiri transparan agar mengikuti background putih di atas */
         input { 
-            color: #000000 !important; 
-            -webkit-text-fill-color: #FFFFFF !important; 
+            color: #FFFFFF !important; 
+            -webkit-text-fill-color: #000000 !important; 
             background-color: transparent !important;
             border: none !important;
         }
