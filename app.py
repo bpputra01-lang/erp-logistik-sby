@@ -27,7 +27,7 @@ if not st.session_state.logged_in:
             background: linear-gradient(rgba(30, 30, 47, 0.9), rgba(30, 30, 47, 0.9)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070'); /* Background Logistik */
             background-size: cover;
-            background-position: center;
+            background-position: fixed;
         }
 
         /* Container Login Box agar pas di tengah */
