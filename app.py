@@ -5,143 +5,86 @@ import streamlit as st
 # 1. KONFIGURASI HALAMAN
 st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 
-# 2. INISIALISASI SESSION STATE
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (TOTAL CLEANUP)
+# KONDISI 1: TAMPILAN LOGIN (NO ERROR VERSION)
 # ==========================================
 if not st.session_state.logged_in:
+    # SEMUA CSS DIGABUNG DISINI
     st.markdown("""
         <style>
-        /* 1. SEMBUNYIKAN SEMUA ELEMEN BAWAAN */
         [data-testid="stSidebar"], header, footer, .stDeployButton { display: none !important; }
-        
-        /* 2. MATIKAN DISPLAY CONTAINER UTAMA */
-        .main .block-container {
-            background: transparent !important;
-            padding: 0 !important;
-            max-width: 0 !important;
-            max-height: 0 !important;
-        }
-        
-        /* 3. BACKGROUND GUDANG FULL SCREEN */
+        .main .block-container { background: transparent !important; padding: 0 !important; }
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.8), rgba(10, 10, 20, 0.8)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            overflow: hidden !important;
+            background-size: cover; background-position: center; background-attachment: fixed;
         }
-
-        /* 4. LOGIN CARD - POSISI FIXED */
+        /* CARD WRAPPER */
         .login-card {
-            position: fixed;
-            top: 45%; 
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 999999;
-            width: 380px;
-            background: rgba(30, 30, 47, 0.98) !important;
-            backdrop-filter: blur(20px);
-            padding: 30px;
-            border-radius: 15px;
-            border: 1px solid rgba(197, 160, 89, 0.5);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.9);
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 380px; background: rgba(30, 30, 47, 0.98); backdrop-filter: blur(20px);
+            padding: 30px; border-radius: 15px; border: 1px solid rgba(197, 160, 89, 0.5);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9); z-index: 1000;
         }
-
-        /* HEADER DI DALAM CARD (Logo & Title Kecil di Atas Username) */
-        .header-container {
-            text-align: left;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(197, 160, 89, 0.2);
-            padding-bottom: 15px;
-        }
-        .header-logo { font-size: 30px; margin-bottom: 0px; display: inline-block; vertical-align: middle; }
+        /* LOGO & JUDUL DI ATAS USERNAME */
+        .header-container { text-align: left; margin-bottom: 20px; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; }
+        .header-logo { font-size: 28px; display: inline-block; vertical-align: middle; }
         .header-text { display: inline-block; vertical-align: middle; margin-left: 10px; }
         .header-title { color: #C5A059; font-size: 18px; font-weight: 800; line-height: 1.1; }
-        .header-subtitle { color: #aaaaaa; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* 5. STYLE INPUT */
-        div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(197, 160, 89, 0.3) !important;
-            border-radius: 8px !important;
-        }
-        input { color: white !important; padding: 10px !important; }
-        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; text-align: left !important; display: block; margin-bottom: 5px; }
-
-        /* 6. TOMBOL LOGIN EMAS */
-        button[kind="primary"] {
-            background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
-            color: #1a2634 !important;
-            font-weight: 800 !important;
-            width: 100% !important;
-            border-radius: 8px !important;
-            padding: 10px !important;
-            margin-top: 10px;
-            border: none !important;
-            text-transform: uppercase;
-        }
+        .header-subtitle { color: #aaaaaa; font-size: 10px; text-transform: uppercase; }
+        
+        /* INPUT STYLE */
+        div[data-baseweb="input"] { background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(197, 160, 89, 0.3) !important; border-radius: 8px !important; }
+        input { color: white !important; }
+        label { color: #C5A059 !important; font-weight: 700 !important; font-size: 13px !important; }
+        
+        /* PEMBASMI BOX BIRU MELINTANG */
+        [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] { border: none !important; background: transparent !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # RENDER FORM
-    with st.container():
-        st.markdown(f"""
-            <div class="login-card">
-                <div class="header-container">
-                    <div class="header-logo">📦</div>
-                    <div class="header-text">
-                        <div class="header-title">ERP LOGISTIC</div>
-                        <div class="header-subtitle">Secure System Access</div>
-                    </div>
+    # RENDER HEADER DI DALAM DIV AGAR TIDAK ADA ERROR SYNTAX
+    st.markdown("""
+        <div class="login-card">
+            <div class="header-container">
+                <div class="header-logo">📦</div>
+                <div class="header-text">
+                    <div class="header-title">ERP LOGISTIC</div>
+                    <div class="header-subtitle">Secure System Access</div>
                 </div>
-        """, unsafe_allow_html=True)
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
-        user = st.text_input("Username", key="u_login")
-        password = st.text_input("Password", type="password", key="p_login")
-        
-        if st.button("ENTER SYSTEM", type="primary"):
-            if user == "admin" and password == "surabaya123":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Credential Gagal!")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-    
+    # INPUT & BUTTON (Ditaruh di bawah Markdown tapi secara visual akan masuk ke card karena CSS Fixed)
+    # Kita pakai container terpisah biar editor nggak bingung tag HTML
+    with st.container():
+        # Buat kolom buat nengahin input biar presisi di atas card
+        _, col, _ = st.columns([1, 2, 1])
+        with col:
+            # Gunakan st.empty atau spacer kalau perlu, tapi dengan CSS fixed di atas harusnya aman
+            user = st.text_input("Username", key="u_login")
+            password = st.text_input("Password", type="password", key="p_login")
+            
+            if st.button("ENTER SYSTEM", type="primary", use_container_width=True):
+                if user == "admin" and password == "surabaya123":
+                    st.session_state.logged_in = True
+                    st.rerun()
+                else:
+                    st.error("Gagal!")
     st.stop()
 
 # ==========================================
-# KONDISI 2: DASHBOARD (ADMINITY UI)
+# DASHBOARD
 # ==========================================
 else:
-    # Dashboard code tetap sama
-    st.markdown("""
-        <style>
-        .block-container { padding-top: 1rem !important; max-width: 100% !important; max-height: 100% !important; }
-        [data-testid="stSidebarNav"] { display: none; } 
-        .stApp { background-color: #f4f7f6; background-image: none !important; }
-        [data-testid="stSidebar"] { background-color: #1e1e2f !important; display: block !important; }
-        .hero-header { 
-            background: linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%); 
-            color: white !important; padding: 1.5rem; border-radius: 12px; margin-bottom: 25px; 
-        }
-        .hero-header h1 { color: white !important; margin: 0; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    with st.sidebar:
-        st.markdown('<h2 style="color:#00d2ff; text-align:center;">🚚 ERP LOGISTIC</h2>', unsafe_allow_html=True)
-        if st.sidebar.button("LOGOUT"):
-            st.session_state.logged_in = False
-            st.rerun()
-
-    st.markdown('<div class="hero-header"><h1>DASHBOARD OVERVIEW</h1></div>', unsafe_allow_html=True)
-    st.success("Selamat Datang, Admin!")
+    st.success("Berhasil Masuk!")
+    if st.sidebar.button("LOGOUT"):
+        st.session_state.logged_in = False
+        st.rerun()
 
 import pandas as pd
 import numpy as np
