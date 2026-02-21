@@ -358,6 +358,18 @@ with st.sidebar:
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
+        # --- TOMBOL LOGOUT (Taruh di sidebar dashboard lu) ---
+
+with st.sidebar:
+    # Lu udah punya judul sidebar di CSS lu (.sidebar-title), 
+    # kita tambahin sedikit space dan tombol logout di bawah menu navigasi
+    st.markdown("<br><br>", unsafe_allow_html=True) # Jarak biar nggak numpuk sama menu
+    
+    if st.button("🚪 LOGOUT", use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
+
+# --- LANJUTKAN KONTEN DASHBOARD LU DI BAWAH ---
         
 
     </style>
