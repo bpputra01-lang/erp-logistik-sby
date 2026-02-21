@@ -77,34 +77,7 @@ if not st.session_state.logged_in:
                 else:
                     st.error("Login Gagal")
     st.stop() # WAJIB DI SINI
-
-# ==========================================
-# KONDISI 2: DASHBOARD (TAMPILAN UTAMA)
-# ==========================================
-# CSS RESET (Wajib buat balikin dashboard yang blank)
-st.markdown("""
-    <style>
-    /* BALIKIN TAMPILAN YANG TADI DISEMBUNYIIN LOGIN */
-    [data-testid="stSidebar"] { display: block !important; }
-    header { display: flex !important; }
-    .stApp { background-color: #f4f7f6 !important; background-image: none !important; }
     
-    /* RESET POSISI AGAR TIDAK BLANK / FIXED */
-    html, body, [data-testid="stAppViewContainer"], .main, .block-container {
-        overflow: auto !important;
-        height: auto !important;
-        position: relative !important;
-    }
-    
-    .block-container { padding-top: 3.5rem !important; }
-    
-    /* CSS DASHBOARD LU YANG ASLI */
-    .hero-header { 
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-        color: white !important; padding: 10px 20px; border-radius: 8px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 # SIDEBAR
 with st.sidebar:
