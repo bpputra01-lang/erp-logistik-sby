@@ -109,7 +109,7 @@ if not st.session_state.logged_in:
             password = st.text_input("Password", type="password", key="p_login")
             
             if st.button("ENTER SYSTEM", type="primary"):
-                if user == "admin" and password == "surabaya123":
+                if user == "logsby" and password == "surabaya123":
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
