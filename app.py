@@ -11,7 +11,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (FULL CLEAN)
+# KONDISI 1: TAMPILAN LOGIN (LOGO DI ATAS INPUT)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
@@ -28,39 +28,35 @@ if not st.session_state.logged_in:
             background-attachment: fixed;
         }
 
-        /* HILANGKAN SEMUA KOTAK DEFAULT STREAMLIT */
-        .main .block-container { background: transparent !important; }
-        [data-testid="stVerticalBlock"] { background: transparent !important; gap: 0rem !important; }
-
-        /* BOX LOGIN MELAYANG DI TENGAH */
-        .login-wrapper {
+        /* CONTAINER LOGIN UTAMA (Penyatu Logo & Form) */
+        .login-card {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 9999;
-            width: 420px;
-            text-align: center;
-            background: rgba(30, 30, 47, 0.9); /* Gelap Solid & Elegant */
+            width: 450px;
+            background: rgba(30, 30, 47, 0.9); 
             backdrop-filter: blur(20px);
-            padding: 50px 40px;
+            padding: 40px;
             border-radius: 20px;
-            border: 1px solid rgba(197, 160, 89, 0.4); /* Border Gold */
+            border: 1px solid rgba(197, 160, 89, 0.4);
             box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+            text-align: center;
         }
 
-        .login-logo { font-size: 60px; margin-bottom: 15px; }
-        .login-title { color: #C5A059; font-size: 26px; font-weight: 800; margin-bottom: 5px; font-family: 'Inter', sans-serif; }
+        .login-logo { font-size: 50px; margin-bottom: 10px; }
+        .login-title { color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px; }
         .login-subtitle { color: #aaaaaa; font-size: 14px; margin-bottom: 30px; }
 
-        /* INPUT FIELD */
+        /* STYLE INPUT AGAR MASUK KE THEMA */
         div[data-baseweb="input"] {
-            background-color: rgba(0, 0, 0, 0.2) !important;
+            background-color: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(197, 160, 89, 0.3) !important;
             border-radius: 10px !important;
         }
         input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700 !important; margin-bottom: 10px !important; }
+        label { color: #C5A059 !important; font-weight: 700 !important; text-align: left !important; display: block; }
 
         /* TOMBOL LOGIN */
         button[kind="primary"] {
@@ -68,49 +64,48 @@ if not st.session_state.logged_in:
             color: #1a2634 !important;
             font-weight: 800 !important;
             width: 100% !important;
-            border-radius: 12px !important;
+            border-radius: 10px !important;
             padding: 12px !important;
+            margin-top: 20px;
             border: none !important;
-            margin-top: 15px;
-            transition: 0.3s;
         }
-        button[kind="primary"]:hover { transform: scale(1.02); }
+
+        /* Hapus space putih Streamlit di dalam box */
+        [data-testid="stVerticalBlock"] { gap: 0.5rem !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # HTML UNTUK BOX LOGIN (Satu div Wrapper saja agar tidak ada kotak double)
-    st.markdown(f"""
-        <div class="login-wrapper">
-            <div class="login-logo">📦</div>
-            <div class="login-title">ERP LOGISTIC</div>
-            <div class="login-subtitle">Secure System Access</div>
-        </div>
+    # Buka Div Card
+    st.markdown('<div class="login-card">', unsafe_allow_html=True)
+    
+    # Bagian Atas (Logo & Judul)
+    st.markdown("""
+        <div class="login-logo">📦</div>
+        <div class="login-title">ERP LOGISTIC</div>
+        <div class="login-subtitle">Secure System Access</div>
     """, unsafe_allow_html=True)
 
-    # Menempatkan input di dalam wrapper secara visual menggunakan CSS fixed di atas
-    # Kita bungkus input dalam kolom kosong agar tidak ngerender kotak default
-    _, center, _ = st.columns([1, 2, 1])
-    with center:
-        # Trik: Gunakan kontainer kosong agar input "jatuh" ke posisi wrapper CSS
-        # Tapi karena wrapper kita pakai 'fixed', kita buat form loginnya di sini
-        st.write("") # Spacer
-        u = st.text_input("Username", key="user")
-        p = st.text_input("Password", type="password", key="pass")
-        
-        if st.button("ENTER SYSTEM", type="primary"):
-            if u == "admin" and p == "surabaya123":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Credential Gagal!")
+    # Bagian Form (Username & Password)
+    # Kita pakai container agar input Streamlit ngerender di sini
+    u = st.text_input("Username", key="user")
+    p = st.text_input("Password", type="password", key="pass")
+    
+    if st.button("ENTER SYSTEM", type="primary"):
+        if u == "admin" and p == "surabaya123":
+            st.session_state.logged_in = True
+            st.rerun()
+        else:
+            st.error("Credential Gagal!")
 
+    # Tutup Div Card
+    st.markdown('</div>', unsafe_allow_html=True)
+    
     st.stop()
 
 # ==========================================
-# KONDISI 2: DASHBOARD (JALAN SETELAH LOGIN)
+# KONDISI 2: DASHBOARD
 # ==========================================
 else:
-    # Kode Dashboard lo tetap sama
     st.sidebar.title("ERP LOGISTIC")
     if st.sidebar.button("LOGOUT"):
         st.session_state.logged_in = False
