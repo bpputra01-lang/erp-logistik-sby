@@ -76,28 +76,12 @@ st.markdown("""
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
-
-
+    
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
         color: #1a2634 !important;
         font-weight: bold !important;
     }
-        # --- STYLE TAMBAHAN BIAR TABEL GAK POLOS ---
-        /* Kasih garis tegas di setiap sel */
-        [data-testid="stTable"] td, [data-testid="stDataEditor"] div {
-            border: 1px solid #d3d3d3 !important;
-        }
-        /* Kasih warna background selang-seling biar gak pusing */
-        [data-testid="stDataEditor"] div[role="row"]:nth-child(even) {
-            background-color: #f9f9f9 !important;
-        }
-        /* Warna khusus buat header tabel */
-        [data-testid="stDataEditor"] div[role="columnheader"] {
-            background-color: #eeeeee !important;
-            font-weight: bold;
-            border-bottom: 2px solid #000000 !important;
-        }
     </style>
     """, unsafe_allow_html=True)
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
