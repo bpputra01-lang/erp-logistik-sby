@@ -12,12 +12,15 @@ st.set_page_config(page_title="ERP Surabaya - Adminity Pro", layout="wide")
 # 2. THE AUTHENTIC ADMINITY UI ENGINE (Hanya memperbaiki CSS agar tulisan Putih)
 st.markdown("""
     <style>
-    /* MENGHAPUS SPACE KOSONG DI ATAS SIDEBAR & BODY */
-    .block-container { padding-top: 1rem !important; }
+    /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
+    .block-container { 
+        padding-top: 3.5rem !important; /* Tambah padding supaya judul gak kelindes toolbar atas */
+        padding-bottom: 0rem !important;
+    }
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarNav"] { display: none; } 
     
-    /* STYLE JUDUL ERP */
+    /* 2. STYLE JUDUL ERP DI SIDEBAR */
     .sidebar-title { 
         color: #00d2ff; 
         text-align: center; 
@@ -33,23 +36,24 @@ st.markdown("""
     .stApp { background-color: #f4f7f6; }
     [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
 
-    /* 3. FIX HERO HEADER - PAS DI ATAS, SLIM MENGIKUTI TULISAN, WARNA SELARAS */
+    /* 3. HERO HEADER - SLIM & MENGIKUTI PANJANG TEKS (GAK KEPOTONG) */
     .hero-header { 
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); /* Biru Navy Pro */
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
         color: white !important; 
-        padding: 6px 15px !important; /* Padding tipis biar slim */
+        padding: 8px 18px !important; /* Padding pas, gak kegedean */
         border-radius: 8px; 
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-        margin-top: -10px !important; /* Pas, tidak terlalu naik sampai kepotong */
-        margin-bottom: 20px !important;
-        display: inline-block; /* KUNCI: Box mengikuti lebar tulisan saja */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        margin-top: 0px !important; /* Reset margin biar gak nyundul ke atas */
+        margin-bottom: 25px !important;
+        display: inline-block; /* Agar background cuma sepanjang tulisan */
+        width: auto;
     }
     .hero-header h1 { 
         color: white !important; 
-        font-size: 18px !important; /* Ukuran font pas & profesional */
+        font-size: 20px !important; /* Ukuran font pas */
         font-weight: 800 !important;
         margin: 0 !important;
-        letter-spacing: -0.5px;
+        letter-spacing: 0.5px;
         line-height: 1.2;
     }
 
@@ -62,34 +66,19 @@ st.markdown("""
     div.row-widget.stRadio > div { background-color: transparent !important; }
     div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
     
-    /* --- PERBAIKAN TULISAN PUTIH DI SINI --- */
-    
-    /* SELECTBOX / DROPDOWN - BOX GELAP & TULISAN PUTIH */
-    div[data-baseweb="select"] > div {
+    /* --- INPUT BOX STYLE (TULISAN PUTIH TETAP AMAN) --- */
+    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
         background-color: #1a2634 !important;
         border: 1px solid #C5A059 !important;
         border-radius: 8px !important;
     }
-    /* Memaksa teks di dalam dropdown jadi putih */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
-        color: white !important;
-        -webkit-text-fill-color: white !important;
-    }
-
-    /* FILE UPLOADER - BOX GELAP & TULISAN PUTIH */
-    [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important;
-        border: 2px dashed #C5A059 !important;
-        border-radius: 10px !important;
-    }
-    /* Memaksa teks di uploader (Browse file / Drag and drop) jadi putih */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
     [data-testid="stFileUploaderText"] > span, 
     [data-testid="stFileUploaderText"] > small {
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
     
-    /* Tombol Browse File */
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
         color: #1a2634 !important;
