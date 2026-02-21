@@ -12,10 +12,10 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (FIXED, NO SCROLL, NAIK)
+# KONDISI 1: TAMPILAN LOGIN (TOTAL LOCK & NO ERROR)
 # ==========================================
 if not st.session_state.logged_in:
-    # 1. CSS UNTUK KUNCI SCROLL DAN FIX TAMPILAN
+    # 1. CSS UNTUK KUNCI SCROLL DAN FIX POSISI
     st.markdown("""
         <style>
         /* MATIKAN SCROLL TOTAL */
@@ -37,81 +37,69 @@ if not st.session_state.logged_in:
             background-size: cover; background-position: center;
         }
 
-        /* CONTAINER KARTU LOGIN (DI-FIXED AGAR NAIK) */
-        .main-login-container {
-            position: fixed;
-            top: 35% !important; /* Posisi naik ke atas */
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 400px;
-            z-index: 9999;
-            background: rgba(30, 30, 47, 0.98);
-            padding: 30px;
-            border-radius: 15px;
-            border: 1px solid rgba(197, 160, 89, 0.5);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.9);
-            text-align: center;
+        /* CARD LOGIN POSITIONING */
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            background: rgba(30, 30, 47, 0.98) !important;
+            padding: 30px !important;
+            border-radius: 15px !important;
+            border: 1px solid rgba(197, 160, 89, 0.5) !important;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.9) !important;
+            max-width: 400px !important;
+            margin: 0 auto !important;
+            margin-top: 15vh !important; /* Menaikkan posisi ke atas */
         }
 
-        .header-container { text-align: left; border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 15px; margin-bottom: 20px; }
-        .header-title { color: #C5A059; font-size: 18px; font-weight: 800; margin: 0; }
-        
-        /* STYLE INPUT AGAR TIDAK LEBAR/KEPOTONG */
+        /* STYLE INPUT & LABEL */
         div[data-baseweb="input"] { 
             background-color: rgba(255, 255, 255, 0.05) !important; 
             border: 1px solid rgba(197, 160, 89, 0.3) !important; 
             border-radius: 8px !important; 
         }
         input { color: white !important; }
-        label { color: #C5A059 !important; font-weight: 700; display: block !important; text-align: left !important;}
+        label { color: #C5A059 !important; font-weight: 700 !important; }
 
         /* TOMBOL */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important; font-weight: 800 !important; width: 100% !important;
-            border-radius: 8px !important; margin-top: 15px; border: none !important; height: 45px;
+            border-radius: 8px !important; border: none !important; height: 45px;
         }
 
-        /* HILANGKAN EXTRA SPACE */
-        [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stVerticalBlock"] { background-color: transparent !important; border: none !important; }
+        /* HEADER TEXT DI DALAM CARD */
+        .login-header {
+            text-align: left;
+            border-bottom: 1px solid rgba(197, 160, 89, 0.2);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. JAVASCRIPT UNTUK FORCE NO-SCROLL
-    st.components.v1.html("""
-        <script>
-            window.parent.document.body.style.overflow = 'hidden';
-            window.parent.document.addEventListener('scroll', function(e) { window.parent.scrollTo(0, 0); }, { passive: false });
-        </script>
-    """, height=0)
-
-    # 3. RENDER KARTU LOGIN (HTML VISUAL)
-    st.markdown("""
-        <div class="main-login-container">
-            <div class="header-container">
-                <span style="font-size: 28px; vertical-align: middle;">📦</span>
-                <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
-                    <div class="header-title">ERP LOGISTIC SURABAYA</div>
-                    <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">Secure System Access</div>
-                </div>
-            </div>
-            <div style="height: 180px;"></div> </div>
-    """, unsafe_allow_html=True)
-
-    # 4. RENDER INPUT (PYTHON WIDGET)
-    _, center_col, _ = st.columns([1, 2.5, 1])
+    # 2. FORM LOGIN (DIBUNGKUS DALAM CONTAINER AGAR OTOMATIS JADI CARD)
+    _, center_col, _ = st.columns([1, 1, 1])
+    
     with center_col:
-        # Menarik input Python ke dalam kartu HTML (menggunakan margin negatif)
-        st.markdown('<div style="margin-top: -33vh;"></div>', unsafe_allow_html=True)
-        user = st.text_input("Username", key="u_login")
-        password = st.text_input("Password", type="password", key="p_login")
-        
-        if st.button("ENTER SYSTEM", type="primary"):
-            if user == "admin" and password == "surabaya123":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Credential Gagal!")
+        with st.container(border=True):
+            # Header manual di dalam container
+            st.markdown("""
+                <div class="login-header">
+                    <span style="font-size: 28px; vertical-align: middle;">📦</span>
+                    <div style="display: inline-block; vertical-align: middle; margin-left: 10px;">
+                        <div style="color: #C5A059; font-size: 18px; font-weight: 800;">ERP LOGISTIC SURABAYA</div>
+                        <div style="color: #aaaaaa; font-size: 10px; text-transform: uppercase;">Secure System Access</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            user = st.text_input("Username", key="u_login")
+            password = st.text_input("Password", type="password", key="p_login")
+            
+            if st.button("ENTER SYSTEM", type="primary"):
+                if user == "admin" and password == "surabaya123":
+                    st.session_state.logged_in = True
+                    st.rerun()
+                else:
+                    st.error("Credential Gagal!")
     
     st.stop()
 
