@@ -892,7 +892,8 @@ elif menu == "Compare RTO":
     # --- 3. STEP 1: COMPARE SCAN VS APPSHEET ---
     st.subheader("🟢 STEP 1: VALIDASI SCAN VS APPSHEET")
     
-    if st.button("🚀 JALANKAN PROSES AWAL", use_container_width=True):
+    # Ganti baris yang error tadi jadi begini:
+        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True, key="tombol_final_rto"):
         if file_ds is not None and file_app is not None:
             try:
                 # Proses baca file otomatis
