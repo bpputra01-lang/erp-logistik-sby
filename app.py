@@ -11,7 +11,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN (NO SCROLL)
+# KONDISI 1: TAMPILAN LOGIN (BERSIH TOTAL)
 # ==========================================
 if not st.session_state.logged_in:
     st.markdown("""
@@ -19,32 +19,39 @@ if not st.session_state.logged_in:
         /* 1. SEMBUNYIKAN SEMUA ELEMEN BAWAAN & MATIKAN SCROLL */
         [data-testid="stSidebar"], header, .stDeployButton { display: none !important; }
         
-        /* Hilangkan padding default streamlit agar tidak ada scroll */
+        /* 2. PEMBASMI BOX BIRU/HITAM DI TENGAH (PENTING!) */
+        .main, .block-container, [data-testid="stVerticalBlock"] {
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
         .main .block-container {
             max-width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
         }
 
-        /* 2. BACKGROUND GUDANG FULL SCREEN */
+        /* 3. BACKGROUND GUDANG FULL SCREEN */
         .stApp {
             background: linear-gradient(rgba(10, 10, 20, 0.85), rgba(10, 10, 20, 0.85)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
-            overflow: hidden !important; /* MATIKAN SCROLL */
+            overflow: hidden !important;
         }
 
-        /* 3. CONTAINER LOGIN CARD (FIXED DI TENGAH) */
+        /* 4. CONTAINER LOGIN CARD YANG ASLI */
         .login-card {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 9999;
-            width: 400px;
-            background: rgba(30, 30, 47, 0.95);
+            width: 420px;
+            background: rgba(30, 30, 47, 0.95) !important;
             backdrop-filter: blur(20px);
             padding: 40px;
             border-radius: 20px;
@@ -53,26 +60,20 @@ if not st.session_state.logged_in:
             text-align: center;
         }
 
-        .login-logo { font-size: 50px; margin-bottom: 10px; }
-        .login-title { color: #C5A059; font-size: 24px; font-weight: 800; margin-bottom: 5px; }
+        .login-logo { font-size: 60px; margin-bottom: 10px; }
+        .login-title { color: #C5A059; font-size: 26px; font-weight: 800; margin-bottom: 5px; }
         .login-subtitle { color: #aaaaaa; font-size: 14px; margin-bottom: 30px; }
 
-        /* 4. STYLE INPUT & LABEL */
+        /* 5. STYLE INPUT & LABEL */
         div[data-baseweb="input"] {
             background-color: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(197, 160, 89, 0.3) !important;
             border-radius: 10px !important;
         }
         input { color: white !important; }
-        label { 
-            color: #C5A059 !important; 
-            font-weight: 700 !important; 
-            text-align: left !important; 
-            display: block !important; 
-            margin-bottom: 8px !important;
-        }
+        label { color: #C5A059 !important; font-weight: 700 !important; text-align: left !important; display: block !important; }
 
-        /* 5. TOMBOL LOGIN */
+        /* 6. TOMBOL LOGIN */
         button[kind="primary"] {
             background: linear-gradient(135deg, #C5A059 0%, #8E6E32 100%) !important;
             color: #1a2634 !important;
@@ -83,48 +84,40 @@ if not st.session_state.logged_in:
             margin-top: 20px;
             border: none !important;
         }
-
-        /* MATIKAN JARAK ANTAR ELEMEN STREAMLIT */
-        [data-testid="stVerticalBlock"] { gap: 0rem !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- RENDER CARD ---
-    # Gunakan satu div pembungkus yang menampung semuanya
+    # MULAI RENDER CARD LOGIN
     st.markdown('<div class="login-card">', unsafe_allow_html=True)
     
     st.markdown("""
         <div class="login-logo">📦</div>
         <div class="login-title">ERP LOGISTIC</div>
-        <div class="login-subtitle">Silakan login terlebih dahulu.</div>
+        <div class="login-subtitle">Secure System Access</div>
     """, unsafe_allow_html=True)
 
-    # Input Streamlit akan otomatis masuk ke posisi paling atas yang tersedia di card
-    user = st.text_input("Username", key="user_login")
-    password = st.text_input("Password", type="password", key="pass_login")
+    user = st.text_input("Username", key="u_log")
+    password = st.text_input("Password", type="password", key="p_log")
     
     if st.button("L O G I N", type="primary"):
         if user == "admin" and password == "surabaya123":
             st.session_state.logged_in = True
             st.rerun()
         else:
-            st.error("Credential Salah!")
+            st.error("Credential Gagal!")
 
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
 # ==========================================
-# KONDISI 2: SUDAH LOGIN (ERP DASHBOARD)
+# KONDISI 2: DASHBOARD (SETELAH LOGIN)
 # ==========================================
 else:
+    # Reset Background Dashboard biar gak gelap terus
     st.markdown("""
         <style>
         .stApp { background: #f4f7f6 !important; overflow: auto !important; }
         [data-testid="stSidebar"] { display: block !important; }
-        .hero-header { 
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-            color: white !important; padding: 10px 20px; border-radius: 8px;
-        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -134,8 +127,8 @@ else:
             st.session_state.logged_in = False
             st.rerun()
 
-    st.markdown('<div class="hero-header"><h1>DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
-    st.success("Selamat datang, Admin!")
+    st.title("DASHBOARD ANALYTICS")
+    st.success("Selamat datang di sistem.")A
 
 import pandas as pd
 import numpy as np
