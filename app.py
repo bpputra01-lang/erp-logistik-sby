@@ -318,7 +318,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
     res_over = pd.DataFrame(overstock_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN", "LOAD"])
 
     return df_gl3, df_gl4, res_refill, res_over
-    
+
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
     df_gl3 = pd.DataFrame()
@@ -592,7 +592,7 @@ with st.sidebar:
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
     
-    m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Stock Minus"]
+    m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Stock Minus", "Compare RTO"]
     
     def change_m2():
         st.session_state.main_menu = st.session_state.m2_key
@@ -806,3 +806,16 @@ elif menu == "Stock Minus":
                         if not df_need_adj.empty: df_need_adj.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
                     st.success("✅ Berhasil diproses!"); st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="HASIL_STOCK_MINUS.xlsx")
         except Exception as e: st.error(f"Error: {e}")
+
+        elif menu == "RTO Engine":  # INI MENU BARU LO
+    st.title("📦 SURABAYA LOGISTICS ENGINE")
+    
+    tab1, tab2 = st.tabs(["Update DS RTO", "Compare Jezpro"])
+    
+    with tab1:
+        st.header("Proses DS RTO vs Appsheet")
+        # Taruh code upload file_ds & file_app di sini sesuai draft lo tadi
+        
+    with tab2:
+        st.header("Compare Draft Jezpro")
+        # Taruh code jezpro lo di sini
