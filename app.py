@@ -807,7 +807,7 @@ elif menu == "Stock Minus":
                     st.success("✅ Berhasil diproses!"); st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="HASIL_STOCK_MINUS.xlsx")
         except Exception as e: st.error(f"Error: {e}")
 
-elif menu == "RTO Engine":  # Pastikan elif ini sejajar dengan if di atas
+elif menu == "Compare RTO":  # Pastikan elif ini sejajar dengan if di atas
     st.title("📦 SURABAYA LOGISTICS ENGINE")
     
     tab1, tab2 = st.tabs(["Update DS RTO", "Compare Jezpro"])
