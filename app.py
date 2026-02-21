@@ -112,70 +112,57 @@ if not st.session_state.logged_in:
         </style>
     """, unsafe_allow_html=True)
 
-    # UI Login Center
-_, col_mid, _ = st.columns([1, 2, 1])
-with col_mid:
-    # HARUS MENJOROK KE DALAM (Indented)
-    st.markdown('<div class="login-card">', unsafe_allow_html=True)
-    
-    # JUDUL
-    st.markdown("""
-        <h2 style="
-            color: #C5A059; 
-            margin-bottom: 0; 
-            font-family: 'Inter', sans-serif; 
-            font-weight: 800; 
-            letter-spacing: 1px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            text-align: center;
-        ">📦 LOGISTIC SURABAYA ERP</h2>
-    """, unsafe_allow_html=True)
-
-    # SUB-JUDUL
-    st.markdown("""
-        <p style="
-            color: #A0A0A0; 
-            font-size: 14px; 
-            font-weight: 400; 
-            letter-spacing: 0.5px;
-            margin-top: 5px;
-            margin-bottom: 30px;
-            text-align: center;
-        ">Surabaya Logistics Management System</p>
-    """, unsafe_allow_html=True)
-
-    # INPUT & BUTTON (Tetap di dalem blok with)
-    user_input = st.text_input("Username", key="input_user", placeholder="Username")
-    pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
-        if user_input == "admin" and pass_input == "surabaya123":
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Kredensial Salah!")
-            
-    st.markdown('</div>', unsafe_allow_html=True)
+# UI Login Center
+    _, col_mid, _ = st.columns([1, 2, 1])
+    with col_mid:
+        # Semua di dalam sini harus menjorok (indent) secara konsisten
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
         
-        user_input = st.text_input("Username", key="input_user")
-        pass_input = st.text_input("Password", type="password", key="input_pass")
+        # JUDUL
+        st.markdown("""
+            <h2 style="
+                color: #C5A059; 
+                margin-bottom: 0; 
+                font-family: 'Inter', sans-serif; 
+                font-weight: 800; 
+                letter-spacing: 1px;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                text-align: center;
+            ">📦 LOGISTIC SURABAYA ERP</h2>
+        """, unsafe_allow_html=True)
+
+        # SUB-JUDUL
+        st.markdown("""
+            <p style="
+                color: #A0A0A0; 
+                font-size: 14px; 
+                font-weight: 400; 
+                letter-spacing: 0.5px;
+                margin-top: 5px;
+                margin-bottom: 30px;
+                text-align: center;
+            ">Surabaya Logistics Management System</p>
+        """, unsafe_allow_html=True)
+
+        # INPUT (Cukup tulis sekali di sini)
+        user_input = st.text_input("Username", key="input_user", placeholder="Username")
+        pass_input = st.text_input("Password", type="password", key="input_pass", placeholder="Password")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
+        # TOMBOL SIGN IN (Cukup sekali di sini)
         if st.button("SIGN IN TO SYSTEM", use_container_width=True, type="primary"):
-            # Ganti username & password sesuai kebutuhan lu
             if user_input == "admin" and pass_input == "surabaya123":
                 st.session_state.logged_in = True
                 st.rerun()
             else:
                 st.error("Kredensial Salah!")
+        
+        # Menutup div login-card
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # PAKSA BERHENTI DI SINI (Dashboard lu di bawah aman, gak bakal diproses)
+    # PAKSA BERHENTI DI SINI (Keluar dari blok 'with', sejajar dengan 'if not st.session_state.logged_in')
     st.stop()
-
 # --- KODE DASHBOARD LU LANJUT DI BAWAH SINI ---
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
 import pandas as pd
