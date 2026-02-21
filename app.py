@@ -809,72 +809,81 @@ elif menu == "Stock Minus":
 
 # --- PASTIKAN NAMA DI SINI SAMA DENGAN DI SIDEBAR ---
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>SURABAYA LOGISTICS ENGINE</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>REKONSILIASI RTO ENGINE</h1></div>', unsafe_allow_html=True)
     
-    st.subheader("🛠️ STEP 1: PREPARE DATA SOURCE")
-    # Langsung buka semua uploader di awal
-    c1, c2, c3 = st.columns(3)
+    # --- 1. SESSION STATE (Biar Data Gak Ilang Pas Refresh) ---
+    if 'data_ds' not in st.session_state: st.session_state.data_ds = None
+    if 'data_app' not in st.session_state: st.session_state.data_app = None
+    if 'hasil_final' not in st.session_state: st.session_state.hasil_final = None
+
+    # --- 2. PREPARE DATA SOURCE ---
+    c1, c2 = st.columns(2)
     with c1:
-        file_ds = st.file_uploader("1. Upload DS RTO", type=['xlsx'], key="ds")
+        file_ds = st.file_uploader("Upload DS RTO", type=['xlsx'], key="ds")
     with c2:
-        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx'], key="app")
-    with c3:
-        file_draft = st.file_uploader("3. Draft RTO Jezpro", type=['xlsx'], key="draft")
+        file_app = st.file_uploader("Master APPSHEET RTO", type=['xlsx'], key="app")
 
-    st.divider()
+    # --- 3. TOMBOL PROSES & REFRESH ---
+    btn_col1, btn_col2 = st.columns(2)
+    
+    with btn_col1:
+        if st.button("🚀 JALANKAN PROSES AWAL", use_container_width=True):
+            if file_ds and file_app:
+                st.session_state.data_ds = pd.read_excel(file_ds)
+                st.session_state.data_app = pd.read_excel(file_app)
+                # Jalankan Engine
+                st.session_state.hasil_final = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
+                st.success("Data Berhasil Diolah!")
+            else:
+                st.error("Upload filenya dulu, Jancok!")
 
-    st.subheader("🚀 STEP 2: EXECUTE SEQUENCE")
-    # Satu tombol buat jalanin semua alur kayak Macro
-    if st.button("🔥 JALANKAN SEMUA PROSES (SEQUENCE)", use_container_width=True):
-        if file_ds and file_app and file_draft:
-            try:
-                # --- PROSES 1: LOAD SEMUA DATA ---
-                with st.status("Sedang memproses alur Macro...", expanded=True) as status:
-                    st.write("Reading files...")
-                    df_ds = pd.read_excel(file_ds)
-                    df_app = pd.read_excel(file_app)
-                    df_draft = pd.read_excel(file_draft)
+    with btn_col2:
+        if st.button("🔄 REFRESH DATA (RE-RUN)", use_container_width=True):
+            if st.session_state.data_ds is not None and file_app:
+                # Update data Appsheet saja (pencarian ulang)
+                st.session_state.data_app = pd.read_excel(file_app)
+                st.session_state.hasil_final = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
+                st.toast("Data Diperbarui!", icon='✅')
+            else:
+                st.warning("Belum ada data untuk di-refresh.")
 
-                    # --- PROSES 2: ENGINE DS RTO (Macro Part 1) ---
-                    st.write("Running Engine DS RTO vs Appsheet...")
-                    hasil_ds = engine_ds_rto_ultrafast(df_ds, df_app)
-                    st.success("Step 1: DS RTO Comparison Beres!")
+    # --- 4. RINGKASAN SELISIH (RECONCILIATION AREA) ---
+    if st.session_state.hasil_final is not None:
+        df_res = st.session_state.hasil_final
+        
+        # Filter hanya yang SELISIH (Mismatch)
+        df_selisih = df_res[df_res['NOTE'] != 'SESUAI'].copy()
+        
+        st.divider()
+        st.subheader(f"⚠️ RINGKASAN SELISIH ({len(df_selisih)} SKU)")
+        
+        # Tampilan Rekonsiliasi (Bisa Diedit Langsung)
+        # st.data_editor bikin tabelnya bisa diketik kayak Excel
+        edited_df = st.data_editor(
+            df_selisih,
+            column_config={
+                "NOTE": st.column_config.TextColumn("Status", disabled=True),
+                "REKONSILIASI": st.column_config.SelectboxColumn(
+                    "Tindakan Rekon",
+                    help="Pilih hasil pencarian ulang",
+                    options=["BIN LAIN DITEMUKAN", "BARANG HILANG", "SALAH SCAN", "SUDAH DIBENERIN"],
+                    required=True,
+                )
+            },
+            disabled=["SKU", "QTY SCAN", "TOTAL_QTY_AMBIL"],
+            hide_index=True,
+            use_container_width=True,
+            key="rekon_editor"
+        )
 
-                    # --- PROSES 3: ENGINE DRAFT JEZPRO (Macro Part 2) ---
-                    # Logic: Gunakan data Appsheet yang sama untuk compare Jezpro
-                    st.write("Running Engine Draft Jezpro vs Appsheet...")
-                    hasil_jez = engine_compare_draft_jezpro(df_draft, df_app)
-                    st.success("Step 2: Draft Jezpro Comparison Beres!")
-
-                    status.update(label="PROSES SELESAI, JANCOK!", state="complete", expanded=False)
-
-                # --- STEP 3: TAMPILKAN HASIL & DOWNLOAD ---
-                st.divider()
-                res1, res2 = st.columns(2)
-                
-                with res1:
-                    st.write("### HASIL DS RTO")
-                    st.dataframe(hasil_ds, height=300)
-                    
-                with res2:
-                    st.write("### HASIL DRAFT JEZPRO")
-                    st.dataframe(hasil_jez, height=300)
-                    
-                    # Tombol Download gabungan atau masing-masing
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        hasil_ds.to_excel(writer, index=False, sheet_name='Update_DS_RTO')
-                        hasil_jez.to_excel(writer, index=False, sheet_name='Draft_Jezpro_Final')
-                    
-                    st.download_button(
-                        label="📥 DOWNLOAD HASIL FINAL (SINGLE FILE)",
-                        data=output.getvalue(),
-                        file_name=f"FINAL_RTO_REPORT_{pd.Timestamp.now().strftime('%d%m%Y_%H%M')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-
-            except Exception as e:
-                st.error(f"Error pas proses, Cok! Cek format kolomnya. Detail: {e}")
-        else:
-            st.error("Upload ketiga filenya dulu! Jangan ada yang ketinggalan.")
+        # --- 5. DOWNLOAD HASIL REKON ---
+        if st.button("💾 SIMPAN HASIL REKONSILIASI"):
+            # Gabungkan kembali data yang sudah direkon ke data utama
+            st.success("Hasil Rekonsiliasi Tersimpan di Memori!")
+            
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_res.to_excel(writer, index=False, sheet_name='ALL_DATA')
+                edited_df.to_excel(writer, index=False, sheet_name='REKON_ONLY')
+            
+            st.download_button("📥 DOWNLOAD LAPORAN REKON", output.getvalue(), "Laporan_Rekon_RTO.xlsx", use_container_width=True)
