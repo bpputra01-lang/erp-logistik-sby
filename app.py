@@ -13,19 +13,25 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 # ==========================================
-# KONDISI 1: TAMPILAN LOGIN
+# KONDISI 1: TAMPILAN LOGIN (CSS HANYA DI SINI)
 # ==========================================
 if not st.session_state.logged_in:
+    # CSS ini HANYA akan jalan pas belum login
     st.markdown("""
         <style>
-        /* 1. MATIKAN SCROLL TOTAL */
-        html, body, [data-testid="stAppViewContainer"], 
-        [data-testid="stMainViewContainer"], .main, .block-container {
-            overflow: hidden !important;
-            height: 100vh !important;
-            position: fixed !important;
-            width: 100% !important;
+        /* CSS Login lu yang kemarin di sini... */
+        html, body, [data-testid="stAppViewContainer"] { 
+            overflow: hidden !important; 
         }
+        [data-testid="stSidebar"], header { display: none !important; }
+        
+        /* WARNA JUDUL (LABEL) - KUNCI BIAR GAK ITEM */
+        label { 
+            color: #FFFFFF !important; 
+            font-weight: 700 !important; 
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
         /* 2. BACKGROUND */
         .stApp {
