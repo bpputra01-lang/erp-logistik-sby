@@ -225,16 +225,6 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-# ==========================================
-# 1. FUNGSI UTAMA (RESEP) - TARUH DI ATAS!
-# ==========================================
-
-import pandas as pd
-import numpy as np
-
-import pandas as pd
-import numpy as np
-
 def engine_ds_rto_vba_total(df_ds, df_app):
     # --- 1. LOAD & CLEAN DATA APPSHEET ---
     df_app_vba = df_app.copy()
