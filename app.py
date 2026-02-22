@@ -968,7 +968,43 @@ elif menu == "Compare RTO":
     if st.session_state.df_selisih is not None:
         st.subheader("⚠️ TABEL SELISIH (HASIL BANDING)")
         st.dataframe(st.session_state.df_selisih, use_container_width=True, hide_index=True)
+        # --- UPDATE MANUAL VIA DATA EDITOR ---
+        st.write("---")
+        st.subheader("✍️ UPDATE MANUAL (TANPA UPLOAD FILE 4)")
         
+        df_edit_manual = st.session_state.df_selisih.copy()
+        
+        # Kolom editor manual
+        edited_manual = st.data_editor(
+            df_edit_manual,
+            use_container_width=True,
+            hide_index=True,
+            key="manual_editor_rto",
+            column_config={
+                "HASIL CEK REAL": st.column_config.NumberColumn("MASUKKAN QTY REAL", min_value=0, step=1, format="%d")
+            },
+            disabled=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN']
+        )
+
+        if st.button("🔄 UPDATE DATA DARI TABEL DI ATAS", use_container_width=True):
+            if st.session_state.data_app_permanen is not None:
+                # Ambil data yang diisi user (Qty > 0)
+                user_updates = edited_manual[edited_manual['HASIL CEK REAL'] > 0]
+                valid_skus = user_updates.set_index('SKU')['HASIL CEK REAL'].to_dict()
+                
+                df_temp = st.session_state.data_app_permanen.copy()
+                c_sku = [c for c in df_temp.columns if 'sku' in c.lower()][0]
+                c_qty = [c for c in df_temp.columns if 'qty' in c.lower()][0]
+                
+                # Filter & Overwrite
+                df_temp = df_temp[df_temp[c_sku].astype(str).str.strip().isin([str(k).strip() for k in valid_dict.keys() if k in valid_skus])]
+                df_temp[c_qty] = df_temp[c_sku].astype(str).str.strip().map({str(k).strip(): v for k, v in valid_skus.items()})
+                
+                # Simpan ke state final
+                st.session_state.df_ds_final = df_temp
+                st.session_state.df_selisih = edited_manual # Biar tabel selisih tetep sinkron
+                st.success(f"✅ Berhasil Update {len(df_temp)} SKU! Sekarang klik tombol FINAL COMPARE di bawah.")
+                st.rerun()
         # Tombol Download buat lo isi manual di luar
         csv_selisih = st.session_state.df_selisih.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Tabel Selisih untuk Diisi", csv_selisih, "Cek_Real_Manual.csv", "text/csv")
