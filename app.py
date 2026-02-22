@@ -982,97 +982,38 @@ elif menu == "Compare RTO":
         # --- 1. SETUP TABS (SHEET EXCEL) ---
         t1, t2, t3, t4, t5 = st.tabs(["📥 INPUT MASTER", "📊 DS RTO", "⚠️ SELISIH", "📝 DRAFT JEZPRO", "📦 NEW DRAFT"])
 
+       # --- TAB 1: INPUT MASTER (VERSI BERSIH) ---
         with t1:
-            st.subheader("📋 Sheet: Input Master (Bisa Upload / Paste)")
+            st.subheader("📋 Sheet: Input Master")
             
-            # Action Toolbar (Macros Buttons) dengan Key Unik
+            # Action Toolbar
             c_btn = st.columns(4)
-            if c_btn[0].button("🔍 DS RTO COMPARE", use_container_width=True, key="btn_compare_rto_unique"):
-                # --- LOGIKA: DS_RTO_QTY_AMBIL_ULTRAFAST ---
-                df_ds = st.session_state.grid_ds.copy()
-                df_app = st.session_state.grid_app.copy()
-                
-                if not df_ds.empty and not df_app.empty:
-                    try:
-                        # Ambil Kolom 9 (Index 8) atau 15 (Index 14) sebagai SKU
-                        sku_app_col = df_app.iloc[:, 8].fillna(df_app.iloc[:, 14])
-                        status_col = df_app.iloc[:, 1].astype(str).str.upper()
-                        
-                        # Filter status DONE / KURANG AMBIL
-                        mask = status_col.isin(["DONE", "KURANG AMBIL"])
-                        valid_app = df_app[mask].copy()
-                        
-                        # Hitung Total Qty: Kolom M (Index 12) + Kolom Q (Index 16)
-                        q_m = pd.to_numeric(valid_app.iloc[:, 12], errors='coerce').fillna(0)
-                        q_q = pd.to_numeric(valid_app.iloc[:, 16], errors='coerce').fillna(0)
-                        valid_app['TOTAL_AMBIL'] = q_m + q_q
-                        valid_app['SKU_CLEAN'] = sku_app_col[mask].astype(str).str.strip()
-                        
-                        # Pivot/Sum Qty per SKU
-                        dict_qty = valid_app.groupby('SKU_CLEAN')['TOTAL_AMBIL'].sum().to_dict()
-                        
-                        # Update DataFrame DS
-                        df_ds.columns = ["SKU", "QTY_SCAN", "QTY_AMBIL", "NOTE"]
-                        df_ds['SKU'] = df_ds['SKU'].astype(str).str.strip()
-                        df_ds['QTY_AMBIL'] = df_ds['SKU'].map(dict_qty).fillna(0)
-                        
-                        # Hitung Note: SCAN vs AMBIL
-                        def check_note(row):
-                            s = pd.to_numeric(row['QTY_SCAN'], errors='coerce') or 0
-                            a = row['QTY_AMBIL']
-                            if s > a: return "KELEBIHAN AMBIL"
-                            elif s < a: return "KURANG AMBIL"
-                            else: return "SESUAI"
-                        
-                        df_ds['NOTE'] = df_ds.apply(check_note, axis=1)
-                        st.session_state.ws_ds = df_ds
-                        st.session_state.ws_selisih = df_ds[df_ds['NOTE'] != "SESUAI"]
-                        st.success("✅ Compare Selesai!")
-                        st.balloons()
-                    except Exception as e:
-                        st.error(f"Gagal Proses: {e}")
+            # ... (Tombol-tombol lo tetep di sini) ...
 
-            if c_btn[1].button("🔄 REFRESH DRAFT", use_container_width=True, key="btn_refresh_rto_unique"):
-                st.info("Logic Refresh Running...")
-                
-            if c_btn[2].button("⚡ GEN NEW DRAFT", use_container_width=True, key="btn_gen_draft_unique"):
-                if not st.session_state.grid_dr.empty:
-                    st.session_state.ws_new_draft = st.session_state.grid_dr.copy()
-                    st.success("New Draft Ready di Tab 5!")
-
-            if c_btn[3].button("🗑️ RESET TOTAL", use_container_width=True, type="primary", key="btn_reset_rto_unique"):
-                for k in ["ws_ds", "ws_app", "ws_draft", "ws_selisih", "ws_new_draft"]:
-                    st.session_state[k] = None
-                st.rerun()
             st.divider()
 
-            # Input Grids
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.write("**1. Data DS RTO (SKU, Qty Scan, Qty Ambil, Note)**")
-                st.session_state.grid_ds = st.data_editor(st.session_state.ws_ds, num_rows="dynamic", key="ds_edit", use_container_width=True, hide_index=True)
-            with col_b:
-                st.write("**2. Data Appsheet (18 Kolom)**")
-                st.session_state.grid_app = st.data_editor(st.session_state.ws_app, num_rows="dynamic", key="app_edit", use_container_width=True, hide_index=True)
-            
-            st.write("**3. Draft Jezpro (9 Kolom)**")
+            # 1. DS RTO
+            st.write("### 📂 1. Sheet: DS RTO (A:D)")
+            f_ds = st.file_uploader("Upload File DS (Opsional)", type=['xlsx','csv'], key="up_ds_rto")
+            if f_ds:
+                st.session_state.ws_ds = pd.read_excel(f_ds).iloc[:, :4]
+            # Data Editor ini yang dipake buat Paste (Ctrl+V)
+            st.session_state.grid_ds = st.data_editor(st.session_state.ws_ds, num_rows="dynamic", key="ds_edit", use_container_width=True, hide_index=True)
+
+            st.divider()
+
+            # 2. APPSHEET RTO
+            st.write("### 📂 2. Sheet: APPSHEET RTO (18 Kolom)")
+            f_app = st.file_uploader("Upload File Appsheet (Opsional)", type=['xlsx','csv'], key="up_app_rto")
+            if f_app:
+                st.session_state.ws_app = pd.read_excel(f_app).iloc[:, :18]
+            st.session_state.grid_app = st.data_editor(st.session_state.ws_app, num_rows="dynamic", key="app_edit", use_container_width=True, hide_index=True)
+
+            st.divider()
+
+            # 3. DRAFT JEZPRO
+            st.write("### 📂 3. Sheet: DRAFT JEZPRO (9 Kolom)")
+            f_dr = st.file_uploader("Upload File Draft (Opsional)", type=['xlsx','csv'], key="up_dr_rto")
+            if f_dr:
+                st.session_state.ws_draft = pd.read_excel(f_dr).iloc[:, :9]
             st.session_state.grid_dr = st.data_editor(st.session_state.ws_draft, num_rows="dynamic", key="dr_edit", use_container_width=True, hide_index=True)
-
-        with t2:
-            st.subheader("📊 Sheet: DS RTO (Live View)")
-            st.dataframe(st.session_state.ws_ds, use_container_width=True, hide_index=True)
-
-        with t3:
-            st.subheader("⚠️ Sheet: Selisih")
-            if st.session_state.ws_selisih is not None:
-                st.dataframe(st.session_state.ws_selisih, use_container_width=True, hide_index=True)
-
-        with t4:
-            st.subheader("📝 Sheet: Draft Jezpro")
-            st.dataframe(st.session_state.ws_draft, use_container_width=True, hide_index=True)
-
-        with t5:
-            st.subheader("📦 Sheet: New Draft")
-            if st.session_state.ws_new_draft is not None:
-                st.dataframe(st.session_state.ws_new_draft, use_container_width=True, hide_index=True)
-                st.download_button("📥 Export New Draft", st.session_state.ws_new_draft.to_csv(index=False).encode('utf-8'), "Export_RTO.csv")
