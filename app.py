@@ -1015,24 +1015,28 @@ elif menu == "Compare RTO":
                 except Exception as e:
                     st.error(f"Error: Pastiin urutan kolom pas paste bener! Detail: {e}")
     with t3:
-        st.subheader("🎯 Hasil Akhir (Silakan Copas Balik ke ERP)")
-        if "final_macros" in st.session_state:
-            df_res = st.session_state.final_macros
-            total_qty = int(df_res["QTY_FINAL"].sum())
+        st.subheader("🎯 Hasil Final (Siap Copy Balik ke ERP)")
+        # Cek apakah session state hasil sudah ada
+        if "df_rto_final" in st.session_state and st.session_state.df_rto_final is not None:
+            res = st.session_state.df_rto_final
             
-            col_a, col_b = st.columns(2)
-            col_a.metric("Total Baris", len(df_res))
-            col_b.metric("Total Qty", f"{total_qty} Pcs")
+            # Hitung total dari kolom ke-2 (index 1) secara dinamis tanpa manggil nama kolom
+            val_qty = pd.to_numeric(res.iloc[:, 1], errors='coerce').fillna(0)
+            total_akhir = int(val_qty.sum())
+            
+            c1, c2 = st.columns(2)
+            c1.metric("Total SKU", len(res))
+            c2.metric("Total Qty", f"{total_akhir} Pcs")
 
-            if total_qty == 231:
+            if total_akhir == 231:
                 st.balloons()
-                st.success("🎯 MANTAP! HASIL PAS 231 PCS!")
+                st.success("🎯 GOAL! 231 PCS TERCAPAI!")
 
-            # Tampilkan tabel yang bisa di-copy balik
-            st.write("Klik kanan pada tabel di bawah untuk copy data hasil:")
-            st.data_editor(df_res, use_container_width=True, hide_index=True, key="final_view")
+            st.write("Silakan blok dan copy tabel di bawah (Ctrl+C):")
+            # Tampilkan editor agar bisa di-copy balik ke Excel/ERP
+            st.data_editor(res, use_container_width=True, hide_index=True, key="view_final_rto")
             
-            csv = df_res.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download sebagai CSV", csv, "Hasil_RTO.csv", "text/csv")
+            csv = res.to_csv(index=False).encode('utf-8')
+            st.download_button(f"📥 Download {total_akhir} Pcs.csv", csv, f"Hasil_RTO_{total_akhir}.csv", "text/csv")
         else:
-            st.warning("Belum ada data. Jalankan proses di Tab 2.")
+            st.info("Belum ada hasil. Jalankan proses di Tab 2 dulu, Cok!")
