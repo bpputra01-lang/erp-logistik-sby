@@ -427,7 +427,7 @@ with t2:
                 st.success(f"DONE! Refill: {len(out_ref)} | Withdraw: {len(out_wdr)}")
             else:
                 st.error("Upload Data Stock Dulu")
-    with t3:
+ with t3:
         if st.session_state.summary_refill is not None:
             st.subheader(f"📦 SUMMARY REFILL ({len(st.session_state.summary_refill)})")
             st.dataframe(st.session_state.summary_refill, use_container_width=True)
