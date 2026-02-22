@@ -1114,16 +1114,27 @@ elif menu == "FDR Update":
             st.divider()
             c = st.columns(4)
             
-            # --- MACRO 1: CLEAN COLUMNS (Hapus G,H,I,K,L,M,R,S,T,U,V,W) ---
+           # --- MACRO 1: CLEAN COLUMNS (Anti-Error) ---
             if c[0].button("🧹 CLEAN COLUMNS", key="btn_clean"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
-                    # Pakai Nama Kolom atau Index (VBA Index: 6,7,8,10,11,12,17,18,19,20,21,22)
+                    
+                    # Indeks kolom yang mau dihapus (VBA: G,H,I,K,L,M,R,S,T,U,V,W)
                     cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
-                    df.drop(df.columns[cols_idx], axis=1, inplace=True, errors='ignore')
-                    st.session_state.ws_manifest = df # Simpan balik
-                    st.success("Kolom Dihapus!")
-                    st.rerun()
+                    
+                    # --- FIX: Filter indeks yang VALID aja (biar gak IndexError) ---
+                    # Artinya: Cuma hapus kalau kolomnya emang ada di file itu
+                    existing_cols = [df.columns[i] for i in cols_idx if i < len(df.columns)]
+                    
+                    if existing_cols:
+                        df.drop(columns=existing_cols, inplace=True)
+                        st.session_state.ws_manifest = df
+                        st.success("KOLOM BERHASIL DIBERSIHKAN!")
+                        st.rerun()
+                    else:
+                        st.warning("Kolom sudah bersih atau tidak ditemukan!")
+                else: 
+                    st.error("UPLOAD FILE DULU BOS!")
 
             # --- MACRO 2: COPY FU IT (M / Index 12 TIDAK KOSONG) ---
             if c[1].button("🚀 COPY FU IT", key="btn_fu"):
