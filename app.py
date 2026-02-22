@@ -323,14 +323,41 @@ def menu_refill_withdraw():
         if key not in st.session_state: 
             st.session_state[key] = None
 
+    # --- 1. UPLOAD SECTION (Gue balikin di sini Cok!) ---
+    col1, col2 = st.columns(2)
+    with col1:
+        u_stock = st.file_uploader("📤 Upload All Stock SBY (Excel)", type=["xlsx"])
+        if u_stock:
+            st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
+            st.success("Stock Loaded!")
+
+    with col2:
+        u_trx = st.file_uploader("📤 Upload Data Transaksi (Excel)", type=["xlsx"])
+        if u_trx:
+            # Pakai try-except biar gak crash kalau nama sheet beda
+            try:
+                st.session_state.df_trx = pd.read_excel(u_trx, sheet_name="Data Transaksi")
+                st.success("Trx Loaded!")
+            except:
+                st.warning("Sheet 'Data Transaksi' gak ada, pakai sheet pertama ya.")
+                st.session_state.df_trx = pd.read_excel(u_trx)
+
+    st.divider()
+
+    # --- 2. TABS SECTION ---
     t1, t2, t3 = st.tabs(["📋 Data View", "🚀 Run Process", "📤 Upload to Google"])
 
     with t1:
         st.subheader("Data Preview")
         if st.session_state.df_stock_sby is not None:
             st.write("Data Stock SBY:", st.session_state.df_stock_sby.head())
+        else:
+            st.info("Belum ada data stock yang diupload.")
+            
         if st.session_state.df_trx is not None:
             st.write("Data Transaksi:", st.session_state.df_trx.head())
+        else:
+            st.info("Belum ada data transaksi yang diupload.")
 
     with t2:
         st.subheader("🛠️ Run Auto-Balance Logic")
