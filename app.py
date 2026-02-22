@@ -993,78 +993,76 @@ elif menu == "Compare RTO":
                 disabled=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN'] 
             )
         
-        if st.button("🔄 REFRESH DATA (Update DS RTO)", use_container_width=True):
+       if st.button("🔄 REFRESH DATA (Update DS RTO)", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
                 df_ds_new = st.session_state.df_ds.copy()
                 edited_selisih['SKU'] = edited_selisih['SKU'].astype(str).str.strip()
+                
+                # Mapping hasil ketikan user
                 dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
                 
+                # UPDATE QTY SCAN di data utama
                 for sku, val in dict_real.items():
                     df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
                 
+                # --- INI FILTRENYA (PENTING!) ---
+                # Jangan biarkan QTY SCAN jadi None/NaN, paksa jadi numeric
+                df_ds_new['QTY SCAN'] = pd.to_numeric(df_ds_new['QTY SCAN'], errors='coerce').fillna(0)
+                
+                # Jalankan ulang mesin compare utama
                 res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, st.session_state.data_app_permanen)
+                
+                # Bersihkan tampilan selisih
                 res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
                 
+                # SIMPAN KE STATE
                 st.session_state.df_ds = res_ds
                 st.session_state.df_selisih = res_selisih
-                st.success("Data Berhasil di-Refresh berdasarkan Hasil Cek Real!")
+                
+                st.success("Data Berhasil di-Refresh! Sekarang jalankan Compare Draft.")
                 st.rerun()
             else:
                 st.error("Data Appsheet hilang dari memori. Silakan upload ulang.")
 
     # --- 4. LOGIC DRAFT JEZPRO (SEKARANG SUDAH MASUK DALAM ELIF MENU) ---
-   # --- 4. LOGIC DRAFT JEZPRO (VBA VALID MODE - ANTI HANTU) ---
+   # --- 4. LOGIC DRAFT JEZPRO ---
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO COMPARE (VBA VALID MODE)")
         
         if st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
-            if st.session_state.data_app_permanen is not None:
-                # 1. Baca Draft Jezpro (f3)
+            # CEK: Pake df_ds (Hasil Refresh), bukan data permanen yang masih kotor!
+            if st.session_state.df_ds is not None:
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # 2. Ambil data hasil update-an lo (yang sudah di-Refresh)
-                # Kita pake data dari st.session_state.df_ds karena ini yang sudah paling update
-                df_valid_lapangan = st.session_state.df_ds.copy()
+                # AMBIL DATA YANG SUDAH DI-SCAN SAJA (> 0)
+                df_siap_compare = st.session_state.df_ds.copy()
+                df_siap_compare['QTY SCAN'] = pd.to_numeric(df_siap_compare['QTY SCAN'], errors='coerce').fillna(0)
+                df_siap_compare = df_siap_compare[df_siap_compare['QTY SCAN'] > 0]
                 
-                # --- FILTER MAUT: Buang yang QTY SCAN-nya 0 atau None ---
-                # Ini biar baris yang lo isi 0 di Cek Real gak ikut ngerusak angka
-                df_valid_lapangan = df_valid_lapangan[df_valid_lapangan['QTY SCAN'] > 0]
+                # JALANKAN COMPARE DRAFT
+                # Sekarang data yang masuk ke engine beneran cuma yang ada isinya (231)
+                hasil_draft = engine_compare_draft_vba(df_siap_compare, df3_draft)
                 
-                # 3. JALANKAN COMPARE HANYA DENGAN DATA YANG > 0
-                hasil_draft = engine_compare_draft_vba(df_valid_lapangan, df3_draft)
-                
-                # 4. CARI KOLOM QTY DAN HITUNG TOTAL
-                col_qty_list = [c for c in hasil_draft.columns if 'qty' in c.lower()]
-                
-                if col_qty_list:
-                    kolom_qty_fix = col_qty_list[0]
+                # Cari kolom qty secara dinamis
+                col_qty = [c for c in hasil_draft.columns if 'qty' in c.lower() or 'ambil' in c.lower()]
+                if col_qty:
+                    kol_fix = col_qty[0]
+                    # Filter lagi hasil akhirnya biar gak ada baris 0 nyempil
+                    hasil_draft = hasil_draft[hasil_draft[kol_fix] > 0]
                     
-                    # Double Check Filter (untuk memastikan hasil engine gak masukin sampah lagi)
-                    hasil_draft = hasil_draft[hasil_draft[kolom_qty_fix] > 0]
-                    
-                    total_vba = hasil_draft[kolom_qty_fix].sum()
-                    
-                    # TAMPILIN HASIL YANG UDAH GAK TOLOL
-                    st.metric("Total Qty Valid (VBA MODE)", f"{total_vba} Pcs")
+                    total_vba = int(hasil_draft[kol_fix].sum())
+                    st.metric("Total Qty Valid", f"{total_vba} Pcs")
                     
                     if total_vba == 231:
-                        st.success("✅ MANTAP! HASIL VALID 231. Item hantu sudah dibasmi.")
+                        st.success("✅ BERHASIL 231 PCS!")
                     else:
-                        st.info(f"Total Aktual: {total_vba} Pcs")
-
-                    st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
+                        st.info(f"Total: {total_vba}")
                     
-                    # 5. DOWNLOAD DATA BERSIH
+                    st.dataframe(hasil_draft, use_container_width=True)
+                    
+                    # DOWNLOAD
                     csv = hasil_draft.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label=f"📥 Download Draft Fix ({total_vba} Pcs)",
-                        data=csv,
-                        file_name=f"Draft_RTO_Final_{total_vba}_pcs.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                else:
-                    st.error("Kolom QTY gak ketemu di file lo!")
+                    st.download_button("📥 Download Hasil Fix", data=csv, file_name=f"Draft_Fix_{total_vba}.csv", mime="text/csv")
             else:
-                st.warning("Klik REFRESH DATA dulu di atas biar input 0 lo diproses!")
+                st.error("Jalankan Proses Awal dan Klik Refresh dulu!")
