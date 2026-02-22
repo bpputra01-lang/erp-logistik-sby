@@ -940,7 +940,12 @@ elif menu == "Compare RTO":
         st.subheader("Sheet: Input Manual (Copy-Paste dari Excel)")
         st.info("Tips: Klik sel paling pojok kiri atas, lalu tekan Ctrl+V.")
         
-       
+       c1, c2 = st.columns(2)
+        with c1:
+            st.write("**1. Paste Data Scan **")
+            # Template kosong biar lo bisa paste
+            df_input_app = pd.DataFrame([["", 0]], columns=["SKU", "QTY"])
+            data_scan = st.data_editor(df_input_app, num_rows="dynamic", use_container_width=True, key="ed_scan")
 
         # 2. SETUP KOLOM DRAFT (9 KOLOM)
         cols_jez = [f"Draft Col {i+1}" for i in range(9)]
@@ -962,13 +967,6 @@ elif menu == "Compare RTO":
         )
         
         st.divider()
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("**1. Paste Data Scan **")
-            # Template kosong biar lo bisa paste
-            df_input_app = pd.DataFrame([["", 0]], columns=["SKU", "QTY"])
-            data_scan = st.data_editor(df_input_app, num_rows="dynamic", use_container_width=True, key="ed_scan")
         
         st.write("**2. Paste Draft Jezpro / RTO (9 Kolom)**")
         data_jez = st.data_editor(
