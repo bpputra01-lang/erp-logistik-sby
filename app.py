@@ -767,37 +767,19 @@ elif menu == "Putaway System":
             except Exception as e: st.error(f"Gagal: {e}")
 
 elif menu == "Scan Out Validation":
-    st.markdown('<div class="hero-header"><h1> COMPARE AND ANLYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
-    with col1: up_scan = st.file_uploader("Upload DATA SCAN", type=['xlsx', 'csv'])
-    with col2: up_hist = st.file_uploader("Upload HISTORY SET UP", type=['xlsx'])
-    with col3: up_stock = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
-    if up_scan and up_hist and up_stock:
-        if st.button("🚀 COMPARE DATA SCAN OUT"):
-            try:
-                df_s = pd.read_excel(up_scan, engine='calamine') if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
-                df_h = pd.read_excel(up_hist, engine='calamine'); df_st = pd.read_excel(up_stock, engine='calamine')
-                df_res, df_draft = process_scan_out(df_s, df_h, df_st)
-                st.success("Validasi Selesai!")
-                def highlight_vba(val): return f'color: {"red" if "MISSMATCH" in str(val) or "BELUM" in str(val) else "black"}; font-weight: bold'
-                st.subheader("📋 DATA SCAN (COMPARED)"); st.dataframe(df_res.style.applymap(highlight_vba, subset=['Keterangan']), use_container_width=True)
-                st.subheader("📝 DRAFT SET UP"); st.dataframe(df_draft, use_container_width=True)
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_res.to_excel(writer, sheet_name='DATA SCAN', index=False); df_draft.to_excel(writer, sheet_name='DRAFT', index=False)
-                st.download_button("📥 DOWNLOAD SCAN OUT", data=output.getvalue(), file_name="SCAN_OUT_RESULT.xlsx")
-            except Exception as e: st.error(f"Error: {e}")
-
-elif menu == "Refill & Overstock":
-  st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (FIX 231)</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (FIX 231)</h1></div>', unsafe_allow_html=True)
     
     # --- 1. INISIALISASI SESSION STATE ---
-    if 'df_ds' not in st.session_state: st.session_state.df_ds = None
-    if 'df_selisih' not in st.session_state: st.session_state.df_selisih = None
-    if 'data_app_permanen' not in st.session_state: st.session_state.data_app_permanen = None
-    if 'df_ds_backdoor' not in st.session_state: st.session_state.df_ds_backdoor = None
+    if 'df_ds' not in st.session_state:
+        st.session_state.df_ds = None
+    if 'df_selisih' not in st.session_state:
+        st.session_state.df_selisih = None
+    if 'data_app_permanen' not in st.session_state:
+        st.session_state.data_app_permanen = None
+    if 'df_ds_backdoor' not in st.session_state:
+        st.session_state.df_ds_backdoor = None
 
-    # --- 2. SLOT UPLOAD (Didefinisikan di Luar biar gak NameError) ---
+    # --- 2. SLOT UPLOAD ---
     c1, c2, c3 = st.columns(3)
     f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1")
     f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2")
@@ -844,43 +826,33 @@ elif menu == "Refill & Overstock":
                 df_temp = st.session_state.data_app_permanen.copy()
                 c_sku_u = [c for c in df_temp.columns if 'sku' in c.lower()][0]
                 
-                # FILTER: Hanya simpan yang ada di file cek real (BASMI HANTU)
                 df_temp = df_temp[df_temp[c_sku_u].astype(str).str.strip().isin([str(k).strip() for k in valid_dict.keys()])]
-                
-                # Update Qty
                 c_qty_u = [c for c in df_temp.columns if 'qty' in c.lower()][0]
                 df_temp[c_qty_u] = df_temp[c_sku_u].astype(str).str.strip().map({str(k).strip(): v for k, v in valid_dict.items()})
                 
                 st.session_state.df_ds_backdoor = df_temp
-                st.info(f"✅ Backdoor Aktif! {len(df_temp)} SKU valid terdeteksi.")
+                st.info(f"✅ Backdoor Aktif! {len(df_temp)} SKU siap diproses.")
             except Exception as e:
                 st.error(f"Gagal baca file 4: {e}")
 
-    # --- 5. FINAL COMPARE (Ditaruh paling bawah, di luar if selisih) ---
+    # --- 5. FINAL COMPARE ---
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
         if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
-            # Cek data mana yang ready
-            data_final = None
-            if st.session_state.df_ds_backdoor is not None:
-                data_final = st.session_state.df_ds_backdoor
-            elif st.session_state.df_ds is not None:
-                data_final = st.session_state.df_ds
+            data_final = st.session_state.df_ds_backdoor if st.session_state.df_ds_backdoor is not None else st.session_state.df_ds
             
             if data_final is not None:
                 df3 = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 hasil = engine_compare_draft_vba(data_final, df3)
                 
-                # Filter Qty > 0 di hasil akhir
                 col_names = [c for c in hasil.columns if any(x in c.lower() for x in ['qty', 'ambil'])]
                 if col_names:
                     c_qty_f = col_names[0]
                     hasil = hasil[pd.to_numeric(hasil[c_qty_f], errors='coerce').fillna(0) > 0]
-                    
                     total = int(hasil[c_qty_f].sum())
-                    st.metric("Total Qty Akhir", f"{total} Pcs")
                     
+                    st.metric("Total Qty Akhir", f"{total} Pcs")
                     if total == 231:
                         st.success("🎯 MELEDAK! 231 PCS FIX!")
                     
@@ -890,4 +862,4 @@ elif menu == "Refill & Overstock":
                 else:
                     st.error("Kolom Qty gak ketemu di hasil compare!")
             else:
-                st.error("Jalankan Tombol Proses Banding dulu di atas!")
+                st.error("Jalankan Tombol Proses Banding dulu!")
