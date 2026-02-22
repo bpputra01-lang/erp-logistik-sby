@@ -220,6 +220,12 @@ import numpy as np
 import math
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
+
+import pandas as pd
+import numpy as np
+import streamlit as st
+
+
 def engine_ds_rto_vba_total(df_ds, df_app):
     # --- 1. LOAD & CLEAN DATA APPSHEET ---
     df_app_vba = df_app.copy()
@@ -958,12 +964,11 @@ elif menu == "Compare RTO":
 
     # --- 3. LOGIC REFRESH (DS & SELISIH) ---
 # --- 3. LOGIC REFRESH (DS & SELISIH) ---
+    # --- 3. LOGIC REFRESH (DS & SELISIH) ---
     if st.session_state.df_selisih is not None:
         st.divider()
         st.subheader("⚠️ SHEET SELISIH")
         
-        # --- FIX UTAMA: Paksa data jadi DataFrame murni dengan tipe Integer ---
-        # Ini supaya gak ada 'None' dan kotak merah pas diketik
         df_for_editor = st.session_state.df_selisih.copy()
         for col in df_for_editor.columns:
             if col == 'HASIL CEK REAL':
@@ -971,13 +976,12 @@ elif menu == "Compare RTO":
             else:
                 df_for_editor[col] = df_for_editor[col].astype(str).replace('nan', '')
 
-        # Gunakan container biar stabil
         with st.container():
             edited_selisih = st.data_editor(
                 df_for_editor, 
                 use_container_width=True, 
                 hide_index=True,
-                key="editor_rto_final", # GANTI KEY TIAP KALI REVISI biar cache ilang
+                key="editor_rto_final", 
                 column_config={
                     "HASIL CEK REAL": st.column_config.NumberColumn(
                         "HASIL CEK REAL",
@@ -992,58 +996,47 @@ elif menu == "Compare RTO":
         if st.button("🔄 REFRESH DATA (Update DS RTO)", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
                 df_ds_new = st.session_state.df_ds.copy()
-                
-                # Gunakan edited_selisih (data hasil ketikan user)
-                # Pastikan SKU jadi string biar mappingnya gak meleset
                 edited_selisih['SKU'] = edited_selisih['SKU'].astype(str).str.strip()
                 dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
                 
-                # Update QTY SCAN di data utama berdasarkan input user
                 for sku, val in dict_real.items():
                     df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
                 
-                # Jalankan ulang mesin
                 res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, st.session_state.data_app_permanen)
-                
-                # Bersihkan lagi hasil selisih dari tulisan None
                 res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
                 
                 st.session_state.df_ds = res_ds
                 st.session_state.df_selisih = res_selisih
-                
                 st.success("Data Berhasil di-Refresh berdasarkan Hasil Cek Real!")
                 st.rerun()
             else:
                 st.error("Data Appsheet hilang dari memori. Silakan upload ulang.")
 
-    # --- 4. LOGIC DRAFT JEZPRO ---
-if f3:
+    # --- 4. LOGIC DRAFT JEZPRO (SEKARANG SUDAH MASUK DALAM ELIF MENU) ---
+    if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO COMPARE (VBA VALID MODE)")
         if st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
                 df3_draft = pd.read_excel(f3)
                 
-                # JALANKAN COMPARE
                 hasil_draft = engine_compare_draft_vba(st.session_state.data_app_permanen, df3_draft)
                 
-                # --- VALIDASI ANGKA ---
-                total_vba = hasil_draft['QTY'].sum() # Asumsi kolom qty hasil compare namanya 'QTY'
+                total_vba = hasil_draft['QTY'].sum() 
                 st.metric("Total Qty Valid (VBA)", f"{total_vba} Pcs")
                 
                 if total_vba == 231:
                     st.success("✅ ANGKA VALID 231! Siap hajar ERP!")
                 else:
-                    st.warning(f"Angka masih {total_vba}, cek lagi hasil scan lo, Cok!")
+                    st.info(f"Total Qty: {total_vba}")
                 
                 st.dataframe(hasil_draft, use_container_width=True)
                 
-                # Download Button
                 csv = hasil_draft.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📥 Download Draft Valid",
                     data=csv,
-                    file_name="Draft_RTO_Fix_231.csv",
+                    file_name=f"Draft_RTO_Fix_{total_vba}.csv",
                     mime="text/csv"
                 )
             else:
