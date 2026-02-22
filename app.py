@@ -987,26 +987,39 @@ elif menu == "Compare RTO":
                 # 1. Ambil data asli Appsheet
                 df_refreshed = st.session_state.data_app_permanen.copy()
                 
-                # 2. Mapping hasil ketikan user (Hanya ambil yang > 0)
-                user_inputs = edited_selisih[edited_selisih['HASIL CEK REAL'] > 0]
-                valid_skus = user_inputs.set_index('SKU')['HASIL CEK REAL'].to_dict()
+                # --- FIX KEYERROR: Cari nama kolom SKU yang bener ---
+                col_sku_ds = [c for c in df_refreshed.columns if 'sku' in c.lower()]
+                col_sku_editor = [c for c in edited_selisih.columns if 'sku' in c.lower()]
                 
-                # 3. Filter data: HANYA simpan SKU yang ada di valid_skus
-                # Ini kuncinya: yang lo isi 0 bakal KEHAPUS dari memori
-                df_refreshed = df_refreshed[df_refreshed['SKU'].isin(valid_skus.keys())]
-                
-                # 4. Update Qty-nya sesuai inputan real lo
-                df_refreshed['QTY SCAN'] = df_refreshed['SKU'].map(valid_skus)
-                
-                # 5. Jalankan engine ulang biar state sinkron
-                res_ds, res_selisih = engine_ds_rto_vba_total(df_refreshed, st.session_state.data_app_permanen)
-                
-                # 6. Simpan ke State
-                st.session_state.df_ds = df_refreshed # Data sekarang beneran cuma 231 baris
-                st.session_state.df_selisih = res_selisih
-                
-                st.success(f"Refresh Sukses! Data sekarang bersih: {len(df_refreshed)} SKU.")
-                st.rerun()
+                if col_sku_ds and col_sku_editor:
+                    sku_name = col_sku_ds[0]
+                    sku_editor_name = col_sku_editor[0]
+                    
+                    # 2. Mapping hasil ketikan user (Hanya ambil yang > 0)
+                    user_inputs = edited_selisih[edited_selisih['HASIL CEK REAL'] > 0]
+                    # Pastikan SKU di-strip spasi biar gak miss
+                    user_inputs[sku_editor_name] = user_inputs[sku_editor_name].astype(str).str.strip()
+                    valid_skus = user_inputs.set_index(sku_editor_name)['HASIL CEK REAL'].to_dict()
+                    
+                    # 3. Filter data: HANYA simpan SKU yang ada di valid_skus
+                    df_refreshed[sku_name] = df_refreshed[sku_name].astype(str).str.strip()
+                    df_refreshed = df_refreshed[df_refreshed[sku_name].isin(valid_skus.keys())]
+                    
+                    # 4. Update Qty-nya sesuai inputan real lo
+                    # Cari kolom QTY di data asli buat di-update
+                    col_qty_ds = [c for c in df_refreshed.columns if 'qty' in c.lower()]
+                    if col_qty_ds:
+                        df_refreshed[col_qty_ds[0]] = df_refreshed[sku_name].map(valid_skus)
+                    
+                    # 5. Jalankan engine ulang
+                    res_ds, res_selisih = engine_ds_rto_vba_total(df_refreshed, st.session_state.data_app_permanen)
+                    
+                    # 6. Simpan ke State (Data sekarang beneran sisa yang valid aja)
+                    st.session_state.df_ds = df_refreshed 
+                    st.session_state.df_selisih = res_selisih
+                    
+                    st.success(f"Refresh Sukses! Data sekarang cuma {len(df_refreshed)} SKU.")
+                    st.rerun()
 
     # --- 4. LOGIC DRAFT JEZPRO (THE 231 MODE) ---
     if f3:
