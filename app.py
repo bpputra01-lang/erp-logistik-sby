@@ -323,24 +323,29 @@ def menu_refill_withdraw():
         if key not in st.session_state: 
             st.session_state[key] = None
 
-    # --- 1. UPLOAD SECTION (Gue balikin di sini Cok!) ---
+    # --- 1. UPLOAD SECTION ---
     col1, col2 = st.columns(2)
     with col1:
         u_stock = st.file_uploader("📤 Upload All Stock SBY (Excel)", type=["xlsx"])
         if u_stock:
-            st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
-            st.success("Stock Loaded!")
+            try:
+                # Coba cari sheet spesifik
+                st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
+                st.success("Stock Loaded (Sheet: All Stock SBY)")
+            except ValueError:
+                # Kalau gagal, hajar sheet pertama
+                st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name=0)
+                st.warning("Sheet 'All Stock SBY' gak ada, otomatis pakai sheet pertama.")
 
     with col2:
         u_trx = st.file_uploader("📤 Upload Data Transaksi (Excel)", type=["xlsx"])
         if u_trx:
-            # Pakai try-except biar gak crash kalau nama sheet beda
             try:
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name="Data Transaksi")
-                st.success("Trx Loaded!")
-            except:
-                st.warning("Sheet 'Data Transaksi' gak ada, pakai sheet pertama ya.")
-                st.session_state.df_trx = pd.read_excel(u_trx)
+                st.success("Trx Loaded (Sheet: Data Transaksi)")
+            except ValueError:
+                st.session_state.df_trx = pd.read_excel(u_trx, sheet_name=0)
+                st.warning("Sheet 'Data Transaksi' gak ada, otomatis pakai sheet pertama.")
 
     st.divider()
 
