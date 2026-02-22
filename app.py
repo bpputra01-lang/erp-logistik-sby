@@ -937,7 +937,6 @@ elif menu == "Compare RTO":
     t1, t2, t3 = st.tabs(["📋 PASTE DATA DISINI", "🔍 PREVIEW & PROSES", "🎯 HASIL SIAP COPAS"])
 
     with t1:
-        with t1:
         st.subheader("Sheet: Input Manual (Copy-Paste dari Excel)")
         st.info("Tips: Klik sel paling pojok kiri atas, lalu tekan Ctrl+V.")
         
