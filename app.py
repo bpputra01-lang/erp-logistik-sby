@@ -329,11 +329,9 @@ def menu_refill_withdraw():
         u_stock = st.file_uploader("📤 Upload All Stock SBY (Excel)", type=["xlsx"])
         if u_stock:
             try:
-                # Coba cari sheet spesifik
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
                 st.success("Stock Loaded (Sheet: All Stock SBY)")
             except ValueError:
-                # Kalau gagal, hajar sheet pertama
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name=0)
                 st.warning("Sheet 'All Stock SBY' gak ada, otomatis pakai sheet pertama.")
 
@@ -376,7 +374,7 @@ def menu_refill_withdraw():
                 if not df_t.empty:
                     df_t.columns = [i for i in range(len(df_t.columns))]
 
-                # 2. DICTIONARIES (PERSIS MACROS VBA)
+                # 2. DICTIONARIES
                 dict_dc = {}; dict_02 = {}
                 dict_tot_dc = {}; dict_tot_02 = {}
                 dict_tot_dc_klrak = {}; dict_brand = {}
@@ -385,28 +383,37 @@ def menu_refill_withdraw():
                 dict_pre_tot_toko = {}; dict_pre_tot_dc_inbound = {}
                 best_val_dc_qty = {}; best_val_02_qty = {}
 
-                # --- STEP 1: SCAN STOCK ---
+                # --- STEP 1: SCAN STOCK (FIXED LOGIC) ---
                 for _, row in df_s.iterrows():
                     sku = str(row[2]).strip()
                     if sku == "" or sku == "nan" or sku == "SKU": continue
+                    
                     bin_loc = str(row[1]).upper().strip()
                     qty_sys = pd.to_numeric(row[9], errors='coerce') or 0
 
+                    # Map info brand/item/var
                     if sku not in dict_brand:
-                        dict_brand[sku] = row[3]; dict_item[sku] = row[4]; dict_var[sku] = row[5]
+                        dict_brand[sku] = str(row[3])
+                        dict_item[sku] = str(row[4])
+                        dict_var[sku] = str(row[5])
 
+                    # LOGIC AREA TOKO
                     if any(x in bin_loc for x in ["02", "TOKO", "STORE", "LT.2"]):
                         dict_pre_tot_toko[sku] = dict_pre_tot_toko.get(sku, 0) + qty_sys
                         if qty_sys > best_val_02_qty.get(sku, -1):
-                            best_val_02_qty[sku] = qty_sys; dict_02[sku] = bin_loc
+                            best_val_02_qty[sku] = qty_sys
+                            dict_02[sku] = bin_loc
                         dict_tot_02[sku] = dict_tot_02.get(sku, 0) + qty_sys
                         dict_bin_list_02[sku] = dict_bin_list_02.get(sku, "") + bin_loc + ", "
+                    
+                    # LOGIC AREA DC
                     elif any(x in bin_loc for x in ["DC", "INBOUND"]):
                         dict_pre_tot_dc_inbound[sku] = dict_pre_tot_dc_inbound.get(sku, 0) + qty_sys
                         if any(x in bin_loc for x in ["KARANTINA", "DEFECT", "REJECT"]): continue
                         if "KL" not in bin_loc:
                             if qty_sys > best_val_dc_qty.get(sku, -1):
-                                best_val_dc_qty[sku] = qty_sys; dict_dc[sku] = bin_loc
+                                best_val_dc_qty[sku] = qty_sys
+                                dict_dc[sku] = bin_loc
                             dict_tot_dc[sku] = dict_tot_dc.get(sku, 0) + qty_sys
                             dict_bin_list_dc[sku] = dict_bin_list_dc.get(sku, "") + bin_loc + ", "
                         dict_tot_dc_klrak[sku] = dict_tot_dc_klrak.get(sku, 0) + qty_sys
