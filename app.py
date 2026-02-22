@@ -307,12 +307,12 @@ import numpy as np
 import streamlit as st
 
 import requests # Tambahin ini di paling atas file buat fungsi Upload
+import math
 
 def menu_refill_withdraw():
     st.markdown("""
         <style>
         div.stButton > button { width: 100% !important; background-color: #002b5b !important; color: white !important; font-weight: bold !important; border: 1px solid #ffc107 !important; }
-        .status-box { padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid #ddd; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -326,145 +326,139 @@ def menu_refill_withdraw():
     # --- 1. UPLOAD SECTION ---
     col1, col2 = st.columns(2)
     with col1:
-        u_stock = st.file_uploader("📤 Upload All Stock SBY (Excel)", type=["xlsx"])
+        u_stock = st.file_uploader("📤 Upload All Stock SBY", type=["xlsx"])
         if u_stock:
             try:
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
-                st.success("Stock Loaded (Sheet: All Stock SBY)")
-            except ValueError:
+            except:
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name=0)
-                st.warning("Sheet 'All Stock SBY' gak ada, otomatis pakai sheet pertama.")
+            st.success("Stock Ready")
 
     with col2:
-        u_trx = st.file_uploader("📤 Upload Data Transaksi (Excel)", type=["xlsx"])
+        u_trx = st.file_uploader("📤 Upload Data Transaksi", type=["xlsx"])
         if u_trx:
             try:
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name="Data Transaksi")
-                st.success("Trx Loaded (Sheet: Data Transaksi)")
-            except ValueError:
+            except:
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name=0)
-                st.warning("Sheet 'Data Transaksi' gak ada, otomatis pakai sheet pertama.")
+            st.success("Trx Ready")
 
-    st.divider()
-
-    # --- 2. TABS SECTION ---
-    t1, t2, t3 = st.tabs(["📋 Data View", "🚀 Run Process", "📤 Upload to Google"])
-
-    with t1:
-        st.subheader("Data Preview")
+    if st.button("🚀 GENERATE SUMMARY (ULTRA FAST)"):
         if st.session_state.df_stock_sby is not None:
-            st.write("Data Stock SBY:", st.session_state.df_stock_sby.head())
-        else:
-            st.info("Belum ada data stock yang diupload.")
+            # Setup Dataframe
+            df_s = st.session_state.df_stock_sby.copy()
+            df_s.columns = [i for i in range(len(df_s.columns))]
             
-        if st.session_state.df_trx is not None:
-            st.write("Data Transaksi:", st.session_state.df_trx.head())
-        else:
-            st.info("Belum ada data transaksi yang diupload.")
+            df_t = st.session_state.df_trx.copy() if st.session_state.df_trx is not None else pd.DataFrame()
+            if not df_t.empty:
+                df_t.columns = [i for i in range(len(df_t.columns))]
 
+            # Dictionaries (Mirip Scripting.Dictionary VBA)
+            dictDC = {}; dict02 = {}; dictTotDC = {}; dictTot02 = {}
+            dictTotDCKLRAK = {}; dictBrand = {}; dictItem = {}; dictVar = {}
+            dictBinListDC = {}; dictBinList02 = {}; dictPreTotToko = {}
+            dictPreTotDCInbound = {}; dictBestValDC = {}; dictBestVal02 = {}
+            dictUniqueRef = {}; dictUniqueWdr = {}
+
+            # --- STEP 1: SCAN STOCK ---
+            for _, row in df_s.iterrows():
+                sku = str(row[2]).strip()
+                if sku == "" or sku == "nan" or sku == "SKU": continue
+
+                binLoc = str(row[1]).upper().strip()
+                qtySys = pd.to_numeric(row[9], errors='coerce') or 0
+
+                if sku not in dictBrand:
+                    dictBrand[sku] = str(row[3])
+                    dictItem[sku] = str(row[4])
+                    dictVar[sku] = str(row[5])
+
+                # AREA TOKO
+                if any(x in binLoc for x in ["02", "TOKO", "STORE", "LT.2"]):
+                    dictPreTotToko[sku] = dictPreTotToko.get(sku, 0) + qtySys
+                    if qtySys > dictBestVal02.get(sku, -1):
+                        dictBestVal02[sku] = qtySys
+                        dict02[sku] = binLoc
+                    dictTot02[sku] = dictTot02.get(sku, 0) + qtySys
+                    dictBinList02[sku] = dictBinList02.get(sku, "") + binLoc + ", "
+
+                # AREA DC
+                elif any(x in binLoc for x in ["DC", "INBOUND"]):
+                    dictPreTotDCInbound[sku] = dictPreTotDCInbound.get(sku, 0) + qtySys
+                    
+                    # Filter Karantina/Defect/Reject
+                    if any(x in binLoc for x in ["KARANTINA", "DEFECT", "REJECT"]): continue
+
+                    if "KL" not in binLoc:
+                        if qtySys > dictBestValDC.get(sku, -1):
+                            dictBestValDC[sku] = qtySys
+                            dictDC[sku] = binLoc
+                        dictTotDC[sku] = dictTotDC.get(sku, 0) + qtySys
+                        dictBinListDC[sku] = dictBinListDC.get(sku, "") + binLoc + ", "
+                    
+                    dictTotDCKLRAK[sku] = dictTotDCKLRAK.get(sku, 0) + qtySys
+
+            outRef = []; outWdr = []
+
+            # --- STEP 2: LOGIKA TRANSAKSI ---
+            if not df_t.empty:
+                for _, row in df_t.iterrows():
+                    sku_t = str(row[1]).strip()
+                    if sku_t not in dictBrand: continue
+                    
+                    safeInvoice = str(row[0]).upper()
+                    safeLoc = str(row[6]).upper()
+
+                    # Jalur Refill via INV
+                    if "INV" in safeInvoice and not any(x in safeLoc for x in ["02", "TOKO"]):
+                        if sku_t not in dictUniqueRef:
+                            # Logic: (Tot02 + TotDC <= 3)
+                            if (dictTot02.get(sku_t, 0) + dictTotDC.get(sku_t, 0) <= 3) and sku_t in dictDC:
+                                bestQty = dictBestValDC.get(sku_t, 0)
+                                if bestQty > 1:
+                                    outRef.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2]])
+                                    dictUniqueRef[sku_t] = True
+                    
+                    # Jalur Withdraw via Trx
+                    elif "INV" not in safeInvoice and any(x in safeLoc for x in ["02", "TOKO"]):
+                        if sku_t not in dictUniqueWdr:
+                            if dictTotDCKLRAK.get(sku_t, 0) <= 3 and sku_t in dict02:
+                                bestQty = dictBestVal02.get(sku_t, 0)
+                                if bestQty > 1:
+                                    outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dict02[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotDCInbound.get(sku_t, 0), dictBinList02.get(sku_t, "")[:-2]])
+                                    dictUniqueWdr[sku_t] = True
+
+            # --- STEP 3: AUTO-BALANCE (FORCE) ---
+            for sku_k in dictBrand.keys():
+                # AUTO REFILL
+                if sku_k not in dictUniqueRef:
+                    if dictTotDC.get(sku_k, 0) > 3 and dictPreTotToko.get(sku_k, 0) == 0 and sku_k in dictDC:
+                        bestQty = dictBestValDC.get(sku_k, 0)
+                        outRef.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dictDC[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinListDC.get(sku_k, "")[:-2]])
+                        dictUniqueRef[sku_k] = True
+
+                # AUTO WITHDRAW
+                if sku_k not in dictUniqueWdr:
+                    if dictTot02.get(sku_k, 0) > 3 and dictPreTotDCInbound.get(sku_k, 0) == 0 and sku_k in dict02:
+                        bestQty = dictBestVal02.get(sku_k, 0)
+                        outWdr.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dict02[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinList02.get(sku_k, "")[:-2]])
+                        dictUniqueWdr[sku_k] = True
+
+            # Export to State
+            cols_ref = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN 02", "BIN LAIN"]
+            cols_wdr = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN DC", "BIN LAIN"]
+            st.session_state.summary_refill = pd.DataFrame(outRef, columns=cols_ref)
+            st.session_state.summary_withdraw = pd.DataFrame(outWdr, columns=cols_wdr)
+            st.success(f"DONE! Refill: {len(outRef)} | Withdraw: {len(outWdr)}")
+
+    # --- TABS FOR VIEW ---
+    t1, t2 = st.tabs(["SUMMARY REFILL", "SUMMARY WITHDRAW"])
+    with t1:
+        if st.session_state.summary_refill is not None:
+            st.dataframe(st.session_state.summary_refill)
     with t2:
-        st.subheader("🛠️ Run Auto-Balance Logic")
-        if st.button("🚀 GENERATE SUMMARY (ULTRA FAST)"):
-            if st.session_state.df_stock_sby is not None:
-                # 1. SETUP DATA
-                df_s = st.session_state.df_stock_sby.copy()
-                df_s.columns = [i for i in range(len(df_s.columns))]
-                
-                df_t = st.session_state.df_trx.copy() if st.session_state.df_trx is not None else pd.DataFrame()
-                if not df_t.empty:
-                    df_t.columns = [i for i in range(len(df_t.columns))]
-
-                # 2. DICTIONARIES
-                dict_dc = {}; dict_02 = {}
-                dict_tot_dc = {}; dict_tot_02 = {}
-                dict_tot_dc_klrak = {}; dict_brand = {}
-                dict_item = {}; dict_var = {}
-                dict_bin_list_dc = {}; dict_bin_list_02 = {}
-                dict_pre_tot_toko = {}; dict_pre_tot_dc_inbound = {}
-                best_val_dc_qty = {}; best_val_02_qty = {}
-
-                # --- STEP 1: SCAN STOCK (FIXED LOGIC) ---
-                for _, row in df_s.iterrows():
-                    sku = str(row[2]).strip()
-                    if sku == "" or sku == "nan" or sku == "SKU": continue
-                    
-                    bin_loc = str(row[1]).upper().strip()
-                    qty_sys = pd.to_numeric(row[9], errors='coerce') or 0
-
-                    # Map info brand/item/var
-                    if sku not in dict_brand:
-                        dict_brand[sku] = str(row[3])
-                        dict_item[sku] = str(row[4])
-                        dict_var[sku] = str(row[5])
-
-                    # LOGIC AREA TOKO
-                    if any(x in bin_loc for x in ["02", "TOKO", "STORE", "LT.2"]):
-                        dict_pre_tot_toko[sku] = dict_pre_tot_toko.get(sku, 0) + qty_sys
-                        if qty_sys > best_val_02_qty.get(sku, -1):
-                            best_val_02_qty[sku] = qty_sys
-                            dict_02[sku] = bin_loc
-                        dict_tot_02[sku] = dict_tot_02.get(sku, 0) + qty_sys
-                        dict_bin_list_02[sku] = dict_bin_list_02.get(sku, "") + bin_loc + ", "
-                    
-                    # LOGIC AREA DC
-                    elif any(x in bin_loc for x in ["DC", "INBOUND"]):
-                        dict_pre_tot_dc_inbound[sku] = dict_pre_tot_dc_inbound.get(sku, 0) + qty_sys
-                        if any(x in bin_loc for x in ["KARANTINA", "DEFECT", "REJECT"]): continue
-                        if "KL" not in bin_loc:
-                            if qty_sys > best_val_dc_qty.get(sku, -1):
-                                best_val_dc_qty[sku] = qty_sys
-                                dict_dc[sku] = bin_loc
-                            dict_tot_dc[sku] = dict_tot_dc.get(sku, 0) + qty_sys
-                            dict_bin_list_dc[sku] = dict_bin_list_dc.get(sku, "") + bin_loc + ", "
-                        dict_tot_dc_klrak[sku] = dict_tot_dc_klrak.get(sku, 0) + qty_sys
-
-                # 3. CORE LOGIC
-                out_ref = []; out_wdr = []
-                unique_ref = set(); unique_wdr = set()
-
-                # --- STEP 2: LOGIKA TRANSAKSI ---
-                if not df_t.empty:
-                    for _, row in df_t.iterrows():
-                        sku_t = str(row[1]).strip()
-                        if sku_t not in dict_brand: continue
-                        invoice = str(row[0]).upper()
-                        loc_t = str(row[6]).upper()
-
-                        if "INV" in invoice and not any(x in loc_t for x in ["02", "TOKO"]):
-                            if sku_t not in unique_ref:
-                                if (dict_tot_02.get(sku_t, 0) + dict_tot_dc.get(sku_t, 0) <= 3) and sku_t in dict_dc:
-                                    b_qty = best_val_dc_qty[sku_t]
-                                    if b_qty > 1:
-                                        out_ref.append([sku_t, dict_brand[sku_t], dict_item[sku_t], dict_var[sku_t], dict_dc[sku_t], b_qty, -(-b_qty // 2), dict_pre_tot_toko.get(sku_t, 0), dict_bin_list_dc.get(sku_t, "")[:-2]])
-                                        unique_ref.add(sku_t)
-                        elif "INV" not in invoice and any(x in loc_t for x in ["02", "TOKO"]):
-                            if sku_t not in unique_wdr:
-                                if dict_tot_dc_klrak.get(sku_t, 0) <= 3 and sku_t in dict_02:
-                                    b_qty = best_val_02_qty[sku_t]
-                                    if b_qty > 1:
-                                        out_wdr.append([sku_t, dict_brand[sku_t], dict_item[sku_t], dict_var[sku_t], dict_02[sku_t], b_qty, -(-b_qty // 2), dict_pre_tot_dc_inbound.get(sku_t, 0), dict_bin_list_02.get(sku_t, "")[:-2]])
-                                        unique_wdr.add(sku_t)
-
-                # --- STEP 3: AUTO-BALANCE ---
-                for sku_k in dict_brand.keys():
-                    if sku_k not in unique_ref:
-                        if dict_tot_dc.get(sku_k, 0) > 3 and dict_pre_tot_toko.get(sku_k, 0) == 0 and sku_k in dict_dc:
-                            b_qty = best_val_dc_qty[sku_k]
-                            out_ref.append([sku_k, dict_brand[sku_k], dict_item[sku_k], dict_var[sku_k], dict_dc[sku_k], b_qty, -(-b_qty // 2), 0, dict_bin_list_dc.get(sku_k, "")[:-2]])
-                            unique_ref.add(sku_k)
-                    if sku_k not in unique_wdr:
-                        if dict_tot_02.get(sku_k, 0) > 3 and dict_pre_tot_dc_inbound.get(sku_k, 0) == 0 and sku_k in dict_02:
-                            b_qty = best_val_02_qty[sku_k]
-                            out_wdr.append([sku_k, dict_brand[sku_k], dict_item[sku_k], dict_var[sku_k], dict_02[sku_k], b_qty, -(-b_qty // 2), 0, dict_bin_list_02.get(sku_k, "")[:-2]])
-                            unique_wdr.add(sku_k)
-
-                cols_ref = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN 02", "BIN LAIN"]
-                cols_wdr = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN DC", "BIN LAIN"]
-                st.session_state.summary_refill = pd.DataFrame(out_ref, columns=cols_ref)
-                st.session_state.summary_withdraw = pd.DataFrame(out_wdr, columns=cols_wdr)
-                st.success(f"DONE! Refill: {len(out_ref)} | Withdraw: {len(out_wdr)}")
-            else:
-                st.error("Upload Data Stock Dulu Cok!")
+        if st.session_state.summary_withdraw is not None:
+            st.dataframe(st.session_state.summary_withdraw)
 
     with t3:
         if st.session_state.summary_refill is not None:
