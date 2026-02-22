@@ -1090,68 +1090,65 @@ elif menu == "Compare RTO":
 elif menu == "FDR Update":
         st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST PROCESSOR</h1></div>', unsafe_allow_html=True)
 
-        # --- 0. INISIALISASI SESSION STATE ---
         if "ws_manifest" not in st.session_state:
-            st.session_state.ws_manifest = None # Set None biar ketauan kalo belum upload
+            st.session_state.ws_manifest = None
         if "ws_fu_it" not in st.session_state:
             st.session_state.ws_fu_it = None
         if "dict_kurir" not in st.session_state:
             st.session_state.dict_kurir = {}
 
-        # --- 1. TABS SYSTEM ---
         t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "✂️ SPLIT KURIR"])
 
         with t1:
             st.subheader("🛠️ Macro Control Panel")
-            
-            # --- MURNI UPLOAD FILE ---
             uploaded_file = st.file_uploader("📂 Pilih File Manifest Excel", type=["xlsx"], key="fdr_upload_strict")
             if uploaded_file:
                 try:
-                    # Langsung baca file tanpa lewat editor
-                    df_upload = pd.read_excel(uploaded_file)
-                    st.session_state.ws_manifest = df_upload
-                    st.toast(f"Berhasil load {len(df_upload)} baris", icon="✅")
+                    st.session_state.ws_manifest = pd.read_excel(uploaded_file)
+                    st.toast("File Berhasil di-load!", icon="✅")
                 except Exception as e:
-                    st.error(f"Error baca file: {e}")
+                    st.error(f"Error: {e}")
 
             st.divider()
-            
             c_btn = st.columns(4)
             
-            # --- MACRO: CLEAN COLUMNS ---
+            # --- MACRO 1: Hapus Kolom (G,H,I,K,L,M,R,S,T,U,V,W) ---
             if c_btn[0].button("🧹 CLEAN COLUMNS", key="btn_fdr_clean"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
+                    # Menyesuaikan Range VBA: G(6), H(7), I(8), K(10), L(11), M(12), R(17), S(18), T(19), U(20), V(21), W(22)
                     cols_to_del = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
                     df.drop(df.columns[cols_to_del], axis=1, inplace=True, errors='ignore')
                     st.session_state.ws_manifest = df
                     st.success("Kolom Berhasil Dihapus!")
-                else: st.warning("Upload file dulu, Cok!")
+                else: st.warning("Upload file dulu!")
 
-            # --- MACRO: COPY FU IT ---
+            # --- MACRO 2: PERLU FU IT (Logic: Kolom M / Index 12 TIDAK KOSONG) ---
             if c_btn[1].button("🚀 COPY FU IT", key="btn_fdr_fu"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
-                    if df.shape[1] >= 13:
-                        mask = df.iloc[:, 12].notna() & (df.iloc[:, 12].astype(str).str.strip() != "")
-                        st.session_state.ws_fu_it = df[mask].iloc[:, :13]
-                        st.success(f"Berhasil Copy {len(st.session_state.ws_fu_it)} Baris!")
+                    # Filter: Kolom M (13) TIDAK KOSONG ("<>")
+                    mask_fu = df.iloc[:, 12].notna() & (df.iloc[:, 12].astype(str).str.strip() != "")
+                    st.session_state.ws_fu_it = df[mask_fu].iloc[:, :13] # Ambil A-M
+                    st.success(f"Dapet {len(st.session_state.ws_fu_it)} baris yang perlu FU IT!")
                 else: st.warning("Data Kosong!")
 
-            # --- MACRO: SPLIT KURIR ---
+            # --- MACRO 3: SPLIT KURIR (Logic: Kolom F ISI & Kolom M KOSONG) ---
             if c_btn[2].button("⚡ SPLIT KURIR", key="btn_fdr_split"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
-                    # Logic: Kolom F (5) isi & Kolom M (12) Kosong
-                    mask = (df.iloc[:, 5].notna()) & (df.iloc[:, 12].isna() | (df.iloc[:, 12].astype(str).str.strip() == ""))
-                    df_split = df[mask].copy()
-                    kurir_groups = {name: data for name, data in df_split.groupby(df_split.iloc[:, 5])}
+                    # F (Index 5) TIDAK KOSONG dan M (Index 12) KOSONG
+                    mask_f_ada = df.iloc[:, 5].notna() & (df.iloc[:, 5].astype(str).str.strip() != "")
+                    mask_m_kosong = df.iloc[:, 12].isna() | (df.iloc[:, 12].astype(str).str.strip() == "")
+                    
+                    df_split_final = df[mask_f_ada & mask_m_kosong].copy()
+                    
+                    # Grouping per Kurir (Kolom F)
+                    kurir_groups = {str(name): data for name, data in df_split_final.groupby(df_split_final.iloc[:, 5])}
                     st.session_state.dict_kurir = kurir_groups
-                    st.success(f"Terpecah {len(kurir_groups)} Kurir!")
+                    st.success(f"Berhasil split {len(kurir_groups)} Kurir!")
                 else: st.warning("Data Kosong!")
 
-            # --- MACRO: CLEAR ---
             if c_btn[3].button("🗑️ CLEAR ALL", type="primary", key="btn_fdr_reset"):
                 st.session_state.ws_manifest = None
                 st.session_state.ws_fu_it = None
@@ -1159,25 +1156,15 @@ elif menu == "FDR Update":
                 st.rerun()
 
             st.divider()
-            
-            # TAMPILAN DATA (Read-Only)
             if st.session_state.ws_manifest is not None:
-                st.write("### 📂 PREVIEW MANIFEST")
                 st.dataframe(st.session_state.ws_manifest, use_container_width=True, hide_index=True)
-            else:
-                st.info("Silahkan upload file manifest (.xlsx) untuk memulai.")
 
+        # Tab FU IT & Split tetap pake st.dataframe (Read-Only)
         with t2:
-            # (Tab FU IT dan Split tetap pake dataframe karena emang output hasil proses)
-            st.subheader("📋 Sheet: PERLU FU IT")
             if st.session_state.ws_fu_it is not None:
                 st.dataframe(st.session_state.ws_fu_it, use_container_width=True, hide_index=True)
-                st.download_button("📥 Download FU IT", st.session_state.ws_fu_it.to_csv(index=False).encode('utf-8'), "FU_IT.csv")
-
         with t3:
-            st.subheader("✂️ Data Per Kurir")
             if st.session_state.dict_kurir:
                 for kurir, data in st.session_state.dict_kurir.items():
-                    with st.expander(f"📦 Kurir: {kurir}"):
+                    with st.expander(f"📦 {kurir}"):
                         st.dataframe(data, use_container_width=True, hide_index=True)
-                        st.download_button(f"📥 Download {kurir}", data.to_csv(index=False).encode('utf-8'), f"{kurir}.csv", key=f"dl_{kurir}")
