@@ -946,22 +946,6 @@ elif menu == "Compare RTO":
         cols_jez = [f"Draft Col {i+1}" for i in range(9)]
         df_init_jez = pd.DataFrame(columns=cols_jez)
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("**1. Paste Data Scan **")
-            # Template kosong biar lo bisa paste
-            df_input_app = pd.DataFrame([["", 0]], columns=["SKU", "QTY"])
-            data_scan = st.data_editor(df_input_app, num_rows="dynamic", use_container_width=True, key="ed_scan")
-        
-        st.write("**2. Paste Draft Jezpro / RTO (9 Kolom)**")
-        data_jez = st.data_editor(
-            df_init_jez, 
-            num_rows="dynamic", 
-            use_container_width=True, 
-            key="ed_jez_rto",
-            hide_index=True
-        )
-            
          # 1. SETUP KOLOM APPSHEET (18 KOLOM)
         # Gue bikin header default biar lo gak bingung urutannya
         cols_app = [f"Col {i+1}" for i in range(18)]
@@ -978,6 +962,23 @@ elif menu == "Compare RTO":
         )
         
         st.divider()
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.write("**1. Paste Data Scan **")
+            # Template kosong biar lo bisa paste
+            df_input_app = pd.DataFrame([["", 0]], columns=["SKU", "QTY"])
+            data_scan = st.data_editor(df_input_app, num_rows="dynamic", use_container_width=True, key="ed_scan")
+        
+        st.write("**2. Paste Draft Jezpro / RTO (9 Kolom)**")
+        data_jez = st.data_editor(
+            df_init_jez, 
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key="ed_jez_rto",
+            hide_index=True
+        )
+            
 
     with t2:
         if st.button("🚀 JALANKAN PROSES SEKARANG", use_container_width=True):
