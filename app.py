@@ -227,39 +227,53 @@ import numpy as np
 # --- TARUH ENGINE INI DI ATAS BIAR DIBACA DULUAN ---
 def engine_vba_style(df_ds, df_app):
     # --- 1. LOGIKA LOAD DATA (Sesuai arrApp = Range("A1:Q")) ---
-    # Di VBA lo: Status musti 'DONE' atau 'KURANG AMBIL'
-    # Kolom 9 (I) atau 15 (O) adalah SKU
-    # Qty = Kolom 13 (M) + Kolom 17 (Q)
+    # Copy biar nggak ngerusak data asli
+    df_app_work = df_app.copy()
     
-    df_app.columns = [str(i) for i in range(1, len(df_app.columns) + 1)] # Pakai angka biar sama kayak VBA
+    # Paksa nama kolom jadi string angka (1-indexed) biar sama kayak logic VBA lo
+    df_app_work.columns = [str(i) for i in range(1, len(df_app_work.columns) + 1)]
     
-    # Filter Status (Kolom B / 2)
-    mask = df_app['2'].str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
-    df_filtered = df_app[mask].copy()
+    # Filter Status (Kolom 2 / B) -> Harus DONE atau KURANG AMBIL
+    if '2' in df_app_work.columns:
+        mask = df_app_work['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
+        df_filtered = df_app_work[mask].copy()
+    else:
+        # Fallback kalau kolom 2 gak ketemu
+        df_filtered = df_app_work.copy()
     
     # Hitung Qty per SKU (Logic Dictionary dictQty di VBA)
     summary_dict = {}
     for _, row in df_filtered.iterrows():
-        # Ambil SKU dari Kolom 9, kalau kosong ambil dari Kolom 15
-        sku = str(row['9']).strip() if str(row['9']).strip() != "" else str(row['15']).strip()
+        # Ambil SKU: Cek Kolom 9 (I), kalau kosong cek Kolom 15 (O)
+        sku_9 = str(row.get('9', '')).strip()
+        sku_15 = str(row.get('15', '')).strip()
         
-        if sku and sku != 'nan':
-            # Sum Qty dari Kolom 13 dan 17
-            qty = pd.to_numeric(row['13'], errors='coerce', default=0) + \
-                  pd.to_numeric(row['17'], errors='coerce', default=0)
+        sku = sku_9 if sku_9 != "" and sku_9 != "nan" else sku_15
+        
+        if sku and sku != 'nan' and sku != '0':
+            # Sum Qty dari Kolom 13 (M) dan 17 (Q)
+            q13 = pd.to_numeric(row.get('13', 0), errors='coerce')
+            q17 = pd.to_numeric(row.get('17', 0), errors='coerce')
+            qty = (0 if pd.isna(q13) else q13) + (0 if pd.isna(q17) else q17)
+            
             summary_dict[sku] = summary_dict.get(sku, 0) + qty
 
     # --- 2. UPDATE DS RTO (Logic Write DS) ---
     df_ds_res = df_ds.copy()
-    # Pastikan kolom QTY SCAN (Kolom 2) adalah angka
-    df_ds_res.iloc[:, 1] = pd.to_numeric(df_ds_res.iloc[:, 1], errors='coerce').fillna(0)
     
-    # VLOOKUP QTY AMBIL dari dictionary
-    df_ds_res['QTY AMBIL'] = df_ds_res.iloc[:, 0].astype(str).str.strip().map(summary_dict).fillna(0)
+    # Pastikan nama kolom DS konsisten: Kolom 1=SKU, Kolom 2=QTY SCAN
+    df_ds_res.columns = ['SKU', 'QTY SCAN'] + list(df_ds_res.columns[2:])
     
-    # LOGIKA NOTE (Sesuai Request VBA lo)
+    # Pastikan tipe data bener
+    df_ds_res['SKU'] = df_ds_res['SKU'].astype(str).str.strip()
+    df_ds_res['QTY SCAN'] = pd.to_numeric(df_ds_res['QTY SCAN'], errors='coerce').fillna(0)
+    
+    # VLOOKUP QTY AMBIL dari summary_dict
+    df_ds_res['QTY AMBIL'] = df_ds_res['SKU'].map(summary_dict).fillna(0)
+    
+    # LOGIKA NOTE (Sesuai Request lo)
     def get_note(row):
-        scan = row.iloc[1] # Kolom B
+        scan = row['QTY SCAN']
         ambil = row['QTY AMBIL']
         if scan > ambil: return "KELEBIHAN AMBIL"
         elif scan < ambil: return "KURANG AMBIL"
@@ -267,6 +281,7 @@ def engine_vba_style(df_ds, df_app):
     
     df_ds_res['NOTE'] = df_ds_res.apply(get_note, axis=1)
     
+    # Return dataframe hasil dan dictionary-nya
     return df_ds_res, summary_dict
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
