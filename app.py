@@ -265,7 +265,7 @@ def menu_fdr_update():
         st.subheader("🛠️ Macro Control Panel")
         
         # --- [INI KUNCI BIAR MUNCUL TOMBOL UPLOAD] ---
-        uploaded_file = st.file_uploader("📂 Upload File Manifest Excel lo di sini, Cok!", type=["xlsx"], key="fdr_uploader_final")
+        uploaded_file = st.file_uploader("📂 Upload File Manifest Excel lo di sini!", type=["xlsx"], key="fdr_uploader_final")
         
         # Kalau ada file yang masuk, otomatis tabel di bawahnya keisi
         if uploaded_file:
@@ -1111,7 +1111,7 @@ elif menu == "Compare RTO":
                 csv = hasil_draft.to_csv(index=False).encode('utf-8')
                 st.download_button(f"📥 Download Draft Final ({total_vba} Pcs)", csv, f"Draft_Final_{total_vba}.csv", "text/csv", use_container_width=True)
             else:
-                st.error("Jalankan Proses Awal (Tombol 1) dulu, Cok!")
+                st.error("Jalankan Proses Awal (Tombol 1) dulu,!")
 
 elif menu == "FDR Update":
         st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST PROCESSOR</h1></div>', unsafe_allow_html=True)
