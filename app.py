@@ -919,31 +919,23 @@ elif menu == "Compare RTO":
             st.success("Proses Compare Selesai!")
 
     # Tampilkan Tabel Selisih (Data Editor buat isi "HASIL CEK REAL")
+ # Tampilkan Tabel Selisih
     if st.session_state.df_selisih is not None:
-        st.subheader("⚠️ SHEET SELISIH (Input Hasil Cek Real di Kolom G)")
-        edited_selisih = st.data_editor(st.session_state.df_selisih, use_container_width=True, hide_index=True, key="editor_vba")
+        st.subheader("⚠️ SHEET SELISIH")
+        # data_editor harus sejajar di dalam IF ini
+        edited_selisih = st.data_editor(st.session_state.df_selisih, use_container_width=True, hide_index=True)
         
-   if st.button("🔄 REFRESH DATA (Like VBA Refresh)", use_container_width=True):
-            # 1. Ambil data terakhir dari session state (BUKAN BACA EXCEL LAGI)
+        # Tombol REFRESH harus sejajar dengan edited_selisih
+        if st.button("🔄 REFRESH DATA (Like VBA Refresh)", use_container_width=True):
             df_ds_new = st.session_state.df_ds.copy()
             
-            # 2. Akumulasi Cek Real dari tabel yang baru lo ketik di layar
-            # Kolom G itu namanya 'HASIL CEK REAL'
+            # Isi tombol REFRESH masuk 1 level lagi (4 spasi)
             dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
             
-            # 3. Update QTY SCAN di DS sesuai inputan user
             for sku, val in dict_real.items():
-                df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
+                df_ds_res.loc[df_ds_res['SKU'] == sku, 'QTY SCAN'] = val
             
-            # 4. Jalankan mesin lagi pake data yang sudah ada di memori
-            # JANGAN PAKAI pd.read_excel(f2) di sini!
-            res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, df_app_uploaded) 
-            
-            # Simpan balik ke session
-            st.session_state.df_ds = res_ds
-            st.session_state.df_selisih = res_selisih
-            
-            st.success("Data Berhasil di-Refresh!")
+            # Re-run logic
             st.rerun()
     st.divider()
     
