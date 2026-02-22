@@ -931,39 +931,55 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📑 RTO EXCEL PASTE (STABLE MODE)</h1></div>', unsafe_allow_html=True)
+   st.markdown('<div class="hero-header"><h1>📑 RTO HYBRID SYSTEM (UPLOAD + PASTE)</h1></div>', unsafe_allow_html=True)
 
-    # --- 0. INISIALISASI STATE (Biar Gak Ilang Pas Pindah Tab) ---
-    if "df_rto_final" not in st.session_state:
-        st.session_state.df_rto_final = None
+    # --- 0. INISIALISASI MEMORI ---
+    if "df_rto_final" not in st.session_state: st.session_state.df_rto_final = None
+    if "data_app_hybrid" not in st.session_state: st.session_state.data_app_hybrid = pd.DataFrame(columns=[f"Col {i+1}" for i in range(18)])
+    if "data_jez_hybrid" not in st.session_state: st.session_state.data_jez_hybrid = pd.DataFrame(columns=[f"Draft Col {i+1}" for i in range(9)])
 
     # --- 1. SETUP TABS ---
-    tab1, tab2, tab3 = st.tabs(["📋 PASTE DATA", "🔍 PROSES MACROS", "🎯 HASIL SIAP COPAS"])
+    tab1, tab2, tab3 = st.tabs(["📋 INPUT DATA", "🔍 PROSES MACROS", "🎯 HASIL SIAP COPAS"])
 
     with tab1:
-        st.subheader("Sheet: Input Manual (Ctrl+V)")
+        st.subheader("Sheet: Input Resources (Bisa Upload atau Paste)")
         
-        # Kolom Appsheet (18 Kolom)
-        cols_app = [f"Col {i+1}" for i in range(18)]
-        st.write("**1. Paste Data Appsheet RTO (18 Kolom)**")
-        data_scan = st.data_editor(pd.DataFrame(columns=cols_app), num_rows="dynamic", use_container_width=True, key="ed_scan_stable", hide_index=True)
+        # --- BAGIAN 1: APPSHEET RTO ---
+        st.write("### 📂 1. Data Appsheet RTO (18 Kolom)")
+        f_app = st.file_uploader("Upload File Appsheet (Opsional)", type=['xlsx','csv'], key="up_app")
+        
+        # Logic: Kalau ada file, masukin ke editor. Kalau gak ada, biarin kosong buat dipaste.
+        if f_app:
+            df_up_app = pd.read_excel(f_app) if f_app.name.endswith('xlsx') else pd.read_csv(f_app)
+            # Paksa jadi 18 kolom biar gak error
+            st.session_state.data_app_hybrid = df_up_app.iloc[:, :18] if len(df_up_app.columns) >= 18 else df_up_app
+            st.success(f"✅ {f_app.name} Terunggah ke Tabel!")
+
+        ed_app = st.data_editor(st.session_state.data_app_hybrid, num_rows="dynamic", use_container_width=True, key="grid_app", hide_index=True)
         
         st.divider()
 
-        # Kolom Draft (9 Kolom)
-        cols_jez = [f"Draft Col {i+1}" for i in range(9)]
-        st.write("**2. Paste Draft Jezpro / RTO (9 Kolom)**")
-        data_jez = st.data_editor(pd.DataFrame(columns=cols_jez), num_rows="dynamic", use_container_width=True, key="ed_jez_stable", hide_index=True)
+        # --- BAGIAN 2: DRAFT JEZPRO ---
+        st.write("### 📂 2. Data Draft Jezpro / RTO (9 Kolom)")
+        f_jez = st.file_uploader("Upload File Draft (Opsional)", type=['xlsx','csv'], key="up_jez")
+        
+        if f_jez:
+            df_up_jez = pd.read_excel(f_jez) if f_jez.name.endswith('xlsx') else pd.read_csv(f_jez)
+            st.session_state.data_jez_hybrid = df_up_jez.iloc[:, :9] if len(df_up_jez.columns) >= 9 else df_up_jez
+            st.success(f"✅ {f_jez.name} Terunggah ke Tabel!")
+
+        ed_jez = st.data_editor(st.session_state.data_jez_hybrid, num_rows="dynamic", use_container_width=True, key="grid_jez", hide_index=True)
 
     with tab2:
         st.subheader("🔍 Jalankan Simulasi Macros")
         if st.button("🚀 JALANKAN PROSES SEKARANG", use_container_width=True):
-            df_s = pd.DataFrame(data_scan).dropna(how='all')
-            df_j = pd.DataFrame(data_jez).dropna(how='all')
+            # Ambil data dari editor (hasil upload maupun paste)
+            df_s = pd.DataFrame(ed_app).dropna(how='all')
+            df_j = pd.DataFrame(ed_jez).dropna(how='all')
             
             if not df_s.empty and not df_j.empty:
                 try:
-                    # Logic: SKU kolom 1 (idx 0), Qty kolom 2 (idx 1)
+                    # Logic: SKU kolom 1, Qty kolom 2 (Sesuai kebiasaan lo)
                     df_s['SKU_KEY'] = df_s.iloc[:, 0].astype(str).str.strip()
                     df_s['QTY_VAL'] = pd.to_numeric(df_s.iloc[:, 1], errors='coerce').fillna(0)
                     
@@ -972,41 +988,32 @@ elif menu == "Compare RTO":
                     df_j['SKU_KEY'] = df_j.iloc[:, 0].astype(str).str.strip()
                     df_j['HASIL_QTY'] = df_j['SKU_KEY'].map(pivot_scan).fillna(0)
                     
-                    # Ambil yang Qty > 0
+                    # Filter barang yang beneran ada (231 target)
                     res_final = df_j[df_j['HASIL_QTY'] > 0].copy()
+                    res_final.iloc[:, 1] = res_final['HASIL_QTY'] # Update Qty Draft
                     
-                    # Update kolom Qty asli draft (idx 1)
-                    res_final.iloc[:, 1] = res_final['HASIL_QTY']
-                    
-                    # KUNCI KE SESSION STATE
                     st.session_state.df_rto_final = res_final.drop(columns=['SKU_KEY', 'HASIL_QTY'])
-                    st.success("✅ Macros Berhasil! Silakan buka Tab 3.")
+                    st.success("✅ Macros Berhasil! Silakan cek Tab 3.")
                     st.balloons()
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error Proses: {e}")
             else:
-                st.warning("Data kosong, Cok! Paste dulu di Tab 1.")
+                st.warning("Data belum diisi, Cok! Upload file atau Paste di Tab 1.")
 
     with tab3:
         st.subheader("🎯 Hasil Final (Siap Copy Balik ke ERP)")
-        # Cek data di session state, bukan di variabel lokal
         if st.session_state.df_rto_final is not None:
             res = st.session_state.df_rto_final
-            
-            # Hitung total qty dari kolom ke-2 (idx 1)
-            total_akhir = int(pd.to_numeric(res.iloc[:, 1], errors='coerce').sum())
+            total_qty = int(pd.to_numeric(res.iloc[:, 1], errors='coerce').sum())
             
             c1, c2 = st.columns(2)
             c1.metric("Total SKU", len(res))
-            c2.metric("Total Qty", f"{total_akhir} Pcs")
+            c2.metric("Total Qty", f"{total_qty} Pcs")
 
-            if total_akhir == 231:
+            if total_qty == 231:
                 st.success("🎯 MANTAP! 231 PCS FIX!")
 
-            st.write("Blok & Copy (Ctrl+C) tabel di bawah:")
-            st.data_editor(res, use_container_width=True, hide_index=True, key="view_final_stable")
-            
-            st.download_button("📥 Download CSV", res.to_csv(index=False).encode('utf-8'), f"RTO_{total_akhir}.csv", "text/csv")
+            st.data_editor(res, use_container_width=True, hide_index=True, key="view_final_hybrid")
+            st.download_button("📥 Download CSV", res.to_csv(index=False).encode('utf-8'), f"RTO_{total_qty}.csv", "text/csv")
         else:
-            # Pesan kalau user ke Tab 3 tapi belum jalanin proses di Tab 2
-            st.info("⚠️ Belum ada hasil. Balik ke Tab 2 terus klik 'JALANKAN PROSES', Cok!")
+            st.info("⚠️ Jalankan proses di Tab 2 dulu!")
