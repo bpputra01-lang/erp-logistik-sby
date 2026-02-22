@@ -940,26 +940,18 @@ elif menu == "Compare RTO":
         st.subheader("Sheet: Input Manual (Copy-Paste dari Excel)")
         st.info("Tips: Klik sel paling pojok kiri atas, lalu tekan Ctrl+V.")
         
-        # 1. SETUP KOLOM APPSHEET (18 KOLOM)
-        # Gue bikin header default biar lo gak bingung urutannya
-        cols_app = [f"Col {i+1}" for i in range(18)]
-        # Kalo lo mau namain spesifik beberapa kolom awal, ganti list di atas atau biarin gini biar fleksibel
-        df_init_app = pd.DataFrame(columns=cols_app)
-        
-        st.write("**1. Paste Data Scan / Appsheet RTO (18 Kolom)**")
-        data_scan = st.data_editor(
-            df_init_app, 
-            num_rows="dynamic", 
-            use_container_width=True, 
-            key="ed_scan_rto",
-            hide_index=True
-        )
-        
-        st.divider()
+       
 
         # 2. SETUP KOLOM DRAFT (9 KOLOM)
         cols_jez = [f"Draft Col {i+1}" for i in range(9)]
         df_init_jez = pd.DataFrame(columns=cols_jez)
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.write("**1. Paste Data Scan **")
+            # Template kosong biar lo bisa paste
+            df_input_app = pd.DataFrame([["", 0]], columns=["SKU", "QTY"])
+            data_scan = st.data_editor(df_input_app, num_rows="dynamic", use_container_width=True, key="ed_scan")
         
         st.write("**2. Paste Draft Jezpro / RTO (9 Kolom)**")
         data_jez = st.data_editor(
@@ -969,18 +961,23 @@ elif menu == "Compare RTO":
             key="ed_jez_rto",
             hide_index=True
         )
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("**1. Paste Data Scan (Appsheet)**")
-            # Template kosong biar lo bisa paste
-            df_input_app = pd.DataFrame([["", 0]], columns=["SKU", "QTY"])
-            data_scan = st.data_editor(df_input_app, num_rows="dynamic", use_container_width=True, key="ed_scan")
             
-        with c2:
-            st.write("**2. Paste Draft Jezpro (ERP)**")
-            df_input_jez = pd.DataFrame([["", 0]], columns=["SKU", "QTY_ERP"])
-            data_jez = st.data_editor(df_input_jez, num_rows="dynamic", use_container_width=True, key="ed_jez")
+         # 1. SETUP KOLOM APPSHEET (18 KOLOM)
+        # Gue bikin header default biar lo gak bingung urutannya
+        cols_app = [f"Col {i+1}" for i in range(18)]
+        # Kalo lo mau namain spesifik beberapa kolom awal, ganti list di atas atau biarin gini biar fleksibel
+        df_init_app = pd.DataFrame(columns=cols_app)
+        
+        st.write("**1. Appsheet RTO (18 Kolom)**")
+        data_scan = st.data_editor(
+            df_init_app, 
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key="ed_scan_rto",
+            hide_index=True
+        )
+        
+        st.divider()
 
     with t2:
         if st.button("🚀 JALANKAN PROSES SEKARANG", use_container_width=True):
