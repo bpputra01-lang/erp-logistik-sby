@@ -232,6 +232,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+import pandas as pd
+import numpy as np
+
 def engine_ds_rto_vba_total(df_ds, df_app):
     # --- 1. LOAD & CLEAN DATA APPSHEET ---
     df_app_vba = df_app.copy()
@@ -270,8 +273,7 @@ def engine_ds_rto_vba_total(df_ds, df_app):
         ambil = pd.to_numeric(row.get('QTY AMBIL', 0), errors='coerce') or 0
         if scan > ambil: return "KELEBIHAN AMBIL"
         elif scan < ambil: return "KURANG AMBIL"
-        elif scan == ambil: return "SESUAI"
-        return "SESUAI"
+        else: return "SESUAI"
     
     df_ds_res['NOTE'] = df_ds_res.apply(get_note, axis=1)
 
@@ -289,58 +291,51 @@ def engine_ds_rto_vba_total(df_ds, df_app):
             })
     
     if list_tambahan:
-        df_tambahan = pd.DataFrame(list_tambahan)
-        df_ds_res = pd.concat([df_ds_res, df_tambahan], ignore_index=True)
+        df_ds_res = pd.concat([df_ds_res, pd.DataFrame(list_tambahan)], ignore_index=True)
 
-    # --- 4. LOGIKA SHEET SELISIH (SPLIT BIN) ---
+    # --- 4. LOGIKA SHEET SELISIH (HASIL CEK REAL = BLANK) ---
     results_selisih = []
-    # Ambil baris yang tidak sesuai (Termasuk yang "DI APPSHEET...")
     mismatch_df = df_ds_res[df_ds_res['NOTE'] != 'SESUAI'].copy()
     
-    # Pre-load kolom SKU Appsheet untuk filter
     c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
     c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
 
     for _, row in mismatch_df.iterrows():
         sku, q_scan, q_ambil, note = row['SKU'], row['QTY SCAN'], row['QTY AMBIL'], row['NOTE']
         
-        # Cari detail BIN di Appsheet
         mask_app = (c9 == sku) | (c15 == sku)
         found_rows = df_app_vba[mask_app]
         
         if not found_rows.empty:
             for _, r_app in found_rows.iterrows():
-                # Cek BIN L (12-13) dan BIN P (16-17)
                 for b_idx, q_idx in [('12','13'), ('16','17')]:
                     bin_val = str(r_app.get(b_idx, '')).strip()
                     qty_bin = pd.to_numeric(r_app.get(q_idx, 0), errors='coerce') or 0
                     
                     if bin_val not in ["", "nan", "-", "0", "None"] and qty_bin > 0:
-                        results_selisih.append([sku, q_scan, q_ambil, note, bin_val, qty_bin, 0])
+                        # ISI DENGAN np.nan BIAR BLANK/KOSONG DI STREAMLIT
+                        results_selisih.append([sku, q_scan, q_ambil, note, bin_val, qty_bin, np.nan])
         else:
-            # Jika SKU memang tidak ada di Appsheet (Cuma ada di DS Scan)
-            results_selisih.append([sku, q_scan, q_ambil, note, "-", 0, 0])
+            # Jika SKU memang tidak ada di Appsheet sama sekali
+            results_selisih.append([sku, q_scan, q_ambil, note, "-", 0, np.nan])
 
     df_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
     
-    # Hapus duplikat pasca split BIN
+    # Hapus duplikat
     df_selisih = df_selisih.drop_duplicates().reset_index(drop=True)
     
     return df_ds_res, df_selisih
 
 def engine_compare_draft_vba(df_app, df_draft):
-    # Copy data agar tidak merusak session state
     df_a = df_app.copy()
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
-    # Ambil list SKU dari Appsheet
     sku_app = set()
     for col in ['9', '15']:
         if col in df_a.columns:
             sku_app.update(df_a[col].astype(str).str.strip().unique())
     
     df_d = df_draft.copy()
-    # Pastikan ada kolom SKU
     if 'SKU' not in df_d.columns:
         df_d.rename(columns={df_d.columns[0]: 'SKU'}, inplace=True)
     
