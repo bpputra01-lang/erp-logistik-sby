@@ -223,41 +223,34 @@ import math
 
 import pandas as pd
 import numpy as np
+import streamlit as st
+
+# ==========================================
+# 1. FUNGSI UTAMA (RESEP) - TARUH DI ATAS!
+# ==========================================
 
 def engine_ds_rto_vba_total(df_ds, df_app):
-    # --- 1. LOAD & CLEAN DATA ---
     df_app_vba = df_app.copy()
-    
-    # Paksa nama kolom jadi string angka '1', '2', dst (Sesuai VBA 1-indexed)
     df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
     
-    # --- 2. APPSHEET LOGIC (Hitung Total Qty per SKU) ---
-    # Filter Status (Kolom 2 / B)
     if '2' in df_app_vba.columns:
-        mask_status = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
-        df_filtered = df_app_vba[mask_status].copy()
+        mask = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
+        df_filtered = df_app_vba[mask].copy()
     else:
         df_filtered = df_app_vba.copy()
     
     dict_qty = {}
     for _, row in df_filtered.iterrows():
-        # Ambil SKU (Cek kolom 9 dulu, kalau kosong cek kolom 15)
         sku = str(row.get('9', '')).strip()
-        if sku in ["", "nan", "0", "None"]:
-            sku = str(row.get('15', '')).strip()
-        
-        if sku not in ["", "nan", "0", "None"]:
-            # Ambil Qty Ambil (M=13, Q=17)
+        if sku in ["", "nan", "0"]: sku = str(row.get('15', '')).strip()
+        if sku not in ["", "nan", "0"]:
             q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
             q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
             dict_qty[sku] = dict_qty.get(sku, 0) + (q13 + q17)
 
-    # --- 3. WRITE DS LOGIC ---
     df_ds_res = df_ds.copy()
     if len(df_ds_res.columns) >= 2:
-        orig_cols = list(df_ds_res.columns)
-        # Amankan nama kolom awal agar tidak tertukar
-        df_ds_res.columns = ['SKU', 'QTY SCAN'] + orig_cols[2:]
+        df_ds_res.columns = ['SKU', 'QTY SCAN'] + list(df_ds_res.columns[2:])
     
     df_ds_res['SKU'] = df_ds_res['SKU'].astype(str).str.strip()
     df_ds_res['QTY AMBIL'] = df_ds_res['SKU'].map(dict_qty).fillna(0)
@@ -271,43 +264,46 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     df_ds_res['NOTE'] = df_ds_res.apply(get_note, axis=1)
     
-    # --- 4. LOGIKA SHEET SELISIH (Split BIN) ---
+    # LOGIKA SELISIH
     results_selisih = []
     mismatch_df = df_ds_res[df_ds_res['NOTE'] != 'SESUAI'].copy()
-    
-    # PROTEKSI: Pastikan panjang Series sama dengan DataFrame untuk menghindari IndexingError
-    # Jika kolom tidak ada, buat Series berisi string kosong dengan index yang sama
-    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""] * len(df_app_vba), index=df_app_vba.index)
-    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""] * len(df_app_vba), index=df_app_vba.index)
+    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
+    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
 
     for _, row in mismatch_df.iterrows():
-        sku = row['SKU']
-        q_scan = row['QTY SCAN']
-        q_ambil = row['QTY AMBIL']
-        note = row['NOTE']
-        
-        # Cari baris yang cocok di Appsheet
-        mask_find = (c9 == sku) | (c15 == sku)
-        found_in_app = df_app_vba[mask_find]
-        
-        if not found_in_app.empty:
-            for _, row_app in found_in_app.iterrows():
-                # Bin L (12) dan Bin P (16)
-                for bin_col, qty_col in [('12', '13'), ('16', '17')]:
-                    bin_val = str(row_app.get(bin_col, '')).strip()
-                    qty_val = pd.to_numeric(row_app.get(qty_col, 0), errors='coerce') or 0
-                    
-                    if bin_val not in ["", "nan", "-", "0", "None"] and qty_val > 0:
-                        results_selisih.append([sku, q_scan, q_ambil, note, bin_val, qty_val, 0])
+        sku, q_scan, q_ambil, note = row['SKU'], row['QTY SCAN'], row['QTY AMBIL'], row['NOTE']
+        mask = (c9 == sku) | (c15 == sku)
+        found = df_app_vba[mask]
+        if not found.empty:
+            for _, r_app in found.iterrows():
+                for b, q in [('12','13'), ('16','17')]:
+                    bv = str(r_app.get(b, '')).strip()
+                    qv = pd.to_numeric(r_app.get(q, 0), errors='coerce') or 0
+                    if bv not in ["", "nan", "-", "0"] and qv > 0:
+                        results_selisih.append([sku, q_scan, q_ambil, note, bv, qv, 0])
         else:
             results_selisih.append([sku, q_scan, q_ambil, note, "TIDAK DITEMUKAN", 0, 0])
 
-    # Buat dataframe selisih
-    df_selisih = pd.DataFrame(results_selisih, columns=[
-        'SKU', 'QTY SCAN', 'QTY AMBIL', 'NOTE', 'BIN', 'QTY AMBIL BIN', 'HASIL CEK REAL'
-    ])
+    return df_ds_res, pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL']).drop_duplicates()
+
+# --- INI FUNGSI YANG BIKIN NAMEERROR TADI (WAJIB ADA DISINI!) ---
+def engine_compare_draft_vba(df_app, df_draft):
+    df_a = df_app.copy()
+    df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
+    sku_app = set()
+    for col in ['9', '15']:
+        if col in df_a.columns:
+            sku_app.update(df_a[col].astype(str).str.strip().unique())
     
-    return df_ds_res, df_selisih.drop_duplicates().reset_index(drop=True)
+    df_d = df_draft.copy()
+    if 'SKU' not in df_d.columns: df_d.rename(columns={df_d.columns[0]: 'SKU'}, inplace=True)
+    df_d['SKU'] = df_d['SKU'].astype(str).str.strip()
+    df_d['STATUS CEK'] = df_d['SKU'].apply(lambda x: "MATCH ✅" if x in sku_app else "TIDAK ADA ❌")
+    return df_d
+
+# ==========================================
+# 2. LANJUT KODE STREAMLIT LO DI BAWAH...
+# ==========================================
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Bersihkan nama kolom (buang spasi)
     df_all_data.columns = df_all_data.columns.str.strip().upper()
