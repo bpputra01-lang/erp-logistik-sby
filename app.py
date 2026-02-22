@@ -321,19 +321,16 @@ def menu_refill_withdraw():
     # --- 0. INIT STATE ---
     for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
         if key not in st.session_state: st.session_state[key] = None
-
-    t1, t2, t3 = st.tabs(["📥 DATA INPUT", "⚙️ PROCESSOR", "📊 SUMMARY RESULTS"])
+t1, t2, t3 = st.tabs(["📋 Data View", "🚀 Run Process", "📤 Upload to Google"])
 
     with t1:
-        c1, c2 = st.columns(2)
-        with c1:
-            u_stock = st.file_uploader("Upload All Stock SBY", type=["xlsx"], key="up_sby")
-            if u_stock: st.session_state.df_stock_sby = pd.read_excel(u_stock)
-        with c2:
-            u_trx = st.file_uploader("Upload Data Transaksi", type=["xlsx"], key="up_trx_sby")
-            if u_trx: st.session_state.df_trx = pd.read_excel(u_trx)
+        st.subheader("Data Preview")
+        if st.session_state.df_stock_sby is not None:
+            st.write("Data Stock SBY:", st.session_state.df_stock_sby.head())
+        if st.session_state.df_trx is not None:
+            st.write("Data Transaksi:", st.session_state.df_trx.head())
 
-with t2:
+    with t2:
         st.subheader("🛠️ Run Auto-Balance Logic")
         if st.button("🚀 GENERATE SUMMARY (ULTRA FAST)"):
             if st.session_state.df_stock_sby is not None:
@@ -345,7 +342,7 @@ with t2:
                 if not df_t.empty:
                     df_t.columns = [i for i in range(len(df_t.columns))]
 
-                # 2. DICTIONARIES (PERSIS VBA)
+                # 2. DICTIONARIES (PERSIS MACROS VBA)
                 dict_dc = {}; dict_02 = {}
                 dict_tot_dc = {}; dict_tot_02 = {}
                 dict_tot_dc_klrak = {}; dict_brand = {}
@@ -426,7 +423,8 @@ with t2:
                 st.session_state.summary_withdraw = pd.DataFrame(out_wdr, columns=cols_wdr)
                 st.success(f"DONE! Refill: {len(out_ref)} | Withdraw: {len(out_wdr)}")
             else:
-                st.error("Upload Data Stock Dulu")
+                st.error("Upload Data Stock Dulu Cok!")
+                
  with t3:
         if st.session_state.summary_refill is not None:
             st.subheader(f"📦 SUMMARY REFILL ({len(st.session_state.summary_refill)})")
