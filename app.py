@@ -898,60 +898,86 @@ elif menu == "Stock Minus":
 elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (VBA MODE)</h1></div>', unsafe_allow_html=True)
     
-    # Session State
+    # --- 1. SESSION STATE INITIALIZATION ---
     if 'df_ds' not in st.session_state: st.session_state.df_ds = None
     if 'df_selisih' not in st.session_state: st.session_state.df_selisih = None
+    if 'data_app_permanen' not in st.session_state: st.session_state.data_app_permanen = None
 
     c1, c2, c3 = st.columns(3)
-    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'])
-    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'])
-    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'])
+    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1")
+    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2")
+    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3")
 
+    # --- 2. JALANKAN PROSES AWAL ---
     if st.button("🚀 JALANKAN PROSES (DS VS APPSHEET)", use_container_width=True):
         if f1 and f2:
+            # Baca file sekali saja
             df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
             df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
+            
+            # SIMPAN DF2 KE SESSION STATE biar nggak ValueError pas Refresh
+            st.session_state.data_app_permanen = df2
             
             # Panggil Mesin VBA 
             res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
             st.session_state.df_ds = res_ds
             st.session_state.df_selisih = res_selisih
             st.success("Proses Compare Selesai!")
+        else:
+            st.error("Upload dulu file DS RTO dan APPSHEET RTO-nya, Cok!")
 
-    # Tampilkan Tabel Selisih (Data Editor buat isi "HASIL CEK REAL")
- # Tampilkan Tabel Selisih
+    # --- 3. LOGIC REFRESH (DS & SELISIH) ---
     if st.session_state.df_selisih is not None:
+        st.divider()
         st.subheader("⚠️ SHEET SELISIH")
-        # data_editor harus sejajar di dalam IF ini
+        st.info("💡 Isi hasil cek fisik di kolom **HASIL CEK REAL**, lalu klik Refresh Data di bawah.")
+        
+        # Editor data
         edited_selisih = st.data_editor(st.session_state.df_selisih, use_container_width=True, hide_index=True)
         
-        # Tombol REFRESH harus sejajar dengan edited_selisih
-        if st.button("🔄 REFRESH DATA (Like VBA Refresh)", use_container_width=True):
-            # 1. Ambil data dari session state
-            df_ds_new = st.session_state.df_ds.copy()
-            
-            # 2. Ambil inputan dari editor
-            dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
-            
-            # 3. UPDATE (Pastiin namanya df_ds_new, bukan df_ds_res!)
-            for sku, val in dict_real.items():
-                df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
-            
-            # 4. Jalankan mesin lagi
-            # Pake data app yang sudah tersimpan di session state
-            res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, st.session_state.data_app)
-            
-            # 5. Simpan balik
-            st.session_state.df_ds = res_ds
-            st.session_state.df_selisih = res_selisih
-            
-            st.success("Data Berhasil di-Refresh!")
-            st.rerun()
-    st.divider()
-    
-    if f3 and st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
-        df3 = pd.read_excel(f3)
-        df2 = pd.read_excel(f2)
-        hasil_draft = engine_compare_draft_vba(df2, df3)
-        st.dataframe(hasil_draft, use_container_width=True)
-        st.download_button("📥 Download Draft Hasil", hasil_draft.to_csv(index=False), "Draft_Final.csv")
+        if st.button("🔄 REFRESH DATA (Update DS RTO)", use_container_width=True):
+            if st.session_state.data_app_permanen is not None:
+                # Ambil data DS terakhir
+                df_ds_new = st.session_state.df_ds.copy()
+                
+                # Ambil inputan user dari editor
+                dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
+                
+                # Update QTY SCAN berdasarkan SKU
+                for sku, val in dict_real.items():
+                    df_ds_new.loc[df_ds_new['SKU'] == str(sku), 'QTY SCAN'] = val
+                
+                # Jalankan ulang mesin pake data APP yang ada di memori (ANTI VALUEERROR)
+                res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, st.session_state.data_app_permanen)
+                
+                # Simpan balik hasil updatenya
+                st.session_state.df_ds = res_ds
+                st.session_state.df_selisih = res_selisih
+                
+                st.success("Data Berhasil di-Refresh berdasarkan Hasil Cek Real!")
+                st.rerun()
+            else:
+                st.error("Data Appsheet hilang dari memori. Silakan upload ulang.")
+
+    # --- 4. LOGIC DRAFT JEZPRO ---
+    if f3:
+        st.divider()
+        st.subheader("📝 DRAFT JEZPRO COMPARE")
+        if st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
+            if st.session_state.data_app_permanen is not None:
+                df3_draft = pd.read_excel(f3)
+                # Gunakan data app dari memori
+                hasil_draft = engine_compare_draft_vba(st.session_state.data_app_permanen, df3_draft)
+                
+                st.dataframe(hasil_draft, use_container_width=True)
+                
+                # Download Button
+                csv = hasil_draft.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Draft Hasil (.csv)",
+                    data=csv,
+                    file_name="Draft_Final_RTO.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.warning("Jalankan Proses (DS vs APPSHEET) dulu biar data Appsheet-nya ke-load, Cok!")
