@@ -58,10 +58,10 @@ st.markdown("""
     div.stButton > button {
         background-color: #002b5b !important; /* Biru Navy Gelap */
         color: white !important;
-        border-radius:30px !important;
+        border-radius: 8px !important;
         border: 2px solid #001a35 !important;
         font-weight: bold !important;
-        height: 3em !important;
+        height: 5em !important;
         transition: 0.3s;
     }
     div.stButton > button:hover {
