@@ -1040,39 +1040,56 @@ elif menu == "Compare RTO":
                 st.error(f"Error baca File 4: {e}")
 
     # --- 4. LOGIC DRAFT JEZPRO ---
+   # --- 4. LOGIC DRAFT JEZPRO (VERSI ANTI ZONK 231) ---
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
-       if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
-            data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
+        
+        btn_final = st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True)
+        
+        if btn_final:
+            # Pilih data: Backdoor dulu, baru data awal
+            if st.session_state.df_ds_final is not None:
+                data_siap = st.session_state.df_ds_final
+            else:
+                data_siap = st.session_state.df_ds
             
             if data_siap is not None:
+                # Baca Draft Jezpro
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # 1. Jalankan engine bawaan
-                hasil_draft = engine_compare_draft_vba(data_siap, df3_draft)
+                # 1. Jalankan engine bawaan lo
+                hasil_mentah = engine_compare_draft_vba(data_siap, df3_draft)
                 
-                # 2. CARI KOLOM QTY (Biasanya ada kata 'QTY' atau 'AMBIL')
-                # Kita cari kolom yang isinya angka hasil compare
-                col_qty_f = [c for c in hasil_draft.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
+                # 2. Cari kolom QTY (Biar dinamis)
+                col_qty = [c for c in hasil_mentah.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
                 
-                # 3. FILTER BERDASARKAN ANGKA (BUKAN SKU)
-                # Paksa kolom jadi angka, yang ngaco jadi NaN, terus ganti NaN jadi 0
-                hasil_draft[col_qty_f] = pd.to_numeric(hasil_draft[col_qty_f], errors='coerce').fillna(0)
+                # 3. FILTER ANGKA (Pembersih Hantu 262)
+                # Paksa jadi numeric, yang error jadi 0
+                hasil_mentah[col_qty] = pd.to_numeric(hasil_mentah[col_qty], errors='coerce').fillna(0)
                 
-                # HANYA ambil yang angkanya lebih dari 0
-                # Ini otomatis ngebuang 31 baris hantu yang Qty-nya 0
-                hasil_final = hasil_draft[hasil_draft[col_qty_f] > 0].copy()
+                # HANYA ambil baris yang Qty > 0
+                hasil_final = hasil_mentah[hasil_mentah[col_qty] > 0].copy()
                 
-                total_vba = int(hasil_final[col_qty_f].sum())
+                # 4. TAMPILIN HASIL
+                total_vba = int(hasil_final[col_qty].sum())
                 st.metric("Total Qty Akhir", f"{total_vba} Pcs")
                 
                 if total_vba == 231:
-                    st.success("🎯 NAH INI DIA! 231 PCS FIX!")
+                    st.success("🎯 AKHIRNYA! 231 PCS FIX! Gak pake drama.")
                 else:
-                    st.info(f"Hasil: {total_vba} Pcs. (Sisa {len(hasil_final)} Baris)")
+                    st.info(f"Hasil: {total_vba} Pcs (Total {len(hasil_final)} baris valid)")
                 
                 st.dataframe(hasil_final, use_container_width=True, hide_index=True)
                 
-                csv = hasil_final.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download Draft {total_vba} Pcs", csv, f"Final_{total_vba}.csv", "text/csv")
+                # 5. DOWNLOAD
+                csv_fix = hasil_final.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label=f"📥 Download Draft {total_vba} Pcs",
+                    data=csv_fix,
+                    file_name=f"Draft_Final_{total_vba}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.error("Proses Awal dulu atau Update Manual dulu, Cok!")
