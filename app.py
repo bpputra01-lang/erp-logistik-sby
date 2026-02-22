@@ -715,28 +715,6 @@ with st.sidebar:
     def change_m1():
         st.session_state.main_menu = st.session_state.m1_key
 
-    # --- 🟢 TAMBAHKAN LOGIKA CLEANER DI SINI 🟢 ---
-    # 1. Inisialisasi 'menu_sebelumnya' jika belum ada
-    if 'menu_sebelumnya' not in st.session_state:
-        st.session_state.menu_sebelumnya = menu
-
-    # 2. Cek jika user pindah menu
-    if st.session_state.menu_sebelumnya != menu:
-        # List variabel session state yang mau dihapus biar tabel & uploadan ilang
-        vars_to_reset = [
-            'df_ds', 'df_selisih', 'hasil_draft', 
-            'up_ds_rto', 'up_app_rto' # Sesuaikan dengan key file_uploader lo jika ada
-        ]
-        
-        for v in vars_to_reset:
-            if v in st.session_state:
-                del st.session_state[v]
-        
-        # Update menu_sebelumnya ke menu saat ini
-        st.session_state.menu_sebelumnya = menu
-    # --- 🔴 AKHIR LOGIKA CLEANER 🔴 ---
-
-
     # Jika menu yang terpilih ada di Kelompok 2, maka radio ini kita "kosongkan" secara visual (atau pilih default)
     idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
     
