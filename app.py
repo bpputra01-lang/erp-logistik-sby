@@ -983,7 +983,6 @@ elif menu == "Compare RTO":
             data_jez = st.data_editor(df_input_jez, num_rows="dynamic", use_container_width=True, key="ed_jez")
 
     with t2:
-        with t2:
         if st.button("🚀 JALANKAN PROSES SEKARANG", use_container_width=True):
             df_scan = pd.DataFrame(data_scan)
             df_jez_raw = pd.DataFrame(data_jez)
