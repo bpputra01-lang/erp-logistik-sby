@@ -931,64 +931,73 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (VBA WEB MODE)</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📑 RTO EXCEL PASTE MODE</h1></div>', unsafe_allow_html=True)
 
-    # --- 1. UPLOAD AREA ---
-    c1, c2, c3 = st.columns(3)
-    f1 = c1.file_uploader("📂 1. DATABASE RTO (DS)", type=['xlsx','csv'], key="f1")
-    f2 = c2.file_uploader("📂 2. DATA SCAN (APPSHEET)", type=['xlsx','csv'], key="f2")
-    f3 = c3.file_uploader("📂 3. DRAFT JEZPRO (ERP)", type=['xlsx','csv'], key="f3")
+    # --- 1. SETUP TABS ---
+    t1, t2, t3 = st.tabs(["📋 PASTE DATA DISINI", "🔍 PREVIEW & PROSES", "🎯 HASIL SIAP COPAS"])
 
-    if f1 and f2 and f3:
-        st.divider()
-        if st.button("🚀 JALANKAN PROSES (VERSI EXCEL/VBA)", use_container_width=True):
-            # A. READ DATA
-            df_ds = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
-            df_app = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
-            df_jez = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
-
-            # B. STANDARISASI KOLOM
-            for df in [df_ds, df_app, df_jez]:
-                df.columns = [str(c).strip().upper() for c in df.columns]
+    with t1:
+        st.subheader("Sheet: Input Manual (Copy-Paste dari Excel)")
+        st.info("Tips: Klik sel pertama, lalu tekan Ctrl+V untuk paste data dari Excel lo.")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.write("**1. Paste Data Scan (Appsheet)**")
+            # Template kosong biar lo bisa paste
+            df_input_app = pd.DataFrame([["", 0]], columns=["SKU", "QTY"])
+            data_scan = st.data_editor(df_input_app, num_rows="dynamic", use_container_width=True, key="ed_scan")
             
-            # Cari Nama Kolom SKU & QTY secara cerdas
-            def get_col(df, keyword):
-                cols = [c for c in df.columns if keyword in c]
-                return cols[0] if cols else None
+        with c2:
+            st.write("**2. Paste Draft Jezpro (ERP)**")
+            df_input_jez = pd.DataFrame([["", 0]], columns=["SKU", "QTY_ERP"])
+            data_jez = st.data_editor(df_input_jez, num_rows="dynamic", use_container_width=True, key="ed_jez")
 
-            s_app = get_col(df_app, "SKU")
-            q_app = get_col(df_app, "QTY")
-            s_jez = get_col(df_jez, "SKU")
-            q_jez = get_col(df_jez, "QTY")
-
-            if s_app and q_app and s_jez and q_jez:
-                # C. LOGIKA VBA (MANUAL CALCULATION)
-                df_app[s_app] = df_app[s_app].astype(str).str.strip()
-                df_app[q_app] = pd.to_numeric(df_app[q_app], errors='coerce').fillna(0)
+    with t2:
+        st.subheader("🔍 Validasi & Jalankan Macros")
+        if st.button("🚀 JALANKAN PROSES SEKARANG", use_container_width=True):
+            # Cek data
+            df_scan = pd.DataFrame(data_scan).dropna(subset=["SKU"])
+            df_jez_raw = pd.DataFrame(data_jez).dropna(subset=["SKU"])
+            
+            if not df_scan.empty and not df_jez_raw.empty:
+                # -- LOGIKA MACROS --
+                # 1. Grouping Scan (Pivot)
+                df_scan["SKU"] = df_scan["SKU"].astype(str).str.strip()
+                df_scan["QTY"] = pd.to_numeric(df_scan["QTY"], errors='coerce').fillna(0)
+                pivot_scan = df_scan.groupby("SKU")["QTY"].sum().to_dict()
                 
-                # Grouping scan (Sama kayak Pivot Table)
-                scan_final = df_app.groupby(s_app)[q_app].sum().reset_index()
-                scan_dict = scan_final.set_index(s_app)[q_app].to_dict()
-
-                # D. PROSES DRAFT JEZPRO (VLOOKUP MURNI)
-                df_jez[s_jez] = df_jez[s_jez].astype(str).str.strip()
-                df_jez['QTY_HASIL'] = df_jez[s_jez].map(scan_dict).fillna(0)
-
-                # FILTER: Buang yang Qty-nya 0 (Biar sisa 231)
-                hasil_akhir = df_jez[df_jez['QTY_HASIL'] > 0].copy()
-                hasil_akhir[q_jez] = hasil_akhir['QTY_HASIL']
-                hasil_akhir = hasil_akhir.drop(columns=['QTY_HASIL'])
-
-                # E. TAMPILIN HASIL
-                total_pcs = int(hasil_akhir[q_jez].sum())
-                st.metric("TOTAL QTY (FIX)", f"{total_pcs} Pcs")
+                # 2. VLOOKUP ke Draft Jezpro
+                df_jez_raw["SKU"] = df_jez_raw["SKU"].astype(str).str.strip()
+                df_jez_raw["QTY_FINAL"] = df_jez_raw["SKU"].map(pivot_scan).fillna(0)
                 
-                if total_pcs == 231:
-                    st.success("🎯 231 PCS! COCOK SAMA EXCEL!")
+                # 3. Filter > 0 (DAPETIN 231)
+                hasil_final = df_jez_raw[df_jez_raw["QTY_FINAL"] > 0].copy()
                 
-                st.dataframe(hasil_akhir, use_container_width=True, hide_index=True)
-
-                csv = hasil_akhir.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download Draft ({total_pcs} Pcs)", csv, f"RTO_{total_pcs}.csv", "text/csv", use_container_width=True)
+                # Simpan ke Session State
+                st.session_state.final_macros = hasil_final
+                st.success("✅ Macros Selesai! Cek tab 'HASIL SIAP COPAS'")
             else:
-                st.error("Kolom SKU atau QTY di file lo gak ketemu, Cok! Cek lagi nama kolomnya.")
+                st.error("Data Scan atau Draft masih kosong, Cok! Paste dulu di Tab 1.")
+
+    with t3:
+        st.subheader("🎯 Hasil Akhir (Silakan Copas Balik ke ERP)")
+        if "final_macros" in st.session_state:
+            df_res = st.session_state.final_macros
+            total_qty = int(df_res["QTY_FINAL"].sum())
+            
+            col_a, col_b = st.columns(2)
+            col_a.metric("Total Baris", len(df_res))
+            col_b.metric("Total Qty", f"{total_qty} Pcs")
+
+            if total_qty == 231:
+                st.balloons()
+                st.success("🎯 MANTAP! HASIL PAS 231 PCS!")
+
+            # Tampilkan tabel yang bisa di-copy balik
+            st.write("Klik kanan pada tabel di bawah untuk copy data hasil:")
+            st.data_editor(df_res, use_container_width=True, hide_index=True, key="final_view")
+            
+            csv = df_res.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Download sebagai CSV", csv, "Hasil_RTO.csv", "text/csv")
+        else:
+            st.warning("Belum ada data. Jalankan proses di Tab 2.")
