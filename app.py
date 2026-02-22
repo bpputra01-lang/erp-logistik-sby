@@ -965,108 +965,117 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📑 RTO EXCEL PASTE MODE</h1></div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-header"><h1>🚀 RTO GATEWAY - VBA EMULATOR</h1></div>', unsafe_allow_html=True)
 
-    # --- 1. SETUP TABS ---
-    t1, t2, t3 = st.tabs(["📋 PASTE DATA DISINI", "🔍 PREVIEW & PROSES", "🎯 HASIL SIAP COPAS"])
+        # --- 0. INISIALISASI SESSION STATE (DATABASE LOKAL ERP) ---
+        if "ws_ds" not in st.session_state: 
+            st.session_state.ws_ds = pd.DataFrame(columns=["SKU", "QTY_SCAN", "QTY_AMBIL", "NOTE"])
+        if "ws_app" not in st.session_state: 
+            st.session_state.ws_app = pd.DataFrame(columns=[f"Col {i+1}" for i in range(18)])
+        if "ws_draft" not in st.session_state: 
+            st.session_state.ws_draft = pd.DataFrame(columns=[f"Draft {i+1}" for i in range(9)])
+        if "ws_selisih" not in st.session_state: 
+            st.session_state.ws_selisih = None
+        if "ws_new_draft" not in st.session_state: 
+            st.session_state.ws_new_draft = None
 
-    with t1:
-        st.subheader("Sheet: Input Manual (Copy-Paste dari Excel)")
-        st.info("Tips: Klik sel paling pojok kiri atas, lalu tekan Ctrl+V.")
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("**1. Paste Data Scan **")
-            # Template kosong biar lo bisa paste
-            df_input_app = pd.DataFrame([["", 0]], columns=["SKU", "QTY"])
-            data_scan = st.data_editor(df_input_app, num_rows="dynamic", use_container_width=True, key="ed_scan")
-       
+        # --- 1. SETUP TABS (SHEET EXCEL) ---
+        t1, t2, t3, t4, t5 = st.tabs(["📥 INPUT MASTER", "📊 DS RTO", "⚠️ SELISIH", "📝 DRAFT JEZPRO", "📦 NEW DRAFT"])
 
-        # 2. SETUP KOLOM DRAFT (9 KOLOM)
-        cols_jez = [f"Draft Col {i+1}" for i in range(9)]
-        df_init_jez = pd.DataFrame(columns=cols_jez)
-        
-         # 1. SETUP KOLOM APPSHEET (18 KOLOM)
-        # Gue bikin header default biar lo gak bingung urutannya
-        cols_app = [f"Col {i+1}" for i in range(18)]
-        # Kalo lo mau namain spesifik beberapa kolom awal, ganti list di atas atau biarin gini biar fleksibel
-        df_init_app = pd.DataFrame(columns=cols_app)
-        
-        st.write("**1. Appsheet RTO (18 Kolom)**")
-        data_scan = st.data_editor(
-            df_init_app, 
-            num_rows="dynamic", 
-            use_container_width=True, 
-            key="ed_scan_rto",
-            hide_index=True
-        )
-        
-        st.divider()
-        
-        
-        st.write("**2. Paste Draft Jezpro / RTO (9 Kolom)**")
-        data_jez = st.data_editor(
-            df_init_jez, 
-            num_rows="dynamic", 
-            use_container_width=True, 
-            key="ed_jez_rto",
-            hide_index=True
-        )
+        with t1:
+            st.subheader("📋 Sheet: Input Master (Bisa Upload / Paste)")
             
-
-    with t2:
-        if st.button("🚀 JALANKAN PROSES SEKARANG", use_container_width=True):
-            df_scan = pd.DataFrame(data_scan)
-            df_jez_raw = pd.DataFrame(data_jez)
-            
-            if not df_scan.empty and not df_jez_raw.empty:
-                # --- ASUMSI URUTAN KOLOM (Sesuaikan dengan urutan pas lo Copy dari Excel) ---
-                # Contoh: SKU ada di Kolom 1, QTY ada di Kolom 2
-                # Inget: Python itung dari 0. Jadi Col 1 = index 0, Col 2 = index 1
+            # Action Toolbar (Macros Buttons)
+            c_btn = st.columns(4)
+            if c_btn[0].button("🔍 DS RTO COMPARE", use_container_width=True):
+                # --- LOGIKA: DS_RTO_QTY_AMBIL_ULTRAFAST ---
+                df_ds = st.session_state.grid_ds.copy()
+                df_app = st.session_state.grid_app.copy()
                 
-                try:
-                    # Ambil SKU & QTY dari Appsheet (Sesuaikan index i di iloc[:, i])
-                    df_scan['SKU_CLEAN'] = df_scan.iloc[:, 0].astype(str).str.strip() # Kolom 1
-                    df_scan['QTY_CLEAN'] = pd.to_numeric(df_scan.iloc[:, 1], errors='coerce').fillna(0) # Kolom 2
-                    
-                    pivot_scan = df_scan.groupby('SKU_CLEAN')['QTY_CLEAN'].sum().to_dict()
-                    
-                    # Ambil SKU dari Draft Jezpro (Misal SKU di kolom 1)
-                    df_jez_raw['SKU_CLEAN'] = df_jez_raw.iloc[:, 0].astype(str).str.strip()
-                    
-                    # VLOOKUP manual
-                    df_jez_raw['QTY_FINAL'] = df_jez_raw['SKU_CLEAN'].map(pivot_scan).fillna(0)
-                    
-                    # FILTER KERAMAT 231
-                    hasil_final = df_jez_raw[df_jez_raw['QTY_FINAL'] > 0].copy()
-                    
-                    # Update kolom Qty asli di Draft (Misal Qty Draft di kolom 2)
-                    # Kita timpa kolom ke-2 dengan hasil scan
-                    hasil_final.iloc[:, 1] = hasil_final['QTY_FINAL']
-                    
-                    st.session_state.final_macros = hasil_final.drop(columns=['SKU_CLEAN', 'QTY_FINAL'])
-                    st.success("✅ Macros Berhasil! Cek hasil di Tab 3.")
-                except Exception as e:
-                    st.error(f"Error: Pastiin urutan kolom pas paste bener! Detail: {e}")
-    with t3:
-        st.subheader("🎯 Hasil Akhir (Silakan Copas Balik ke ERP)")
-        if "final_macros" in st.session_state:
-            df_res = st.session_state.final_macros
-            total_qty = int(df_res["QTY_FINAL"].sum())
-            
+                if not df_ds.empty and not df_app.empty:
+                    try:
+                        # Cleaning SKU & Status
+                        sku_app_col = df_app.iloc[:, 8].fillna(df_app.iloc[:, 14]) # Kolom 9 or 15
+                        status_col = df_app.iloc[:, 1].astype(str).str.upper()
+                        
+                        # Filter Done / Kurang Ambil
+                        mask = status_col.isin(["DONE", "KURANG AMBIL"])
+                        valid_app = df_app[mask].copy()
+                        
+                        # Hitung Qty (M + Q)
+                        q_m = pd.to_numeric(valid_app.iloc[:, 12], errors='coerce').fillna(0)
+                        q_q = pd.to_numeric(valid_app.iloc[:, 16], errors='coerce').fillna(0)
+                        valid_app['TOTAL_AMBIL'] = q_m + q_q
+                        valid_app['SKU_CLEAN'] = sku_app_col[mask].astype(str).str.strip()
+                        
+                        # Dict Sum (Pivot)
+                        dict_qty = valid_app.groupby('SKU_CLEAN')['TOTAL_AMBIL'].sum().to_dict()
+                        
+                        # Update DS Sheet
+                        df_ds.columns = ["SKU", "QTY_SCAN", "QTY_AMBIL", "NOTE"]
+                        df_ds['SKU'] = df_ds['SKU'].astype(str).str.strip()
+                        df_ds['QTY_AMBIL'] = df_ds['SKU'].map(dict_qty).fillna(0)
+                        
+                        # Logic Note
+                        def check_note(row):
+                            s = pd.to_numeric(row['QTY_SCAN'], errors='coerce') or 0
+                            a = row['QTY_AMBIL']
+                            if s > a: return "KELEBIHAN AMBIL"
+                            elif s < a: return "KURANG AMBIL"
+                            else: return "SESUAI"
+                        
+                        df_ds['NOTE'] = df_ds.apply(check_note, axis=1)
+                        st.session_state.ws_ds = df_ds
+                        st.session_state.ws_selisih = df_ds[df_ds['NOTE'] != "SESUAI"]
+                        st.success("✅ Compare Selesai!")
+                        st.balloons()
+                    except Exception as e:
+                        st.error(f"Gagal: {e}")
+
+            if c_btn[1].button("🔄 REFRESH DRAFT", use_container_width=True):
+                st.info("Logic Refresh Running...")
+                # Masukkan logic REFRESH_DATA_RTO lo di sini
+                
+            if c_btn[2].button("⚡ GEN NEW DRAFT", use_container_width=True):
+                # Logic GENERATE_NEW_DRAFT_RTO
+                if not st.session_state.ws_draft.empty:
+                    st.session_state.ws_new_draft = st.session_state.ws_draft.copy()
+                    st.success("New Draft Ready!")
+
+            if c_btn[3].button("🗑️ RESET TOTAL", use_container_width=True, type="primary"):
+                for k in ["ws_ds", "ws_app", "ws_draft", "ws_selisih", "ws_new_draft"]:
+                    st.session_state[k] = None
+                st.rerun()
+
+            st.divider()
+
+            # Input Grids
             col_a, col_b = st.columns(2)
-            col_a.metric("Total Baris", len(df_res))
-            col_b.metric("Total Qty", f"{total_qty} Pcs")
-
-            if total_qty == 231:
-                st.balloons()
-                st.success("🎯 MANTAP! HASIL PAS 231 PCS!")
-
-            # Tampilkan tabel yang bisa di-copy balik
-            st.write("Klik kanan pada tabel di bawah untuk copy data hasil:")
-            st.data_editor(df_res, use_container_width=True, hide_index=True, key="final_view")
+            with col_a:
+                st.write("**1. Data DS RTO (SKU, Qty Scan, Qty Ambil, Note)**")
+                st.session_state.grid_ds = st.data_editor(st.session_state.ws_ds, num_rows="dynamic", key="ds_edit", use_container_width=True, hide_index=True)
+            with col_b:
+                st.write("**2. Data Appsheet (18 Kolom)**")
+                st.session_state.grid_app = st.data_editor(st.session_state.ws_app, num_rows="dynamic", key="app_edit", use_container_width=True, hide_index=True)
             
-            csv = df_res.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download sebagai CSV", csv, "Hasil_RTO.csv", "text/csv")
-        else:
-            st.warning("Belum ada data. Jalankan proses di Tab 2.")
+            st.write("**3. Draft Jezpro (9 Kolom)**")
+            st.session_state.grid_dr = st.data_editor(st.session_state.ws_draft, num_rows="dynamic", key="dr_edit", use_container_width=True, hide_index=True)
+
+        with t2:
+            st.subheader("📊 Sheet: DS RTO (Live View)")
+            st.dataframe(st.session_state.ws_ds, use_container_width=True, hide_index=True)
+
+        with t3:
+            st.subheader("⚠️ Sheet: Selisih")
+            if st.session_state.ws_selisih is not None:
+                st.dataframe(st.session_state.ws_selisih, use_container_width=True, hide_index=True)
+
+        with t4:
+            st.subheader("📝 Sheet: Draft Jezpro")
+            st.dataframe(st.session_state.ws_draft, use_container_width=True, hide_index=True)
+
+        with t5:
+            st.subheader("📦 Sheet: New Draft")
+            if st.session_state.ws_new_draft is not None:
+                st.dataframe(st.session_state.ws_new_draft, use_container_width=True, hide_index=True)
+                st.download_button("📥 Export New Draft", st.session_state.ws_new_draft.to_csv(index=False).encode('utf-8'), "Export_RTO.csv")
