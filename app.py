@@ -234,8 +234,8 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     # --- 2. APPSHEET LOGIC (Hitung Total Qty per SKU) ---
     # Filter Status (Kolom 2 / B)
     if '2' in df_app_vba.columns:
-        mask = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
-        df_filtered = df_app_vba[mask].copy()
+        mask_status = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
+        df_filtered = df_app_vba[mask_status].copy()
     else:
         df_filtered = df_app_vba.copy()
     
@@ -243,10 +243,10 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     for _, row in df_filtered.iterrows():
         # Ambil SKU (Cek kolom 9 dulu, kalau kosong cek kolom 15)
         sku = str(row.get('9', '')).strip()
-        if sku in ["", "nan", "0"]:
+        if sku in ["", "nan", "0", "None"]:
             sku = str(row.get('15', '')).strip()
         
-        if sku not in ["", "nan", "0"]:
+        if sku not in ["", "nan", "0", "None"]:
             # Ambil Qty Ambil (M=13, Q=17)
             q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
             q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
@@ -254,13 +254,12 @@ def engine_ds_rto_vba_total(df_ds, df_app):
 
     # --- 3. WRITE DS LOGIC ---
     df_ds_res = df_ds.copy()
-    # Standarisasi kolom DS: Kolom 0 = SKU, Kolom 1 = QTY SCAN
     if len(df_ds_res.columns) >= 2:
         orig_cols = list(df_ds_res.columns)
+        # Amankan nama kolom awal agar tidak tertukar
         df_ds_res.columns = ['SKU', 'QTY SCAN'] + orig_cols[2:]
     
     df_ds_res['SKU'] = df_ds_res['SKU'].astype(str).str.strip()
-    # Map qty dari Appsheet ke DS
     df_ds_res['QTY AMBIL'] = df_ds_res['SKU'].map(dict_qty).fillna(0)
     
     def get_note(row):
@@ -276,9 +275,10 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     results_selisih = []
     mismatch_df = df_ds_res[df_ds_res['NOTE'] != 'SESUAI'].copy()
     
-    # Pre-calculate kolom SKU untuk filter cepat
-    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([], dtype=str)
-    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([], dtype=str)
+    # PROTEKSI: Pastikan panjang Series sama dengan DataFrame untuk menghindari IndexingError
+    # Jika kolom tidak ada, buat Series berisi string kosong dengan index yang sama
+    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""] * len(df_app_vba), index=df_app_vba.index)
+    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""] * len(df_app_vba), index=df_app_vba.index)
 
     for _, row in mismatch_df.iterrows():
         sku = row['SKU']
@@ -286,26 +286,20 @@ def engine_ds_rto_vba_total(df_ds, df_app):
         q_ambil = row['QTY AMBIL']
         note = row['NOTE']
         
-        # Cari semua baris di Appsheet yang punya SKU ini
-        mask = (c9 == sku) | (c15 == sku)
-        found_in_app = df_app_vba[mask]
+        # Cari baris yang cocok di Appsheet
+        mask_find = (c9 == sku) | (c15 == sku)
+        found_in_app = df_app_vba[mask_find]
         
         if not found_in_app.empty:
-            # Iterasi tiap baris yang ketemu di Appsheet untuk pecah BIN
             for _, row_app in found_in_app.iterrows():
-                # Cek Bin L (12) dan Qty-nya (13)
-                bin_12 = str(row_app.get('12', '')).strip()
-                qty_13 = pd.to_numeric(row_app.get('13', 0), errors='coerce') or 0
-                if bin_12 not in ["", "nan", "-", "0"] and qty_13 > 0:
-                    results_selisih.append([sku, q_scan, q_ambil, note, bin_12, qty_13, 0])
-                
-                # Cek Bin P (16) dan Qty-nya (17)
-                bin_16 = str(row_app.get('16', '')).strip()
-                qty_17 = pd.to_numeric(row_app.get('17', 0), errors='coerce') or 0
-                if bin_16 not in ["", "nan", "-", "0"] and qty_17 > 0:
-                    results_selisih.append([sku, q_scan, q_ambil, note, bin_16, qty_17, 0])
+                # Bin L (12) dan Bin P (16)
+                for bin_col, qty_col in [('12', '13'), ('16', '17')]:
+                    bin_val = str(row_app.get(bin_col, '')).strip()
+                    qty_val = pd.to_numeric(row_app.get(qty_col, 0), errors='coerce') or 0
+                    
+                    if bin_val not in ["", "nan", "-", "0", "None"] and qty_val > 0:
+                        results_selisih.append([sku, q_scan, q_ambil, note, bin_val, qty_val, 0])
         else:
-            # Jika SKU tidak ditemukan sama sekali di Appsheet
             results_selisih.append([sku, q_scan, q_ambil, note, "TIDAK DITEMUKAN", 0, 0])
 
     # Buat dataframe selisih
@@ -313,10 +307,7 @@ def engine_ds_rto_vba_total(df_ds, df_app):
         'SKU', 'QTY SCAN', 'QTY AMBIL', 'NOTE', 'BIN', 'QTY AMBIL BIN', 'HASIL CEK REAL'
     ])
     
-    # Bersihkan duplikat baris yang identik (opsional, biar rapi)
-    df_selisih = df_selisih.drop_duplicates().reset_index(drop=True)
-    
-    return df_ds_res, df_selisih
+    return df_ds_res, df_selisih.drop_duplicates().reset_index(drop=True)
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Bersihkan nama kolom (buang spasi)
     df_all_data.columns = df_all_data.columns.str.strip().upper()
