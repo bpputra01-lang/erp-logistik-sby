@@ -1156,6 +1156,4 @@ elif menu == "FDR Update":
                 st.rerun()
 
             st.divider()
-            st.write("### 📂 MANIFEST DATA (A:Z)")
-            # Editor ini sakti: bisa nampung hasil upload, bisa juga lo edit manual
             st.session_state.grid_fdr = st.data_editor(st.session_state.ws_manifest, num_rows="dynamic", use_container_width=True, key="editor_fdr_main")
