@@ -220,11 +220,6 @@ import numpy as np
 import math
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
-
-import pandas as pd
-import numpy as np
-import streamlit as st
-
 def engine_ds_rto_vba_total(df_ds, df_app):
     # --- 1. LOAD & CLEAN DATA APPSHEET ---
     df_app_vba = df_app.copy()
