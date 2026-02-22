@@ -224,56 +224,42 @@ import math
 import pandas as pd
 import numpy as np
 
-# --- TARUH ENGINE INI DI ATAS BIAR DIBACA DULUAN ---
-def engine_vba_style(df_ds, df_app):
-    # --- 1. LOGIKA LOAD DATA (Sesuai arrApp = Range("A1:Q")) ---
-    # Copy biar nggak ngerusak data asli
-    df_app_work = df_app.copy()
+def engine_ds_rto_vba_total(df_ds, df_app):
+    # --- LOAD DATA ---
+    # Samakan penamaan kolom pakai angka (1-indexed) biar sama kayak VBA arrApp(i, 9) dsb.
+    df_app_vba = df_app.copy()
+    df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
     
-    # Paksa nama kolom jadi string angka (1-indexed) biar sama kayak logic VBA lo
-    df_app_work.columns = [str(i) for i in range(1, len(df_app_work.columns) + 1)]
+    # --- APPSHEET LOGIC (Hitung Total Qty per SKU) ---
+    # Filter: Status (Kolom 2) musti 'DONE' atau 'KURANG AMBIL'
+    mask = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
+    df_filtered = df_app_vba[mask].copy()
     
-    # Filter Status (Kolom 2 / B) -> Harus DONE atau KURANG AMBIL
-    if '2' in df_app_work.columns:
-        mask = df_app_work['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
-        df_filtered = df_app_work[mask].copy()
-    else:
-        # Fallback kalau kolom 2 gak ketemu
-        df_filtered = df_app_work.copy()
-    
-    # Hitung Qty per SKU (Logic Dictionary dictQty di VBA)
-    summary_dict = {}
+    dict_qty = {}
     for _, row in df_filtered.iterrows():
-        # Ambil SKU: Cek Kolom 9 (I), kalau kosong cek Kolom 15 (O)
-        sku_9 = str(row.get('9', '')).strip()
-        sku_15 = str(row.get('15', '')).strip()
+        # SKU di kolom 9 (I), kalau kosong di kolom 15 (O)
+        sku = str(row.get('9', '')).strip()
+        if sku == "" or sku == "nan":
+            sku = str(row.get('15', '')).strip()
         
-        sku = sku_9 if sku_9 != "" and sku_9 != "nan" else sku_15
-        
-        if sku and sku != 'nan' and sku != '0':
-            # Sum Qty dari Kolom 13 (M) dan 17 (Q)
-            q13 = pd.to_numeric(row.get('13', 0), errors='coerce')
-            q17 = pd.to_numeric(row.get('17', 0), errors='coerce')
-            qty = (0 if pd.isna(q13) else q13) + (0 if pd.isna(q17) else q17)
-            
-            summary_dict[sku] = summary_dict.get(sku, 0) + qty
+        if sku != "" and sku != "nan":
+            # Qty = Kolom 13 (M) + Kolom 17 (Q)
+            q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
+            q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
+            dict_qty[sku] = dict_qty.get(sku, 0) + (q13 + q17)
 
-    # --- 2. UPDATE DS RTO (Logic Write DS) ---
+    # --- WRITE DS LOGIC ---
     df_ds_res = df_ds.copy()
-    
-    # Pastikan nama kolom DS konsisten: Kolom 1=SKU, Kolom 2=QTY SCAN
+    # Kolom A = SKU, Kolom B = QTY SCAN
     df_ds_res.columns = ['SKU', 'QTY SCAN'] + list(df_ds_res.columns[2:])
-    
-    # Pastikan tipe data bener
     df_ds_res['SKU'] = df_ds_res['SKU'].astype(str).str.strip()
-    df_ds_res['QTY SCAN'] = pd.to_numeric(df_ds_res['QTY SCAN'], errors='coerce').fillna(0)
     
-    # VLOOKUP QTY AMBIL dari summary_dict
-    df_ds_res['QTY AMBIL'] = df_ds_res['SKU'].map(summary_dict).fillna(0)
+    # VLOOKUP QTY AMBIL (Kolom 3 / C)
+    df_ds_res['QTY AMBIL'] = df_ds_res['SKU'].map(dict_qty).fillna(0)
     
-    # LOGIKA NOTE (Sesuai Request lo)
+    # Logika NOTE (Kolom 4 / D)
     def get_note(row):
-        scan = row['QTY SCAN']
+        scan = pd.to_numeric(row['QTY SCAN'], errors='coerce') or 0
         ambil = row['QTY AMBIL']
         if scan > ambil: return "KELEBIHAN AMBIL"
         elif scan < ambil: return "KURANG AMBIL"
@@ -281,8 +267,90 @@ def engine_vba_style(df_ds, df_app):
     
     df_ds_res['NOTE'] = df_ds_res.apply(get_note, axis=1)
     
-    # Return dataframe hasil dan dictionary-nya
-    return df_ds_res, summary_dict
+    # --- LOGIKA SHEET SELISIH (Split BIN) ---
+    results_selisih = []
+    
+    # 1. Cek dari sisi DS yang gak sesuai
+    for _, row in df_ds_res[df_ds_res['NOTE'] != 'SESUAI'].iterrows():
+        sku = row['SKU']
+        q_scan = row['QTY SCAN']
+        q_ambil = row['QTY AMBIL']
+        note = row['NOTE']
+        
+        # Cari BIN di Appsheet (FindBinAndAdd)
+        found_in_app = df_app_vba[(df_app_vba['9'] == sku) | (df_app_vba['15'] == sku)]
+        
+        if not found_in_app.empty:
+            for _, row_app in found_in_app.iterrows():
+                # Bin L (12) & Qty M (13)
+                if str(row_app.get('12', '')).strip() != "":
+                    results_selisih.append([sku, q_scan, q_ambil, note, row_app['12'], row_app['13'], 0])
+                # Bin P (16) & Qty Q (17)
+                if str(row_app.get('16', '')).strip() != "":
+                    results_selisih.append([sku, q_scan, q_ambil, note, row_app['16'], row_app['17'], 0])
+        else:
+            results_selisih.append([sku, q_scan, q_ambil, note, "-", 0, 0])
+
+    df_selisih = pd.DataFrame(results_selisih, columns=['SKU', 'QTY SCAN', 'QTY AMBIL', 'NOTE', 'BIN', 'QTY AMBIL BIN', 'HASIL CEK REAL'])
+    
+    return df_ds_res, df_selisih
+
+def engine_compare_draft_vba(df_app, df_draft):
+    # Logika Makro: COMPARE_DRAFT_JEZPRO_ULTRAFAST
+    df_draft_res = df_draft.copy()
+    # Pastikan Draft punya SKU (4), BIN (9), QTY DRAFT (8)
+    df_app_vba = df_app.copy()
+    df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
+    
+    final_rows = []
+    for _, d_row in df_draft_res.iterrows():
+        sku = str(d_row.iloc[3]).strip() # Kolom D
+        bin_draft = str(d_row.iloc[8]).strip() # Kolom I
+        qty_h = pd.to_numeric(d_row.iloc[7], errors='coerce') or 0 # Kolom H
+        tf_draft = str(d_row.iloc[0]).strip() # Kolom A
+        
+        qty_j = 0 # Qty Ambil
+        note_k = ""
+        status_n = ""
+        bin_l = "" # Bin Lain
+        qty_m = 0 # Qty Bin Lain
+        found = False
+        
+        # Cari Match di Appsheet
+        for _, a_row in df_app_vba.iterrows():
+            tf_app = str(a_row.get('18', '')).strip()
+            # Cek Slot 1 (I, L, M) & Slot 2 (O, P, Q)
+            match1 = (str(a_row['9']) == sku and str(a_row['12']) == bin_draft)
+            match2 = (str(a_row['15']) == sku and str(a_row['16']) == bin_draft)
+            
+            if match1 or match2:
+                # Logika TF
+                is_tf_ok = (tf_draft in ["", "0", "nan"]) or (tf_app in ["", "0", "nan"]) or (tf_draft == tf_app)
+                if is_tf_ok:
+                    qty_j = pd.to_numeric(a_row['13'] if match1 else a_row['17'], errors='coerce') or 0
+                    found = True
+                    break
+        
+        # Logika Status N & Note K
+        if found:
+            if qty_j < qty_h:
+                note_k = "QTY AMBIL KURANG DARI DRAFT"
+                status_n = "PERLU EDIT QTY DRAFT"
+            elif qty_j == qty_h:
+                note_k = "DRAFT SESUAI"
+                status_n = "OK"
+            else:
+                note_k = "ADA BIN LAIN"; status_n = "CEK BIN LAIN"
+        else:
+            note_k = "HAPUS ITEM INI DARI DRAFT"
+            status_n = "DELETE ITEM"
+            
+        final_rows.append([qty_j, note_k, bin_l, qty_m, status_n])
+    
+    # Gabungkan ke draft asli
+    df_status = pd.DataFrame(final_rows, columns=['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS'])
+    return pd.concat([df_draft_res, df_status], axis=1)
+
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Bersihkan nama kolom (buang spasi)
@@ -876,123 +944,51 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (VBA MODE)</h1></div>', unsafe_allow_html=True)
     
-    # --- 1. SESSION STATE ---
-    if 'step_cleared' not in st.session_state: st.session_state.step_cleared = False
-    if 'hasil_ds_vs_app' not in st.session_state: st.session_state.hasil_ds_vs_app = None
-    if 'data_ds' not in st.session_state: st.session_state.data_ds = None
-    if 'data_app' not in st.session_state: st.session_state.data_app = None
-    if 'data_draft' not in st.session_state: st.session_state.data_draft = None
+    # Session State
+    if 'df_ds' not in st.session_state: st.session_state.df_ds = None
+    if 'df_selisih' not in st.session_state: st.session_state.df_selisih = None
 
-    def smart_read(file):
-        try:
-            if file.name.lower().endswith('.csv'):
-                return pd.read_csv(file, sep=None, engine='python')
-            else:
-                return pd.read_excel(file, engine='openpyxl')
-        except Exception as e:
-            st.error(f"File rusak/salah format: {e}")
-            return None
-
-    # --- 2. UPLOAD AREA ---
     c1, c2, c3 = st.columns(3)
-    with c1:
-        file_ds = st.file_uploader("1. Upload DS RTO (Fisik)", type=['xlsx','csv'], key="u_ds")
-    with c2:
-        file_app = st.file_uploader("2. Master APPSHEET RTO", type=['xlsx','csv'], key="u_app")
-    with c3:
-        file_draft = st.file_uploader("3. Draft RTO (Rencana)", type=['xlsx','csv'], key="u_draft")
+    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'])
+    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'])
+    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'])
 
-    st.divider()
+    if st.button("🚀 JALANKAN PROSES (DS VS APPSHEET)", use_container_width=True):
+        if f1 and f2:
+            df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
+            df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
+            
+            # Panggil Mesin VBA 
+            res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
+            st.session_state.df_ds = res_ds
+            st.session_state.df_selisih = res_selisih
+            st.success("Proses Compare Selesai!")
 
-    # --- 3. STEP 1: VALIDASI ---
-    st.subheader("🟢 STEP 1: VALIDASI SCAN VS APPSHEET")
-    
-    if st.button("🚀 JALANKAN PROSES AWAL", use_container_width=True, key="btn_awal"):
-        if file_ds and file_app:
-            st.session_state.data_ds = smart_read(file_ds)
-            st.session_state.data_app = smart_read(file_app)
-            if file_draft: st.session_state.data_draft = smart_read(file_draft)
-            
-            hasil = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
-            st.session_state.hasil_ds_vs_app = hasil
-            
-            mismatch = hasil[hasil['NOTE'] != 'SESUAI']
-            st.session_state.step_cleared = (len(mismatch) == 0)
-            
-            if st.session_state.step_cleared:
-                st.success("✅ DATA SINKRON! Lanjut ke Step 2.")
-            else:
-                st.error(f"❌ Ada {len(mismatch)} SKU Selisih!")
-        else:
-            st.error("Upload File 1 & 2 dulu!")
-
-    # --- 4. AREA REKONSILIASI ---
-    if st.session_state.hasil_ds_vs_app is not None:
-        df_res = st.session_state.hasil_ds_vs_app
-        df_mismatch = df_res[df_res['NOTE'] != 'SESUAI'].copy()
+    # Tampilkan Tabel Selisih (Data Editor buat isi "HASIL CEK REAL")
+    if st.session_state.df_selisih is not None:
+        st.subheader("⚠️ SHEET SELISIH (Input Hasil Cek Real di Kolom G)")
+        edited_selisih = st.data_editor(st.session_state.df_selisih, use_container_width=True, hide_index=True, key="editor_vba")
         
-        if len(df_mismatch) > 0:
-            st.divider()
-            st.subheader(f"⚠️ DAFTAR SELISIH ({len(df_mismatch)} SKU)")
-            if 'KETERANGAN' not in df_mismatch.columns:
-                df_mismatch['KETERANGAN'] = ""
+        if st.button("🔄 REFRESH DATA (Like VBA Refresh)", use_container_width=True):
+            # Logika Refresh Makro: Update DS berdasarkan input Kolom G
+            df_ds_new = st.session_state.df_ds.copy()
+            # Akumulasi Cek Real per SKU
+            dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
+            
+            for sku, val in dict_real.items():
+                df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
+            
+            # Hitung ulang Note
+            st.session_state.df_ds, _ = engine_ds_rto_vba_total(df_ds_new, pd.read_excel(f2))
+            st.rerun()
 
-            st.data_editor(
-                df_mismatch,
-                use_container_width=True,
-                key="editor_rekon_live",
-                hide_index=True,
-                disabled=["SKU", "QTY SCAN", "QTY AMBIL", "TOTAL_QTY_APPSHEET", "SELISIH", "NOTE"]
-            )
-
-            # --- LOGIKA REFRESH SAKTI ---
-            if st.button("🔄 REFRESH & SYNC DATA DROP", use_container_width=True, key="btn_refresh_sync"):
-                try:
-                    df_current = st.session_state.hasil_ds_vs_app.copy()
-                    # Pakai kolom 'QTY AMBIL' karena itu hasil dari engine_vba_style lo
-                    df_current['QTY SCAN'] = df_current['QTY AMBIL']
-                    
-                    # Buang yang qty-nya 0
-                    df_updated = df_current[df_current['QTY AMBIL'] > 0].copy()
-                    
-                    # Simpan balik
-                    st.session_state.data_ds = df_updated[['SKU', 'QTY SCAN']].copy()
-                    
-                    # Hitung ulang Note-nya
-                    st.session_state.hasil_ds_vs_app = engine_ds_rto_ultrafast(st.session_state.data_ds, st.session_state.data_app)
-                    st.session_state.step_cleared = True
-                    st.success("✅ DATA DROP UPDATED!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Gagal Sync: {e}")
-
-    # --- 5. STEP 2: COMPARE DRAFT ---
     st.divider()
-    st.subheader("🔵 STEP 2: COMPARE APPSHEET VS DRAFT RTO")
     
-    if st.session_state.step_cleared:
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True, key="btn_final"):
-            if st.session_state.data_draft is not None:
-                df_actual = st.session_state.data_ds.copy()
-                df_draft = st.session_state.data_draft.copy()
-                df_draft.columns = df_draft.columns.str.strip().str.upper()
-                
-                summary = pd.merge(df_actual, df_draft, on='SKU', how='outer', suffixes=('_ACT', '_DFT')).fillna(0)
-                
-                # Cari kolom qty di draft (biasanya 'QTY' atau kolom ke-2)
-                qty_col = 'QTY' if 'QTY' in summary.columns else summary.columns[-1]
-                summary['DIFF_FINAL'] = summary['QTY SCAN'] - summary[qty_col]
-                summary['STATUS'] = summary['DIFF_FINAL'].apply(lambda x: 'MATCH ✅' if x == 0 else 'SELISIH ❌')
-                
-                st.success("🏆 MATCHING BERHASIL!")
-                st.dataframe(summary, use_container_width=True)
-                
-                csv = summary.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 DOWNLOAD CSV", csv, "Summary_Final.csv", "text/csv", key="dl_btn")
-                st.balloons()
-            else:
-                st.error("Upload File 3 (Draft) dulu!")
-    else:
-        st.warning("🔒 Step 2 Terkunci. Selesaikan Step 1.")
+    if f3 and st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
+        df3 = pd.read_excel(f3)
+        df2 = pd.read_excel(f2)
+        hasil_draft = engine_compare_draft_vba(df2, df3)
+        st.dataframe(hasil_draft, use_container_width=True)
+        st.download_button("📥 Download Draft Hasil", hasil_draft.to_csv(index=False), "Draft_Final.csv")
