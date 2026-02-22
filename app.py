@@ -1048,48 +1048,49 @@ elif menu == "Compare RTO":
         btn_final = st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True)
         
         if btn_final:
-            # Pilih data: Backdoor dulu, baru data awal
             if st.session_state.df_ds_final is not None:
                 data_siap = st.session_state.df_ds_final
             else:
                 data_siap = st.session_state.df_ds
             
             if data_siap is not None:
-                # Baca Draft Jezpro
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # 1. Jalankan engine bawaan lo
+                # 1. Jalankan engine (Biarkan dia berimajinasi ke 262 dulu)
                 hasil_mentah = engine_compare_draft_vba(data_siap, df3_draft)
                 
-                # 2. Cari kolom QTY (Biar dinamis)
-                col_qty = [c for c in hasil_mentah.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
+                # 2. Ambil List SKU yang beneran ada di data scan lo (Data Siap)
+                c_sku_scan = [c for c in data_siap.columns if 'sku' in c.lower()][0]
+                list_sku_user = data_siap[c_sku_scan].astype(str).str.strip().unique()
                 
-                # 3. FILTER ANGKA (Pembersih Hantu 262)
-                # Paksa jadi numeric, yang error jadi 0
-                hasil_mentah[col_qty] = pd.to_numeric(hasil_mentah[col_qty], errors='coerce').fillna(0)
+                # 3. Paksa Filter Hasil Akhir: HANYA SKU yang ada di scan & QTY > 0
+                c_sku_final = [c for c in hasil_mentah.columns if 'sku' in c.lower()][0]
+                c_qty_final = [c for c in hasil_mentah.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
                 
-                # HANYA ambil baris yang Qty > 0
-                hasil_final = hasil_mentah[hasil_mentah[col_qty] > 0].copy()
+                # Bersihkan data hasil mentah
+                hasil_mentah[c_qty_final] = pd.to_numeric(hasil_mentah[c_qty_final], errors='coerce').fillna(0)
                 
-                # 4. TAMPILIN HASIL
-                total_vba = int(hasil_final[col_qty].sum())
-                st.metric("Total Qty Akhir", f"{total_vba} Pcs")
+                # FILTER KERAMAT: Harus ada di scan DAN Qty harus lebih dari 0
+                hasil_final = hasil_mentah[
+                    (hasil_mentah[c_sku_final].astype(str).str.strip().isin(list_sku_user)) & 
+                    (hasil_mentah[c_qty_final] > 0)
+                ].copy()
                 
-                if total_vba == 231:
-                    st.success("🎯 AKHIRNYA! 231 PCS FIX! Gak pake drama.")
+                # 4. Hitung ulang totalnya secara mandiri
+                total_fix = int(hasil_final[c_qty_final].sum())
+                
+                # TAMPILIN
+                st.metric("Total Qty Akhir (FIX)", f"{total_fix} Pcs")
+                
+                if total_fix == 231:
+                    st.success("🎯 MELEDAK COK! 231 PCS FIX NO DEBAT!")
                 else:
-                    st.info(f"Hasil: {total_vba} Pcs (Total {len(hasil_final)} baris valid)")
+                    st.warning(f"Hasil: {total_fix} Pcs. (Cek lagi apakah file scan lo beneran totalnya 231?)")
                 
                 st.dataframe(hasil_final, use_container_width=True, hide_index=True)
                 
-                # 5. DOWNLOAD
+                # DOWNLOAD
                 csv_fix = hasil_final.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label=f"📥 Download Draft {total_vba} Pcs",
-                    data=csv_fix,
-                    file_name=f"Draft_Final_{total_vba}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
+                st.download_button(f"📥 Download Draft {total_fix} Pcs", csv_fix, f"Final_{total_fix}.csv", "text/csv")
             else:
-                st.error("Proses Awal dulu atau Update Manual dulu, Cok!")
+                st.error("Proses awal dulu!")
