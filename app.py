@@ -1032,20 +1032,33 @@ elif menu == "Compare RTO":
                 st.error("Data Appsheet hilang dari memori. Silakan upload ulang.")
 
     # --- 4. LOGIC DRAFT JEZPRO ---
-    if f3:
+if f3:
         st.divider()
-        st.subheader("📝 DRAFT JEZPRO COMPARE")
+        st.subheader("📝 DRAFT JEZPRO COMPARE (VBA VALID MODE)")
         if st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
                 df3_draft = pd.read_excel(f3)
+                
+                # JALANKAN COMPARE
                 hasil_draft = engine_compare_draft_vba(st.session_state.data_app_permanen, df3_draft)
+                
+                # --- VALIDASI ANGKA ---
+                total_vba = hasil_draft['QTY'].sum() # Asumsi kolom qty hasil compare namanya 'QTY'
+                st.metric("Total Qty Valid (VBA)", f"{total_vba} Pcs")
+                
+                if total_vba == 231:
+                    st.success("✅ ANGKA VALID 231! Siap hajar ERP!")
+                else:
+                    st.warning(f"Angka masih {total_vba}, cek lagi hasil scan lo, Cok!")
+                
                 st.dataframe(hasil_draft, use_container_width=True)
                 
+                # Download Button
                 csv = hasil_draft.to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="📥 Download Draft Hasil (.csv)",
+                    label="📥 Download Draft Valid",
                     data=csv,
-                    file_name="Draft_Final_RTO.csv",
+                    file_name="Draft_RTO_Fix_231.csv",
                     mime="text/csv"
                 )
             else:
