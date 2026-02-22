@@ -1043,38 +1043,36 @@ elif menu == "Compare RTO":
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
+       if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
             data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
             
             if data_siap is not None:
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # 1. Jalankan engine bawaan lo
+                # 1. Jalankan engine bawaan
                 hasil_draft = engine_compare_draft_vba(data_siap, df3_draft)
                 
-                # 2. --- FILTER SADIS ANTI 262 ---
-                # Kita paksa buang semua baris yang SKU-nya TIDAK ADA di data scan lo
-                c_sku_final = [c for c in hasil_draft.columns if 'sku' in c.lower()][0]
-                c_sku_scan = [c for c in data_siap.columns if 'sku' in c.lower()][0]
+                # 2. CARI KOLOM QTY (Biasanya ada kata 'QTY' atau 'AMBIL')
+                # Kita cari kolom yang isinya angka hasil compare
+                col_qty_f = [c for c in hasil_draft.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
                 
-                list_sku_valid = data_siap[c_sku_scan].astype(str).str.strip().unique()
+                # 3. FILTER BERDASARKAN ANGKA (BUKAN SKU)
+                # Paksa kolom jadi angka, yang ngaco jadi NaN, terus ganti NaN jadi 0
+                hasil_draft[col_qty_f] = pd.to_numeric(hasil_draft[col_qty_f], errors='coerce').fillna(0)
                 
-                # HANYA ambil SKU yang beneran lo scan/isi tadi
-                hasil_draft = hasil_draft[hasil_draft[c_sku_final].astype(str).str.strip().isin(list_sku_valid)]
+                # HANYA ambil yang angkanya lebih dari 0
+                # Ini otomatis ngebuang 31 baris hantu yang Qty-nya 0
+                hasil_final = hasil_draft[hasil_draft[col_qty_f] > 0].copy()
                 
-                # 3. Filter Qty > 0 (Double Protection)
-                col_qty_f = [c for c in hasil_draft.columns if 'qty' in c.lower() or 'ambil' in c.lower()][0]
-                hasil_draft = hasil_draft[pd.to_numeric(hasil_draft[col_qty_f], errors='coerce').fillna(0) > 0]
-                
-                total_vba = int(hasil_draft[col_qty_f].sum())
+                total_vba = int(hasil_final[col_qty_f].sum())
                 st.metric("Total Qty Akhir", f"{total_vba} Pcs")
                 
                 if total_vba == 231:
-                    st.success("🎯 AKHIRNYA PECAH TELOR! 231 PCS FIX!")
+                    st.success("🎯 NAH INI DIA! 231 PCS FIX!")
                 else:
-                    st.warning(f"Hasil: {total_vba} Pcs. (Masih {len(hasil_draft)} baris)")
+                    st.info(f"Hasil: {total_vba} Pcs. (Sisa {len(hasil_final)} Baris)")
                 
-                st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
+                st.dataframe(hasil_final, use_container_width=True, hide_index=True)
                 
-                csv = hasil_draft.to_csv(index=False).encode('utf-8')
+                csv = hasil_final.to_csv(index=False).encode('utf-8')
                 st.download_button(f"📥 Download Draft {total_vba} Pcs", csv, f"Final_{total_vba}.csv", "text/csv")
