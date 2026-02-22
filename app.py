@@ -955,15 +955,16 @@ elif menu == "Compare RTO":
     # --- 2. JALANKAN PROSES AWAL ---
     if st.button("🚀 JALANKAN PROSES (DS VS APPSHEET)", use_container_width=True):
         if f1 and f2:
-            # Baca file sekali saja
             df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
             df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
             
-            # SIMPAN DF2 KE SESSION STATE biar nggak ValueError pas Refresh
             st.session_state.data_app_permanen = df2
             
-            # Panggil Mesin VBA 
             res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
+            
+            # --- TWEAK: Ganti None/NaN jadi 0 biar gak muncul tulisan "None" ---
+            res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
+            
             st.session_state.df_ds = res_ds
             st.session_state.df_selisih = res_selisih
             st.success("Proses Compare Selesai!")
@@ -976,25 +977,42 @@ elif menu == "Compare RTO":
         st.subheader("⚠️ SHEET SELISIH")
         st.info("💡 Isi hasil cek fisik di kolom **HASIL CEK REAL**, lalu klik Refresh Data di bawah.")
         
-        # Editor data
-        edited_selisih = st.data_editor(st.session_state.df_selisih, use_container_width=True, hide_index=True)
+        # --- IMPROVED EDITOR: Biar gak ada tulisan None & Input Langsung Muncul ---
+        edited_selisih = st.data_editor(
+            st.session_state.df_selisih, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "HASIL CEK REAL": st.column_config.NumberColumn(
+                    "HASIL CEK REAL",
+                    help="Masukkan angka hasil cek fisik (Gudang)",
+                    min_value=0,
+                    step=1,
+                    format="%d", # Menghilangkan desimal .00
+                )
+            },
+            disabled=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN'] # Kunci kolom lain
+        )
         
         if st.button("🔄 REFRESH DATA (Update DS RTO)", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
-                # Ambil data DS terakhir
                 df_ds_new = st.session_state.df_ds.copy()
                 
-                # Ambil inputan user dari editor
+                # Gunakan edited_selisih (data hasil ketikan user)
+                # Pastikan SKU jadi string biar mappingnya gak meleset
+                edited_selisih['SKU'] = edited_selisih['SKU'].astype(str).str.strip()
                 dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
                 
-                # Update QTY SCAN berdasarkan SKU
+                # Update QTY SCAN di data utama berdasarkan input user
                 for sku, val in dict_real.items():
-                    df_ds_new.loc[df_ds_new['SKU'] == str(sku), 'QTY SCAN'] = val
+                    df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
                 
-                # Jalankan ulang mesin pake data APP yang ada di memori (ANTI VALUEERROR)
+                # Jalankan ulang mesin
                 res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, st.session_state.data_app_permanen)
                 
-                # Simpan balik hasil updatenya
+                # Bersihkan lagi hasil selisih dari tulisan None
+                res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
+                
                 st.session_state.df_ds = res_ds
                 st.session_state.df_selisih = res_selisih
                 
@@ -1010,12 +1028,9 @@ elif menu == "Compare RTO":
         if st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
                 df3_draft = pd.read_excel(f3)
-                # Gunakan data app dari memori
                 hasil_draft = engine_compare_draft_vba(st.session_state.data_app_permanen, df3_draft)
-                
                 st.dataframe(hasil_draft, use_container_width=True)
                 
-                # Download Button
                 csv = hasil_draft.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📥 Download Draft Hasil (.csv)",
@@ -1024,4 +1039,4 @@ elif menu == "Compare RTO":
                     mime="text/csv"
                 )
             else:
-                st.warning("Jalankan Proses (DS vs APPSHEET) dulu biar data Appsheet-nya ke-load, Cok!")
+                st.warning("Jalankan Proses (DS vs APPSHEET) dulu")
