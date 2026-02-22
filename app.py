@@ -927,15 +927,25 @@ elif menu == "Compare RTO":
         
         # Tombol REFRESH harus sejajar dengan edited_selisih
         if st.button("🔄 REFRESH DATA (Like VBA Refresh)", use_container_width=True):
+            # 1. Ambil data dari session state
             df_ds_new = st.session_state.df_ds.copy()
             
-            # Isi tombol REFRESH masuk 1 level lagi (4 spasi)
+            # 2. Ambil inputan dari editor
             dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
             
+            # 3. UPDATE (Pastiin namanya df_ds_new, bukan df_ds_res!)
             for sku, val in dict_real.items():
-                df_ds_res.loc[df_ds_res['SKU'] == sku, 'QTY SCAN'] = val
+                df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
             
-            # Re-run logic
+            # 4. Jalankan mesin lagi
+            # Pake data app yang sudah tersimpan di session state
+            res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, st.session_state.data_app)
+            
+            # 5. Simpan balik
+            st.session_state.df_ds = res_ds
+            st.session_state.df_selisih = res_selisih
+            
+            st.success("Data Berhasil di-Refresh!")
             st.rerun()
     st.divider()
     
