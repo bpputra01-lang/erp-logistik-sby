@@ -923,19 +923,28 @@ elif menu == "Compare RTO":
         st.subheader("⚠️ SHEET SELISIH (Input Hasil Cek Real di Kolom G)")
         edited_selisih = st.data_editor(st.session_state.df_selisih, use_container_width=True, hide_index=True, key="editor_vba")
         
-        if st.button("🔄 REFRESH DATA (Like VBA Refresh)", use_container_width=True):
-            # Logika Refresh Makro: Update DS berdasarkan input Kolom G
+   if st.button("🔄 REFRESH DATA (Like VBA Refresh)", use_container_width=True):
+            # 1. Ambil data terakhir dari session state (BUKAN BACA EXCEL LAGI)
             df_ds_new = st.session_state.df_ds.copy()
-            # Akumulasi Cek Real per SKU
+            
+            # 2. Akumulasi Cek Real dari tabel yang baru lo ketik di layar
+            # Kolom G itu namanya 'HASIL CEK REAL'
             dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
             
+            # 3. Update QTY SCAN di DS sesuai inputan user
             for sku, val in dict_real.items():
                 df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
             
-            # Hitung ulang Note
-            st.session_state.df_ds, _ = engine_ds_rto_vba_total(df_ds_new, pd.read_excel(f2))
+            # 4. Jalankan mesin lagi pake data yang sudah ada di memori
+            # JANGAN PAKAI pd.read_excel(f2) di sini!
+            res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, df_app_uploaded) 
+            
+            # Simpan balik ke session
+            st.session_state.df_ds = res_ds
+            st.session_state.df_selisih = res_selisih
+            
+            st.success("Data Berhasil di-Refresh!")
             st.rerun()
-
     st.divider()
     
     if f3 and st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
