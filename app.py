@@ -937,8 +937,39 @@ elif menu == "Compare RTO":
     t1, t2, t3 = st.tabs(["📋 PASTE DATA DISINI", "🔍 PREVIEW & PROSES", "🎯 HASIL SIAP COPAS"])
 
     with t1:
+        with t1:
         st.subheader("Sheet: Input Manual (Copy-Paste dari Excel)")
-        st.info("Tips: Klik sel pertama, lalu tekan Ctrl+V untuk paste data dari Excel lo.")
+        st.info("Tips: Klik sel paling pojok kiri atas, lalu tekan Ctrl+V.")
+        
+        # 1. SETUP KOLOM APPSHEET (18 KOLOM)
+        # Gue bikin header default biar lo gak bingung urutannya
+        cols_app = [f"Col {i+1}" for i in range(18)]
+        # Kalo lo mau namain spesifik beberapa kolom awal, ganti list di atas atau biarin gini biar fleksibel
+        df_init_app = pd.DataFrame(columns=cols_app)
+        
+        st.write("**1. Paste Data Scan / Appsheet RTO (18 Kolom)**")
+        data_scan = st.data_editor(
+            df_init_app, 
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key="ed_scan_rto",
+            hide_index=True
+        )
+        
+        st.divider()
+
+        # 2. SETUP KOLOM DRAFT (9 KOLOM)
+        cols_jez = [f"Draft Col {i+1}" for i in range(9)]
+        df_init_jez = pd.DataFrame(columns=cols_jez)
+        
+        st.write("**2. Paste Draft Jezpro / RTO (9 Kolom)**")
+        data_jez = st.data_editor(
+            df_init_jez, 
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key="ed_jez_rto",
+            hide_index=True
+        )
         
         c1, c2 = st.columns(2)
         with c1:
@@ -953,32 +984,40 @@ elif menu == "Compare RTO":
             data_jez = st.data_editor(df_input_jez, num_rows="dynamic", use_container_width=True, key="ed_jez")
 
     with t2:
-        st.subheader("🔍 Validasi & Jalankan Macros")
+        with t2:
         if st.button("🚀 JALANKAN PROSES SEKARANG", use_container_width=True):
-            # Cek data
-            df_scan = pd.DataFrame(data_scan).dropna(subset=["SKU"])
-            df_jez_raw = pd.DataFrame(data_jez).dropna(subset=["SKU"])
+            df_scan = pd.DataFrame(data_scan)
+            df_jez_raw = pd.DataFrame(data_jez)
             
             if not df_scan.empty and not df_jez_raw.empty:
-                # -- LOGIKA MACROS --
-                # 1. Grouping Scan (Pivot)
-                df_scan["SKU"] = df_scan["SKU"].astype(str).str.strip()
-                df_scan["QTY"] = pd.to_numeric(df_scan["QTY"], errors='coerce').fillna(0)
-                pivot_scan = df_scan.groupby("SKU")["QTY"].sum().to_dict()
+                # --- ASUMSI URUTAN KOLOM (Sesuaikan dengan urutan pas lo Copy dari Excel) ---
+                # Contoh: SKU ada di Kolom 1, QTY ada di Kolom 2
+                # Inget: Python itung dari 0. Jadi Col 1 = index 0, Col 2 = index 1
                 
-                # 2. VLOOKUP ke Draft Jezpro
-                df_jez_raw["SKU"] = df_jez_raw["SKU"].astype(str).str.strip()
-                df_jez_raw["QTY_FINAL"] = df_jez_raw["SKU"].map(pivot_scan).fillna(0)
-                
-                # 3. Filter > 0 (DAPETIN 231)
-                hasil_final = df_jez_raw[df_jez_raw["QTY_FINAL"] > 0].copy()
-                
-                # Simpan ke Session State
-                st.session_state.final_macros = hasil_final
-                st.success("✅ Macros Selesai! Cek tab 'HASIL SIAP COPAS'")
-            else:
-                st.error("Data Scan atau Draft masih kosong, Cok! Paste dulu di Tab 1.")
-
+                try:
+                    # Ambil SKU & QTY dari Appsheet (Sesuaikan index i di iloc[:, i])
+                    df_scan['SKU_CLEAN'] = df_scan.iloc[:, 0].astype(str).str.strip() # Kolom 1
+                    df_scan['QTY_CLEAN'] = pd.to_numeric(df_scan.iloc[:, 1], errors='coerce').fillna(0) # Kolom 2
+                    
+                    pivot_scan = df_scan.groupby('SKU_CLEAN')['QTY_CLEAN'].sum().to_dict()
+                    
+                    # Ambil SKU dari Draft Jezpro (Misal SKU di kolom 1)
+                    df_jez_raw['SKU_CLEAN'] = df_jez_raw.iloc[:, 0].astype(str).str.strip()
+                    
+                    # VLOOKUP manual
+                    df_jez_raw['QTY_FINAL'] = df_jez_raw['SKU_CLEAN'].map(pivot_scan).fillna(0)
+                    
+                    # FILTER KERAMAT 231
+                    hasil_final = df_jez_raw[df_jez_raw['QTY_FINAL'] > 0].copy()
+                    
+                    # Update kolom Qty asli di Draft (Misal Qty Draft di kolom 2)
+                    # Kita timpa kolom ke-2 dengan hasil scan
+                    hasil_final.iloc[:, 1] = hasil_final['QTY_FINAL']
+                    
+                    st.session_state.final_macros = hasil_final.drop(columns=['SKU_CLEAN', 'QTY_FINAL'])
+                    st.success("✅ Macros Berhasil! Cek hasil di Tab 3.")
+                except Exception as e:
+                    st.error(f"Error: Pastiin urutan kolom pas paste bener! Detail: {e}")
     with t3:
         st.subheader("🎯 Hasil Akhir (Silakan Copas Balik ke ERP)")
         if "final_macros" in st.session_state:
