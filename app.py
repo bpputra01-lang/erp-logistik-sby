@@ -767,84 +767,261 @@ elif menu == "Putaway System":
             except Exception as e: st.error(f"Gagal: {e}")
 
 elif menu == "Scan Out Validation":
-    # --- SEMUA KODE DI BAWAH INI HARUS MASUK 1 TAB DARI ELIF MENU ---
-    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (FIX 231)</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1> COMPARE AND ANLYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+    with col1: up_scan = st.file_uploader("Upload DATA SCAN", type=['xlsx', 'csv'])
+    with col2: up_hist = st.file_uploader("Upload HISTORY SET UP", type=['xlsx'])
+    with col3: up_stock = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
+    if up_scan and up_hist and up_stock:
+        if st.button("🚀 COMPARE DATA SCAN OUT"):
+            try:
+                df_s = pd.read_excel(up_scan, engine='calamine') if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
+                df_h = pd.read_excel(up_hist, engine='calamine'); df_st = pd.read_excel(up_stock, engine='calamine')
+                df_res, df_draft = process_scan_out(df_s, df_h, df_st)
+                st.success("Validasi Selesai!")
+                def highlight_vba(val): return f'color: {"red" if "MISSMATCH" in str(val) or "BELUM" in str(val) else "black"}; font-weight: bold'
+                st.subheader("📋 DATA SCAN (COMPARED)"); st.dataframe(df_res.style.applymap(highlight_vba, subset=['Keterangan']), use_container_width=True)
+                st.subheader("📝 DRAFT SET UP"); st.dataframe(df_draft, use_container_width=True)
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df_res.to_excel(writer, sheet_name='DATA SCAN', index=False); df_draft.to_excel(writer, sheet_name='DRAFT', index=False)
+                st.download_button("📥 DOWNLOAD SCAN OUT", data=output.getvalue(), file_name="SCAN_OUT_RESULT.xlsx")
+            except Exception as e: st.error(f"Error: {e}")
+
+elif menu == "Refill & Overstock":
+    st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1: up_all = st.file_uploader("Upload ALL DATA STOCK", type=['xlsx'])
+    with c2: up_track = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
+    if up_all and up_track:
+        if st.button("🚀 PROSES REFILL & OVERSTOCK"):
+            try:
+                with st.spinner("Processing..."):
+                    df_all = pd.read_excel(up_all, engine='calamine')
+                    df_track = pd.read_excel(up_track, engine='calamine')
+                    res_gl3, res_gl4, res_refill, res_over = process_refill_overstock(df_all, df_track)
+                    st.success("Data Berhasil di Filter!")
+                    m1, m2, m3 = st.columns(3)
+                    m1.markdown(f'<div class="m-box"><span class="m-lbl">REFILL ITEMS</span><span class="m-val">{len(res_refill)}</span></div>', unsafe_allow_html=True)
+                    m2.markdown(f'<div class="m-box"><span class="m-lbl">OVERSTOCK ITEMS</span><span class="m-val">{len(res_over)}</span></div>', unsafe_allow_html=True)
+                    m3.markdown(f'<div class="m-box"><span class="m-lbl">GL3/GL4 ROWS</span><span class="m-val">{len(res_gl3)+len(res_gl4)}</span></div>', unsafe_allow_html=True)
+                    t1, t2, t3, t4 = st.tabs(["📦 REFILL", "⚠️ OVERSTOCK", "📑 GL3 DATA", "📑 GL4 DATA"])
+                    with t1: st.dataframe(res_refill, use_container_width=True)
+                    with t2: st.dataframe(res_over, use_container_width=True)
+                    with t3: st.dataframe(res_gl3, use_container_width=True)
+                    with t4: st.dataframe(res_gl4, use_container_width=True)
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        res_refill.to_excel(writer, sheet_name='REFILL', index=False)
+                        res_over.to_excel(writer, sheet_name='OVERSTOCK', index=False)
+                        res_gl3.to_excel(writer, sheet_name='GL3', index=False)
+                        res_gl4.to_excel(writer, sheet_name='GL4', index=False)
+                    st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REFILL_OVERSTOCK_REPORT.xlsx")
+            except Exception as e: st.error(f"Error: {e}")
+
+elif menu == "Database Master":
+    # Link Google Sheets lo yang sudah dikunci
+    SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
     
-    # 1. INISIALISASI (Pake nama variabel unik biar gak tabrakan sama menu lain)
-    if 'rto_df_ds' not in st.session_state: st.session_state.rto_df_ds = None
-    if 'rto_df_selisih' not in st.session_state: st.session_state.rto_df_selisih = None
-    if 'rto_data_app_permanen' not in st.session_state: st.session_state.rto_data_app_permanen = None
-    if 'rto_df_ds_backdoor' not in st.session_state: st.session_state.rto_df_ds_backdoor = None
-
-    # 2. SLOT UPLOAD
-    cr1, cr2, cr3 = st.columns(3)
-    f1_rto = cr1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1_rto")
-    f2_rto = cr2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2_rto")
-    f3_rto = cr3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3_rto")
-
-    # 3. TOMBOL PROSES AWAL
-    st.divider()
-    if st.button("🚀 JALANKAN PROSES BANDING (1 & 2)", use_container_width=True, key="btn_rto_awal"):
-        if f1_rto and f2_rto:
-            df1 = pd.read_excel(f1_rto) if f1_rto.name.endswith('xlsx') else pd.read_csv(f1_rto)
-            df2 = pd.read_excel(f2_rto) if f2_rto.name.endswith('xlsx') else pd.read_csv(f2_rto)
-            st.session_state.rto_data_app_permanen = df2.copy()
+    st.markdown('<div class="hero-header"><h1>DATABASE MASTER CHECKER</h1><p>Koneksi Otomatis ke Master Data ERP</p></div>', unsafe_allow_html=True)
+    
+    try:
+        # Ekstrak File ID secara otomatis dari link
+        file_id = "1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY"
+        xlsx_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+        
+        with st.spinner("Sedang mengambil data terbaru..."):
+            # Baca semua sheet (tab) yang ada
+            all_sheets = pd.read_excel(xlsx_url, sheet_name=None, engine='calamine')
             
+            # Pilihan Tab/Sheet
+            tab_names = list(all_sheets.keys())
+            c_select, c_empty = st.columns([1, 2])
+            with c_select:
+                selected_sheet = st.selectbox("PILIH TAB DATA:", tab_names)
+            
+            if selected_sheet:
+                df_master = all_sheets[selected_sheet]
+                
+                # Baris metrik informasi data
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL BARIS</span><span class="m-val">{len(df_master)}</span></div>', unsafe_allow_html=True)
+                with c2: st.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL KOLOM</span><span class="m-val">{len(df_master.columns)}</span></div>', unsafe_allow_html=True)
+                with c3: st.markdown(f'<div class="m-box"><span class="m-lbl">STATUS</span><span class="m-val">CONNECTED</span></div>', unsafe_allow_html=True)
+                with c4: st.markdown(f'<div class="m-box"><span class="m-lbl">SOURCE</span><span class="m-val">G-SHEET</span></div>', unsafe_allow_html=True)
+                
+                # Tampilkan tabel data
+                st.dataframe(df_master, use_container_width=True, height=600)
+                
+                # Tombol Download kalau sewaktu-waktu butuh offline
+                csv = df_master.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 DOWNLOAD TAB INI (.CSV)",
+                    data=csv,
+                    file_name=f"Master_{selected_sheet}.csv",
+                    mime='text/csv',
+                )
+
+    except Exception as e:
+        st.error(f"⚠️ Gagal terhubung ke Google Sheets. Pastikan aksesnya sudah 'Anyone with the link'. Error: {e}")
+elif menu == "Stock Minus":
+    st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
+    if uploaded_file:
+        try:
+            df = pd.read_excel(uploaded_file, engine="calamine")
+            col_sku, col_bin = 'SKU', 'BIN'
+            col_qty = next((c for c in df.columns if 'QTY SYS' in str(c).upper()), 'QTY SYSTEM')
+            if st.button("🔃 PROSES DATA"):
+                with st.spinner('Memproses...'):
+                    df_minus_awal = df[df[col_qty] < 0].copy()
+                    qty_arr = pd.to_numeric(df[col_qty], errors='coerce').fillna(0).values
+                    sku_arr, bin_arr = df[col_sku].astype(str).values, df[col_bin].astype(str).values
+                    prior_bins = ["RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC", "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3", "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"]
+                    pos_map = {}
+                    for i, q in enumerate(qty_arr):
+                        if q > 0:
+                            s = sku_arr[i]
+                            if s not in pos_map: pos_map[s] = {}
+                            b = bin_arr[i].upper()
+                            if b not in pos_map[s]: pos_map[s][b] = []
+                            pos_map[s][b].append(i)
+                    set_up_results = []
+                    minus_indices = np.where(qty_arr < 0)[0]
+                    for idx in minus_indices:
+                        sku_target, qty_needed, bin_tujuan = sku_arr[idx], abs(qty_arr[idx]), bin_arr[idx].upper()
+                        if sku_target in pos_map:
+                            sku_bins = pos_map[sku_target]
+                            while qty_needed > 0:
+                                found_idx = -1
+                                if bin_tujuan == "TOKO":
+                                    for b_name, indices in sku_bins.items():
+                                        if "LT.2" in b_name or "GL2-STORE" in b_name:
+                                            for p_idx in indices:
+                                                if qty_arr[p_idx] > 0: found_idx = p_idx; break
+                                        if found_idx != -1: break
+                                elif "LT.2" in bin_tujuan or "GL2-STORE" in bin_tujuan:
+                                    if "TOKO" in sku_bins:
+                                        for p_idx in sku_bins["TOKO"]:
+                                            if qty_arr[p_idx] > 0: found_idx = p_idx; break
+                                if found_idx == -1:
+                                    for pb in prior_bins:
+                                        if pb in sku_bins:
+                                            for p_idx in sku_bins[pb]:
+                                                if qty_arr[p_idx] > 0: found_idx = p_idx; break
+                                        if found_idx != -1: break
+                                if found_idx == -1:
+                                    for b_name, indices in sku_bins.items():
+                                        if b_name != "REJECT DEFECT":
+                                            for p_idx in indices:
+                                                if qty_arr[p_idx] > 0: found_idx = p_idx; break
+                                        if found_idx != -1: break
+                                if found_idx != -1:
+                                    take = min(qty_needed, qty_arr[found_idx]); qty_arr[found_idx] -= take; qty_arr[idx] += take
+                                    set_up_results.append({"BIN AWAL": bin_arr[found_idx], "BIN TUJUAN": bin_arr[idx], "SKU": sku_target, "QUANTITY": take, "NOTES": "STOCK MINUS"})
+                                    qty_needed -= take
+                                else: break
+                    df_final = df.copy(); df_final[col_qty] = qty_arr; df_need_adj = df_final[df_final[col_qty] < 0].copy()
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        df_minus_awal.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
+                        if set_up_results: pd.DataFrame(set_up_results).to_excel(writer, sheet_name='SET_UP', index=False)
+                        if not df_need_adj.empty: df_need_adj.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
+                    st.success("✅ Berhasil diproses!"); st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="HASIL_STOCK_MINUS.xlsx")
+        except Exception as e: st.error(f"Error: {e}")
+
+elif menu == "Compare RTO":
+    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (BACKDOOR MODE)</h1></div>', unsafe_allow_html=True)
+    
+    # --- 1. SESSION STATE INITIALIZATION ---
+    if 'df_ds' not in st.session_state: st.session_state.df_ds = None
+    if 'df_selisih' not in st.session_state: st.session_state.df_selisih = None
+    if 'data_app_permanen' not in st.session_state: st.session_state.data_app_permanen = None
+    if 'df_ds_final' not in st.session_state: st.session_state.df_ds_final = None
+
+    # UI Kolom Upload
+    c1, c2, c3 = st.columns(3)
+    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1")
+    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2")
+    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3")
+    
+    # --- TOMBOL PROSES AWAL (INI YANG ILANG TADI, COK) ---
+    st.divider()
+    if st.button("🚀 JALANKAN PROSES BANDING (DS vs APPSHEET)", use_container_width=True):
+        if f1 and f2:
+            df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
+            df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
+            
+            st.session_state.data_app_permanen = df2.copy()
             res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
+            
+            # Bersihkan angka tampilan
             res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
             
-            st.session_state.rto_df_ds = res_ds
-            st.session_state.rto_df_selisih = res_selisih
-            st.success("✅ Tahap 1 Selesai!")
+            st.session_state.df_ds = res_ds
+            st.session_state.df_selisih = res_selisih
+            st.success("✅ Tahap 1 Selesai! Tabel selisih muncul di bawah.")
         else:
-            st.error("Upload File 1 & 2 dulu!")
+            st.error("Upload File 1 & 2 dulu biar bisa dibandingin!")
 
-    # 4. LOGIC BACKDOOR
-    if st.session_state.rto_df_selisih is not None:
-        st.subheader("⚠️ TABEL SELISIH")
-        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
+    # --- TAMPILIN TABEL SELISIH DULU (Biar bisa lo download buat diisi) ---
+    if st.session_state.df_selisih is not None:
+        st.subheader("⚠️ TABEL SELISIH (HASIL BANDING)")
+        st.dataframe(st.session_state.df_selisih, use_container_width=True, hide_index=True)
         
-        st.divider()
-        f4_rto = st.file_uploader("📥 4. UPLOAD FILE CEK REAL (Backdoor)", type=['xlsx','csv'], key="f4_rto")
+        # Tombol Download buat lo isi manual di luar
+        csv_selisih = st.session_state.df_selisih.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Tabel Selisih untuk Diisi", csv_selisih, "Cek_Real_Manual.csv", "text/csv")
 
-        if f4_rto and st.session_state.rto_data_app_permanen is not None:
+        st.divider()
+        st.subheader("🛠️ JALUR BACKDOOR (OVERWRITE)")
+        f4 = st.file_uploader("📥 4. UPLOAD HASIL CEK REAL YANG SUDAH DIISI", type=['xlsx','csv'], key="f4")
+
+        # Logic Overwrite jika file 4 di-upload
+        if f4:
             try:
-                df_real = pd.read_excel(f4_rto) if f4_rto.name.endswith('xlsx') else pd.read_csv(f4_rto)
-                c_sku_m = [c for c in df_real.columns if 'sku' in c.lower()][0]
-                c_qty_m = [c for c in df_real.columns if any(x in c.lower() for x in ['real', 'qty', 'cek'])][0]
+                df_real_manual = pd.read_excel(f4) if f4.name.endswith('xlsx') else pd.read_csv(f4)
+                c_sku_m = [c for c in df_real_manual.columns if 'sku' in c.lower()][0]
+                c_qty_m = [c for c in df_real_manual.columns if 'real' in c.lower() or 'qty' in c.lower() or 'cek' in c.lower()][0]
                 
-                df_real[c_qty_m] = pd.to_numeric(df_real[c_qty_m], errors='coerce').fillna(0)
-                valid_dict = df_real[df_real[c_qty_m] > 0].set_index(c_sku_m)[c_qty_m].to_dict()
+                df_real_manual[c_qty_m] = pd.to_numeric(df_real_manual[c_qty_m], errors='coerce').fillna(0)
+                valid_data_real = df_real_manual[df_real_manual[c_qty_m] > 0].copy()
+                valid_data_real[c_sku_m] = valid_data_real[c_sku_m].astype(str).str.strip()
+                mapping_real = valid_data_real.set_index(c_sku_m)[c_qty_m].to_dict()
                 
-                df_temp = st.session_state.rto_data_app_permanen.copy()
+                df_temp = st.session_state.data_app_permanen.copy()
                 c_sku_u = [c for c in df_temp.columns if 'sku' in c.lower()][0]
-                df_temp = df_temp[df_temp[c_sku_u].astype(str).str.strip().isin([str(k).strip() for k in valid_dict.keys()])]
+                df_temp[c_sku_u] = df_temp[c_sku_u].astype(str).str.strip()
                 
+                # Filter SKU & Update Qty
+                df_temp = df_temp[df_temp[c_sku_u].isin(mapping_real.keys())]
                 c_qty_u = [c for c in df_temp.columns if 'qty' in c.lower()][0]
-                df_temp[c_qty_u] = df_temp[c_sku_u].astype(str).str.strip().map({str(k).strip(): v for k, v in valid_dict.items()})
+                df_temp[c_qty_u] = df_temp[c_sku_u].map(mapping_real)
                 
-                st.session_state.rto_df_ds_backdoor = df_temp
-                st.info(f"✅ Backdoor Aktif! {len(df_temp)} SKU valid.")
+                st.session_state.df_ds_final = df_temp
+                st.info(f"✅ Data Ter-overwrite! {len(df_temp)} SKU siap ditabrak ke Draft.")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error baca File 4: {e}")
 
-    # 5. FINAL COMPARE
-    if f3_rto:
+    # --- 4. LOGIC DRAFT JEZPRO ---
+    if f3:
         st.divider()
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True, key="btn_rto_final"):
-            data_final = st.session_state.rto_df_ds_backdoor if st.session_state.rto_df_ds_backdoor is not None else st.session_state.rto_df_ds
-            if data_final is not None:
-                df3 = pd.read_excel(f3_rto) if f3_rto.name.endswith('xlsx') else pd.read_csv(f3_rto)
-                hasil = engine_compare_draft_vba(data_final, df3)
+        st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
+        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
+            data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
+            
+            if data_siap is not None:
+                df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
+                hasil_draft = engine_compare_draft_vba(data_siap, df3_draft)
                 
-                col_names = [c for c in hasil.columns if any(x in c.lower() for x in ['qty', 'ambil'])]
-                if col_names:
-                    c_qty_f = col_names[0]
-                    hasil = hasil[pd.to_numeric(hasil[c_qty_f], errors='coerce').fillna(0) > 0]
-                    total = int(hasil[c_qty_f].sum())
-                    st.metric("Total Qty Akhir", f"{total} Pcs")
-                    st.dataframe(hasil, use_container_width=True, hide_index=True)
-                    st.download_button("📥 Download Draft", hasil.to_csv(index=False).encode('utf-8'), f"Final_{total}.csv", "text/csv")
+                col_qty_f = [c for c in hasil_draft.columns if 'qty' in c.lower() or 'ambil' in c.lower()][0]
+                hasil_draft = hasil_draft[pd.to_numeric(hasil_draft[col_qty_f], errors='coerce').fillna(0) > 0]
+                
+                total_vba = int(hasil_draft[col_qty_f].sum())
+                st.metric("Total Qty Akhir", f"{total_vba} Pcs")
+                st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
+                
+                csv = hasil_draft.to_csv(index=False).encode('utf-8')
+                st.download_button(f"📥 Download Draft {total_vba} Pcs", csv, f"Draft_Final_{total_vba}.csv", "text/csv")
             else:
-                st.error("Jalankan Tahap 1 dulu!")
-    # --- AKHIR DARI MENU COMPARE RTO (PASTIIN GAK ADA KODE LAIN NYELIP DI SINI) ---
+                st.error("Jalankan Proses Banding dulu!")
