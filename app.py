@@ -61,7 +61,7 @@ st.markdown("""
         border-radius: 8px !important;
         border: 2px solid #001a35 !important;
         font-weight: bold !important;
-        height: 4em !important;
+        height: 3em !important;
         transition: 0.3s;
     }
     div.stButton > button:hover {
