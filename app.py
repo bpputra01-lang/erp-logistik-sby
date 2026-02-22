@@ -220,7 +220,7 @@ div.stFormSubmitButton > button {
             
             # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
             if submit_button:
-                if user_input == "admin" and pass_input == "surabaya123":
+                if user_input == "admin" and pass_input == "sby123":
                     st.session_state.logged_in = True
                     st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
                     st.rerun()
