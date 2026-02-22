@@ -767,83 +767,74 @@ elif menu == "Putaway System":
             except Exception as e: st.error(f"Gagal: {e}")
 
 elif menu == "Scan Out Validation":
+    # --- SEMUA KODE DI BAWAH INI HARUS MASUK 1 TAB DARI ELIF MENU ---
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (FIX 231)</h1></div>', unsafe_allow_html=True)
     
-    # --- 1. INISIALISASI SESSION STATE ---
-    if 'df_ds' not in st.session_state:
-        st.session_state.df_ds = None
-    if 'df_selisih' not in st.session_state:
-        st.session_state.df_selisih = None
-    if 'data_app_permanen' not in st.session_state:
-        st.session_state.data_app_permanen = None
-    if 'df_ds_backdoor' not in st.session_state:
-        st.session_state.df_ds_backdoor = None
+    # 1. INISIALISASI (Pake nama variabel unik biar gak tabrakan sama menu lain)
+    if 'rto_df_ds' not in st.session_state: st.session_state.rto_df_ds = None
+    if 'rto_df_selisih' not in st.session_state: st.session_state.rto_df_selisih = None
+    if 'rto_data_app_permanen' not in st.session_state: st.session_state.rto_data_app_permanen = None
+    if 'rto_df_ds_backdoor' not in st.session_state: st.session_state.rto_df_ds_backdoor = None
 
-    # --- 2. SLOT UPLOAD ---
-    c1, c2, c3 = st.columns(3)
-    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1")
-    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2")
-    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3")
+    # 2. SLOT UPLOAD
+    cr1, cr2, cr3 = st.columns(3)
+    f1_rto = cr1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1_rto")
+    f2_rto = cr2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2_rto")
+    f3_rto = cr3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3_rto")
 
-    # --- 3. TOMBOL PROSES AWAL ---
+    # 3. TOMBOL PROSES AWAL
     st.divider()
-    if st.button("🚀 JALANKAN PROSES BANDING (1 & 2)", use_container_width=True):
-        if f1 and f2:
-            df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
-            df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
+    if st.button("🚀 JALANKAN PROSES BANDING (1 & 2)", use_container_width=True, key="btn_rto_awal"):
+        if f1_rto and f2_rto:
+            df1 = pd.read_excel(f1_rto) if f1_rto.name.endswith('xlsx') else pd.read_csv(f1_rto)
+            df2 = pd.read_excel(f2_rto) if f2_rto.name.endswith('xlsx') else pd.read_csv(f2_rto)
+            st.session_state.rto_data_app_permanen = df2.copy()
             
-            st.session_state.data_app_permanen = df2.copy()
             res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
             res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
             
-            st.session_state.df_ds = res_ds
-            st.session_state.df_selisih = res_selisih
-            st.success("✅ Tahap 1 Selesai! Tabel selisih muncul di bawah.")
+            st.session_state.rto_df_ds = res_ds
+            st.session_state.rto_df_selisih = res_selisih
+            st.success("✅ Tahap 1 Selesai!")
         else:
-            st.error("Upload File 1 & 2 dulu, Cok!")
+            st.error("Upload File 1 & 2 dulu!")
 
-    # --- 4. LOGIC SELISIH & BACKDOOR ---
-    if st.session_state.df_selisih is not None:
+    # 4. LOGIC BACKDOOR
+    if st.session_state.rto_df_selisih is not None:
         st.subheader("⚠️ TABEL SELISIH")
-        st.dataframe(st.session_state.df_selisih, use_container_width=True, hide_index=True)
+        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
         
-        csv_selisih = st.session_state.df_selisih.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Tabel untuk Diisi Manual", csv_selisih, "Cek_Real.csv", "text/csv")
-
         st.divider()
-        st.subheader("🛠️ UPLOAD HASIL CEK REAL (BACKDOOR)")
-        f4 = st.file_uploader("📥 4. UPLOAD FILE CEK REAL (Overwrite)", type=['xlsx','csv'], key="f4")
+        f4_rto = st.file_uploader("📥 4. UPLOAD FILE CEK REAL (Backdoor)", type=['xlsx','csv'], key="f4_rto")
 
-        if f4 and st.session_state.data_app_permanen is not None:
+        if f4_rto and st.session_state.rto_data_app_permanen is not None:
             try:
-                df_real = pd.read_excel(f4) if f4.name.endswith('xlsx') else pd.read_csv(f4)
+                df_real = pd.read_excel(f4_rto) if f4_rto.name.endswith('xlsx') else pd.read_csv(f4_rto)
                 c_sku_m = [c for c in df_real.columns if 'sku' in c.lower()][0]
                 c_qty_m = [c for c in df_real.columns if any(x in c.lower() for x in ['real', 'qty', 'cek'])][0]
                 
                 df_real[c_qty_m] = pd.to_numeric(df_real[c_qty_m], errors='coerce').fillna(0)
                 valid_dict = df_real[df_real[c_qty_m] > 0].set_index(c_sku_m)[c_qty_m].to_dict()
                 
-                df_temp = st.session_state.data_app_permanen.copy()
+                df_temp = st.session_state.rto_data_app_permanen.copy()
                 c_sku_u = [c for c in df_temp.columns if 'sku' in c.lower()][0]
-                
                 df_temp = df_temp[df_temp[c_sku_u].astype(str).str.strip().isin([str(k).strip() for k in valid_dict.keys()])]
+                
                 c_qty_u = [c for c in df_temp.columns if 'qty' in c.lower()][0]
                 df_temp[c_qty_u] = df_temp[c_sku_u].astype(str).str.strip().map({str(k).strip(): v for k, v in valid_dict.items()})
                 
-                st.session_state.df_ds_backdoor = df_temp
-                st.info(f"✅ Backdoor Aktif! {len(df_temp)} SKU siap diproses.")
+                st.session_state.rto_df_ds_backdoor = df_temp
+                st.info(f"✅ Backdoor Aktif! {len(df_temp)} SKU valid.")
             except Exception as e:
-                st.error(f"Gagal baca file 4: {e}")
+                st.error(f"Error: {e}")
 
-    # --- 5. FINAL COMPARE ---
-    if f3:
+    # 5. FINAL COMPARE
+    if f3_rto:
         st.divider()
-        st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
-            data_final = st.session_state.df_ds_backdoor if st.session_state.df_ds_backdoor is not None else st.session_state.df_ds
-            
+        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True, key="btn_rto_final"):
+            data_final = st.session_state.rto_df_ds_backdoor if st.session_state.rto_df_ds_backdoor is not None else st.session_state.rto_df_ds
             if data_final is not None:
-                df3 = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
+                df3 = pd.read_excel(f3_rto) if f3_rto.name.endswith('xlsx') else pd.read_csv(f3_rto)
                 hasil = engine_compare_draft_vba(data_final, df3)
                 
                 col_names = [c for c in hasil.columns if any(x in c.lower() for x in ['qty', 'ambil'])]
@@ -851,15 +842,9 @@ elif menu == "Scan Out Validation":
                     c_qty_f = col_names[0]
                     hasil = hasil[pd.to_numeric(hasil[c_qty_f], errors='coerce').fillna(0) > 0]
                     total = int(hasil[c_qty_f].sum())
-                    
                     st.metric("Total Qty Akhir", f"{total} Pcs")
-                    if total == 231:
-                        st.success("🎯 MELEDAK! 231 PCS FIX!")
-                    
                     st.dataframe(hasil, use_container_width=True, hide_index=True)
-                    csv_final = hasil.to_csv(index=False).encode('utf-8')
-                    st.download_button(f"📥 Download Draft {total} Pcs", csv_final, f"Final_{total}.csv", "text/csv")
-                else:
-                    st.error("Kolom Qty gak ketemu di hasil compare!")
+                    st.download_button("📥 Download Draft", hasil.to_csv(index=False).encode('utf-8'), f"Final_{total}.csv", "text/csv")
             else:
-                st.error("Jalankan Tombol Proses Banding dulu!")
+                st.error("Jalankan Tahap 1 dulu!")
+    # --- AKHIR DARI MENU COMPARE RTO (PASTIIN GAK ADA KODE LAIN NYELIP DI SINI) ---
