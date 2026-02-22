@@ -985,38 +985,38 @@ elif menu == "Compare RTO":
         with t1:
             st.subheader("📋 Sheet: Input Master (Bisa Upload / Paste)")
             
-            # Action Toolbar (Macros Buttons)
+            # Action Toolbar (Macros Buttons) dengan Key Unik
             c_btn = st.columns(4)
-            if c_btn[0].button("🔍 DS RTO COMPARE", use_container_width=True):
+            if c_btn[0].button("🔍 DS RTO COMPARE", use_container_width=True, key="btn_compare_rto_unique"):
                 # --- LOGIKA: DS_RTO_QTY_AMBIL_ULTRAFAST ---
                 df_ds = st.session_state.grid_ds.copy()
                 df_app = st.session_state.grid_app.copy()
                 
                 if not df_ds.empty and not df_app.empty:
                     try:
-                        # Cleaning SKU & Status
-                        sku_app_col = df_app.iloc[:, 8].fillna(df_app.iloc[:, 14]) # Kolom 9 or 15
+                        # Ambil Kolom 9 (Index 8) atau 15 (Index 14) sebagai SKU
+                        sku_app_col = df_app.iloc[:, 8].fillna(df_app.iloc[:, 14])
                         status_col = df_app.iloc[:, 1].astype(str).str.upper()
                         
-                        # Filter Done / Kurang Ambil
+                        # Filter status DONE / KURANG AMBIL
                         mask = status_col.isin(["DONE", "KURANG AMBIL"])
                         valid_app = df_app[mask].copy()
                         
-                        # Hitung Qty (M + Q)
+                        # Hitung Total Qty: Kolom M (Index 12) + Kolom Q (Index 16)
                         q_m = pd.to_numeric(valid_app.iloc[:, 12], errors='coerce').fillna(0)
                         q_q = pd.to_numeric(valid_app.iloc[:, 16], errors='coerce').fillna(0)
                         valid_app['TOTAL_AMBIL'] = q_m + q_q
                         valid_app['SKU_CLEAN'] = sku_app_col[mask].astype(str).str.strip()
                         
-                        # Dict Sum (Pivot)
+                        # Pivot/Sum Qty per SKU
                         dict_qty = valid_app.groupby('SKU_CLEAN')['TOTAL_AMBIL'].sum().to_dict()
                         
-                        # Update DS Sheet
+                        # Update DataFrame DS
                         df_ds.columns = ["SKU", "QTY_SCAN", "QTY_AMBIL", "NOTE"]
                         df_ds['SKU'] = df_ds['SKU'].astype(str).str.strip()
                         df_ds['QTY_AMBIL'] = df_ds['SKU'].map(dict_qty).fillna(0)
                         
-                        # Logic Note
+                        # Hitung Note: SCAN vs AMBIL
                         def check_note(row):
                             s = pd.to_numeric(row['QTY_SCAN'], errors='coerce') or 0
                             a = row['QTY_AMBIL']
@@ -1030,23 +1030,20 @@ elif menu == "Compare RTO":
                         st.success("✅ Compare Selesai!")
                         st.balloons()
                     except Exception as e:
-                        st.error(f"Gagal: {e}")
+                        st.error(f"Gagal Proses: {e}")
 
-            if c_btn[1].button("🔄 REFRESH DRAFT", use_container_width=True):
+            if c_btn[1].button("🔄 REFRESH DRAFT", use_container_width=True, key="btn_refresh_rto_unique"):
                 st.info("Logic Refresh Running...")
-                # Masukkan logic REFRESH_DATA_RTO lo di sini
                 
-            if c_btn[2].button("⚡ GEN NEW DRAFT", use_container_width=True):
-                # Logic GENERATE_NEW_DRAFT_RTO
-                if not st.session_state.ws_draft.empty:
-                    st.session_state.ws_new_draft = st.session_state.ws_draft.copy()
-                    st.success("New Draft Ready!")
+            if c_btn[2].button("⚡ GEN NEW DRAFT", use_container_width=True, key="btn_gen_draft_unique"):
+                if not st.session_state.grid_dr.empty:
+                    st.session_state.ws_new_draft = st.session_state.grid_dr.copy()
+                    st.success("New Draft Ready di Tab 5!")
 
-            if c_btn[3].button("🗑️ RESET TOTAL", use_container_width=True, type="primary"):
+            if c_btn[3].button("🗑️ RESET TOTAL", use_container_width=True, type="primary", key="btn_reset_rto_unique"):
                 for k in ["ws_ds", "ws_app", "ws_draft", "ws_selisih", "ws_new_draft"]:
                     st.session_state[k] = None
                 st.rerun()
-
             st.divider()
 
             # Input Grids
