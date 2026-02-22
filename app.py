@@ -219,6 +219,91 @@ import pandas as pd
 import numpy as np
 import math
 
+
+def menu_fdr_update():
+    st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST PROCESSOR</h1></div>', unsafe_allow_html=True)
+
+    # --- 0. INISIALISASI SESSION STATE ---
+    if "ws_manifest" not in st.session_state:
+        st.session_state.ws_manifest = pd.DataFrame(columns=[chr(i) for i in range(ord('A'), ord('Z')+1)])
+    if "ws_fu_it" not in st.session_state:
+        st.session_state.ws_fu_it = None
+    if "dict_kurir" not in st.session_state:
+        st.session_state.dict_kurir = {}
+
+    # --- 1. TABS SYSTEM ---
+    t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "✂️ SPLIT KURIR"])
+
+    with t1:
+        st.subheader("🛠️ Macro Control Panel")
+        
+        # --- FITUR UPLOAD FILE ---
+        uploaded_file = st.file_uploader("📂 Upload File Manifest (Excel)", type=["xlsx"], key="fdr_uploader")
+        
+        if uploaded_file:
+            try:
+                # Baca Excel, pastiin ambil sheet pertama atau sesuaikan nama sheetnya
+                df_upload = pd.read_excel(uploaded_file)
+                st.session_state.ws_manifest = df_upload
+                st.success(f"✅ File '{uploaded_file.name}' berhasil di-load!")
+            except Exception as e:
+                st.error(f"Gagal baca file: {e}")
+
+        st.divider()
+        
+        c_btn = st.columns(4)
+        
+        # --- MACRO: CLEAN COLUMNS ---
+        if c_btn[0].button("🧹 CLEAN COLUMNS", key="btn_fdr_clean"):
+            df = st.session_state.grid_fdr.copy() # Ambil data terbaru dari editor
+            if not df.empty:
+                # Kolom VBA: G,H,I,K,L,M,R,S,T,U,V,W (Index: 6,7,8,10,11,12,17,18,19,20,21,22)
+                cols_to_del = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+                # Drop kolom berdasarkan urutan index (axis=1)
+                df.drop(df.columns[cols_to_del], axis=1, inplace=True, errors='ignore')
+                st.session_state.ws_manifest = df
+                st.success("Kolom Berhasil Dihapus!")
+                st.rerun() # Refresh biar tabel update
+            else: st.warning("Data Kosong!")
+
+        # --- MACRO: COPY FU IT ---
+        if c_btn[1].button("🚀 COPY FU IT", key="btn_fdr_fu"):
+            df = st.session_state.grid_fdr.copy()
+            if not df.empty and df.shape[1] >= 13:
+                # Filter Kolom M (Index 12) tidak kosong
+                mask = df.iloc[:, 12].notna() & (df.iloc[:, 12].astype(str).str.strip() != "")
+                st.session_state.ws_fu_it = df[mask].iloc[:, :13]
+                st.success(f"Berhasil Copy {len(st.session_state.ws_fu_it)} Baris!")
+            else: st.warning("Data tidak cukup kolom!")
+
+        # --- MACRO: SPLIT KURIR ---
+        if c_btn[2].button("⚡ SPLIT KURIR", key="btn_fdr_split"):
+            df = st.session_state.grid_fdr.copy()
+            if not df.empty and df.shape[1] >= 6:
+                # Kolom F (Index 5) ada isi & Kolom M (Index 12) Kosong
+                mask = (df.iloc[:, 5].notna()) & (df.iloc[:, 12].isna() | (df.iloc[:, 12].astype(str).str.strip() == ""))
+                df_split = df[mask].copy()
+                kurir_groups = {name: data for name, data in df_split.groupby(df_split.iloc[:, 5])}
+                st.session_state.dict_kurir = kurir_groups
+                st.success(f"Terpecah {len(kurir_groups)} Kurir!")
+            else: st.warning("Data tidak memenuhi syarat split!")
+
+        # --- MACRO: CLEAR ---
+        if c_btn[3].button("🗑️ CLEAR ALL", type="primary", key="btn_fdr_reset"):
+            st.session_state.ws_manifest = pd.DataFrame(columns=[chr(i) for i in range(ord('A'), ord('Z')+1)])
+            st.session_state.ws_fu_it = None
+            st.session_state.dict_kurir = {}
+            st.rerun()
+
+        st.divider()
+        st.write("### 📂 MANIFEST DATA (Preview & Edit)")
+        # Tabel Editor: Hasil Upload muncul di sini, bisa diedit manual juga
+        st.session_state.grid_fdr = st.data_editor(
+            st.session_state.ws_manifest, 
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key="editor_fdr_main"
+        )
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
 import pandas as pd
