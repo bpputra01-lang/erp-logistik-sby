@@ -931,7 +931,7 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "Compare RTO":
-  st.markdown('<div class="hero-header"><h1>📑 RTO HYBRID (UPLOAD + PASTE)</h1></div>', unsafe_allow_html=True)
+ st.markdown('<div class="hero-header"><h1>📑 RTO HYBRID (UPLOAD + PASTE)</h1></div>', unsafe_allow_html=True)
 
     # --- 0. INISIALISASI MEMORI ---
     if "df_rto_final" not in st.session_state:
@@ -952,9 +952,13 @@ elif menu == "Compare RTO":
         f_app = st.file_uploader("Upload File Appsheet (Opsional)", type=['xlsx','csv'], key="up_app_rto")
         
         if f_app:
-            df_up_app = pd.read_excel(f_app) if f_app.name.endswith('xlsx') else pd.read_csv(f_app)
-            st.session_state.data_app_hybrid = df_up_app.iloc[:, :18]
-            st.success(f"✅ {f_app.name} Masuk ke Tabel!")
+            try:
+                df_up_app = pd.read_excel(f_app) if f_app.name.endswith('xlsx') else pd.read_csv(f_app)
+                # Ambil max 18 kolom biar gak berantakan
+                st.session_state.data_app_hybrid = df_up_app.iloc[:, :18]
+                st.success(f"✅ {f_app.name} Berhasil Load!")
+            except Exception as e:
+                st.error(f"Gagal baca file: {e}")
 
         ed_app = st.data_editor(st.session_state.data_app_hybrid, num_rows="dynamic", use_container_width=True, key="grid_app_rto", hide_index=True)
         
@@ -965,9 +969,12 @@ elif menu == "Compare RTO":
         f_jez = st.file_uploader("Upload File Draft (Opsional)", type=['xlsx','csv'], key="up_jez_rto")
         
         if f_jez:
-            df_up_jez = pd.read_excel(f_jez) if f_jez.name.endswith('xlsx') else pd.read_csv(f_jez)
-            st.session_state.data_jez_hybrid = df_up_jez.iloc[:, :9]
-            st.success(f"✅ {f_jez.name} Masuk ke Tabel!")
+            try:
+                df_up_jez = pd.read_excel(f_jez) if f_jez.name.endswith('xlsx') else pd.read_csv(f_jez)
+                st.session_state.data_jez_hybrid = df_up_jez.iloc[:, :9]
+                st.success(f"✅ {f_jez.name} Berhasil Load!")
+            except Exception as e:
+                st.error(f"Gagal baca file: {e}")
 
         ed_jez = st.data_editor(st.session_state.data_jez_hybrid, num_rows="dynamic", use_container_width=True, key="grid_jez_rto", hide_index=True)
 
@@ -988,17 +995,18 @@ elif menu == "Compare RTO":
                     df_j['SKU_KEY'] = df_j.iloc[:, 0].astype(str).str.strip()
                     df_j['HASIL_QTY'] = df_j['SKU_KEY'].map(pivot_scan).fillna(0)
                     
-                    # Ambil yang Qty > 0 buat target 231
+                    # Filter sisa 231 (Hanya Qty > 0)
                     res_final = df_j[df_j['HASIL_QTY'] > 0].copy()
+                    # Timpa kolom Qty Draft (Kolom ke-2 / Index 1)
                     res_final.iloc[:, 1] = res_final['HASIL_QTY']
                     
                     st.session_state.df_rto_final = res_final.drop(columns=['SKU_KEY', 'HASIL_QTY'])
-                    st.success("✅ Macros Berhasil! Pindah ke Tab 3.")
+                    st.success("✅ Macros Selesai! Cek Tab 3.")
                     st.balloons()
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error logic: {e}")
             else:
-                st.warning("Isi dulu datanya di Tab 1!")
+                st.warning("Data Scan atau Draft masih kosong!")
 
     with tab3:
         st.subheader("🎯 Hasil Final")
@@ -1006,11 +1014,15 @@ elif menu == "Compare RTO":
             res = st.session_state.df_rto_final
             total_qty = int(pd.to_numeric(res.iloc[:, 1], errors='coerce').sum())
             
-            col1, col2 = st.columns(2)
-            col1.metric("Total SKU", len(res))
-            col2.metric("Total Qty", f"{total_qty} Pcs")
+            c1, c2 = st.columns(2)
+            c1.metric("Total SKU", len(res))
+            c2.metric("Total Qty", f"{total_qty} Pcs")
 
-            st.data_editor(res, use_container_width=True, hide_index=True, key="final_rto_view")
-            st.download_button("📥 Download CSV", res.to_csv(index=False).encode('utf-8'), f"RTO_{total_qty}.csv", "text/csv")
+            if total_qty == 231:
+                st.success("🎯 MANTAP! HASIL PAS 231 PCS!")
+
+            st.data_editor(res, use_container_width=True, hide_index=True, key="view_rto_final")
+            csv = res.to_csv(index=False).encode('utf-8')
+            st.download_button(f"📥 Download {total_qty} Pcs", csv, f"RTO_{total_qty}.csv", "text/csv")
         else:
-            st.info("Jalankan proses di Tab 2 dulu!")
+            st.info("Jalankan proses di Tab 2 dulu.")
