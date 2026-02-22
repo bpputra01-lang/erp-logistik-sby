@@ -1048,49 +1048,39 @@ elif menu == "Compare RTO":
         btn_final = st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True)
         
         if btn_final:
-            if st.session_state.df_ds_final is not None:
-                data_siap = st.session_state.df_ds_final
-            else:
-                data_siap = st.session_state.df_ds
+            # Ambil data sumber (Backdoor diutamakan)
+            data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
             
             if data_siap is not None:
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # 1. Jalankan engine (Biarkan dia berimajinasi ke 262 dulu)
+                # 1. Jalankan engine (Hasil mentah ERP)
                 hasil_mentah = engine_compare_draft_vba(data_siap, df3_draft)
                 
-                # 2. Ambil List SKU yang beneran ada di data scan lo (Data Siap)
-                c_sku_scan = [c for c in data_siap.columns if 'sku' in c.lower()][0]
-                list_sku_user = data_siap[c_sku_scan].astype(str).str.strip().unique()
+                # 2. Cari kolom Qty secara paksa
+                # Kita cari kolom yang mengandung kata 'qty', 'ambil', atau 'real'
+                target_col = [c for c in hasil_mentah.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
                 
-                # 3. Paksa Filter Hasil Akhir: HANYA SKU yang ada di scan & QTY > 0
-                c_sku_final = [c for c in hasil_mentah.columns if 'sku' in c.lower()][0]
-                c_qty_final = [c for c in hasil_mentah.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
+                # 3. FILTER TOTAL (Hapus semua yang Qty-nya 0 atau NaN)
+                # Ini cara paling ampuh buat ngebuang 31 baris siluman
+                hasil_mentah[target_col] = pd.to_numeric(hasil_mentah[target_col], errors='coerce').fillna(0)
+                hasil_final = hasil_mentah[hasil_mentah[target_col] > 0].copy()
                 
-                # Bersihkan data hasil mentah
-                hasil_mentah[c_qty_final] = pd.to_numeric(hasil_mentah[c_qty_final], errors='coerce').fillna(0)
+                # 4. HITUNG ULANG TOTAL DARI DATA YANG SUDAH BERSIH
+                total_real = int(hasil_final[target_col].sum())
                 
-                # FILTER KERAMAT: Harus ada di scan DAN Qty harus lebih dari 0
-                hasil_final = hasil_mentah[
-                    (hasil_mentah[c_sku_final].astype(str).str.strip().isin(list_sku_user)) & 
-                    (hasil_mentah[c_qty_final] > 0)
-                ].copy()
+                # TAMPILIN HASIL AKHIR
+                st.metric("Total Qty Akhir (REAL)", f"{total_real} Pcs")
                 
-                # 4. Hitung ulang totalnya secara mandiri
-                total_fix = int(hasil_final[c_qty_final].sum())
-                
-                # TAMPILIN
-                st.metric("Total Qty Akhir (FIX)", f"{total_fix} Pcs")
-                
-                if total_fix == 231:
-                    st.success("🎯 MELEDAK COK! 231 PCS FIX NO DEBAT!")
+                if total_real == 231:
+                    st.success("🎯 231 PCS! AKHIRNYA MENANG LAWAN ERP, COK!")
                 else:
-                    st.warning(f"Hasil: {total_fix} Pcs. (Cek lagi apakah file scan lo beneran totalnya 231?)")
-                
+                    st.warning(f"Dapetnya {total_real} Pcs. Coba cek lagi file upload-an lo!")
+
                 st.dataframe(hasil_final, use_container_width=True, hide_index=True)
                 
-                # DOWNLOAD
-                csv_fix = hasil_final.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download Draft {total_fix} Pcs", csv_fix, f"Final_{total_fix}.csv", "text/csv")
+                # Download Button
+                csv_final = hasil_final.to_csv(index=False).encode('utf-8')
+                st.download_button(f"📥 Download Draft {total_real} Pcs", csv_final, f"Draft_Final_{total_real}.csv", "text/csv")
             else:
-                st.error("Proses awal dulu!")
+                st.error("Jalankan Proses Banding (Tahap 1) dulu!")
