@@ -931,45 +931,39 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (BACKDOOR MODE)</h1></div>', unsafe_allow_html=True)
-    
-    # --- 1. SESSION STATE INITIALIZATION ---
-    if 'df_ds' not in st.session_state: st.session_state.df_ds = None
-    if 'df_selisih' not in st.session_state: st.session_state.df_selisih = None
-    if 'data_app_permanen' not in st.session_state: st.session_state.data_app_permanen = None
-    if 'df_ds_final' not in st.session_state: st.session_state.df_ds_final = None
-
-    # UI Kolom Upload
-    c1, c2, c3 = st.columns(3)
-    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1")
-    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2")
-    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3")
-    
-    # --- TOMBOL PROSES AWAL (INI YANG ILANG TADI, COK) ---
+   # --- 2. TOMBOL EKSEKUSI UTAMA (PROSES BANDING) ---
     st.divider()
-    if st.button("🚀 JALANKAN PROSES BANDING (DS vs APPSHEET)", use_container_width=True):
+    
+    # Gue taruh di luar syarat 'if', biar selalu muncul pas file di-upload
+    btn_proses = st.button("🚀 JALANKAN PROSES BANDING (DS vs APPSHEET)", use_container_width=True)
+
+    if btn_proses:
         if f1 and f2:
             df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
             df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
             
+            # Simpan data asli buat cadangan backdoor
             st.session_state.data_app_permanen = df2.copy()
+            
+            # Jalankan Engine Utama
             res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
             
-            # Bersihkan angka tampilan
+            # Bersihkan angka biar gak desimal
             res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
             
+            # Update State
             st.session_state.df_ds = res_ds
             st.session_state.df_selisih = res_selisih
             st.success("✅ Tahap 1 Selesai! Tabel selisih muncul di bawah.")
         else:
-            st.error("Upload File 1 & 2 dulu biar bisa dibandingin!")
+            st.error("Upload File 1 & 2 dulu biar bisa running, Cok!")
 
-    # --- TAMPILIN TABEL SELISIH DULU (Biar bisa lo download buat diisi) ---
+    # --- 3. LOGIC SETELAH PROSES AWAL JALAN ---
     if st.session_state.df_selisih is not None:
         st.subheader("⚠️ TABEL SELISIH (HASIL BANDING)")
         st.dataframe(st.session_state.df_selisih, use_container_width=True, hide_index=True)
         
-        # Tombol Download buat lo isi manual di luar
+        # Tombol Download buat lo isi manual di Excel/CSV
         csv_selisih = st.session_state.df_selisih.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Tabel Selisih untuk Diisi", csv_selisih, "Cek_Real_Manual.csv", "text/csv")
 
@@ -981,47 +975,66 @@ elif menu == "Compare RTO":
         if f4:
             try:
                 df_real_manual = pd.read_excel(f4) if f4.name.endswith('xlsx') else pd.read_csv(f4)
-                c_sku_m = [c for c in df_real_manual.columns if 'sku' in c.lower()][0]
-                c_qty_m = [c for c in df_real_manual.columns if 'real' in c.lower() or 'qty' in c.lower() or 'cek' in c.lower()][0]
                 
+                # Cari kolom SKU dan QTY secara cerdas
+                c_sku_m = [c for c in df_real_manual.columns if 'sku' in c.lower()][0]
+                c_qty_m = [c for c in df_real_manual.columns if any(x in c.lower() for x in ['real', 'qty', 'cek'])][0]
+                
+                # Ambil data yang Qty > 0
                 df_real_manual[c_qty_m] = pd.to_numeric(df_real_manual[c_qty_m], errors='coerce').fillna(0)
                 valid_data_real = df_real_manual[df_real_manual[c_qty_m] > 0].copy()
                 valid_data_real[c_sku_m] = valid_data_real[c_sku_m].astype(str).str.strip()
+                
                 mapping_real = valid_data_real.set_index(c_sku_m)[c_qty_m].to_dict()
                 
+                # Proses Overwrite
                 df_temp = st.session_state.data_app_permanen.copy()
                 c_sku_u = [c for c in df_temp.columns if 'sku' in c.lower()][0]
                 df_temp[c_sku_u] = df_temp[c_sku_u].astype(str).str.strip()
                 
-                # Filter SKU & Update Qty
+                # Filter SKU yang beneran ada di file lo (Biar sisa 231)
                 df_temp = df_temp[df_temp[c_sku_u].isin(mapping_real.keys())]
+                
+                # Update Qty-nya
                 c_qty_u = [c for c in df_temp.columns if 'qty' in c.lower()][0]
                 df_temp[c_qty_u] = df_temp[c_sku_u].map(mapping_real)
                 
                 st.session_state.df_ds_final = df_temp
-                st.info(f"✅ Data Ter-overwrite! {len(df_temp)} SKU siap ditabrak ke Draft.")
+                st.info(f"✅ Data Ter-overwrite! {len(df_temp)} SKU valid masuk sistem.")
             except Exception as e:
                 st.error(f"Error baca File 4: {e}")
 
-    # --- 4. LOGIC DRAFT JEZPRO ---
+    # --- 4. LOGIC DRAFT JEZPRO (AKHIR) ---
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
-        if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
+        
+        # Tombol Final Compare
+        btn_final = st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True)
+        
+        if btn_final:
+            # Pake data backdoor kalo ada, kalo gak ada pake data awal
             data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
             
             if data_siap is not None:
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
+                
+                # Compare ke Jezpro
                 hasil_draft = engine_compare_draft_vba(data_siap, df3_draft)
                 
-                col_qty_f = [c for c in hasil_draft.columns if 'qty' in c.lower() or 'ambil' in c.lower()][0]
+                # Filter Qty > 0 biar baris kosong gak ikut ke-print
+                col_qty_f = [c for c in hasil_draft.columns if any(x in c.lower() for x in ['qty', 'ambil'])][0]
                 hasil_draft = hasil_draft[pd.to_numeric(hasil_draft[col_qty_f], errors='coerce').fillna(0) > 0]
                 
                 total_vba = int(hasil_draft[col_qty_f].sum())
                 st.metric("Total Qty Akhir", f"{total_vba} Pcs")
+                
+                if total_vba == 231:
+                    st.success("🎯 MELEDAK! 231 PCS FIX!")
+                
                 st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
                 
                 csv = hasil_draft.to_csv(index=False).encode('utf-8')
                 st.download_button(f"📥 Download Draft {total_vba} Pcs", csv, f"Draft_Final_{total_vba}.csv", "text/csv")
             else:
-                st.error("Jalankan Proses Banding dulu!")
+                st.error("Jalankan Tombol 'JALANKAN PROSES BANDING' dulu!")
