@@ -54,7 +54,33 @@ st.markdown("""
         letter-spacing: 0.5px;
         line-height: 1.2;
     }
-
+/* Tombol Utama (Clean, Copy, Split) */
+    div.stButton > button {
+        background-color: #002b5b !important; /* Biru Navy Gelap */
+        color: white !important;
+        border-radius: 8px !important;
+        border: 2px solid #001a35 !important;
+        font-weight: bold !important;
+        height: 3em !important;
+        transition: 0.3s;
+    }
+    div.stButton > button:hover {
+        background-color: #004085 !important; /* Terang dikit pas di-hover */
+        border-color: #ffc107 !important; /* Border kuning pas di-hover */
+    }
+    /* Tombol Clear (Khusus Merah biar beda) */
+    div.stButton > button[key*="reset"], div.stButton > button[key*="clear"] {
+        background-color: #8b0000 !important; /* Merah Marun */
+        border-color: #4a0000 !important;
+    }
+    /* Kotak Upload File */
+    [data-testid="stFileUploader"] {
+        background-color: #f0f2f6;
+        border: 2px dashed #002b5b;
+        border-radius: 10px;
+        padding: 10px;
+    }
+    
     /* Metric Box */
     .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
     .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
