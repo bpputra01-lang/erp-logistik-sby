@@ -452,32 +452,179 @@ def menu_refill_withdraw():
             st.success(f"DONE! Refill: {len(outRef)} | Withdraw: {len(outWdr)}")
 
     # --- TABS FOR VIEW ---
-    t1, t2 = st.tabs(["SUMMARY REFILL", "SUMMARY WITHDRAW"])
+    import math
+import pandas as pd
+import streamlit as st
+import requests
+
+def menu_refill_withdraw():
+    st.markdown("""
+        <style>
+        div.stButton > button { width: 100% !important; background-color: #002b5b !important; color: white !important; font-weight: bold !important; border: 1px solid #ffc107 !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="hero-header"><h1>🔄 REFILL & WITHDRAW SYSTEM</h1></div>', unsafe_allow_html=True)
+
+    # --- 0. INIT STATE ---
+    for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
+        if key not in st.session_state: 
+            st.session_state[key] = None
+
+    # --- 1. UPLOAD SECTION ---
+    col1, col2 = st.columns(2)
+    with col1:
+        u_stock = st.file_uploader("📤 Upload All Stock SBY", type=["xlsx"])
+        if u_stock:
+            try:
+                st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
+                st.success("Stock Loaded: All Stock SBY")
+            except:
+                st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name=0)
+                st.warning("Pakai Sheet Pertama")
+
+    with col2:
+        u_trx = st.file_uploader("📤 Upload Data Transaksi", type=["xlsx"])
+        if u_trx:
+            try:
+                st.session_state.df_trx = pd.read_excel(u_trx, sheet_name="Data Transaksi")
+                st.success("Trx Loaded: Data Transaksi")
+            except:
+                st.session_state.df_trx = pd.read_excel(u_trx, sheet_name=0)
+                st.warning("Pakai Sheet Pertama")
+
+    st.divider()
+
+    # --- 2. GENERATE BUTTON ---
+    if st.button("🚀 GENERATE SUMMARY (ULTRA FAST)"):
+        if st.session_state.df_stock_sby is not None:
+            # Setup Dataframe & Clean Columns
+            df_s = st.session_state.df_stock_sby.copy()
+            df_s.columns = [i for i in range(len(df_s.columns))]
+            
+            df_t = st.session_state.df_trx.copy() if st.session_state.df_trx is not None else pd.DataFrame()
+            if not df_t.empty:
+                df_t.columns = [i for i in range(len(df_t.columns))]
+
+            # Dictionaries (Samain Persis VBA)
+            dictDC = {}; dict02 = {}; dictTotDC = {}; dictTot02 = {}
+            dictTotDCKLRAK = {}; dictBrand = {}; dictItem = {}; dictVar = {}
+            dictBinListDC = {}; dictBinList02 = {}; dictPreTotToko = {}
+            dictPreTotDCInbound = {}; dictBestValDC = {}; dictBestVal02 = {}
+            dictUniqueRef = {}; dictUniqueWdr = {}
+
+            # --- STEP 1: SCAN STOCK ---
+            for _, row in df_s.iterrows():
+                sku = str(row[2]).strip()
+                if sku == "" or sku == "nan" or sku == "SKU": continue
+
+                binLoc = str(row[1]).upper().strip()
+                qtySys = pd.to_numeric(row[9], errors='coerce') or 0
+
+                if sku not in dictBrand:
+                    dictBrand[sku] = str(row[3])
+                    dictItem[sku] = str(row[4])
+                    dictVar[sku] = str(row[5])
+
+                # AREA TOKO (02, TOKO, STORE, LT.2)
+                if any(x in binLoc for x in ["02", "TOKO", "STORE", "LT.2"]):
+                    dictPreTotToko[sku] = dictPreTotToko.get(sku, 0) + qtySys
+                    if qtySys > dictBestVal02.get(sku, -1):
+                        dictBestVal02[sku] = qtySys
+                        dict02[sku] = binLoc
+                    dictTot02[sku] = dictTot02.get(sku, 0) + qtySys
+                    dictBinList02[sku] = dictBinList02.get(sku, "") + binLoc + ", "
+
+                # AREA DC (DC, INBOUND)
+                elif any(x in binLoc for x in ["DC", "INBOUND"]):
+                    dictPreTotDCInbound[sku] = dictPreTotDCInbound.get(sku, 0) + qtySys
+                    
+                    if any(x in binLoc for x in ["KARANTINA", "DEFECT", "REJECT"]): continue
+
+                    if "KL" not in binLoc:
+                        if qtySys > dictBestValDC.get(sku, -1):
+                            dictBestValDC[sku] = qtySys
+                            dictDC[sku] = binLoc
+                        dictTotDC[sku] = dictTotDC.get(sku, 0) + qtySys
+                        dictBinListDC[sku] = dictBinListDC.get(sku, "") + binLoc + ", "
+                    
+                    dictTotDCKLRAK[sku] = dictTotDCKLRAK.get(sku, 0) + qtySys
+
+            outRef = []; outWdr = []
+
+            # --- STEP 2: LOGIKA TRANSAKSI ---
+            if not df_t.empty:
+                for _, row in df_t.iterrows():
+                    sku_t = str(row[1]).strip()
+                    if sku_t not in dictBrand: continue
+                    
+                    safeInvoice = str(row[0]).upper()
+                    safeLoc = str(row[6]).upper()
+
+                    # Jalur Refill via INV
+                    if "INV" in safeInvoice and not any(x in safeLoc for x in ["02", "TOKO"]):
+                        if sku_t not in dictUniqueRef:
+                            # VBA Logic: (dictTot02(sku) + dictTotDC(sku) <= 3)
+                            if (dictTot02.get(sku_t, 0) + dictTotDC.get(sku_t, 0) <= 3) and sku_t in dictDC:
+                                bestQty = dictBestValDC.get(sku_t, 0)
+                                if bestQty > 1:
+                                    outRef.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2]])
+                                    dictUniqueRef[sku_t] = True
+                    
+                    # Jalur Withdraw via Trx
+                    elif "INV" not in safeInvoice and any(x in safeLoc for x in ["02", "TOKO"]):
+                        if sku_t not in dictUniqueWdr:
+                            if dictTotDCKLRAK.get(sku_t, 0) <= 3 and sku_t in dict02:
+                                bestQty = dictBestVal02.get(sku_t, 0)
+                                if bestQty > 1:
+                                    outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dict02[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotDCInbound.get(sku_t, 0), dictBinList02.get(sku_t, "")[:-2]])
+                                    dictUniqueWdr[sku_t] = True
+
+            # --- STEP 3: AUTO-BALANCE (FORCE) ---
+            for sku_k in dictBrand.keys():
+                if sku_k not in dictUniqueRef:
+                    if dictTotDC.get(sku_k, 0) > 3 and dictPreTotToko.get(sku_k, 0) == 0 and sku_k in dictDC:
+                        bestQty = dictBestValDC.get(sku_k, 0)
+                        outRef.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dictDC[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinListDC.get(sku_k, "")[:-2]])
+                        dictUniqueRef[sku_k] = True
+
+                if sku_k not in dictUniqueWdr:
+                    if dictTot02.get(sku_k, 0) > 3 and dictPreTotDCInbound.get(sku_k, 0) == 0 and sku_k in dict02:
+                        bestQty = dictBestVal02.get(sku_k, 0)
+                        outWdr.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dict02[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinList02.get(sku_k, "")[:-2]])
+                        dictUniqueWdr[sku_k] = True
+
+            st.session_state.summary_refill = pd.DataFrame(outRef, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN 02", "BIN LAIN"])
+            st.session_state.summary_withdraw = pd.DataFrame(outWdr, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN DC", "BIN LAIN"])
+            st.success(f"DONE! Refill: {len(outRef)} | Withdraw: {len(outWdr)}")
+        else:
+            st.error("Upload Data Stock Dulu Cok!")
+
+    # --- 3. TABS SECTION ---
+    t1, t2, t3 = st.tabs(["📦 Summary Refill", "📤 Summary Withdraw", "☁️ Upload Cloud"])
+
     with t1:
         if st.session_state.summary_refill is not None:
-            st.dataframe(st.session_state.summary_refill)
+            st.dataframe(st.session_state.summary_refill, use_container_width=True)
+
     with t2:
         if st.session_state.summary_withdraw is not None:
-            st.dataframe(st.session_state.summary_withdraw)
+            st.dataframe(st.session_state.summary_withdraw, use_container_width=True)
 
     with t3:
         if st.session_state.summary_refill is not None:
-            st.subheader(f"📦 SUMMARY REFILL ({len(st.session_state.summary_refill)})")
-            st.dataframe(st.session_state.summary_refill, use_container_width=True)
-            if st.button("☁️ UPLOAD REFILL TO CLOUD"):
+            if st.button("🚀 Upload Refill to Google"):
                 data_json = st.session_state.summary_refill.astype(str).values.tolist()
                 url = "https://script.google.com/macros/s/AKfycbxoZjGlZlpCRSoYmAkJPOOx50_Xxp0VRTadSKNKCnZD9-WbdAgcUFIfIIukWkTt5XpT/exec?sheet=REFILL%20STOCK"
-                res = requests.post(url, json=data_json)
-                st.toast("REFILL UPLOADED!", icon="✅")
+                requests.post(url, json=data_json)
+                st.toast("REFILL UPLOADED!")
 
         if st.session_state.summary_withdraw is not None:
-            st.subheader(f"📤 SUMMARY WITHDRAW ({len(st.session_state.summary_withdraw)})")
-            st.dataframe(st.session_state.summary_withdraw, use_container_width=True)
-            if st.button("☁️ UPLOAD WITHDRAW TO CLOUD"):
+            if st.button("🚀 Upload Withdraw to Google"):
                 data_json = st.session_state.summary_withdraw.astype(str).values.tolist()
                 url = "https://script.google.com/macros/s/AKfycbxoZjGlZlpCRSoYmAkJPOOx50_Xxp0VRTadSKNKCnZD9-WbdAgcUFIfIIukWkTt5XpT/exec?sheet=WITHDRAW%20STOCK"
-                res = requests.post(url, json=data_json)
-                st.toast("WITHDRAW UPLOADED!", icon="✅")
+                requests.post(url, json=data_json)
+                st.toast("WITHDRAW UPLOADED!")
 # --- ELIF NYA ---
 # elif menu == "Refill & Withdraw":
 #     menu_refill_withdraw()
