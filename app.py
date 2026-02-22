@@ -972,27 +972,37 @@ elif menu == "Compare RTO":
             st.error("Upload dulu file DS RTO dan APPSHEET RTO-nya, Cok!")
 
     # --- 3. LOGIC REFRESH (DS & SELISIH) ---
+# --- 3. LOGIC REFRESH (DS & SELISIH) ---
     if st.session_state.df_selisih is not None:
         st.divider()
         st.subheader("⚠️ SHEET SELISIH")
-        st.info("💡 Isi hasil cek fisik di kolom **HASIL CEK REAL**, lalu klik Refresh Data di bawah.")
         
-        # --- IMPROVED EDITOR: Biar gak ada tulisan None & Input Langsung Muncul ---
-        edited_selisih = st.data_editor(
-            st.session_state.df_selisih, 
-            use_container_width=True, 
-            hide_index=True,
-            column_config={
-                "HASIL CEK REAL": st.column_config.NumberColumn(
-                    "HASIL CEK REAL",
-                    help="Masukkan angka hasil cek fisik (Gudang)",
-                    min_value=0,
-                    step=1,
-                    format="%d", # Menghilangkan desimal .00
-                )
-            },
-            disabled=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN'] # Kunci kolom lain
-        )
+        # --- FIX UTAMA: Paksa data jadi DataFrame murni dengan tipe Integer ---
+        # Ini supaya gak ada 'None' dan kotak merah pas diketik
+        df_for_editor = st.session_state.df_selisih.copy()
+        for col in df_for_editor.columns:
+            if col == 'HASIL CEK REAL':
+                df_for_editor[col] = pd.to_numeric(df_for_editor[col], errors='coerce').fillna(0).astype(int)
+            else:
+                df_for_editor[col] = df_for_editor[col].astype(str).replace('nan', '')
+
+        # Gunakan container biar stabil
+        with st.container():
+            edited_selisih = st.data_editor(
+                df_for_editor, 
+                use_container_width=True, 
+                hide_index=True,
+                key="editor_rto_final", # GANTI KEY TIAP KALI REVISI biar cache ilang
+                column_config={
+                    "HASIL CEK REAL": st.column_config.NumberColumn(
+                        "HASIL CEK REAL",
+                        min_value=0,
+                        step=1,
+                        format="%d",
+                    )
+                },
+                disabled=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN'] 
+            )
         
         if st.button("🔄 REFRESH DATA (Update DS RTO)", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
