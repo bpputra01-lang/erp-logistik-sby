@@ -1013,50 +1013,53 @@ elif menu == "Compare RTO":
                 st.error("Data Appsheet hilang dari memori. Silakan upload ulang.")
 
     # --- 4. LOGIC DRAFT JEZPRO (SEKARANG SUDAH MASUK DALAM ELIF MENU) ---
-    # --- 4. LOGIC DRAFT JEZPRO ---
+    # --- 4. LOGIC DRAFT JEZPRO (VBA VALID MODE) ---
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO COMPARE (VBA VALID MODE)")
         
         if st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
-                # Baca file f3
+                # 1. Baca file f3
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # JALANKAN COMPARE
-                hasil_draft = engine_compare_draft_vba(st.session_state.data_app_permanen, df3_draft)
+                # 2. JALANKAN COMPARE (Raw Data dari ERP vs Appsheet)
+                hasil_draft_raw = engine_compare_draft_vba(st.session_state.data_app_permanen, df3_draft)
                 
-                # --- FIX KEYERROR 'QTY' (Mencari kolom qty secara cerdas) ---
-                # Mencari nama kolom yang ada unsur kata 'qty' (case-insensitive)
-                col_qty_list = [c for c in hasil_draft.columns if 'qty' in c.lower()]
+                # 3. CARI KOLOM QTY SECARA DINAMIS
+                col_qty_list = [c for c in hasil_draft_raw.columns if 'qty' in c.lower()]
                 
                 if col_qty_list:
-                    kolom_qty_fix = col_qty_list[0] # Ambil kolom qty yang ketemu pertama
+                    kolom_qty_fix = col_qty_list[0]
+                    
+                    # --- KUNCINYA DI SINI: FILTER DATA ---
+                    # Kita cuma ambil baris yang QTY-nya lebih dari 0 (Barang yang beneran di-scan)
+                    # Baris "Hantu" dari ERP (yang Qty-nya 0) bakal dibuang otomatis
+                    hasil_draft = hasil_draft_raw[hasil_draft_raw[kolom_qty_fix] > 0].copy()
+                    
+                    # 4. HITUNG TOTAL TERFILTER (Harusnya dapet 231)
                     total_vba = hasil_draft[kolom_qty_fix].sum()
                     
-                    st.metric("Total Qty Valid (VBA)", f"{total_vba} Pcs")
+                    st.metric("Total Qty Valid (VBA MODE)", f"{total_vba} Pcs")
                     
                     if total_vba == 231:
-                        st.success("✅ ANGKA VALID 231! Siap hajar ERP!")
+                        st.success("✅ FIX 231 PCS! Data ERP Hantu sudah dibuang.")
                     else:
-                        st.info(f"Total Qty Berdasarkan Scan: {total_vba}")
+                        st.warning(f"Total: {total_vba} Pcs (Beda dari 231, cek scan-an lo!)")
                     
+                    # Tampilan Tabel yang sudah bersih
                     st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
                     
-                    # Download Button dengan Nama File Dinamis
+                    # 5. DOWNLOAD BUTTON (Data yang sudah valid 231)
                     csv = hasil_draft.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label=f"📥 Download Draft Valid ({total_vba} Pcs)",
                         data=csv,
-                        file_name=f"Draft_RTO_Fix_{total_vba}_pcs.csv",
+                        file_name=f"Draft_RTO_VBA_Final_{total_vba}.csv",
                         mime="text/csv",
                         use_container_width=True
                     )
                 else:
-                    # Kalau kolom QTY beneran gak ada di hasil engine lo
-                    st.error("Jancok! Kolom 'QTY' gak ketemu di data. Tolong cek nama kolom di file Draft lo!")
-                    st.write("Kolom yang terdeteksi:", list(hasil_draft.columns))
+                    st.error("Kolom 'QTY' gak ketemu. Cek nama kolom di file Draft lo!")
             else:
                 st.warning("Jalankan Proses (DS vs APPSHEET) dulu biar datanya ke-load!")
-
-# --- TUTUP ELIF MENU (Pastikan indentasi menu berikutnya sejajar dengan elif Compare RTO) ---
