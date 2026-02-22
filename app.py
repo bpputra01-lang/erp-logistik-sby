@@ -739,6 +739,13 @@ with st.sidebar:
     st.divider()
     st.caption("ERP Logistic Surabaya v2.1")
 
+    # Contoh logika di bagian pemilihan menu
+if menu_sebelumnya != menu_sekarang:
+    # Hapus data tabel biar pas balik lagi kondisinya kosong
+    if 'hasil_draft' in st.session_state:
+        del st.session_state['hasil_draft']
+    # Tambahkan variabel lain yang mau direset disini
+
 # --- MENU ROUTING ---
 if menu == "Dashboard Overview":
     st.markdown('<div class="hero-header"><h1>DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
