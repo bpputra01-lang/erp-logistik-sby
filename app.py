@@ -1032,7 +1032,7 @@ elif menu == "Compare RTO":
             else:
                 st.error("Jalankan Proses Awal (Tombol 1) dulu, Cok!")
 
-elif menu == "FDR UPDATE":
+elif menu == "FDR Update"
         st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST PROCESSOR</h1></div>', unsafe_allow_html=True)
 
         # --- 0. INISIALISASI SESSION STATE ---
