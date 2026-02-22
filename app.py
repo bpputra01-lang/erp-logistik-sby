@@ -931,23 +931,12 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (BACKDOOR MODE)</h1></div>', unsafe_allow_html=True)
-    
-    # --- 1. SESSION STATE INITIALIZATION ---
-    if 'df_ds' not in st.session_state: st.session_state.df_ds = None
-    if 'df_selisih' not in st.session_state: st.session_state.df_selisih = None
-    if 'data_app_permanen' not in st.session_state: st.session_state.data_app_permanen = None
-    if 'df_ds_final' not in st.session_state: st.session_state.df_ds_final = None
+   # --- 1. SLOT UPLOAD TAMBAHAN (BACKDOOR) ---
+    st.sidebar.markdown("---")
+    f4 = st.sidebar.file_uploader("📥 4. UPLOAD HASIL CEK REAL (Backdoor)", type=['xlsx','csv'], key="f4")
 
-    # UI Kolom Upload
-    c1, c2, c3 = st.columns(3)
-    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1")
-    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2")
-    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3")
-    
-    # --- TOMBOL PROSES AWAL (INI YANG ILANG TADI, COK) ---
-    st.divider()
-    if st.button("🚀 JALANKAN PROSES BANDING (DS vs APPSHEET)", use_container_width=True):
+    # --- 2. JALANKAN PROSES AWAL ---
+    if st.button("🚀 JALANKAN PROSES AWAL (DS VS APPSHEET)", use_container_width=True):
         if f1 and f2:
             df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
             df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
@@ -960,68 +949,78 @@ elif menu == "Compare RTO":
             
             st.session_state.df_ds = res_ds
             st.session_state.df_selisih = res_selisih
-            st.success("✅ Tahap 1 Selesai! Tabel selisih muncul di bawah.")
+            st.success("Proses Awal Selesai! Data siap di-overwrite via Backdoor atau Refresh.")
         else:
-            st.error("Upload File 1 & 2 dulu biar bisa dibandingin!")
+            st.error("Upload File 1 & 2 dulu, Cok!")
 
-    # --- TAMPILIN TABEL SELISIH DULU (Biar bisa lo download buat diisi) ---
-    if st.session_state.df_selisih is not None:
-        st.subheader("⚠️ TABEL SELISIH (HASIL BANDING)")
-        st.dataframe(st.session_state.df_selisih, use_container_width=True, hide_index=True)
+    # --- 3. LOGIC BACKDOOR (OVERWRITE VIA FILE UPLOAD 4) ---
+    if f4 and st.session_state.data_app_permanen is not None:
+        st.info("🛠️ BACKDOOR ACTIVE: Menggunakan data dari File Cek Real lo.")
+        df_real_manual = pd.read_excel(f4) if f4.name.endswith('xlsx') else pd.read_csv(f4)
         
-        # Tombol Download buat lo isi manual di luar
-        csv_selisih = st.session_state.df_selisih.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Tabel Selisih untuk Diisi", csv_selisih, "Cek_Real_Manual.csv", "text/csv")
+        # Cari kolom SKU dan QTY secara dinamis di file upload-an ke-4
+        c_sku_m = [c for c in df_real_manual.columns if 'sku' in c.lower()][0]
+        c_qty_m = [c for c in df_real_manual.columns if 'real' in c.lower() or 'qty' in c.lower() or 'cek' in c.lower()][0]
+        
+        # Bersihkan data: ambil yang Qty > 0 saja
+        df_real_manual[c_qty_m] = pd.to_numeric(df_real_manual[c_qty_m], errors='coerce').fillna(0)
+        valid_data_real = df_real_manual[df_real_manual[c_qty_m] > 0].copy()
+        valid_data_real[c_sku_m] = valid_data_real[c_sku_m].astype(str).str.strip()
+        
+        # Buat mapping dictionary
+        mapping_real = valid_data_real.set_index(c_sku_m)[c_qty_m].to_dict()
+        
+        # OVERWRITE DATA UTAMA
+        df_final_backdoor = st.session_state.data_app_permanen.copy()
+        c_sku_u = [c for c in df_final_backdoor.columns if 'sku' in c.lower()][0]
+        df_final_backdoor[c_sku_u] = df_final_backdoor[c_sku_u].astype(str).str.strip()
+        
+        # FILTER: HANYA ambil SKU yang ada di file cek real lo
+        df_final_backdoor = df_final_backdoor[df_final_backdoor[c_sku_u].isin(mapping_real.keys())]
+        
+        # Update nilainya
+        c_qty_u = [c for c in df_final_backdoor.columns if 'qty' in c.lower()][0]
+        df_final_backdoor[c_qty_u] = df_final_backdoor[c_sku_u].map(mapping_real)
+        
+        # Simpan ke state khusus backdoor
+        st.session_state.df_ds_final = df_final_backdoor
+        st.success(f"✅ Backdoor Sukses! {len(df_final_backdoor)} SKU siap ditabrakkan ke Draft.")
 
-        st.divider()
-        st.subheader("🛠️ JALUR BACKDOOR (OVERWRITE)")
-        f4 = st.file_uploader("📥 4. UPLOAD HASIL CEK REAL YANG SUDAH DIISI", type=['xlsx','csv'], key="f4")
-
-        # Logic Overwrite jika file 4 di-upload
-        if f4:
-            try:
-                df_real_manual = pd.read_excel(f4) if f4.name.endswith('xlsx') else pd.read_csv(f4)
-                c_sku_m = [c for c in df_real_manual.columns if 'sku' in c.lower()][0]
-                c_qty_m = [c for c in df_real_manual.columns if 'real' in c.lower() or 'qty' in c.lower() or 'cek' in c.lower()][0]
-                
-                df_real_manual[c_qty_m] = pd.to_numeric(df_real_manual[c_qty_m], errors='coerce').fillna(0)
-                valid_data_real = df_real_manual[df_real_manual[c_qty_m] > 0].copy()
-                valid_data_real[c_sku_m] = valid_data_real[c_sku_m].astype(str).str.strip()
-                mapping_real = valid_data_real.set_index(c_sku_m)[c_qty_m].to_dict()
-                
-                df_temp = st.session_state.data_app_permanen.copy()
-                c_sku_u = [c for c in df_temp.columns if 'sku' in c.lower()][0]
-                df_temp[c_sku_u] = df_temp[c_sku_u].astype(str).str.strip()
-                
-                # Filter SKU & Update Qty
-                df_temp = df_temp[df_temp[c_sku_u].isin(mapping_real.keys())]
-                c_qty_u = [c for c in df_temp.columns if 'qty' in c.lower()][0]
-                df_temp[c_qty_u] = df_temp[c_sku_u].map(mapping_real)
-                
-                st.session_state.df_ds_final = df_temp
-                st.info(f"✅ Data Ter-overwrite! {len(df_temp)} SKU siap ditabrak ke Draft.")
-            except Exception as e:
-                st.error(f"Error baca File 4: {e}")
-
-    # --- 4. LOGIC DRAFT JEZPRO ---
+    # --- 4. LOGIC DRAFT JEZPRO (THE FINAL BOSS) ---
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
+        
         if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
-            data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
+            # Prioritas: 1. Data Backdoor (File 4), 2. Data DS (Proses Awal)
+            data_siap = None
+            if 'df_ds_final' in st.session_state:
+                data_siap = st.session_state.df_ds_final
+            elif st.session_state.df_ds is not None:
+                data_siap = st.session_state.df_ds
             
             if data_siap is not None:
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
+                
+                # Jalankan Compare ke Draft Jezpro
                 hasil_draft = engine_compare_draft_vba(data_siap, df3_draft)
                 
+                # Filter Qty > 0 di hasil akhir biar beneran 231
                 col_qty_f = [c for c in hasil_draft.columns if 'qty' in c.lower() or 'ambil' in c.lower()][0]
                 hasil_draft = hasil_draft[pd.to_numeric(hasil_draft[col_qty_f], errors='coerce').fillna(0) > 0]
                 
                 total_vba = int(hasil_draft[col_qty_f].sum())
-                st.metric("Total Qty Akhir", f"{total_vba} Pcs")
+                st.metric("Total Qty Valid (FINAL)", f"{total_vba} Pcs")
+                
+                if total_vba == 231:
+                    st.success("🎯 MELEDAK COK! 231 PCS FIX!")
+                else:
+                    st.warning(f"Hasil: {total_vba} Pcs. Masih belum 231? Cek isi File 4 lo.")
+                
                 st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
                 
+                # Download Button
                 csv = hasil_draft.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download Draft {total_vba} Pcs", csv, f"Draft_Final_{total_vba}.csv", "text/csv")
+                st.download_button(f"📥 Download Draft {total_vba} Pcs", csv, f"Draft_RTO_Final_{total_vba}.csv", "text/csv", use_container_width=True)
             else:
-                st.error("Jalankan Proses Banding dulu!")
+                st.error("Jalankan Proses Awal dulu atau Upload File Cek Real!")
