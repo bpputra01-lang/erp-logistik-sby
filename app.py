@@ -80,7 +80,24 @@ st.markdown("""
         border-radius: 10px;
         padding: 10px;
     }
-    
+    /* 1. Hilangkan gap antar kolom di container tombol */
+    [data-testid="column"] {
+        padding-left: 0px !important;
+        padding-right: 2px !important; /* Kasih jarak tipis banget biar gak dempetan */
+    }
+
+    /* 2. Styling Tombol biar seragam dan kontras */
+    div.stButton > button {
+        width: 100% !important;        /* Tombol dipaksa penuhi lebar kolom */
+        background-color: #002b5b !important; 
+        color: white !important;
+        border-radius: 4px !important; /* Gak usah terlalu bulat biar kaku kek pro */
+        border: 1px solid #001a35 !important;
+        font-weight: bold !important;
+        font-size: 0.9em !important;   /* Kecilin font dikit biar muat */
+        white-space: nowrap !important; /* Biar teks gak turun ke bawah */
+        padding: 0px 5px !important;
+    }
     /* Metric Box */
     .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
     .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
