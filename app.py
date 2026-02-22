@@ -962,11 +962,12 @@ elif menu == "Compare RTO":
         else:
             st.error("Upload dulu file DS RTO dan APPSHEET RTO-nya, Cok!")
 
-    # --- 3. LOGIC REFRESH (DS & SELISIH) ---
+   # --- 3. LOGIC REFRESH (DS & SELISIH) ---
     if st.session_state.df_selisih is not None:
         st.divider()
         st.subheader("⚠️ SHEET SELISIH")
         
+        # Penyiapan data untuk editor
         df_for_editor = st.session_state.df_selisih.copy()
         for col in df_for_editor.columns:
             if col == 'HASIL CEK REAL':
@@ -974,12 +975,11 @@ elif menu == "Compare RTO":
             else:
                 df_for_editor[col] = df_for_editor[col].astype(str).replace('nan', '')
 
-        # Tampilkan editor
         edited_selisih = st.data_editor(
             df_for_editor, 
             use_container_width=True, 
             hide_index=True,
-            key="editor_rto_final_vFIXED", 
+            key="editor_v_final_fix", 
             column_config={
                 "HASIL CEK REAL": st.column_config.NumberColumn(
                     "HASIL CEK REAL", min_value=0, step=1, format="%d",
@@ -988,78 +988,73 @@ elif menu == "Compare RTO":
             disabled=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN'] 
         )
         
-        # Tombol Refresh (Satu saja, sejajar dengan edited_selisih)
-        if st.button("🔄 REFRESH DATA (Update DS RTO)", use_container_width=True):
+        # --- TOMBOL REFRESH YANG SEBENARNYA ---
+        if st.button("🔄 REFRESH DATA & BERSIHKAN HANTU", use_container_width=True):
             if st.session_state.data_app_permanen is not None:
+                # 1. Ambil copy data DS
                 df_ds_new = st.session_state.df_ds.copy()
                 edited_selisih['SKU'] = edited_selisih['SKU'].astype(str).str.strip()
+                
+                # 2. Ambil inputan "HASIL CEK REAL" dari user
                 dict_real = edited_selisih.groupby('SKU')['HASIL CEK REAL'].sum().to_dict()
                 
+                # 3. Update QTY SCAN di data utama
                 for sku, val in dict_real.items():
                     df_ds_new.loc[df_ds_new['SKU'] == sku, 'QTY SCAN'] = val
                 
-                # Paksa Qty Scan jadi angka & bersihkan
+                # 4. KUNCI: Buang semua yang Qty-nya 0 atau Blank!
                 df_ds_new['QTY SCAN'] = pd.to_numeric(df_ds_new['QTY SCAN'], errors='coerce').fillna(0)
+                df_ds_new = df_ds_new[df_ds_new['QTY SCAN'] > 0] # Hanya simpan yang ada isinya
                 
-                # Jalankan engine compare utama
+                # 5. Jalankan ulang engine compare dengan data bersih
                 res_ds, res_selisih = engine_ds_rto_vba_total(df_ds_new, st.session_state.data_app_permanen)
                 res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
                 
-                # Simpan ke session state
+                # 6. Update Session State (Sekarang isinya cuma yang valid)
                 st.session_state.df_ds = res_ds
                 st.session_state.df_selisih = res_selisih
-                st.success("Data Berhasil di-Refresh! Silakan lanjut ke Draft Jezpro di bawah.")
+                
+                st.success(f"Data Berhasil di-Refresh! Sisa item: {len(res_ds)} baris.")
                 st.rerun()
-            else:
-                st.error("Data Appsheet hilang. Upload ulang file 2.")
 
-    # --- 4. LOGIC DRAFT JEZPRO ---
+    # --- 4. LOGIC DRAFT JEZPRO (ANTI 262) ---
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO COMPARE (VBA VALID MODE)")
         
         if st.button("🔥 RUN COMPARE TO DRAFT", use_container_width=True):
+            # Cek apakah sudah di-refresh (df_ds harus sudah terfilter)
             if st.session_state.df_ds is not None:
-                # Baca Draft Jezpro
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # AMBIL DATA DARI DF_DS (Hasil Refresh)
-                df_siap = st.session_state.df_ds.copy()
-                df_siap['QTY SCAN'] = pd.to_numeric(df_siap['QTY SCAN'], errors='coerce').fillna(0)
+                # Kita HANYA pake df_ds yang udah didepak hantunya pas Refresh tadi
+                df_siap_hajar = st.session_state.df_ds.copy()
                 
-                # FILTER: Hanya yang di-scan > 0 (Ini yang bikin hasilnya 231)
-                df_siap = df_siap[df_siap['QTY SCAN'] > 0]
+                # Jalankan compare ke file Jezpro
+                hasil_draft = engine_compare_draft_vba(df_siap_hajar, df3_draft)
                 
-                # Jalankan Compare Draft
-                hasil_draft = engine_compare_draft_vba(df_siap, df3_draft)
-                
-                # Cari kolom QTY secara cerdas
+                # Cari kolom Qty
                 col_qty = [c for c in hasil_draft.columns if 'qty' in c.lower() or 'ambil' in c.lower()]
-                
                 if col_qty:
-                    k_fix = col_qty[0]
-                    # Filter akhir biar baris 0 (item titipan ERP) hilang
-                    hasil_draft = hasil_draft[hasil_draft[k_fix] > 0]
-                    total_vba = int(hasil_draft[k_fix].sum())
+                    kol_fix = col_qty[0]
+                    # Filter akhir buat mastiin gak ada baris kosong nyelip dari Jezpro
+                    hasil_draft = hasil_draft[hasil_draft[kol_fix] > 0]
                     
-                    # TAMPILKAN HASIL KERAMAT 231
-                    st.metric("Total Qty Valid (VBA)", f"{total_vba} Pcs")
+                    total_akhir = int(hasil_draft[kol_fix].sum())
                     
-                    if total_vba == 231:
-                        st.success("✅ FIX 231 PCS! Data sudah bersih dari SKU hantu.")
+                    # Tampilan Hasil Akhir
+                    st.metric("Total Qty Valid (FIX)", f"{total_akhir} Pcs")
+                    
+                    if total_akhir == 231:
+                        st.success("✅ MANTAP! SUDAH 231 PCS. Gak tai lagi kan?")
+                    else:
+                        st.warning(f"Total: {total_akhir} Pcs. (Cek lagi inputan lo!)")
                     
                     st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
                     
-                    # Tombol Download
                     csv = hasil_draft.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label=f"📥 Download Draft Valid ({total_vba} Pcs)",
-                        data=csv,
-                        file_name=f"Draft_RTO_Fix_{total_vba}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
+                    st.download_button(f"📥 Download Draft Final ({total_akhir} Pcs)", csv, f"Draft_RTO_Fix.csv", "text/csv", use_container_width=True)
                 else:
-                    st.error("Kolom 'QTY' gak ketemu di file Draft lo!")
+                    st.error("Kolom Qty gak ketemu di file lo!")
             else:
-                st.warning("Jalankan 'PROSES AWAL' dulu dan pastikan sudah klik 'REFRESH DATA'.")
+                st.error("Wajib klik 'REFRESH DATA' dulu biar item hantunya kehapus!")
