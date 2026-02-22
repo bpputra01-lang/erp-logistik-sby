@@ -226,115 +226,149 @@ import numpy as np
 import streamlit as st
 
 
-def engine_ds_rto_vba_total(df_ds, df_app):
-    # --- 1. LOAD & CLEAN DATA APPSHEET ---
-    df_app_vba = df_app.copy()
-    df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
-    
-    # Filter Status sesuai standar VBA (DONE & KURANG AMBIL)
-    if '2' in df_app_vba.columns:
-        mask_status = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
-        df_filtered = df_app_vba[mask_status].copy()
-    else:
-        df_filtered = df_app_vba.copy()
-    
-    # Hitung akumulasi QTY per SKU dari Appsheet
-    dict_qty = {}
-    for _, row in df_filtered.iterrows():
-        sku = str(row.get('9', '')).strip()
-        if sku in ["", "nan", "0", "None"]: 
-            sku = str(row.get('15', '')).strip()
+import streamlit as st
+import pandas as pd
+import numpy as np
+from io import BytesIO
+
+def menu_rto_vba_mode():
+    st.markdown('<div class="hero-header"><h1>🚀 RTO GATEWAY - VBA EMULATOR</h1></div>', unsafe_allow_html=True)
+
+    # --- 0. INISIALISASI SESSION STATE (DATABASE LOKAL ERP) ---
+    # Ini pengganti Sheet di Excel
+    if "ws_ds" not in st.session_state: st.session_state.ws_ds = pd.DataFrame(columns=["SKU", "QTY SCAN", "QTY AMBIL", "NOTE"])
+    if "ws_app" not in st.session_state: st.session_state.ws_app = pd.DataFrame(columns=[f"Col {i+1}" for i in range(18)])
+    if "ws_draft" not in st.session_state: st.session_state.ws_draft = pd.DataFrame(columns=[f"Draft {i+1}" for i in range(9)])
+    if "ws_selisih" not in st.session_state: st.session_state.ws_selisih = None
+    if "ws_new_draft" not in st.session_state: st.session_state.ws_new_draft = None
+
+    # --- 1. TAMPILAN TABS (SHEET EXCEL) ---
+    t1, t2, t3, t4, t5 = st.tabs(["📥 INPUT DATA", "📊 DS RTO", "⚠️ SELISIH", "📝 DRAFT JEZPRO", "📦 NEW DRAFT"])
+
+    # ---------------------------------------------------------
+    # TAB 1: INPUT DATA (UPLOAD & PASTE)
+    # ---------------------------------------------------------
+    with t1:
+        st.subheader("📋 Sheet: Input Master")
         
-        if sku not in ["", "nan", "0", "None"]:
-            q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
-            q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
-            dict_qty[sku] = dict_qty.get(sku, 0) + (q13 + q17)
+        # Action Buttons (Macros Toolbar)
+        col_btn = st.columns(4)
+        btn_compare = col_btn[0].button("🔍 DS RTO COMPARE", use_container_width=True)
+        btn_refresh = col_btn[1].button("🔄 REFRESH DATA", use_container_width=True)
+        btn_generate = col_btn[2].button("⚡ GEN NEW DRAFT", use_container_width=True)
+        btn_reset = col_btn[3].button("🗑️ RESET TOTAL", use_container_width=True, type="primary")
 
-    # --- 2. LOGIKA UTAMA DS RTO ---
-    df_ds_res = df_ds.copy()
-    if len(df_ds_res.columns) >= 2:
-        orig_cols = list(df_ds_res.columns)
-        df_ds_res.columns = ['SKU', 'QTY SCAN'] + orig_cols[2:]
-    
-    df_ds_res['SKU'] = df_ds_res['SKU'].astype(str).str.strip()
-    df_ds_res['QTY AMBIL'] = df_ds_res['SKU'].map(dict_qty).fillna(0)
-    
-    def get_note(row):
-        scan = pd.to_numeric(row.get('QTY SCAN', 0), errors='coerce') or 0
-        ambil = pd.to_numeric(row.get('QTY AMBIL', 0), errors='coerce') or 0
-        if scan > ambil: return "KELEBIHAN AMBIL"
-        elif scan < ambil: return "KURANG AMBIL"
-        else: return "SESUAI"
-    
-    df_ds_res['NOTE'] = df_ds_res.apply(get_note, axis=1)
-
-    # --- 3. LOGIKA TAMBAHAN (SKU ADA DI APPSHEET TAPI TIDAK DI DS) ---
-    sku_di_ds = set(df_ds_res['SKU'].unique())
-    list_tambahan = []
-    
-    for sku_app, qty_total in dict_qty.items():
-        if sku_app not in sku_di_ds:
-            list_tambahan.append({
-                'SKU': sku_app,
-                'QTY SCAN': 0,
-                'QTY AMBIL': qty_total,
-                'NOTE': "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
-            })
-    
-    if list_tambahan:
-        df_ds_res = pd.concat([df_ds_res, pd.DataFrame(list_tambahan)], ignore_index=True)
-
-    # --- 4. LOGIKA SHEET SELISIH (HASIL CEK REAL = BLANK) ---
-    results_selisih = []
-    mismatch_df = df_ds_res[df_ds_res['NOTE'] != 'SESUAI'].copy()
-    
-    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
-    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
-
-    for _, row in mismatch_df.iterrows():
-        sku, q_scan, q_ambil, note = row['SKU'], row['QTY SCAN'], row['QTY AMBIL'], row['NOTE']
+        st.divider()
         
-        mask_app = (c9 == sku) | (c15 == sku)
-        found_rows = df_app_vba[mask_app]
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.write("**Sheet: DS RTO**")
+            up_ds = st.file_uploader("Upload DS", type=['xlsx','csv'], key="u1")
+            if up_ds: st.session_state.ws_ds = pd.read_excel(up_ds).iloc[:, :4]
+            st.session_state.ws_ds = st.data_editor(st.session_state.ws_ds, num_rows="dynamic", key="ed_ds", hide_index=True)
+            
+        with c2:
+            st.write("**Sheet: APPSHEET RTO**")
+            up_app = st.file_uploader("Upload Appsheet", type=['xlsx','csv'], key="u2")
+            if up_app: st.session_state.ws_app = pd.read_excel(up_app).iloc[:, :18]
+            st.session_state.ws_app = st.data_editor(st.session_state.ws_app, num_rows="dynamic", key="ed_app", hide_index=True)
+
+        with c3:
+            st.write("**Sheet: DRAFT RTO JEZPRO**")
+            up_dr = st.file_uploader("Upload Draft", type=['xlsx','csv'], key="u3")
+            if up_dr: st.session_state.ws_draft = pd.read_excel(up_dr).iloc[:, :9]
+            st.session_state.ws_draft = st.data_editor(st.session_state.ws_draft, num_rows="dynamic", key="ed_dr", hide_index=True)
+
+    # ---------------------------------------------------------
+    # LOGIKA MACRO: DS_RTO_QTY_AMBIL_ULTRAFAST
+    # ---------------------------------------------------------
+    if btn_compare:
+        df_ds = st.session_state.ws_ds.copy()
+        df_app = st.session_state.ws_app.copy()
         
-        if not found_rows.empty:
-            for _, r_app in found_rows.iterrows():
-                for b_idx, q_idx in [('12','13'), ('16','17')]:
-                    bin_val = str(r_app.get(b_idx, '')).strip()
-                    qty_bin = pd.to_numeric(r_app.get(q_idx, 0), errors='coerce') or 0
-                    
-                    if bin_val not in ["", "nan", "-", "0", "None"] and qty_bin > 0:
-                        # ISI DENGAN np.nan BIAR BLANK/KOSONG DI STREAMLIT
-                        results_selisih.append([sku, q_scan, q_ambil, note, bin_val, qty_bin, np.nan])
-        else:
-            # Jika SKU memang tidak ada di Appsheet sama sekali
-            results_selisih.append([sku, q_scan, q_ambil, note, "-", 0, np.nan])
+        if not df_ds.empty and not df_app.empty:
+            # Standarisasi Data
+            df_ds.columns = ["SKU", "QTY_SCAN", "QTY_AMBIL", "NOTE"]
+            df_app.iloc[:, 8] = df_app.iloc[:, 8].fillna(df_app.iloc[:, 14]) # SKU (Kolom 9 or 15)
+            
+            # Logic: Filter Status DONE / KURANG AMBIL
+            df_app_filtered = df_app[df_app.iloc[:, 1].astype(str).str.upper().isin(["DONE", "KURANG AMBIL"])].copy()
+            
+            # Hitung Qty (Kolom 13 + 17)
+            df_app_filtered['TOTAL_AMBIL'] = pd.to_numeric(df_app_filtered.iloc[:, 12], errors='coerce').fillna(0) + \
+                                            pd.to_numeric(df_app_filtered.iloc[:, 16], errors='coerce').fillna(0)
+            
+            # Grouping Qty Scan per SKU (DictQty)
+            dict_qty = df_app_filtered.groupby(df_app_filtered.iloc[:, 8])['TOTAL_AMBIL'].sum().to_dict()
+            
+            # Update DS RTO
+            df_ds['QTY_AMBIL'] = df_ds['SKU'].astype(str).str.strip().map(dict_qty).fillna(0)
+            
+            # Logic Note
+            def get_note(row):
+                scan = pd.to_numeric(row['QTY_SCAN'], errors='coerce') or 0
+                ambil = row['QTY_AMBIL']
+                if scan > ambil: return "KELEBIHAN AMBIL"
+                elif scan < ambil: return "KURANG AMBIL"
+                else: return "SESUAI"
+            
+            df_ds['NOTE'] = df_ds.apply(get_note, axis=1)
+            st.session_state.ws_ds = df_ds
+            
+            # Create Selisih Sheet
+            selisih = df_ds[df_ds['NOTE'] != "SESUAI"].copy()
+            st.session_state.ws_selisih = selisih
+            st.success("✅ Compare Selesai! Cek Sheet DS RTO & SELISIH.")
+            st.balloons()
 
-    df_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
-    
-    # Hapus duplikat
-    df_selisih = df_selisih.drop_duplicates().reset_index(drop=True)
-    
-    return df_ds_res, df_selisih
+    # ---------------------------------------------------------
+    # LOGIKA MACRO: GENERATE_NEW_DRAFT_RTO
+    # ---------------------------------------------------------
+    if btn_generate:
+        # Pake data dari Draft Jezpro dan Appsheet
+        df_draft = st.session_state.ws_draft.copy()
+        df_app = st.session_state.ws_app.copy()
+        
+        # Logic sederhana: Ambil yang qty > 0 (Sesuai 231 target lo)
+        # (Sesuaikan index kolom jika perlu)
+        if not df_draft.empty:
+            new_draft = df_draft.copy()
+            st.session_state.ws_new_draft = new_draft
+            st.success("✅ New Draft Generated!")
 
-def engine_compare_draft_vba(df_app, df_draft):
-    df_a = df_app.copy()
-    df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
-    
-    sku_app = set()
-    for col in ['9', '15']:
-        if col in df_a.columns:
-            sku_app.update(df_a[col].astype(str).str.strip().unique())
-    
-    df_d = df_draft.copy()
-    if 'SKU' not in df_d.columns:
-        df_d.rename(columns={df_d.columns[0]: 'SKU'}, inplace=True)
-    
-    df_d['SKU'] = df_d['SKU'].astype(str).str.strip()
-    df_d['STATUS CEK'] = df_d['SKU'].apply(lambda x: "MATCH ✅" if x in sku_app else "TIDAK ADA ❌")
-    
-    return df_d
+    # ---------------------------------------------------------
+    # LOGIKA MACRO: RESET TOTAL
+    # ---------------------------------------------------------
+    if btn_reset:
+        for key in st.session_state.keys():
+            if "ws_" in key: st.session_state[key] = None
+        st.rerun()
 
+    # --- TAMPILAN PER SHEET ---
+    with t2:
+        st.write("### 📊 Sheet: DS RTO")
+        st.dataframe(st.session_state.ws_ds, use_container_width=True, hide_index=True)
+        
+    with t3:
+        st.write("### ⚠️ Sheet: SELISIH")
+        if st.session_state.ws_selisih is not None:
+            st.dataframe(st.session_state.ws_selisih, use_container_width=True, hide_index=True)
+        
+    with t4:
+        st.write("### 📝 Sheet: DRAFT JEZPRO")
+        # Logic Compare Draft Jezpro lo dimasukin sini
+        st.dataframe(st.session_state.ws_draft, use_container_width=True, hide_index=True)
+
+    with t5:
+        st.write("### 📦 Sheet: NEW DRAFT (FINAL)")
+        if st.session_state.ws_new_draft is not None:
+            st.dataframe(st.session_state.ws_new_draft, use_container_width=True, hide_index=True)
+            # Button Download ala VBA
+            csv = st.session_state.ws_new_draft.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 DOWNLOAD NEW DRAFT RTO", csv, "NEW_DRAFT.csv", "text/csv", use_container_width=True)
+
+# Panggil fungsi menu
+menu_rto_vba_mode()
 # ==========================================
 # 2. LANJUT KODE STREAMLIT LO DI BAWAH...
 # ==========================================
