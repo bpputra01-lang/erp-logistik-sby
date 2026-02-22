@@ -1031,3 +1031,99 @@ elif menu == "Compare RTO":
                 st.download_button(f"📥 Download Draft Final ({total_vba} Pcs)", csv, f"Draft_Final_{total_vba}.csv", "text/csv", use_container_width=True)
             else:
                 st.error("Jalankan Proses Awal (Tombol 1) dulu, Cok!")
+
+                elif menu == "FDR UPDATE":
+        st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST PROCESSOR</h1></div>', unsafe_allow_html=True)
+
+        # --- 0. INISIALISASI SESSION STATE (DATABASE RAM) ---
+        if "ws_manifest" not in st.session_state:
+            st.session_state.ws_manifest = pd.DataFrame(columns=[chr(i) for i in range(ord('A'), ord('Z')+1)])
+        if "ws_fu_it" not in st.session_state:
+            st.session_state.ws_fu_it = None
+        if "dict_kurir" not in st.session_state:
+            st.session_state.dict_kurir = {}
+
+        # --- 1. TOOLBAR TOMBOL (MACROS BAR) ---
+        t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "✂️ SPLIT KURIR"])
+
+        with t1:
+            st.subheader("🛠️ Macro Control Panel")
+            c_btn = st.columns(4)
+            
+            # --- MACRO 1: Hapus Kolom Manifest ---
+            if c_btn[0].button("🧹 CLEAN COLUMNS", use_container_width=True, key="btn_clean"):
+                df = st.session_state.ws_manifest.copy()
+                if not df.empty:
+                    # G,H,I,K,L,M,R,S,T,U,V,W (Index starts 0)
+                    cols_to_del = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+                    # Kita drop berdasarkan urutan kolom VBA lo
+                    df.drop(df.columns[cols_to_del], axis=1, inplace=True, errors='ignore')
+                    st.session_state.ws_manifest = df
+                    st.success("Kolom Berhasil Dihapus!")
+                else: st.warning("Data Kosong!")
+
+            # --- MACRO 2: CopyManifest_UltraFast (Filter M <> "") ---
+            if c_btn[1].button("🚀 COPY FU IT", use_container_width=True, key="btn_copy_fu"):
+                df = st.session_state.ws_manifest.copy()
+                if not df.empty and df.shape[1] >= 13:
+                    # Filter Kolom M (Index 12) yang tidak kosong
+                    mask = df.iloc[:, 12].notna() & (df.iloc[:, 12].astype(str).str.strip() != "")
+                    st.session_state.ws_fu_it = df[mask].iloc[:, :13]
+                    st.success(f"Berhasil Copy {len(st.session_state.ws_fu_it)} Baris ke FU IT!")
+                else: st.warning("Data Manifest minimal harus 13 kolom!")
+
+            # --- MACRO 3: SplitSheet_UltraFast (Split per Kolom F) ---
+            if c_btn[2].button("⚡ SPLIT KURIR", use_container_width=True, key="btn_split"):
+                df = st.session_state.ws_manifest.copy()
+                if not df.empty and df.shape[1] >= 13:
+                    # Logika: Kolom F (Index 5) ada isi, Kolom M (Index 12) KOSONG
+                    mask = (df.iloc[:, 5].notna()) & (df.iloc[:, 12].isna() | (df.iloc[:, 12].astype(str).str.strip() == ""))
+                    df_split = df[mask].copy()
+                    
+                    # Grouping (Dictionary Logic)
+                    kurir_groups = {name: data for name, data in df_split.groupby(df_split.iloc[:, 5])}
+                    st.session_state.dict_kurir = kurir_groups
+                    st.success(f"Data Pecah Jadi {len(kurir_groups)} Kurir!")
+                else: st.warning("Data tidak memenuhi kriteria Split!")
+
+            # --- MACRO 4: Clear All ---
+            if c_btn[3].button("🗑️ CLEAR ALL", use_container_width=True, type="primary", key="btn_clear_fdr"):
+                st.session_state.ws_manifest = pd.DataFrame(columns=[chr(i) for i in range(ord('A'), ord('Z')+1)])
+                st.session_state.ws_fu_it = None
+                st.session_state.dict_kurir = {}
+                st.rerun()
+
+            st.divider()
+            
+            # --- INPUT DATA MANIFEST ---
+            st.write("### 📂 MANIFEST DATA (Paste / Upload)")
+            f_man = st.file_uploader("Upload Manifest Excel", type=['xlsx'], key="up_fdr")
+            if f_man:
+                st.session_state.ws_manifest = pd.read_excel(f_man)
+
+            st.session_state.ws_manifest = st.data_editor(
+                st.session_state.ws_manifest, 
+                num_rows="dynamic", 
+                use_container_width=True, 
+                key="editor_fdr"
+            )
+
+        with t2:
+            st.subheader("📋 Sheet: PERLU FU IT")
+            if st.session_state.ws_fu_it is not None:
+                st.dataframe(st.session_state.ws_fu_it, use_container_width=True)
+                csv = st.session_state.ws_fu_it.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Download FU IT", csv, "FU_IT.csv", "text/csv")
+            else:
+                st.info("Klik tombol 'COPY FU IT' dulu.")
+
+        with t3:
+            st.subheader("✂️ Data Per Kurir")
+            if st.session_state.dict_kurir:
+                for nama_kurir, data_kurir in st.session_state.dict_kurir.items():
+                    with st.expander(f"📦 Kurir: {nama_kurir}"):
+                        st.dataframe(data_kurir, use_container_width=True)
+                        csv_k = data_kurir.to_csv(index=False).encode('utf-8')
+                        st.download_button(f"Download Data {nama_kurir}", csv_k, f"{nama_kurir}.csv", key=f"dl_{nama_kurir}")
+            else:
+                st.info("Klik tombol 'SPLIT KURIR' dulu.")
