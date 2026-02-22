@@ -232,7 +232,6 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
     
     # --- APPSHEET LOGIC (Hitung Total Qty per SKU) ---
-    # Filter Status (Kolom 2 / B)
     if '2' in df_app_vba.columns:
         mask = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
         df_filtered = df_app_vba[mask].copy()
@@ -241,20 +240,17 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     dict_qty = {}
     for _, row in df_filtered.iterrows():
-        # Ambil SKU (Kolom 9 atau 15)
         sku = str(row.get('9', '')).strip()
-        if sku == "" or sku == "nan":
+        if sku in ["", "nan", "0"]:
             sku = str(row.get('15', '')).strip()
         
-        if sku != "" and sku != "nan":
-            # Qty = Kolom 13 (M) + Kolom 17 (Q)
+        if sku not in ["", "nan", "0"]:
             q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
             q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
             dict_qty[sku] = dict_qty.get(sku, 0) + (q13 + q17)
 
     # --- WRITE DS LOGIC ---
     df_ds_res = df_ds.copy()
-    # Pastikan minimal ada 2 kolom di DS
     if len(df_ds_res.columns) >= 2:
         orig_cols = list(df_ds_res.columns)
         df_ds_res.columns = ['SKU', 'QTY SCAN'] + orig_cols[2:]
@@ -273,33 +269,32 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     # --- LOGIKA SHEET SELISIH (Split BIN) ---
     results_selisih = []
-    
-    # Loop hanya yang mismatch
     mismatch_df = df_ds_res[df_ds_res['NOTE'] != 'SESUAI']
     
+    # Ambil data kolom sebagai array untuk kecepatan dan keamanan filter
+    # Biar nggak kena IndexingError, kita definisikan series dengan index yang sama
+    col_9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""] * len(df_app_vba), index=df_app_vba.index)
+    col_15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""] * len(df_app_vba), index=df_app_vba.index)
+
     for _, row in mismatch_df.iterrows():
         sku = row['SKU']
         q_scan = row['QTY SCAN']
         q_ambil = row['QTY AMBIL']
         note = row['NOTE']
         
-        # INI PERBAIKAN KEYERROR: Cari SKU di df_app_vba kolom 9 atau 15
-        # Kita filter manual biar aman dari KeyError
-        found_in_app = df_app_vba[
-            (df_app_vba.get('9', pd.Series()).astype(str) == sku) | 
-            (df_app_vba.get('15', pd.Series()).astype(str) == sku)
-        ]
+        # FILTER AMAN: Pakai index yang sama dengan dataframe asal
+        found_in_app = df_app_vba[(col_9 == sku) | (col_15 == sku)]
         
         if not found_in_app.empty:
             for _, row_app in found_in_app.iterrows():
                 # Bin L (12)
                 bin_12 = str(row_app.get('12', '')).strip()
-                if bin_12 != "" and bin_12 != "nan":
+                if bin_12 not in ["", "nan", "-", "0"]:
                     results_selisih.append([sku, q_scan, q_ambil, note, bin_12, row_app.get('13', 0), 0])
                 
                 # Bin P (16)
                 bin_16 = str(row_app.get('16', '')).strip()
-                if bin_16 != "" and bin_16 != "nan":
+                if bin_16 not in ["", "nan", "-", "0"]:
                     results_selisih.append([sku, q_scan, q_ambil, note, bin_16, row_app.get('17', 0), 0])
         else:
             results_selisih.append([sku, q_scan, q_ambil, note, "-", 0, 0])
