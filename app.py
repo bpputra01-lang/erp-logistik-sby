@@ -1123,48 +1123,46 @@ elif menu == "FDR Update":
                     st.success("Kolom Berhasil Dihapus!")
                 else: st.warning("Upload file dulu!")
 
-            # --- MACRO 2: PERLU FU IT (Logic: Kolom M / Index 12 TIDAK KOSONG) ---
+           # --- MACRO 2: COPY FU IT (Logic Asli VBA) ---
             if c_btn[1].button("🚀 COPY FU IT", key="btn_fdr_fu"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
-                    # Filter: Kolom M (13) TIDAK KOSONG ("<>")
-                    mask_fu = df.iloc[:, 12].notna() & (df.iloc[:, 12].astype(str).str.strip() != "")
-                    st.session_state.ws_fu_it = df[mask_fu].iloc[:, :13] # Ambil A-M
-                    st.success(f"Dapet {len(st.session_state.ws_fu_it)} baris yang perlu FU IT!")
-                else: st.warning("Data Kosong!")
+                    
+                    # 1. Ambil Header (Baris 1 di VBA)
+                    # 2. Filter Kolom M (Index 12) yang TIDAK KOSONG ("<>")
+                    # Kita pastiin kolom M dibaca string biar gak error pas cek empty
+                    mask_fu = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
+                    
+                    # 3. Copy A-M (Index 0:13) buat data yang tersaring
+                    df_fu = df[mask_fu].iloc[:, 0:13] 
+                    
+                    st.session_state.ws_fu_it = df_fu
+                    st.success(f"KILAT BOS! {len(df_fu)} baris A-M sudah di-copy.")
+                else: 
+                    st.warning("MANIFEST KOSONG! Upload dulu.")
 
-            # --- MACRO 3: SPLIT KURIR (Logic: Kolom F ISI & Kolom M KOSONG) ---
+            # --- MACRO 3: SPLIT KURIR (Logic: F Isi & M Kosong) ---
             if c_btn[2].button("⚡ SPLIT KURIR", key="btn_fdr_split"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
-                    # F (Index 5) TIDAK KOSONG dan M (Index 12) KOSONG
-                    mask_f_ada = df.iloc[:, 5].notna() & (df.iloc[:, 5].astype(str).str.strip() != "")
-                    mask_m_kosong = df.iloc[:, 12].isna() | (df.iloc[:, 12].astype(str).str.strip() == "")
                     
-                    df_split_final = df[mask_f_ada & mask_m_kosong].copy()
+                    # Clean up data buat checking
+                    col_f = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
+                    col_m = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
                     
-                    # Grouping per Kurir (Kolom F)
-                    kurir_groups = {str(name): data for name, data in df_split_final.groupby(df_split_final.iloc[:, 5])}
-                    st.session_state.dict_kurir = kurir_groups
-                    st.success(f"Berhasil split {len(kurir_groups)} Kurir!")
-                else: st.warning("Data Kosong!")
-
-            if c_btn[3].button("🗑️ CLEAR ALL", type="primary", key="btn_fdr_reset"):
-                st.session_state.ws_manifest = None
-                st.session_state.ws_fu_it = None
-                st.session_state.dict_kurir = {}
-                st.rerun()
-
-            st.divider()
-            if st.session_state.ws_manifest is not None:
-                st.dataframe(st.session_state.ws_manifest, use_container_width=True, hide_index=True)
-
-        # Tab FU IT & Split tetap pake st.dataframe (Read-Only)
-        with t2:
-            if st.session_state.ws_fu_it is not None:
-                st.dataframe(st.session_state.ws_fu_it, use_container_width=True, hide_index=True)
-        with t3:
-            if st.session_state.dict_kurir:
-                for kurir, data in st.session_state.dict_kurir.items():
-                    with st.expander(f"📦 {kurir}"):
-                        st.dataframe(data, use_container_width=True, hide_index=True)
+                    # Logic: Nama Sheet (F) ada isinya DAN Kolom M KOSONG
+                    mask_split = (col_f != "") & (col_m == "")
+                    df_filtered = df[mask_split].copy()
+                    
+                    # Dictionary buat grouping (Key: Kolom F)
+                    kurir_dict = {}
+                    if not df_filtered.empty:
+                        for name, group in df_filtered.groupby(df_filtered.iloc[:, 5]):
+                            kurir_dict[str(name)] = group.iloc[:, 0:13] # Tetap ambil A-M
+                        
+                        st.session_state.dict_kurir = kurir_dict
+                        st.success(f"TOP SPEED! {len(kurir_dict)} Kurir berhasil dipisah.")
+                    else:
+                        st.error("KAGAK ADA DATA yang cocok buat di-split!")
+                else:
+                    st.warning("MANIFEST KOSONG!")
