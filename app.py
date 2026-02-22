@@ -934,11 +934,11 @@ elif menu == "Compare RTO":
    st.markdown('<div class="hero-header"><h1>📑 RTO HYBRID (UPLOAD + PASTE)</h1></div>', unsafe_allow_html=True)
 
     # --- 0. INISIALISASI MEMORI ---
-    if "df_rto_final" not in st.session_state:
+        if "df_rto_final" not in st.session_state:
         st.session_state.df_rto_final = None
-    if "data_app_hybrid" not in st.session_state:
+            if "data_app_hybrid" not in st.session_state:
         st.session_state.data_app_hybrid = pd.DataFrame(columns=[f"Col {i+1}" for i in range(18)])
-    if "data_jez_hybrid" not in st.session_state:
+                if "data_jez_hybrid" not in st.session_state:
         st.session_state.data_jez_hybrid = pd.DataFrame(columns=[f"Draft Col {i+1}" for i in range(9)])
 
     # --- 1. SETUP TABS ---
