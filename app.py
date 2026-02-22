@@ -309,107 +309,130 @@ import streamlit as st
 import requests # Tambahin ini di paling atas file buat fungsi Upload
 
 def menu_refill_withdraw():
-    # --- CSS TETEP SAMA (GAK GUE UBAH) ---
     st.markdown("""
         <style>
         div.stButton > button { width: 100% !important; background-color: #002b5b !important; color: white !important; font-weight: bold !important; border: 1px solid #ffc107 !important; }
+        .status-box { padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid #ddd; }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header"><h1>🔄 REFILL & WITHDRAW SYSTEM</h1></div>', unsafe_allow_html=True)
 
-    if "summary_refill" not in st.session_state: st.session_state.summary_refill = None
-    if "summary_withdraw" not in st.session_state: st.session_state.summary_withdraw = None
+    # --- 0. INIT STATE ---
+    for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
+        if key not in st.session_state: st.session_state[key] = None
 
     t1, t2, t3 = st.tabs(["📥 DATA INPUT", "⚙️ PROCESSOR", "📊 SUMMARY RESULTS"])
 
     with t1:
-        u_stock = st.file_uploader("Upload All Stock SBY", type=["xlsx"])
-        # Lo bisa tambah u_trx di sini kalau mau pake logic INV/Trans, 
-        # tapi ini gue fokusin ke logic AUTO-BALANCE dulu biar angka sinkron.
+        c1, c2 = st.columns(2)
+        with c1:
+            u_stock = st.file_uploader("Upload All Stock SBY", type=["xlsx"], key="up_sby")
+            if u_stock: st.session_state.df_stock_sby = pd.read_excel(u_stock)
+        with c2:
+            u_trx = st.file_uploader("Upload Data Transaksi", type=["xlsx"], key="up_trx_sby")
+            if u_trx: st.session_state.df_trx = pd.read_excel(u_trx)
 
     with t2:
+        st.subheader("🛠️ Run Auto-Balance Logic")
         if st.button("🚀 GENERATE SUMMARY (ULTRA FAST)"):
-            if u_stock:
-                df = pd.read_excel(u_stock)
-                df.columns = [str(i) for i in range(len(df.columns))] # Force index B=1, C=2, D=3 dst.
+            if st.session_state.df_stock_sby is not None:
+                df_s = st.session_state.df_stock_sby.copy()
+                df_t = st.session_state.df_trx.copy() if st.session_state.df_trx is not None else pd.DataFrame()
 
-                # --- 1. SCAN SEMUA STOCK (LOGIC DICT VBA) ---
+                # --- STEP 1: SCAN STOCK ---
+                # A=0, B=BIN(1), C=SKU(2), D=Brand(3), E=Item(4), F=Var(5), J=Qty(9)
                 prod_info = {}
-                dict_tot_toko = {}      # dictTot02
-                dict_tot_dc_pure = {}   # dictTotDC (Tanpa KL)
-                dict_tot_dc_all = {}    # dictTotDCKLRAK
-                
-                dict_best_bin_toko = {} # dict02 (Cari Qty paling gede)
-                dict_best_bin_dc = {}   # dictDC (Cari Qty paling gede)
-                
-                dict_bin_list_toko = {} # dictBinList02
-                dict_bin_list_dc = {}   # dictBinListDC
+                tot_toko = {}      # Qty di Area 02/Toko
+                tot_dc = {}        # Qty di Area DC/Inbound
+                best_bin_toko = {} # Bin Toko dgn Qty terbanyak
+                best_bin_dc = {}   # Bin DC dgn Qty terbanyak
+                bin_list_toko = {}
+                bin_list_dc = {}
 
-                for _, row in df.iterrows():
-                    sku = str(row['2']).strip() # Kolom C
-                    if not sku or sku == 'nan' or sku == 'SKU': continue
+                for _, row in df_s.iterrows():
+                    sku = str(row.iloc[2]).strip()
+                    if not sku or sku == 'nan': continue
                     
-                    bin_loc = str(row['1']).upper() # Kolom B
-                    qty = pd.to_numeric(row['9'], errors='coerce') or 0 # Kolom J (Qty Sys)
+                    bin_loc = str(row.iloc[1]).upper()
+                    qty = float(row.iloc[9]) if not pd.isna(row.iloc[9]) else 0
 
                     if sku not in prod_info:
-                        prod_info[sku] = [row['3'], row['4'], row['5']] # Brand, Item, Var
+                        prod_info[sku] = [row.iloc[3], row.iloc[4], row.iloc[5]]
                     
-                    # LOGIC AREA TOKO (02, TOKO, STORE, LT.2)
+                    # LOGIC: AREA TOKO
                     if any(x in bin_loc for x in ["02", "TOKO", "STORE", "LT.2"]):
-                        dict_tot_toko[sku] = dict_tot_toko.get(sku, 0) + qty
-                        dict_bin_list_toko[sku] = dict_bin_list_toko.get(sku, "") + bin_loc + ", "
-                        if qty > dict_best_bin_toko.get(sku, (-1, ""))[0]:
-                            dict_best_bin_toko[sku] = (qty, bin_loc)
+                        tot_toko[sku] = tot_toko.get(sku, 0) + qty
+                        bin_list_toko[sku] = bin_list_toko.get(sku, "") + bin_loc + ", "
+                        if qty > best_bin_toko.get(sku, (-1, ""))[0]:
+                            best_bin_toko[sku] = (qty, bin_loc)
                     
-                    # LOGIC AREA DC (DC, INBOUND)
+                    # LOGIC: AREA DC (Exclude Karantina/Defect/Reject)
                     elif any(x in bin_loc for x in ["DC", "INBOUND"]):
                         if any(x in bin_loc for x in ["KARANTINA", "DEFECT", "REJECT"]): continue
                         
-                        dict_tot_dc_all[sku] = dict_tot_dc_all.get(sku, 0) + qty # DC Termasuk KL
-                        
                         if "KL" not in bin_loc:
-                            dict_tot_dc_pure[sku] = dict_tot_dc_pure.get(sku, 0) + qty # DC Tanpa KL
-                            dict_bin_list_dc[sku] = dict_bin_list_dc.get(sku, "") + bin_loc + ", "
-                            if qty > dict_best_bin_dc.get(sku, (-1, ""))[0]:
-                                dict_best_bin_dc[sku] = (qty, bin_loc)
+                            tot_dc[sku] = tot_dc.get(sku, 0) + qty
+                            bin_list_dc[sku] = bin_list_dc.get(sku, "") + bin_loc + ", "
+                            if qty > best_bin_dc.get(sku, (-1, ""))[0]:
+                                best_bin_dc[sku] = (qty, bin_loc)
 
-                # --- 2. STEP 3: LOGIKA AUTO-BALANCE (FORCE) ---
+                # --- STEP 2 & 3: CORE LOGIC ---
                 refill_list = []
                 withdraw_list = []
+                processed_ref = set()
+                processed_wdr = set()
 
+                # Jalur Auto-Balance (Force)
                 for sku, info in prod_info.items():
-                    q_toko = dict_tot_toko.get(sku, 0)
-                    q_dc_pure = dict_tot_dc_pure.get(sku, 0)
-                    q_dc_all = dict_tot_dc_all.get(sku, 0)
+                    q_toko = tot_toko.get(sku, 0)
+                    q_dc = tot_dc.get(sku, 0)
+                    
+                    # AUTO REFILL: DC > 3 & Toko Kosong
+                    if q_dc > 3 and q_toko == 0 and sku in best_bin_dc:
+                        bin_ambil = best_bin_dc[sku][1]
+                        qty_ambil = best_bin_dc[sku][0]
+                        refill_list.append([sku, info[0], info[1], info[2], bin_ambil, qty_ambil, -(-qty_ambil // 2), q_toko, bin_list_dc.get(sku, "")[:-2]])
+                        processed_ref.add(sku)
 
-                    # REFILL: Ada di DC (>3) tapi KOSONG di Toko
-                    if q_dc_pure > 3 and q_toko == 0 and sku in dict_best_bin_dc:
-                        b_qty, b_bin = dict_best_bin_dc[sku]
-                        load = -(-b_qty // 2) 
-                        refill_list.append([sku, info[0], info[1], info[2], b_bin, b_qty, load, q_toko, dict_bin_list_dc.get(sku, "")[:-2]])
+                    # AUTO WITHDRAW: Toko > 3 & DC Kosong
+                    if q_toko > 3 and q_dc == 0 and sku in best_bin_toko:
+                        bin_ambil = best_bin_toko[sku][1]
+                        qty_ambil = best_bin_toko[sku][0]
+                        withdraw_list.append([sku, info[0], info[1], info[2], bin_ambil, qty_ambil, -(-qty_ambil // 2), q_dc, bin_list_toko.get(sku, "")[:-2]])
+                        processed_wdr.add(sku)
 
-                    # WITHDRAW: Ada di Toko (>3) tapi KOSONG di DC/Inbound
-                    if q_toko > 3 and q_dc_all == 0 and sku in dict_best_bin_toko:
-                        b_qty, b_bin = dict_best_bin_toko[sku]
-                        load = -(-b_qty // 2)
-                        withdraw_list.append([sku, info[0], info[1], info[2], b_bin, b_qty, load, q_dc_all, dict_bin_list_toko.get(sku, "")[:-2]])
-
+                # --- EXPORT TO STATE ---
                 cols = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY TARGET", "BIN LAIN"]
                 st.session_state.summary_refill = pd.DataFrame(refill_list, columns=cols)
                 st.session_state.summary_withdraw = pd.DataFrame(withdraw_list, columns=cols)
-                st.success(f"Berhasil! Refill: {len(refill_list)} | Withdraw: {len(withdraw_list)}")
+                st.success("DONE - LOGIKA AUTO-BALANCE AKTIF!")
             else:
-                st.error("Upload filenya dulu!")
+                st.error("Upload Data Stock Dulu Cok!")
 
     with t3:
         if st.session_state.summary_refill is not None:
             st.subheader("📦 SUMMARY REFILL")
             st.dataframe(st.session_state.summary_refill, use_container_width=True)
+            if st.button("☁️ UPLOAD REFILL TO CLOUD"):
+                # Logic JSON Post sama kayak macro lo
+                data_json = st.session_state.summary_refill.astype(str).values.tolist()
+                url = "https://script.google.com/macros/s/AKfycbxoZjGlZlpCRSoYmAkJPOOx50_Xxp0VRTadSKNKCnZD9-WbdAgcUFIfIIukWkTt5XpT/exec?sheet=REFILL%20STOCK"
+                res = requests.post(url, json=data_json)
+                st.toast("REFILL UPLOADED!", icon="✅")
+
         if st.session_state.summary_withdraw is not None:
             st.subheader("📤 SUMMARY WITHDRAW")
             st.dataframe(st.session_state.summary_withdraw, use_container_width=True)
+            if st.button("☁️ UPLOAD WITHDRAW TO CLOUD"):
+                data_json = st.session_state.summary_withdraw.astype(str).values.tolist()
+                url = "https://script.google.com/macros/s/AKfycbxoZjGlZlpCRSoYmAkJPOOx50_Xxp0VRTadSKNKCnZD9-WbdAgcUFIfIIukWkTt5XpT/exec?sheet=WITHDRAW%20STOCK"
+                res = requests.post(url, json=data_json)
+                st.toast("WITHDRAW UPLOADED!", icon="✅")
+
+# --- ELIF NYA ---
+# elif menu == "Refill & Withdraw":
+#     menu_refill_withdraw()
 
 def engine_ds_rto_vba_total(df_ds, df_app):
     # --- 1. LOAD & CLEAN DATA APPSHEET ---
