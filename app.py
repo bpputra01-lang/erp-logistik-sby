@@ -1040,47 +1040,39 @@ elif menu == "Compare RTO":
                 st.error(f"Error baca File 4: {e}")
 
     # --- 4. LOGIC DRAFT JEZPRO ---
-   # --- 4. LOGIC DRAFT JEZPRO (VERSI ANTI ZONK 231) ---
     if f3:
         st.divider()
         st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
-        
-        btn_final = st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True)
-        
-        if btn_final:
-            # Ambil data sumber (Backdoor diutamakan)
+       if st.button("🔥 RUN FINAL COMPARE TO DRAFT", use_container_width=True):
             data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
             
             if data_siap is not None:
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # 1. Jalankan engine (Hasil mentah ERP)
-                hasil_mentah = engine_compare_draft_vba(data_siap, df3_draft)
+                # 1. Jalankan engine bawaan
+                hasil_draft = engine_compare_draft_vba(data_siap, df3_draft)
                 
-                # 2. Cari kolom Qty secara paksa
-                # Kita cari kolom yang mengandung kata 'qty', 'ambil', atau 'real'
-                target_col = [c for c in hasil_mentah.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
+                # 2. CARI KOLOM QTY (Biasanya ada kata 'QTY' atau 'AMBIL')
+                # Kita cari kolom yang isinya angka hasil compare
+                col_qty_f = [c for c in hasil_draft.columns if any(x in c.lower() for x in ['qty', 'ambil', 'real'])][0]
                 
-                # 3. FILTER TOTAL (Hapus semua yang Qty-nya 0 atau NaN)
-                # Ini cara paling ampuh buat ngebuang 31 baris siluman
-                hasil_mentah[target_col] = pd.to_numeric(hasil_mentah[target_col], errors='coerce').fillna(0)
-                hasil_final = hasil_mentah[hasil_mentah[target_col] > 0].copy()
+                # 3. FILTER BERDASARKAN ANGKA (BUKAN SKU)
+                # Paksa kolom jadi angka, yang ngaco jadi NaN, terus ganti NaN jadi 0
+                hasil_draft[col_qty_f] = pd.to_numeric(hasil_draft[col_qty_f], errors='coerce').fillna(0)
                 
-                # 4. HITUNG ULANG TOTAL DARI DATA YANG SUDAH BERSIH
-                total_real = int(hasil_final[target_col].sum())
+                # HANYA ambil yang angkanya lebih dari 0
+                # Ini otomatis ngebuang 31 baris hantu yang Qty-nya 0
+                hasil_final = hasil_draft[hasil_draft[col_qty_f] > 0].copy()
                 
-                # TAMPILIN HASIL AKHIR
-                st.metric("Total Qty Akhir (REAL)", f"{total_real} Pcs")
+                total_vba = int(hasil_final[col_qty_f].sum())
+                st.metric("Total Qty Akhir", f"{total_vba} Pcs")
                 
-                if total_real == 231:
-                    st.success("🎯 231 PCS! AKHIRNYA MENANG LAWAN ERP, COK!")
+                if total_vba == 231:
+                    st.success("🎯 NAH INI DIA! 231 PCS FIX!")
                 else:
-                    st.warning(f"Dapetnya {total_real} Pcs. Coba cek lagi file upload-an lo!")
-
+                    st.info(f"Hasil: {total_vba} Pcs. (Sisa {len(hasil_final)} Baris)")
+                
                 st.dataframe(hasil_final, use_container_width=True, hide_index=True)
                 
-                # Download Button
-                csv_final = hasil_final.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download Draft {total_real} Pcs", csv_final, f"Draft_Final_{total_real}.csv", "text/csv")
-            else:
-                st.error("Jalankan Proses Banding (Tahap 1) dulu!")
+                csv = hasil_final.to_csv(index=False).encode('utf-8')
+                st.download_button(f"📥 Download Draft {total_vba} Pcs", csv, f"Final_{total_vba}.csv", "text/csv")
