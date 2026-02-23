@@ -256,7 +256,7 @@ div.stFormSubmitButton > button {
     <h2 style="
         font-family: 'Inter', sans-serif; 
         font-weight: 900; 
-        font-size: 26px;
+        font-size: 30px;
         margin: 0;
         background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
         -webkit-background-clip: text;
