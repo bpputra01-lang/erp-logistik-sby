@@ -257,13 +257,15 @@ div.stFormSubmitButton > button {
         font-family: 'Inter', sans-serif; 
         font-weight: 900; 
         font-size: 30px;
-        margin: -100;
+        margin-bottom: 10px;
+        margin: 0;
         background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.4));
         letter-spacing: 1px;
         text-transform: uppercase;
+
     ">
         LOGISTIC SURABAYA ERP
     </h2>
