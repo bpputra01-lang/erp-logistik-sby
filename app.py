@@ -125,7 +125,7 @@ st.markdown("""
         gap: 20px !important;             /* Tambah jarak antar kolom di baris tombol */
         flex-wrap: wrap !important;       /* Kalau layar sangat sempit, turun rapi bukan numpuk */
     }
-    }
+    
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
         color: #1a2634 !important;
