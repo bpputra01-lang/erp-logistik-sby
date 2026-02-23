@@ -125,13 +125,13 @@ st.markdown("""
         min-height: 4.5em !important;    /* Tinggi cukup untuk teks 2 baris */
         white-space: normal !important;  /* Izinkan teks turun ke bawah (enter) */
         word-wrap: break-word !important;
-        padding: 5px 5px !important;   /* Jarak dalam tombol simetris */
+        padding: 10px 15px !important;   /* Jarak dalam tombol simetris */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         text-align: center !important;
         font-size: 14px !important;
-        line-height: 1.2 !important;
+        line-height: 1 !important;
         border: 2px solid #001a35 !important;
     
     }
