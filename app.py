@@ -238,30 +238,31 @@ div.stFormSubmitButton > button {
     div[data-testid="stNotification"] svg {
         fill: white !important;
     }
-    /* --- FIX PERMANEN BLOK PASSWORD TERPOTONG --- */
-/* 1. Paksa form login menggunakan lebar penuh tanpa intervensi inline-block */
-div[data-testid="stForm"] {
+    /* --- FORCE RESET UNTUK FORM LOGIN --- */
+/* Reset kolom agar tidak menciut (fit-content) khusus di form login */
+[data-testid="stForm"] [data-testid="column"] {
     width: 100% !important;
-    max-width: 450px !important; /* Batas lebar form agar tetap elegan di tengah */
-    margin: 0 auto !important;
-    display: block !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
 }
 
-/* 2. Pastikan kontainer input password tidak menciut */
-div[data-testid="stForm"] div[data-baseweb="input"] {
+/* Paksa kontainer password melebar penuh */
+div[data-testid="stPasswordInput"], 
+div[data-testid="stPasswordInput"] > div {
+    width: 100% !important;
+    min-width: 100% !important;
+}
+
+/* Pastikan box input putihnya tidak tertekan oleh ikon mata */
+div[data-baseweb="input"] {
     width: 100% !important;
     display: flex !important;
 }
 
-/* 3. Reset lebar untuk kolom password agar ikon mata tidak mendorong teks */
-div[data-testid="stPasswordInput"] {
-    width: 100% !important;
-}
-
-/* 4. Pastikan input teks di dalamnya mengambil sisa ruang yang ada */
-div[data-testid="stPasswordInput"] input {
-    width: 100% !important;
-    flex-grow: 1 !important;
+/* Hilangkan pengaruh margin/padding yang bikin melenceng */
+.stForm {
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 20px !important;
 }
     
     
