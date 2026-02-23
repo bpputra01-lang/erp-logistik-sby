@@ -252,10 +252,10 @@ div.stFormSubmitButton > button {
         
         # JUDUL
         st.markdown("""
-           <h2 style="
+<h2 style="
     font-family: 'Inter', sans-serif; 
     font-weight: 900; 
-    font-size: 35px;
+    font-size: 32px;         /* Ukuran font yang pas */
     text-align: center;
     margin-top: -30px; 
     margin-bottom: -5px;
@@ -265,14 +265,22 @@ div.stFormSubmitButton > button {
     filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
     letter-spacing: 2px;
     text-transform: uppercase;
+    
+    /* --- PENGATUR RULER KIRI KANAN --- */
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 12px;
+    
+    max-width: 90%;          /* ATUR DISINI: Batas lebar teks (misal 90% dari layar) */
+    margin-left: auto !important;
+    margin-right: auto !important;
+    white-space: nowrap;     /* Kunci agar tetap satu baris lurus */
+    overflow: hidden;        /* Jika teks kepanjangan, tidak akan berantakan ke luar */
 ">
-    <span style="-webkit-text-fill-color: initial; filter: drop-shadow(0 0 5px #C5A059);"></span>
     LOGISTIC SURABAYA ERP
 </h2>
+
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
