@@ -102,32 +102,37 @@ st.markdown("""
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
-  /* --- 1. PAKSA CONTAINER AGAR MEMBERI JARAK ANTAR KOLOM --- */
+  /* --- 1. KUNCI KONTAINER UTAMA (JARAK ANTAR TOMBOL SAMA) --- */
     [data-testid="stHorizontalBlock"] {
-        gap: 2rem !important;        /* Tambah jarak horizontal antar kolom agar tidak dempet */
-        align-items: center !important;
-        flex-wrap: nowrap !important; /* Paksa tetap sejajar tapi dengan gap */
+        display: flex !important;
+        flex-wrap: wrap !important;      /* Paksa turun ke bawah kalau gak muat */
+        gap: 12px !important;            /* Jarak antar tombol (Kanan-Kiri & Atas-Bawah) SAMA PERSIS */
+        justify-content: flex-start !important; /* Susun dari kiri biar gak ada jarak bolong di tengah */
+        align-items: stretch !important;
     }
 
-    /* --- 2. HILANGKAN PEMBATAS LEBAR KOLOM STREAMLIT --- */
+    /* --- 2. KUNCI LEBAR KOLOM AGAR TIDAK ADA JARAK ANEH --- */
     [data-testid="column"] {
-        min-width: fit-content !important; /* Kolom harus mengikuti lebar tombolnya */
-        flex: unset !important;             /* Jangan biarkan Streamlit bagi lebar otomatis */
+        flex: 1 1 auto !important;       /* Kolom fleksibel mengikuti isi */
+        min-width: fit-content !important; /* Jangan paksa lebar kolom kalau isi sudah cukup */
+        max-width: fit-content !important; /* KUNCI: Menghilangkan jarak lebar kosong antar tombol */
         width: auto !important;
+        padding: 0px !important;         /* Buang padding bawaan kolom */
     }
 
-    /* --- 3. STYLE TOMBOL AGAR PRESISI & TIDAK KEPOTONG --- */
+    /* --- 3. STYLE TOMBOL (TINGGI & LEBAR SEIMBANG) --- */
     div.stButton > button {
-        width: auto !important;          /* Lebar dinamis mengikuti teks */
-        white-space: nowrap !important;  /* Teks dilarang turun ke bawah */
-        padding: 12px 25px !important;   /* Jarak dalam (Atas-Bawah 12px, Kiri-Kanan 25px) agar rapi */
-        margin: 0px !important;          /* Reset margin luar agar tidak overlap */
-        display: inline-flex !important;
-        justify-content: center !important;
+        width: 100% !important;          /* Isi penuh kolomnya */
+        min-width: 180px !important;     /* Lebar minimal agar teks panjang aman */
+        height: 3.5em !important;        /* Tinggi tombol disamakan semua */
+        white-space: nowrap !important;  /* Teks dilarang kepotong/turun baris di dlm tombol */
+        padding: 10px 20px !important;   /* Jarak dalam (padding) simetris */
+        display: flex !important;
         align-items: center !important;
+        justify-content: center !important;
         font-size: 14px !important;
-        height: 3.5em !important;
         border: 2px solid #001a35 !important;
+        margin: 0px !important;          /* Buang margin liar */
     
     }
     [data-testid="stFileUploader"] button {
