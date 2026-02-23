@@ -176,136 +176,15 @@ st.markdown("""
 import streamlit as st
 
 # 1. Inisialisasi session state login
-# 1. KONFIGURASI HALAMAN (Wajib di paling atas)
-st.set_page_config(page_title="Logistic Surabaya ERP", layout="wide")
-
-# 2. INISIALISASI SESSION STATE
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# --- CSS GLOBAL (Agar Dashboard Rapi tapi Login Tidak Rusak) ---
-st.markdown("""
-    <style>
-    /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
-    .block-container { 
-        padding-top: 3.5rem !important; 
-        padding-bottom: 0rem !important;
-    }
-    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
-    [data-testid="stSidebarNav"] { display: none; } 
-    
-    /* 2. STYLE JUDUL ERP DI SIDEBAR */
-    .sidebar-title { 
-        color: #00d2ff; 
-        text-align: center; 
-        font-family: 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 20px;
-        margin-top: -45px; 
-        padding-bottom: 15px;
-        border-bottom: 1px solid #2d2d44;
-        margin-bottom: 10px;
-    }
-
-    .stApp { background-color: #f4f7f6; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
-
-    /* 3. HERO HEADER */
-    .hero-header { 
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-        color: white !important; 
-        padding: 8px 18px !important; 
-        border-radius: 8px; 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-        margin-top: 0px !important; 
-        margin-bottom: 25px !important;
-        display: inline-block; 
-        width: auto;
-    }
-    .hero-header h1 { 
-        color: white !important; 
-        font-size: 20px !important; 
-        font-weight: 800 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px;
-        line-height: 1.2;
-    }
-
-    /* 4. KONTAINER TOMBOL NAVIGASI (Horizontal) */
-    [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 12px !important;
-        justify-content: flex-start !important;
-        width: 100% !important;
-    }
-
-    /* 5. KUNCI KOLOM: HANYA UNTUK TOMBOL DI DASHBOARD */
-    /* Kita pakai spesifik selector [data-testid="stHorizontalBlock"] */
-    /* Supaya kolom di dalam FORM LOGIN tidak ikut menciut */
-    [data-testid="stHorizontalBlock"] [data-testid="column"] {
-        flex: 0 1 auto !important;
-        width: auto !important;
-        min-width: fit-content !important; 
-        max-width: fit-content !important; 
-    }
-
-    /* 6. STYLE TOMBOL DASHBOARD */
-    div.stButton > button {
-        width: 180px !important;
-        min-height: 3.5em !important;
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        padding: 10px 15px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        text-align: center !important;
-        font-size: 14px !important;
-        line-height: 1.2 !important;
-        background-color: #002b5b !important;
-        color: white !important;
-        border-radius: 8px !important;
-        border: 2px solid #001a35 !important;
-        font-weight: bold !important;
-        transition: 0.3s;
-    }
-    div.stButton > button:hover {
-        background-color: #004085 !important;
-        border-color: #ffc107 !important;
-    }
-
-    /* 7. STYLE INPUT BOX & UPLOADER */
-    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important;
-        border: 1px solid #C5A059 !important;
-        border-radius: 8px !important;
-    }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
-    [data-testid="stFileUploaderText"] > span {
-        color: white !important;
-    }
-
-    /* 8. TOMBOL LOGOUT SIDEBAR */
-    [data-testid="stSidebar"] div.stButton > button {
-        background-color: #002b5b !important; 
-        color: #ff4b4b !important; 
-        border: 2px solid #ff4b4b !important;
-        width: 100% !important;
-        height: 2.5em !important;
-    }
-    [data-testid="stSidebar"] div.stButton > button:hover {
-        background-color: #8b0000 !important;
-        color: white !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- FUNGSI LOGIN ---
+# --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
+# --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
-        /* Background & Fullscreen Login */
+        /* 1. Background & Layout */
         .stApp {
             background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
@@ -313,75 +192,120 @@ if not st.session_state.logged_in:
         }
         [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
         
-        /* --- FIX PASSWORD: PAKSA LEBAR UTUH 100% --- */
-        /* Menghancurkan paksaan 'fit-content' khusus di dalam form */
+        /* --- KUNCI PERBAIKAN: PAKSA LEBAR PENUH --- */
+        /* Menghapus efek 'fit-content' dari global agar input password tidak menciut */
         [data-testid="stForm"] [data-testid="column"] {
-            flex: 1 1 100% !important;
+            flex: 1 1 auto !important;
             width: 100% !important;
             max-width: 100% !important;
-            min-width: 100% !important;
         }
 
-        /* Target Box Putih Input (Baseweb) */
-        div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid #C5A059 !important;
-            border-radius: 10px !important;
-            width: 100% !important;
-            display: flex !important;
-        }
-
-        /* Paksa Input Password Melebar Penuh */
-        div[data-testid="stPasswordInput"] {
-            width: 100% !important;
-            min-width: 100% !important;
-        }
-
-        /* Submit Button (Sign In) */
-        button[data-testid="stFormSubmitButton"] {
+        /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
+        button[data-testid="stFormSubmitButton"], 
+        div.stFormSubmitButton > button {
             background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
             color: #ffffff !important;
+            border: none !important;
             border-radius: 12px !important;
             padding: 18px 20px !important;
-            font-weight: 800 !important;
-            width: 100% !important;
+            line-height: 1.2 !important;
             height: auto !important;
-            text-transform: uppercase !important;
+            font-weight: 800 !important;
+            font-size: 16px !important;
+            letter-spacing: 1px !important;
+            width: 100% !important;
             box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
+            text-transform: uppercase !important;
+        }
+
+        /* 4. Input Box - Paksa lebar 100% agar tidak terpotong */
+        div[data-baseweb="input"] {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 10px !important;
+            width: 100% !important; /* Tambahkan ini agar blok putih penuh */
+        }
+
+        div[data-testid="stPasswordInput"] {
+            width: 100% !important;
         }
 
         input { 
             color: #C5A059 !important; 
             font-weight: 600 !important; 
-            width: 100% !important; 
+            width: 100% !important; /* Tambahkan ini */
         }
 
+        /* Tombol Form Hover */
+        button[data-testid="stFormSubmitButton"]:hover {
+            background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
+            color: #1e1e2f !important;
+            box-shadow: 0 20px 25px rgba(197, 160, 89, 0.5) !important;
+            transform: translateY(-2px);
+        }
+
+        /* Notifikasi Sukses */
+        div[data-testid="stNotification"] {
+            background-color: #1e7e34 !important;
+            color: white !important;
+            border-radius: 10px !important;
+            border: 1px solid #C5A059 !important;
+        }
+        
+        
+        div[data-testid="stNotification"] svg { fill: white !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
-
-    # Centering Form
+    # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
-        st.markdown('<div style="padding: 30px; background: rgba(0,0,0,0.5); border-radius: 20px; border: 1px solid #C5A059; margin-top: 50px;">', unsafe_allow_html=True)
+        # Buka Container Card
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
         
-        st.markdown('<h2 style="color: #C5A059; text-align: center; font-family: \'Inter\', sans-serif; font-weight: 800;">📦 LOGISTIC SURABAYA ERP</h2>', unsafe_allow_html=True)
-        st.markdown('<p style="color: #A0A0A0; text-align: center; margin-bottom: 30px;">Surabaya Logistics Management System</p>', unsafe_allow_html=True)
+        # JUDUL
+        st.markdown("""
+            <h2 style="
+                color: #C5A059; 
+                margin-top: -20px; 
+                margin-bottom: -5px; 
+                font-family: 'Inter', sans-serif; 
+                font-weight: 800; 
+                text-align: center;
+            ">📦 LOGISTIC SURABAYA ERP</h2>
+        """, unsafe_allow_html=True)
+        
+        # SUB-JUDUL
+        st.markdown("""
+            <p style="
+                color: #A0A0A0; 
+                font-size: 14px; 
+                margin-bottom: 30px; 
+                text-align: center;
+            ">Surabaya Logistics Management System</p>
+        """, unsafe_allow_html=True)
 
+       # BUNGKUS FORM
         with st.form("login_form"):
             user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
             pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
             
             st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
+            
             submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
             
+            # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
             if submit_button:
                 if user_input == "admin" and pass_input == "sby123":
                     st.session_state.logged_in = True
+                    st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
                     st.rerun()
                 else:
                     st.error("Username atau Password salah!")
+        
+        # Tutup Container Card
         st.markdown('</div>', unsafe_allow_html=True)
+
     st.stop()
 # --- DASHBOARD UTAMA (Jalan setelah login) ---
 
