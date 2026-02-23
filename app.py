@@ -281,7 +281,7 @@ div.stFormSubmitButton > button {
                 color: #FFFFFF; 
                 font-size: 14px; 
                 margin-bottom: 30px; 
-                text-align: center;
+                text-align: left;
             ">🐊Surabaya Logistics Management System</p>
         """, unsafe_allow_html=True)
 
