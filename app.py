@@ -259,21 +259,20 @@ div.stFormSubmitButton > button {
     text-align: center;
     margin-top: -30px; 
     margin-bottom: -5px;
-    margin-left: calc(-50vw + 50%)
     background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
     letter-spacing: 2px;
     text-transform: uppercase;
-    width: 100vw;             /* Mengikuti lebar div utama */
+    width: 100%;             /* Mengikuti lebar div utama */
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 12px;
 ">
-    SURABAYA<br>
-            <span style="white-space: nowrap;">DISTRIBUTION CENTER</span>
+    <span style="-webkit-text-fill-color: initial; filter: drop-shadow(0 0 5px #C5A059);"></span>
+    SURABAYA DISTRIBUTION CENTER
 </h2>
         """, unsafe_allow_html=True)
         
