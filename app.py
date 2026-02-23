@@ -1520,16 +1520,16 @@ elif menu == "FDR Update":
             # PREVIEW (Read-only, biar nggak ketimpa input kosong)
             if st.session_state.ws_manifest is not None:
                 st.write("### 📂 MANIFEST DATA (A:Z)")
-                st.dataframe(st.session_state.ws_manifest, use_container_width=False, hide_index=True)
+                st.dataframe(st.session_state.ws_manifest, use_container_width=true, hide_index=True)
 
         with t2:
             if st.session_state.ws_fu_it is not None:
-                st.dataframe(st.session_state.ws_fu_it, use_container_width=False, hide_index=True)
+                st.dataframe(st.session_state.ws_fu_it, use_container_width=true, hide_index=True)
         with t3:
             if st.session_state.dict_kurir:
                 for k, d in st.session_state.dict_kurir.items():
                     with st.expander(f"📦 {k}"):
-                        st.dataframe(d, use_container_width=False)
+                        st.dataframe(d, use_container_width=true)
 
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
