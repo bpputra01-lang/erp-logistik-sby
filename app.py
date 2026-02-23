@@ -142,7 +142,7 @@ st.markdown("""
         color: #ff4b4b !important; 
         border: 2px solid #ff4b4b !important;
         width: 50% !important;
-        height: 1.0em !important;
+        height: 0 em !important;
         border-radius: 8px !important;
         font-weight: bold !important;
         white-space: nowrap !important;
