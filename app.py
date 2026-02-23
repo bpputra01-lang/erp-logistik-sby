@@ -102,20 +102,23 @@ st.markdown("""
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
-    /* --- FIX TOMBOL BERANTAKAN --- */
+    /* --- PERBAIKAN FINAL AGAR TIDAK KEPOTONG --- */
     div.stButton > button {
-        width: 100% !important;        /* Paksa tombol menuhi lebar kolomnya */
-        white-space: nowrap !important; /* HARUS: Biar teks gak turun ke bawah */
-        display: block !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important; /* Kalau kepanjangan bgt, jadi titik-titik, bukan berantakan */
-        font-size: 13px !important;    /* Ukuran font disesuaikan biar gak sesak */
-        padding: 0px 5px !important;
+        width: auto !important;         /* Biarkan lebar mengikuti teks */
+        min-width: 160px !important;    /* Kasih lebar minimal biar seragam */
+        white-space: nowrap !important;  /* Teks HARUS satu baris */
+        padding: 0px 20px !important;    /* Kasih nafas di kiri-kanan teks */
+        display: inline-flex !important; /* Biar ikon & teks sejajar rapi */
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 14px !important;      /* Ukuran font standar */
     }
 
-    /* Memastikan container tombol Streamlit gak maksa ganti baris */
-    [data-testid="stHorizontalBlock"] {
-        align-items: center !important;
+    /* Hilangkan margin bawaan streamlit yang bikin sempit */
+    [data-testid="column"] {
+        width: fit-content !important;
+        flex: unset !important;
+        min-width: unset !important;
     }
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
