@@ -251,37 +251,48 @@ div.stFormSubmitButton > button {
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
         
         # JUDUL
-        st.markdown("""
-<h2 style="
-    font-family: 'Inter', sans-serif; 
-    font-weight: 900; 
-    font-size: 32px;         /* Ukuran font yang pas */
-    text-align: center;
-    margin-top: -30px; 
-    margin-bottom: -5px;
-    background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    
-    /* --- PENGATUR RULER KIRI KANAN --- */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    
-    max-width: 90%;          /* ATUR DISINI: Batas lebar teks (misal 90% dari layar) */
-    margin-left: auto !important;
-    margin-right: auto !important;
-    white-space: nowrap;     /* Kunci agar tetap satu baris lurus */
-    overflow: hidden;        /* Jika teks kepanjangan, tidak akan berantakan ke luar */
-">
-    LOGISTIC SURABAYA ERP
-</h2>
-
-        """, unsafe_allow_html=True)
+        st.markdown(f"""
+    <div style="
+        display: block; 
+        width: 100%; 
+        text-align: center; 
+        margin: 0 auto;
+    ">
+        <h2 style="
+            font-family: 'Inter', sans-serif; 
+            font-weight: 900; 
+            font-size: 28px;
+            margin-top: -30px; 
+            margin-bottom: 0px;
+            background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            
+            /* --- RULER / BATAS KIRI KANAN --- */
+            max-width: 85%;          /* Ganti angka ini untuk atur lebar ruler */
+            margin-left: auto;
+            margin-right: auto;
+            white-space: nowrap;     /* Biar gak enter ke bawah */
+            overflow: visible;
+        ">
+            LOGISTIC SURABAYA ERP
+        </h2>
+        
+        <p style="
+            color: #FFFFFF; 
+            font-size: 13px; 
+            margin-top: 5px; 
+            margin-bottom: 25px; 
+            opacity: 0.9;
+            white-space: nowrap;
+        ">
+            <span style="vertical-align: middle;">🐊</span> Surabaya Logistics Management System
+        </p>
+    </div>
+""", unsafe_allow_html=True)
         
         # SUB-JUDUL
         st.markdown("""
