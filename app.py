@@ -252,38 +252,42 @@ div.stFormSubmitButton > button {
         
         # JUDUL
         st.markdown("""
-      <div style="text-align: center; width: 100%; margin-top: -30px; margin-bottom: 25px;">
-    <h2 style="
-        font-family: 'Inter', sans-serif; 
-        font-weight: 900; 
-        font-size: 30px;
-        margin-bottom: 10px;
-        margin: 0;
-        background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.4));
-        letter-spacing: 1px;
-        text-transform: uppercase;
-
-    ">
-        LOGISTIC SURABAYA ERP
-    </h2>
+           <h2 style="
+    font-family: 'Inter', sans-serif; 
+    font-weight: 900; 
+    font-size: 30px;
+    text-align: center;
+    margin-top: -30px; 
+    margin-bottom: -5px;
+    background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+">
+    <span style="-webkit-text-fill-color: initial; filter: drop-shadow(0 0 5px #C5A059);"></span>
+    LOGISTIC SURABAYA ERP
+</h2>
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
         st.markdown("""
-     <p style="
-        color: #FFFFFF; 
-        font-size: 13px; 
-        margin: 5px 0 0 0; 
-        opacity: 0.9;
-        letter-spacing: 0.5px;
-        font-family: 'Inter', sans-serif;
-    ">
-        <span style="vertical-align: middle;">🐊</span> Surabaya Logistics Management System
-    </p>
-</div>
+           <p style="
+    color: #FFFFFF; 
+    font-size: 13px; 
+    margin-top: 5px;         /* Rapatkan jarak ke judul di atas */
+    margin-bottom: 25px; 
+    text-align: center;
+    opacity: 0.9;
+    letter-spacing: 0.5px;
+">
+    <span style="filter: brightness(1.2);">🐊</span> Surabaya Logistics Management System
+</p>
         """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
