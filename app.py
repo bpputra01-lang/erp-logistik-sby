@@ -252,29 +252,33 @@ div.stFormSubmitButton > button {
         
         # JUDUL
         st.markdown("""
-           <h2 style="
-    font-family: 'Inter', sans-serif; 
-    font-weight: 900; 
-    font-size: 35px;
-    text-align: center;
-    margin-top: -30px; 
-    margin-bottom: -5px;
-    margin-left: calc(-50vw + 50%)
-    background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    width: 100vw;             /* Mengikuti lebar div utama */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-">
-    SURABAYA<br>
-            <span style="white-space: nowrap;">DISTRIBUTION CENTER</span>
-</h2>
+  <div style="
+        display: block; 
+        width: 100vw;            /* Paksa lebar sesuai layar laptop */
+        margin-left: calc(-50vw + 50%); /* Trik agar div benar-benar center murni */
+        text-align: center; 
+    ">
+        <h2 style="
+            font-family: 'Inter', sans-serif; 
+            font-weight: 900; 
+            font-size: 35px;         /* KUNCI: Ukuran 35px sesuai kemauan Bos */
+            margin-top: -30px; 
+            margin-bottom: 0px;
+            background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
+            letter-spacing: -0.5px;   /* Rapatkan sedikit hurufnya biar gak kepotong */
+            text-transform: uppercase;
+            line-height: 1.1;
+        ">
+            SURABAYA<br>
+            <span style="
+                white-space: nowrap; 
+                display: inline-block;
+                padding: 0 10px;    /* Kasih ruang buat efek glow di pinggir */
+            ">DISTRIBUTION CENTER</span>
+        </h2>
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
