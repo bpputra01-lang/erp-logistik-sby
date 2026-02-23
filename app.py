@@ -102,38 +102,38 @@ st.markdown("""
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
-  /* --- 1. KUNCI KONTAINER UTAMA (JARAK ANTAR TOMBOL SAMA) --- */
+  /* --- 1. KONTAINER UTAMA (JARAK ANTAR TOMBOL SAMA) --- */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
-        flex-wrap: wrap !important;      /* Paksa turun ke bawah kalau gak muat */
+        flex-wrap: wrap !important;      /* Paksa turun ke baris baru kalau gak muat secara horizontal */
         gap: 12px !important;            /* Jarak antar tombol (Kanan-Kiri & Atas-Bawah) SAMA PERSIS */
-        justify-content: flex-start !important; /* Susun dari kiri biar gak ada jarak bolong di tengah */
+        justify-content: flex-start !important; 
         align-items: stretch !important;
     }
 
-    /* --- 2. KUNCI LEBAR KOLOM AGAR TIDAK ADA JARAK ANEH --- */
+    /* --- 2. KUNCI LEBAR KOLOM --- */
     [data-testid="column"] {
-        flex: 1 1 auto !important;       /* Kolom fleksibel mengikuti isi */
-        min-width: fit-content !important; /* Jangan paksa lebar kolom kalau isi sudah cukup */
-        max-width: fit-content !important; /* KUNCI: Menghilangkan jarak lebar kosong antar tombol */
-        width: auto !important;
-        padding: 0px !important;         /* Buang padding bawaan kolom */
+        flex: 1 1 auto !important;
+        min-width: 150px !important;     /* Lebar minimal kolom agar tombol tidak terlalu kurus */
+        max-width: fit-content !important; /* Buang jarak kosong berlebih antar tombol */
+        padding: 0px !important;
     }
 
-    /* --- 3. STYLE TOMBOL (TINGGI & LEBAR SEIMBANG) --- */
+    /* --- 3. STYLE TOMBOL (TEKS BOLEH TURUN KE BAWAH) --- */
     div.stButton > button {
-        width: 100% !important;          /* Isi penuh kolomnya */
-        min-width: 180px !important;     /* Lebar minimal agar teks panjang aman */
-        height: 3.5em !important;        /* Tinggi tombol disamakan semua */
-        white-space: nowrap !important;  /* Teks dilarang kepotong/turun baris di dlm tombol */
-        padding: 10px 20px !important;   /* Jarak dalam (padding) simetris */
+        width: 100% !important;
+        min-height: 4em !important;      /* Tambah tinggi sedikit agar teks 2 baris gak sesak */
+        white-space: normal !important;  /* KUNCI: Teks BOLEH turun ke bawah/enter */
+        word-wrap: break-word !important;
+        line-height: 1.2 !important;     /* Jarak antar baris teks agar rapi */
+        padding: 10px 15px !important;   /* Jarak dalam simetris */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        text-align: center !important;   /* Teks rata tengah */
         font-size: 14px !important;
         border: 2px solid #001a35 !important;
-        margin: 0px !important;          /* Buang margin liar */
-    
+        margin: 0px !important;
     }
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
