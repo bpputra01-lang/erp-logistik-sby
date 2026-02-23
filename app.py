@@ -7,9 +7,7 @@ import math
 st.set_page_config(
     page_title="LogsbyERP.id",
     page_icon="🚛",)
-  # Taruh ini di paling atas setelah st.set_page_config
-if st.session_state.logged_in:
-    st.button("Logout Session", key="logout_top")
+  
 st.markdown("""
     <style>
     /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
@@ -137,35 +135,35 @@ st.markdown("""
         border: 2px solid #001a35 !important;
     
     }
-    /* --- TRIK PINDAHKAN LOGOUT KE SEBELAH FORK --- */
-    div.stButton > button:has(p:contains("Logout")) {
-        position: fixed !important;
-        top: 10px !important;          /* Atur tinggi agar sejajar Toolbar */
-        right: 150px !important;        /* Atur jarak dari kanan agar di sebelah Fork */
-        z-index: 999999 !important;    /* Pastikan paling depan */
-        
-        /* Ukuran Mini agar pas di Toolbar */
-        width: auto !important;
-        height: 30px !important;
-        padding: 0px 15px !important;
-        font-size: 12px !important;
-        
-        background-color: transparent !important; /* Buat transparan biar elegan */
+    /* --- SOLUSI PERMANEN TOMBOL LOGOUT --- */
+    /* 1. Kunci Button di Sidebar agar tidak ikut gaya tombol utama */
+    [data-testid="stSidebar"] div.stButton > button {
+        background-color: #002b5b !important; 
+        color: #ff4b4b !important; 
+        border: 2px solid #ff4b4b !important;
+        width: 50% !important;
+        height: 2.0em !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        white-space: nowrap !important;
+        transition: none !important; /* Biar gak kedap-kedip pas refresh */
+    }
+
+    /* 2. Pastikan teks di dalamnya tetap merah */
+    [data-testid="stSidebar"] div.stButton > button p {
         color: #ff4b4b !important;
-        border: 1px solid #ff4b4b !important;
-        border-radius: 5px !important;
     }
 
-    /* Efek saat di-hover */
-    div.stButton > button:has(p:contains("Logout")):hover {
-        background-color: #ff4b4b !important;
+    /* 3. Efek Hover khusus Logout */
+    [data-testid="stSidebar"] div.stButton > button:hover {
+        background-color: #8b0000 !important;
         color: white !important;
+        border-color: white !important;
     }
 
-    /* Sembunyikan garis header bawaan biar gak tabrakan */
-    header[data-testid="stHeader"] {
-        z-index: 999998 !important;
-        background: transparent !important;
+    /* 4. Reset teks hover */
+    [data-testid="stSidebar"] div.stButton > button:hover p {
+        color: white !important;
     }
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
