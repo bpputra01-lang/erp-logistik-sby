@@ -171,6 +171,26 @@ st.markdown("""
         color: #1a2634 !important;
         font-weight: bold !important;
     }
+    [data-testid="stAppViewContainer"] {
+    background-image: url("https://your-image-url.com/bg.jpg");
+    background-size: cover;
+    background-position: center;
+}
+
+div[data-baseweb="input"] > div {
+    background-color: transparent !important;
+}
+
+input {
+    background-color: rgba(255,255,255,0.2) !important;
+    backdrop-filter: blur(5px);
+    border-radius: 10px !important;
+    color: white !important;
+}
+
+label {
+    color: white !important;
+}
     </style>
     """, unsafe_allow_html=True)
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
