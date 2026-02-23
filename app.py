@@ -252,46 +252,52 @@ div.stFormSubmitButton > button {
         
         # JUDUL
         st.markdown("""
-    <div style="
-        width: 100%; 
-        display: flex; 
-        justify-content: center; /* Menjamin seluruh blok ada di tengah form */
-        margin-top: -30px;
-        margin-bottom: 0px; 
+  <div style="
+    display: block; 
+    width: 100%; 
+    text-align: center; 
+    margin: 0 auto;
+    overflow: visible;
+">
+    <h2 style="
+        font-family: 'Inter', sans-serif; 
+        font-weight: 900; 
+        font-size: 35px;         /* Tetap 35px sesuai kemauan Bos */
+        margin-top: -30px; 
+        margin-bottom: 0px;
+        background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
+        letter-spacing: -0.5px; 
+        text-transform: uppercase;
+        line-height: 1.1;
+        display: inline-block;   /* KUNCI: Membuat box mengikuti lebar teks terpanjang */
     ">
-        <h2 style="
-            font-family: 'Inter', sans-serif; 
-            font-weight: 900; 
-            font-size: 35px;         /* Tetap 35px sesuai permintaan Bos */
-            text-align: center;      /* Menjamin baris atas dan bawah saling center */
-            margin: 0;
-            background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
-            letter-spacing: -0.8px;  /* Rapatkan dikit agar tidak luber ke samping */
-            text-transform: uppercase;
-            line-height: 1.1;
-            display: table;          /* KUNCI: Membuat lebar box seukuran teks terpanjang */
-        ">
-            SURABAYA<br>
-            <span style="white-space: nowrap;">DISTRIBUTION CENTER</span>
-        </h2>
-    </div>
-    
-    <p style="
-        color: #FFFFFF; 
-        font-size: 13px; 
-        text-align: center;
-        margin-top: 5px; 
-        margin-bottom: 10px; 
-        opacity: 0.9;
-        width: 100%;
-    ">
-        <span style="vertical-align: middle;">🐊</span> Surabaya Logistics Management System
-    </p>
-""", unsafe_allow_html=True)
+        SURABAYA<br>
+        <span style="
+            white-space: nowrap; 
+            display: inline-block;
+            padding: 0 5px;      /* Ruang tipis untuk glow agar tidak kepotong */
+        ">DISTRIBUTION CENTER</span>
+    </h2>
+</div>
+        """, unsafe_allow_html=True)
         
+        # SUB-JUDUL
+        st.markdown("""
+           <p style="
+    color: #FFFFFF; 
+    font-size: 13px; 
+    margin-top: 5px;         /* Rapatkan jarak ke judul di atas */
+    margin-bottom: 16px; 
+    text-align: center;
+    opacity: 0.9;
+    letter-spacing: 0.5px;
+">
+    <span style="filter: brightness(1.2);">🐊</span> Surabaya Logistics Management System
+</p>
+        """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
         with st.form("login_form"):
