@@ -271,8 +271,8 @@ div.stFormSubmitButton > button {
     align-items: center;
     gap: 12px;
 ">
-    <span style="-webkit-text-fill-color: initial; filter: drop-shadow(0 0 5px #C5A059);"></span>
-    SURABAYA DISTRIBUTION CENTER
+    SURABAYA<br>
+            <span style="white-space: nowrap;">DISTRIBUTION CENTER</span>
 </h2>
         """, unsafe_allow_html=True)
         
