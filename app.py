@@ -251,6 +251,33 @@ if not st.session_state.logged_in:
             border-radius: 10px !important;
             border: 1px solid #C5A059 !important;
         }
+        /* --- FORCE RESET TOTAL UNTUK INPUT PASSWORD --- */
+/* 1. Paksa kolom password mengabaikan aturan 'fit-content' global */
+[data-testid="stForm"] [data-testid="column"], 
+[data-testid="stForm"] div[data-testid="stPasswordInput"] {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+}
+
+/* 2. Paksa blok putih (input base) melebar penuh tanpa ampun */
+div[data-baseweb="input"] {
+    width: 100% !important;
+    display: flex !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 3. Pastikan kolom password tidak terpengaruh oleh icon 'mata' */
+[data-testid="stPasswordInput"] input {
+    width: 100% !important;
+    flex-grow: 1 !important;
+}
+
+/* 4. Penyesuaian untuk Light Mode agar border tetap terlihat emas */
+div[data-baseweb="input"] {
+    border: 1px solid #C5A059 !important; /* Paksa border emas biar kontras di Light Mode */
+}
         
         div[data-testid="stNotification"] svg { fill: white !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
