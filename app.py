@@ -1285,7 +1285,7 @@ elif menu == "Refill & Overstock":
                     st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REFILL_OVERSTOCK_REPORT.xlsx")
             except Exception as e: st.error(f"Error: {e}")
 
-elif menu == "📈Database Master":
+elif menu == "Database Master":
     # Link Google Sheets lo yang sudah dikunci
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
     
