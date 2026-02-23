@@ -598,7 +598,7 @@ def menu_refill_withdraw():
             st.session_state.summary_withdraw = pd.DataFrame(outWdr, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN DC", "BIN LAIN"])
             st.success(f"DONE! Refill: {len(outRef)} | Withdraw: {len(outWdr)}")
         else:
-            st.error("Upload Data Stock Dulu Cok!")
+            st.error("Upload Data Stock Dulu!")
 
     # --- 3. TABS SECTION ---
     t1, t2, t3 = st.tabs(["📦 Summary Refill", "📤 Summary Withdraw", "☁️ Upload Cloud"])
