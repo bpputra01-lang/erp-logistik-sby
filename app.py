@@ -322,7 +322,7 @@ def menu_fdr_update():
         st.session_state.dict_kurir = {}
 
     # --- 1. TABS SYSTEM ---
-    t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "✂️ SPLIT KURIR"])
+    t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "🛵 SPLIT KURIR"])
 
     with t1:
         st.subheader("🛠️ Macro Control Panel")
@@ -406,7 +406,7 @@ def menu_refill_withdraw():
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name=0)
             st.success("Trx Ready")
 
-    if st.button("🚀 GENERATE SUMMARY (ULTRA FAST)"):
+    if st.button("▶️ GENERATE SUMMARY "):
         if st.session_state.df_stock_sby is not None:
             # Setup Dataframe
             df_s = st.session_state.df_stock_sby.copy()
@@ -559,7 +559,7 @@ def menu_refill_withdraw():
     st.divider()
 
     # --- 2. GENERATE BUTTON ---
-    if st.button("🚀 GENERATE SUMMARY (ULTRA FAST)"):
+    if st.button(" 📝GENERATE SUMMARY "):
         if st.session_state.df_stock_sby is not None:
             # Setup Dataframe & Clean Columns
             df_s = st.session_state.df_stock_sby.copy()
@@ -664,7 +664,7 @@ def menu_refill_withdraw():
             st.error("Upload Data Stock Dulu!")
 
     # --- 3. TABS SECTION ---
-    t1, t2, t3 = st.tabs(["📦 Summary Refill", "📤 Summary Withdraw", "☁️ Upload Cloud"])
+    t1, t2, t3 = st.tabs(["♻️ Summary Refill", "♻️ Summary Withdraw", "☁️ Upload Appsheet"])
 
     with t1:
         if st.session_state.summary_refill is not None:
@@ -1209,10 +1209,10 @@ if menu == "Dashboard Overview":
 elif menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    with c1: up_ds = st.file_uploader("Upload DS PUTAWAY", type=['xlsx', 'csv'])
-    with c2: up_asal = st.file_uploader("Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
+    with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
+    with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
     if up_ds and up_asal:
-        if st.button("⚡COMPARE PUTAWAY"):
+        if st.button("▶️COMPARE PUTAWAY"):
             try:
                 df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='calamine')
                 df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='calamine')
@@ -1235,11 +1235,11 @@ elif menu == "Putaway System":
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANLYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
-    with col1: up_scan = st.file_uploader("Upload DATA SCAN", type=['xlsx', 'csv'])
-    with col2: up_hist = st.file_uploader("Upload HISTORY SET UP", type=['xlsx'])
-    with col3: up_stock = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
+    with col1: up_scan = st.file_uploader("U📥pload DATA SCAN", type=['xlsx', 'csv'])
+    with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'])
+    with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
     if up_scan and up_hist and up_stock:
-        if st.button("🚀 COMPARE DATA SCAN OUT"):
+        if st.button("▶️ COMPARE DATA SCAN OUT"):
             try:
                 df_s = pd.read_excel(up_scan, engine='calamine') if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
                 df_h = pd.read_excel(up_hist, engine='calamine'); df_st = pd.read_excel(up_stock, engine='calamine')
@@ -1257,10 +1257,10 @@ elif menu == "Scan Out Validation":
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    with c1: up_all = st.file_uploader("Upload ALL DATA STOCK", type=['xlsx'])
-    with c2: up_track = st.file_uploader("Upload STOCK TRACKING", type=['xlsx'])
+    with c1: up_all = st.file_uploader("📥Upload ALL DATA STOCK", type=['xlsx'])
+    with c2: up_track = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
     if up_all and up_track:
-        if st.button("🚀 PROSES REFILL & OVERSTOCK"):
+        if st.button("▶️ PROSES REFILL & OVERSTOCK"):
             try:
                 with st.spinner("Processing..."):
                     df_all = pd.read_excel(up_all, engine='calamine')
@@ -1416,7 +1416,7 @@ elif menu == "Compare RTO":
     f4 = st.file_uploader("📥 4. UPLOAD HASIL CEK REAL ", type=['xlsx','csv'], key="f4", help="Upload file selisih yang sudah diisi kolom HASIL CEK REAL-nya")
 
     # --- 2. JALANKAN PROSES AWAL ---
-    if st.button("🚀 1. JALANKAN PROSES AWAL", use_container_width=True):
+    if st.button("▶️ JALANKAN PROSES", use_container_width=True):
         if f1 and f2:
             df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
             df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
@@ -1471,7 +1471,7 @@ elif menu == "Compare RTO":
         st.divider()
         st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
         
-        if st.button("🔥 2. RUN FINAL COMPARE TO DRAFT", use_container_width=True):
+        if st.button("🏁 FINAL COMPARE TO DRAFT RTO", use_container_width=True):
             # Cek data mana yang dipake
             data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
             
@@ -1489,14 +1489,14 @@ elif menu == "Compare RTO":
                 st.metric("Total Qty Akhir", f"{total_vba} Pcs")
                 
                 if total_vba == 231:
-                    st.success("✅ MANTAP! HASIL AKHIR 231 PCS!")
+                    st.success("✅ PROSES BERHASIL")
                 
                 st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
                 
                 csv = hasil_draft.to_csv(index=False).encode('utf-8')
                 st.download_button(f"📥 Download Draft Final ({total_vba} Pcs)", csv, f"Draft_Final_{total_vba}.csv", "text/csv", use_container_width=True)
             else:
-                st.error("Jalankan Proses Awal (Tombol 1) dulu,!")
+                st.error("Jalankan Proses Awal dulu,!")
 
 elif menu == "FDR Update":
         st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST PROCESSOR</h1></div>', unsafe_allow_html=True)
@@ -1512,10 +1512,10 @@ elif menu == "FDR Update":
         t1, t2, t3 = st.tabs(["MANIFEST INPUT", "PERLU FU IT", "SPLIT KURIR"])
 
         with t1:
-            st.subheader("🛠️ CEK MANIFEST OUTSTANDING")
+            st.subheader("🛵 CEK MANIFEST OUTSTANDING")
             
             # 1. UPLOAD (Langsung masukin ke State)
-            u_file = st.file_uploader("📂 Pilih File Manifest Excel", type=["xlsx"], key="fdr_up")
+            u_file = st.file_uploader("📂 Choose Your File", type=["xlsx"], key="fdr_up")
             if u_file:
                 # Cek biar nggak loading terus-terusan
                 if st.session_state.ws_manifest is None:
@@ -1526,7 +1526,7 @@ elif menu == "FDR Update":
             c = st.columns(4)
             
            # --- MACRO 1: CLEAN COLUMNS (Anti-Error) ---
-            if c[0].button("🧹 CLEAR COLUMNS", key="btn_clean"):
+            if c[0].button("🚮 CLEAR COLUMNS", key="btn_clean"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
                     
@@ -1545,7 +1545,7 @@ elif menu == "FDR Update":
                     else:
                         st.warning("Kolom sudah bersih atau tidak ditemukan!")
                 else: 
-                    st.error("UPLOAD FILE DULU BOS!")
+                    st.error("UPLOAD FILE DULU!")
 
             # --- MACRO 2: COPY FU IT (M / Index 12 TIDAK KOSONG) ---
             if c[1].button("🖥️NEED FU IT", key="btn_fu"):
@@ -1571,7 +1571,7 @@ elif menu == "FDR Update":
                         d_kurir = {str(n): g.iloc[:, 0:13] for n, g in filtered.groupby(filtered.iloc[:, 5])}
                         st.session_state.dict_kurir = d_kurir
                         st.success("Split Beres!")
-                    else: st.error("KAGAK ADA DATA yang cocok buat di-split!")
+                    else: st.error("No Data Split!")
 
             if c[3].button("🗑️ CLEAR", type="primary"):
                 st.session_state.ws_manifest = None
