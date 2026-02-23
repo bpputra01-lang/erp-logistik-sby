@@ -197,7 +197,7 @@ if not st.session_state.logged_in:
         [data-testid="stForm"] [data-testid="column"] {
             flex: 1 1 auto !important;
             width: 110% !important;
-            max-width: 110% !important;
+            max-width: 10% !important;
         }
 
         /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
