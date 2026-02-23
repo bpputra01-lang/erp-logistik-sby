@@ -1049,7 +1049,27 @@ with st.sidebar:
             background-color: #FFD700 !important;
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
         }
+/* Container utama tombol */
+.container-tombol-bos {
+    display: flex;
+    flex-wrap: nowrap;       /* Paksa tetap satu baris horizontal */
+    gap: 10px;               /* Jarak antar tombol */
+    justify-content: center; /* Tombol di tengah */
+    width: 100%;
+    overflow-x: auto;        /* Kalau layar sempit, bisa di-scroll bukan berantakan */
+}
 
+/* Styling masing-masing tombol */
+.tombol-erp {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;     /* KUNCI: Tulisan dilarang turun ke bawah */
+    font-size: 13px;         /* Kecilkan sedikit jika masih sesak */
+    padding: 10px 15px;
+    border-radius: 8px;
+    min-width: fit-content;  /* Lebar mengikuti teks tapi tidak dipaksa sempit */
+    flex-shrink: 0;          /* Jangan biarkan tombol "menciut" */
+}
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
