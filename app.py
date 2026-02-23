@@ -264,7 +264,6 @@ div.stFormSubmitButton > button {
         filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.4));
         letter-spacing: 1px;
         text-transform: uppercase;
-        display: inline-block;
     ">
         LOGISTIC SURABAYA ERP
     </h2>
