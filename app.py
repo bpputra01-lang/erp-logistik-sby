@@ -192,13 +192,14 @@ if not st.session_state.logged_in:
         }
         [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
         
-        /* --- KUNCI PERBAIKAN: PAKSA LEBAR PENUH --- */
-        /* Menghapus efek 'fit-content' dari global agar input password tidak menciut */
-        [data-testid="stForm"] [data-testid="column"] {
-            flex: 1 1 auto !important;
-            width: 100% !important;
-            max-width: 100% !important;
-        }
+       /* --- KUNCI PERBAIKAN: PAKSA LEBAR PENUH --- */
+[data-testid="stForm"] [data-testid="column"] {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important; /* TAMBAHKAN INI BOS, BIAR GAK BISA BANTAH */
+}
+        
 
         /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
         button[data-testid="stFormSubmitButton"], 
@@ -251,37 +252,7 @@ if not st.session_state.logged_in:
             border-radius: 10px !important;
             border: 1px solid #C5A059 !important;
         }
-        /* --- JURUS PAMUNGKAS: FIX PASSWORD LIGHT MODE --- */
-
-/* 1. Bongkar paksa lebar kolom form agar tidak menciut */
-div.stForm {
-    width: 100% !important;
-}
-
-/* 2. Target langsung ke kontainer terdalam Password Input */
-div[data-testid="stPasswordInput"] > div {
-    width: 100% !important;
-    max-width: none !important;
-}
-
-/* 3. Paksa 'Baseweb Input' (kotak putihnya) untuk melar 100% */
-/* Ini yang biasanya nahan di Light Mode */
-div[data-baseweb="input"] {
-    width: 100% !important;
-    min-width: 100% !important;
-    display: flex !important;
-}
-
-/* 4. Pastikan tidak ada margin kanan liar yang bikin kepotong */
-[data-testid="column"] {
-    margin-right: 0px !important;
-    margin-left: 0px !important;
-}
-
-/* 5. Khusus Light Mode: Pastikan warna teks input tetap kontras */
-input {
-    color: #1e1e2f !important; /* Gunakan warna gelap agar terbaca di Light Mode */
-}
+        
         
         div[data-testid="stNotification"] svg { fill: white !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
