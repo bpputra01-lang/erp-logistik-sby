@@ -255,7 +255,7 @@ div.stFormSubmitButton > button {
            <h2 style="
     font-family: 'Inter', sans-serif; 
     font-weight: 900; 
-    font-size: 30px;
+    font-size: 35px;
     text-align: center;
     margin-top: -30px; 
     margin-bottom: -5px;
@@ -272,7 +272,7 @@ div.stFormSubmitButton > button {
     gap: 12px;
 ">
     <span style="-webkit-text-fill-color: initial; filter: drop-shadow(0 0 5px #C5A059);"></span>
-    SURABAYA DISTRIBUTION CENTER
+    LOGISTIC SURABAYA ERP
 </h2>
         """, unsafe_allow_html=True)
         
