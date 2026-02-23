@@ -252,27 +252,14 @@ div.stFormSubmitButton > button {
         
         # JUDUL
         st.markdown("""
-           <h2 style="
-    font-family: 'Inter', sans-serif; 
-    font-weight: 900; 
-    font-size: 30px;
-    text-align: center;
-    margin-top: -30px; 
-    margin-bottom: -5px;
-    background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-">
-    <span style="-webkit-text-fill-color: initial; filter: drop-shadow(0 0 5px #C5A059);"></span>
-    LOGISTIC SURABAYA ERP
-</h2>
+            <h2 style="
+                color: #C5A059; 
+                margin-top: -20px; 
+                margin-bottom: -5px; 
+                font-family: 'Inter', sans-serif; 
+                font-weight: 800; 
+                text-align: center;
+            ">LOGISTIC SURABAYA ERP</h2>
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
@@ -280,7 +267,7 @@ div.stFormSubmitButton > button {
             <p style="
                 color: #FFFFFF; 
                 font-size: 14px; 
-                margin-bottom: 20px; 
+                margin-bottom: 30px; 
                 text-align: center;
             ">🐊Surabaya Logistics Management System</p>
         """, unsafe_allow_html=True)
