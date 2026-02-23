@@ -255,7 +255,7 @@ div.stFormSubmitButton > button {
            <h2 style="
     font-family: 'Inter', sans-serif; 
     font-weight: 900; 
-    font-size: 35px;
+    font-size: 30px;
     text-align: center;
     margin-top: -30px; 
     margin-bottom: -5px;
@@ -277,17 +277,12 @@ div.stFormSubmitButton > button {
         
         # SUB-JUDUL
         st.markdown("""
-           <p style="
-    color: #FFFFFF; 
-    font-size: 13px; 
-    margin-top: 5px;         /* Rapatkan jarak ke judul di atas */
-    margin-bottom: 25px; 
-    text-align: center;
-    opacity: 0.9;
-    letter-spacing: 0.5px;
-">
-    <span style="filter: brightness(1.2);">🐊</span> Surabaya Logistics Management System
-</p>
+            <p style="
+                color: #FFFFFF; 
+                font-size: 14px; 
+                margin-bottom: 20px; 
+                text-align: center;
+            ">🐊Surabaya Logistics Management System</p>
         """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
