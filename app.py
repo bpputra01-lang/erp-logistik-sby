@@ -122,7 +122,7 @@ st.markdown("""
     /* --- 3. STYLE TOMBOL: PRESISI & TEKS ENTER --- */
     div.stButton > button {
         width: 180px !important;         /* Tentukan lebar tetap agar semua tombol seragam */
-        min-height: 4.5em !important;    /* Tinggi cukup untuk teks 2 baris */
+        min-height: 3.5em !important;    /* Tinggi cukup untuk teks 2 baris */
         white-space: normal !important;  /* Izinkan teks turun ke bawah (enter) */
         word-wrap: break-word !important;
         padding: 10px 15px !important;   /* Jarak dalam tombol simetris */
@@ -131,7 +131,7 @@ st.markdown("""
         justify-content: center !important;
         text-align: center !important;
         font-size: 14px !important;
-        line-height: 0 !important;
+        line-height: 1.2 !important;
         border: 2px solid #001a35 !important;
     
     }
