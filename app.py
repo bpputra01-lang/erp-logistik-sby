@@ -135,25 +135,35 @@ st.markdown("""
         border: 2px solid #001a35 !important;
     
     }
-    /* --- 1. LOCK STYLE KHUSUS LOGOUT SESSION --- */
-    /* Kita targetkan tombol yang punya teks 'Logout' agar tidak berubah-ubah */
-    button[kind="secondary"]:has(div p:contains("Logout")), 
-    button:contains("Logout") {
-        background-color: #002b5b !important; /* Tetap Biru Navy */
-        color: #ff4b4b !important;           /* Teks Merah agar tegas */
+    /* --- SOLUSI PERMANEN TOMBOL LOGOUT --- */
+    /* 1. Kunci Button di Sidebar agar tidak ikut gaya tombol utama */
+    [data-testid="stSidebar"] div.stButton > button {
+        background-color: #002b5b !important; 
+        color: #ff4b4b !important; 
         border: 2px solid #ff4b4b !important;
         width: 100% !important;
-        height: 3em !important;
+        height: 3.5em !important;
         border-radius: 8px !important;
         font-weight: bold !important;
-        transition: none !important;         /* Matikan transisi biar gak kedap-kedip */
+        white-space: nowrap !important;
+        transition: none !important; /* Biar gak kedap-kedip pas refresh */
     }
 
-    /* --- 2. PREVENT HOVER JUMPING --- */
-    button:contains("Logout"):hover {
-        background-color: #8b0000 !important; /* Merah gelap pas di-hover */
+    /* 2. Pastikan teks di dalamnya tetap merah */
+    [data-testid="stSidebar"] div.stButton > button p {
+        color: #ff4b4b !important;
+    }
+
+    /* 3. Efek Hover khusus Logout */
+    [data-testid="stSidebar"] div.stButton > button:hover {
+        background-color: #8b0000 !important;
         color: white !important;
         border-color: white !important;
+    }
+
+    /* 4. Reset teks hover */
+    [data-testid="stSidebar"] div.stButton > button:hover p {
+        color: white !important;
     }
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
