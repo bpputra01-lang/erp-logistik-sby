@@ -252,7 +252,6 @@ if not st.session_state.logged_in:
             border: 1px solid #C5A059 !important;
         }
         
-        
         div[data-testid="stNotification"] svg { fill: white !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
