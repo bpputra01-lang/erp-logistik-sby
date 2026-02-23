@@ -292,7 +292,7 @@ st.markdown(f"""
             <span style="vertical-align: middle;">🐊</span> Surabaya Logistics Management System
         </p>
     </div>
-            """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
         with st.form("login_form"):
