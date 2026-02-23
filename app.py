@@ -111,13 +111,22 @@ st.markdown("""
         width: 100% !important;
     }
 
-    /* --- 2. KUNCI KOLOM: BUANG JARAK KOSONG (GAP) OTOMATIS --- */
-    [data-testid="column"] {
-        flex: 0 1 auto !important;       /* Jangan biarkan kolom melebar sendiri menghabiskan layar */
-        width: auto !important;          /* Lebar kolom wajib mengikuti isi tombolnya saja */
-        min-width: fit-content !important; 
-        max-width: fit-content !important; /* Paksa kolom menciut, buang jarak jauh antar tombol */
-    }
+    /* --- 2. KUNCI KOLOM: HANYA UNTUK TOMBOL (GAK MERUSAK LOGIN) --- */
+/* Tambahkan spesifik selector agar form login tidak ikut menciut */
+[data-testid="stHorizontalBlock"] [data-testid="column"] {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: fit-content !important; 
+    max-width: fit-content !important; 
+}
+
+/* Reset kembali untuk form login agar tetap penuh */
+[data-testid="stForm"] [data-testid="column"] {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+}
 
     /* --- 3. STYLE TOMBOL: PRESISI & TEKS ENTER --- */
     div.stButton > button {
@@ -181,7 +190,6 @@ if 'logged_in' not in st.session_state:
 
 # --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
 # --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
-# --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
@@ -193,22 +201,14 @@ if not st.session_state.logged_in:
         }
         [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
         
-        /* --- KUNCI PERBAIKAN: PAKSA LEBAR PENUH TANPA AMPUN --- */
-        /* Target kolom form agar tidak menciut (menimpa aturan fit-content) */
-        [data-testid="stForm"] [data-testid="column"] {
-            flex: 1 1 auto !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 100% !important;
-        }
-
-        /* Target Jantung Input Password (Baseweb) - Ini yang sering nahan di Light Mode */
-        [data-testid="stForm"] div[data-baseweb="input"], 
-        [data-testid="stForm"] div[data-testid="stPasswordInput"] > div {
-            width: 100% !important;
-            min-width: 100% !important;
-            display: flex !important;
-        }
+       /* --- KUNCI PERBAIKAN: PAKSA LEBAR PENUH --- */
+[data-testid="stForm"] [data-testid="column"] {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important; /* TAMBAHKAN INI BOS, BIAR GAK BISA BANTAH */
+}
+        
 
         /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
         button[data-testid="stFormSubmitButton"], 
@@ -228,25 +228,22 @@ if not st.session_state.logged_in:
             text-transform: uppercase !important;
         }
 
-        /* 4. Style Input Box (Blok Putih) */
+        /* 4. Input Box - Paksa lebar 100% agar tidak terpotong */
         div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
             border-radius: 10px !important;
+            width: 100% !important; /* Tambahkan ini agar blok putih penuh */
         }
 
-        /* Paksa Teks Input & Password agar Melebar */
+        div[data-testid="stPasswordInput"] {
+            width: 100% !important;
+        }
+
         input { 
             color: #C5A059 !important; 
             font-weight: 600 !important; 
-            width: 100% !important;
-            flex-grow: 1 !important;
-        }
-
-        /* Fix Ikon Mata Password agar tidak mendorong kotak */
-        [data-testid="stPasswordInput"] button {
-            background: transparent !important;
-            border: none !important;
+            width: 100% !important; /* Tambahkan ini */
         }
 
         /* Tombol Form Hover */
@@ -257,13 +254,15 @@ if not st.session_state.logged_in:
             transform: translateY(-2px);
         }
 
-        /* Notifikasi */
+        /* Notifikasi Sukses */
         div[data-testid="stNotification"] {
             background-color: #1e7e34 !important;
             color: white !important;
             border-radius: 10px !important;
             border: 1px solid #C5A059 !important;
         }
+        
+        
         div[data-testid="stNotification"] svg { fill: white !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
