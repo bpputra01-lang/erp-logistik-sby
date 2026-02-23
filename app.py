@@ -1463,7 +1463,7 @@ elif menu == "FDR Update":
             c = st.columns(4)
             
            # --- MACRO 1: CLEAN COLUMNS (Anti-Error) ---
-            if c[0].button("🧹 CLEAN COLUMNS", key="btn_clean"):
+            if c[0].button("🧹 CLEAR COLUMNS", key="btn_clean"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
                     
@@ -1485,7 +1485,7 @@ elif menu == "FDR Update":
                     st.error("UPLOAD FILE DULU BOS!")
 
             # --- MACRO 2: COPY FU IT (M / Index 12 TIDAK KOSONG) ---
-            if c[1].button("Need FU IT", key="btn_fu"):
+            if c[1].button("🖥️NEED FU IT", key="btn_fu"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
                     # Filter M (12) <> ""
@@ -1495,7 +1495,7 @@ elif menu == "FDR Update":
                 else: st.error("Data Kosong!")
 
             # --- MACRO 3: SPLIT KURIR (F Isi & M Kosong) ---
-            if c[2].button("Outstanding by Kurir", key="btn_split"):
+            if c[2].button("🛵OUTSTANDING COURIER", key="btn_split"):
                 if st.session_state.ws_manifest is not None:
                     df = st.session_state.ws_manifest.copy()
                     f_val = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
