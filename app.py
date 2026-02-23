@@ -131,7 +131,7 @@ st.markdown("""
         justify-content: center !important;
         text-align: center !important;
         font-size: 14px !important;
-        line-height: 1 !important;
+        line-height: 0 !important;
         border: 2px solid #001a35 !important;
     
     }
