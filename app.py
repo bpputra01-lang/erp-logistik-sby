@@ -102,23 +102,29 @@ st.markdown("""
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
-    /* --- PERBAIKAN FINAL AGAR TIDAK KEPOTONG --- */
+  /* --- PERBAIKAN TOTAL: GAK KEPOTONG & GAK NUMPUK --- */
     div.stButton > button {
-        width: auto !important;         /* Biarkan lebar mengikuti teks */
-        min-width: 160px !important;    /* Kasih lebar minimal biar seragam */
-        white-space: nowrap !important;  /* Teks HARUS satu baris */
-        padding: 0px 20px !important;    /* Kasih nafas di kiri-kanan teks */
-        display: inline-flex !important; /* Biar ikon & teks sejajar rapi */
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 14px !important;      /* Ukuran font standar */
+        width: auto !important;          /* Lebar otomatis mengikuti teks */
+        white-space: nowrap !important;   /* Teks dilarang ganti baris */
+        padding: 10px 25px !important;    /* Kasih ruang biar gak nempel border */
+        display: inline-flex !important;  /* Gabungkan ikon dan teks secara lurus */
+        margin-right: 15px !important;    /* Kasih jarak antar tombol biar gak numpuk */
+        font-size: 14px !important;       /* Ukuran font ideal */
+        border: 2px solid #001a35 !important;
     }
 
-    /* Hilangkan margin bawaan streamlit yang bikin sempit */
+    /* MENGATUR CONTAINER AGAR KOLOM MELEBAR SESUAI ISI */
     [data-testid="column"] {
-        width: fit-content !important;
-        flex: unset !important;
-        min-width: unset !important;
+        flex: 1 1 auto !important;        /* Kolom akan melebar sendiri seperlunya */
+        min-width: fit-content !important; /* Jangan paksa kolom jadi sempit */
+        width: auto !important;
+    }
+
+    /* MENCEGAH TOMBOL SALING TINDIH (OVERLAP) */
+    [data-testid="stHorizontalBlock"] {
+        gap: 20px !important;             /* Tambah jarak antar kolom di baris tombol */
+        flex-wrap: wrap !important;       /* Kalau layar sangat sempit, turun rapi bukan numpuk */
+
     }
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
