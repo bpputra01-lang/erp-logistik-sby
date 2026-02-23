@@ -265,7 +265,7 @@ div.stFormSubmitButton > button {
         # SUB-JUDUL
         st.markdown("""
             <p style="
-                color: #A0A0A0; 
+                color: #FFFFFF; 
                 font-size: 14px; 
                 margin-bottom: 30px; 
                 text-align: center;
