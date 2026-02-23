@@ -18,6 +18,7 @@ st.markdown("""
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarNav"] { display: none; } 
     
+
     
     /* 2. STYLE JUDUL ERP DI SIDEBAR */
     .sidebar-title { 
@@ -113,12 +114,12 @@ st.markdown("""
     }
 
     /* --- 2. KUNCI KOLOM: BUANG JARAK KOSONG (GAP) OTOMATIS --- */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-    flex: 0 1 auto !important;
-    width: auto !important;
-    min-width: fit-content !important; 
-    max-width: fit-content !important;
-}
+    [data-testid="column"] {
+        flex: 0 1 auto !important;       /* Jangan biarkan kolom melebar sendiri menghabiskan layar */
+        width: auto !important;          /* Lebar kolom wajib mengikuti isi tombolnya saja */
+        min-width: fit-content !important; 
+        max-width: fit-content !important; /* Paksa kolom menciut, buang jarak jauh antar tombol */
+    }
 
     /* --- 3. STYLE TOMBOL: PRESISI & TEKS ENTER --- */
     div.stButton > button {
@@ -170,18 +171,7 @@ st.markdown("""
         background-color: #C5A059 !important;
         color: #1a2634 !important;
         font-weight: bold !important;
-
     }
-    /* RESET TOTAL LAYOUT LOGIN */
-[data-testid="stHorizontalBlock"] {
-    display: block !important;
-}
-
-div[data-testid="column"] {
-    width: 100% !important;
-    max-width: 100% !important;
-}
-    
     </style>
     """, unsafe_allow_html=True)
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
@@ -254,9 +244,6 @@ div.stFormSubmitButton > button {
     
         input { color: #C5A059 !important; font-weight: 600 !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
-
-
-}
         </style>
     """, unsafe_allow_html=True)
     # UI Login Center
