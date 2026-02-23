@@ -282,7 +282,7 @@ div.stFormSubmitButton > button {
     color: #FFFFFF; 
     font-size: 13px; 
     margin-top: 5px;         /* Rapatkan jarak ke judul di atas */
-    margin-bottom: 25px; 
+    margin-bottom: 16px; 
     text-align: center;
     opacity: 0.9;
     letter-spacing: 0.5px;
