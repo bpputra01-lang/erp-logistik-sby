@@ -135,6 +135,26 @@ st.markdown("""
         border: 2px solid #001a35 !important;
     
     }
+    /* --- 1. LOCK STYLE KHUSUS LOGOUT SESSION --- */
+    /* Kita targetkan tombol yang punya teks 'Logout' agar tidak berubah-ubah */
+    button[kind="secondary"]:has(div p:contains("Logout")), 
+    button:contains("Logout") {
+        background-color: #002b5b !important; /* Tetap Biru Navy */
+        color: #ff4b4b !important;           /* Teks Merah agar tegas */
+        border: 2px solid #ff4b4b !important;
+        width: 100% !important;
+        height: 3em !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        transition: none !important;         /* Matikan transisi biar gak kedap-kedip */
+    }
+
+    /* --- 2. PREVENT HOVER JUMPING --- */
+    button:contains("Logout"):hover {
+        background-color: #8b0000 !important; /* Merah gelap pas di-hover */
+        color: white !important;
+        border-color: white !important;
+    }
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
         color: #1a2634 !important;
