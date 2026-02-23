@@ -255,7 +255,7 @@ div.stFormSubmitButton > button {
   <div style="
         display: block; 
         width: 100vw;            /* Paksa lebar sesuai layar laptop */
-        margin-left: calc(-40vw + 10%); /* Trik agar div benar-benar center murni */
+        margin-left: calc(-40vw + 15%); /* Trik agar div benar-benar center murni */
         text-align: center; 
     ">
         <h2 style="
