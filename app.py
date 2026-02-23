@@ -260,7 +260,7 @@ div.stFormSubmitButton > button {
     font-weight: 800; 
     text-align: center;
     display: flex;
-    justify-content: center;
+    justify-content: left;
     align-items: center;
     gap: 10px;
 ">
