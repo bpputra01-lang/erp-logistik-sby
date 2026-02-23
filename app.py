@@ -1397,7 +1397,7 @@ elif menu == "Stock Minus":
         except Exception as e: st.error(f"Error: {e}")
 
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM (BACKDOOR MODE)</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM </h1></div>', unsafe_allow_html=True)
     
     # --- 1. SESSION STATE INITIALIZATION ---
     if 'df_ds' not in st.session_state: st.session_state.df_ds = None
@@ -1413,7 +1413,7 @@ elif menu == "Compare RTO":
     
     # Slot Backdoor di bawah kolom upload
     st.divider()
-    f4 = st.file_uploader("📥 4. UPLOAD HASIL CEK REAL (Backdoor Overwrite)", type=['xlsx','csv'], key="f4", help="Upload file selisih yang sudah diisi kolom HASIL CEK REAL-nya")
+    f4 = st.file_uploader("📥 4. UPLOAD HASIL CEK REAL ", type=['xlsx','csv'], key="f4", help="Upload file selisih yang sudah diisi kolom HASIL CEK REAL-nya")
 
     # --- 2. JALANKAN PROSES AWAL ---
     if st.button("🚀 1. JALANKAN PROSES AWAL", use_container_width=True):
