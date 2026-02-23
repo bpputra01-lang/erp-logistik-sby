@@ -255,9 +255,6 @@ div.stFormSubmitButton > button {
            <h2 style="
     font-family: 'Inter', sans-serif; 
     font-weight: 900; 
-    max-width: 100%;
-    overflow: hidden;
-    box-sizing: border-box;
     font-size: 35px;
     text-align: center;
     margin-top: -30px; 
@@ -268,7 +265,7 @@ div.stFormSubmitButton > button {
     filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
     letter-spacing: 2px;
     text-transform: uppercase;
-    width: 110%;             /* Mengikuti lebar div utama */
+    width: 100%;             /* Mengikuti lebar div utama */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -285,7 +282,7 @@ div.stFormSubmitButton > button {
     color: #FFFFFF; 
     font-size: 13px; 
     margin-top: 5px;         /* Rapatkan jarak ke judul di atas */
-    margin-bottom: 16px; 
+    margin-bottom: 25px; 
     text-align: center;
     opacity: 0.9;
     letter-spacing: 0.5px;
