@@ -279,7 +279,7 @@ div.stFormSubmitButton > button {
         st.markdown("""
             <p style="
                 color: #FFFFFF; 
-                font-size: 18px; 
+                font-size: 14px; 
                 margin-bottom: 20px; 
                 text-align: center;
             ">🐊Surabaya Logistics Management System</p>
