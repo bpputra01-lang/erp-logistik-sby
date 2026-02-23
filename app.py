@@ -244,6 +244,13 @@ div.stFormSubmitButton > button {
     
         input { color: #C5A059 !important; font-weight: 600 !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
+
+        /* === FIX KHUSUS LOGIN AGAR TIDAK KEPOTONG === */
+[data-testid="column"] {
+    flex: 1 1 0% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
         </style>
     """, unsafe_allow_html=True)
     # UI Login Center
