@@ -257,7 +257,7 @@ div.stFormSubmitButton > button {
         display: flex; 
         justify-content: center; /* Menjamin seluruh blok ada di tengah form */
         margin-top: -30px;
-        margin-bottom: 10px; 
+        margin-bottom: 0px; 
     ">
         <h2 style="
             font-family: 'Inter', sans-serif; 
