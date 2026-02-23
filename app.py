@@ -257,6 +257,7 @@ div.stFormSubmitButton > button {
         display: flex; 
         justify-content: center; /* Menjamin seluruh blok ada di tengah form */
         margin-top: -30px;
+        margin-bottom: 10px; 
     ">
         <h2 style="
             font-family: 'Inter', sans-serif; 
@@ -283,7 +284,7 @@ div.stFormSubmitButton > button {
         font-size: 13px; 
         text-align: center;
         margin-top: 5px; 
-        margin-bottom: 25px; 
+        margin-bottom: 10px; 
         opacity: 0.9;
         width: 100%;
     ">
@@ -291,20 +292,6 @@ div.stFormSubmitButton > button {
     </p>
 """, unsafe_allow_html=True)
         
-        # SUB-JUDUL
-        st.markdown("""
-           <p style="
-    color: #FFFFFF; 
-    font-size: 13px; 
-    margin-top: 5px;         /* Rapatkan jarak ke judul di atas */
-    margin-bottom: 16px; 
-    text-align: center;
-    opacity: 0.9;
-    letter-spacing: 0.5px;
-">
-    <span style="filter: brightness(1.2);">🐊</span> Surabaya Logistics Management System
-</p>
-        """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
         with st.form("login_form"):
