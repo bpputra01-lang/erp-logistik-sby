@@ -192,15 +192,7 @@ if not st.session_state.logged_in:
         }
         [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
         
-       /* --- KUNCI PERBAIKAN: PAKSA LEBAR PENUH --- */
-[data-testid="stForm"] [data-testid="column"] {
-    flex: 1 1 auto !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 100% !important; /* TAMBAHKAN INI BOS, BIAR GAK BISA BANTAH */
-}
         
-
         /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
         button[data-testid="stFormSubmitButton"], 
         div.stFormSubmitButton > button {
@@ -256,6 +248,14 @@ if not st.session_state.logged_in:
         
         div[data-testid="stNotification"] svg { fill: white !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
+
+               /* --- KUNCI PERBAIKAN: PAKSA LEBAR PENUH --- */
+[data-testid="stForm"] [data-testid="column"] {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important; /* TAMBAHKAN INI BOS, BIAR GAK BISA BANTAH */
+}
         </style>
     """, unsafe_allow_html=True)
     # UI Login Center
