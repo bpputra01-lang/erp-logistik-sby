@@ -1199,7 +1199,7 @@ with st.sidebar:
 
 # --- MENU ROUTING ---
 if menu == "Dashboard Overview":
-    st.markdown('<div class="hero-header"><h1>DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📊DASHBOARD ANALYTICS</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns([3, 1])
     with c1: pilih = st.selectbox("PILIH LAPORAN", ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"])
     with c2: zoom = st.slider("ZOOM", 0.1, 1.0, 0.35)
