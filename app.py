@@ -252,14 +252,21 @@ div.stFormSubmitButton > button {
         
         # JUDUL
         st.markdown("""
-            <h2 style="
-                color: #C5A059; 
-                margin-top: -20px; 
-                margin-bottom: -5px; 
-                font-family: 'Inter', sans-serif; 
-                font-weight: 800; 
-                text-align: center;
-            ">📦 LOGISTIC SURABAYA ERP</h2>
+           <h2 style="
+    color: #C5A059; 
+    margin-top: -20px; 
+    margin-bottom: -5px; 
+    font-family: 'Inter', sans-serif; 
+    font-weight: 800; 
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+">
+    <span style="margin-right: -5px; vertical-align: middle;">📦</span> 
+    LOGISTIC SURABAYA ERP
+</h2>
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
