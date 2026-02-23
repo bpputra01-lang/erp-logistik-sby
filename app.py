@@ -259,6 +259,7 @@ div.stFormSubmitButton > button {
     text-align: center;
     margin-top: -30px; 
     margin-bottom: -5px;
+    margin-left: calc(-50vw + 50%)
     background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
