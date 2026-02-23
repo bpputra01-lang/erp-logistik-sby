@@ -272,7 +272,7 @@ div.stFormSubmitButton > button {
     gap: 12px;
 ">
     <span style="-webkit-text-fill-color: initial; filter: drop-shadow(0 0 5px #C5A059);"></span>
-    LOGISTIC SURABAYA ERP
+    SURABAYA DISTRIBUTION CENTER
 </h2>
         """, unsafe_allow_html=True)
         
