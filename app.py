@@ -254,18 +254,22 @@ div.stFormSubmitButton > button {
         st.markdown("""
            <h2 style="
     color: #C5A059; 
-    margin-top: -20px; 
-    margin-bottom: -20px; 
+    margin-top: -30px;      /* Naikkan posisi judul agar tidak terlalu bawah */
+    margin-bottom: -40px;   /* Tarik form username agar lebih rapat ke atas */
     font-family: 'Inter', sans-serif; 
     font-weight: 800; 
     text-align: center;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 10px;
+    width: 100%;            /* Paksa container selebar layar agar center murni */
 ">
-    <span style="margin-right: -5px; vertical-align: middle;">📦</span> 
-    LOGISTIC SURABAYA ERP
+    <span style="
+        margin-right: 8px;   /* Jarak pas antara kardus dan teks */
+        display: inline-block;
+        transform: translateY(-2px); /* Geser kardus naik 2px agar sejajar mata huruf */
+    ">📦</span> 
+    <span style="letter-spacing: 1px;">LOGISTIC SURABAYA ERP</span>
 </h2>
         """, unsafe_allow_html=True)
         
