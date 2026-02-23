@@ -102,38 +102,38 @@ st.markdown("""
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
-  /* --- 1. KONTAINER UTAMA (JARAK ANTAR TOMBOL SAMA) --- */
+  /* --- 1. KONTAINER UTAMA: KUNCI JARAK ANTAR TOMBOL --- */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
-        flex-wrap: wrap !important;      /* Paksa turun ke baris baru kalau gak muat secara horizontal */
-        gap: 12px !important;            /* Jarak antar tombol (Kanan-Kiri & Atas-Bawah) SAMA PERSIS */
-        justify-content: flex-start !important; 
-        align-items: stretch !important;
-    }
-
-    /* --- 2. KUNCI LEBAR KOLOM --- */
-    [data-testid="column"] {
-        flex: 1 1 auto !important;
-        min-width: 150px !important;     /* Lebar minimal kolom agar tombol tidak terlalu kurus */
-        max-width: fit-content !important; /* Buang jarak kosong berlebih antar tombol */
-        padding: 0px !important;
-    }
-
-    /* --- 3. STYLE TOMBOL (TEKS BOLEH TURUN KE BAWAH) --- */
-    div.stButton > button {
+        flex-wrap: wrap !important;      /* Teks turun baris jika sempit */
+        gap: 12px !important;            /* KUNCI: Jarak horizontal & vertikal antar tombol SAMA SEMUA */
+        justify-content: flex-start !important; /* Susun rapat ke kiri, buang sisa space di tengah */
         width: 100% !important;
-        min-height: 4em !important;      /* Tambah tinggi sedikit agar teks 2 baris gak sesak */
-        white-space: normal !important;  /* KUNCI: Teks BOLEH turun ke bawah/enter */
+    }
+
+    /* --- 2. KUNCI KOLOM: BUANG JARAK KOSONG (GAP) OTOMATIS --- */
+    [data-testid="column"] {
+        flex: 0 1 auto !important;       /* Jangan biarkan kolom melebar sendiri menghabiskan layar */
+        width: auto !important;          /* Lebar kolom wajib mengikuti isi tombolnya saja */
+        min-width: fit-content !important; 
+        max-width: fit-content !important; /* Paksa kolom menciut, buang jarak jauh antar tombol */
+    }
+
+    /* --- 3. STYLE TOMBOL: PRESISI & TEKS ENTER --- */
+    div.stButton > button {
+        width: 180px !important;         /* Tentukan lebar tetap agar semua tombol seragam */
+        min-height: 4.5em !important;    /* Tinggi cukup untuk teks 2 baris */
+        white-space: normal !important;  /* Izinkan teks turun ke bawah (enter) */
         word-wrap: break-word !important;
-        line-height: 1.2 !important;     /* Jarak antar baris teks agar rapi */
-        padding: 10px 15px !important;   /* Jarak dalam simetris */
+        padding: 10px 15px !important;   /* Jarak dalam tombol simetris */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        text-align: center !important;   /* Teks rata tengah */
+        text-align: center !important;
         font-size: 14px !important;
+        line-height: 1.2 !important;
         border: 2px solid #001a35 !important;
-        margin: 0px !important;
+    
     }
     [data-testid="stFileUploader"] button {
         background-color: #C5A059 !important;
