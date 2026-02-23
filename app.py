@@ -255,7 +255,7 @@ div.stFormSubmitButton > button {
            <h2 style="
     font-family: 'Inter', sans-serif; 
     font-weight: 900; 
-    font-size: 35px;
+    font-size: 30px;
     text-align: center;
     margin-top: -30px; 
     margin-bottom: -5px;
@@ -265,7 +265,7 @@ div.stFormSubmitButton > button {
     filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
     letter-spacing: 2px;
     text-transform: uppercase;
-    width: 100%;             /* Mengikuti lebar div utama */
+    width: 110%;             /* Mengikuti lebar div utama */
     display: flex;
     justify-content: center;
     align-items: center;
