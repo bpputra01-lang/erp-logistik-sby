@@ -1235,7 +1235,7 @@ elif menu == "Putaway System":
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANLYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
-    with col1: up_scan = st.file_uploader("U📥pload DATA SCAN", type=['xlsx', 'csv'])
+    with col1: up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'])
     with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'])
     with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
     if up_scan and up_hist and up_stock:
