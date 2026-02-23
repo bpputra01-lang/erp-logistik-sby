@@ -104,6 +104,22 @@ st.markdown("""
         color: white !important;
         -webkit-text-fill-color: white !important;
     }
+  /* --- 1. KONTAINER UTAMA: KUNCI JARAK ANTAR TOMBOL --- */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-wrap: wrap !important;      /* Teks turun baris jika sempit */
+        gap: 12px !important;            /* KUNCI: Jarak horizontal & vertikal antar tombol SAMA SEMUA */
+        justify-content: flex-start !important; /* Susun rapat ke kiri, buang sisa space di tengah */
+        width: 100% !important;
+    }
+
+    /* --- 2. KUNCI KOLOM: BUANG JARAK KOSONG (GAP) OTOMATIS --- */
+    [data-testid="column"] {
+        flex: 0 1 auto !important;       /* Jangan biarkan kolom melebar sendiri menghabiskan layar */
+        width: auto !important;          /* Lebar kolom wajib mengikuti isi tombolnya saja */
+        min-width: fit-content !important; 
+        max-width: fit-content !important; /* Paksa kolom menciut, buang jarak jauh antar tombol */
+    }
 
     /* --- 3. STYLE TOMBOL: PRESISI & TEKS ENTER --- */
     div.stButton > button {
