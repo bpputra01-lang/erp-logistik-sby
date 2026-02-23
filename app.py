@@ -255,6 +255,9 @@ div.stFormSubmitButton > button {
            <h2 style="
     font-family: 'Inter', sans-serif; 
     font-weight: 900; 
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
     font-size: 35px;
     text-align: center;
     margin-top: -30px; 
