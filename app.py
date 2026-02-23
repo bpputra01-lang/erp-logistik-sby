@@ -125,7 +125,7 @@ st.markdown("""
         min-height: 4.5em !important;    /* Tinggi cukup untuk teks 2 baris */
         white-space: normal !important;  /* Izinkan teks turun ke bawah (enter) */
         word-wrap: break-word !important;
-        padding: 10px 15px !important;   /* Jarak dalam tombol simetris */
+        padding: 10px 10px !important;   /* Jarak dalam tombol simetris */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
