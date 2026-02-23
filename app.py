@@ -18,6 +18,11 @@ st.markdown("""
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarNav"] { display: none; } 
     
+    /* SATU BARIS SAKTI: Paksa semua kontainer input (Username & Password) jadi lebar penuh */
+div[data-baseweb="input"], [data-testid="stForm"] [data-testid="column"] {
+    width: 100% !important; min-width: 100% !important; flex-basis: 100% !important;
+}
+    
     /* 2. STYLE JUDUL ERP DI SIDEBAR */
     .sidebar-title { 
         color: #00d2ff; 
