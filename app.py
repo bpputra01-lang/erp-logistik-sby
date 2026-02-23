@@ -255,14 +255,14 @@ div.stFormSubmitButton > button {
            <h2 style="
     color: #C5A059; 
     margin-top: -20px; 
-    margin-bottom: -5px; 
+    margin-bottom: -20px; 
     font-family: 'Inter', sans-serif; 
     font-weight: 800; 
     text-align: center;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 2px;
+    gap: 10px;
 ">
     <span style="margin-right: -5px; vertical-align: middle;">📦</span> 
     LOGISTIC SURABAYA ERP
