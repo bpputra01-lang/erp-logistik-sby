@@ -254,7 +254,7 @@ div.stFormSubmitButton > button {
         st.markdown("""
   <div style="
     display: block; 
-    width: 80%; 
+    width: 110%; 
     text-align: center; 
     margin: 0 auto;
     overflow: visible;
