@@ -253,46 +253,46 @@ div.stFormSubmitButton > button {
         # JUDUL
         # JUDUL UTAMA & SUB-JUDUL (SATU BLOK AGAR SYNC)
 st.markdown(f"""
-    <div style="
-        width: 100%; 
-        display: flex; 
-        flex-direction: column;
-        align-items: center; 
-        justify-content: center;
-        margin-top: -30px;
-        overflow: visible;
+<div style="
+    width: 100%; 
+    display: flex; 
+    flex-direction: column;
+    align-items: center; 
+    justify-content: center;
+    margin-top: -30px;
+    overflow: visible;
+">
+    <h2 style="
+        font-family: 'Inter', sans-serif; 
+        font-weight: 900; 
+        font-size: 30px;         /* Ukuran 30px lebih aman agar tidak merusak layout password */
+        text-align: center;
+        margin: 0;
+        background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
+        letter-spacing: -0.5px;
+        text-transform: uppercase;
+        line-height: 1.1;
+        white-space: nowrap;    /* Kunci agar satu baris lurus */
     ">
-        <h2 style="
-            font-family: 'Inter', sans-serif; 
-            font-weight: 900; 
-            font-size: 35px;
-            text-align: center;
-            margin: 0;
-            background: linear-gradient(135deg, #ffffff 0%, #ffdf91 25%, #C5A059 50%, #8E6D35 75%, #ffffff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
-            letter-spacing: -0.5px;
-            text-transform: uppercase;
-            line-height: 1.1;
-            white-space: nowrap;
-        ">
-            LOGISTIC SURABAYA ERP
-        </h2>
-        
-        <p style="
-            color: #FFFFFF; 
-            font-size: 13px; 
-            margin-top: 5px; 
-            margin-bottom: 20px; 
-            text-align: center;
-            opacity: 0.9;
-            white-space: nowrap;
-        ">
-            <span style="vertical-align: middle;">🐊</span> Surabaya Logistics Management System
-        </p>
-    </div>
-        """, unsafe_allow_html=True)
+        LOGISTIC SURABAYA ERP
+    </h2>
+    
+    <p style="
+        color: #FFFFFF; 
+        font-size: 13px; 
+        margin-top: 5px; 
+        margin-bottom: 20px; 
+        text-align: center;
+        opacity: 0.9;
+        white-space: nowrap;
+    ">
+        <span style="vertical-align: middle;">🐊</span> Surabaya Logistics Management System
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
        # BUNGKUS FORM
         with st.form("login_form"):
