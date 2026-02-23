@@ -190,30 +190,52 @@ if not st.session_state.logged_in:
             background-size: cover !important;
         }
         [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
-    
+        
+        /* --- KUNCI PERBAIKAN: PAKSA LEBAR PENUH --- */
+        /* Menghapus efek 'fit-content' dari global agar input password tidak menciut */
+        [data-testid="stForm"] [data-testid="column"] {
+            flex: 1 1 auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
 
         /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
-button[data-testid="stFormSubmitButton"], 
-div.stFormSubmitButton > button {
-    background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 12px !important;
-    
-    /* GANTI BAGIAN INI */
-    padding: 18px 20px !important; /* Naikin dari 14px ke 18px biar lega */
-    line-height: 1.2 !important;   /* Pastikan teks di tengah vertikal */
-    height: auto !important;       /* Biar tinggi tombol ngikutin padding */
-    
-    font-weight: 800 !important;
-    font-size: 16px !important;
-    letter-spacing: 1px !important;
-    width: 100% !important;
-    box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
-    text-transform: uppercase !important;
-}
+        button[data-testid="stFormSubmitButton"], 
+        div.stFormSubmitButton > button {
+            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 12px !important;
+            padding: 18px 20px !important;
+            line-height: 1.2 !important;
+            height: auto !important;
+            font-weight: 800 !important;
+            font-size: 16px !important;
+            letter-spacing: 1px !important;
+            width: 100% !important;
+            box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
+            text-transform: uppercase !important;
+        }
 
-        /* Paksa warna tetep emas pas kursor nempel */
+        /* 4. Input Box - Paksa lebar 100% agar tidak terpotong */
+        div[data-baseweb="input"] {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 10px !important;
+            width: 100% !important; /* Tambahkan ini agar blok putih penuh */
+        }
+
+        div[data-testid="stPasswordInput"] {
+            width: 100% !important;
+        }
+
+        input { 
+            color: #C5A059 !important; 
+            font-weight: 600 !important; 
+            width: 100% !important; /* Tambahkan ini */
+        }
+
+        /* Tombol Form Hover */
         button[data-testid="stFormSubmitButton"]:hover {
             background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
             color: #1e1e2f !important;
@@ -221,52 +243,15 @@ div.stFormSubmitButton > button {
             transform: translateY(-2px);
         }
 
-        /* 4. Input Box biar gelap & elegan */
-        div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        /* Notifikasi Sukses */
+        div[data-testid="stNotification"] {
+            background-color: #1e7e34 !important;
+            color: white !important;
             border-radius: 10px !important;
+            border: 1px solid #C5A059 !important;
         }
-        /* Ubah background st.success jadi hijau solid */
-    div[data-testid="stNotification"] {
-        background-color: #1e7e34 !important; /* Hijau Tua Surabaya */
-        color: white !important;               /* Tulisan Putih */
-        border-radius: 10px !important;
-        border: 1px solid #C5A059 !important;  /* Kasih border emas dikit biar matching */
-    }
-    /* Pastikan ikon centangnya juga putih */
-    div[data-testid="stNotification"] svg {
-        fill: white !important;
-    }
-    /* --- FORCE RESET UNTUK FORM LOGIN --- */
-/* Reset kolom agar tidak menciut (fit-content) khusus di form login */
-[data-testid="stForm"] [data-testid="column"] {
-    width: 100% !important;
-    max-width: 100% !important;
-    flex: 1 1 auto !important;
-}
-
-/* Paksa kontainer password melebar penuh */
-div[data-testid="stPasswordInput"], 
-div[data-testid="stPasswordInput"] > div {
-    width: 100% !important;
-    min-width: 100% !important;
-}
-
-/* Pastikan box input putihnya tidak tertekan oleh ikon mata */
-div[data-baseweb="input"] {
-    width: 100% !important;
-    display: flex !important;
-}
-
-/* Hilangkan pengaruh margin/padding yang bikin melenceng */
-.stForm {
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    padding: 20px !important;
-}
-    
-    
-        input { color: #C5A059 !important; font-weight: 600 !important; }
+        
+        div[data-testid="stNotification"] svg { fill: white !important; }
         [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
