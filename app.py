@@ -171,10 +171,6 @@ st.markdown("""
         color: #1a2634 !important;
         font-weight: bold !important;
     }
-    /* SATU BARIS SAKTI: Paksa semua kontainer input (Username & Password) jadi lebar penuh */
-div[data-baseweb="input"], [data-testid="stForm"] [data-testid="column"] {
-    width: 100% !important; min-width: 100% !important; flex-basis: 100% !important;
-}
     </style>
     """, unsafe_allow_html=True)
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
