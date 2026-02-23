@@ -265,7 +265,7 @@ div.stFormSubmitButton > button {
     filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.5));
     letter-spacing: 2px;
     text-transform: uppercase;
-    width: 130%;             /* Mengikuti lebar div utama */
+    width: 120%;             /* Mengikuti lebar div utama */
     display: flex;
     justify-content: center;
     align-items: center;
