@@ -631,7 +631,7 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     # Bandingkan tiap baris Fisik dengan Total System
     for _, row in ds.iterrows():
         key = (row['BIN'], row['SKU'])
-        qty scan = row['QTY SCAN']
+        qty_scan = row['QTY SCAN']
         qty_sys = dict_system.get(key, 0)
         
         diff = qty scan - qty sys
