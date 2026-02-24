@@ -625,8 +625,8 @@ def menu_Stock_Opname():
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
             # Load Data
-            df_s = pd.read_excel(up_scan, sheet_name="DATA SCAN")
-            df_t = pd.read_excel(up_stock, sheet_name="STOCK SYSTEM")
+            df_s = pd.read_excel(up_scan)
+            df_t = pd.read_excel(up_stock)
             
             # Sub 1 & Sub 2
             res_scan = logic_compare_scan_to_stock(df_s, df_t, up_scan)
