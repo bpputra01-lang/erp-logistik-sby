@@ -1675,7 +1675,7 @@ elif menu == "Compare RTO":
                 st.error("Jalankan Proses Awal dulu,!")
 
 elif menu == "FDR Update":
-        st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST PROCESSOR</h1></div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
 
         # --- 0. INIT STATE ---
         if "ws_manifest" not in st.session_state:
