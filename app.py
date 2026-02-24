@@ -739,7 +739,7 @@ def menu_refill_withdraw():
             st.error("Upload Data Stock Dulu!")
 
     # --- 3. TABS SECTION ---
-    t1, t2 = st.tabs(["♻️ Summary Refill", "♻️ Summary Withdraw"])
+    t1, t2, t3= st.tabs(["♻️ Summary Refill", "♻️ Summary Withdraw", "🔺Upload to Appsheet"])
 
     with t1:
         if st.session_state.summary_refill is not None:
@@ -751,14 +751,14 @@ def menu_refill_withdraw():
 
     with t3:
         if st.session_state.summary_refill is not None:
-            if st.button("🚀 Upload Refill to Google"):
+            if st.button("🔺 Upload Refill to Appsheet"):
                 data_json = st.session_state.summary_refill.astype(str).values.tolist()
                 url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=REFILL%20STOCK"
                 requests.post(url, json=data_json)
                 st.toast("REFILL UPLOADED!")
 
         if st.session_state.summary_withdraw is not None:
-            if st.button("🚀 Upload Withdraw to Google"):
+            if st.button("🔺Upload Withdraw to Appsheet"):
                 data_json = st.session_state.summary_withdraw.astype(str).values.tolist()
                 url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=WITHDRAW%20STOCK"
                 requests.post(url, json=data_json)
