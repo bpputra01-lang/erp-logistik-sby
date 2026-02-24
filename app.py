@@ -492,141 +492,87 @@ from openpyxl import load_workbook
 # 1. FUNGSI PENDUKUNG (HARUS DI ATAS)
 # =========================================================
 
-def get_yellow_cells(file, sku_col_index):
-    yellow_skus = set()
-    try:
-        wb = load_workbook(file, data_only=True)
-        ws = wb.active
-        for row in range(2, ws.max_row + 1):
-            cell = ws.cell(row=row, column=sku_col_index)
-            color = str(cell.fill.start_color.index)
-            # Cek berbagai kode warna kuning excel
-            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
-                sku_val = str(cell.value).strip().upper() if cell.value else ""
-                if sku_val:
-                    yellow_skus.add(sku_val)
-    except:
-        pass
-    return yellow_skus
-
 def compare_data_scan_stock_system(df_scan, df_stock, scan_file):
     try:
-        yellow_skus = get_yellow_cells(scan_file, 2) # Kolom B
-        
-        # SCAN: BIN(A), SKU(B), QTY(C)
+        # VBA: Scan BIN(A), SKU(B), QTY(C)
         df_scan_clean = df_scan.iloc[:, [0, 1, 2]].copy()
         df_scan_clean.columns = ['BIN', 'SKU', 'QTY_SCAN']
         
-        # STOCK: BIN(B), SKU(C), QTY(J) -> Index 1, 2, 9
+        # VBA: Stock BIN(B), SKU(C), QTY(J)
         df_stock_lite = df_stock.iloc[:, [1, 2, 9]].copy()
         df_stock_lite.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
 
+        # Sesuai VBA: Trim & UCase
         for df in [df_scan_clean, df_stock_lite]:
             df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
             df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
+            # Pastikan QTY adalah angka
+            qty_col = 'QTY_SCAN' if 'QTY_SCAN' in df.columns else 'QTY_SYSTEM'
+            df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce').fillna(0)
 
-        # Grouping (VBA Dictionary Logic)
+        # Sesuai VBA: Grouping data System (dict.Add key, dataStock)
         df_stock_grouped = df_stock_lite.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
 
+        # Merge Left (Fisik sebagai acuan)
         result = pd.merge(df_scan_clean, df_stock_grouped, on=['BIN', 'SKU'], how='left')
         result['QTY_SYSTEM'] = result['QTY_SYSTEM'].fillna(0)
+        
+        # VBA logic: outDiff = qtyScan - qtySys
         result['DIFF'] = result['QTY_SCAN'] - result['QTY_SYSTEM']
-        result['NOTE'] = result['DIFF'].apply(lambda x: 'REAL +' if x > 0 else 'OK')
+        
+        # VBA logic: If qtyScan > qtySys Then "REAL +" Else "OK"
+        # PENTING: Jika Qty Scan <= Qty System, maka statusnya OK (tidak masuk REAL +)
+        result['NOTE'] = result.apply(lambda x: "REAL +" if x['QTY_SCAN'] > x['QTY_SYSTEM'] else "OK", axis=1)
+        
+        # Cek warna kuning (VBA logic)
+        yellow_skus = get_yellow_cells(scan_file, 2)
         result['IS_YELLOW'] = result['SKU'].apply(lambda x: "YES" if x in yellow_skus else "NO")
         
         return result, None
     except Exception as e:
-        return None, f"Gagal Scan vs Stock: {str(e)}"
+        return None, f"Error Logic Scan: {str(e)}"
 
 def compare_stock_system_vs_data_scan(df_stock, df_scan, stock_file):
     try:
-        yellow_skus = get_yellow_cells(stock_file, 3) # Kolom C
+        # VBA: Stock BIN(B), SKU(C), QTY(J)
+        df_stock_lite = df_stock.copy()
+        # Buat key pembantu untuk join
+        df_stock_lite['JOIN_BIN'] = df_stock_lite.iloc[:, 1].astype(str).str.strip().str.upper()
+        df_stock_lite['JOIN_SKU'] = df_stock_lite.iloc[:, 2].astype(str).str.strip().str.upper()
         
-        df_stock_full = df_stock.copy()
-        df_stock_full['JOIN_BIN'] = df_stock_full.iloc[:, 1].astype(str).str.strip().str.upper()
-        df_stock_full['JOIN_SKU'] = df_stock_full.iloc[:, 2].astype(str).str.strip().str.upper()
-        
+        # VBA: Scan BIN(A), SKU(B), QTY(C)
         df_scan_lite = df_scan.iloc[:, [0, 1, 2]].copy()
         df_scan_lite.columns = ['JOIN_BIN', 'JOIN_SKU', 'QTY_SCAN']
         df_scan_lite['JOIN_BIN'] = df_scan_lite['JOIN_BIN'].astype(str).str.strip().str.upper()
         df_scan_lite['JOIN_SKU'] = df_scan_lite['JOIN_SKU'].astype(str).str.strip().str.upper()
+        df_scan_lite['QTY_SCAN'] = pd.to_numeric(df_scan_lite['QTY_SCAN'], errors='coerce').fillna(0)
 
+        # Sesuai VBA: Grouping data Scan (dict.Add key, dataScan)
         df_scan_grouped = df_scan_lite.groupby(['JOIN_BIN', 'JOIN_SKU'])['QTY_SCAN'].sum().reset_index()
 
-        result = pd.merge(df_stock_full, df_scan_grouped, on=['JOIN_BIN', 'JOIN_SKU'], how='left')
+        # Merge Left (System sebagai acuan)
+        result = pd.merge(df_stock_lite, df_scan_grouped, on=['JOIN_BIN', 'JOIN_SKU'], how='left')
         result['QTY_SCAN'] = result['QTY_SCAN'].fillna(0)
         
-        # Kolom J (index 9)
+        # Ambil QTY SYSTEM dari kolom J (index 9)
         qty_sys = pd.to_numeric(result.iloc[:, 9], errors='coerce').fillna(0)
+        
+        # VBA logic: outDiff = qtySystem - qtyScan
         result['DIFF'] = qty_sys - result['QTY_SCAN']
-        result['NOTE'] = result['DIFF'].apply(lambda x: 'SYSTEM +' if x > 0 else 'OK')
+        
+        # VBA logic: If qtySystem > qtyScan Then "SYSTEM +" Else "OK"
+        result['NOTE'] = result['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
+        
+        # Cek warna kuning (VBA logic)
+        yellow_skus = get_yellow_cells(stock_file, 3)
         result['IS_YELLOW'] = result['JOIN_SKU'].apply(lambda x: "YES" if x in yellow_skus else "NO")
         
+        # Hapus kolom pembantu
         result = result.drop(columns=['JOIN_BIN', 'JOIN_SKU'])
+        
         return result, None
     except Exception as e:
-        return None, f"Gagal Stock vs Scan: {str(e)}"
-
-def generate_real_plus_system_plus(df_res, df_stock_res):
-    real_plus = df_res[df_res['NOTE'] == 'REAL +'].copy()
-    system_plus = df_stock_res[df_stock_res['NOTE'] == 'SYSTEM +'].copy()
-    return real_plus, system_plus
-
-# =========================================================
-# 2. FUNGSI MENU (TEMPAT ELIF ANDA)
-# =========================================================
-
-def menu_Stock_Opname():
-    st.markdown('### 📊 COMPARE AND ANALYZE ITEM SCAN OUT')
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        up_scan = st.file_uploader("📥 Upload DATA SCAN", type=['xlsx', 'csv'], key='scan_file')
-    with col2:
-        up_stock = st.file_uploader("📥 Upload STOCK SYSTEM", type=['xlsx'], key='stock_file')
-    with col3:
-        st.info("📋 Format:\n- SCAN: BIN(A), SKU(B), QTY(C)\n- STOCK: BIN(B), SKU(C), QTY(J)")
-
-    if 'processed_data' not in st.session_state:
-        st.session_state.processed_data = None
-
-    if up_scan and up_stock:
-        if st.button("▶️ COMPARE DATA SCAN OUT", use_container_width=True):
-            try:
-                # Load (Coba gunakan engine openpyxl dulu)
-                df_scan = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
-                df_stock = pd.read_excel(up_stock) 
-                
-                with st.spinner("Memproses..."):
-                    df_res, err1 = compare_data_scan_stock_system(df_scan, df_stock, up_scan)
-                    df_stock_res, err2 = compare_stock_system_vs_data_scan(df_stock, df_scan, up_stock)
-                    
-                    if err1 or err2:
-                        st.error(f"Error: {err1 if err1 else err2}")
-                        return
-
-                    df_real_p, df_sys_p = generate_real_plus_system_plus(df_res, df_stock_res)
-                    
-                    st.session_state.processed_data = {
-                        'df_result': df_res,
-                        'df_stock_result': df_stock_res,
-                        'df_real_plus': df_real_p,
-                        'df_system_plus': df_sys_p
-                    }
-                    st.success("✅ Compare Selesai!")
-            except Exception as e:
-                st.error(f"Error saat memproses: {e}")
-
-    # Tampilkan jika sudah ada data
-    if st.session_state.processed_data:
-        d = st.session_state.processed_data
-        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "✅ REAL +", "✅ SYSTEM +"])
-        with t1: st.dataframe(d['df_result'], use_container_width=True)
-        with t2: st.dataframe(d['df_stock_result'], use_container_width=True)
-        with t3: st.dataframe(d['df_real_plus'], use_container_width=True)
-        with t4: st.dataframe(d['df_system_plus'], use_container_width=True)
-
-# =========================================================
+        return None, f"Error Logic System: {str(e)}"# =========================================================
 # 3. NAVIGASI (ELIF)
 # =========================================================
 # (Gunakan ini di bagian pilihan menu Anda)
