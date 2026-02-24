@@ -2103,102 +2103,102 @@ elif menu == "Compare RTO":
                 st.download_button(f"📥 Download Draft Final ({total_vba} Pcs)", csv, f"Draft_Final_{total_vba}.csv", "text/csv", use_container_width=True)
             else:
                 st.error("Jalankan Proses Awal dulu,!")
-
 elif menu == "FDR Update":
-        st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
 
-        # --- 0. INIT STATE ---
-        if "ws_manifest" not in st.session_state:
-            st.session_state.ws_manifest = None
-        if "ws_fu_it" not in st.session_state:
-            st.session_state.ws_fu_it = None
-        if "dict_kurir" not in st.session_state:
-            st.session_state.dict_kurir = {}
+    # --- 0. INIT STATE ---
+    if "ws_manifest" not in st.session_state:
+        st.session_state.ws_manifest = None
+    if "ws_fu_it" not in st.session_state:
+        st.session_state.ws_fu_it = None
+    if "dict_kurir" not in st.session_state:
+        st.session_state.dict_kurir = {}
 
-        t1, t2, t3 = st.tabs(["MANIFEST INPUT", "PERLU FU IT", "SPLIT KURIR"])
+    t1, t2, t3 = st.tabs(["MANIFEST INPUT", "PERLU FU IT", "SPLIT KURIR"])
 
-        with t1:
-            st.subheader("🛵 CEK MANIFEST OUTSTANDING")
-            
-            # 1. UPLOAD (Langsung masukin ke State)
-            u_file = st.file_uploader("📂 Choose Your File", type=["xlsx"], key="fdr_up")
-            if u_file:
-                # Cek biar nggak loading terus-terusan
-                if st.session_state.ws_manifest is None:
-                    st.session_state.ws_manifest = pd.read_excel(u_file)
-                    st.rerun()
-
-            st.divider()
-            c = st.columns(4)
-            
-           # --- MACRO 1: CLEAN COLUMNS (Anti-Error) ---
-            if c[0].button("🚮 CLEAR COLUMNS", key="btn_clean"):
-                if st.session_state.ws_manifest is not None:
-                    df = st.session_state.ws_manifest.copy()
-                    
-                    # Indeks kolom yang mau dihapus (VBA: G,H,I,K,L,M,R,S,T,U,V,W)
-                    cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
-                    
-                    # --- FIX: Filter indeks yang VALID aja (biar gak IndexError) ---
-                    # Artinya: Cuma hapus kalau kolomnya emang ada di file itu
-                    existing_cols = [df.columns[i] for i in cols_idx if i < len(df.columns)]
-                    
-                    if existing_cols:
-                        df.drop(columns=existing_cols, inplace=True)
-                        st.session_state.ws_manifest = df
-                        st.success("KOLOM BERHASIL DIBERSIHKAN!")
-                        st.rerun()
-                    else:
-                        st.warning("Kolom sudah bersih atau tidak ditemukan!")
-                else: 
-                    st.error("UPLOAD FILE DULU!")
-
-            # --- MACRO 2: COPY FU IT (M / Index 12 TIDAK KOSONG) ---
-            if c[1].button("🖥️NEED FU IT", key="btn_fu"):
-                if st.session_state.ws_manifest is not None:
-                    df = st.session_state.ws_manifest.copy()
-                    # Filter M (12) <> ""
-                    mask = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
-                    st.session_state.ws_fu_it = df[mask].iloc[:, 0:13] # Ambil A-M
-                    st.success(f"Copy {len(st.session_state.ws_fu_it)} Baris!")
-                else: st.error("Data Kosong!")
-
-            # --- MACRO 3: SPLIT KURIR (F Isi & M Kosong) ---
-            if c[2].button("🛵OUTSTANDING COURIER", key="btn_split"):
-                if st.session_state.ws_manifest is not None:
-                    df = st.session_state.ws_manifest.copy()
-                    f_val = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
-                    m_val = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
-                    
-                    mask = (f_val != "") & (m_val == "")
-                    filtered = df[mask].copy()
-                    
-                    if not filtered.empty:
-                        d_kurir = {str(n): g.iloc[:, 0:13] for n, g in filtered.groupby(filtered.iloc[:, 5])}
-                        st.session_state.dict_kurir = d_kurir
-                        st.success("Split Beres!")
-                    else: st.error("No Data Split!")
-
-            if c[3].button("🗑️ CLEAR", type="primary"):
-                st.session_state.ws_manifest = None
-                st.session_state.ws_fu_it = None
-                st.session_state.dict_kurir = {}
+    with t1:
+        st.subheader("🛵 CEK MANIFEST OUTSTANDING")
+        
+        # 1. UPLOAD (Langsung masukin ke State)
+        u_file = st.file_uploader("📂 Choose Your File", type=["xlsx"], key="fdr_up")
+        if u_file:
+            # Cek biar nggak loading terus-terusan
+            if st.session_state.ws_manifest is None:
+                st.session_state.ws_manifest = pd.read_excel(u_file)
                 st.rerun()
 
-            st.divider()
-            # PREVIEW (Read-only, biar nggak ketimpa input kosong)
+        st.divider()
+        c = st.columns(4)
+        
+        # --- MACRO 1: CLEAN COLUMNS (Anti-Error) ---
+        if c[0].button("🚮 CLEAR COLUMNS", key="btn_clean"):
             if st.session_state.ws_manifest is not None:
-                st.write("### 📂 MANIFEST DATA (A:Z)")
-                st.dataframe(st.session_state.ws_manifest, use_container_width=true, hide_index=True)
+                df = st.session_state.ws_manifest.copy()
+                
+                # Indeks kolom yang mau dihapus (VBA: G,H,I,K,L,M,R,S,T,U,V,W)
+                cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+                
+                # --- FIX: Filter indeks yang VALID aja (biar gak IndexError) ---
+                # Artinya: Cuma hapus kalau kolomnya emang ada di file itu
+                existing_cols = [df.columns[i] for i in cols_idx if i < len(df.columns)]
+                
+                if existing_cols:
+                    df.drop(columns=existing_cols, inplace=True)
+                    st.session_state.ws_manifest = df
+                    st.success("KOLOM BERHASIL DIBERSIHKAN!")
+                    st.rerun()
+                else:
+                    st.warning("Kolom sudah bersih atau tidak ditemukan!")
+            else: 
+                st.error("UPLOAD FILE DULU!")
 
-        with t2:
-            if st.session_state.ws_fu_it is not None:
-                st.dataframe(st.session_state.ws_fu_it, use_container_width=true, hide_index=True)
-        with t3:
-            if st.session_state.dict_kurir:
-                for k, d in st.session_state.dict_kurir.items():
-                    with st.expander(f"📦 {k}"):
-                        st.dataframe(d, use_container_width=true)
+        # --- MACRO 2: COPY FU IT (M / Index 12 TIDAK KOSONG) ---
+        if c[1].button("🖥️ NEED FU IT", key="btn_fu"):
+            if st.session_state.ws_manifest is not None:
+                df = st.session_state.ws_manifest.copy()
+                # Filter M (12) <> ""
+                mask = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
+                st.session_state.ws_fu_it = df[mask].iloc[:, 0:13] # Ambil A-M
+                st.success(f"Copy {len(st.session_state.ws_fu_it)} Baris!")
+            else: st.error("Data Kosong!")
+
+        # --- MACRO 3: SPLIT KURIR (F Isi & M Kosong) ---
+        if c[2].button("🛵 OUTSTANDING COURIER", key="btn_split"):
+            if st.session_state.ws_manifest is not None:
+                df = st.session_state.ws_manifest.copy()
+                f_val = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
+                m_val = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+                
+                mask = (f_val != "") & (m_val == "")
+                filtered = df[mask].copy()
+                
+                if not filtered.empty:
+                    d_kurir = {str(n): g.iloc[:, 0:13] for n, g in filtered.groupby(filtered.iloc[:, 5])}
+                    st.session_state.dict_kurir = d_kurir
+                    st.success("Split Beres!")
+                else: st.error("No Data Split!")
+
+        if c[3].button("🗑️ CLEAR", type="primary"):
+            st.session_state.ws_manifest = None
+            st.session_state.ws_fu_it = None
+            st.session_state.dict_kurir = {}
+            st.rerun()
+
+        st.divider()
+        # PREVIEW (Read-only, biar nggak ketimpa input kosong)
+        if st.session_state.ws_manifest is not None:
+            st.write("### 📂 MANIFEST DATA (A:Z)")
+            st.dataframe(st.session_state.ws_manifest, use_container_width=True, hide_index=True)
+
+    with t2:
+        if st.session_state.ws_fu_it is not None:
+            st.dataframe(st.session_state.ws_fu_it, use_container_width=True, hide_index=True)
+            
+    with t3:
+        if st.session_state.dict_kurir:
+            for k, d in st.session_state.dict_kurir.items():
+                with st.expander(f"📦 {k}"):
+                    st.dataframe(d, use_container_width=True)
 
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
