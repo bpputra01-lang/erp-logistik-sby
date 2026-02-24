@@ -1306,6 +1306,30 @@ def engine_compare_draft_vba(df_app, df_draft):
     
     return df_d
 
+def putaway_system(df_ds, df_asal):
+    """
+    Fungsi placeholder - GANTI dengan logic asli lo!
+    """
+    df_comp = df_ds.copy()
+    df_plist = df_ds.head(0)
+    df_kurang = df_ds.head(0)
+    df_sum = df_ds.head(0)
+    df_lt3 = df_ds.head(0)
+    df_updated_bin = df_ds.head(0)
+    
+    return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin
+
+def process_scan_out(df_scan, df_hist, df_stock):
+    """
+    Fungsi placeholder - GANTI dengan logic asli lo!
+    """
+    df_res = df_scan.copy()
+    if 'Keterangan' not in df_res.columns:
+        df_res['Keterangan'] = "OK"
+        
+    df_draft = df_scan.head(0)
+    
+    return df_res, df_draft
 # ==========================================
 # 2. LANJUT KODE STREAMLIT LO DI BAWAH...
 # ==========================================
@@ -1813,30 +1837,7 @@ if menu == "Dashboard Overview":
     st.markdown(f'''<div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"><div style="width: 100%; height: 600px; overflow: auto;"><iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links[pilih]}&single=true&rm=minimal" style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe></div></div>''', unsafe_allow_html=True)
 
 # ==================== DUMMY FUNCTIONS (TARUH DI ATAS) ====================
-def putaway_system(df_ds, df_asal):
-    """
-    Fungsi placeholder - GANTI dengan logic asli lo!
-    """
-    df_comp = df_ds.copy()
-    df_plist = df_ds.head(0)
-    df_kurang = df_ds.head(0)
-    df_sum = df_ds.head(0)
-    df_lt3 = df_ds.head(0)
-    df_updated_bin = df_ds.head(0)
-    
-    return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin
 
-def process_scan_out(df_scan, df_hist, df_stock):
-    """
-    Fungsi placeholder - GANTI dengan logic asli lo!
-    """
-    df_res = df_scan.copy()
-    if 'Keterangan' not in df_res.columns:
-        df_res['Keterangan'] = "OK"
-        
-    df_draft = df_scan.head(0)
-    
-    return df_res, df_draft
 
 # ==================== PUTAWAY SYSTEM ====================
 elif menu == "Putaway System":
