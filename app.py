@@ -1906,104 +1906,10 @@ def putaway_system(df_ds, df_asal):
     
     return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin
 
-elif menu == "Scan Out Validation":
-    st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1: up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'])
-    with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'])
-    with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
-
-    if up_scan and up_hist and up_stock:
-        if st.button("▶️ COMPARE DATA SCAN OUT"):
-            try:
-                # --- PERBAIKAN: Ganti engine ke openpyxl ---
-                if up_scan.name.endswith('.csv'):
-                    df_s = pd.read_csv(up_scan)
-                else:
-                    df_s = pd.read_excel(up_scan, engine='openpyxl')
-                
-                df_h = pd.read_excel(up_hist, engine='openpyxl')
-                df_st = pd.read_excel(up_stock, engine='openpyxl')
-
-                # --- PERBAIKAN: Panggil fungsi processing ---
-                # Pastikan lo punya fungsi process_scan_out di file lo!
-                df_res, df_draft = process_scan_out(df_s, df_h, df_st)
-                
-                st.success("✅ Validasi Selesai!")
-                
-                # --- TAMBAHAN: OVERVIEW & RINGKASAN ---
-                st.divider()
-                st.subheader("📊 RINGKASAN HASIL")
-                
-                # Metrics
-                m1, m2, m3 = st.columns(3)
-                total_scan = len(df_res)
-                # Hitung mismatch/error
-                mismatch = 0
-                if 'Keterangan' in df_res.columns:
-                    mismatch = len(df_res[df_res['Keterangan'].astype(str).str.contains('MISSMATCH|BELUM', na=False)])
-                
-                draft_count = len(df_draft)
-                
-                m1.metric("Total Item Scan", total_scan)
-                m2.metric("Mismatch / Error", mismatch, delta_color="inverse")
-                m3.metric("Draft Set Up", draft_count)
-
-                # Tampilkan Data
-                st.write("#### 📋 DATA SCAN (COMPARED)")
-                
-                # Styling (Disesuaikan agar tidak error di pandas terbaru)
-                def highlight_vba(val):
-                    s_val = str(val).upper()
-                    if "MISSMATCH" in s_val or "BELUM" in s_val:
-                        return 'color: red; font-weight: bold'
-                    return 'color: black'
-                
-                # Cek apakah kolom Keterangan ada sebelum styling
-                if 'Keterangan' in df_res.columns:
-                    st.dataframe(df_res.style.map(highlight_vba, subset=['Keterangan']), use_container_width=True)
-                else:
-                    st.dataframe(df_res, use_container_width=True)
-
-                if not df_draft.empty:
-                    st.write("#### 📝 DRAFT SET UP")
-                    st.dataframe(df_draft, use_container_width=True)
-                
-                st.divider()
-
-                # Download
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_res.to_excel(writer, sheet_name='DATA SCAN', index=False)
-                    df_draft.to_excel(writer, sheet_name='DRAFT', index=False)
-                
-                st.download_button(
-                    "📥 DOWNLOAD SCAN OUT", 
-                    data=output.getvalue(), 
-                    file_name="SCAN_OUT_RESULT.xlsx"
-                )
-                
-            except Exception as e: 
-                st.error(f"Error: {e}")
-
-# --- TAMBAHAN: DUMMY FUNCTION (GANTI DENGAN LOGIC ASLI LO) ---
-def process_scan_out(df_scan, df_hist, df_stock):
-    """
-    Fungsi ini adalah placeholder. 
-    Ganti logic di dalamnya dengan proses bisnis Scan Out Validation yang sebenarnya!
-    """
-    # Contoh return value (harus df_res dan df_draft)
-    # Misal: Bandingkan df_scan vs df_hist vs df_stock
-    
-    # Logika dummy:
-    df_res = df_scan.copy() 
-    if 'Keterangan' not in df_res.columns:
-        df_res['Keterangan'] = "OK"
-        
-    df_draft = df_scan.head(0) # Empty dataframe
-    
-    return df_res, df_draft
+File "/mount/src/erp-logistik-sby/app.py", line 1909
+  elif menu == "Scan Out Validation":
+  ^
+SyntaxError: invalid syntax
 
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
