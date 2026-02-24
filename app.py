@@ -2094,11 +2094,6 @@ elif menu == "Stock Minus":
                     m2.metric("Qty Dipindahkan", total_qty)
                     m3.metric("Item Masih Minus", still_minus, delta_color="inverse")
                     
-                    # --- TAMBAHAN: PREVIEW DATA MINUS AWAL ---
-                    if not df_minus_awal.empty:
-                        st.write("#### 📋 Data Minus Awal (Sebelum Proses)")
-                        st.dataframe(df_minus_awal, use_container_width=True)
-                    
                     # Preview Data Transfer
                     if set_up_results:
                         st.write("#### 📋 Detail Transfer (SET_UP)")
@@ -2117,7 +2112,7 @@ elif menu == "Stock Minus":
                         bins = df_need_adj[col_bin].unique()
                         for bin_loc in bins:
                             bin_data = detail_minus[detail_minus[col_bin] == bin_loc]
-                            total_bin_minus = bin_data['QTY_MINUS'].sum()
+                            total_bin_minus = bin_data['QTY_MINUS'].sum()  # <-- INI YANG DIPERBAIKI
                             with st.expander(f"📍 {bin_loc} - Total Minus: {total_bin_minus}"):
                                 st.dataframe(bin_data, use_container_width=True)
                         
