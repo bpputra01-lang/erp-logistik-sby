@@ -569,15 +569,52 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
 # =========================================================
 # 3. LOGIKA COMPARE 2: STOCK VS DATA SCAN (SUB 2)
 # =========================================================
+import streamlit as st
+import pandas as pd
+import io
+from openpyxl import load_workbook
+
+# --- KONFIGURASI HALAMAN ---
+# Pastikan ini ada di bagian paling atas script app.py Anda
+# st.set_page_config(page_title="UltraFast Stock Compare", layout="wide")
+
+# =========================================================
+# 1. FUNGSI DETEKSI WARNA (IDENTIK VBA INTERIOR.COLOR)
+# =========================================================
+def get_yellow_skus(file, column_index):
+    yellow_set = set()
+    try:
+        # PENTING: Hanya bekerja untuk file .xlsx
+        wb = load_workbook(file, data_only=True)
+        ws = wb.active
+        for row_idx in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=column_index)
+            color = str(cell.fill.start_color.index)
+            # Standard Excel Yellow codes
+            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
+                sku_val = str(cell.value).strip().upper() if cell.value else ""
+                if sku_val:
+                    yellow_set.add(sku_val)
+    except:
+        pass
+    return yellow_set
+
+# =========================================================
+# 2. LOGIKA COMPARE 2: STOCK VS DATA SCAN
+# =========================================================
 def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
     # Stock Full (A-K = 0-10)
     df_stock_res = df_stock.copy()
     
     # Scan Lite for Dictionary (A=0, B=1, C=2)
+    # Gunakan iloc untuk memastikan index kolom tepat sesuai VBA
     df_scan_lite = df_scan.iloc[:, [0, 1, 2]].copy()
     df_scan_lite.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    
+    # Bersihkan Data (Trim & UCase)
     df_scan_lite['BIN'] = df_scan_lite['BIN'].astype(str).str.strip().str.upper()
     df_scan_lite['SKU'] = df_scan_lite['SKU'].astype(str).str.strip().str.upper()
+    df_scan_lite['QTY_SCAN'] = pd.to_numeric(df_scan_lite['QTY_SCAN'], errors='coerce').fillna(0)
     
     # Dictionary Logic: Sum Scan Qty by BIN|SKU
     dict_scan = df_scan_lite.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().to_dict()
@@ -590,9 +627,9 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
         # Kolom B=index 1, C=index 2, J=index 9
         bin_val = str(row.iloc[1]).strip().upper()
         sku_val = str(row.iloc[2]).strip().upper()
-        qty_sys = row.iloc[9] if pd.notnull(row.iloc[9]) else 0
+        qty_sys = pd.to_numeric(row.iloc[9], errors='coerce') if pd.notnull(row.iloc[9]) else 0
         
-        key = f"{bin_val}|{sku_val}"
+        key = (bin_val, sku_val)
         qty_scan = dict_scan.get(key, 0)
         
         qty_so_list.append(qty_scan)
@@ -600,73 +637,106 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
         diff_list.append(diff_val)
         note_list.append("SYSTEM +" if qty_sys > qty_scan else "OK")
 
+    # Tambahkan hasil ke DataFrame
     df_stock_res['QTY SO'] = qty_so_list
     df_stock_res['DIFF'] = diff_list
     df_stock_res['NOTE'] = note_list
     
-    # Yellow Highlight
-    yellows = get_yellow_skus(stock_file, 3) # Kolom C
-    df_stock_res['IS_YELLOW'] = df_stock_res.iloc[:, 2].astype(str).str.strip().str.upper().apply(lambda x: "YES" if x in yellows else "NO")
+    # Yellow Highlight (VBA Kolom C = Index 3)
+    yellows = get_yellow_skus(stock_file, 3)
+    df_stock_res['IS_YELLOW'] = df_stock_res.iloc[:, 2].astype(str).str.strip().str.upper().apply(
+        lambda x: "YES" if x in yellows else "NO"
+    )
+    
+    # PENTING: Hapus kolom duplikat agar Streamlit Styler tidak crash
+    df_stock_res = df_stock_res.loc[:, ~df_stock_res.columns.duplicated()].copy()
     
     return df_stock_res
 
 # =========================================================
-# 4. MENU UTAMA (STREAMLIT INTERFACE)
+# 3. MENU UTAMA (STREAMLIT INTERFACE)
 # =========================================================
 def menu_Stock_Opname():
     st.title("🚀 UltraFast Stock Compare (Identik VBA)")
     
     c1, c2 = st.columns(2)
     with c1:
-        up_scan = st.file_uploader("📥 DATA SCAN (Sheet: DATA SCAN)", type=['xlsx','csv'])
+        up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="up_scan_so")
     with c2:
-        up_stock = st.file_uploader("📥 STOCK SYSTEM (Sheet: STOCK SYSTEM)", type=['xlsx', 'csv'])
+        up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx', 'csv'], key="up_stock_so")
 
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
-            # Load Data
-            df_s = pd.read_excel(up_scan)
-            df_t = pd.read_excel(up_stock)
-            
-            # Sub 1 & Sub 2
-            res_scan = logic_compare_scan_to_stock(df_s, df_t, up_scan)
-            res_stock = logic_compare_stock_to_scan(df_t, df_s, up_stock)
-            
-            # Sub 3: Generate Real+ & System+
-            real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
-            system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
-            
-            # Tambahan: Item Name Lookup (E=index 4)
-            item_map = df_t.iloc[:, [2, 4]].dropna()
-            item_map.columns = ['SKU', 'ITEM NAME']
-            item_map['SKU'] = item_map['SKU'].astype(str).str.strip().str.upper()
-            item_map = item_map.drop_duplicates('SKU').set_index('SKU')['ITEM NAME'].to_dict()
-            
-            real_plus['ITEM NAME'] = real_plus['SKU'].map(item_map)
+            try:
+                # Load Data (Membaca sheet pertama secara default)
+                df_s = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
+                df_t = pd.read_excel(up_stock) if up_stock.name.endswith('xlsx') else pd.read_csv(up_stock)
+                
+                with st.spinner("Processing..."):
+                    # Sub 1: Scan vs System (Memakai fungsi logic_compare_scan_to_stock yang Anda punya)
+                    res_scan = logic_compare_scan_to_stock(df_s, df_t, up_scan)
+                    
+                    # Sub 2: System vs Scan
+                    res_stock = logic_compare_stock_to_scan(df_t, df_s, up_stock)
+                    
+                    # Sub 3: Generate Real+ & System+ (Filter hasil)
+                    real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
+                    system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+                    
+                    # Tambahan: Item Name Lookup (E=index 4 di file Stock)
+                    try:
+                        item_map = df_t.iloc[:, [2, 4]].dropna()
+                        item_map.columns = ['SKU', 'ITEM NAME']
+                        item_map['SKU'] = item_map['SKU'].astype(str).str.strip().str.upper()
+                        item_map = item_map.drop_duplicates('SKU').set_index('SKU')['ITEM NAME'].to_dict()
+                        real_plus['ITEM NAME'] = real_plus['SKU'].map(item_map)
+                    except:
+                        pass # Lewati jika kolom E tidak ada
 
-            # Simpan ke Session State
-            st.session_state.final_data = {
-                'res_scan': res_scan,
-                'res_stock': res_stock,
-                'real_plus': real_plus,
-                'system_plus': system_plus
-            }
+                    # Simpan ke Session State agar tidak hilang saat tab diklik
+                    st.session_state.final_data = {
+                        'res_scan': res_scan,
+                        'res_stock': res_stock,
+                        'real_plus': real_plus,
+                        'system_plus': system_plus
+                    }
+                    st.success("Compare Selesai!")
+            except Exception as e:
+                st.error(f"Terjadi kesalahan: {e}")
 
+    # TAMPILKAN HASIL
     if 'final_data' in st.session_state:
         d = st.session_state.final_data
         t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
         
-        # Helper untuk styling warna kuning
+        # Helper styling kuning (Hex Code agar lebih stabil)
         def style_yellow(row):
-            return ['background-color: yellow' if row.IS_YELLOW == 'YES' else '' for _ in row]
+            color = 'background-color: #FFFF00' if row.get('IS_YELLOW') == 'YES' else ''
+            return [color for _ in row]
 
-        with t1: st.dataframe(d['res_scan'].style.apply(style_yellow, axis=1))
-        with t2: st.dataframe(d['res_stock'].style.apply(style_yellow, axis=1))
-        with t3: st.dataframe(d['real_plus'].style.apply(style_yellow, axis=1))
-        with t4: st.dataframe(d['system_plus'].style.apply(style_yellow, axis=1))
+        with t1:
+            st.dataframe(d['res_scan'].style.apply(style_yellow, axis=1), use_container_width=True)
+        with t2:
+            st.dataframe(d['res_stock'].style.apply(style_yellow, axis=1), use_container_width=True)
+        with t3:
+            st.dataframe(d['real_plus'].style.apply(style_yellow, axis=1), use_container_width=True)
+        with t4:
+            st.dataframe(d['system_plus'].style.apply(style_yellow, axis=1), use_container_width=True)
 
-
-#     menu_Stock_Opname()
+        # Download Button
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+            d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
+            d['real_plus'].to_excel(writer, sheet_name='REAL PLUS', index=False)
+            d['system_plus'].to_excel(writer, sheet_name='SYSTEM PLUS', index=False)
+        
+        st.download_button(
+            label="📥 DOWNLOAD ALL RESULTS",
+            data=output.getvalue(),
+            file_name="Compare_Result.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 def menu_fdr_update():
     st.markdown('<div class="hero-header"><h1>🚚 FDR OUTSTANDING - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
