@@ -1309,7 +1309,7 @@ with st.sidebar:
             border-radius: 8px !important;
             color: #B8956E !important;
             font-size: 10px !important;
-            font-weight: 100 !important;
+            font-weight: 500 !important;
             letter-spacing: 1px !important;
             text-transform: uppercase !important;
             padding: 10px 14px !important;
