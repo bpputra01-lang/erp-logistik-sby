@@ -118,7 +118,7 @@ st.markdown("""
         flex: 0 1 auto !important;       /* Jangan biarkan kolom melebar sendiri menghabiskan layar */
         width: auto !important;          /* Lebar kolom wajib mengikuti isi tombolnya saja */
         min-width: fit-content !important; 
-        max-width: fit-content !important; /* Paksa kolom menciut, buang jarak jauh antar tombol */
+        max-width: fit-content !important; /* Paksa kolom thérapeut, buang jarak jauh antar tombol */
     }
 
     /* --- 3. STYLE TOMBOL: PRESISI & TEKS ENTER --- */
@@ -223,12 +223,88 @@ div.stFormSubmitButton > button {
             transform: translateY(-2px);
         }
 
-        /* 4. Input Box biar gelap & elegan */
+        /* 4. Input Box biar gelap & elegan - PERBAIKAN UTAMA DISINI */
+        /* container input */
         div[data-baseweb="input"] {
-            background-color: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
             border-radius: 10px !important;
+            padding: 8px 12px !important;
         }
+        
+        /* container input focus */
+        div[data-baseweb="input"]:focus-within {
+            border-color: #D4AF37 !important;
+            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
+        }
+        
+        /* input field (termasuk password) */
+        input[type="text"], 
+        input[type="password"],
+        input[type="email"],
+        div[data-baseweb="input"] input {
+            background-color: transparent !important;
+            border: none !important;
+            color: #C5A059 !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        
+        /* placeholder styling */
+        input::placeholder {
+            color: rgba(197, 160, 89, 0.5) !important;
+            opacity: 1 !important;
+        }
+        
+        /* Firefox placeholder */
+        input::-webkit-input-placeholder {
+            color: rgba(197, 160, 89, 0.5) !important;
+        }
+        
+        /* password field dots styling */
+        input[type="password"] {
+            letter-spacing: 2px !important;
+        }
+
+        /* Label styling */
+        [data-testid="stWidgetLabel"] p {
+            color: #E0E0E0 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            margin-bottom: 8px !important;
+        }
+
+        /* Form spacing */
+        .stForm {
+            background-color: transparent !important;
+            border: none !important;
+        }
+        
+        /* Input wrapper styling */
+        div[data-testid="stTextInput"] div[data-baseweb="input"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 10px !important;
+            padding: 12px 16px !important;
+            min-height: 50px !important;
+        }
+        
+        /* Pastikan password dots terlihat jelas */
+        div[data-testid="stTextInput"] input {
+            color: #C5A059 !important;
+            -webkit-text-fill-color: #C5A059 !important;
+        }
+
+        /* Hilangkan background overlay Streamlit */
+        .stTextInput > div > div {
+            background-color: transparent !important;
+        }
+
         /* Ubah background st.success jadi hijau solid */
     div[data-testid="stNotification"] {
         background-color: #1e7e34 !important; /* Hijau Tua Surabaya */
@@ -241,10 +317,7 @@ div.stFormSubmitButton > button {
         fill: white !important;
     }
     
-    
-        input { color: #C5A059 !important; font-weight: 600 !important; }
-        [data-testid="stWidgetLabel"] p { color: #E0E0E0 !important; font-weight: 600 !important; }
-        </style>
+    </style>
     """, unsafe_allow_html=True)
     # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
