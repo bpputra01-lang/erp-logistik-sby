@@ -1309,7 +1309,7 @@ with st.sidebar:
             font-size: 10px !important;
             font-weight: 500 !important;
             letter-spacing: 0.5px !important;
-            padding: 6px 12px !important;
+            padding: 5px 5px !important;
             transition: all 0.2s ease !important;
         }
         
