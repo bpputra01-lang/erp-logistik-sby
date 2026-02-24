@@ -527,11 +527,11 @@ def get_yellow_skus(file, column_index):
 def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     # Mapping Kolom (A=0, B=1, C=2)
     df_scan_clean = df_scan.iloc[:, [0, 1, 2]].copy()
-    df_scan_clean.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    df_scan_clean.columns = ['BIN', 'SKU', 'QTY SCAN']
     
     # Mapping Stock (B=1, C=2, J=9)
     df_stock_lite = df_stock.iloc[:, [1, 2, 9]].copy()
-    df_stock_lite.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+    df_stock_lite.columns = ['BIN', 'SKU', 'QTY SYSTEM']
 
     # Logika VBA: Trim & UCase
     for df in [df_scan_clean, df_stock_lite]:
@@ -689,7 +689,7 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
     
     # 3. Hapus kolom lama yang mungkin sudah ada di file excel (mencegah duplikat QTY_SO)
     # Kita hapus variasi penamaan yang mungkin muncul agar tidak bentrok
-    cols_to_drop = ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE', 'IS_YELLOW']
+    cols_to_drop = ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE',]
     for col in cols_to_drop:
         if col in dt.columns:
             dt = dt.drop(columns=[col])
@@ -827,8 +827,8 @@ def menu_Stock_Opname():
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             prepare_df(d['res_scan']).to_excel(writer, sheet_name='DATA SCAN', index=False)
             prepare_df(d['res_stock']).to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
-            prepare_df(d['real_plus']).to_excel(writer, sheet_name='REAL PLUS', index=False)
-            prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM PLUS', index=False)
+            prepare_df(d['real_plus']).to_excel(writer, sheet_name='REAL +', index=False)
+            prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM +', index=False)
         
         st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
 def menu_fdr_update():
