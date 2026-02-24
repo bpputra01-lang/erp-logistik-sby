@@ -2011,7 +2011,8 @@ elif menu == "Putaway System":
                 m1.metric("Total Compare", len(df_comp))
                 m2.metric("List Items", len(df_plist))
                 m3.metric("Kurang Setup", len(df_kurang))
-                m4.metric("LT.3 Out", len(df_lt3))
+                lt3_total_qty = df_lt3['QTY'].sum() if 'QTY' in df_lt3.columns and not df_lt3.empty else 0
+                m4.metric("LT.3 Out (Total Qty)", int(lt3_total_qty))
                 
                 # --- TABS PREVIEW ---
                 t1, t2, t3, t4, t5 = st.tabs(["📋 Compare", "📝 List", "⚠️ Kurang Setup", "📊 Summary", "📦 LT.3 Out"])
