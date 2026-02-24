@@ -1969,4 +1969,5 @@ elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
 elif menu == "Stock Opname":
-    compare_data_scan_stock_system(df_scan, df_stock, scan_file)
+    # CUKUP PANGGIL INI
+    menu_Stock_Opname()
