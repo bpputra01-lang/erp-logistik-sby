@@ -1597,7 +1597,7 @@ def putaway_system(df_ds, df_asal):
                         out_data.append([bin_asal, sku, original_diff, "(NO BIN)", 0, diff_after_take, 
                                         "PERLU CARI STOCK MANUAL"])
                     
-                    diff_qty = 0  # Selesai untuk loop ini
+                    diff_qty = 0
                     allocated = True
                     break
         
@@ -1674,21 +1674,20 @@ def putaway_system(df_ds, df_asal):
         })
         df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "STATUS"]]
         df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"]
-        df_plist['NOTES'] = "PUTAWAY"  # Override semua jadi PUTAWAY
+        df_plist['NOTES'] = "PUTAWAY"
     else:
         df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"])
     
-    # 6. REKAP KURANG SETUP (FULLY, PARTIAL, MANUAL)
-    df_kurang = df_comp.copy()  # Ambil semua
+    # 6. REKAP KURANG SETUP (HANYA "PERLU CARI STOCK MANUAL")
+    df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
     if not df_kurang.empty:
         df_kurang = df_kurang.rename(columns={
             "BIN ASAL": "BIN",
             "DIFF": "QTY"
         })
-        df_kurang = df_kurang[["BIN", "SKU", "QTY", "STATUS"]]
-        df_kurang.columns = ["BIN", "SKU", "QTY", "NOTES"]
+        df_kurang = df_kurang[["BIN", "SKU", "QTY"]]
     else:
-        df_kurang = pd.DataFrame(columns=["BIN", "SKU", "QTY", "NOTES"])
+        df_kurang = pd.DataFrame(columns=["BIN", "SKU", "QTY"])
     
     # 7. SUMMARY PUTAWAY
     df_sum = df_plist.copy()
@@ -1706,7 +1705,7 @@ def putaway_system(df_ds, df_asal):
         df_lt3 = pd.DataFrame(columns=["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"])
     
     return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_asal_updated
-    
+
 with st.sidebar:
        st.markdown("""
     <style>
