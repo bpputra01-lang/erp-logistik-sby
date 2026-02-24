@@ -517,7 +517,7 @@ def menu_Stock_Opname():
     except Exception as e:
         return None, f"Error Data Scan: {str(e)}"
 
-def compare_stock_system_vs_data_scan(df_stock, df_scan):
+def compare_stock_system_vs_data_scan():
     try:
         # VBA: Stock BIN(B), SKU(C), QTY SYSTEM(J)
         df_stock_full = df_stock.copy()
