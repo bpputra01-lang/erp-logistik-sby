@@ -552,7 +552,7 @@ def compare_stock_system_vs_data_scan():
     except Exception as e:
         return None, f"Error Stock System: {str(e)}"
 
-def generate_real_plus_system_plus(df_scan_res, df_stock_res):
+def generate_real_plus_system_plus():
     # VBA: If dataScan(i, 6) = "REAL +"
     real_plus = df_scan_res[df_scan_res['NOTE'] == 'REAL +'].copy()
     
