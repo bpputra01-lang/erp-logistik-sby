@@ -676,7 +676,20 @@ def menu_refill_withdraw():
         if st.session_state.summary_withdraw is not None:
             st.dataframe(st.session_state.summary_withdraw, use_container_width=True)
 
+    with t3:
+        if st.session_state.summary_refill is not None:
+            if st.button("🚀 Upload Refill to Google"):
+                data_json = st.session_state.summary_refill.astype(str).values.tolist()
+                url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=REFILL%20STOCK"
+                requests.post(url, json=data_json)
+                st.toast("REFILL UPLOADED!")
 
+        if st.session_state.summary_withdraw is not None:
+            if st.button("🚀 Upload Withdraw to Google"):
+                data_json = st.session_state.summary_withdraw.astype(str).values.tolist()
+                url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=WITHDRAW%20STOCK"
+                requests.post(url, json=data_json)
+                st.toast("WITHDRAW UPLOADED!")
 # --- ELIF NYA ---
 # elif menu == "Refill & Withdraw":
 #     menu_refill_withdraw()
