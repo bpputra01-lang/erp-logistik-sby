@@ -2022,6 +2022,5 @@ elif menu == "FDR Update":
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
-selected = st.sidebar.selectbox("Stock Opname")
-elif selected == "Stock Opname":
+elif menu == "Stock Opname":
     menu_Stock_Opname()
