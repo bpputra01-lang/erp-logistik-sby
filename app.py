@@ -1503,24 +1503,22 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 # ============================================
 # FUNGSI UTAMA PUTAWAY SYSTEM (VBA TO PYTHON)
 # ============================================
+# ============================================
+# FUNGSI UTAMA PUTAWAY SYSTEM (VBA TO PYTHON)
+# ============================================
 
 def putaway_system(df_ds, df_asal):
     """
     Konversi dari VBA ComparePutaway()
     """
-    # Kolom expected:
-    # df_ds (DS PUTAWAY): A=BIN ASAL, B=SKU, C=QTY PUTAWAY
-    # df_asal (ASAL BIN): A=something, B=BIN, C=SKU, ..., J=QTY SYSTEM
-    
-    # Rename kolom untuk konsistensi
-    df_asal.columns = range(df_asal.shape[1]) # Reset kolom ke 0-based index
+    # Rename kolom untuk numerik index (0-based)
+    df_asal.columns = range(df_asal.shape[1])
     
     # Asumsi struktur df_asal (sesuaikan jika berbeda):
-    # Kolom 1 = BIN, Kolom 2 = SKU, Kolom 9 = QTY SYSTEM (Index 9 = Kolom J)
-    # Sesuaikan index ini berdasarkan struktur file asli lo!
+    # Kolom 1 = BIN, Kolom 2 = SKU, Kolom 9 = QTY SYSTEM (Kolom J)
     col_bin_asal = 1
     col_sku_asal = 2
-    col_qty_asal = 9 # Kolom J (0-based index)
+    col_qty_asal = 9
     
     # df_ds: Kolom 0=BIN ASAL, 1=SKU, 2=QTY PUTAWAY
     col_bin_ds = 0
@@ -1531,50 +1529,64 @@ def putaway_system(df_ds, df_asal):
     bin_qty_dict = {}
     for idx, row in df_asal.iterrows():
         key = str(row[col_bin_asal]) + "|" + str(row[col_sku_asal])
-        qty = pd.to_numeric(row[col_qty_asal], errors='coerce')
-        bin_qty_dict[key] = qty if pd.notna(qty) else 0
+        try:
+            qty = float(row[col_qty_asal])
+        except:
+            qty = 0
+        bin_qty_dict[key] = qty
     
     # 2. PROCESSING UTAMA
     out_data = []
     
     for idx, row in df_ds.iterrows():
         sku = str(row[col_sku_ds])
-        diff_qty = pd.to_numeric(row[col_qty_ds], errors='coerce')
-        if pd.isna(diff_qty): 
-            continue
-        diff_qty = int(diff_qty)
+        try:
+            diff_qty = int(float(row[col_qty_ds]))
+        except:
+            diff_qty = 0
         
+        if diff_qty <= 0:
+            continue
+            
         bin_asal = str(row[col_bin_ds])
         original_diff = diff_qty
-        
         allocated = False
         
         # --- PRIORITY 1: STAGGING/STAGING LT.3 ---
-        if diff_qty > 0:
-            for key, qty in bin_qty_dict.items():
-                if qty <= 0: continue
-                b, s = key.split("|")
-                if s != sku: continue
-                b_upper = b.upper()
-                if "STAGGING LT.3" in b_upper or "STAGING LT.3" in b_upper:
-                    take = min(diff_qty, qty)
-                    bin_qty_dict[key] -= take
-                    out_data.append([bin_asal, sku, original_diff, b, take, diff_qty - take, 
-                                    "FULLY SETUP" if diff_qty - take == 0 else "PARTIAL SETUP"])
-                    diff_qty -= take
-                    allocated = True
-                    break
+        for key, qty in bin_qty_dict.items():
+            if qty <= 0:
+                continue
+            parts = key.split("|")
+            if len(parts) < 2:
+                continue
+            b, s = parts[0], parts[1]
+            if s != sku:
+                continue
+            b_upper = b.upper()
+            if "STAGGING LT.3" in b_upper or "STAGING LT.3" in b_upper:
+                take = min(diff_qty, int(qty))
+                bin_qty_dict[key] -= take
+                out_data.append([bin_asal, sku, original_diff, b, take, diff_qty - take, 
+                                "FULLY SETUP" if diff_qty - take == 0 else "PARTIAL SETUP"])
+                diff_qty -= take
+                allocated = True
+                break
         
         # --- PRIORITY 2: STAGING/KARANTINA (SELAIN LT.3) ---
         if not allocated and diff_qty > 0:
             for key, qty in bin_qty_dict.items():
-                if qty <= 0: continue
-                b, s = key.split("|")
-                if s != sku: continue
+                if qty <= 0:
+                    continue
+                parts = key.split("|")
+                if len(parts) < 2:
+                    continue
+                b, s = parts[0], parts[1]
+                if s != sku:
+                    continue
                 b_upper = b.upper()
                 if (("STAGGING" in b_upper or "STAGING" in b_upper or "KARANTINA" in b_upper) 
                     and "LT.3" not in b_upper):
-                    take = min(diff_qty, qty)
+                    take = min(diff_qty, int(qty))
                     bin_qty_dict[key] -= take
                     out_data.append([bin_asal, sku, original_diff, b, take, diff_qty - take, 
                                     "FULLY SETUP" if diff_qty - take == 0 else "PARTIAL SETUP"])
@@ -1585,12 +1597,17 @@ def putaway_system(df_ds, df_asal):
         # --- PRIORITY 3: NORMAL BINS ---
         if not allocated and diff_qty > 0:
             for key, qty in bin_qty_dict.items():
-                if qty <= 0: continue
-                b, s = key.split("|")
-                if s != sku: continue
+                if qty <= 0:
+                    continue
+                parts = key.split("|")
+                if len(parts) < 2:
+                    continue
+                b, s = parts[0], parts[1]
+                if s != sku:
+                    continue
                 b_upper = b.upper()
                 if "STAGGING" not in b_upper and "STAGING" not in b_upper and "KARANTINA" not in b_upper:
-                    take = min(diff_qty, qty)
+                    take = min(diff_qty, int(qty))
                     bin_qty_dict[key] -= take
                     out_data.append([bin_asal, sku, original_diff, b, take, diff_qty - take, 
                                     "FULLY SETUP" if diff_qty - take == 0 else "PARTIAL SETUP"])
@@ -1607,52 +1624,48 @@ def putaway_system(df_ds, df_asal):
         "BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QTY BIN SYSTEM", "DIFF", "NOTE"
     ])
     
-    # 4. UPDATE KOLOM QTY DI df_asal (Kolom J)
-    # Masukin balik nilai ke df_asal
+    # 4. UPDATE df_asal dengan qty baru
     df_asal_updated = df_asal.copy()
-    for key, val in bin_qty_dict.items():
-        b, s = key.split("|")
-        mask = (df_asal_updated[col_bin_asal].astype(str) == b) & (df_asal_updated[col_sku_asal].astype(str) == s)
-        df_asal_updated.loc_mask = mask # Ini akan di-assign di loop
-        df_asal_updated.loc[mask, col_qty_asal] = val
-    
-    # Fix untuk update qty
-    for idx, row in df_asal_updated.iterrows():
-        key = str(row[col_bin_asal]) + "|" + str(row[col_sku_asal])
-        if key in bin_qty_dict:
-            df_asal_updated.at[idx, col_qty_asal] = bin_qty_dict[key]
     
     # 5. EXPORT PUTAWAY LIST (FULLY/PARTIAL SETUP)
     df_plist = df_comp[df_comp['NOTE'].isin(['FULLY SETUP', 'PARTIAL SETUP'])].copy()
-    df_plist = df_plist.rename(columns={
-        "BIN DITEMUKAN": "BIN AWAL", 
-        "BIN ASAL": "BIN TUJUAN"
-    })[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QTY BIN SYSTEM', 'NOTE']]
-    df_plist['NOTES'] = "PUTAWAY"
+    if not df_plist.empty:
+        df_plist = df_plist.rename(columns={
+            "BIN DITEMUKAN": "BIN AWAL", 
+            "BIN ASAL": "BIN TUJUAN"
+        })
+        df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTE"]]
+        df_plist['NOTES'] = "PUTAWAY"
+    else:
+        df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTE", "NOTES"])
     
     # 6. REKAP KURANG SETUP
     df_kurang = df_comp[df_comp['NOTE'] == "PERLU CARI STOCK MANUAL"].copy()
-    df_kurang = df_kurang.rename(columns={
-        "BIN ASAL": "BIN",
-        "DIFF": "QTY"
-    })[['BIN', 'SKU', 'QTY']]
+    if not df_kurang.empty:
+        df_kurang = df_kurang.rename(columns={
+            "BIN ASAL": "BIN",
+            "DIFF": "QTY"
+        })
+        df_kurang = df_kurang[["BIN", "SKU", "QTY"]]
+    else:
+        df_kurang = pd.DataFrame(columns=["BIN", "SKU", "QTY"])
     
     # 7. SUMMARY PUTAWAY
     df_sum = df_plist.copy()
-    # Untuk SISA BIN AWAL, kita perlu cari di df_asal
-    # (Logic sumifs complicated, disederhanakan)
     df_sum = df_sum.rename(columns={"QTY BIN SYSTEM": "QTY PUTAWAY"})
     
     # 8. STAGGING LT.3 OUTSTANDING
     df_lt3 = df_asal_updated[
         (df_asal_updated[col_qty_asal] != 0) & 
-        (df_asal_updated[col_bin_asal].astype(str).str.upper().str.contains("STAGGING LT.3"))
+        (df_asal_updated[col_bin_asal].astype(str).str.upper().str.contains("STAGGING LT.3", na=False))
     ].copy()
-    # Ambil kolom yang needed (sesuaikan dengan struktur asli)
-    # Asumsi: Kolom 4=Brand, 5=ItemName, 6=Variant, 7=Category
+    
+    # Ambil kolom yang needed
     if len(df_lt3.columns) > 7:
         df_lt3 = df_lt3[[col_bin_asal, col_sku_asal, 5, 4, 7, 6, col_qty_asal]]
         df_lt3.columns = ["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"]
+    else:
+        df_lt3 = pd.DataFrame(columns=["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"])
     
     return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_asal_updated
 
