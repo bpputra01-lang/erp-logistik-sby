@@ -711,18 +711,36 @@ def menu_Stock_Opname():
         
         # Helper styling kuning (Hex Code agar lebih stabil)
         def style_yellow(row):
-            color = 'background-color: #FFFF00' if row.get('IS_YELLOW') == 'YES' else ''
+            # Cek apakah IS_YELLOW ada di index row, jika tidak default ke NO
+            is_y = row.get('IS_YELLOW', 'NO')
+            color = 'background-color: #FFFF00' if is_y == 'YES' else ''
             return [color for _ in row]
 
-        with t1:
-            st.dataframe(d['res_scan'].style.apply(style_yellow, axis=1), use_container_width=True)
-        with t2:
-            st.dataframe(d['res_stock'].style.apply(style_yellow, axis=1), use_container_width=True)
-        with t3:
-            st.dataframe(d['real_plus'].style.apply(style_yellow, axis=1), use_container_width=True)
-        with t4:
-            st.dataframe(d['system_plus'].style.apply(style_yellow, axis=1), use_container_width=True)
+        def clean_df_for_styler(df):
+            """Membersihkan dataframe dari kolom duplikat dan unnamed agar styler tidak crash"""
+            if df is None or df.empty:
+                return df
+            # 1. Hapus kolom yang namanya duplikat
+            df = df.loc[:, ~df.columns.duplicated()].copy()
+            # 2. Hapus kolom yang mengandung kata 'Unnamed' (biasanya kolom kosong di excel)
+            cols_to_keep = [c for c in df.columns if 'Unnamed' not in str(c)]
+            return df[cols_to_keep]
 
+        with t1:
+            df1 = clean_df_for_styler(d['res_scan'])
+            st.dataframe(df1.style.apply(style_yellow, axis=1), use_container_width=True)
+            
+        with t2:
+            df2 = clean_df_for_styler(d['res_stock'])
+            st.dataframe(df2.style.apply(style_yellow, axis=1), use_container_width=True)
+            
+        with t3:
+            df3 = clean_df_for_styler(d['real_plus'])
+            st.dataframe(df3.style.apply(style_yellow, axis=1), use_container_width=True)
+            
+        with t4:
+            df4 = clean_df_for_styler(d['system_plus'])
+            st.dataframe(df4.style.apply(style_yellow, axis=1), use_container_width=True)
         # Download Button
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
