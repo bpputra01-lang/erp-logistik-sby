@@ -2112,8 +2112,8 @@ elif menu == "Stock Minus":
                         bins = df_need_adj[col_bin].unique()
                         for bin_loc in bins:
                             bin_data = detail_minus[detail_minus[col_bin] == bin_loc]
-                            total_bin_minus = bin_data['QTY_MINUS'].sum()
-                            with st.expander(f"📍 {bin_loc} - Total Minus: {total_bin}"):
+                            total_bin_minus = bin_data['QTY_MINUS'].sum()  # <-- INI YANG DIPERBAIKI
+                            with st.expander(f"📍 {bin_loc} - Total Minus: {total_bin_minus}"):
                                 st.dataframe(bin_data, use_container_width=True)
                         
                         # Summary Table
