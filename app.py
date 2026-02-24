@@ -2058,8 +2058,5 @@ elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
 # --- Navigasi ---
-menu = st.sidebar.selectbox("Menu", ["Dashboard", "Stock Opname"])
-if menu == "Dashboard":
-    st.write("Dashboard")
 elif menu == "Stock Opname":
     menu_Stock_Opname()
