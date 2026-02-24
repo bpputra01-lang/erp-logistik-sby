@@ -2023,5 +2023,5 @@ elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
 selected = st.sidebar.selectbox("Stock Opname")
-elif selected == "Stock Opname":  # Sekarang Python sudah tahu apa itu 'selected'
+elif selected == "Stock Opname":
     menu_Stock_Opname()
