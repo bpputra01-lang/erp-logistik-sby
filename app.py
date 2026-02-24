@@ -1370,7 +1370,7 @@ with st.sidebar:
     menu = st.session_state.main_menu
 
     st.divider()
-    st.caption("ERP Logistic Surabaya v2.1")
+
     
 
 # --- MENU ROUTING ---
