@@ -1862,26 +1862,48 @@ elif menu == "Scan Out Validation":
 
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
+    
+    # --- TAMBAHKAN CSS AGAR KOTAK METRICS MUNCUL ---
+    st.markdown("""
+    <style>
+    .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+    .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+    .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
+
     c1, c2 = st.columns(2)
     with c1: up_all = st.file_uploader("📥Upload ALL DATA STOCK", type=['xlsx'])
     with c2: up_track = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
+    
     if up_all and up_track:
         if st.button("▶️ PROSES REFILL & OVERSTOCK"):
             try:
                 with st.spinner("Processing..."):
-                    df_all = pd.read_excel(up_all, engine='calamine')
-                    df_track = pd.read_excel(up_track, engine='calamine')
+                    # --- PERBAIKAN: Ganti engine ke openpyxl ---
+                    df_all = pd.read_excel(up_all, engine='openpyxl')
+                    df_track = pd.read_excel(up_track, engine='openpyxl')
+                    
+                    # --- PERBAIKAN: PANGGIL FUNGSI ---
+                    # Pastikan lo punya fungsi process_refill_overstock di file lo!
                     res_gl3, res_gl4, res_refill, res_over = process_refill_overstock(df_all, df_track)
+                    
                     st.success("Data Berhasil di Filter!")
+                    
+                    # Tampilan Metrics
                     m1, m2, m3 = st.columns(3)
                     m1.markdown(f'<div class="m-box"><span class="m-lbl">REFILL ITEMS</span><span class="m-val">{len(res_refill)}</span></div>', unsafe_allow_html=True)
                     m2.markdown(f'<div class="m-box"><span class="m-lbl">OVERSTOCK ITEMS</span><span class="m-val">{len(res_over)}</span></div>', unsafe_allow_html=True)
                     m3.markdown(f'<div class="m-box"><span class="m-lbl">GL3/GL4 ROWS</span><span class="m-val">{len(res_gl3)+len(res_gl4)}</span></div>', unsafe_allow_html=True)
+                    
+                    # Tabs dan Data
                     t1, t2, t3, t4 = st.tabs(["📦 REFILL", "⚠️ OVERSTOCK", "📑 GL3 DATA", "📑 GL4 DATA"])
                     with t1: st.dataframe(res_refill, use_container_width=True)
                     with t2: st.dataframe(res_over, use_container_width=True)
                     with t3: st.dataframe(res_gl3, use_container_width=True)
                     with t4: st.dataframe(res_gl4, use_container_width=True)
+                    
+                    # Download
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                         res_refill.to_excel(writer, sheet_name='REFILL', index=False)
@@ -1889,8 +1911,9 @@ elif menu == "Refill & Overstock":
                         res_gl3.to_excel(writer, sheet_name='GL3', index=False)
                         res_gl4.to_excel(writer, sheet_name='GL4', index=False)
                     st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REFILL_OVERSTOCK_REPORT.xlsx")
-            except Exception as e: st.error(f"Error: {e}")
-
+                    
+            except Exception as e: 
+                st.error(f"Error: {e}")
 elif menu == "Database Master":
     # Link Google Sheets lo yang sudah dikunci
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
@@ -1937,7 +1960,7 @@ elif menu == "Database Master":
     except Exception as e:
         st.error(f"⚠️ Gagal terhubung ke Google Sheets. Pastikan aksesnya sudah 'Anyone with the link'. Error: {e}")
 
-        
+
 elif menu == "Stock Minus":
     st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     
