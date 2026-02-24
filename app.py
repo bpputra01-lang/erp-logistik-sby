@@ -1206,7 +1206,7 @@ with st.sidebar:
         <style>
         /* Hilangkan padding bawaan container tombol agar bisa mepet */
         [data-testid="stVerticalBlock"] > div:has(div.stButton) {
-            margin-top: -5px !important; 
+            margin-top: -10px !important; 
         }
 
         /* Styling tombol logout */
@@ -1217,7 +1217,7 @@ with st.sidebar:
             border-radius: 8px !important;
             transition: all 0.3s ease !important;
             font-size: 13px !important;
-            height: 35px !important;
+            height: 25px !important;
         }
         
         div.stButton > button:hover {
