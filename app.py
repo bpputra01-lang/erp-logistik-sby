@@ -1297,31 +1297,40 @@ with st.sidebar:
     <!-- VERSION TAG -->
     <div class="version-tag">v2.1 PRO</div>
 """, unsafe_allow_html=True)
+
+# --- TOMBOL LOGOUT ---
 with st.sidebar:
     st.markdown("""
         <style>
-        /* Tombol logout minimalis */
-        .minimal-logout {
-            background: transparent !important;
+        /* Tombol logout simple elegant */
+        .simple-logout-btn {
+            background: rgba(197, 160, 89, 0.08) !important;
             border: 1px solid rgba(197, 160, 89, 0.25) !important;
-            border-radius: 6px !important;
-            color: #8E8E8E !important;
+            border-radius: 8px !important;
+            color: #B8956E !important;
             font-size: 10px !important;
             font-weight: 500 !important;
-            letter-spacing: 0.5px !important;
-            padding: 5px 5px !important;
-            transition: all 0.2s ease !important;
+            letter-spacing: 1px !important;
+            text-transform: uppercase !important;
+            padding: 10px 14px !important;
+            transition: all 0.25s ease !important;
+            margin-top: 20px !important;
         }
         
-        .minimal-logout:hover {
-            background: rgba(255, 75, 75, 0.08) !important;
-            border-color: rgba(255, 75, 75, 0.4) !important;
-            color: #ff6b6b !important;
+        .simple-logout-btn:hover {
+            background: rgba(197, 160, 89, 0.15) !important;
+            border-color: #C5A059 !important;
+            color: #C5A059 !important;
+        }
+        
+        .simple-logout-btn::before {
+            content: '🔴  ';
+            font-size: 12px;
         }
         </style>
     """, unsafe_allow_html=True)
     
-    if st.button("🔴Logout", key="simple_logout"):
+    if st.button("Logout", key="simple_logout"):
         st.session_state.logged_in = False
         st.rerun()
     
