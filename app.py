@@ -1969,32 +1969,6 @@ elif menu == "Scan Out Validation":
             except Exception as e: 
                 st.error(f"Error: {e}")
 
-# ==================== DUMMY FUNCTIONS (HAPUS JIKA SUDAH PUNYA) ====================
-def putaway_system(df_ds, df_asal):
-    """
-    Fungsi placeholder - GANTI dengan logic asli lo!
-    """
-    df_comp = df_ds.copy()
-    df_plist = df_ds.head(0)
-    df_kurang = df_ds.head(0)
-    df_sum = df_ds.head(0)
-    df_lt3 = df_ds.head(0)
-    df_updated_bin = df_ds.head(0)
-    
-    return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin
-
-def process_scan_out(df_scan, df_hist, df_stock):
-    """
-    Fungsi placeholder - GANTI dengan logic asli lo!
-    """
-    df_res = df_scan.copy()
-    if 'Keterangan' not in df_res.columns:
-        df_res['Keterangan'] = "OK"
-        
-    df_draft = df_scan.head(0)
-    
-    return df_res, df_draft
-
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
     
