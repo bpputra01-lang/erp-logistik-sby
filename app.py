@@ -2094,14 +2094,36 @@ elif menu == "Stock Minus":
                     m2.metric("Qty Dipindahkan", total_qty)
                     m3.metric("Item Masih Minus", still_minus, delta_color="inverse")
                     
-                    # Preview Data
+                    # Preview Data Transfer
                     if set_up_results:
                         st.write("#### 📋 Detail Transfer (SET_UP)")
                         st.dataframe(pd.DataFrame(set_up_results), use_container_width=True)
                     
+                    # --- TAMBAHAN: DETAIL LIST ITEM MINUS ---
                     if not df_need_adj.empty:
                         st.warning("⚠️ Item berikut masih minus dan perlu justificasi manual:")
-                        st.dataframe(df_need_adj, use_container_width=True)
+                        
+                        # Group by BIN TUJUAN
+                        df_need_adj['QTY_MINUS'] = df_need_adj[col_qty].abs()
+                        detail_minus = df_need_adj.groupby([col_bin, col_sku])['QTY_MINUS'].sum().reset_index()
+                        detail_minus = detail_minus.sort_values(by=[col_bin, 'QTY_MINUS'], ascending=[True, False])
+                        
+                        # Tampilkan dalam expander per BIN
+                        bins = df_need_adj[col_bin].unique()
+                        for bin_loc in bins:
+                            bin_data = detail_minus[detail_minus[col_bin] == bin_loc]
+                            total_bin_minus = bin_data['QTY_MINUS'].sum()
+                            with st.expander(f"📍 {bin_loc} - Total Minus: {total_bin}"):
+                                st.dataframe(bin_data, use_container_width=True)
+                        
+                        # Summary Table
+                        st.write("#### 📊 Ringkasan Minus per Lokasi")
+                        summary_per_bin = df_need_adj.groupby(col_bin).agg({
+                            col_sku: 'count',
+                            'QTY_MINUS': 'sum'
+                        }).rename(columns={col_sku: 'Jumlah SKU', 'QTY_MINUS': 'Total Qty Minus'})
+                        summary_per_bin = summary_per_bin.sort_values('Total Qty Minus', ascending=False)
+                        st.dataframe(summary_per_bin, use_container_width=True)
                     
                     st.divider()
                     
@@ -2123,7 +2145,7 @@ elif menu == "Stock Minus":
                     
         except Exception as e:
             st.error(f"Terjadi Kesalahan: {e}")
-            
+
 elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM </h1></div>', unsafe_allow_html=True)
     
