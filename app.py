@@ -560,10 +560,7 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     df_scan_clean['DIFF'] = diff_list
     df_scan_clean['NOTE'] = note_list
     
-    # Yellow Highlight
-    yellows = get_yellow_skus(scan_file, 2) # Kolom B
-    df_scan_clean['IS_YELLOW'] = df_scan_clean['SKU'].apply(lambda x: "YES" if x in yellows else "NO")
-    
+
     return df_scan_clean
 
 # =========================================================
@@ -646,9 +643,7 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     ds['DIFF'] = diff_list
     ds['NOTE'] = note_list
     
-    # Warna Kuning (Scan Kolom B = Index 2)
-    yellows = get_yellow_skus(scan_file, 2)
-    ds['IS_YELLOW'] = ds['SKU'].apply(lambda x: "YES" if x in yellows else "NO")
+    
     
     return ds
 
@@ -699,14 +694,6 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
     dt['DIFF'] = diff_list
     dt['NOTE'] = note_list
     
-    # 5. Warna Kuning (Stock Kolom C = Index 3)
-    try:
-        yellows = get_yellow_skus(stock_file, 3)
-        dt['IS_YELLOW'] = dt.iloc[:, 2].astype(str).str.strip().str.upper().apply(
-            lambda x: "YES" if x in yellows else "NO"
-        )
-    except:
-        dt['IS_YELLOW'] = "NO" # Fallback jika fungsi warna error
     
     # 6. Final Clean: Pastikan tidak ada kolom duplikat tersisa secara teknis
     dt = dt.loc[:, ~dt.columns.duplicated()].copy()
@@ -782,14 +769,7 @@ def menu_Stock_Opname():
             df = df.loc[:, ~df.columns.duplicated()]
             return df
 
-        def apply_style(df):
-            # Cek apakah kolom IS_YELLOW ada
-            if 'IS_YELLOW' in df.columns:
-                return df.style.map(
-                    lambda x: 'background-color: yellow', 
-                    subset=pd.IndexSlice[df.get('IS_YELLOW') == 'YES', :]
-                )
-            return df
+       
 
         t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
         
