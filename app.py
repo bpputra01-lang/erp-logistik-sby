@@ -10,170 +10,268 @@ st.set_page_config(
   
 st.markdown("""
     <style>
-    /* 1. ATUR JARAK ATAS AGAR TIDAK KEPOTONG */
-    .block-container { 
-        padding-top: 3.5rem !important; /* Tambah padding supaya judul gak kelindes toolbar atas */
+    /* ============================================
+       FONTS IMPORT
+       ============================================ */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
+
+    /* ============================================
+       1. LAYOUT & SPACING
+       ============================================ */
+    .block-container {
+        padding-top: 3.5rem !important;
         padding-bottom: 0rem !important;
     }
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
-    [data-testid="stSidebarNav"] { display: none; } 
-    
+    [data-testid="stSidebarNav"] { display: none !important; }
 
-    
-    /* 2. STYLE JUDUL ERP DI SIDEBAR */
-    .sidebar-title { 
-        color: #00d2ff; 
-        text-align: center; 
-        font-family: 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 20px;
-        margin-top: -45px; 
-        padding-bottom: 15px;
-        border-bottom: 1px solid #2d2d44;
-        margin-bottom: 10px;
+    /* ============================================
+       2. APP BACKGROUND
+       ============================================ */
+    .stApp {
+        background-color: #f5f7fa !important;
     }
 
-    .stApp { background-color: #f4f7f6; }
-    [data-testid="stSidebar"] { background-color: #1e1e2f !important; border-right: 1px solid #2d2d44; }
+    /* ============================================
+       3. SIDEBAR - PREMIUM DARK
+       ============================================ */
+    [data-testid="stSidebar"] {
+        background-color: #1a1d2e !important;
+        border-right: 1px solid rgba(197, 160, 89, 0.15) !important;
+    }
 
-    /* 3. HERO HEADER - SLIM & MENGIKUTI PANJANG TEKS (GAK KEPOTONG) */
-    .hero-header { 
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-        color: white !important; 
-        padding: 8px 18px !important; /* Padding pas, gak kegedean */
-        border-radius: 8px; 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-        margin-top: 0px !important; /* Reset margin biar gak nyundul ke atas */
+    /* ============================================
+       4. HERO HEADER - PREMIUM BLUE
+       ============================================ */
+    .hero-header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%) !important;
+        color: white !important;
+        padding: 10px 22px !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.25) !important;
+        margin-top: 0px !important;
         margin-bottom: 25px !important;
-        display: inline-block; /* Agar background cuma sepanjang tulisan */
-        width: auto;
+        display: inline-block !important;
+        width: auto !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
-    .hero-header h1 { 
-        color: white !important; 
-        font-size: 20px !important; /* Ukuran font pas */
-        font-weight: 800 !important;
+    .hero-header h1 {
+        color: white !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 19px !important;
+        font-weight: 700 !important;
         margin: 0 !important;
-        letter-spacing: 0.5px;
-        line-height: 1.2;
+        letter-spacing: 0.3px;
+        line-height: 1.3;
     }
-/* Tombol Utama (Clean, Copy, Split) */
+
+    /* ============================================
+       5. MAIN BUTTONS - NAVY BLUE
+       ============================================ */
     div.stButton > button {
-        background-color: #002b5b !important; /* Biru Navy Gelap */
+        background: linear-gradient(135deg, #002b5b 0%, #003874 100%) !important;
         color: white !important;
         border-radius: 8px !important;
-        border: 2px solid #001a35 !important;
-        font-weight: bold !important;
+        border: 1px solid #001a35 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
         height: 3em !important;
-        transition: 0.3s;
+        transition: all 0.25s ease !important;
+        box-shadow: 0 2px 8px rgba(0, 43, 91, 0.2) !important;
     }
     div.stButton > button:hover {
-        background-color: #004085 !important; /* Terang dikit pas di-hover */
-        border-color: #ffc107 !important; /* Border kuning pas di-hover */
+        background: linear-gradient(135deg, #003874 0%, #004a9e 100%) !important;
+        border-color: #ffc107 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(0, 43, 91, 0.3) !important;
     }
-    /* Tombol Clear (Khusus Merah biar beda) */
-    div.stButton > button[key*="reset"], div.stButton > button[key*="clear"] {
-        background-color: #8b0000 !important; /* Merah Marun */
+
+    /* Clear/Reset Buttons - Red */
+    div.stButton > button[key*="reset"],
+    div.stButton > button[key*="clear"] {
+        background: linear-gradient(135deg, #8b0000 0%, #a00000 100%) !important;
         border-color: #4a0000 !important;
     }
-    /* Kotak Upload File */
+    div.stButton > button[key*="reset"]:hover,
+    div.stButton > button[key*="clear"]:hover {
+        background: linear-gradient(135deg, #a00000 0%, #b50000 100%) !important;
+        border-color: #ff4444 !important;
+    }
+
+    /* ============================================
+       6. FILE UPLOADER
+       ============================================ */
     [data-testid="stFileUploader"] {
         background-color: #f0f2f6;
-        border: 2px dashed #002b5b;
+        border: 2px dashed rgba(0, 43, 91, 0.3) !important;
         border-radius: 10px;
-        padding: 10px;
+        padding: 12px;
     }
-    
-    /* Metric Box */
-    .m-box { background: #1e1e2f; padding: 15px; border-radius: 8px; border-left: 5px solid #ffce00; margin-bottom: 10px; text-align: center; }
-    .m-lbl { color: #ffffff; font-size: 10px; font-weight: 700; text-transform: uppercase; display: block; }
-    .m-val { color: #ffce00; font-size: 20px; font-weight: 800; }
+    [data-testid="stFileUploader"] button {
+        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important;
+        color: #1a1d2e !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+    }
 
-    /* Radio Button styling */
+    /* ============================================
+       7. METRIC BOXES - PREMIUM CARD
+       ============================================ */
+    .m-box {
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+        padding: 18px 20px !important;
+        border-radius: 10px !important;
+        border-left: 4px solid #C5A059 !important;
+        margin-bottom: 10px !important;
+        text-align: left !important;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
+    }
+    .m-lbl {
+        color: rgba(255, 255, 255, 0.65) !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .m-val {
+        color: #C5A059 !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+    }
+
+    /* ============================================
+       8. RADIO BUTTONS
+       ============================================ */
     div.row-widget.stRadio > div { background-color: transparent !important; }
-    div.row-widget.stRadio label { color: #d1d1d1 !important; font-size: 14px !important; padding: 8px 15px !important; border-radius: 5px; }
-    
-    /* --- INPUT BOX STYLE (TULISAN PUTIH TETAP AMAN) --- */
-    div[data-baseweb="select"] > div, [data-testid="stFileUploaderSection"] {
-        background-color: #1a2634 !important;
-        border: 1px solid #C5A059 !important;
+    div.row-widget.stRadio label {
+        color: #a0a5b5 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 13px !important;
+        padding: 8px 14px !important;
+        border-radius: 6px !important;
+        background: rgba(26, 29, 46, 0.5) !important;
+        border: 1px solid rgba(197, 160, 89, 0.15) !important;
+        transition: all 0.2s ease !important;
+    }
+    div.row-widget.stRadio label:hover {
+        background: rgba(197, 160, 89, 0.1) !important;
+        border-color: rgba(197, 160, 89, 0.3) !important;
+        color: #C5A059 !important;
+    }
+
+    /* ============================================
+       9. INPUT BOXES - GOLD BORDER
+       ============================================ */
+    div[data-baseweb="select"] > div,
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
         border-radius: 8px !important;
     }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
-    [data-testid="stFileUploaderText"] > span, 
-    [data-testid="stFileUploaderText"] > small {
-        color: white !important;
-        -webkit-text-fill-color: white !important;
+    div[data-baseweb="select"] > div:focus-within,
+    [data-testid="stFileUploaderSection"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
     }
-  /* --- 1. KONTAINER UTAMA: KUNCI JARAK ANTAR TOMBOL --- */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    [data-testid="stFileUploaderText"] > span,
+    [data-testid="stFileUploaderText"] > small {
+        color: #e0e0e0 !important;
+        -webkit-text-fill-color: #e0e0e0 !important;
+    }
+
+    /* Text inputs */
+    div[data-baseweb="input"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+    }
+    div[data-baseweb="input"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    input {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 14px !important;
+    }
+
+    /* ============================================
+       10. BUTTONS LAYOUT
+       ============================================ */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
-        flex-wrap: wrap !important;      /* Teks turun baris jika sempit */
-        gap: 12px !important;            /* KUNCI: Jarak horizontal & vertikal antar tombol SAMA SEMUA */
-        justify-content: flex-start !important; /* Susun rapat ke kiri, buang sisa space di tengah */
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        justify-content: flex-start !important;
         width: 100% !important;
     }
-
-    /* --- 2. KUNCI KOLOM: BUANG JARAK KOSONG (GAP) OTOMATIS --- */
     [data-testid="column"] {
-        flex: 0 1 auto !important;       /* Jangan biarkan kolom melebar sendiri menghabiskan layar */
-        width: auto !important;          /* Lebar kolom wajib mengikuti isi tombolnya saja */
-        min-width: fit-content !important; 
-        max-width: fit-content !important; /* Paksa kolom thérapeut, buang jarak jauh antar tombol */
+        flex: 0 1 auto !important;
+        width: auto !important;
+        min-width: fit-content !important;
+        max-width: fit-content !important;
     }
-
-    /* --- 3. STYLE TOMBOL: PRESISI & TEKS ENTER --- */
     div.stButton > button {
-        width: 180px !important;         /* Tentukan lebar tetap agar semua tombol seragam */
-        min-height: 3.5em !important;    /* Tinggi cukup untuk teks 2 baris */
-        white-space: normal !important;  /* Izinkan teks turun ke bawah (enter) */
+        width: 170px !important;
+        min-height: 3.3em !important;
+        white-space: normal !important;
         word-wrap: break-word !important;
-        padding: 10px 15px !important;   /* Jarak dalam tombol simetris */
+        padding: 10px 14px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         text-align: center !important;
-        font-size: 14px !important;
-        line-height: 1.2 !important;
-        border: 2px solid #001a35 !important;
-    
+        font-size: 13px !important;
+        line-height: 1.3 !important;
     }
-    /* --- SOLUSI PERMANEN TOMBOL LOGOUT --- */
-    /* 1. Kunci Button di Sidebar agar tidak ikut gaya tombol utama */
+
+    /* ============================================
+       11. SIDEBAR BUTTONS - GOLD THEME
+       ============================================ */
     [data-testid="stSidebar"] div.stButton > button {
-        background-color: #002b5b !important; 
-        color: #ff4b4b !important; 
-        border: 2px solid #ff4b4b !important;
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important;
+        color: #C5A059 !important;
+        border: 1px solid rgba(197, 160, 89, 0.25) !important;
         width: 100% !important;
-        height: 3.5em !important;
+        height: auto !important;
+        min-height: 42px !important;
         border-radius: 8px !important;
-        font-weight: bold !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 12px !important;
         white-space: nowrap !important;
-        transition: none !important; /* Biar gak kedap-kedip pas refresh */
+        transition: all 0.25s ease !important;
+        margin-bottom: 6px !important;
     }
-
-    /* 2. Pastikan teks di dalamnya tetap merah */
-    [data-testid="stSidebar"] div.stButton > button p {
-        color: #ff4b4b !important;
-    }
-
-    /* 3. Efek Hover khusus Logout */
     [data-testid="stSidebar"] div.stButton > button:hover {
-        background-color: #8b0000 !important;
-        color: white !important;
-        border-color: white !important;
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important;
+        border-color: #C5A059 !important;
+        color: #FFD700 !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button p {
+        color: inherit !important;
+        font-family: 'Inter', sans-serif !important;
     }
 
-    /* 4. Reset teks hover */
-    [data-testid="stSidebar"] div.stButton > button:hover p {
-        color: white !important;
-    }
-    [data-testid="stFileUploader"] button {
-        background-color: #C5A059 !important;
-        color: #1a2634 !important;
-        font-weight: bold !important;
+    /* ============================================
+       12. LABELS
+       ============================================ */
+    [data-testid="stWidgetLabel"] p {
+        color: #2d3748 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
     }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
 import streamlit as st
 
