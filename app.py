@@ -492,91 +492,180 @@ from openpyxl import load_workbook
 # 1. FUNGSI PENDUKUNG (HARUS DI ATAS)
 # =========================================================
 
-def menu_Stock_Opname(df_scan, df_stock, scan_file):
-    try:
-        # VBA: Scan BIN(A), SKU(B), QTY(C)
-        df_scan_clean = df_scan.iloc[:, [0, 1, 2]].copy()
-        df_scan_clean.columns = ['BIN', 'SKU', 'QTY_SCAN']
-        
-        # VBA: Stock BIN(B), SKU(C), QTY(J)
-        df_stock_lite = df_stock.iloc[:, [1, 2, 9]].copy()
-        df_stock_lite.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+import streamlit as st
+import pandas as pd
+import io
+from openpyxl import load_workbook
 
-        # Sesuai VBA: Trim & UCase
-        for df in [df_scan_clean, df_stock_lite]:
-            df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
-            df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
-            # Pastikan QTY adalah angka
-            qty_col = 'QTY_SCAN' if 'QTY_SCAN' in df.columns else 'QTY_SYSTEM'
-            df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce').fillna(0)
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="UltraFast Stock Compare", layout="wide")
 
-        # Sesuai VBA: Grouping data System (dict.Add key, dataStock)
-        df_stock_grouped = df_stock_lite.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
-
-        # Merge Left (Fisik sebagai acuan)
-        result = pd.merge(df_scan_clean, df_stock_grouped, on=['BIN', 'SKU'], how='left')
-        result['QTY_SYSTEM'] = result['QTY_SYSTEM'].fillna(0)
-        
-        # VBA logic: outDiff = qtyScan - qtySys
-        result['DIFF'] = result['QTY_SCAN'] - result['QTY_SYSTEM']
-        
-        # VBA logic: If qtyScan > qtySys Then "REAL +" Else "OK"
-        # PENTING: Jika Qty Scan <= Qty System, maka statusnya OK (tidak masuk REAL +)
-        result['NOTE'] = result.apply(lambda x: "REAL +" if x['QTY_SCAN'] > x['QTY_SYSTEM'] else "OK", axis=1)
-        
-        # Cek warna kuning (VBA logic)
-        yellow_skus = get_yellow_cells(scan_file, 2)
-        result['IS_YELLOW'] = result['SKU'].apply(lambda x: "YES" if x in yellow_skus else "NO")
-        
-        return result, None
-    except Exception as e:
-        return None, f"Error Logic Scan: {str(e)}"
-
-def compare_stock_system_vs_data_scan(df_stock, df_scan, stock_file):
-    try:
-        # VBA: Stock BIN(B), SKU(C), QTY(J)
-        df_stock_lite = df_stock.copy()
-        # Buat key pembantu untuk join
-        df_stock_lite['JOIN_BIN'] = df_stock_lite.iloc[:, 1].astype(str).str.strip().str.upper()
-        df_stock_lite['JOIN_SKU'] = df_stock_lite.iloc[:, 2].astype(str).str.strip().str.upper()
-        
-        # VBA: Scan BIN(A), SKU(B), QTY(C)
-        df_scan_lite = df_scan.iloc[:, [0, 1, 2]].copy()
-        df_scan_lite.columns = ['JOIN_BIN', 'JOIN_SKU', 'QTY_SCAN']
-        df_scan_lite['JOIN_BIN'] = df_scan_lite['JOIN_BIN'].astype(str).str.strip().str.upper()
-        df_scan_lite['JOIN_SKU'] = df_scan_lite['JOIN_SKU'].astype(str).str.strip().str.upper()
-        df_scan_lite['QTY_SCAN'] = pd.to_numeric(df_scan_lite['QTY_SCAN'], errors='coerce').fillna(0)
-
-        # Sesuai VBA: Grouping data Scan (dict.Add key, dataScan)
-        df_scan_grouped = df_scan_lite.groupby(['JOIN_BIN', 'JOIN_SKU'])['QTY_SCAN'].sum().reset_index()
-
-        # Merge Left (System sebagai acuan)
-        result = pd.merge(df_stock_lite, df_scan_grouped, on=['JOIN_BIN', 'JOIN_SKU'], how='left')
-        result['QTY_SCAN'] = result['QTY_SCAN'].fillna(0)
-        
-        # Ambil QTY SYSTEM dari kolom J (index 9)
-        qty_sys = pd.to_numeric(result.iloc[:, 9], errors='coerce').fillna(0)
-        
-        # VBA logic: outDiff = qtySystem - qtyScan
-        result['DIFF'] = qty_sys - result['QTY_SCAN']
-        
-        # VBA logic: If qtySystem > qtyScan Then "SYSTEM +" Else "OK"
-        result['NOTE'] = result['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
-        
-        # Cek warna kuning (VBA logic)
-        yellow_skus = get_yellow_cells(stock_file, 3)
-        result['IS_YELLOW'] = result['JOIN_SKU'].apply(lambda x: "YES" if x in yellow_skus else "NO")
-        
-        # Hapus kolom pembantu
-        result = result.drop(columns=['JOIN_BIN', 'JOIN_SKU'])
-        
-        return result, None
-    except Exception as e:
-        return None, f"Error Logic System: {str(e)}"# =========================================================
-# 3. NAVIGASI (ELIF)
 # =========================================================
-# (Gunakan ini di bagian pilihan menu Anda)
-# if selected == "Stock Opname":
+# 1. FUNGSI DETEKSI WARNA (IDENTIK VBA INTERIOR.COLOR)
+# =========================================================
+def get_yellow_skus(file, column_index):
+    """Mendeteksi SKU yang selnya berwarna kuning (Excel Standard Yellow)"""
+    yellow_set = set()
+    try:
+        wb = load_workbook(file, data_only=True)
+        ws = wb.active
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
+            cell = ws.cell(row=row_idx, column=column_index)
+            # Kode warna kuning (Standard VBA vbYellow atau Tinted)
+            color = str(cell.fill.start_color.index)
+            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
+                sku_val = str(cell.value).strip().upper() if cell.value else ""
+                if sku_val:
+                    yellow_set.add(sku_val)
+    except:
+        pass
+    return yellow_set
+
+# =========================================================
+# 2. LOGIKA COMPARE 1: DATA SCAN VS STOCK (SUB 1)
+# =========================================================
+def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
+    # Mapping Kolom (A=0, B=1, C=2)
+    df_scan_clean = df_scan.iloc[:, [0, 1, 2]].copy()
+    df_scan_clean.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    
+    # Mapping Stock (B=1, C=2, J=9)
+    df_stock_lite = df_stock.iloc[:, [1, 2, 9]].copy()
+    df_stock_lite.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+
+    # Logika VBA: Trim & UCase
+    for df in [df_scan_clean, df_stock_lite]:
+        df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
+        df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
+
+    # Dictionary Logic: Sum System Qty by BIN|SKU
+    dict_stock = df_stock_lite.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().to_dict()
+
+    # Process Compare
+    qty_sys_list = []
+    diff_list = []
+    note_list = []
+    
+    for _, row in df_scan_clean.iterrows():
+        key = f"{row['BIN']}|{row['SKU']}"
+        qty_scan = row['QTY_SCAN']
+        qty_sys = dict_stock.get(key, 0)
+        
+        diff = qty_scan - qty_sys
+        qty_sys_list.append(qty_sys)
+        diff_list.append(diff)
+        note_list.append("REAL +" if qty_scan > qty_sys else "OK")
+
+    df_scan_clean['QTY_SYSTEM'] = qty_sys_list
+    df_scan_clean['DIFF'] = diff_list
+    df_scan_clean['NOTE'] = note_list
+    
+    # Yellow Highlight
+    yellows = get_yellow_skus(scan_file, 2) # Kolom B
+    df_scan_clean['IS_YELLOW'] = df_scan_clean['SKU'].apply(lambda x: "YES" if x in yellows else "NO")
+    
+    return df_scan_clean
+
+# =========================================================
+# 3. LOGIKA COMPARE 2: STOCK VS DATA SCAN (SUB 2)
+# =========================================================
+def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
+    # Stock Full (A-K = 0-10)
+    df_stock_res = df_stock.copy()
+    
+    # Scan Lite for Dictionary (A=0, B=1, C=2)
+    df_scan_lite = df_scan.iloc[:, [0, 1, 2]].copy()
+    df_scan_lite.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    df_scan_lite['BIN'] = df_scan_lite['BIN'].astype(str).str.strip().str.upper()
+    df_scan_lite['SKU'] = df_scan_lite['SKU'].astype(str).str.strip().str.upper()
+    
+    # Dictionary Logic: Sum Scan Qty by BIN|SKU
+    dict_scan = df_scan_lite.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().to_dict()
+
+    qty_so_list = []
+    diff_list = []
+    note_list = []
+
+    for _, row in df_stock_res.iterrows():
+        # Kolom B=index 1, C=index 2, J=index 9
+        bin_val = str(row.iloc[1]).strip().upper()
+        sku_val = str(row.iloc[2]).strip().upper()
+        qty_sys = row.iloc[9] if pd.notnull(row.iloc[9]) else 0
+        
+        key = f"{bin_val}|{sku_val}"
+        qty_scan = dict_scan.get(key, 0)
+        
+        qty_so_list.append(qty_scan)
+        diff_val = qty_sys - qty_scan
+        diff_list.append(diff_val)
+        note_list.append("SYSTEM +" if qty_sys > qty_scan else "OK")
+
+    df_stock_res['QTY SO'] = qty_so_list
+    df_stock_res['DIFF'] = diff_list
+    df_stock_res['NOTE'] = note_list
+    
+    # Yellow Highlight
+    yellows = get_yellow_skus(stock_file, 3) # Kolom C
+    df_stock_res['IS_YELLOW'] = df_stock_res.iloc[:, 2].astype(str).str.strip().str.upper().apply(lambda x: "YES" if x in yellows else "NO")
+    
+    return df_stock_res
+
+# =========================================================
+# 4. MENU UTAMA (STREAMLIT INTERFACE)
+# =========================================================
+def menu_Stock_Opname():
+    st.title("🚀 UltraFast Stock Compare (Identik VBA)")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        up_scan = st.file_uploader("📥 DATA SCAN (Sheet: DATA SCAN)", type=['xlsx'])
+    with c2:
+        up_stock = st.file_uploader("📥 STOCK SYSTEM (Sheet: STOCK SYSTEM)", type=['xlsx'])
+
+    if up_scan and up_stock:
+        if st.button("▶️ RUN COMPARE", use_container_width=True):
+            # Load Data
+            df_s = pd.read_excel(up_scan, sheet_name="DATA SCAN")
+            df_t = pd.read_excel(up_stock, sheet_name="STOCK SYSTEM")
+            
+            # Sub 1 & Sub 2
+            res_scan = logic_compare_scan_to_stock(df_s, df_t, up_scan)
+            res_stock = logic_compare_stock_to_scan(df_t, df_s, up_stock)
+            
+            # Sub 3: Generate Real+ & System+
+            real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
+            system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+            
+            # Tambahan: Item Name Lookup (E=index 4)
+            item_map = df_t.iloc[:, [2, 4]].dropna()
+            item_map.columns = ['SKU', 'ITEM NAME']
+            item_map['SKU'] = item_map['SKU'].astype(str).str.strip().str.upper()
+            item_map = item_map.drop_duplicates('SKU').set_index('SKU')['ITEM NAME'].to_dict()
+            
+            real_plus['ITEM NAME'] = real_plus['SKU'].map(item_map)
+
+            # Simpan ke Session State
+            st.session_state.final_data = {
+                'res_scan': res_scan,
+                'res_stock': res_stock,
+                'real_plus': real_plus,
+                'system_plus': system_plus
+            }
+
+    if 'final_data' in st.session_state:
+        d = st.session_state.final_data
+        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
+        
+        # Helper untuk styling warna kuning
+        def style_yellow(row):
+            return ['background-color: yellow' if row.IS_YELLOW == 'YES' else '' for _ in row]
+
+        with t1: st.dataframe(d['res_scan'].style.apply(style_yellow, axis=1))
+        with t2: st.dataframe(d['res_stock'].style.apply(style_yellow, axis=1))
+        with t3: st.dataframe(d['real_plus'].style.apply(style_yellow, axis=1))
+        with t4: st.dataframe(d['system_plus'].style.apply(style_yellow, axis=1))
+
+
 #     menu_Stock_Opname()
 
 def menu_fdr_update():
@@ -1968,5 +2057,9 @@ elif menu == "FDR Update":
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
+# --- Navigasi ---
+menu = st.sidebar.selectbox("Menu", ["Dashboard", "Stock Opname"])
+if menu == "Dashboard":
+    st.write("Dashboard")
 elif menu == "Stock Opname":
     menu_Stock_Opname()
