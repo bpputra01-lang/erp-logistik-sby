@@ -1108,24 +1108,112 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 
 
 with st.sidebar:
-    st.markdown("""
+       st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         
+        /* --- JUDUL UTAMA 3D ELEGANT --- */
         .elegant-header {
-            font-family: 'Inter', sans-serif;
-            color: #E2E8F0;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 900;
+            font-size: 26px;
             text-align: left;
-            margin-top: -70px;
-            font-size: 22px;
-            font-weight: 800;
+            margin-top: -60px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(197, 160, 89, 0.3);
             letter-spacing: -0.5px;
-            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            line-height: 1.3;
+            
+            /* Efek 3D dengan multiple shadows */
+            text-shadow: 
+                0 1px 0 rgba(255,255,255,0.1),
+                0 2px 0 rgba(0,0,0,0.2),
+                0 3px 0 rgba(0,0,0,0.15),
+                0 4px 15px rgba(0,0,0,0.3),
+                0 0 20px rgba(197, 160, 89, 0.15);
+            
+            /* Gradient text dengan warna lebih kaya */
+            background: linear-gradient(
+                180deg,
+                #FFFFFF 0%,
+                #E8E8E8 30%,
+                #C5A059 60%,
+                #8E6D35 100%
+            );
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            padding-bottom: 10px;
+            background-clip: text;
+            
+            /* Subtle glow effect */
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+        
+        /* --- ICON/Emoji dengan efek glow --- */
+        .elegant-header .header-icon {
+            display: inline-block;
+            font-size: 32px;
+            margin-right: 8px;
+            vertical-align: middle;
+            filter: drop-shadow(0 2px 8px rgba(197, 160, 89, 0.5));
+            animation: truck-bounce 2s ease-in-out infinite;
+        }
+        
+        /* Animasi halus untuk icon */
+        @keyframes truck-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        
+        /* --- SUBTITLE ELEGANT --- */
+        .elegant-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(197, 160, 89, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-top: -10px;
+            margin-bottom: 20px;
+            padding-left: 2px;
+            
+            /* Efek subtle glow */
+            text-shadow: 0 0 10px rgba(197, 160, 89, 0.3);
+        }
+        
+        /* --- DECORATIVE LINE --- */
+        .elegant-divider {
+            height: 2px;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                #C5A059 20%,
+                #FFD700 50%,
+                #C5A059 80%,
+                transparent 100%
+            );
+            margin: 15px 0 20px 0;
+            border-radius: 2px;
+            opacity: 0.6;
+        }
+        
+        /* --- VERSION TAG --- */
+        .version-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(197, 160, 89, 0.15) 0%, rgba(197, 160, 89, 0.05) 100%);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 9px;
+            font-weight: 600;
+            color: #C5A059;
+            letter-spacing: 1px;
+            margin-top: 5px;
         }
 
+        /* --- LABEL STYLING --- */
         section[data-testid="stSidebar"] label p,
         section[data-testid="stSidebar"] .stCaption p {
             color: #E2E8F0;
@@ -1137,7 +1225,7 @@ with st.sidebar:
             -webkit-text-fill-color: transparent;
         }
 
-        /* FIX 1: TUTUP KURUNG & HAPUS TEKS ACAK */
+        /* --- INPUT BOX STYLE --- */
         div[data-baseweb="input"], div[data-baseweb="select"] > div {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
@@ -1148,7 +1236,7 @@ with st.sidebar:
             color: #FFFFFF !important;
         }
 
-        /* FIX 2: LABEL DI ATAS BOX JADI HITAM (BIAR KELIHATAN) */
+        /* --- LABEL HITAM DI AREA GELAP --- */
         div[data-testid="stWidgetLabel"] p {
             color: #000000 !important;
             -webkit-text-fill-color: #000000 !important;
@@ -1161,12 +1249,11 @@ with st.sidebar:
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
         }
 
-        /* 4. FILE UPLOADER - SEKARANG JALAN KARENA ATASNYA SUDAH FIX */
+        /* --- FILE UPLOADER --- */
         [data-testid="stFileUploaderSection"] {
             background-color: #1a2634 !important;
             border: 2px dashed #C5A059 !important;
             border-radius: 10px !important;
-           
         }
 
         [data-testid="stFileUploaderText"] > span,
@@ -1191,12 +1278,24 @@ with st.sidebar:
         [data-testid="stFileUploader"] svg {
             fill: #C5A059 !important;
         }
-        
-
     </style>
+    
+    <!-- JUDUL UTAMA DENGAN ICON -->
     <div class="elegant-header">
-        🚚 ERP LOGISTIC<br>SURABAYA
+        <span class="header-icon">🚛</span>
+        ERP LOGISTIC<br>SURABAYA
     </div>
+    
+    <!-- SUBTITLE -->
+    <div class="elegant-subtitle">
+        Warehouse Management System
+    </div>
+    
+    <!-- GARIS DEKORATIF -->
+    <div class="elegant-divider"></div>
+    
+    <!-- VERSION TAG -->
+    <div class="version-tag">v2.1 PRO</div>
 """, unsafe_allow_html=True)
 # --- TOMBOL LOGOUT ELEGAN (Taruh di paling bawah) ---
 
