@@ -2008,14 +2008,14 @@ elif menu == "Putaway System":
                 st.divider()
                 st.subheader("📊 RINGKASAN HASIL")
                 m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total Compare", len(df_comp))
-                m2.metric("List Items", len(df_plist))
+                m1.metric("Hasil Compare", len(df_comp))
+                m2.metric("List Item Set Up", len(df_plist))
                 m3.metric("Kurang Setup", len(df_kurang))
                 lt3_total_qty = df_lt3['QTY'].sum() if 'QTY' in df_lt3.columns and not df_lt3.empty else 0
                 m4.metric("LT.3 Outstanding (Total Qty)", int(lt3_total_qty))
                 
                 # --- TABS PREVIEW ---
-                t1, t2, t3, t4, t5 = st.tabs(["📋 Compare", "📝 List", "⚠️ Kurang Setup", "📊 Summary", "📦 LT.3 Out"])
+                t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 LT.3 Outstanding"])
                 
                 with t1: st.dataframe(df_comp, use_container_width=True)
                 with t2: st.dataframe(df_plist, use_container_width=True)
@@ -2025,7 +2025,6 @@ elif menu == "Putaway System":
                     else:
                         st.success("✅ Semua Tercover!")
                 with t4: st.dataframe(df_sum, use_container_width=True)
-                with t5: st.dataframe(df_lt3, use_container_width=True)
                 
                 # --- DOWNLOAD ---
                 output = io.BytesIO()
