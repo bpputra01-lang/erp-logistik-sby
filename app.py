@@ -1819,7 +1819,7 @@ elif menu == "Putaway System":
             try:
                 df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='calamine')
                 df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='calamine')
-                df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin = putaway_system(df_ds_p, df_asal_p)
+                df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin = putaway system(df_ds_p, df_asal_p)
                 st.success("Proses Putaway Selesai!")
                 t1, t2, t3, t4, t5 = st.tabs(["📋 Compare", "📝 List", "⚠️ Kurang Setup", "📊 Summary", "📦 LT.3 Out"])
                 with t1: st.dataframe(df_comp, use_container_width=True)
