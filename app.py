@@ -482,8 +482,102 @@ import numpy as np
 import math
 
 
+import pandas as pd
+import streamlit as st
+import io
+import openpyxl
+from openpyxl import load_workbook
+
+# =========================================================
+# 1. FUNGSI PENDUKUNG (HARUS DI ATAS)
+# =========================================================
+
+def get_yellow_cells(file, sku_col_index):
+    yellow_skus = set()
+    try:
+        wb = load_workbook(file, data_only=True)
+        ws = wb.active
+        for row in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row, column=sku_col_index)
+            color = str(cell.fill.start_color.index)
+            # Cek berbagai kode warna kuning excel
+            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
+                sku_val = str(cell.value).strip().upper() if cell.value else ""
+                if sku_val:
+                    yellow_skus.add(sku_val)
+    except:
+        pass
+    return yellow_skus
+
+def compare_data_scan_stock_system(df_scan, df_stock, scan_file):
+    try:
+        yellow_skus = get_yellow_cells(scan_file, 2) # Kolom B
+        
+        # SCAN: BIN(A), SKU(B), QTY(C)
+        df_scan_clean = df_scan.iloc[:, [0, 1, 2]].copy()
+        df_scan_clean.columns = ['BIN', 'SKU', 'QTY_SCAN']
+        
+        # STOCK: BIN(B), SKU(C), QTY(J) -> Index 1, 2, 9
+        df_stock_lite = df_stock.iloc[:, [1, 2, 9]].copy()
+        df_stock_lite.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+
+        for df in [df_scan_clean, df_stock_lite]:
+            df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
+            df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
+
+        # Grouping (VBA Dictionary Logic)
+        df_stock_grouped = df_stock_lite.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
+
+        result = pd.merge(df_scan_clean, df_stock_grouped, on=['BIN', 'SKU'], how='left')
+        result['QTY_SYSTEM'] = result['QTY_SYSTEM'].fillna(0)
+        result['DIFF'] = result['QTY_SCAN'] - result['QTY_SYSTEM']
+        result['NOTE'] = result['DIFF'].apply(lambda x: 'REAL +' if x > 0 else 'OK')
+        result['IS_YELLOW'] = result['SKU'].apply(lambda x: "YES" if x in yellow_skus else "NO")
+        
+        return result, None
+    except Exception as e:
+        return None, f"Gagal Scan vs Stock: {str(e)}"
+
+def compare_stock_system_vs_data_scan(df_stock, df_scan, stock_file):
+    try:
+        yellow_skus = get_yellow_cells(stock_file, 3) # Kolom C
+        
+        df_stock_full = df_stock.copy()
+        df_stock_full['JOIN_BIN'] = df_stock_full.iloc[:, 1].astype(str).str.strip().str.upper()
+        df_stock_full['JOIN_SKU'] = df_stock_full.iloc[:, 2].astype(str).str.strip().str.upper()
+        
+        df_scan_lite = df_scan.iloc[:, [0, 1, 2]].copy()
+        df_scan_lite.columns = ['JOIN_BIN', 'JOIN_SKU', 'QTY_SCAN']
+        df_scan_lite['JOIN_BIN'] = df_scan_lite['JOIN_BIN'].astype(str).str.strip().str.upper()
+        df_scan_lite['JOIN_SKU'] = df_scan_lite['JOIN_SKU'].astype(str).str.strip().str.upper()
+
+        df_scan_grouped = df_scan_lite.groupby(['JOIN_BIN', 'JOIN_SKU'])['QTY_SCAN'].sum().reset_index()
+
+        result = pd.merge(df_stock_full, df_scan_grouped, on=['JOIN_BIN', 'JOIN_SKU'], how='left')
+        result['QTY_SCAN'] = result['QTY_SCAN'].fillna(0)
+        
+        # Kolom J (index 9)
+        qty_sys = pd.to_numeric(result.iloc[:, 9], errors='coerce').fillna(0)
+        result['DIFF'] = qty_sys - result['QTY_SCAN']
+        result['NOTE'] = result['DIFF'].apply(lambda x: 'SYSTEM +' if x > 0 else 'OK')
+        result['IS_YELLOW'] = result['JOIN_SKU'].apply(lambda x: "YES" if x in yellow_skus else "NO")
+        
+        result = result.drop(columns=['JOIN_BIN', 'JOIN_SKU'])
+        return result, None
+    except Exception as e:
+        return None, f"Gagal Stock vs Scan: {str(e)}"
+
+def generate_real_plus_system_plus(df_res, df_stock_res):
+    real_plus = df_res[df_res['NOTE'] == 'REAL +'].copy()
+    system_plus = df_stock_res[df_stock_res['NOTE'] == 'SYSTEM +'].copy()
+    return real_plus, system_plus
+
+# =========================================================
+# 2. FUNGSI MENU (TEMPAT ELIF ANDA)
+# =========================================================
+
 def menu_Stock_Opname():
-    st.markdown('<div class="hero-header"><h1>📊 COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
+    st.markdown('### 📊 COMPARE AND ANALYZE ITEM SCAN OUT')
     
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -492,20 +586,18 @@ def menu_Stock_Opname():
         up_stock = st.file_uploader("📥 Upload STOCK SYSTEM", type=['xlsx'], key='stock_file')
     with col3:
         st.info("📋 Format:\n- SCAN: BIN(A), SKU(B), QTY(C)\n- STOCK: BIN(B), SKU(C), QTY(J)")
-    
-    # Inisialisasi session_state agar hasil tidak hilang/blank
+
     if 'processed_data' not in st.session_state:
         st.session_state.processed_data = None
 
     if up_scan and up_stock:
         if st.button("▶️ COMPARE DATA SCAN OUT", use_container_width=True):
             try:
-                # Load data
+                # Load (Coba gunakan engine openpyxl dulu)
                 df_scan = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
-                df_stock = pd.read_excel(up_stock) # Coba tanpa calamine dulu untuk tes
+                df_stock = pd.read_excel(up_stock) 
                 
                 with st.spinner("Memproses..."):
-                    # Proses sesuai fungsi yang kita buat sebelumnya
                     df_res, err1 = compare_data_scan_stock_system(df_scan, df_stock, up_scan)
                     df_stock_res, err2 = compare_stock_system_vs_data_scan(df_stock, df_scan, up_stock)
                     
@@ -515,7 +607,6 @@ def menu_Stock_Opname():
 
                     df_real_p, df_sys_p = generate_real_plus_system_plus(df_res, df_stock_res)
                     
-                    # SIMPAN KE SESSION STATE
                     st.session_state.processed_data = {
                         'df_result': df_res,
                         'df_stock_result': df_stock_res,
@@ -523,49 +614,24 @@ def menu_Stock_Opname():
                         'df_system_plus': df_sys_p
                     }
                     st.success("✅ Compare Selesai!")
-
             except Exception as e:
                 st.error(f"Error saat memproses: {e}")
 
-    # TAMPILKAN HASIL JIKA DATA ADA DI SESSION STATE
-    if st.session_state.processed_data is not None:
-        data = st.session_state.processed_data
-        
-        tab1, tab2, tab3, tab4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "✅ REAL +", "✅ SYSTEM +"])
-        
-        with tab1:
-            st.dataframe(data['df_result'], use_container_width=True)
-        
-        with tab2:
-            st.dataframe(data['df_stock_result'], use_container_width=True)
-            
-        with tab3:
-            if not data['df_real_plus'].empty:
-                st.dataframe(data['df_real_plus'], use_container_width=True)
-            else:
-                st.info("Tidak ada data REAL +")
-                
-        with tab4:
-            if not data['df_system_plus'].empty:
-                st.dataframe(data['df_system_plus'], use_container_width=True)
-            else:
-                st.info("Tidak ada data SYSTEM +")
+    # Tampilkan jika sudah ada data
+    if st.session_state.processed_data:
+        d = st.session_state.processed_data
+        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "✅ REAL +", "✅ SYSTEM +"])
+        with t1: st.dataframe(d['df_result'], use_container_width=True)
+        with t2: st.dataframe(d['df_stock_result'], use_container_width=True)
+        with t3: st.dataframe(d['df_real_plus'], use_container_width=True)
+        with t4: st.dataframe(d['df_system_plus'], use_container_width=True)
 
-        # Tombol Download
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            data['df_result'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-            data['df_stock_result'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
-            data['df_real_plus'].to_excel(writer, sheet_name='REAL PLUS', index=False)
-            data['df_system_plus'].to_excel(writer, sheet_name='SYSTEM PLUS', index=False)
-        
-        st.download_button(
-            "📥 DOWNLOAD RESULT",
-            data=output.getvalue(),
-            file_name="COMPARE_RESULT.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+# =========================================================
+# 3. NAVIGASI (ELIF)
+# =========================================================
+# (Gunakan ini di bagian pilihan menu Anda)
+# if selected == "Stock Opname":
+#     menu_Stock_Opname()
 
 def menu_fdr_update():
     st.markdown('<div class="hero-header"><h1>🚚 FDR OUTSTANDING - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
