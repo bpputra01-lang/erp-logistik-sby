@@ -1955,6 +1955,3 @@ elif menu == "FDR Update":
 
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
-
-if selected == "Stock Opname":
-    menu_Stock_Opname()
