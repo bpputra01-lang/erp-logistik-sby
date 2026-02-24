@@ -618,9 +618,9 @@ def menu_Stock_Opname():
     
     c1, c2 = st.columns(2)
     with c1:
-        up_scan = st.file_uploader("📥 DATA SCAN (Sheet: DATA SCAN)", type=['xlsx'])
+        up_scan = st.file_uploader("📥 DATA SCAN (Sheet: DATA SCAN)", type=['xlsx','csv'])
     with c2:
-        up_stock = st.file_uploader("📥 STOCK SYSTEM (Sheet: STOCK SYSTEM)", type=['xlsx'])
+        up_stock = st.file_uploader("📥 STOCK SYSTEM (Sheet: STOCK SYSTEM)", type=['xlsx', 'csv'])
 
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
