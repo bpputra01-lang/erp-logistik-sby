@@ -1314,7 +1314,7 @@ with st.sidebar:
             text-transform: uppercase !important;
             padding: 10px 14px !important;
             transition: all 0.25s ease !important;
-            margin-top: 20px !important;
+            margin-top: 10px !important;
         }
         
         .simple-logout-btn:hover {
@@ -1330,7 +1330,7 @@ with st.sidebar:
         </style>
     """, unsafe_allow_html=True)
     
-    if st.button("Logout", key="simple_logout"):
+    if st.button("🔴Logout", key="simple_logout"):
         st.session_state.logged_in = False
         st.rerun()
     
