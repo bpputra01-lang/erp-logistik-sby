@@ -1297,94 +1297,31 @@ with st.sidebar:
     <!-- VERSION TAG -->
     <div class="version-tag">v2.1 PRO</div>
 """, unsafe_allow_html=True)
-# --- TOMBOL LOGOUT ELEGAN (Taruh di paling bawah) ---
-
 with st.sidebar:
-    # CSS khusus tombol logout yang elegan
     st.markdown("""
         <style>
-        /* --- KONTAINER TOMBOL LOGOUT --- */
-        .logout-container {
-            margin-top: 30px !important;
-            padding-top: 20px;
-            border-top: 1px solid rgba(197, 160, 89, 0.2);
+        /* Tombol logout minimalis */
+        .minimal-logout {
+            background: transparent !important;
+            border: 1px solid rgba(197, 160, 89, 0.25) !important;
+            border-radius: 6px !important;
+            color: #8E8E8E !important;
+            font-size: 10px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.5px !important;
+            padding: 6px 12px !important;
+            transition: all 0.2s ease !important;
         }
         
-        /* --- TOMBOL LOGOUT UTAMA --- */
-        div.stButton.logout-btn > button {
-            width: 100% !important;
-            background: linear-gradient(
-                135deg,
-                rgba(197, 160, 89, 0.08) 0%,
-                rgba(197, 160, 89, 0.03) 100%
-            ) !important;
-            color: #C5A059 !important;
-            border: 1px solid rgba(197, 160, 89, 0.3) !important;
-            border-radius: 8px !important;
-            font-family: 'Inter', sans-serif !important;
-            font-size: 11px !important;
-            font-weight: 600 !important;
-            letter-spacing: 1.5px !important;
-            text-transform: uppercase !important;
-            padding: 10px 16px !important;
-            height: auto !important;
-            min-height: 38px !important;
-            transition: all 0.3s ease !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            gap: 8px !important;
-        }
-        
-        /* --- ICON DALAM TOMBOL --- */
-        div.stButton.logout-btn > button::before {
-            content: '🚪';
-            font-size: 14px;
-            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
-        }
-        
-        /* --- HOVER EFFECT --- */
-        div.stButton.logout-btn > button:hover {
-            background: linear-gradient(
-                135deg,
-                rgba(255, 75, 75, 0.15) 0%,
-                rgba(255, 75, 75, 0.05) 100%
-            ) !important;
-            border-color: #ff4b4b !important;
-            color: #ff4b4b !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 12px rgba(255, 75, 75, 0.2) !important;
-        }
-        
-        /* --- HOVER ICON CHANGE --- */
-        div.stButton.logout-btn > button:hover::before {
-            content: '🔒' !important;
-        }
-        
-        /* --- ACTIVE/CLICK EFFECT --- */
-        div.stButton.logout-btn > button:active {
-            transform: translateY(0) !important;
-            box-shadow: 0 2px 6px rgba(255, 75, 75, 0.15) !important;
-        }
-        
-        /* --- HILANGKAN OUTLINE DEFAULT --- */
-        div.stButton.logout-btn > button:focus {
-            outline: none !important;
-            box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.3) !important;
-        }
-        
-        /* --- RESPONSIVE --- */
-        @media (max-width: 768px) {
-            div.stButton.logout-btn > button {
-                font-size: 10px !important;
-                padding: 8px 12px !important;
-            }
+        .minimal-logout:hover {
+            background: rgba(255, 75, 75, 0.08) !important;
+            border-color: rgba(255, 75, 75, 0.4) !important;
+            color: #ff6b6b !important;
         }
         </style>
     """, unsafe_allow_html=True)
-
-    # Tombol Logout dengan styling class khusus
-    if st.button("Logout Session", key="logout_btn", help="Klik untuk keluar dari sistem"):
+    
+    if st.button("🚪 Logout", key="simple_logout"):
         st.session_state.logged_in = False
         st.rerun()
     
