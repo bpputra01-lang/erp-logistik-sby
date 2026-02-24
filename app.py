@@ -1936,71 +1936,144 @@ elif menu == "Database Master":
 
     except Exception as e:
         st.error(f"⚠️ Gagal terhubung ke Google Sheets. Pastikan aksesnya sudah 'Anyone with the link'. Error: {e}")
+
+        
 elif menu == "Stock Minus":
     st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
+    
+    # Upload File
     uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
+    
     if uploaded_file:
         try:
-            df = pd.read_excel(uploaded_file, engine="calamine")
+            # --- PERBAIKAN: Ganti engine jadi openpyxl (lebih stabil) ---
+            df = pd.read_excel(uploaded_file, engine="openpyxl")
+            
             col_sku, col_bin = 'SKU', 'BIN'
+            # Cari kolom QTY SYS, kalau ga ada fallback ke QTY SYSTEM
             col_qty = next((c for c in df.columns if 'QTY SYS' in str(c).upper()), 'QTY SYSTEM')
+            
             if st.button("🔃 PROSES DATA"):
                 with st.spinner('Memproses...'):
+                    # Backup data minus awal
                     df_minus_awal = df[df[col_qty] < 0].copy()
+                    
+                    # Konversi nilai ke numerik
                     qty_arr = pd.to_numeric(df[col_qty], errors='coerce').fillna(0).values
-                    sku_arr, bin_arr = df[col_sku].astype(str).values, df[col_bin].astype(str).values
-                    prior_bins = ["RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC", "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3", "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"]
+                    sku_arr = df[col_sku].astype(str).values
+                    bin_arr = df[col_bin].astype(str).values
+                    
+                    # Prioritas lokasi (dari prioritas tertinggi ke rendah)
+                    prior_bins = [
+                        "RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", 
+                        "KARANTINA DC", "KARANTINA STORE 02", "STAGGING REFUND", 
+                        "STAGING GAGAL QC", "STAGGING LT.3", "STAGGING OUTBOUND SEMARANG", 
+                        "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"
+                    ]
+                    
+                    # Mapping posisi SKU per BIN
                     pos_map = {}
                     for i, q in enumerate(qty_arr):
                         if q > 0:
                             s = sku_arr[i]
-                            if s not in pos_map: pos_map[s] = {}
+                            if s not in pos_map: 
+                                pos_map[s] = {}
                             b = bin_arr[i].upper()
-                            if b not in pos_map[s]: pos_map[s][b] = []
+                            if b not in pos_map[s]: 
+                                pos_map[s][b] = []
                             pos_map[s][b].append(i)
+                    
                     set_up_results = []
                     minus_indices = np.where(qty_arr < 0)[0]
+                    
+                    # Proses clearing stock minus
                     for idx in minus_indices:
-                        sku_target, qty_needed, bin_tujuan = sku_arr[idx], abs(qty_arr[idx]), bin_arr[idx].upper()
+                        sku_target = sku_arr[idx]
+                        qty_needed = abs(qty_arr[idx])
+                        bin_tujuan = bin_arr[idx].upper()
+                        
                         if sku_target in pos_map:
                             sku_bins = pos_map[sku_target]
+                            
                             while qty_needed > 0:
                                 found_idx = -1
+                                
+                                # Logika prioritas lokasi
                                 if bin_tujuan == "TOKO":
                                     for b_name, indices in sku_bins.items():
                                         if "LT.2" in b_name or "GL2-STORE" in b_name:
                                             for p_idx in indices:
-                                                if qty_arr[p_idx] > 0: found_idx = p_idx; break
-                                        if found_idx != -1: break
+                                                if qty_arr[p_idx] > 0: 
+                                                    found_idx = p_idx
+                                                    break
+                                            if found_idx != -1: 
+                                                break
+                                                
                                 elif "LT.2" in bin_tujuan or "GL2-STORE" in bin_tujuan:
                                     if "TOKO" in sku_bins:
                                         for p_idx in sku_bins["TOKO"]:
-                                            if qty_arr[p_idx] > 0: found_idx = p_idx; break
+                                            if qty_arr[p_idx] > 0: 
+                                                found_idx = p_idx
+                                                break
+                                                
                                 if found_idx == -1:
                                     for pb in prior_bins:
                                         if pb in sku_bins:
                                             for p_idx in sku_bins[pb]:
-                                                if qty_arr[p_idx] > 0: found_idx = p_idx; break
-                                        if found_idx != -1: break
+                                                if qty_arr[p_idx] > 0: 
+                                                    found_idx = p_idx
+                                                    break
+                                            if found_idx != -1: 
+                                                break
+                                                
                                 if found_idx == -1:
                                     for b_name, indices in sku_bins.items():
                                         if b_name != "REJECT DEFECT":
                                             for p_idx in indices:
-                                                if qty_arr[p_idx] > 0: found_idx = p_idx; break
-                                        if found_idx != -1: break
+                                                if qty_arr[p_idx] > 0: 
+                                                    found_idx = p_idx
+                                                    break
+                                            if found_idx != -1: 
+                                                break
+                                                
                                 if found_idx != -1:
-                                    take = min(qty_needed, qty_arr[found_idx]); qty_arr[found_idx] -= take; qty_arr[idx] += take
-                                    set_up_results.append({"BIN AWAL": bin_arr[found_idx], "BIN TUJUAN": bin_arr[idx], "SKU": sku_target, "QUANTITY": take, "NOTES": "STOCK MINUS"})
+                                    take = min(qty_needed, qty_arr[found_idx])
+                                    qty_arr[found_idx] -= take
+                                    qty_arr[idx] += take
+                                    
+                                    set_up_results.append({
+                                        "BIN AWAL": bin_arr[found_idx], 
+                                        "BIN TUJUAN": bin_arr[idx], 
+                                        "SKU": sku_target, 
+                                        "QUANTITY": take, 
+                                        "NOTES": "STOCK MINUS"
+                                    })
                                     qty_needed -= take
-                                else: break
-                    df_final = df.copy(); df_final[col_qty] = qty_arr; df_need_adj = df_final[df_final[col_qty] < 0].copy()
+                                else: 
+                                    break
+                    
+                    # Siapkan output Excel
+                    df_final = df.copy()
+                    df_final[col_qty] = qty_arr
+                    df_need_adj = df_final[df_final[col_qty] < 0].copy()
+                    
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                         df_minus_awal.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
-                        if set_up_results: pd.DataFrame(set_up_results).to_excel(writer, sheet_name='SET_UP', index=False)
-                        if not df_need_adj.empty: df_need_adj.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
-                    st.success("✅ Berhasil diproses!"); st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="HASIL_STOCK_MINUS.xlsx")
-        except Exception as e: st.error(f"Error: {e}")
+                        if set_up_results: 
+                            pd.DataFrame(set_up_results).to_excel(writer, sheet_name='SET_UP', index=False)
+                        if not df_need_adj.empty: 
+                            df_need_adj.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
+                    
+                    st.success("✅ Berhasil diproses!")
+                    st.download_button(
+                        "📥 DOWNLOAD HASIL", 
+                        data=output.getvalue(), 
+                        file_name="HASIL_STOCK_MINUS.xlsx"
+                    )
+                    
+        except Exception as e:
+            st.error(f"Terjadi Kesalahan: {e}")
 
 elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM </h1></div>', unsafe_allow_html=True)
