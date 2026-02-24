@@ -1961,5 +1961,5 @@ elif menu == "FDR Update":
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
-elif menu == "Stock Opname"
+elif menu == "Stock Opname":
     menu_Stock_Opname()
