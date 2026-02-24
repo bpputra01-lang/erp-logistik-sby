@@ -658,7 +658,7 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
 def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
     dt = df_stock.copy()
     
-    # Grouping Scan (Identik dengan dict.Add key di VBA Sub 2)
+    # 1. Grouping Scan (Identik dengan dict.Add key di VBA Sub 2)
     ds_lite = df_scan.iloc[:, [0, 1, 2]].copy()
     ds_lite.columns = ['BIN', 'SKU', 'QTY_SCAN']
     ds_lite['BIN'] = ds_lite['BIN'].astype(str).str.strip().str.upper()
@@ -671,6 +671,7 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
     diff_list = []
     note_list = []
 
+    # 2. Proses Perbandingan
     for _, row in dt.iterrows():
         bin_val = str(row.iloc[1]).strip().upper()
         sku_val = str(row.iloc[2]).strip().upper()
@@ -684,18 +685,33 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
         diff_list.append(diff_val)
         note_list.append("SYSTEM +" if qty_sys > qty_scan else "OK")
 
+    # --- BAGIAN PERBAIKAN UTAMA ---
+    
+    # 3. Hapus kolom lama yang mungkin sudah ada di file excel (mencegah duplikat QTY_SO)
+    # Kita hapus variasi penamaan yang mungkin muncul agar tidak bentrok
+    cols_to_drop = ['QTY SO', 'QTY_SO', 'DIFF', 'NOTE', 'IS_YELLOW']
+    for col in cols_to_drop:
+        if col in dt.columns:
+            dt = dt.drop(columns=[col])
+
+    # 4. Masukkan data hasil perhitungan yang baru
     dt['QTY_SO'] = qty_so_list
     dt['DIFF'] = diff_list
     dt['NOTE'] = note_list
     
-    # Warna Kuning (Stock Kolom C = Index 3)
-    yellows = get_yellow_skus(stock_file, 3)
-    dt['IS_YELLOW'] = dt.iloc[:, 2].astype(str).str.strip().str.upper().apply(
-        lambda x: "YES" if x in yellows else "NO"
-    )
+    # 5. Warna Kuning (Stock Kolom C = Index 3)
+    try:
+        yellows = get_yellow_skus(stock_file, 3)
+        dt['IS_YELLOW'] = dt.iloc[:, 2].astype(str).str.strip().str.upper().apply(
+            lambda x: "YES" if x in yellows else "NO"
+        )
+    except:
+        dt['IS_YELLOW'] = "NO" # Fallback jika fungsi warna error
+    
+    # 6. Final Clean: Pastikan tidak ada kolom duplikat tersisa secara teknis
+    dt = dt.loc[:, ~dt.columns.duplicated()].copy()
     
     return dt
-
 # =========================================================
 # 4. MENU UTAMA
 # =========================================================
