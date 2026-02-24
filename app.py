@@ -1306,30 +1306,6 @@ def engine_compare_draft_vba(df_app, df_draft):
     
     return df_d
 
-def putaway_system(df_ds, df_asal):
-    """
-    Fungsi placeholder - GANTI dengan logic asli lo!
-    """
-    df_comp = df_ds.copy()
-    df_plist = df_ds.head(0)
-    df_kurang = df_ds.head(0)
-    df_sum = df_ds.head(0)
-    df_lt3 = df_ds.head(0)
-    df_updated_bin = df_ds.head(0)
-    
-    return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin
-
-def process_scan_out(df_scan, df_hist, df_stock):
-    """
-    Fungsi placeholder - GANTI dengan logic asli lo!
-    """
-    df_res = df_scan.copy()
-    if 'Keterangan' not in df_res.columns:
-        df_res['Keterangan'] = "OK"
-        
-    df_draft = df_scan.head(0)
-    
-    return df_res, df_draft
 # ==========================================
 # 2. LANJUT KODE STREAMLIT LO DI BAWAH...
 # ==========================================
@@ -1836,48 +1812,32 @@ if menu == "Dashboard Overview":
     dash_links = {"WORKING REPORT": "864743695", "PERSONAL PERFORMANCE": "251294539", "CYCLE COUNT DAN KERAPIHAN": "1743896821", "DASHBOARD MOVING STOCK": "1671817510"}
     st.markdown(f'''<div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"><div style="width: 100%; height: 600px; overflow: auto;"><iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links[pilih]}&single=true&rm=minimal" style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe></div></div>''', unsafe_allow_html=True)
 
-# ==================== PUTAWAY SYSTEM ====================
 elif menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
     if up_ds and up_asal:
-        if st.button("▶️ COMPARE PUTAWAY"):
+        if st.button("▶️COMPARE PUTAWAY"):
             try:
-                # --- PERBAIKAN: Ganti engine ke openpyxl ---
-                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='openpyxl')
-                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='openpyxl')
-                
+                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='calamine')
+                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='calamine')
                 df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin = putaway_system(df_ds_p, df_asal_p)
-                
-                st.success("✅ Proses Putaway Selesai!")
-                
-                # --- TAMBAHAN: OVERVIEW ---
-                st.divider()
-                st.subheader("📊 RINGKASAN HASIL")
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total Compare", len(df_comp))
-                m2.metric("List Items", len(df_plist))
-                m3.metric("Kurang Setup", len(df_kurang))
-                m4.metric("LT.3 Out", len(df_lt3))
-                
+                st.success("Proses Putaway Selesai!")
                 t1, t2, t3, t4, t5 = st.tabs(["📋 Compare", "📝 List", "⚠️ Kurang Setup", "📊 Summary", "📦 LT.3 Out"])
                 with t1: st.dataframe(df_comp, use_container_width=True)
                 with t2: st.dataframe(df_plist, use_container_width=True)
                 with t3: st.dataframe(df_kurang, use_container_width=True)
                 with t4: st.dataframe(df_sum, use_container_width=True)
                 with t5: st.dataframe(df_lt3, use_container_width=True)
-                
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     df_comp.to_excel(writer, sheet_name='COMPARE', index=False); df_plist.to_excel(writer, sheet_name='LIST', index=False)
                     df_kurang.to_excel(writer, sheet_name='KURANG', index=False); df_sum.to_excel(writer, sheet_name='SUMMARY', index=False)
-                    df_lt3.to_excel(writer, sheet_name='LT3_OUT', index=False); df_updated_bin.to_excel(writer, sheet_name='UPDATED_BIN', index=False)
+                    df_updated_bin.to_excel(writer, sheet_name='UPDATED_BIN', index=False)
                 st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REPORT_PUTAWAY.xlsx")
             except Exception as e: st.error(f"Gagal: {e}")
 
-# ==================== SCAN OUT VALIDATION ====================
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
@@ -1887,28 +1847,13 @@ elif menu == "Scan Out Validation":
     if up_scan and up_hist and up_stock:
         if st.button("▶️ COMPARE DATA SCAN OUT"):
             try:
-                # --- PERBAIKAN: Ganti engine ke openpyxl ---
-                df_s = pd.read_csv(up_scan) if up_scan.name.endswith('.csv') else pd.read_excel(up_scan, engine='openpyxl')
-                df_h = pd.read_excel(up_hist, engine='openpyxl')
-                df_st = pd.read_excel(up_stock, engine='openpyxl')
-                
+                df_s = pd.read_excel(up_scan, engine='calamine') if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
+                df_h = pd.read_excel(up_hist, engine='calamine'); df_st = pd.read_excel(up_stock, engine='calamine')
                 df_res, df_draft = process_scan_out(df_s, df_h, df_st)
-                
-                st.success("✅ Validasi Selesai!")
-                
-                # --- TAMBAHAN: OVERVIEW ---
-                st.divider()
-                st.subheader("📊 RINGKASAN HASIL")
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Total Scan", len(df_res))
-                m2.metric("Draft Set Up", len(df_draft))
-                
+                st.success("Validasi Selesai!")
                 def highlight_vba(val): return f'color: {"red" if "MISSMATCH" in str(val) or "BELUM" in str(val) else "black"}; font-weight: bold'
-                st.subheader("📋 DATA SCAN (COMPARED)")
-                st.dataframe(df_res.style.map(highlight_vba, subset=['Keterangan']), use_container_width=True)
-                st.subheader("📝 DRAFT SET UP")
-                st.dataframe(df_draft, use_container_width=True)
-                
+                st.subheader("📋 DATA SCAN (COMPARED)"); st.dataframe(df_res.style.applymap(highlight_vba, subset=['Keterangan']), use_container_width=True)
+                st.subheader("📝 DRAFT SET UP"); st.dataframe(df_draft, use_container_width=True)
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     df_res.to_excel(writer, sheet_name='DATA SCAN', index=False); df_draft.to_excel(writer, sheet_name='DRAFT', index=False)
