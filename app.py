@@ -1814,29 +1814,97 @@ if menu == "Dashboard Overview":
 
 elif menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
+    
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
+    
     if up_ds and up_asal:
-        if st.button("▶️COMPARE PUTAWAY"):
+        if st.button("▶️ COMPARE PUTAWAY"):
             try:
-                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='calamine')
-                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='calamine')
+                # --- PERBAIKAN: Ganti engine ke openpyxl ---
+                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='openpyxl')
+                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='openpyxl')
+                
+                # --- PERBAIKAN: Panggil fungsi putaway_system ---
+                # Pastikan lo punya fungsi ini di file lo!
                 df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin = putaway_system(df_ds_p, df_asal_p)
-                st.success("Proses Putaway Selesai!")
+                
+                st.success("✅ Proses Putaway Selesai!")
+                
+                # --- TAMBAHAN: OVERVIEW & RINGKASAN ---
+                st.divider()
+                st.subheader("📊 RINGKASAN HASIL PUTAWAY")
+                
+                # Metrics
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Total Compare", len(df_comp))
+                m2.metric("List Items", len(df_plist))
+                m3.metric("Kurang Setup", len(df_kurang))
+                m4.metric("LT.3 Out", len(df_lt3))
+                
+                # Preview Data
                 t1, t2, t3, t4, t5 = st.tabs(["📋 Compare", "📝 List", "⚠️ Kurang Setup", "📊 Summary", "📦 LT.3 Out"])
-                with t1: st.dataframe(df_comp, use_container_width=True)
-                with t2: st.dataframe(df_plist, use_container_width=True)
-                with t3: st.dataframe(df_kurang, use_container_width=True)
-                with t4: st.dataframe(df_sum, use_container_width=True)
-                with t5: st.dataframe(df_lt3, use_container_width=True)
+                
+                with t1:
+                    st.write("#### 📋 Data Compare")
+                    st.dataframe(df_comp, use_container_width=True)
+                
+                with t2:
+                    st.write("#### 📝 Data List")
+                    st.dataframe(df_plist, use_container_width=True)
+                
+                with t3:
+                    if not df_kurang.empty:
+                        st.warning("⚠️ Item yang Kurang Setup:")
+                        st.dataframe(df_kurang, use_container_width=True)
+                    else:
+                        st.success("✅ Tidak ada item yang kurang setup!")
+                
+                with t4:
+                    st.write("#### 📊 Summary")
+                    st.dataframe(df_sum, use_container_width=True)
+                
+                with t5:
+                    st.write("#### 📦 Data LT.3 Out")
+                    st.dataframe(df_lt3, use_container_width=True)
+                
+                st.divider()
+                
+                # Download
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_comp.to_excel(writer, sheet_name='COMPARE', index=False); df_plist.to_excel(writer, sheet_name='LIST', index=False)
-                    df_kurang.to_excel(writer, sheet_name='KURANG', index=False); df_sum.to_excel(writer, sheet_name='SUMMARY', index=False)
+                    df_comp.to_excel(writer, sheet_name='COMPARE', index=False)
+                    df_plist.to_excel(writer, sheet_name='LIST', index=False)
+                    df_kurang.to_excel(writer, sheet_name='KURANG', index=False)
+                    df_sum.to_excel(writer, sheet_name='SUMMARY', index=False)
+                    df_lt3.to_excel(writer, sheet_name='LT3_OUT', index=False)
                     df_updated_bin.to_excel(writer, sheet_name='UPDATED_BIN', index=False)
-                st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REPORT_PUTAWAY.xlsx")
-            except Exception as e: st.error(f"Gagal: {e}")
+                
+                st.download_button(
+                    "📥 DOWNLOAD REPORT", 
+                    data=output.getvalue(), 
+                    file_name="REPORT_PUTAWAY.xlsx"
+                )
+                
+            except Exception as e: 
+                st.error(f"Gagal: {e}")
+
+# --- TAMBAHAN: DUMMY FUNCTION (HAPUS JIKA SUDAH PUNYA FUNGSI ASLI) ---
+def putaway_system(df_ds, df_asal):
+    """
+    Fungsi ini adalah placeholder. 
+    Ganti logic di dalamnya dengan proses bisnis putaway yang sebenarnya!
+    """
+    # Contoh return value (sesuaikan dengan logic asli lo)
+    df_comp = df_ds.copy()
+    df_plist = df_ds.head(0)  # Empty dataframe
+    df_kurang = df_ds.head(0) # Empty dataframe
+    df_sum = df_ds.head(0)    # Empty dataframe
+    df_lt3 = df_ds.head(0)    # Empty dataframe
+    df_updated_bin = df_ds.head(0) # Empty dataframe
+    
+    return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin
 
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
