@@ -1503,14 +1503,8 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 # ============================================
 # FUNGSI UTAMA PUTAWAY SYSTEM (VBA TO PYTHON)
 # ============================================
-# ============================================
-# FUNGSI UTAMA PUTAWAY SYSTEM (VBA TO PYTHON)
-# ============================================
 
 def putaway_system(df_ds, df_asal):
-    """
-    Konversi dari VBA ComparePutaway()
-    """
     # Rename kolom untuk numerik index (0-based)
     df_asal.columns = range(df_asal.shape[1])
     
