@@ -746,37 +746,75 @@ def menu_Stock_Opname():
     if 'final_data' in st.session_state:
         d = st.session_state.final_data
         
-        # Fungsi Pembersih agar Styler tidak crash
-        def clean_for_display(df):
+        # Fungsi pembersih total sebelum masuk ke dataframe
+        def prepare_df(df):
+            if df is None or df.empty:
+                return df
             df = df.copy()
-            df.columns = [str(c) for c in df.columns]
-            return df.loc[:, ~df.columns.duplicated()]
+            # 1. Pastikan index unik dan bersih (Penting untuk Styler)
+            df = df.reset_index(drop=True)
+            # 2. Paksa semua nama kolom jadi string unik
+            new_cols = []
+            for i, col in enumerate(df.columns):
+                c_str = str(col).strip()
+                if c_str == "" or "Unnamed" in c_str:
+                    new_cols.append(f"Col_{i}")
+                else:
+                    new_cols.append(c_str)
+            df.columns = new_cols
+            # 3. Hapus duplikat kolom jika masih ada
+            df = df.loc[:, ~df.columns.duplicated()]
+            return df
 
-        def style_yellow(row):
-            color = 'background-color: #FFFF00' if row.get('IS_YELLOW') == 'YES' else ''
-            return [color for _ in row]
+        def apply_style(df):
+            # Cek apakah kolom IS_YELLOW ada
+            if 'IS_YELLOW' in df.columns:
+                return df.style.map(
+                    lambda x: 'background-color: yellow', 
+                    subset=pd.IndexSlice[df.get('IS_YELLOW') == 'YES', :]
+                )
+            return df
 
         t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
         
         with t1:
-            st.dataframe(clean_for_display(d['res_scan']).style.apply(style_yellow, axis=1))
-        with t2:
-            st.dataframe(clean_for_display(d['res_stock']).style.apply(style_yellow, axis=1))
-        with t3:
-            st.dataframe(clean_for_display(d['real_plus']).style.apply(style_yellow, axis=1))
-        with t4:
-            st.dataframe(clean_for_display(d['system_plus']).style.apply(style_yellow, axis=1))
+            df1 = prepare_df(d['res_scan'])
+            # Jika masih error, tampilkan tanpa style agar app tidak mati
+            try:
+                st.dataframe(df1.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
+            except:
+                st.dataframe(df1, use_container_width=True)
 
-        # Download Button
+        with t2:
+            df2 = prepare_df(d['res_stock'])
+            try:
+                st.dataframe(df2.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
+            except:
+                st.dataframe(df2, use_container_width=True)
+            
+        with t3:
+            df3 = prepare_df(d['real_plus'])
+            try:
+                st.dataframe(df3.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
+            except:
+                st.dataframe(df3, use_container_width=True)
+            
+        with t4:
+            df4 = prepare_df(d['system_plus'])
+            try:
+                st.dataframe(df4.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
+            except:
+                st.dataframe(df4, use_container_width=True)
+
+        # --- DOWNLOAD BUTTON (Tetap Sama) ---
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-            d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
-            d['real_plus'].to_excel(writer, sheet_name='REAL PLUS', index=False)
-            d['system_plus'].to_excel(writer, sheet_name='SYSTEM PLUS', index=False)
+            prepare_df(d['res_scan']).to_excel(writer, sheet_name='DATA SCAN', index=False)
+            prepare_df(d['res_stock']).to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
+            prepare_df(d['real_plus']).to_excel(writer, sheet_name='REAL PLUS', index=False)
+            prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM PLUS', index=False)
         
-        st.download_button("📥 DOWNLOAD EXCEL", output.getvalue(), "Hasil_SO.xlsx")
-
+        st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
 def menu_fdr_update():
     st.markdown('<div class="hero-header"><h1>🚚 FDR OUTSTANDING - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
 
