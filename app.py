@@ -703,44 +703,71 @@ def menu_Stock_Opname():
                     st.success("Compare Selesai!")
             except Exception as e:
                 st.error(f"Terjadi kesalahan: {e}")
-
-    # TAMPILKAN HASIL
+# TAMPILKAN HASIL
     if 'final_data' in st.session_state:
         d = st.session_state.final_data
         t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
         
-        # Helper styling kuning (Hex Code agar lebih stabil)
         def style_yellow(row):
-            # Cek apakah IS_YELLOW ada di index row, jika tidak default ke NO
+            # Gunakan pengecekan yang sangat aman
             is_y = row.get('IS_YELLOW', 'NO')
             color = 'background-color: #FFFF00' if is_y == 'YES' else ''
             return [color for _ in row]
 
-        def clean_df_for_styler(df):
-            """Membersihkan dataframe dari kolom duplikat dan unnamed agar styler tidak crash"""
+        def super_clean_df(df):
+            """Fungsi pembersih tingkat tinggi agar Styler tidak error"""
             if df is None or df.empty:
                 return df
-            # 1. Hapus kolom yang namanya duplikat
-            df = df.loc[:, ~df.columns.duplicated()].copy()
-            # 2. Hapus kolom yang mengandung kata 'Unnamed' (biasanya kolom kosong di excel)
-            cols_to_keep = [c for c in df.columns if 'Unnamed' not in str(c)]
-            return df[cols_to_keep]
+            
+            df = df.copy()
+            # 1. Pastikan semua nama kolom adalah String dan tidak ada spasi di ujungnya
+            df.columns = [str(c).strip() for c in df.columns]
+            
+            # 2. Hapus kolom yang namanya 'Unnamed: ...' atau string kosong
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            df = df.loc[:, df.columns != ""]
+            
+            # 3. Paksa nama kolom menjadi unik (jika ada 'NOTE' dan 'NOTE', jadi 'NOTE' dan 'NOTE.1')
+            cols = pd.Series(df.columns)
+            for i, col in enumerate(cols):
+                if cols[:i].tolist().count(col) > 0:
+                    count = cols[:i].tolist().count(col)
+                    cols[i] = f"{col}.{count}"
+            df.columns = cols
+            
+            return df
 
+        # --- TAB 1 ---
         with t1:
-            df1 = clean_df_for_styler(d['res_scan'])
-            st.dataframe(df1.style.apply(style_yellow, axis=1), use_container_width=True)
-            
+            try:
+                df1 = super_clean_df(d['res_scan'])
+                st.dataframe(df1.style.apply(style_yellow, axis=1), use_container_width=True)
+            except:
+                st.dataframe(d['res_scan'], use_container_width=True) # Fallback jika styler gagal
+        
+        # --- TAB 2 ---
         with t2:
-            df2 = clean_df_for_styler(d['res_stock'])
-            st.dataframe(df2.style.apply(style_yellow, axis=1), use_container_width=True)
+            try:
+                df2 = super_clean_df(d['res_stock'])
+                st.dataframe(df2.style.apply(style_yellow, axis=1), use_container_width=True)
+            except:
+                st.dataframe(d['res_stock'], use_container_width=True)
             
+        # --- TAB 3 ---
         with t3:
-            df3 = clean_df_for_styler(d['real_plus'])
-            st.dataframe(df3.style.apply(style_yellow, axis=1), use_container_width=True)
+            try:
+                df3 = super_clean_df(d['real_plus'])
+                st.dataframe(df3.style.apply(style_yellow, axis=1), use_container_width=True)
+            except:
+                st.dataframe(d['real_plus'], use_container_width=True)
             
+        # --- TAB 4 ---
         with t4:
-            df4 = clean_df_for_styler(d['system_plus'])
-            st.dataframe(df4.style.apply(style_yellow, axis=1), use_container_width=True)
+            try:
+                df4 = super_clean_df(d['system_plus'])
+                st.dataframe(df4.style.apply(style_yellow, axis=1), use_container_width=True)
+            except:
+                st.dataframe(d['system_plus'], use_container_width=True)
         # Download Button
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
