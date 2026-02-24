@@ -539,7 +539,7 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
         df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
 
     # Dictionary Logic: Sum System Qty by BIN|SKU
-    dict_stock = df_stock_lite.groupby(['BIN', 'SKU'])['QTY SYSTEM'].sum().to_dict()
+    dict_stock = df_stock_lite.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().to_dict()
 
     # Process Compare
     qty_sys_list = []
@@ -548,7 +548,7 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     
     for _, row in df_scan_clean.iterrows():
         key = f"{row['BIN']}|{row['SKU']}"
-        qty_scan = row['QTY SCAN']
+        qty_scan = row['QTY_SCAN']
         qty_sys = dict_stock.get(key, 0)
         
         diff = qty_scan - qty_sys
@@ -607,7 +607,7 @@ def get_yellow_skus(file, column_index):
 def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     # Mapping VBA: Scan BIN(A), SKU(B), QTY SCAN(C)
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN', 'SKU', 'QTY SCAN']
+    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
     
     # Mapping VBA: Stock BIN(B), SKU(C), QTY SYSTEM(J)
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
@@ -617,7 +617,7 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     for df in [ds, dt]:
         df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
         df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
-        qty_col = 'QTY SCAN' if 'QTY SCAN' in df.columns else 'QTY_SYSTEM'
+        qty_col = 'QTY_SCAN' if 'QTY_SCAN' in df.columns else 'QTY_SYSTEM'
         df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce').fillna(0)
 
     # PENTING: Grouping System (Identik dengan dict.Add key di VBA)
@@ -631,13 +631,13 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     # Bandingkan tiap baris Fisik dengan Total System
     for _, row in ds.iterrows():
         key = (row['BIN'], row['SKU'])
-        qty_scan = row['QTY SCAN']
+        qty_scan = row['QTY_SCAN']
         qty_sys = dict_system.get(key, 0)
         
-        diff = qty scan - qty sys
+        diff = qty_scan - qty_sys
         qty_sys_list.append(qty_sys)
         diff_list.append(diff)
-        note_list.append("REAL +" if qty scan > qty_sys else "OK")
+        note_list.append("REAL +" if qty_scan > qty_sys else "OK")
 
     ds['QTY_SYSTEM'] = qty_sys_list
     ds['DIFF'] = diff_list
