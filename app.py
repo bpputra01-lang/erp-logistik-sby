@@ -2080,6 +2080,32 @@ elif menu == "Stock Minus":
                     df_final[col_qty] = qty_arr
                     df_need_adj = df_final[df_final[col_qty] < 0].copy()
                     
+                    # --- TAMBAHAN: RINGKASAN & PREVIEW ---
+                    st.divider()
+                    st.subheader("📊 RINGKASAN HASIL PROSES")
+                    
+                    # Metrics
+                    m1, m2, m3 = st.columns(3)
+                    total_transfer = len(set_up_results)
+                    total_qty = sum([x['QUANTITY'] for x in set_up_results])
+                    still_minus = len(df_need_adj)
+                    
+                    m1.metric("Total Transfer", total_transfer)
+                    m2.metric("Qty Dipindahkan", total_qty)
+                    m3.metric("Item Masih Minus", still_minus, delta_color="inverse")
+                    
+                    # Preview Data
+                    if set_up_results:
+                        st.write("#### 📋 Detail Transfer (SET_UP)")
+                        st.dataframe(pd.DataFrame(set_up_results), use_container_width=True)
+                    
+                    if not df_need_adj.empty:
+                        st.warning("⚠️ Item berikut masih minus dan perlu justificasi manual:")
+                        st.dataframe(df_need_adj, use_container_width=True)
+                    
+                    st.divider()
+                    
+                    # Download
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                         df_minus_awal.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
@@ -2097,7 +2123,7 @@ elif menu == "Stock Minus":
                     
         except Exception as e:
             st.error(f"Terjadi Kesalahan: {e}")
-
+            
 elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM </h1></div>', unsafe_allow_html=True)
     
