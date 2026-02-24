@@ -492,7 +492,7 @@ from openpyxl import load_workbook
 # 1. FUNGSI PENDUKUNG (HARUS DI ATAS)
 # =========================================================
 
-def Stock_Opname(df_scan, df_stock, scan_file):
+def menu_Stock_Opname(df_scan, df_stock, scan_file):
     try:
         # VBA: Scan BIN(A), SKU(B), QTY(C)
         df_scan_clean = df_scan.iloc[:, [0, 1, 2]].copy()
