@@ -1994,7 +1994,7 @@ def process_scan_out(df_scan, df_hist, df_stock):
     df_draft = df_scan.head(0)
     
     return df_res, df_draft
-    
+
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
     
