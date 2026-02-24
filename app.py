@@ -481,6 +481,96 @@ import pandas as pd
 import numpy as np
 import math
 
+import streamlit as st
+import pandas as pd
+import io
+
+def menu_Stock_Opname():
+    st.markdown('<div class="hero-header"><h1>📊 COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        up_scan = st.file_uploader("📥 Upload DATA SCAN", type=['xlsx', 'csv'], key='scan_file')
+    with col2:
+        up_stock = st.file_uploader("📥 Upload STOCK SYSTEM", type=['xlsx'], key='stock_file')
+    with col3:
+        st.info("📋 Format:\n- DATA SCAN: BIN(A), SKU(B), QTY SCAN(C)\n- STOCK: BIN(B), SKU(C), QTY(J)")
+    
+    if up_scan and up_stock:
+        if st.button("▶️ COMPARE DATA SCAN OUT", use_container_width=True):
+            try:
+                # Load data
+                df_scan = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
+                df_stock = pd.read_excel(up_stock, engine='calamine')
+                
+                with st.spinner("Memproses..."):
+                    # Step 1: Compare DATA SCAN -> STOCK SYSTEM
+                    df_result, error = compare_data_scan_stock_system(df_scan, df_stock)
+                    
+                    if error:
+                        st.error(error)
+                        return
+                    
+                    # Step 2: Compare STOCK SYSTEM -> DATA SCAN
+                    df_stock_result, error2 = compare_stock_system_vs_data_scan(df_stock, df_scan)
+                    
+                    if error2:
+                        st.error(error2)
+                        return
+                    
+                    # Step 3: Generate REAL + and SYSTEM +
+                    df_real_plus, df_system_plus = generate_real_plus_system_plus(df_result, df_stock_result)
+                
+                st.success("✅ Compare Selesai!")
+                
+                # Tampilkan hasil
+                tab1, tab2, tab3, tab4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "✅ REAL +", "✅ SYSTEM +"])
+                
+                with tab1:
+                    st.subheader("DATA SCAN (COMPARED)")
+                    st.dataframe(df_result, use_container_width=True)
+                
+                with tab2:
+                    st.subheader("STOCK SYSTEM (COMPARED)")
+                    st.dataframe(df_stock_result, use_container_width=True)
+                
+                with tab3:
+                    st.subheader("REAL + (Kelebihan Scan)")
+                    if not df_real_plus.empty:
+                        st.dataframe(df_real_plus, use_container_width=True)
+                    else:
+                        st.info("Tidak ada data REAL +")
+                
+                with tab4:
+                    st.subheader("SYSTEM + (Kelebihan System)")
+                    if not df_system_plus.empty:
+                        st.dataframe(df_system_plus, use_container_width=True)
+                    else:
+                        st.info("Tidak ada data SYSTEM +")
+                
+                # Download
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df_result.to_excel(writer, sheet_name='DATA SCAN', index=False)
+                    df_stock_result.to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
+                    if not df_real_plus.empty:
+                        df_real_plus.to_excel(writer, sheet_name='REAL +', index=False)
+                    if not df_system_plus.empty:
+                        df_system_plus.to_excel(writer, sheet_name='SYSTEM +', index=False)
+                
+                st.download_button(
+                    "📥 DOWNLOAD RESULT",
+                    data=output.getvalue(),
+                    file_name="COMPARE_RESULT.xlsx",
+                    use_container_width=True
+                )
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+# Panggil fungsi di menu Anda
+# elif menu == "Scan Out Validation":
+#     menu_scan_out_validation()
 
 def menu_fdr_update():
     st.markdown('<div class="hero-header"><h1>🚚 FDR OUTSTANDING - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
@@ -1454,7 +1544,7 @@ with st.sidebar:
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
     
-    m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock","Refill & Withdraw","Stock Minus", "Compare RTO", "FDR Update"]
+    m2_list = ["Stock Opname", "Putaway System", "Scan Out Validation", "Refill & Overstock","Refill & Withdraw","Stock Minus", "Compare RTO", "FDR Update"]
     
     def change_m2():
         st.session_state.main_menu = st.session_state.m2_key
@@ -1870,3 +1960,6 @@ elif menu == "FDR Update":
 
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
+
+elif menu == "Stock Opname"
+    menu_Stock_Opname()
