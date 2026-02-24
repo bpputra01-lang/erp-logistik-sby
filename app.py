@@ -1969,5 +1969,4 @@ elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
 elif menu == "Stock Opname":
-    # CUKUP PANGGIL INI
     menu_Stock_Opname()
