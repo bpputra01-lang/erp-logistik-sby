@@ -822,6 +822,9 @@ def menu_fdr_update():
         st.session_state.ws_fu_it = None
     if "dict_kurir" not in st.session_state:
         st.session_state.dict_kurir = {}
+    # --- INI YANG KURANG & PENYEBAB ERROR ---
+    if "grid_fdr" not in st.session_state:
+        st.session_state.grid_fdr = pd.DataFrame()  # Inisialisasi awal agar tidak error
 
     # --- 1. TABS SYSTEM ---
     t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "🛵 SPLIT KURIR"])
@@ -839,7 +842,7 @@ def menu_fdr_update():
                 st.session_state.ws_manifest = df_temp
                 st.success(f"Mantap! File {uploaded_file.name} udah masuk.")
             except Exception as e:
-                st.error(f"Aduh gagal baca file: {e}")
+                st.error(f"gagal baca file: {e}")
 
         st.divider()
         
