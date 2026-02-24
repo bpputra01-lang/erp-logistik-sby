@@ -334,17 +334,17 @@ div.stFormSubmitButton > button {
                 font-family: 'Inter', sans-serif; 
                 font-weight: 800; 
                 text-align: center;
-            ">📦 LOGISTIC SURABAYA ERP</h2>
+            ">SURABAYA DISTRIBUTION CENTER</h2>
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
         st.markdown("""
             <p style="
-                color: #A0A0A0; 
+                color: #FFFFFF; 
                 font-size: 14px; 
                 margin-bottom: 30px; 
                 text-align: center;
-            ">Surabaya Logistics Management System</p>
+            ">🐊Surabaya Logistics Management System</p>
         """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
