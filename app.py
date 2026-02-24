@@ -1321,7 +1321,7 @@ with st.sidebar:
         </style>
     """, unsafe_allow_html=True)
     
-    if st.button("🚪 Logout", key="simple_logout"):
+    if st.button("🔴Logout", key="simple_logout"):
         st.session_state.logged_in = False
         st.rerun()
     
