@@ -482,7 +482,7 @@ import numpy as np
 import math
 
 
-def menu_Stock_Opname(df_scan, df_stock):
+def menu_Stock_Opname():
     try:
         # --- PREPARATION (Sesuai Logika VBA dataScan) ---
         # VBA: Scan BIN(A), SKU(B), QTY SCAN(C)
