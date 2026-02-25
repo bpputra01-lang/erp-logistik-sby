@@ -1594,15 +1594,17 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 # ============================================
 # FUNGSI UTAMA PUTAWAY SYSTEM (VBA TO PYTHON)
 # ============================================
-
 def putaway_system(df_ds, df_asal):
     """
     Konversi dari VBA ComparePutaway()
     """
-    # Rename kolom untuk konsistensi
-    df_asal.columns = range(df_asal.shape[1])
+    # Simpan nama kolom asli sebelum rename
+    original_columns = list(df_asal.columns)
     
-    col_bin_asal = 1
+    # Rename kolom untuk konsistensi
+    df_asal.columns = range(df_as])
+    
+    colal.shape[1_bin_asal = 1
     col_sku_asal = 2
     col_qty_asal = 9
     
@@ -1725,8 +1727,8 @@ def putaway_system(df_ds, df_asal):
             "BIN DITEMUKAN": "BIN AWAL", 
             "BIN ASAL": "BIN TUJUAN"
         })
-        df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
-        df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
+        df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "STATUS"]]
+        df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"]
         df_plist['NOTES'] = "PUTAWAY"
     else:
         df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"])
@@ -1745,8 +1747,7 @@ def putaway_system(df_ds, df_asal):
     # 7. SUMMARY PUTAWAY
     df_sum = df_plist.copy()
     
-    # 8. STAGGING LT.3 OUTSTANDING (PERBAIKAN: Hanya yang benar-benar ST.LT.3)
-    # Filter: QTY > 0 DAN bin mengandung "STAGGING LT.3" atau "STAGING LT.3"
+    # 8. STAGGING LT.3 OUTSTANDING (PAKE NAMA KOLOM ASLI)
     lt3_mask = (
         (df_asal_updated[col_qty_asal] > 0) & 
         (df_asal_updated[col_bin_asal].astype(str).str.upper().str.contains("STAGGING LT\\.?3|STAGING LT\\.?3", na=False, regex=True))
@@ -1754,35 +1755,33 @@ def putaway_system(df_ds, df_asal):
     df_lt3 = df_asal_updated[lt3_mask].copy()
     
     if not df_lt3.empty:
-        # Ambil kolom yang ada
-        available_cols = list(df_lt3.columns)
+        # AMBIL KOLOM SESUAI POSISI VBA ASLI
+        # Kolom 1 (index 0) = A, Kolom 2 (index 1) = B, dst
         cols_to_take = []
         
-        if col_bin_asal in available_cols:
-            cols_to_take.append(col_bin_asal)
-        if col_sku_asal in available_cols:
-            cols_to_take.append(col_sku_asal)
+        # Sesuaikan dengan posisi asli (1=BIN, 2=SKU, 4=NAMA, 5=BRAND, 6=CAT, 7=SAT, 10=QTY)
+        for col_idx in df_lt3.columns:
+            if col_idx == 0:  # Kolom A
+                cols_to_take.append('BIN')
+            elif col_idx == 1:  # Kolom B
+                cols_to_take.append('SKU')
+            elif col_idx == 4:  # Kolom E
+                cols_to_take.append('NAMA BARANG')
+            elif col_idx == 5:  # Kolom F
+                cols_to_take.append('BRAND')
+            elif col_idx == 6:  # Kolom G
+                cols_to_take.append('CATEGORY')
+            elif col_idx == 7:  # Kolom H
+                cols_to_take.append('SATUAN')
+            elif col_idx == 9:  # Kolom J
+                cols_to_take.append('QTY')
+            else:
+                cols_to_take.append(f'COL_{col_idx}')
         
-        # Tambahkan kolom lain jika ada (5, 4, 7, 6)
-        for c in [5, 4, 7, 6]:
-            if c in available_cols and c not in cols_to_take:
-                cols_to_take.append(c)
+        df_lt3.columns = cols_to_take
         
-        # Ambil QTY
-        if col_qty_asal not in cols_to_take:
-            cols_to_take.append(col_qty_asal)
-        
-        df_lt3 = df_lt3[cols_to_take].copy()
-        
-        # Rename kolom
-        col_names = ["BIN", "SKU"]
-        for i in range(2, len(cols_to_take)):
-            col_names.append(f"COL_{i}")
-        col_names[-1] = "QTY"
-        
-        df_lt3.columns = col_names[:len(df_lt3.columns)]
     else:
-        df_lt3 = pd.DataFrame(columns=["BIN", "SKU", "QTY"])
+        df_lt3 = pd.DataFrame(columns=["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"])
     
     return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_asal_updated
 
