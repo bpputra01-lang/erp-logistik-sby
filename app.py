@@ -2984,11 +2984,6 @@ elif menu == "Stock Minus":
             st.code(traceback.format_exc())
 
 
----
-
-## Menu Streamlit RTO (LENGKAP):
-
-```python
 elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM </h1></div>', unsafe_allow_html=True)
     
