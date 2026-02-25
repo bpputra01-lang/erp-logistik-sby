@@ -1536,7 +1536,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 # FUNGSI UTAMA PUTAWAY SYSTEM (VBA TO PYTHON)
 # ============================================
 
-def putaway_system(df_ds, df_asal):
+ddef putaway_system(df_ds, df_asal):
     """
     Konversi dari VBA ComparePutaway()
     """
@@ -1585,11 +1585,9 @@ def putaway_system(df_ds, df_asal):
                     bin_qty_dict[key] -= take
                     diff_after_take = diff_qty - take
                     
-                    # SIMPAN ROW UNTUK SETUP
                     out_data.append([bin_asal, sku, original_diff, b, take, diff_after_take, 
                                     "FULLY SETUP" if diff_after_take == 0 else "PARTIAL SETUP"])
                     
-                    # JIKA MASIH ADA SISA (PARTIAL), TAMBAH ROW BARU "PERLU CARI STOCK MANUAL"
                     if diff_after_take > 0:
                         out_data.append([bin_asal, sku, original_diff, "(NO BIN)", 0, diff_after_take, 
                                         "PERLU CARI STOCK MANUAL"])
@@ -1645,7 +1643,7 @@ def putaway_system(df_ds, df_asal):
                     allocated = True
                     break
         
-        # --- JIKA TIDAK KETEMU SAMA SEKALI ---
+        # --- JIKA TIDAK KETEMU ---
         if not allocated:
             out_data.append([bin_asal, sku, original_diff, "(NO BIN)", 0, diff_qty, "PERLU CARI STOCK MANUAL"])
     
@@ -1662,7 +1660,6 @@ def putaway_system(df_ds, df_asal):
             df_asal_updated.at[idx, col_qty_asal] = bin_qty_dict[key]
     
     # 5. EXPORT PUTAWAY LIST (FULLY/PARTIAL SETUP)
-    # NOTES = "PUTAWAY" untuk semua
     df_plist = df_comp[df_comp['STATUS'].isin(['FULLY SETUP', 'PARTIAL SETUP'])].copy()
     if not df_plist.empty:
         df_plist = df_plist.rename(columns={
@@ -1675,7 +1672,7 @@ def putaway_system(df_ds, df_asal):
     else:
         df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"])
     
-    # 6. REKAP KURANG SETUP (HANYA "PERLU CARI STOCK MANUAL")
+    # 6. REKAP KURANG SETUP
     df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
     if not df_kurang.empty:
         df_kurang = df_kurang.rename(columns={
@@ -1689,17 +1686,44 @@ def putaway_system(df_ds, df_asal):
     # 7. SUMMARY PUTAWAY
     df_sum = df_plist.copy()
     
-    # 8. STAGGING LT.3 OUTSTANDING
-    df_lt3 = df_asal_updated[
-        (df_asal_updated[col_qty_asal] != 0) & 
-        (df_asal_updated[col_bin_asal].astype(str).str.upper().str.contains("STAGGING LT.3", na=False))
-    ].copy()
+    # 8. STAGGING LT.3 OUTSTANDING (PERBAIKAN: Hanya yang benar-benar ST.LT.3)
+    # Filter: QTY > 0 DAN bin mengandung "STAGGING LT.3" atau "STAGING LT.3"
+    lt3_mask = (
+        (df_asal_updated[col_qty_asal] > 0) & 
+        (df_asal_updated[col_bin_asal].astype(str).str.upper().str.contains("STAGGING LT\\.?3|STAGING LT\\.?3", na=False, regex=True))
+    )
+    df_lt3 = df_asal_updated[lt3_mask].copy()
     
-    if len(df_lt3.columns) > 7:
-        df_lt3 = df_lt3[[col_bin_asal, col_sku_asal, 5, 4, 7, 6, col_qty_asal]]
-        df_lt3.columns = ["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"]
+    if not df_lt3.empty:
+        # Ambil kolom yang ada
+        available_cols = list(df_lt3.columns)
+        cols_to_take = []
+        
+        if col_bin_asal in available_cols:
+            cols_to_take.append(col_bin_asal)
+        if col_sku_asal in available_cols:
+            cols_to_take.append(col_sku_asal)
+        
+        # Tambahkan kolom lain jika ada (5, 4, 7, 6)
+        for c in [5, 4, 7, 6]:
+            if c in available_cols and c not in cols_to_take:
+                cols_to_take.append(c)
+        
+        # Ambil QTY
+        if col_qty_asal not in cols_to_take:
+            cols_to_take.append(col_qty_asal)
+        
+        df_lt3 = df_lt3[cols_to_take].copy()
+        
+        # Rename kolom
+        col_names = ["BIN", "SKU"]
+        for i in range(2, len(cols_to_take)):
+            col_names.append(f"COL_{i}")
+        col_names[-1] = "QTY"
+        
+        df_lt3.columns = col_names[:len(df_lt3.columns)]
     else:
-        df_lt3 = pd.DataFrame(columns=["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"])
+        df_lt3 = pd.DataFrame(columns=["BIN", "SKU", "QTY"])
     
     return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_asal_updated
 
@@ -2285,7 +2309,7 @@ if menu == "Dashboard Overview":
 
 elif menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
-
+    
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
@@ -2305,15 +2329,48 @@ elif menu == "Putaway System":
                 # --- RINGKASAN ---
                 st.divider()
                 st.subheader("📊 RINGKASAN HASIL")
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Hasil Compare", len(df_comp))
-                m2.metric("List Item Set Up", len(df_plist))
-                m3.metric("Kurang Setup", len(df_kurang))
-                lt3_total_qty = df_lt3['QTY'].sum() if 'QTY' in df_lt3.columns and not df_lt3.empty else 0
-                m4.metric("LT.3 Outstanding (Total Qty)", int(lt3_total_qty))
                 
-                # --- TABS PREVIEW ---
-                t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 LT.3 Outstanding"])
+                total_compare = len(df_comp)
+                total_list = len(df_plist)
+                total_kurang = len(df_kurang)
+                lt3_total_qty = int(df_lt3['QTY'].sum()) if 'QTY' in df_lt3.columns and not df_lt3.empty else 0
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">Hasil Compare</span>
+                        <span class="m-val">{total_compare}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">List Item Set Up</span>
+                        <span class="m-val">{total_list}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                
+                with col3:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">Kurang Setup</span>
+                        <span class="m-val">{total_kurang}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                
+                with col4:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">STG.LT.3 Outstanding</span>
+                        <span class="m-val">{lt3_total_qty}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                
+                # --- TABS ---
+                t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 STG.LT.3 Outstanding"])
                 
                 with t1: st.dataframe(df_comp, use_container_width=True)
                 with t2: st.dataframe(df_plist, use_container_width=True)
@@ -2322,7 +2379,11 @@ elif menu == "Putaway System":
                         st.dataframe(df_kurang, use_container_width=True)
                     else:
                         st.success("✅ Semua Tercover!")
-                with t4: st.dataframe(df_sum, use_container_width=True)
+                with t4: 
+                    if not df_lt3.empty:
+                        st.dataframe(df_lt3, use_container_width=True)
+                    else:
+                        st.success("✅ Tidak ada STG.LT.3 Outstanding!")
                 
                 # --- DOWNLOAD ---
                 output = io.BytesIO()
@@ -2337,6 +2398,8 @@ elif menu == "Putaway System":
                 
             except Exception as e: 
                 st.error(f"Gagal: {e}")
+                import traceback
+                st.code(traceback.format_exc())
 
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
