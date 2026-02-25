@@ -39,7 +39,34 @@ st.markdown("""
         background-color: #1a1d2e !important;
         border-right: 1px solid rgba(197, 160, 89, 0.15) !important;
     }
-
+# =====================================================
+# CSS GLOBAL - SAMA PERSIS DENGAN YANG ANDA PUNY
+# =====================================================
+    /* Kotak Metrics Custom - SAMA PERSIS */
+    .m-box { 
+        background-color: #f0f2f6; 
+        padding: 15px; 
+        border-radius: 10px; 
+        text-align: center; 
+        margin: 5px 0; 
+    }
+    .m-lbl { 
+        display: block; 
+        font-size: 14px; 
+        color: #555; 
+        font-weight: bold; 
+    }
+    .m-val { 
+        display: block; 
+        font-size: 24px; 
+        color: #ff4b4b; 
+        font-weight: bold; 
+    }
+    
+    /* Styling tambahan untuk dataframes */
+    .stDataFrame {
+        border-radius: 10px;
+    }
     /* ============================================
        4. HERO HEADER - PREMIUM BLUE
        ============================================ */
