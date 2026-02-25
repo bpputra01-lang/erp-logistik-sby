@@ -2712,16 +2712,14 @@ elif menu == "Stock Minus":
     
     if uploaded_file:
         try:
-            # --- PERBAIKAN: Ganti engine jadi openpyxl (lebih stabil) ---
             df = pd.read_excel(uploaded_file, engine="openpyxl")
             
             col_sku, col_bin = 'SKU', 'BIN'
-            # Cari kolom QTY SYS, kalau ga ada fallback ke QTY SYSTEM
             col_qty = next((c for c in df.columns if 'QTY SYS' in str(c).upper()), 'QTY SYSTEM')
             
             if st.button("🔃 PROSES DATA"):
                 with st.spinner('Memproses...'):
-                    # Backup data minus awal
+                    # Backup data minus awal (SEMUA item minus)
                     df_minus_awal = df[df[col_qty] < 0].copy()
                     
                     # Konversi nilai ke numerik
@@ -2729,7 +2727,7 @@ elif menu == "Stock Minus":
                     sku_arr = df[col_sku].astype(str).values
                     bin_arr = df[col_bin].astype(str).values
                     
-                    # Prioritas lokasi (dari prioritas tertinggi ke rendah)
+                    # Prioritas lokasi
                     prior_bins = [
                         "RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", 
                         "KARANTINA DC", "KARANTINA STORE 02", "STAGGING REFUND", 
@@ -2764,7 +2762,6 @@ elif menu == "Stock Minus":
                             while qty_needed > 0:
                                 found_idx = -1
                                 
-                                # Logika prioritas lokasi
                                 if bin_tujuan == "TOKO":
                                     for b_name, indices in sku_bins.items():
                                         if "LT.2" in b_name or "GL2-STORE" in b_name:
@@ -2864,26 +2861,26 @@ elif menu == "Stock Minus":
                         st.write("#### 📋 Detail Transfer (SET_UP)")
                         st.dataframe(pd.DataFrame(set_up_results), use_container_width=True)
                     
-                    # --- DETAIL LIST ITEM MINUS ---
-                    if not df_need_adj.empty:
-                        st.warning("⚠️ Item berikut masih minus dan perlu justifikasi:")
+                    # --- PERBAIKAN: RINGKASAN MINUS PER LOKASI (SEMUA ITEM MINUS) ---
+                    if not df_minus_awal.empty:
+                        st.warning("⚠️ Ringkasan Minus per Lokasi (SEMUA Item Minus):")
                         
-                        # Group by BIN TUJUAN
-                        df_need_adj['QTY_MINUS'] = df_need_adj[col_qty].abs()
-                        detail_minus = df_need_adj.groupby([col_bin, col_sku])['QTY_MINUS'].sum().reset_index()
+                        # Group by BIN - GUNAKAN df_minus_awal (SEMUA minus awal)
+                        df_minus_awal['QTY_MINUS'] = df_minus_awal[col_qty].abs()
+                        detail_minus = df_minus_awal.groupby([col_bin, col_sku])['QTY_MINUS'].sum().reset_index()
                         detail_minus = detail_minus.sort_values(by=[col_bin, 'QTY_MINUS'], ascending=[True, False])
                         
                         # Tampilkan dalam expander per BIN
-                        bins = df_need_adj[col_bin].unique()
+                        bins = sorted(df_minus_awal[col_bin].unique())
                         for bin_loc in bins:
                             bin_data = detail_minus[detail_minus[col_bin] == bin_loc]
                             total_bin_minus = int(bin_data['QTY_MINUS'].sum())
                             with st.expander(f"📍 {bin_loc} - Total Minus: {total_bin_minus}"):
                                 st.dataframe(bin_data, use_container_width=True)
                         
-                        # Summary Table
+                        # Summary Table - TAMPILKAN SEMUA
                         st.write("#### 📊 Ringkasan Minus per Lokasi")
-                        summary_per_bin = df_need_adj.groupby(col_bin).agg({
+                        summary_per_bin = df_minus_awal.groupby(col_bin).agg({
                             col_sku: 'count',
                             'QTY_MINUS': 'sum'
                         }).rename(columns={col_sku: 'Jumlah SKU', 'QTY_MINUS': 'Total Qty Minus'})
