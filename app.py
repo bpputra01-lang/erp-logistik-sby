@@ -2282,10 +2282,6 @@ if menu == "Dashboard Overview":
 # ============================================
 # STREAMLIST APP - PUTAWAY SYSTEM
 # ============================================
-
-elif menu == "Putaway System":
-    st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
-       # --- TAMBAHKAN CSS AGAR KOTAK METRICS MUNCUL ---
     st.markdown("""
     <style>
     .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
@@ -2293,8 +2289,12 @@ elif menu == "Putaway System":
     .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
+
+elif menu == "Putaway System":
+    st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
+       # --- TAMBAHKAN CSS AGAR KOTAK METRICS MUNCUL ---
     
-    c1, c2 = st.columns(2)
+        c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
     
@@ -2346,6 +2346,13 @@ elif menu == "Putaway System":
             except Exception as e: 
                 st.error(f"Gagal: {e}")
 
+    st.markdown("""
+    <style>
+    .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+    .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+    .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     
@@ -2547,7 +2554,14 @@ elif menu == "Scan Out Validation":
                 """)
                 import traceback
                 st.code(traceback.format_exc())
-                
+
+    st.markdown("""
+    <style>
+    .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+    .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+    .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)               
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
     
@@ -2648,7 +2662,13 @@ elif menu == "Database Master":
     except Exception as e:
         st.error(f"⚠️ Gagal terhubung ke Google Sheets. Pastikan aksesnya sudah 'Anyone with the link'. Error: {e}")
 
-
+    st.markdown("""
+    <style>
+    .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+    .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+    .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
 elif menu == "Stock Minus":
     st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     
@@ -2834,6 +2854,13 @@ elif menu == "Stock Minus":
         except Exception as e:
             st.error(f"Terjadi Kesalahan: {e}")
 
+    st.markdown("""
+    <style>
+    .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+    .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+    .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
 elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM </h1></div>', unsafe_allow_html=True)
     
