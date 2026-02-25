@@ -2286,6 +2286,15 @@ if menu == "Dashboard Overview":
 elif menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     
+    # --- CSS ---
+    st.markdown("""
+        <style>
+        .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+        .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+        .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+        </style>
+    """, unsafe_allow_html=True)
+    
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
@@ -2302,48 +2311,37 @@ elif menu == "Putaway System":
                 
                 st.success("✅ Proses Putaway Selesai!")
                 
-                # --- RINGKASAN ---
+                # --- RINGKASAN (PERBAIKAN: GUNAKAN QTY, BUKAN ROW!) ---
                 st.divider()
                 st.subheader("📊 RINGKASAN HASIL")
                 
-                total_compare = len(df_comp)
-                total_list = len(df_plist)
-                total_kurang = len(df_kurang)
-                lt3_total_qty = int(df_lt3['QTY'].sum()) if 'QTY' in df_lt3.columns and not df_lt3.empty else 0
+                # PERBAIKAN: GUNAKAN SUM QTY, BUKAN LEN
+                total_compare_qty = int(df_comp['QTY PUTAWAY'].sum()) if not df_comp.empty else 0
+                total_list_qty = int(df_plist['QTY BIN SYSTEM'].sum()) if not df_plist.empty else 0
+                total_kurang_qty = int(df_kurang['QTY'].sum()) if not df_kurang.empty else 0
+                
+                # QTY LT3
+                lt3_total_qty = 0
+                if not df_lt3.empty:
+                    # Cari kolom QTY di df_lt3
+                    for col in df_lt3.columns:
+                        if 'qty' in col.lower():
+                            lt3_total_qty = int(df_lt3[col].sum())
+                            break
                 
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">Hasil Compare</span>
-                        <span class="m-val">{total_compare}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">Hasil Compare (Qty)</span><span class="m-val">{total_compare_qty}</span></div>''', unsafe_allow_html=True)
                 
                 with col2:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">List Item Set Up</span>
-                        <span class="m-val">{total_list}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">List Item Set Up (Qty)</span><span class="m-val">{total_list_qty}</span></div>''', unsafe_allow_html=True)
                 
                 with col3:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">Kurang Setup</span>
-                        <span class="m-val">{total_kurang}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">Kurang Setup (Qty)</span><span class="m-val">{total_kurang_qty}</span></div>''', unsafe_allow_html=True)
                 
                 with col4:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">STG.LT.3 Outstanding</span>
-                        <span class="m-val">{lt3_total_qty}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">STG.LT.3 Outstanding</span><span class="m-val">{lt3_total_qty}</span></div>''', unsafe_allow_html=True)
                 
                 # --- TABS ---
                 t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 STG.LT.3 Outstanding"])
@@ -2374,8 +2372,6 @@ elif menu == "Putaway System":
                 
             except Exception as e: 
                 st.error(f"Gagal: {e}")
-                import traceback
-                st.code(traceback.format_exc())
 
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
