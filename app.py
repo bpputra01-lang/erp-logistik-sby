@@ -1703,7 +1703,7 @@ def putaway_system(df_ds, df_asal):
     
     return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_asal_updated
 
- import pandas as pd
+import pandas as pd
 import numpy as np
 import io
 
