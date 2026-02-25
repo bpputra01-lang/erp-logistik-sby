@@ -2817,81 +2817,72 @@ elif menu == "Compare RTO":
         </style>
     """, unsafe_allow_html=True)
     
-    # --- 1. SESSION STATE DENGAN KEY UNIK AGAR BISA REFRESH ---
-    # Gunakan key berbeda untuk setiap file upload
-    if 'rto_ds_loaded' not in st.session_state:
-        st.session_state.rto_ds_loaded = False
-    if 'rto_appsheet_loaded' not in st.session_state:
-        st.session_state.rto_appsheet_loaded = False
-    if 'rto_draft_loaded' not in st.session_state:
-        st.session_state.rto_draft_loaded = False
-    if 'rto_cek_real_loaded' not in st.session_state:
-        st.session_state.rto_cek_real_loaded = False
-    
-    # Cek apakah ada file baru di upload
-    current_f1 = st.session_state.get('current_f1_name', '')
-    current_f2 = st.session_state.get('current_f2_name', '')
-    current_f3 = st.session_state.get('current_f3_name', '')
-    current_f4 = st.session_state.get('current_f4_name', '')
-    
-    # Reset session jika file berbeda
-    if f1 and f1.name != current_f1:
-        st.session_state.df_ds = None
-        st.session_state.df_selisih = None
-        st.session_state.data_app_permanen = None
-        st.session_state.df_ds_final = None
-        st.session_state.current_f1_name = f1.name
-        st.session_state.rto_ds_loaded = False
-    
-    if f2 and f2.name != current_f2:
-        st.session_state.df_ds = None
-        st.session_state.df_selisih = None
-        st.session_state.data_app_permanen = None
-        st.session_state.df_ds_final = None
-        st.session_state.current_f2_name = f2.name
-        st.session_state.rto_appsheet_loaded = False
-    
-    if f3 and f3.name != current_f3:
-        st.session_state.df_draft_final = None
-        st.session_state.current_f3_name = f3.name
-        st.session_state.rto_draft_loaded = False
-    
-    if f4 and f4.name != current_f4:
-        st.session_state.df_ds_final = None
-        st.session_state.current_f4_name = f4.name
-        st.session_state.rto_cek_real_loaded = False
-
-    # UI Kolom Upload
+    # --- UI KOLOM UPLOAD (DEFINISIKAN TERLEBIH DAHULU) ---
     c1, c2, c3 = st.columns(3)
-    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1_rto")
-    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2_rto")
-    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3_rto")
+    f1 = c1.file_uploader("1. DS RTO", type=['xlsx','csv'], key="f1_rto_v2")
+    f2 = c2.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="f2_rto_v2")
+    f3 = c3.file_uploader("3. DRAFT JEZPRO", type=['xlsx','csv'], key="f3_rto_v2")
     
     st.divider()
-    f4 = st.file_uploader("📥 4. UPLOAD HASIL CEK REAL ", type=['xlsx','csv'], key="f4_rto", help="Upload file selisih yang sudah diisi kolom HASIL CEK REAL-nya")
+    f4 = st.file_uploader("📥 4. UPLOAD HASIL CEK REAL ", type=['xlsx','csv'], key="f4_rto_v2", help="Upload file selisih")
 
-    # --- 2. JALANKAN PROSES AWAL ---
+    # --- CEK FILE BARU & RESET DATA ---
+    # Jika ada file baru diupload, reset session state
+    current_f1 = st.session_state.get('current_f1_name_rto', '')
+    current_f2 = st.session_state.get('current_f2_name_rto', '')
+    current_f3 = st.session_state.get('current_f3_name_rto', '')
+    current_f4 = st.session_state.get('current_f4_name_rto', '')
+    
+    # Reset jika file 1 berubah
+    if f1 is not None and f1.name != current_f1:
+        st.session_state.df_ds = None
+        st.session_state.df_selisih = None
+        st.session_state.data_app_permanen = None
+        st.session_state.df_ds_final = None
+        st.session_state.current_f1_name_rto = f1.name
+        st.session_state.hasil_draft_final = None
+    
+    # Reset jika file 2 berubah
+    if f2 is not None and f2.name != current_f2:
+        st.session_state.df_ds = None
+        st.session_state.df_selisih = None
+        st.session_state.data_app_permanen = None
+        st.session_state.df_ds_final = None
+        st.session_state.current_f2_name_rto = f2.name
+        st.session_state.hasil_draft_final = None
+    
+    # Reset jika file 3 berubah
+    if f3 is not None and f3.name != current_f3:
+        st.session_state.hasil_draft_final = None
+        st.session_state.current_f3_name_rto = f3.name
+    
+    # Reset jika file 4 berubah
+    if f4 is not None and f4.name != current_f4:
+        st.session_state.df_ds_final = None
+        st.session_state.current_f4_name_rto = f4.name
+
+    # --- JALANKAN PROSES AWAL ---
     if st.button("▶️ JALANKAN PROSES", use_container_width=True):
         if f1 and f2:
-            df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
-            df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
-            
-            st.session_state.data_app_permanen = df2.copy()
-            res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
-            
-            # Bersihkan angka tampilan
-            res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
-            
-            st.session_state.df_ds = res_ds
-            st.session_state.df_selisih = res_selisih
-            st.session_state.rto_ds_loaded = True
-            st.session_state.rto_appsheet_loaded = True
-            
-            st.success("✅ Proses Awal Selesai!")
+            with st.spinner("Memproses..."):
+                df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
+                df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
+                
+                st.session_state.data_app_permanen = df2.copy()
+                res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
+                
+                # Bersihkan angka
+                if 'HASIL CEK REAL' in res_selisih.columns:
+                    res_selisih['HASIL CEK REAL'] = res_selisih['HASIL CEK REAL'].fillna(0).astype(int)
+                
+                st.session_state.df_ds = res_ds
+                st.session_state.df_selisih = res_selisih
+                
+                st.success("✅ Proses Awal Selesai!")
         else:
             st.error("Upload File 1 (DS) & File 2 (Appsheet) dulu!")
 
-    # --- 3. TAMPILKAN HASIL JIKA SUDAH DIPROSES ---
+    # --- TAMPILKAN HASIL JIKA ADA ---
     if st.session_state.df_selisih is not None:
         st.divider()
         st.subheader("📊 HASIL COMPARE")
@@ -2905,45 +2896,20 @@ elif menu == "Compare RTO":
         mc1, mc2, mc3, mc4 = st.columns(4)
         
         with mc1:
-            st.markdown(f'''
-            <div class="m-box">
-                <span class="m-lbl">Total Rows</span>
-                <span class="m-val">{total_rows}</span>
-            </div>
-            ''', unsafe_allow_html=True)
-        
+            st.markdown(f'<div class="m-box"><span class="m-lbl">Total Rows</span><span class="m-val">{total_rows}</span></div>', unsafe_allow_html=True)
         with mc2:
-            st.markdown(f'''
-            <div class="m-box">
-                <span class="m-lbl">Match</span>
-                <span class="m-val">{match_rows}</span>
-            </div>
-            ''', unsafe_allow_html=True)
-        
+            st.markdown(f'<div class="m-box"><span class="m-lbl">Match</span><span class="m-val">{match_rows}</span></div>', unsafe_allow_html=True)
         with mc3:
-            st.markdown(f'''
-            <div class="m-box">
-                <span class="m-lbl">Selisih Lebih</span>
-                <span class="m-val">{selisih_lebih}</span>
-            </div>
-            ''', unsafe_allow_html=True)
-        
+            st.markdown(f'<div class="m-box"><span class="m-lbl">Selisih Lebih</span><span class="m-val">{selisih_lebih}</span></div>', unsafe_allow_html=True)
         with mc4:
-            st.markdown(f'''
-            <div class="m-box">
-                <span class="m-lbl">Selisih Kurang</span>
-                <span class="m-val">{selisih_kurang}</span>
-            </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'<div class="m-box"><span class="m-lbl">Selisih Kurang</span><span class="m-val">{selisih_kurang}</span></div>', unsafe_allow_html=True)
         
-        # Tampilkan DataFrame
         st.dataframe(st.session_state.df_selisih, use_container_width=True, hide_index=True)
         
-        # Download Hasil
         csv_ds = st.session_state.df_selisih.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Hasil", csv_ds, "HASIL_COMPARE_RTO.csv", "text/csv", use_container_width=True)
 
-    # --- 4. LOGIC BACKDOOR (OVERWRITE DATA) ---
+    # --- UPDATE DENGAN FILE CEK REAL ---
     if f4 and st.session_state.data_app_permanen is not None:
         st.divider()
         st.subheader("🔄 UPDATE DENGAN HASIL CEK REAL")
@@ -2952,81 +2918,172 @@ elif menu == "Compare RTO":
             try:
                 df_real_manual = pd.read_excel(f4) if f4.name.endswith('xlsx') else pd.read_csv(f4)
                 
-                # Cari kolom SKU dan QTY secara dinamis
                 c_sku_m = [c for c in df_real_manual.columns if 'sku' in c.lower()][0]
                 c_qty_m = [c for c in df_real_manual.columns if 'real' in c.lower() or 'qty' in c.lower() or 'cek' in c.lower()][0]
                 
-                # Ambil yang Qty > 0 saja
                 df_real_manual[c_qty_m] = pd.to_numeric(df_real_manual[c_qty_m], errors='coerce').fillna(0)
                 valid_data_real = df_real_manual[df_real_manual[c_qty_m] > 0].copy()
                 valid_data_real[c_sku_m] = valid_data_real[c_sku_m].astype(str).str.strip()
                 
                 mapping_real = valid_data_real.set_index(c_sku_m)[c_qty_m].to_dict()
                 
-                # Overwrite Data Utama
                 df_temp = st.session_state.data_app_permanen.copy()
                 c_sku_u = [c for c in df_temp.columns if 'sku' in c.lower()][0]
                 df_temp[c_sku_u] = df_temp[c_sku_u].astype(str).str.strip()
                 
-                # FILTER: Buang SKU yang gak ada di file cek real
                 df_temp = df_temp[df_temp[c_sku_u].isin(mapping_real.keys())]
                 
-                # Update Nilai Qty
                 c_qty_u = [c for c in df_temp.columns if 'qty' in c.lower()][0]
                 df_temp[c_qty_u] = df_temp[c_sku_u].map(mapping_real)
                 
                 st.session_state.df_ds_final = df_temp
-                st.session_state.rto_cek_real_loaded = True
-                
-                st.success(f"✅ Data Updated: {len(df_temp)} SKU valid!")
+                st.success(f"✅ Data Updated: {len(df_temp)} SKU!")
                 
             except Exception as e:
-                st.error(f"Gagal baca File 4: {e}")
+                st.error(f"Error: {e}")
 
-    # --- 5. LOGIC DRAFT JEZPRO ---
+    # --- FINAL COMPARE DENGAN DRAFT ---
     if f3:
         st.divider()
-        st.subheader("📝 DRAFT JEZPRO FINAL COMPARE")
+        st.subheader("📝 FINAL COMPARE")
         
-        if st.button("🏁 FINAL COMPARE TO DRAFT RTO", use_container_width=True):
-            # Cek data mana yang dipake
+        if st.button("🏁 FINAL COMPARE", use_container_width=True):
             data_siap = st.session_state.df_ds_final if st.session_state.df_ds_final is not None else st.session_state.df_ds
             
             if data_siap is not None:
                 df3_draft = pd.read_excel(f3) if f3.name.endswith('xlsx') else pd.read_csv(f3)
                 
-                # Compare
                 hasil_draft = engine_compare_draft_vba(data_siap, df3_draft)
                 
-                # Filter Qty > 0
                 col_qty_f = [c for c in hasil_draft.columns if 'qty' in c.lower() or 'ambil' in c.lower()][0]
                 hasil_draft = hasil_draft[pd.to_numeric(hasil_draft[col_qty_f], errors='coerce').fillna(0) > 0]
                 
                 total_vba = int(hasil_draft[col_qty_f].sum())
+                st.session_state.hasil_draft_final = hasil_draft
                 
-                # Metrics
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">Total Qty Akhir</span>
-                        <span class="m-val">{total_vba}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                
+                    st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Akhir</span><span class="m-val">{total_vba}</span></div>', unsafe_allow_html=True)
                 with col2:
-                    if total_vba == 231:
-                        st.success("✅ PROSES BERHASIL")
-                    else:
-                        st.warning(f"⚠️ Hasil: {total_vba} (Seharusnya 231)")
+                    st.success("✅ SELESAI" if total_vba > 0 else "⚠️ CEK ULANG")
                 
                 st.dataframe(hasil_draft, use_container_width=True, hide_index=True)
                 
                 csv = hasil_draft.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download Draft Final ({total_vba} Pcs)", csv, f"Draft_Final_{total_vba}.csv", "text/csv", use_container_width=True)
+                st.download_button(f"📥 Download ({total_vba} Pcs)", csv, f"Draft_Final_{total_vba}.csv", "text/csv", use_container_width=True)
             else:
                 st.error("Jalankan Proses Awal dulu!")
 
+
+# =====================================================
+# MENU: FDR UPDATE (YANG DIPERBAIKI)
+# =====================================================
+elif menu == "FDR Update":
+    st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
+    
+    # --- CSS ---
+    st.markdown("""
+        <style>
+        .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+        .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+        .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # --- INIT STATE ---
+    if "ws_manifest_fdr" not in st.session_state:
+        st.session_state.ws_manifest_fdr = None
+    if "ws_fu_it_fdr" not in st.session_state:
+        st.session_state.ws_fu_it_fdr = None
+    if "dict_kurir_fdr" not in st.session_state:
+        st.session_state.dict_kurir_fdr = {}
+    if "fdr_current_file" not in st.session_state:
+        st.session_state.fdr_current_file = None
+    
+    # --- FILE UPLOAD ---
+    u_file = st.file_uploader("📂 Choose Your File", type=["xlsx"], key="fdr_file_v2")
+    
+    # RESET JIKA FILE BERBEDA
+    if u_file is not None:
+        if st.session_state.fdr_current_file != u_file.name:
+            st.session_state.ws_manifest_fdr = None
+            st.session_state.ws_fu_it_fdr = None
+            st.session_state.dict_kurir_fdr = {}
+            st.session_state.fdr_current_file = u_file.name
+    
+    # LOAD FILE JIKA BELUM
+    if u_file and st.session_state.ws_manifest_fdr is None:
+        st.session_state.ws_manifest_fdr = pd.read_excel(u_file)
+        st.rerun()
+    
+    st.divider()
+    
+    # --- BUTTONS ---
+    c = st.columns(4)
+    
+    # CLEAR COLUMNS
+    if c[0].button("🚮 CLEAR COLUMNS", key="btn_clean_v2"):
+        if st.session_state.ws_manifest_fdr is not None:
+            df = st.session_state.ws_manifest_fdr.copy()
+            cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+            existing_cols = [df.columns[i] for i in cols_idx if i < len(df.columns)]
+            
+            if existing_cols:
+                df.drop(columns=existing_cols, inplace=True)
+                st.session_state.ws_manifest_fdr = df
+                st.session_state.ws_fu_it_fdr = None
+                st.session_state.dict_kurir_fdr = {}
+                st.success("✅ KOLOM DIBERSIHKAN!")
+                st.rerun()
+            else:
+                st.warning("Kolom sudah bersih!")
+        else:
+            st.error("UPLOAD FILE DULU!")
+
+    # NEED FU IT
+    if c[1].button("🖥️ NEED FU IT", key="btn_fu_v2"):
+        if st.session_state.ws_manifest_fdr is not None:
+            df = st.session_state.ws_manifest_fdr.copy()
+            mask = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
+            st.session_state.ws_fu_it_fdr = df[mask].iloc[:, 0:13]
+            st.success(f"✅ {len(st.session_state.ws_fu_it_fdr)} Baris!")
+        else:
+            st.error("Data Kosong!")
+
+    # OUTSTANDING COURIER
+    if c[2].button("🛵 OUTSTANDING COURIER", key="btn_split_v2"):
+        if st.session_state.ws_manifest_fdr is not None:
+            df = st.session_state.ws_manifest_fdr.copy()
+            f_val = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
+            m_val = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+            
+            mask = (f_val != "") & (m_val == "")
+            filtered = df[mask].copy()
+            
+            if not filtered.empty:
+                d_kurir = {str(n): g.iloc[:, 0:13] for n, g in filtered.groupby(filtered.iloc[:, 5])}
+                st.session_state.dict_kurir_fdr = d_kurir
+                st.success(f"✅ {len(d_kurir)} Kurir")
+            else:
+                st.error("No Data!")
+        else:
+            st.error("Data Kosong!")
+
+    # CLEAR ALL
+    if c[3].button("🗑️ CLEAR ALL", type="primary", key="btn_clear_v2"):
+        st.session_state.ws_manifest_fdr = None
+        st.session_state.ws_fu_it_fdr = None
+        st.session_state.dict_kurir_fdr = {}
+        st.session_state.fdr_current_file = None
+        st.rerun()
+
+    st.divider()
+    
+    # --- PREVIEW ---
+    if st.session_state.ws_manifest_fdr is not None:
+        st.subheader("📂 MANIFEST DATA")
+        st.dataframe(st.session_state.ws_manifest_fdr, use_container_width=True, hide_index=True)
+        
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
