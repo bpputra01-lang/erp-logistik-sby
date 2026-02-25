@@ -1711,12 +1711,6 @@ def process_scan_out(df_scan, df_history, df_stock):
     """
     Fungsi untuk memproses dan membandingkan data scan out
     dengan history set up dan stock tracking
-    
-    Including:
-    - HapusDataStock: Filter history & stock berdasarkan SKU di DATA SCAN
-    - CLEAN_DATA_SCAN_WITH_COUNTIFS: Hitung QTY & hapus duplikat BIN+SKU
-    - CompareDataScan: Bandingkan data
-    - CreateDraftSetUp: Buat draft set up
     """
     
     # =====================================================
@@ -1734,7 +1728,6 @@ def process_scan_out(df_scan, df_history, df_stock):
     df_stock.columns = [str(col).strip().upper() for col in df_stock.columns]
     
     # Rename kolom sesuai posisi VBA
-    # Kolom A = index 0, Kolom B = index 1, dst
     df_scan = df_scan.rename(columns={
         df_scan.columns[0]: 'BIN_AWAL',  # Kolom A
         df_scan.columns[1]: 'SKU',       # Kolom B
@@ -1755,27 +1748,30 @@ def process_scan_out(df_scan, df_history, df_stock):
     })
     
     # =====================================================
-    # BAGIAN 2: LOGIKA - HAPUS DATA STOCK (Filter Data)
+    # BAGIAN 2: KONVERSI NUMERIC SEBELUM LOOP
     # =====================================================
-    # Replikasi: HapusDataStock()
-    # 1. Ambil list SKU dari DATA SCAN
-    # 2. Bersihkan HISTORY SET UP (hapus yang SKU-nya tidak ada di DATA SCAN)
-    # 3. Bersihkan STOCK TRACKING (hapus yang SKU-nya tidak ada & Invoice tidak ada "INV")
+    
+    # Konversi QTY ke numeric SEBELUM loop (PENTING!)
+    df_scan['QTY'] = pd.to_numeric(df_scan['QTY'], errors='coerce').fillna(0)
+    df_history['QTY_HIST'] = pd.to_numeric(df_history['QTY_HIST'], errors='coerce').fillna(0)
+    df_stock['QTY_STOCK'] = pd.to_numeric(df_stock['QTY_STOCK'], errors='coerce').fillna(0)
+    
+    # =====================================================
+    # BAGIAN 3: LOGIKA - HAPUS DATA STOCK (Filter Data)
+    # =====================================================
     
     # Get list SKU dari DATA SCAN
     scan_skus = set(df_scan['SKU'].dropna().astype(str).str.strip())
     
-    # Filter HISTORY SET UP (hapus yang SKU-nya tidak ada di DATA SCAN)
+    # Filter HISTORY SET UP
     df_history['SKU_STR'] = df_history['SKU'].astype(str).str.strip()
     df_history = df_history[df_history['SKU_STR'].isin(scan_skus)]
     df_history = df_history.drop(columns=['SKU_STR'])
     
     # Filter STOCK TRACKING
-    # Hapus jika: SKU tidak ada di DATA SCAN ATAU Invoice tidak valid
     df_stock['SKU_STR'] = df_stock['SKU'].astype(str).str.strip()
     df_stock['INVOICE_STR'] = df_stock['INVOICE'].astype(str).str.strip()
     
-    # Filter: SKU harus ada di scan DAN Invoice harus mengandung "INV"
     valid_stock_mask = (
         df_stock['SKU_STR'].isin(scan_skus) & 
         df_stock['INVOICE_STR'].str.contains('INV', case=False, na=False)
@@ -1784,11 +1780,8 @@ def process_scan_out(df_scan, df_history, df_stock):
     df_stock = df_stock.drop(columns=['SKU_STR', 'INVOICE_STR'])
     
     # =====================================================
-    # BAGIAN 3: LOGIKA - CLEAN DATA SCAN (Count Qty & Hapus Duplikat)
+    # BAGIAN 4: LOGIKA - CLEAN DATA SCAN (Count Qty & Hapus Duplikat)
     # =====================================================
-    # Replikasi: CLEAN_DATA_SCAN_WITH_COUNTIFS_V2()
-    # 1. Hitung QTY dengan COUNTIFS (hitung kemunculan BIN+SKU)
-    # 2. Hapus baris duplikat (pertahankan yang pertama)
     
     # Pastikan BIN_AWAL dan SKU tidak kosong
     df_scan = df_scan.dropna(subset=['BIN_AWAL', 'SKU'])
@@ -1798,20 +1791,19 @@ def process_scan_out(df_scan, df_history, df_stock):
     # Hitung QTY dengan COUNTIFS (hitung jumlah kemunculan BIN+SKU)
     df_scan['QTY'] = df_scan.groupby(['BIN_AWAL', 'SKU'])['BIN_AWAL'].transform('count')
     
-    # Hapus duplikat (pertahankan yang pertama - first occurrence)
+    # Hapus duplikat (pertahankan yang pertama)
     df_scan = df_scan.drop_duplicates(subset=['BIN_AWAL', 'SKU'], keep='first')
     
     # Reset index
     df_scan = df_scan.reset_index(drop=True)
     
     # =====================================================
-    # BAGIAN 4: COMPARE DATA SCAN (LOGIKA UTAMA)
+    # BAGIAN 5: COMPARE DATA SCAN (LOGIKA UTAMA)
     # =====================================================
-    # Replikasi: CompareDataScan_FullFormat()
     
     # Inisialisasi kolom hasil
     df_scan['KETERANGAN'] = ''
-    df_scan['TOTAL_QTY_SETUP_TERJUAL'] = np.nan
+    df_scan['TOTAL_QTY_SETUP_TERJUAL'] = 0.0
     df_scan['BIN_AFTER_SET_UP'] = ''
     df_scan['INVOICE'] = ''
     
@@ -1821,15 +1813,11 @@ def process_scan_out(df_scan, df_history, df_stock):
     df_stock['SKU'] = df_stock['SKU'].astype(str).str.strip()
     df_stock['BIN_STOCK'] = df_stock['BIN_STOCK'].astype(str).str.strip()
     
-    # Convert QTY ke numeric
-    df_history['QTY_HIST'] = pd.to_numeric(df_history['QTY_HIST'], errors='coerce').fillna(0)
-    df_stock['QTY_STOCK'] = pd.to_numeric(df_stock['QTY_STOCK'], errors='coerce').fillna(0)
-    
     # Loop untuk setiap baris di DATA SCAN
     for idx in df_scan.index:
         sku = df_scan.loc[idx, 'SKU']
         bin_awal = df_scan.loc[idx, 'BIN_AWAL']
-        qty_scan = df_scan.loc[idx, 'QTY']
+        qty_scan = float(df_scan.loc[idx, 'QTY'])  # Konversi ke float
         
         found_stock = False
         found_history = False
@@ -1844,10 +1832,10 @@ def process_scan_out(df_scan, df_history, df_stock):
             found_stock = True
             row_stock = stock_match.iloc[0]
             
-            df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = row_stock['QTY_STOCK']
+            df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = float(row_stock['QTY_STOCK'])
             df_scan.loc[idx, 'INVOICE'] = row_stock['INVOICE']
             
-            if row_stock['QTY_STOCK'] == qty_scan:
+            if float(row_stock['QTY_STOCK']) == qty_scan:
                 df_scan.loc[idx, 'KETERANGAN'] = 'ITEM TELAH TERJUAL'
             else:
                 df_scan.loc[idx, 'KETERANGAN'] = 'ITEM TERJUAL (QTY MISSMATCH)'
@@ -1860,11 +1848,11 @@ def process_scan_out(df_scan, df_history, df_stock):
                 found_history = True
                 row_hist = hist_match.iloc[0]
                 
-                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = row_hist['QTY_HIST']
+                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = float(row_hist['QTY_HIST'])
                 df_scan.loc[idx, 'BIN_AFTER_SET_UP'] = row_hist['BIN_AFTER']
                 
                 if row_hist['BIN_HIST'] == bin_awal:
-                    if row_hist['QTY_HIST'] == qty_scan:
+                    if float(row_hist['QTY_HIST']) == qty_scan:
                         df_scan.loc[idx, 'KETERANGAN'] = 'DONE AND MATCH SET UP'
                     else:
                         df_scan.loc[idx, 'KETERANGAN'] = 'DONE SETUP (QTY MISSMATCH)'
@@ -1879,7 +1867,7 @@ def process_scan_out(df_scan, df_history, df_stock):
                 row_stock = stock_sku_match.iloc[0]
                 
                 df_scan.loc[idx, 'KETERANGAN'] = 'ITEM TERJUAL (BIN MISSMATCH)'
-                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = row_stock['QTY_STOCK']
+                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = float(row_stock['QTY_STOCK'])
                 df_scan.loc[idx, 'INVOICE'] = row_stock['INVOICE']
                 found_stock = True
         
@@ -1888,9 +1876,8 @@ def process_scan_out(df_scan, df_history, df_stock):
             df_scan.loc[idx, 'KETERANGAN'] = 'ITEM BELUM TERSETUP & TIDAK TERJUAL'
     
     # =====================================================
-    # BAGIAN 5: BUAT DRAFT SET UP
+    # BAGIAN 6: BUAT DRAFT SET UP
     # =====================================================
-    # Replikasi: CreateDraftSetUp_FIXED()
     
     draft_data = []
     
@@ -1898,13 +1885,9 @@ def process_scan_out(df_scan, df_history, df_stock):
         keterangan = df_scan.loc[idx, 'KETERANGAN']
         bin_awal = df_scan.loc[idx, 'BIN_AWAL']
         sku = df_scan.loc[idx, 'SKU']
-        qty_scan = df_scan.loc[idx, 'QTY']
-        qty_setup = df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL']
+        qty_scan = float(df_scan.loc[idx, 'QTY'])
+        qty_setup = float(df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'])
         bin_after = df_scan.loc[idx, 'BIN_AFTER_SET_UP']
-        
-        # Konversi ke numeric
-        qty_scan = pd.to_numeric(qty_scan, errors='coerce').fillna(0)
-        qty_setup = pd.to_numeric(qty_setup, errors='coerce').fillna(0)
         
         # --- LOGIKA DRAFT: DONE SETUP (QTY MISSMATCH) ---
         if keterangan == 'DONE SETUP (QTY MISSMATCH)':
@@ -1947,17 +1930,18 @@ def process_scan_out(df_scan, df_history, df_stock):
             })
     
     # Buat DataFrame DRAFT
-    df_draft = pd.DataFrame(draft_data, columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+    if draft_data:
+        df_draft = pd.DataFrame(draft_data, columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+    else:
+        df_draft = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
     
     # =====================================================
-    # BAGIAN 6: SUSUN KOLOM OUTPUT (SESUAI VBA)
+    # BAGIAN 7: SUSUN KOLOM OUTPUT
     # =====================================================
     
-    # Susun kolom sesuai urutan di VBA (D1:G1)
     df_res = df_scan[['BIN_AWAL', 'SKU', 'QTY', 'KETERANGAN', 
                        'TOTAL_QTY_SETUP_TERJUAL', 'BIN_AFTER_SET_UP', 'INVOICE']].copy()
     
-    # Rename kolom sesuai header VBA
     df_res = df_res.rename(columns={
         'BIN_AWAL': 'BIN AWAL',
         'QTY': 'QTY SCAN',
