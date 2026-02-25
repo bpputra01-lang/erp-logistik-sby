@@ -2404,7 +2404,6 @@ elif menu == "Putaway System":
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     
-    # Informasi format file yang diharapkan
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
@@ -2421,7 +2420,6 @@ elif menu == "Scan Out Validation":
     if up_scan and up_hist and up_stock:
         if st.button("▶️ COMPARE DATA SCAN OUT"):
             try:
-                # ========== BAGIAN 1: BACA FILE ==========
                 if up_scan.name.endswith('.csv'):
                     df_s = pd.read_csv(up_scan)
                 else:
@@ -2430,60 +2428,80 @@ elif menu == "Scan Out Validation":
                 df_h = pd.read_excel(up_hist, engine='openpyxl')
                 df_st = pd.read_excel(up_stock, engine='openpyxl')
                 
-                # ========== BAGIAN 2: CEK STRUKTUR KOLOM ==========
-                # Normalisasi nama kolom (uppercase)
                 df_s.columns = [str(col).strip().upper() for col in df_s.columns]
                 df_h.columns = [str(col).strip().upper() for col in df_h.columns]
                 df_st.columns = [str(col).strip().upper() for col in df_st.columns]
                 
-                # Validasi kolom minimum
                 if len(df_s.columns) < 2:
                     st.error("❌ DATA SCAN harus memiliki minimal 2 kolom (BIN, SKU)")
                     st.stop()
-                
                 if len(df_h.columns) < 4:
-                    st.error("❌ HISTORY SET UP harus memiliki minimal 4 kolom (SKU, BIN, QTY, BIN After)")
+                    st.error("❌ HISTORY SET UP harus memiliki minimal 4 kolom")
                     st.stop()
-                    
                 if len(df_st.columns) < 2:
-                    st.error("❌ STOCK TRACKING harus memiliki minimal 2 kolom (Invoice, SKU)")
+                    st.error("❌ STOCK TRACKING harus memiliki minimal 2 kolom")
                     st.stop()
                 
-                # ========== BAGIAN 3: PROSES DATA ==========
                 with st.spinner('🔄 Sedang memproses data...'):
                     df_res, df_draft = process_scan_out(df_s, df_h, df_st)
                 
                 st.success("✅ Validasi Selesai!")
                 
-                # ========== BAGIAN 4: STATISTIK HASIL ==========
-                # Hitung statistik
-                total_items = len(df_res)
-                
-                # Hitung masing-masing kategori
-                terjual_mask = df_res['Keterangan'].str.contains('TERJUAL', case=False, na=False)
-                mismatch_mask = df_res['Keterangan'].str.contains('MISSMATCH', case=False, na=False)
-                belum_mask = df_res['Keterangan'].str.contains('BELUM', case=False, na=False)
-                done_mask = df_res['Keterangan'].str.contains('DONE', case=False, na=False)
-                
-                terjual_count = terjual_mask.sum()
-                mismatch_count = mismatch_mask.sum()
-                belum_count = belum_mask.sum()
-                done_count = done_mask.sum()
-                
-                # Tampilkan statistik
+                # ========== STATISTIK DENGAN KOTAK CUSTOM ==========
+                st.divider()
                 st.subheader("📊 Ringkasan Hasil")
-                stat_col1, stat_col2, stat_col3, stat_col4, stat_col5 = st.columns(5)
-                stat_col1.metric("📦 Total Items", total_items)
-                stat_col2.metric("✅ DONE", done_count)
-                stat_col3.metric("📤 TERJUAL", terjual_count)
-                stat_col4.metric("⚠️ MISSMATCH", mismatch_count)
-                stat_col5.metric("❌ BELUM TERSETUP", belum_count)
+                
+                total_items = len(df_res)
+                terjual_count = df_res['Keterangan'].str.contains('TERJUAL', case=False, na=False).sum()
+                mismatch_count = df_res['Keterangan'].str.contains('MISSMATCH', case=False, na=False).sum()
+                belum_count = df_res['Keterangan'].str.contains('BELUM', case=False, na=False).sum()
+                done_count = df_res['Keterangan'].str.contains('DONE', case=False, na=False).sum()
+                
+                sc1, sc2, sc3, sc4, sc5 = st.columns(5)
+                
+                with sc1:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">📦 Total Items</span>
+                        <span class="m-val">{total_items}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                
+                with sc2:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">✅ DONE</span>
+                        <span class="m-val">{done_count}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                
+                with sc3:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">📤 TERJUAL</span>
+                        <span class="m-val">{terjual_count}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                
+                with sc4:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">⚠️ MISSMATCH</span>
+                        <span class="m-val">{mismatch_count}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                
+                with sc5:
+                    st.markdown(f'''
+                    <div class="m-box">
+                        <span class="m-lbl">❌ BELUM TERSETUP</span>
+                        <span class="m-val">{belum_count}</span>
+                    </div>
+                    ''', unsafe_allow_html=True)
                 
                 st.divider()
                 
-                # ========== BAGIAN 5: TAMPILKAN HASIL ==========
-                
-                # Fungsi highlight untuk error
+                # ========== TAMPILKAN HASIL ==========
                 def highlight_vba(val):
                     if pd.isna(val):
                         return 'color: black'
@@ -2498,26 +2516,16 @@ elif menu == "Scan Out Validation":
                         return 'color: blue; font-weight: bold'
                     return 'color: black'
                 
-                # Tampilkan DATA SCAN (COMPARED)
                 st.subheader("📋 DATA SCAN (COMPARED)")
-                
-                # Styling DataFrame
-                styled_df = df_res.style.applymap(
-                    highlight_vba, 
-                    subset=['Keterangan']
-                ).apply(
+                styled_df = df_res.style.applymap(highlight_vba, subset=['Keterangan']).apply(
                     lambda x: ['background-color: #ffcccc' if 'MISSMATCH' in str(x) or 'BELUM' in str(x) else '' for i in x],
-                    subset=['Keterangan'],
-                    axis=1
+                    subset=['Keterangan'], axis=1
                 )
-                
                 st.dataframe(styled_df, use_container_width=True, height=400)
                 
-                # Tampilkan DRAFT SET UP jika ada data
                 if len(df_draft) > 0:
                     st.subheader("📝 DRAFT SET UP")
                     
-                    # Styling untuk Draft
                     def highlight_draft(val):
                         if pd.isna(val):
                             return 'color: black'
@@ -2535,17 +2543,13 @@ elif menu == "Scan Out Validation":
                 else:
                     st.info("ℹ️ Tidak ada data untuk DRAFT SET UP")
                 
-                # ========== BAGIAN 6: DOWNLOAD ==========
+                # ========== DOWNLOAD ==========
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    # Tulis DATA SCAN
                     df_res.to_excel(writer, sheet_name='DATA SCAN', index=False)
-                    
-                    # Ambil workbook dan worksheet untuk formatting
                     workbook = writer.book
                     worksheet = writer.sheets['DATA SCAN']
                     
-                    # Format header
                     header_format = workbook.add_format({
                         'bold': True,
                         'bg_color': '#0070C0',
@@ -2554,37 +2558,26 @@ elif menu == "Scan Out Validation":
                         'border': 1
                     })
                     
-                    # Format angka (tanpa desimal)
                     int_format = workbook.add_format({'num_format': '0'})
                     
-                    # Tulis format header
                     for col_num, value in enumerate(df_res.columns.values):
                         worksheet.write(0, col_num, value, header_format)
                     
-                    # AutoFit kolom
-                    worksheet.set_column(0, 1, 15)  # BIN AWAL, SKU
-                    worksheet.set_column(2, 2, 10, int_format)  # QTY SCAN
-                    worksheet.set_column(3, 3, 35)  # Keterangan
-                    worksheet.set_column(4, 4, 20, int_format)  # Total Qty Setup/Terjual
-                    worksheet.set_column(5, 6, 15)  # Bin After Set Up, Invoice
+                    worksheet.set_column(0, 1, 15)
+                    worksheet.set_column(2, 2, 10, int_format)
+                    worksheet.set_column(3, 3, 35)
+                    worksheet.set_column(4, 4, 20, int_format)
+                    worksheet.set_column(5, 6, 15)
                     
-                    # Tulis DRAFT SET UP jika ada data
                     if len(df_draft) > 0:
                         df_draft.to_excel(writer, sheet_name='DRAFT SET UP', index=False)
-                        
-                        # Ambil worksheet draft
                         worksheet_draft = writer.sheets['DRAFT SET UP']
-                        
-                        # Format header draft
                         for col_num, value in enumerate(df_draft.columns.values):
                             worksheet_draft.write(0, col_num, value, header_format)
-                        
-                        # Format angka untuk draft
-                        worksheet_draft.set_column(0, 2, 15)  # BIN AWAL, BIN TUJUAN, SKU
-                        worksheet_draft.set_column(3, 3, 10, int_format)  # QUANTITY
-                        worksheet_draft.set_column(4, 4, 20)  # NOTES
+                        worksheet_draft.set_column(0, 2, 15)
+                        worksheet_draft.set_column(3, 3, 10, int_format)
+                        worksheet_draft.set_column(4, 4, 20)
                 
-                # Tombol download
                 st.download_button(
                     label="📥 DOWNLOAD HASIL (DATA SCAN + DRAFT)",
                     data=output.getvalue(),
@@ -2594,14 +2587,6 @@ elif menu == "Scan Out Validation":
                 
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
-                st.warning("""
-                ⚠️ Possible solutions:
-                1. Pastikan format file sesuai dengan template
-                2. Pastikan tidak ada sel kosong di awal file
-                3. Coba simpan ulang file Excel dan upload ulang
-                """)
-                import traceback
-                st.code(traceback.format_exc())
                 
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
