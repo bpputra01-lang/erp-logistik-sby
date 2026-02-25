@@ -2046,21 +2046,53 @@ elif menu == "Scan Out Validation":
     with col1: up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'])
     with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'])
     with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
+    
     if up_scan and up_hist and up_stock:
         if st.button("▶️ COMPARE DATA SCAN OUT"):
             try:
-                df_s = pd.read_excel(up_scan, engine='calamine') if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
-                df_h = pd.read_excel(up_hist, engine='calamine'); df_st = pd.read_excel(up_stock, engine='calamine')
+                # Baca file dengan engine yang benar
+                if up_scan.name.endswith('.csv'):
+                    df_s = pd.read_csv(up_scan)
+                else:
+                    df_s = pd.read_excel(up_scan, engine='openpyxl')
+                
+                df_h = pd.read_excel(up_hist, engine='openpyxl')
+                df_st = pd.read_excel(up_stock, engine='openpyxl')
+                
+                # Proses data
                 df_res, df_draft = process_scan_out(df_s, df_h, df_st)
                 st.success("Validasi Selesai!")
-                def highlight_vba(val): return f'color: {"red" if "MISSMATCH" in str(val) or "BELUM" in str(val) else "black"}; font-weight: bold'
-                st.subheader("📋 DATA SCAN (COMPARED)"); st.dataframe(df_res.style.applymap(highlight_vba, subset=['Keterangan']), use_container_width=True)
-                st.subheader("📝 DRAFT SET UP"); st.dataframe(df_draft, use_container_width=True)
+                
+                # Fungsi highlight untuk error
+                def highlight_vba(val):
+                    val_str = str(val)
+                    if "MISSMATCH" in val_str or "BELUM" in val_str:
+                        return 'color: red; font-weight: bold'
+                    return 'color: black'
+                
+                # Tampilkan hasil
+                st.subheader("📋 DATA SCAN (COMPARED)")
+                st.dataframe(df_res.style.applymap(highlight_vba, subset=['Keterangan']), use_container_width=True)
+                
+                st.subheader("📝 DRAFT SET UP")
+                st.dataframe(df_draft, use_container_width=True)
+                
+                # Download hasil
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_res.to_excel(writer, sheet_name='DATA SCAN', index=False); df_draft.to_excel(writer, sheet_name='DRAFT', index=False)
-                st.download_button("📥 DOWNLOAD SCAN OUT", data=output.getvalue(), file_name="SCAN_OUT_RESULT.xlsx")
-            except Exception as e: st.error(f"Error: {e}")
+                    df_res.to_excel(writer, sheet_name='DATA SCAN', index=False)
+                    df_draft.to_excel(writer, sheet_name='DRAFT', index=False)
+                
+                st.download_button(
+                    label="📥 DOWNLOAD SCAN OUT",
+                    data=output.getvalue(),
+                    file_name="SCAN_OUT_RESULT.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+                st.error("Pastikan format file sesuai dan semua kolom yang diperlukan tersedia.")
 
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
