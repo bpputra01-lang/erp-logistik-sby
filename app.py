@@ -2880,7 +2880,7 @@ elif menu == "Stock Minus":
 
 
 elif menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM </h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
     
     # --- CSS ---
     st.markdown("""
@@ -2898,8 +2898,6 @@ elif menu == "Compare RTO":
         st.session_state.rto_df_selisih = None
     if 'rto_df_app' not in st.session_state:
         st.session_state.rto_df_app = None
-    if 'rto_draft_compared' not in st.session_state:
-        st.session_state.rto_draft_compared = None
     if 'rto_new_draft' not in st.session_state:
         st.session_state.rto_new_draft = None
     
@@ -2930,7 +2928,6 @@ elif menu == "Compare RTO":
         st.divider()
         st.subheader("📊 HASIL COMPARE AWAL")
         
-        # Metrics
         total_rows = len(st.session_state.rto_df_selisih)
         match_count = len(st.session_state.rto_df_ds[st.session_state.rto_df_ds['NOTE'] == 'SESUAI']) if 'NOTE' in st.session_state.rto_df_ds.columns else 0
         lebih_count = len(st.session_state.rto_df_ds[st.session_state.rto_df_ds['NOTE'] == 'KELEBIHAN AMBIL']) if 'NOTE' in st.session_state.rto_df_ds.columns else 0
@@ -2946,8 +2943,54 @@ elif menu == "Compare RTO":
         with mc4:
             st.markdown(f'<div class="m-box"><span class="m-lbl">KURANG</span><span class="m-val">{kurang_count}</span></div>', unsafe_allow_html=True)
         
-        # Tampilkan Sheet Selisih
         st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
+        
+        # Download
+        csv_selisih = st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Hasil Selisih", csv_selisih, "SELISIH_RTO.csv", "text/csv", use_container_width=True)
+
+    st.divider()
+    
+    # --- UPLOAD FILE CEK REAL ---
+    st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
+    f_cek = st.file_uploader("📥 Upload File Hasil Cek Real (isian dari Sheet Selisih)", type=['xlsx','csv'], key="rto_cek")
+    
+    if f_cek and st.session_state.rto_df_app is not None:
+        if st.button("🔄 REFRESH DATA", use_container_width=True):
+            with st.spinner("Memproses Refresh..."):
+                df_cek = pd.read_excel(f_cek) if f_cek.name.endswith('xlsx') else pd.read_csv(f_cek)
+                
+                ds_refreshed, app_refreshed = engine_refresh_rto(
+                    st.session_state.rto_df_ds,
+                    st.session_state.rto_df_app,
+                    df_cek
+                )
+                
+                st.session_state.rto_df_ds = ds_refreshed
+                st.session_state.rto_df_app = app_refreshed
+                
+                st.success("✅ Refresh Selesai!")
+    
+    # --- GENERATE NEW DRAFT ---
+    st.divider()
+    st.subheader("📝 GENERATE NEW DRAFT")
+    f_draft = st.file_uploader("📥 Upload Draft Jezpro", type=['xlsx','csv'], key="rto_draft")
+    
+    if f_draft:
+        if st.button("🏁 GENERATE NEW DRAFT", use_container_width=True):
+            with st.spinner("Memproses..."):
+                df_draft = pd.read_excel(f_draft) if f_draft.name.endswith('xlsx') else pd.read_csv(f_draft)
+                
+                new_draft = engine_generate_new_draft(df_draft)
+                st.session_state.rto_new_draft = new_draft
+                
+                total_qty = int(new_draft['QUANTITY'].sum()) if not new_draft.empty else 0
+                
+                st.success(f"✅ Generate Selesai! Total: {total_qty} Pcs")
+                st.dataframe(new_draft, use_container_width=True, hide_index=True)
+                
+                csv_new = new_draft.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Download New Draft", csv_new, "NEW_DRAFT_RTO.csv", "text/csv", use_container_width=True)
 
 # =====================================================
 # MENU: FDR UPDATE (YANG DIPERBAIKI)
