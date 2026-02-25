@@ -2770,9 +2770,9 @@ elif menu == "Stock Minus":
                     total_qty = sum([x['QUANTITY'] for x in set_up_results])
                     still_minus = len(df_need_adj)
                     
-                    m1.metric("Total Transfer", total_transfer)
-                    m2.metric("Qty Dipindahkan", total_qty)
-                    m3.metric("Item Masih Minus", still_minus, delta_color="inverse")
+                    m1.metric("Total Stock Minus", total_transfer)
+                    m2.metric("Mutasi Stock Minus", total_qty)
+                    m3.metric("Item Need Justification", still_minus, delta_color="inverse")
                     
                     # Preview Data Transfer
                     if set_up_results:
@@ -2781,7 +2781,7 @@ elif menu == "Stock Minus":
                     
                     # --- TAMBAHAN: DETAIL LIST ITEM MINUS ---
                     if not df_need_adj.empty:
-                        st.warning("⚠️ Item berikut masih minus dan perlu justificasi manual:")
+                        st.warning("⚠️ Item berikut masih minus dan perlu justifikasi:")
                         
                         # Group by BIN TUJUAN
                         df_need_adj['QTY_MINUS'] = df_need_adj[col_qty].abs()
