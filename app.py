@@ -2285,15 +2285,7 @@ if menu == "Dashboard Overview":
 
 elif menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
-     # --- TAMBAHKAN CSS AGAR KOTAK METRICS MUNCUL ---
-    st.markdown("""
-    <style>
-    .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
-    .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
-    .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
-    
+
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
