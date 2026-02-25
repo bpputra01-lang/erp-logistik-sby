@@ -1536,7 +1536,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking):
 # FUNGSI UTAMA PUTAWAY SYSTEM (VBA TO PYTHON)
 # ============================================
 
-ddef putaway_system(df_ds, df_asal):
+def putaway_system(df_ds, df_asal):
     """
     Konversi dari VBA ComparePutaway()
     """
