@@ -1196,6 +1196,9 @@ def menu_refill_withdraw():
 # =====================================================
 # ENGINE 1: DS RTO vs APPSHEET
 # =====================================================
+# =====================================================
+# ENGINE: PROSES AWAL DS RTO vs APPSHEET
+# =====================================================
 def engine_ds_rto_vba_total(df_ds, df_app):
     import numpy as np
     
@@ -1242,7 +1245,9 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     for sku_app, qty_total in dict_qty.items():
         if sku_app not in sku_di_ds:
             list_tambahan.append({
-                'SKU': sku_app, 'QTY SCAN': 0, 'QTY AMBIL': qty_total,
+                'SKU': sku_app,
+                'QTY SCAN': 0,
+                'QTY AMBIL': qty_total,
                 'NOTE': "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
             })
     
@@ -1252,8 +1257,8 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     results_selisih = []
     mismatch_df = df_ds_res[df_ds_res['NOTE'] != 'SESUAI'].copy()
     
-    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""]*len(df_app_vba))
-    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""]*len(df_app_vba))
+    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
+    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
 
     for _, row in mismatch_df.iterrows():
         sku = row['SKU']
@@ -1285,85 +1290,112 @@ def engine_ds_rto_vba_total(df_ds, df_app):
 
 
 # =====================================================
-# ENGINE 2: COMPARE DRAFT JEZPRO
+# ENGINE: REFRESH DATA RTO
+# =====================================================
+def engine_refresh_rto(df_ds, df_app, df_selisih):
+    dict_ds = {}
+    dict_app = {}
+    
+    for _, row in df_selisih.iterrows():
+        sku = str(row.get('SKU', '')).strip()
+        bin_val = str(row.get('BIN', '')).strip()
+        qty_real = pd.to_numeric(row.get('HASIL CEK REAL', 0), errors='coerce') or 0
+        
+        if sku and qty_real > 0:
+            dict_ds[sku] = dict_ds.get(sku, 0) + qty_real
+            key_app = sku + "|" + bin_val
+            dict_app[key_app] = qty_real
+    
+    df_ds_updated = df_ds.copy()
+    df_ds_updated['SKU'] = df_ds_updated['SKU'].astype(str).str.strip()
+    df_ds_updated['QTY SCAN'] = df_ds_updated['SKU'].map(dict_ds).fillna(df_ds_updated['QTY SCAN'])
+    
+    def get_note_refresh(row):
+        scan = pd.to_numeric(row.get('QTY SCAN', 0), errors='coerce') or 0
+        ambil = pd.to_numeric(row.get('QTY AMBIL', 0), errors='coerce') or 0
+        if scan > ambil: return "KELEBIHAN AMBIL"
+        elif scan < ambil: return "KURANG AMBIL"
+        else: return "SESUAI"
+    
+    df_ds_updated['NOTE'] = df_ds_updated.apply(get_note_refresh, axis=1)
+    
+    df_app_updated = df_app.copy()
+    df_app_updated.columns = [str(i) for i in range(1, len(df_app_updated.columns) + 1)]
+    
+    for idx, row in df_app_updated.iterrows():
+        sku9 = str(row.get('9', '')).strip()
+        sku15 = str(row.get('15', '')).strip()
+        sku = sku9 if sku9 else sku15
+        
+        bin1 = str(row.get('12', '')).strip()
+        key1 = sku + "|" + bin1
+        if key1 in dict_app:
+            df_app_updated.at[idx, '13'] = dict_app[key1]
+        
+        bin2 = str(row.get('16', '')).strip()
+        key2 = sku + "|" + bin2
+        if key2 in dict_app:
+            df_app_updated.at[idx, '17'] = dict_app[key2]
+    
+    return df_ds_updated, df_app_updated
+
+
+# =====================================================
+# ENGINE: COMPARE DRAFT JEZPRO
 # =====================================================
 def engine_compare_draft_jezpro(df_app, df_draft):
     import numpy as np
     
-    # Siapkan Appsheet
     df_a = df_app.copy()
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
-    # Siapkan Draft
     df_d = df_draft.copy()
-    df_d.columns = range(len(df_d.columns))
+    df_d.columns = range(df_d.shape[1])
     
-    # Cari kolom di Draft
-    col_tf = col_sku = col_qty = col_bin = None
-    for i, col in enumerate(df_d.columns):
-        if col_sku is None and i == 3:
-            col_sku = i
-        elif col_qty is None and i == 7:
-            col_qty = i
-        elif col_bin is None and i == 8:
-            col_bin = i
-        elif col_tf is None and i == 0:
-            col_tf = i
+    col_tf_draft = 0
+    col_sku_draft = 3
+    col_qty_draft = 7
+    col_bin_draft = 8
     
-    if col_tf is None: col_tf = 0
-    if col_sku is None: col_sku = 3
-    if col_qty is None: col_qty = 7
-    if col_bin is None: col_bin = 8
+    col_sku_app = ['9', '15']
+    col_bin_app = ['12', '16']
+    col_qty_app = ['13', '17']
+    col_tf_app = '18'
     
-    # Dictionary Appsheet: (SKU+BIN) -> data
     app_dict = {}
     app_sku_dict = {}
     
     for _, row in df_a.iterrows():
-        # Slot 1: Kolom 9, 12, 13
-        sku1 = str(row.get('9', '')).strip()
-        bin1 = str(row.get('12', '')).strip()
-        qty1 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
-        tf1 = str(row.get('18', '')).strip()
-        
-        if sku1 and bin1 and qty1 > 0:
-            key1 = sku1 + "|" + bin1
-            app_dict[key1] = {'qty': qty1, 'tf': tf1}
-            if sku1 not in app_sku_dict:
-                app_sku_dict[sku1] = []
-            app_sku_dict[sku1].append({'bin': bin1, 'qty': qty1, 'tf': tf1})
-        
-        # Slot 2: Kolom 15, 16, 17
-        sku2 = str(row.get('15', '')).strip()
-        bin2 = str(row.get('16', '')).strip()
-        qty2 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
-        tf2 = str(row.get('18', '')).strip()
-        
-        if sku2 and bin2 and qty2 > 0:
-            key2 = sku2 + "|" + bin2
-            app_dict[key2] = {'qty': qty2, 'tf': tf2}
-            if sku2 not in app_sku_dict:
-                app_sku_dict[sku2] = []
-            app_sku_dict[sku2].append({'bin': bin2, 'qty': qty2, 'tf': tf2})
+        for slot in range(2):
+            sku = str(row.get(col_sku_app[slot], '')).strip()
+            bin_val = str(row.get(col_bin_app[slot], '')).strip()
+            qty = pd.to_numeric(row.get(col_qty_app[slot], 0), errors='coerce') or 0
+            tf = str(row.get(col_tf_app, '')).strip()
+            
+            if sku and bin_val and qty > 0:
+                key = sku + "|" + bin_val
+                app_dict[key] = {'qty': qty, 'tf': tf, 'sku': sku, 'bin': bin_val}
+                
+                if sku not in app_sku_dict:
+                    app_sku_dict[sku] = []
+                app_sku_dict[sku].append({'bin': bin_val, 'qty': qty, 'tf': tf})
     
-    # Proses Draft
     results = []
     
     for idx, row in df_d.iterrows():
-        tf_draft = str(row.get(col_tf, '')).strip()
-        sku = str(row.get(col_sku, '')).strip()
-        bin_draft = str(row.get(col_bin, '')).strip()
-        qty_h = pd.to_numeric(row.get(col_qty, 0), errors='coerce') or 0
+        tf_draft = str(row.get(col_tf_draft, '')).strip()
+        sku = str(row.get(col_sku_draft, '')).strip()
+        bin_draft = str(row.get(col_bin_draft, '')).strip()
+        qty_h = pd.to_numeric(row.get(col_qty_draft, 0), errors='coerce') or 0
         
         qty_j = 0
-        bin_l = ""
         qty_m = 0
+        bin_l = ""
         note_k = ""
         status_n = ""
         found_match = False
         tf_is_wrong = False
         
-        # Cari match
         key_check = sku + "|" + bin_draft
         if key_check in app_dict:
             app_data = app_dict[key_check]
@@ -1376,43 +1408,22 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             else:
                 tf_is_wrong = True
         
-        # Logika Status
         if found_match:
             if qty_j < qty_h:
-                note_k = "QTY AMBIL KURANG DARI DRAFT"
+                qty_m = 0
                 status_n = "PERLU EDIT QTY DRAFT"
-            elif qty_j == qty_h:
+                note_k = "QTY AMBIL KURANG DARI DRAFT"
+            elif qty_h == qty_j:
                 note_k = "DRAFT SESUAI"
                 status_n = "OK"
             else:
-                # Cari bin lain
-                if sku in app_sku_dict:
-                    for data in app_sku_dict[sku]:
-                        if data['bin'] != bin_draft:
-                            bin_l = data['bin']
-                            qty_m = data['qty']
-                            note_k = "ADA BIN LAIN"
-                            if (qty_j + qty_m) < qty_h:
-                                status_n = "PERLU EDIT BIN & QTY TF"
-                            else:
-                                status_n = "PERLU EDIT BIN & HAPUS BIN LAMA"
-                            break
+                bin_l, qty_m, note_k, status_n = cari_bin_lain(app_sku_dict, sku, bin_draft, qty_j, qty_h, tf_draft)
         else:
             if tf_is_wrong:
                 note_k = "HAPUS ITEM INI DARI DRAFT"
                 status_n = "DELETE ITEM"
             else:
-                if sku in app_sku_dict:
-                    for data in app_sku_dict[sku]:
-                        if data['bin'] != bin_draft:
-                            bin_l = data['bin']
-                            qty_m = data['qty']
-                            note_k = "ADA BIN LAIN"
-                            if (qty_j + qty_m) < qty_h:
-                                status_n = "PERLU EDIT BIN & QTY TF"
-                            else:
-                                status_n = "PERLU EDIT BIN & HAPUS BIN LAMA"
-                            break
+                bin_l, qty_m, note_k, status_n = cari_bin_lain(app_sku_dict, sku, bin_draft, qty_j, qty_h, tf_draft)
                 if note_k == "":
                     note_k = "HAPUS ITEM INI DARI DRAFT"
                     status_n = "DELETE ITEM"
@@ -1425,7 +1436,6 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             'STATUS': status_n
         })
     
-    # Gabungkan
     df_result = df_d.copy()
     df_result['QTY AMBIL'] = [r['QTY AMBIL'] for r in results]
     df_result['NOTE'] = [r['NOTE'] for r in results]
@@ -1436,8 +1446,40 @@ def engine_compare_draft_jezpro(df_app, df_draft):
     return df_result
 
 
+def cari_bin_lain(app_sku_dict, sku, bin_sekarang, qty_j, qty_h, tf_draft):
+    qty_m = 0
+    bin_l = ""
+    note_k = ""
+    status_n = ""
+    
+    if sku in app_sku_dict:
+        for data in app_sku_dict[sku]:
+            bin_candidate = data['bin']
+            qty_candidate = data['qty']
+            tf_app = data['tf']
+            
+            if bin_candidate == bin_sekarang:
+                continue
+            
+            is_tf_blank = (tf_draft in ['', '0'] or tf_app in ['', '0'])
+            tf_match = is_tf_blank or (tf_draft == tf_app)
+            
+            if tf_match:
+                bin_l = bin_candidate
+                qty_m = qty_candidate
+                note_k = "ADA BIN LAIN"
+                
+                if (qty_j + qty_m) < qty_h:
+                    status_n = "PERLU EDIT BIN & QTY TF"
+                else:
+                    status_n = "PERLU EDIT BIN & HAPUS BIN LAMA"
+                break
+    
+    return bin_l, qty_m, note_k, status_n
+
+
 # =====================================================
-# ENGINE 3: GENERATE NEW DRAFT
+# ENGINE: GENERATE NEW DRAFT
 # =====================================================
 def engine_generate_new_draft(df_draft):
     df = df_draft.copy()
@@ -1448,7 +1490,7 @@ def engine_generate_new_draft(df_draft):
             col_bin = col
         elif col_sku is None and 'sku' in str(col).lower():
             col_sku = col
-        elif col_qty is None and 'qty' in str(col).lower():
+        elif col_qty is None and ('qty' in str(col).lower() or 'quantity' in str(col).lower()):
             col_qty = col
     
     if col_bin is None: col_bin = df.columns[0]
@@ -3127,7 +3169,7 @@ elif menu == "Compare RTO":
                 
                 csv_new = new_draft.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Download New Draft", csv_new, "NEW_DRAFT_RTO.csv", "text/csv", use_container_width=True)
-                
+
 # =====================================================
 # MENU: FDR UPDATE (YANG DIPERBAIKI)
 # =====================================================
