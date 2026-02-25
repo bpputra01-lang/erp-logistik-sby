@@ -1666,8 +1666,8 @@ def putaway_system(df_ds, df_asal):
             "BIN DITEMUKAN": "BIN AWAL", 
             "BIN ASAL": "BIN TUJUAN"
         })
-        df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "STATUS"]]
-        df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"]
+        df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
+        df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
         df_plist['NOTES'] = "PUTAWAY"
     else:
         df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"])
