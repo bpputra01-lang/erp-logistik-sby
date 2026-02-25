@@ -1602,9 +1602,9 @@ def putaway_system(df_ds, df_asal):
     original_columns = list(df_asal.columns)
     
     # Rename kolom untuk konsistensi
-    df_asal.columns = range(df_as])
-    
-    colal.shape[1_bin_asal = 1
+    df_asal.columns = range(df_asal.shape[1])
+
+    col_bin_asal = 1
     col_sku_asal = 2
     col_qty_asal = 9
     
