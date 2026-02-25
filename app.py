@@ -1740,7 +1740,6 @@ def process_scan_out(df_scan, df_history, df_stock):
     # Cek apakah QTY sudah ada atau perlu dihitung
     if 'QTY' not in df_scan.columns:
         # QTY belum ada, hitung dengan COUNTIFS (groupby)
-        # Hitung jumlah kemunculan setiap kombinasi BIN + SKU
         df_scan['QTY'] = df_scan.groupby(['BIN_AWAL', 'SKU'])['BIN_AWAL'].transform('count')
     else:
         # QTY sudah ada, konversi ke numeric
@@ -1793,7 +1792,7 @@ def process_scan_out(df_scan, df_history, df_stock):
         })
     
     # =====================================================
-    # BAGIAN 4: KONVERSI NUMERIC
+    # BAGIAN 4: KONVERSI NUMERIC (TANPA TRAILING ZEROS)
     # =====================================================
     
     # Konversi QTY ke numeric
@@ -1836,7 +1835,7 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     # Inisialisasi kolom hasil
     df_scan['KETERANGAN'] = ''
-    df_scan['TOTAL_QTY_SETUP_TERJUAL'] = 0.0
+    df_scan['TOTAL_QTY_SETUP_TERJUAL'] = 0
     df_scan['BIN_AFTER_SET_UP'] = ''
     df_scan['INVOICE'] = ''
     
@@ -1855,7 +1854,7 @@ def process_scan_out(df_scan, df_history, df_stock):
     for idx in df_scan.index:
         sku = str(df_scan.loc[idx, 'SKU']).strip()
         bin_awal = str(df_scan.loc[idx, 'BIN_AWAL']).strip()
-        qty_scan = float(df_scan.loc[idx, 'QTY'])
+        qty_scan = int(df_scan.loc[idx, 'QTY']) if df_scan.loc[idx, 'QTY'] == int(df_scan.loc[idx, 'QTY']) else round(df_scan.loc[idx, 'QTY'], 2)
         
         found_stock = False
         found_history = False
@@ -1872,7 +1871,8 @@ def process_scan_out(df_scan, df_history, df_stock):
                 row_stock = stock_match.iloc[0]
                 
                 qty_stock = float(row_stock.get('QTY_STOCK', 0))
-                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = qty_stock
+                qty_stock_clean = int(qty_stock) if qty_stock == int(qty_stock) else round(qty_stock, 2)
+                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = qty_stock_clean
                 df_scan.loc[idx, 'INVOICE'] = row_stock.get('INVOICE', '')
                 
                 if qty_stock == qty_scan:
@@ -1889,7 +1889,8 @@ def process_scan_out(df_scan, df_history, df_stock):
                 row_hist = hist_match.iloc[0]
                 
                 qty_hist = float(row_hist.get('QTY_HIST', 0))
-                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = qty_hist
+                qty_hist_clean = int(qty_hist) if qty_hist == int(qty_hist) else round(qty_hist, 2)
+                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = qty_hist_clean
                 df_scan.loc[idx, 'BIN_AFTER_SET_UP'] = str(row_hist.get('BIN_AFTER', ''))
                 
                 bin_hist = str(row_hist.get('BIN_HIST', ''))
@@ -1910,7 +1911,8 @@ def process_scan_out(df_scan, df_history, df_stock):
                 
                 df_scan.loc[idx, 'KETERANGAN'] = 'ITEM TERJUAL (BIN MISSMATCH)'
                 qty_stock = float(row_stock.get('QTY_STOCK', 0))
-                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = qty_stock
+                qty_stock_clean = int(qty_stock) if qty_stock == int(qty_stock) else round(qty_stock, 2)
+                df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'] = qty_stock_clean
                 df_scan.loc[idx, 'INVOICE'] = row_stock.get('INVOICE', '')
                 found_stock = True
         
@@ -1932,13 +1934,19 @@ def process_scan_out(df_scan, df_history, df_stock):
         qty_setup = float(df_scan.loc[idx, 'TOTAL_QTY_SETUP_TERJUAL'])
         bin_after = df_scan.loc[idx, 'BIN_AFTER_SET_UP']
         
+        # Konversi ke integer jika bilangan bulat
+        qty_scan_clean = int(qty_scan) if qty_scan == int(qty_scan) else round(qty_scan, 2)
+        qty_setup_clean = int(qty_setup) if qty_setup == int(qty_setup) else round(qty_setup, 2)
+        qty_diff = qty_scan - qty_setup
+        qty_diff_clean = int(qty_diff) if qty_diff == int(qty_diff) else round(qty_diff, 2)
+        
         # --- LOGIKA DRAFT: DONE SETUP (QTY MISSMATCH) ---
         if keterangan == 'DONE SETUP (QTY MISSMATCH)':
             draft_data.append({
                 'BIN AWAL': bin_awal,
                 'BIN TUJUAN': bin_after,
                 'SKU': sku,
-                'QUANTITY': qty_scan - qty_setup,
+                'QUANTITY': qty_diff_clean,
                 'NOTES': 'WAITING OFFLINE'
             })
         
@@ -1948,7 +1956,7 @@ def process_scan_out(df_scan, df_history, df_stock):
                 'BIN AWAL': bin_awal,
                 'BIN TUJUAN': 'KARANTINA',
                 'SKU': sku,
-                'QUANTITY': qty_scan,
+                'QUANTITY': qty_scan_clean,
                 'NOTES': 'WAITING OFFLINE'
             })
         
@@ -1959,7 +1967,7 @@ def process_scan_out(df_scan, df_history, df_stock):
                 'BIN AWAL': bin_after,
                 'BIN TUJUAN': bin_awal,
                 'SKU': sku,
-                'QUANTITY': qty_setup,
+                'QUANTITY': qty_setup_clean,
                 'NOTES': 'SET UP BALIK'
             })
             
@@ -1968,7 +1976,7 @@ def process_scan_out(df_scan, df_history, df_stock):
                 'BIN AWAL': bin_awal,
                 'BIN TUJUAN': 'KARANTINA',
                 'SKU': sku,
-                'QUANTITY': qty_scan,
+                'QUANTITY': qty_scan_clean,
                 'NOTES': 'WAITING OFFLINE'
             })
     
@@ -2366,7 +2374,6 @@ elif menu == "Scan Out Validation":
                 df_st.columns = [str(col).strip().upper() for col in df_st.columns]
                 
                 # Validasi kolom minimum
-                # DATA SCAN: MINIMAL 2 KOLOM (BIN + SKU), QTY akan dihitung otomatis
                 if len(df_s.columns) < 2:
                     st.error("❌ DATA SCAN harus memiliki minimal 2 kolom (BIN, SKU)")
                     st.stop()
@@ -2484,12 +2491,19 @@ elif menu == "Scan Out Validation":
                         'border': 1
                     })
                     
+                    # Format angka (tanpa desimal)
+                    int_format = workbook.add_format({'num_format': '0'})
+                    
                     # Tulis format header
                     for col_num, value in enumerate(df_res.columns.values):
                         worksheet.write(0, col_num, value, header_format)
                     
                     # AutoFit kolom
-                    worksheet.set_column(0, len(df_res.columns)-1, 15)
+                    worksheet.set_column(0, 1, 15)  # BIN AWAL, SKU
+                    worksheet.set_column(2, 2, 10, int_format)  # QTY SCAN
+                    worksheet.set_column(3, 3, 35)  # Keterangan
+                    worksheet.set_column(4, 4, 20, int_format)  # Total Qty Setup/Terjual
+                    worksheet.set_column(5, 6, 15)  # Bin After Set Up, Invoice
                     
                     # Tulis DRAFT SET UP jika ada data
                     if len(df_draft) > 0:
@@ -2502,7 +2516,10 @@ elif menu == "Scan Out Validation":
                         for col_num, value in enumerate(df_draft.columns.values):
                             worksheet_draft.write(0, col_num, value, header_format)
                         
-                        worksheet_draft.set_column(0, len(df_draft.columns)-1, 15)
+                        # Format angka untuk draft
+                        worksheet_draft.set_column(0, 2, 15)  # BIN AWAL, BIN TUJUAN, SKU
+                        worksheet_draft.set_column(3, 3, 10, int_format)  # QUANTITY
+                        worksheet_draft.set_column(4, 4, 20)  # NOTES
                 
                 # Tombol download
                 st.download_button(
