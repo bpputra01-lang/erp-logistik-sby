@@ -1762,19 +1762,27 @@ def putaway_system(df_ds, df_asal):
         # Sesuaikan dengan posisi asli (1=BIN, 2=SKU, 4=NAMA, 5=BRAND, 6=CAT, 7=SAT, 10=QTY)
         for col_idx in df_lt3.columns:
             if col_idx == 0:  # Kolom A
-                cols_to_take.append('BIN')
+                cols_to_take.append('Identify')
             elif col_idx == 1:  # Kolom B
+                cols_to_take.append('BIN')
+            elif col_idx == 2:  # Kolom E
                 cols_to_take.append('SKU')
-            elif col_idx == 4:  # Kolom E
-                cols_to_take.append('NAMA BARANG')
-            elif col_idx == 5:  # Kolom F
+            elif col_idx == 3:  # Kolom F
                 cols_to_take.append('BRAND')
-            elif col_idx == 6:  # Kolom G
-                cols_to_take.append('CATEGORY')
-            elif col_idx == 7:  # Kolom H
-                cols_to_take.append('SATUAN')
-            elif col_idx == 9:  # Kolom J
-                cols_to_take.append('QTY')
+            elif col_idx == 4:  # Kolom G
+                cols_to_take.append('ITEM NAME')
+            elif col_idx == 5:  # Kolom H
+                cols_to_take.append('VARIANT')
+            elif col_idx == 6:  # Kolom I
+                cols_to_take.append('SUB KATEGORI')
+            elif col_idx == 7:  # Kolom J
+                cols_to_take.append('Harga Beli')
+            elif col_idx == 8:  # Kolom K
+                cols_to_take.append('Harga Jual')
+            elif col_idx == 9:  # Kolom L
+                cols_to_take.append('QTY SYSTEM')
+            elif col_idx == 10:  # Kolom M
+                cols_to_take.append('QTY SO')
             else:
                 cols_to_take.append(f'COL_{col_idx}')
         
