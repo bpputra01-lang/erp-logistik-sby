@@ -2823,26 +2823,48 @@ elif menu == "Stock Minus":
                     df_final[col_qty] = qty_arr
                     df_need_adj = df_final[df_final[col_qty] < 0].copy()
                     
-                    # --- TAMBAHAN: RINGKASAN & PREVIEW ---
+                    # --- RINGKASAN DENGAN KOTAK CUSTOM ---
                     st.divider()
                     st.subheader("📊 RINGKASAN HASIL PROSES")
                     
-                    # Metrics
-                    m1, m2, m3 = st.columns(3)
+                    # Hitung nilai
                     total_transfer = len(set_up_results)
-                    total_qty = sum([x['QUANTITY'] for x in set_up_results])
+                    total_qty = int(sum([x['QUANTITY'] for x in set_up_results]))
                     still_minus = len(df_need_adj)
                     
-                    m1.metric("Total Stock Minus", total_transfer)
-                    m2.metric("Mutasi Stock Minus", total_qty)
-                    m3.metric("Item Need Justification", still_minus, delta_color="inverse")
+                    # Tampilkan dalam kotak custom
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown(f'''
+                        <div class="m-box">
+                            <span class="m-lbl">Total Stock Minus</span>
+                            <span class="m-val">{total_transfer}</span>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.markdown(f'''
+                        <div class="m-box">
+                            <span class="m-lbl">Mutasi Stock Minus</span>
+                            <span class="m-val">{total_qty}</span>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    
+                    with col3:
+                        st.markdown(f'''
+                        <div class="m-box">
+                            <span class="m-lbl">Need Justification</span>
+                            <span class="m-val">{still_minus}</span>
+                        </div>
+                        ''', unsafe_allow_html=True)
                     
                     # Preview Data Transfer
                     if set_up_results:
                         st.write("#### 📋 Detail Transfer (SET_UP)")
                         st.dataframe(pd.DataFrame(set_up_results), use_container_width=True)
                     
-                    # --- TAMBAHAN: DETAIL LIST ITEM MINUS ---
+                    # --- DETAIL LIST ITEM MINUS ---
                     if not df_need_adj.empty:
                         st.warning("⚠️ Item berikut masih minus dan perlu justifikasi:")
                         
@@ -2855,7 +2877,7 @@ elif menu == "Stock Minus":
                         bins = df_need_adj[col_bin].unique()
                         for bin_loc in bins:
                             bin_data = detail_minus[detail_minus[col_bin] == bin_loc]
-                            total_bin_minus = bin_data['QTY_MINUS'].sum()  # <-- INI YANG DIPERBAIKI
+                            total_bin_minus = int(bin_data['QTY_MINUS'].sum())
                             with st.expander(f"📍 {bin_loc} - Total Minus: {total_bin_minus}"):
                                 st.dataframe(bin_data, use_container_width=True)
                         
@@ -2888,6 +2910,8 @@ elif menu == "Stock Minus":
                     
         except Exception as e:
             st.error(f"Terjadi Kesalahan: {e}")
+            import traceback
+            st.code(traceback.format_exc())
 
 elif menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM </h1></div>', unsafe_allow_html=True)
