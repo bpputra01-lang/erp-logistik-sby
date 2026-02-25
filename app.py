@@ -1266,7 +1266,7 @@ def engine_ds_rto_vba_total(df_ds, df_app):
                     'NOTE': "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
                 })
         
-        if list_tambahkan:
+        if list_tambahan:
             df_ds_res = pd.concat([df_ds_res, pd.DataFrame(list_tambahan)], ignore_index=True)
 
         # --- 4. LOGIKA SHEET SELISIH ---
