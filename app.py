@@ -1373,6 +1373,178 @@ def engine_generate_new_draft(df_draft):
     df_agg = df_agg[df_agg['QUANTITY'] > 0]
     
     return df_agg
+    # =====================================================
+# ENGINE: COMPARE DRAFT JEZPRO ULTRAFAST
+# =====================================================
+def engine_compare_draft_ultrafast(df_app, df_draft):
+    """
+    Compare Draft Jezpro dengan Appsheet - sesuai VBA COMPARE_DRAFT_JEZPRO_ULTRAFAST
+    """
+    # Load Appsheet
+    df_a = df_app.copy()
+    df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
+    
+    # Load Draft
+    df_d = df_draft.copy()
+    
+    # Rename kolom draft sesuai posisi VBA
+    # Kolom A=1, D=4, I=9, H=8
+    if len(df_d.columns) >= 9:
+        df_d.rename(columns={
+            df_d.columns[0]: 'TF_DRAFT',  # Kolom A
+            df_d.columns[3]: 'SKU',       # Kolom D
+            df_d.columns[7]: 'QTY_H',     # Kolom H
+            df_d.columns[8]: 'BIN_DRAFT'  # Kolom I
+        }, inplace=True)
+    
+    # Filter Appsheet: DONE & KURANG AMBIL
+    if '2' in df_a.columns:
+        mask_status = df_a['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
+        df_a_filtered = df_a[mask_status].copy()
+    else:
+        df_a_filtered = df_a.copy()
+    
+    # Kolom Appsheet: SKU=9/15, BIN=12/16, QTY=13/17, TF=18
+    results = []
+    
+    for idx_d, row_d in df_d.iterrows():
+        sku = str(row_d.get('SKU', '')).strip()
+        bin_draft = str(row_d.get('BIN_DRAFT', '')).strip()
+        tf_draft = str(row_d.get('TF_DRAFT', '')).strip()
+        qty_h = pd.to_numeric(row_d.get('QTY_H', 0), errors='coerce') or 0
+        
+        qty_j = 0
+        qty_m = 0
+        bin_l = ""
+        note_k = ""
+        status_n = ""
+        found_match = False
+        tf_is_wrong = False
+        
+        # --- TAHAP 1: CARI MATCH ---
+        for idx_a, row_a in df_a_filtered.iterrows():
+            tf_app = str(row_a.get('18', '')).strip()
+            
+            # SLOT 1: SKU(9) + BIN(12)
+            sku_a1 = str(row_a.get('9', '')).strip()
+            bin_a1 = str(row_a.get('12', '')).strip()
+            qty_a1 = pd.to_numeric(row_a.get('13', 0), errors='coerce') or 0
+            
+            # SLOT 2: SKU(15) + BIN(16)
+            sku_a2 = str(row_a.get('15', '')).strip()
+            bin_a2 = str(row_a.get('16', '')).strip()
+            qty_a2 = pd.to_numeric(row_a.get('17', 0), errors='coerce') or 0
+            
+            # Cek SLOT 1
+            if sku_a1 == sku and bin_a1 == bin_draft:
+                is_tf_blank = (tf_draft in ['', '0'] or tf_app in ['', '0'])
+                if is_tf_blank or (tf_draft == tf_app):
+                    qty_j = qty_a1
+                    found_match = True
+                else:
+                    tf_is_wrong = True
+                break
+            
+            # Cek SLOT 2
+            if sku_a2 == sku and bin_a2 == bin_draft:
+                is_tf_blank = (tf_draft in ['', '0'] or tf_app in ['', '0'])
+                if is_tf_blank or (tf_draft == tf_app):
+                    qty_j = qty_a2
+                    found_match = True
+                else:
+                    tf_is_wrong = True
+                break
+        
+        # --- TAHAP 2: LOGIKA STATUS ---
+        if found_match:
+            if qty_j < qty_h:
+                qty_m = 0
+                status_n = "PERLU EDIT QTY DRAFT"
+                note_k = "QTY AMBIL KURANG DARI DRAFT"
+            elif qty_h == qty_j:
+                note_k = "DRAFT SESUAI"
+                status_n = "OK"
+            else:
+                # Cari bin lain
+                note_k, bin_l, qty_m, status_n = cari_bin_lain(df_a_filtered, sku, bin_draft, tf_draft, qty_j, qty_h)
+        else:
+            if tf_is_wrong:
+                note_k = "HAPUS ITEM INI DARI DRAFT"
+                status_n = "DELETE ITEM"
+            else:
+                note_k, bin_l, qty_m, status_n = cari_bin_lain(df_a_filtered, sku, bin_draft, tf_draft, qty_j, qty_h)
+                if note_k == "":
+                    note_k = "HAPUS ITEM INI DARI DRAFT"
+                    status_n = "DELETE ITEM"
+        
+        results.append({
+            'TF_DRAFT': tf_draft,
+            'SKU': sku,
+            'QTY_H': qty_h,
+            'BIN_DRAFT': bin_draft,
+            'QTY_AM': qty_j,
+            'NOTE': note_k,
+            'BIN_LAIN': bin_l,
+            'QTY_BIN_LAIN': qty_m,
+            'STATUS': status_n,
+            'TF_SALAH': tf_is_wrong
+        })
+    
+    df_result = pd.DataFrame(results)
+    
+    return df_result
+
+
+def cari_bin_lain(df_app, sku, bin_draft, tf_draft, qty_j, qty_h):
+    """
+    Sub pembantu cari bin lain
+    """
+    qty_m = 0
+    bin_l = ""
+    note_k = ""
+    status_n = ""
+    tf_is_wrong = False
+    
+    for idx_a, row_a in df_app.iterrows():
+        tf_app = str(row_a.get('18', '')).strip()
+        
+        # Cek TF berbeda
+        if (tf_draft not in ['', '0'] and tf_app not in ['', '0'] and tf_draft != tf_app):
+            tf_is_wrong = True
+        
+        # SLOT 1: SKU(9) + BIN(12) berbeda dari bin draft
+        sku_a1 = str(row_a.get('9', '')).strip()
+        bin_a1 = str(row_a.get('12', '')).strip()
+        qty_a1 = pd.to_numeric(row_a.get('13', 0), errors='coerce') or 0
+        
+        if sku_a1 == sku and bin_a1 != bin_draft:
+            is_tf_blank = (tf_draft in ['', '0'] or tf_app in ['', '0'])
+            if is_tf_blank or tf_draft == tf_app:
+                bin_l = bin_a1
+                qty_m = qty_a1
+                note_k = "ADA BIN LAIN"
+                break
+        
+        # SLOT 2: SKU(15) + BIN(16) berbeda dari bin draft
+        sku_a2 = str(row_a.get('15', '')).strip()
+        bin_a2 = str(row_a.get('16', '')).strip()
+        qty_a2 = pd.to_numeric(row_a.get('17', 0), errors='coerce') or 0
+        
+        if sku_a2 == sku and bin_a2 != bin_draft:
+            is_tf_blank = (tf_draft in ['', '0'] or tf_app in ['', '0'])
+            if is_tf_blank or tf_draft == tf_app:
+                bin_l = bin_a2
+                qty_m = qty_a2
+                note_k = "ADA BIN LAIN"
+                break
+    
+    if note_k == "ADA BIN LAIN":
+        if (qty_j + qty_m) < qty_h:
+            status_n = "PERLU EDIT BIN & QTY TF"
+        else:
+            status_n = "PERLU EDIT BIN & HAPUS BIN LAMA"
+    
+    return note_k, bin_l, qty_m, status_n
 # ==========================================
 # 2. LANJUT KODE STREAMLIT LO DI BAWAH...
 # ==========================================
@@ -2898,6 +3070,8 @@ elif menu == "Compare RTO":
         st.session_state.rto_df_selisih = None
     if 'rto_df_app' not in st.session_state:
         st.session_state.rto_df_app = None
+    if 'rto_draft_compared' not in st.session_state:
+        st.session_state.rto_draft_compared = None
     if 'rto_new_draft' not in st.session_state:
         st.session_state.rto_new_draft = None
     
@@ -2908,7 +3082,7 @@ elif menu == "Compare RTO":
     
     st.divider()
     
-    # --- PROSES AWAL ---
+    # --- PROSES AWAL (DS vs APPSHEET) ---
     if f1 and f2:
         if st.button("▶️ JALANKAN PROSES", use_container_width=True):
             with st.spinner("Memproses..."):
@@ -2926,7 +3100,7 @@ elif menu == "Compare RTO":
     # --- TAMPILKAN HASIL AWAL ---
     if st.session_state.rto_df_selisih is not None:
         st.divider()
-        st.subheader("📊 HASIL COMPARE AWAL")
+        st.subheader("📊 HASIL COMPARE AWAL (DS vs APPSHEET)")
         
         total_rows = len(st.session_state.rto_df_selisih)
         match_count = len(st.session_state.rto_df_ds[st.session_state.rto_df_ds['NOTE'] == 'SESUAI']) if 'NOTE' in st.session_state.rto_df_ds.columns else 0
@@ -2945,43 +3119,64 @@ elif menu == "Compare RTO":
         
         st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
         
-        # Download
         csv_selisih = st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Hasil Selisih", csv_selisih, "SELISIH_RTO.csv", "text/csv", use_container_width=True)
+        st.download_button("📥 Download Sheet Selisih", csv_selisih, "SELISIH_RTO.csv", "text/csv", use_container_width=True)
 
     st.divider()
     
-    # --- UPLOAD FILE CEK REAL ---
-    st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
-    f_cek = st.file_uploader("📥 Upload File Hasil Cek Real (isian dari Sheet Selisih)", type=['xlsx','csv'], key="rto_cek")
+    # --- COMPARE DRAFT JEZPRO ---
+    st.subheader("📝 COMPARE DRAFT JEZPRO")
     
-    if f_cek and st.session_state.rto_df_app is not None:
-        if st.button("🔄 REFRESH DATA", use_container_width=True):
-            with st.spinner("Memproses Refresh..."):
-                df_cek = pd.read_excel(f_cek) if f_cek.name.endswith('xlsx') else pd.read_csv(f_cek)
-                
-                ds_refreshed, app_refreshed = engine_refresh_rto(
-                    st.session_state.rto_df_ds,
-                    st.session_state.rto_df_app,
-                    df_cek
-                )
-                
-                st.session_state.rto_df_ds = ds_refreshed
-                st.session_state.rto_df_app = app_refreshed
-                
-                st.success("✅ Refresh Selesai!")
+    # Upload Draft + Appsheet (sudah diupload di atas)
+    if f2:
+        f_draft = st.file_uploader("📥 Upload DRAFT JEZPRO", type=['xlsx','csv'], key="rto_draft_jezpro")
+        
+        if f_draft and st.session_state.rto_df_app is not None:
+            if st.button("🔍 COMPARE DRAFT JEZPRO", use_container_width=True):
+                with st.spinner("Memproses..."):
+                    df_draft = pd.read_excel(f_draft) if f_draft.name.endswith('xlsx') else pd.read_csv(f_draft)
+                    
+                    # Panggil engine compare draft
+                    df_compared = engine_compare_draft_jezpro(st.session_state.rto_df_app, df_draft)
+                    st.session_state.rto_draft_compared = df_compared
+                    
+                    st.success("✅ Compare Draft Selesai!")
+    
+    # Tampilkan hasil compare draft
+    if st.session_state.rto_draft_compared is not None:
+        st.divider()
+        st.subheader("📊 HASIL COMPARE DRAFT JEZPRO")
+        
+        # Metrics
+        total_draft = len(st.session_state.rto_draft_compared)
+        ok_count = len(st.session_state.rto_draft_compared[st.session_state.rto_draft_compared['STATUS'] == 'OK']) if 'STATUS' in st.session_state.rto_draft_compared.columns else 0
+        perlu_edit = len(st.session_state.rto_draft_compared[st.session_state.rto_draft_compared['STATUS'].str.contains('EDIT', na=False)]) if 'STATUS' in st.session_state.rto_draft_compared.columns else 0
+        delete_count = len(st.session_state.rto_draft_compared[st.session_state.rto_draft_compared['STATUS'] == 'DELETE ITEM']) if 'STATUS' in st.session_state.rto_draft_compared.columns else 0
+        
+        dc1, dc2, dc3, dc4 = st.columns(4)
+        with dc1:
+            st.markdown(f'<div class="m-box"><span class="m-lbl">Total Draft</span><span class="m-val">{total_draft}</span></div>', unsafe_allow_html=True)
+        with dc2:
+            st.markdown(f'<div class="m-box"><span class="m-lbl">OK</span><span class="m-val">{ok_count}</span></div>', unsafe_allow_html=True)
+        with dc3:
+            st.markdown(f'<div class="m-box"><span class="m-lbl">Perlu Edit</span><span class="m-val">{perlu_edit}</span></div>', unsafe_allow_html=True)
+        with dc4:
+            st.markdown(f'<div class="m-box"><span class="m-lbl">Delete</span><span class="m-val">{delete_count}</span></div>', unsafe_allow_html=True)
+        
+        st.dataframe(st.session_state.rto_draft_compared, use_container_width=True, hide_index=True)
+        
+        csv_draft = st.session_state.rto_draft_compared.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Draft Compared", csv_draft, "DRAFT_COMPARED.csv", "text/csv", use_container_width=True)
+
+    st.divider()
     
     # --- GENERATE NEW DRAFT ---
-    st.divider()
-    st.subheader("📝 GENERATE NEW DRAFT")
-    f_draft = st.file_uploader("📥 Upload Draft Jezpro", type=['xlsx','csv'], key="rto_draft")
+    st.subheader("🏁 GENERATE NEW DRAFT")
     
-    if f_draft:
+    if st.session_state.rto_draft_compared is not None:
         if st.button("🏁 GENERATE NEW DRAFT", use_container_width=True):
             with st.spinner("Memproses..."):
-                df_draft = pd.read_excel(f_draft) if f_draft.name.endswith('xlsx') else pd.read_csv(f_draft)
-                
-                new_draft = engine_generate_new_draft(df_draft)
+                new_draft = engine_generate_new_draft(st.session_state.rto_draft_compared)
                 st.session_state.rto_new_draft = new_draft
                 
                 total_qty = int(new_draft['QUANTITY'].sum()) if not new_draft.empty else 0
@@ -2991,7 +3186,7 @@ elif menu == "Compare RTO":
                 
                 csv_new = new_draft.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Download New Draft", csv_new, "NEW_DRAFT_RTO.csv", "text/csv", use_container_width=True)
-
+                
 # =====================================================
 # MENU: FDR UPDATE (YANG DIPERBAIKI)
 # =====================================================
