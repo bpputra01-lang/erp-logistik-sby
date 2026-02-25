@@ -2336,7 +2336,7 @@ elif menu == "Scan Out Validation":
                     df_s = pd.read_excel(up_scan, engine='openpyxl')
                 
                 df_h = pd.read_excel('upopenpyxl')
-                df_st =_hist, engine=' pd.read_excel(up_stock, engine='openpyxl')
+                df_st =_hist, engine=' pd.read_excel(up_stock, engine=openpyxl)
                 
                 # ========== BAGIAN 2: CEK STRUKTUR KOLOM ==========
                 # Normalisasi nama kolom (uppercase)
