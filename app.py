@@ -1340,6 +1340,57 @@ def cari_bin_lain_v2(app_sku_dict, sku, bin_sekarang, qty_j, qty_h, tf_draft):
                 break
     
     return bin_l, qty_m, note_k, status_n
+def engine_generate_new_draft(df_draft):
+    df = df_draft.copy()
+    
+    # Kolom VBA: D(3)=SKU, I(8)=BIN, J(9)=QTY AMBIL, L(11)=BIN LAIN, M(12)=QTY BIN LAIN
+    # Akses berdasarkan index posisi
+    
+    results = {}
+    
+    for idx, row in df.iterrows():
+        # Skip jika tidak ada data
+        if len(row) < 13:
+            continue
+        
+        sku = str(row.iloc[3]).strip() if pd.notna(row.iloc[3]) else ''  # Kolom D
+        bin_i = str(row.iloc[8]).strip() if pd.notna(row.iloc[8]) else ''  # Kolom I
+        qty_j = pd.to_numeric(row.iloc[9], errors='coerce') or 0 if pd.notna(row.iloc[9]) else 0  # Kolom J
+        bin_l = str(row.iloc[11]).strip() if len(row) > 11 and pd.notna(row.iloc[11]) else ''  # Kolom L
+        qty_m = pd.to_numeric(row.iloc[12], errors='coerce') or 0 if len(row) > 12 and pd.notna(row.iloc[12]) else 0  # Kolom M
+        
+        # LOGIKA 1 & 3: QTY J > 0
+        if qty_j != 0:
+            # Simpan Bin Utama
+            if bin_i:
+                key1 = bin_i + "|" + sku
+                results[key1] = results.get(key1, 0) + qty_j
+            
+            # LOGIKA 3: Jika ada Bin Lain
+            if bin_l and qty_m != 0:
+                key2 = bin_l + "|" + sku
+                results[key2] = results.get(key2, 0) + qty_m
+        
+        # LOGIKA 4: QTY J = 0 tapi ada Bin Lain
+        elif qty_j == 0 and bin_l and qty_m != 0:
+            key = bin_l + "|" + sku
+            results[key] = results.get(key, 0) + qty_m
+    
+    # Convert ke DataFrame
+    if results:
+        data = []
+        for key, qty in results.items():
+            parts = key.split("|")
+            if len(parts) == 2:
+                data.append({'BIN': parts[0], 'SKU': parts[1], 'QUANTITY': qty})
+        
+        df_result = pd.DataFrame(data)
+        df_result = df_result[df_result['QUANTITY'] > 0]  # Filter QTY > 0
+        df_result = df_result.sort_values('BIN').reset_index(drop=True)
+        return df_result
+    else:
+        return pd.DataFrame(columns=['BIN', 'SKU', 'QUANTITY'])
+
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
