@@ -850,64 +850,216 @@ def menu_Stock_Opname():
             prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM +', index=False)
         
         st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
-        
-def menu_fdr_update():
-    st.markdown('<div class="hero-header"><h1>🚚 FDR OUTSTANDING - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
 
-    # --- 0. INISIALISASI SESSION STATE ---
-    if "ws_manifest" not in st.session_state:
-        # Default awal: DataFrame kosong dengan kolom A-M (sesuai gambar lo)
-        st.session_state.ws_manifest = pd.DataFrame(columns=[chr(i) for i in range(ord('A'), ord('M')+1)])
-    if "ws_fu_it" not in st.session_state:
-        st.session_state.ws_fu_it = None
-    if "dict_kurir" not in st.session_state:
-        st.session_state.dict_kurir = {}
-    # --- INI YANG KURANG & PENYEBAB ERROR ---
-    if "grid_fdr" not in st.session_state:
-        st.session_state.grid_fdr = pd.DataFrame()  # Inisialisasi awal agar tidak error
-
-    # --- 1. TABS SYSTEM ---
-    t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "🛵 OUTSTANDING COURIER"])
-
-    with t1:
-        st.subheader("🛠️ Macro Control Panel")
-        
-        # --- [INI KUNCI BIAR MUNCUL TOMBOL UPLOAD] ---
-        uploaded_file = st.file_uploader("📂 Upload File Manifest Excel lo di sini!", type=["xlsx"], key="fdr_uploader_final")
-        
-        # Kalau ada file yang masuk, otomatis tabel di bawahnya keisi
-        if uploaded_file:
-            try:
-                df_temp = pd.read_excel(uploaded_file)
-                st.session_state.ws_manifest = df_temp
-                st.success(f"Mantap! File {uploaded_file.name} udah masuk.")
-            except Exception as e:
-                st.error(f"gagal baca file: {e}")
-
-        st.divider()
-        
-        # Action Buttons (Macro lo)
-        c_btn = st.columns(4)
-        if c_btn[0].button("Clear Columns", key="btn_fdr_clean_f"):
-            # Logic hapus kolom VBA
-            df = st.session_state.grid_fdr.copy()
-            cols_to_del = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
-            df.drop(df.columns[cols_to_del], axis=1, inplace=True, errors='ignore')
-            st.session_state.ws_manifest = df
+# MENU: FDR UPDATE (YANG TELAH DIPERBAIKI & AMAN)
+# =====================================================
+elif menu == "FDR Update":
+    st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
+    
+    # --- CSS ---
+    st.markdown("""
+        <style>
+        .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+        .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+        .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # --- INIT STATE ---
+    if "ws_manifest_fdr" not in st.session_state:
+        st.session_state.ws_manifest_fdr = None
+    if "ws_fu_it_fdr" not in st.session_state:
+        st.session_state.ws_fu_it_fdr = None
+    if "dict_kurir_fdr" not in st.session_state:
+        st.session_state.dict_kurir_fdr = {}
+    if "fdr_current_file" not in st.session_state:
+        st.session_state.fdr_current_file = None
+    
+    # --- FILE UPLOAD ---
+    u_file = st.file_uploader("📂 Choose Your File", type=["xlsx"], key="fdr_file_v2")
+    
+    # RESET JIKA FILE BERBEDA
+    if u_file is not None:
+        if st.session_state.fdr_current_file != u_file.name:
+            st.session_state.ws_manifest_fdr = None
+            st.session_state.ws_fu_it_fdr = None
+            st.session_state.dict_kurir_fdr = {}
+            st.session_state.fdr_current_file = u_file.name
+    
+    # --- LOAD FILE (DENGAN ERROR HANDLING) ---
+    if u_file and st.session_state.ws_manifest_fdr is None:
+        try:
+            # Coba baca file Excel
+            st.session_state.ws_manifest_fdr = pd.read_excel(u_file)
+            st.success(f"File {u_file.name} berhasil dimuat!")
             st.rerun()
+        except ValueError as e:
+            st.error(f"❌ Gagal Membaca File: Format tidak sesuai atau file corrupt.")
+            st.warning("Pastikan file adalah .xlsx asli dan bukan .csv yang diganti nama.")
+            # Reset session agar user bisa upload ulang
+            st.session_state.fdr_current_file = None
+            st.session_state.ws_manifest_fdr = None
+        except Exception as e:
+            st.error(f"❌ Terjadi Error: {e}")
+            st.session_state.fdr_current_file = None
+            
+    st.divider()
+    
+    # --- BUTTONS ---
+    c = st.columns(4)
+    
+    # CLEAR COLUMNS
+    if c[0].button("🚮 CLEAR COLUMNS", key="btn_clean_v2"):
+        if st.session_state.ws_manifest_fdr is not None:
+            df = st.session_state.ws_manifest_fdr.copy()
+            cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+            existing_cols = [df.columns[i] for i in cols_idx if i < len(df.columns)]
+            
+            if existing_cols:
+                df.drop(columns=existing_cols, inplace=True)
+                st.session_state.ws_manifest_fdr = df
+                st.session_state.ws_fu_it_fdr = None
+                st.session_state.dict_kurir_fdr = {}
+                st.success("✅ KOLOM DIBERSIHKAN!")
+                st.rerun()
+            else:
+                st.warning("Kolom sudah bersih!")
+        else:
+            st.error("UPLOAD FILE DULU!")
 
-        # ... (Tombol Copy FU IT & Split Kurir tetep sama kodenya) ...
+    # NEED FU IT
+    if c[1].button("🖥️ NEED FU IT", key="btn_fu_v2"):
+        if st.session_state.ws_manifest_fdr is not None:
+            df = st.session_state.ws_manifest_fdr.copy()
+            mask = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
+            st.session_state.ws_fu_it_fdr = df[mask].iloc[:, 0:13]
+            st.success(f"✅ {len(st.session_state.ws_fu_it_fdr)} Baris!")
+        else:
+            st.error("Data Kosong!")
 
-        st.divider()
-        st.write("### 📂 MANIFEST DATA (A:Z)")
+    # OUTSTANDING COURIER
+    if c[2].button("🛵 OUTSTANDING COURIER", key="btn_split_v2"):
+        if st.session_state.ws_manifest_fdr is not None:
+            df = st.session_state.ws_manifest_fdr.copy()
+            
+            if len(df.columns) > 12:
+                f_val = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
+                m_val = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+                
+                mask = (f_val != "") & (m_val == "")
+                filtered = df[mask].copy()
+                
+                if not filtered.empty:
+                    d_kurir = {str(n): g.iloc[:, 0:13] for n, g in filtered.groupby(filtered.iloc[:, 5])}
+                    st.session_state.dict_kurir_fdr = d_kurir
+                    st.success(f"✅ {len(d_kurir)} Kurir Ditampilkan!")
+                else:
+                    st.session_state.dict_kurir_fdr = {}
+                    st.warning("Tidak ada data Outstanding.")
+            else:
+                st.error("File Excel tidak memiliki cukup kolom.")
+        else:
+            st.error("Data Kosong!")
+
+    # CLEAR ALL
+    if c[3].button("🗑️ CLEAR ALL", type="primary", key="btn_clear_v2"):
+        st.session_state.ws_manifest_fdr = None
+        st.session_state.ws_fu_it_fdr = None
+        st.session_state.dict_kurir_fdr = {}
+        st.session_state.fdr_current_file = None
+        st.rerun()
+
+    st.divider()
+    
+    # --- AREA TAMPILAN & DOWNLOAD ---
+    
+    # 1. AREA OUTSTANDING COURIER
+    if st.session_state.dict_kurir_fdr:
+        st.subheader(f"🛵 OUTSTANDING COURIER ({len(st.session_state.dict_kurir_fdr)} Kurir)")
         
-        # Tabel ini bakal nampilin isi file yang lo upload tadi
-        st.session_state.grid_fdr = st.data_editor(
-            st.session_state.ws_manifest, 
-            num_rows="dynamic", 
-            use_container_width=True, 
-            key="editor_fdr_main_v2"
+        # --- KOLOM DOWNLOAD ---
+        d1, d2 = st.columns([2, 1])
+        
+        with d1:
+            list_kurir = list(st.session_state.dict_kurir_fdr.keys())
+            selected_kurir = st.selectbox("Pilih Kurir untuk Dilihat:", list_kurir, key="select_kurir_view")
+        
+        with d2:
+            st.write("")  # Spacer
+            st.write("### 📥 Download Options")
+        
+        # --- DOWNLOAD PARTIAL (SATU KURIR) ---
+        col_dl_partial, col_dl_all = st.columns(2)
+        
+        with col_dl_partial:
+            if selected_kurir:
+                # Konversi ke CSV
+                csv_partial = st.session_state.dict_kurir_fdr[selected_kurir].to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label=f"📥 Download {selected_kurir} (CSV)",
+                    data=csv_partial,
+                    file_name=f"Outstanding_{selected_kurir}.csv",
+                    mime="text/csv",
+                    key=f"dl_partial_{selected_kurir}"
+                )
+        
+        with col_dl_all:
+            # --- DOWNLOAD ALL (EXCEL MULTI-SHEET) ---
+            if st.session_state.dict_kurir_fdr:
+                # Buat buffer untuk Excel
+                import io
+                output = io.BytesIO()
+                
+                # Gunakan pandas ExcelWriter
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    for nama_kurir, df_kurir in st.session_state.dict_kurir_fdr.items():
+                        # Bersihkan nama sheet (max 31 karakter, tidak boleh ada [ ] : * ? / \$
+                        safe_name = "".join([c for c in str(nama_kurir) if c.isalpha() or c.isdigit() or c in (' ', '_')]).rstrip()
+                        if len(safe_name) > 31:
+                            safe_name = safe_name[:31]
+                        
+                        df_kurir.to_excel(writer, sheet_name=safe_name, index=False)
+                
+                # Siapkan data untuk didownload
+                excel_data = output.getvalue()
+                
+                st.download_button(
+                    label="📊 Download ALL (Excel Multi-Sheet)",
+                    data=excel_data,
+                    file_name="All_Outstanding_Courier.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_all_excel"
+                )
+        
+        st.divider()
+        
+        # TAMPILKAN TABEL YANG DIPILIH
+        if selected_kurir:
+            st.dataframe(st.session_state.dict_kurir_fdr[selected_kurir], use_container_width=True, hide_index=True)
+        
+        st.divider()
+
+    # 2. AREA FU IT
+    if st.session_state.ws_fu_it_fdr is not None:
+        st.subheader(f"📋 PERLU FU IT ({len(st.session_state.ws_fu_it_fdr)} Baris)")
+        
+        # Download Button FU IT
+        csv_fu = st.session_state.ws_fu_it_fdr.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Data FU IT (CSV)",
+            data=csv_fu,
+            file_name="Data_FU_IT.csv",
+            mime="text/csv",
+            key="dl_fu_it"
         )
+        
+        st.dataframe(st.session_state.ws_fu_it_fdr, use_container_width=True, hide_index=True)
+        st.divider()
+
+    # 3. AREA MANIFEST MASTER
+    if st.session_state.ws_manifest_fdr is not None:
+        st.subheader("📂 MANIFEST DATA (MASTER)")
+        st.dataframe(st.session_state.ws_manifest_fdr, use_container_width=True, hide_index=True)
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
 import pandas as pd
