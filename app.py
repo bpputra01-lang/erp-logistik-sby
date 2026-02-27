@@ -645,61 +645,15 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
 # --- MENU UTAMA ---
 def menu_Stock_Opname():
     st.markdown("""
-            # --- CSS DROPDOWN LEBIH KUAT ---
-    /* Umum Dropdown */
-    div[data-baseweb="select"] {
-        color: white !important;
-    }
-    
-    /* Kotak Utama Dropdown */
-    div[data-baseweb="select"] > div {
-        background-color: #262730 !important;
-        border-color: #464855 !important;
-    }
-    
-    /* Input field di dalam dropdown */
-    div[data-baseweb="select"] input {
-        color: white !important;
-        background-color: transparent !important;
-    }
-    
-    /* Placeholder (Tulisan "Choose...") */
-    div[data-baseweb="select"] input::placeholder {
-        color: white !important;
-        opacity: 0.7;
-    }
-    
-    /* Seluruh teks di dalam kotak dropdown */
-    div[data-baseweb="select"] > div > div {
-        color: white !important;
-    }
-    
-    /* Label/Opsi yang muncul di kotak */
-    div[data-baseweb="select"] span {
-        color: white !important;
-    }
-    
-    /* Ikon Panah */
-    div[data-baseweb="select"] svg {
-        fill: white !important;
-    }
-    
-    /* Dropdown Menu (List pilihannya)) */
-    div[data-baseweb="popover"] {
-        background-color: #262730 !important;
-        color: white !important;
-    }
-    
-    /* Items di dalam list dropdown */
-    div[data-baseweb="popover"] ul li {
-        color: white !important;
-    }
-    
-    /* Hover effect pada items */
-    div[data-baseweb="popover"] ul li:hover {
-        background-color: #1d3567 !important;
-    }
-    </style>
+       <style>
+        .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
+        .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
+        div[data-baseweb="select"] > div { background-color: #262730 !important; border-color: #464855 !important; color: white !important; }
+        div[data-baseweb="select"] input { color: white !important; }
+        div[data-baseweb="select"] span { color: white !important; }
+        div[data-baseweb="select"] svg { fill: white !important; }
+        
+        </style>
     """, unsafe_allow_html=True)
      
     st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE & ALLOCATION</h1></div>', unsafe_allow_html=True)
