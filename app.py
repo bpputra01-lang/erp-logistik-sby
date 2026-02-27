@@ -700,21 +700,43 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
 # =========================================================
 # 4. MENU UTAMA (STOCK OPNAME) - UPDATED LAYOUT
 # =========================================================
+# =========================================================
+# 4. MENU UTAMA (STOCK OPNAME) - UPDATED LAYOUT & COLOR
+# =========================================================
 def menu_Stock_Opname():
     st.markdown("""
         <style>
+        /* Header Style */
         .hero-header { 
             background-color: #1d3567; 
             padding: 20px; border-radius: 10px; margin-bottom: 20px; 
             text-align: center; border: 1px solid #333;
         }
         .hero-header h1 { color: white; margin: 0; font-size: 28px; font-weight: bold; }
+        
+        /* Container Filter */
         .filter-container {
-            background-color: #f8f9fa;
-            padding: 15px;
+            background-color: #1d3567; /* Mengubah background menjadi biru gelap agar teks putih masuk */
+            padding: 20px;
             border-radius: 10px;
-            border: 1px solid #e0e0e0;
+            border: 1px solid #333;
             margin-bottom: 20px;
+        }
+
+        /* --- PERBAIKAN WARNA TULISAN PUTIH --- */
+        /* Target label multiselect dan tulisan petunjuk */
+        div[data-testid="stWidgetLabel"] p {
+            color: white !important;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        /* Judul kecil filter */
+        .filter-title {
+            color: white !important;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -722,43 +744,46 @@ def menu_Stock_Opname():
     # 1. JUDUL HEADER
     st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME – COMPARE SYSTEM</h1></div>', unsafe_allow_html=True)
     
-    # 2. SEKSI FILTER (Tepat di bawah judul)
-    with st.container():
-        st.markdown('<p style="font-weight: bold; color: #1d3567;">🎯 FILTER PENGECUALIAN (IGNORE DATA)</p>', unsafe_allow_html=True)
-        col_f1, col_f2, col_f3 = st.columns(3)
-        
-        with col_f1:
-            list_sub_kat = [
-                "GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", 
-                "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", 
-                "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", 
-                "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", 
-                "NUTRITION", "BAG", "EXTRAS SHOES"
-            ]
-            exclude_sub = st.multiselect("Sub Kategori (Ignore):", list_sub_kat)
+    # 2. SEKSI FILTER (Sekarang dibungkus div agar background seragam)
+    st.markdown('<div class="filter-container">', unsafe_allow_html=True)
+    st.markdown('<p class="filter-title">🎯 CHOOSE OPTIONS / FILTER PENGECUALIAN</p>', unsafe_allow_html=True)
+    
+    col_f1, col_f2, col_f3 = st.columns(3)
+    
+    with col_f1:
+        list_sub_kat = [
+            "GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", 
+            "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", 
+            "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", 
+            "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", 
+            "NUTRITION", "BAG", "EXTRAS SHOES"
+        ]
+        exclude_sub = st.multiselect("Sub Kategori (Ignore):", list_sub_kat)
 
-        with col_f2:
-            list_bin_stock = [
-                "GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", 
-                "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
-                "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
-                "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "DAU", 
-                "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", 
-                "GUDANG", "SDA", "SMG"
-            ]
-            exclude_bin_sys = st.multiselect("BIN System (Ignore):", list_bin_stock)
+    with col_f2:
+        list_bin_stock = [
+            "GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", 
+            "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
+            "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
+            "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "DAU", 
+            "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", 
+            "GUDANG", "SDA", "SMG"
+        ]
+        exclude_bin_sys = st.multiselect("BIN System (Ignore):", list_bin_stock)
 
-        with col_f3:
-            list_bin_cov = [
-                "KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", 
-                "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
-                "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
-                "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", 
-                "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"
-            ]
-            exclude_bin_scan = st.multiselect("BIN Coverage (Ignore):", list_bin_cov)
+    with col_f3:
+        list_bin_cov = [
+            "KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", 
+            "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
+            "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
+            "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", 
+            "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"
+        ]
+        exclude_bin_scan = st.multiselect("BIN Coverage (Ignore):", list_bin_cov)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("---") # Garis pemisah
+    st.markdown("---") 
 
     # 3. SEKSI UPLOAD FILE
     c1, c2 = st.columns(2)
@@ -771,29 +796,22 @@ def menu_Stock_Opname():
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
             try:
-                # Load Data
                 df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
                 df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith('xlsx') else pd.read_csv(up_stock)
                 
                 with st.spinner("Memproses filter dan menghitung ulang..."):
-                    # Aplikasi Filter dari Input Multiselect
                     if exclude_sub:
-                        # Asumsi Sub-Kategori di Kolom Index 5 (F)
                         df_t_raw = df_t_raw[~df_t_raw.iloc[:, 5].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_sub])]
                     
                     if exclude_bin_sys:
-                        # Asumsi BIN System di Kolom Index 1 (B)
                         df_t_raw = df_t_raw[~df_t_raw.iloc[:, 1].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_sys])]
 
                     if exclude_bin_scan:
-                        # Asumsi BIN Scan di Kolom Index 0 (A)
                         df_s_raw = df_s_raw[~df_s_raw.iloc[:, 0].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_scan])]
 
-                    # Jalankan logic compare yang sudah ada
                     res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw, up_scan)
                     res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw, up_stock)
                     
-                    # Simpan ke session state
                     st.session_state.final_data = {
                         'res_scan': res_scan, 'res_stock': res_stock,
                         'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
