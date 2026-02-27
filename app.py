@@ -780,30 +780,12 @@ def menu_Stock_Opname():
     st.markdown("### 📊 RINGKASAN ALLOCATION")
     
     st.markdown("""
-        <style>
-        /* Box Metrics Style */
-        div[data-testid="stMetric"] {
-            background-color: #1d3567 !important;
-            border-radius: 10px;
-            padding: 20px;
-            border: 2px solid #1d3567;
-        }
-        div[data-testid="stMetric"] label {
-            color: white !important;
-            font-weight: bold;
-            font-size: 16px;
-        }
-        div[data-testid="stMetricValue"] {
-            color: white !important;
-            font-size: 28px;
-            font-weight: bold;
-        }
-        /* Arrow color adjustment */
-        div[data-testid="stMetric"] svg {
-            fill: white !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+    <style>
+    .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+    .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
+    .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
     
     full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
     partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
