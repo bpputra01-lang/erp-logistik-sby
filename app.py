@@ -853,7 +853,7 @@ def menu_Stock_Opname():
 
 # MENU: FDR UPDATE (YANG TELAH DIPERBAIKI & AMAN)
 # =====================================================
-elif menu == "FDR Update":
+elif menu == "FDR Update"
     st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
     
     # --- CSS ---
