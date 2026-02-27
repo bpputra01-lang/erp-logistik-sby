@@ -699,8 +699,7 @@ def menu_Stock_Opname():
         </style>
     """, unsafe_allow_html=True)
      
-    st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE & ALLOCATION</h1></div>', unsafe_allow_html=True)
-    
+    st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE & ALLOCATION</h1></div>', unsafe_allow_html=True)    
     # --- FILTER SECTION ---
     with st.container():
         st.markdown('<p style="font-weight: bold; color: #1d3567;">🎯 FILTER DATA</p>', unsafe_allow_html=True)
