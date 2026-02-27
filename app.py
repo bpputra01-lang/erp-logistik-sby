@@ -1190,23 +1190,19 @@ def menu_rto_v2():
 
     # --- STATE ---
     if 'rto_v2' not in st.session_state:
-        st.session_state.rto_v2 = {
-            'app': None, 'ds': None, 'mismatch': None, 'app_updated': None, 'draft': None, 'result': None
-        }
+        st.session_state.rto_v2 = {'app': None, 'ds': None, 'mismatch': None, 'app_updated': None, 'draft': None, 'result': None}
 
-    # --- ENGINE: INITIAL COMPARE ---
+    # --- ENGINE 1: INITIAL ---
     def run_initial(ds, app):
         df_app_vba = app.copy()
         df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
         
-        # Filter Status
         if '2' in df_app_vba.columns:
             mask = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
             df_f = df_app_vba[mask]
         else:
             df_f = df_app_vba
             
-        # Sum Qty
         d_qty = {}
         for _, r in df_f.iterrows():
             sku = str(r.get('9','')).strip()
@@ -1216,7 +1212,6 @@ def menu_rto_v2():
                 q17 = pd.to_numeric(r.get('17',0), errors='coerce') or 0
                 d_qty[sku] = d_qty.get(sku,0) + (q13+q17)
 
-        # Process DS
         df_res = ds.copy()
         if len(df_res.columns) >= 2:
             df_res.columns = ['SKU', 'QTY SCAN'] + list(df_res.columns[2:])
@@ -1232,7 +1227,6 @@ def menu_rto_v2():
         
         df_res['NOTE'] = df_res.apply(get_note, axis=1)
         
-        # Mismatch Detail
         mis = df_res[df_res['NOTE'] != 'SESUAI'].copy()
         res = []
         c9 = df_app_vba['9'].astype(str).str.strip()
@@ -1253,7 +1247,7 @@ def menu_rto_v2():
                 
         return df_res, pd.DataFrame(res, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY BIN','HASIL CEK REAL'])
 
-    # --- ENGINE: UPDATE APP (LOOKUP) ---
+    # --- ENGINE 2: UPDATE APP (LOOKUP) ---
     def update_app(app_df, sel_df):
         df = app_df.copy()
         df.columns = [str(i) for i in range(1, len(df.columns)+1)]
@@ -1272,7 +1266,7 @@ def menu_rto_v2():
                             df.at[idx, '17'] = qty; cnt+=1
         return df, cnt
 
-    # --- ENGINE: COMPARE DRAFT ---
+    # --- ENGINE 3: COMPARE DRAFT ---
     def compare_draft(app_df, draft_df):
         df_a = app_df.copy()
         df_a.columns = [str(i) for i in range(1, len(df_a.columns)+1)]
@@ -1321,7 +1315,41 @@ def menu_rto_v2():
                 st.session_state.rto_v2['app_updated'] = app.copy()
             st.rerun()
 
-    if st.session_state.rto
+    if st.session_state.rto_v2['mismatch'] is not None:
+        st.divider()
+        st.subheader("1. Input Hasil Cek Real")
+        mis_df = st.data_editor(st.session_state.rto_v2['mismatch'], num_rows="dynamic", key="edit_mis")
+        
+        if st.button("🔄 UPDATE DATA APPSHEET"):
+            with st.spinner("Updating..."):
+                updated_app, count = update_app(st.session_state.rto_v2['app'], mis_df)
+                st.session_state.rto_v2['app_updated'] = updated_app
+            st.success(f"Berhasil update {count} data.")
+            st.rerun()
+            
+        st.divider()
+        st.subheader("2. Upload Draft & Compare")
+        f_draft = st.file_uploader("File Draft", type=['xlsx','csv'], key="draft_v2")
+        
+        if f_draft:
+            if st.button("📊 COMPARE DRAFT"):
+                with st.spinner("Comparing..."):
+                    draft = pd.read_excel(f_draft) if f_draft.name.endswith('xlsx') else pd.read_csv(f_draft)
+                    res = compare_draft(st.session_state.rto_v2['app_updated'], draft)
+                    st.session_state.rto_v2['result'] = res
+                st.rerun()
+
+    if st.session_state.rto_v2['result'] is not None:
+        st.divider()
+        st.subheader("3. Hasil Compare")
+        st.dataframe(st.session_state.rto_v2['result'])
+        
+        csv = st.session_state.rto_v2['result'].to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Hasil", csv, "hasil_compare.csv", "text/csv")
+        
+        if st.button("🗑️ RESET"):
+            st.session_state.rto_v2 = {'app': None, 'ds': None, 'mismatch': None, 'app_updated': None, 'draft': None, 'result': None}
+            st.rerun()
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
