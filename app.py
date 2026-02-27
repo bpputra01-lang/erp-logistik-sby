@@ -498,9 +498,7 @@ import io
 from openpyxl import load_workbook
 import re
 
-# =========================================================
-# 1. FUNGSI DETEKSI WARNA
-# =========================================================
+# --- FUNGSI DETEKSI WARNA ---
 def get_yellow_skus(file, column_index):
     yellow_set = set()
     try:
@@ -511,31 +509,23 @@ def get_yellow_skus(file, column_index):
             color = str(cell.fill.start_color.index)
             if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
                 sku_val = str(cell.value).strip().upper() if cell.value else ""
-                if sku_val:
-                    yellow_set.add(sku_val)
-    except:
-        pass
+                if sku_val: yellow_set.add(sku_val)
+    except: pass
     return yellow_set
 
-# =========================================================
-# 2. LOGIKA COMPARE (SCAN VS SYSTEM)
-# =========================================================
+# --- LOGIKA COMPARE 1: SCAN VS SYSTEM ---
 def logic_compare_scan_to_stock(df_scan, df_stock):
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
     dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-
     for df in [ds, dt]:
         df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
         df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
         qty_col = 'QTY_SCAN' if 'QTY_SCAN' in df.columns else 'QTY_SYSTEM'
         df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce').fillna(0)
-
     dict_system = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().to_dict()
-
     qty_sys_list, diff_list, note_list = [], [], []
-
     for _, row in ds.iterrows():
         key = (row['BIN'], row['SKU'])
         qty_scan = row['QTY_SCAN']
@@ -544,15 +534,12 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
         qty_sys_list.append(qty_sys)
         diff_list.append(diff)
         note_list.append("REAL +" if qty_scan > qty_sys else "OK")
-
     ds['QTY_SYSTEM'] = qty_sys_list
     ds['DIFF'] = diff_list
     ds['NOTE'] = note_list
     return ds
 
-# =========================================================
-# 3. LOGIKA COMPARE (SYSTEM VS SCAN)
-# =========================================================
+# --- LOGIKA COMPARE 2: SYSTEM VS SCAN ---
 def logic_compare_stock_to_scan(df_stock, df_scan):
     dt = df_stock.copy()
     ds_lite = df_scan.iloc[:, [0, 1, 2]].copy()
@@ -561,33 +548,26 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     ds_lite['SKU'] = ds_lite['SKU'].astype(str).str.strip().str.upper()
     ds_lite['QTY_SCAN'] = pd.to_numeric(ds_lite['QTY_SCAN'], errors='coerce').fillna(0)
     dict_scan = ds_lite.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().to_dict()
-
     qty_so_list, diff_list, note_list = [], [], []
-
     for _, row in dt.iterrows():
         bin_val = str(row.iloc[1]).strip().upper()
         sku_val = str(row.iloc[2]).strip().upper()
         qty_sys = pd.to_numeric(row.iloc[9], errors='coerce') if pd.notnull(row.iloc[9]) else 0
         key = (bin_val, sku_val)
         qty_scan = dict_scan.get(key, 0)
-        
         qty_so_list.append(qty_scan)
         diff_val = qty_sys - qty_scan
         diff_list.append(diff_val)
         note_list.append("SYSTEM +" if qty_sys > qty_scan else "OK")
-
     for col in ['QTY SO', 'DIFF', 'NOTE']:
         if col in dt.columns: dt = dt.drop(columns=[col])
-
     dt['QTY_SO'] = qty_so_list
     dt['DIFF'] = diff_list
     dt['NOTE'] = note_list
     dt = dt.loc[:, ~dt.columns.duplicated()].copy()
     return dt
 
-# =========================================================
-# 4. LOGIKA ALLOCATION
-# =========================================================
+# --- LOGIKA ALLOCATION (UPDATE SYSTEM QTY) ---
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     # Source 1: System Plus
     sys_lite = df_system_plus.iloc[:, [1, 2, df_system_plus.columns.get_loc('DIFF')]].copy()
@@ -604,6 +584,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     dict_cov_source = cov_lite.groupby(['BIN', 'SKU'])['QTY_COV'].sum().to_dict()
 
     df_res = df_real_plus.copy()
+    df_sys_updated = df_system_plus.copy()
     bin_alokasi_list, qty_alokasi_list, status_list = [], [], []
 
     for idx, row in df_res.iterrows():
@@ -614,7 +595,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
             remaining_diff = current_diff
             temp_alloc_bin, temp_alloc_qty = [], 0
             
-            # Cari di System +
+            # Tahap 1: System +
             sys_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_system_source.items() if k[1] == sku and v > 0]
             for src in sys_list:
                 if remaining_diff <= 0: break
@@ -622,9 +603,15 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
                 temp_alloc_bin.append(src['BIN'])
                 temp_alloc_qty += qty_alloc
                 dict_system_source[(src['BIN'], sku)] -= qty_alloc
+                
+                # Update DF System (Mengurangi Diff/Qty SO)
+                mask = (df_sys_updated.iloc[:,1].str.upper() == src['BIN']) & (df_sys_updated.iloc[:,2].str.upper() == sku)
+                if mask.any():
+                    diff_col_idx = df_sys_updated.columns.get_loc('DIFF')
+                    df_sys_updated.loc[mask, df_sys_updated.columns[diff_col_idx]] -= qty_alloc
                 remaining_diff -= qty_alloc
 
-            # Cari di BIN Coverage
+            # Tahap 2: Bin Coverage
             if remaining_diff > 0:
                 cov_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_cov_source.items() if k[1] == sku and v > 0]
                 for src in cov_list:
@@ -651,11 +638,10 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     df_res['BIN ALOKASI'] = bin_alokasi_list
     df_res['QTY ALLOCATION'] = qty_alokasi_list
     df_res['STATUS'] = status_list
-    return df_res
+    
+    return df_res, df_sys_updated
 
-# =========================================================
-# 5. MENU UTAMA
-# =========================================================
+# --- MENU UTAMA ---
 def menu_Stock_Opname():
     st.markdown("""
        <style>
@@ -670,53 +656,58 @@ def menu_Stock_Opname():
      
     st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE & ALLOCATION</h1></div>', unsafe_allow_html=True)
     
-    # --- SEKSI FILTER ---
+    # --- FILTER SECTION ---
     with st.container():
-        st.markdown('<p style="font-weight: bold; color: #1d3567;">🎯 FILTER DATA (Stock System)</p>', unsafe_allow_html=True)
-        col_f1, col_f2 = st.columns(2)
+        st.markdown('<p style="font-weight: bold; color: #1d3567;">🎯 FILTER DATA</p>', unsafe_allow_html=True)
+        col_f1, col_f2, col_f3 = st.columns(3)
         
         with col_f1:
             list_sub_kat = ["GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", "NUTRITION", "BAG", "EXTRAS SHOES"]
-            selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat, key="filter_sub_v5")
+            selected_sub = st.multiselect("🗂️ Sub Kategori (System):", list_sub_kat, key="filter_sub_v7")
 
         with col_f2:
             list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
-            selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock, key="filter_bin_sys_v5")
+            selected_bin_sys = st.multiselect("🏭 BIN System (System):", list_bin_stock, key="filter_bin_sys_v7")
+
+        with col_f3:
+            list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
+            selected_bin_cov = st.multiselect("📡 BIN Coverage (Scan):", list_bin_cov, key="filter_bin_cov_v7")
 
     st.markdown("---")
 
-    # --- SEKSI UPLOAD (STEP 1) ---
-    st.subheader("1️⃣ Upload Data & Run Compare")
+    # --- STEP 1: UPLOAD & COMPARE ---
+    st.subheader("1️⃣ Upload & Run Compare")
     c1, c2 = st.columns(2)
     with c1:
-        up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="up_scan_v5")
+        up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="up_scan_v7")
     with c2:
-        up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="up_stock_v5")
+        up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="up_stock_v7")
 
-    # --- PROSES COMPARE ---
     if up_scan and up_stock:
-        if st.button("▶️ RUN COMPARE", use_container_width=True, key="btn_run_compare_v5"):
+        if st.button("▶️ RUN COMPARE", use_container_width=True, key="btn_run_compare_v7"):
             try:
                 df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
                 df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
                 
-                with st.spinner("Memproses Compare..."):
+                with st.spinner("Memproses..."):
+                    # Filter System (Sub Kat & BIN)
                     if selected_sub:
                         df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.strip().str.upper().isin([x.upper() for x in selected_sub])]
-                    
                     if selected_bin_sys:
                         mask_bin = df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(case.upper() in x for case in selected_bin_sys))
                         df_t_raw = df_t_raw[mask_bin]
+                    
+                    # Filter Scan (BIN Coverage)
+                    if selected_bin_cov:
+                        mask_cov = df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(case.upper() in x for case in selected_bin_cov))
+                        df_s_raw = df_s_raw[mask_cov]
 
-                    if df_t_raw.empty:
-                        st.error("❌ Data System kosong!")
+                    if df_t_raw.empty: st.error("❌ Data System kosong!")
                     else:
                         res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
                         res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
-                        
                         real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
                         system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
-                        
                         try:
                             item_dict = df_t_raw.iloc[:, [2, 4]].dropna()
                             item_dict.columns = ['SKU', 'NAME']
@@ -725,10 +716,7 @@ def menu_Stock_Opname():
                             real_plus['ITEM NAME'] = real_plus['SKU'].map(map_name)
                         except: pass
 
-                        st.session_state.compare_result = {
-                            'res_scan': res_scan, 'res_stock': res_stock,
-                            'real_plus': real_plus, 'system_plus': system_plus
-                        }
+                        st.session_state.compare_result = {'res_scan': res_scan, 'res_stock': res_stock, 'real_plus': real_plus, 'system_plus': system_plus}
                         st.success("✅ Compare Selesai!")
             except Exception as e:
                 st.error(f"❌ Error: {e}")
@@ -737,131 +725,90 @@ def menu_Stock_Opname():
     if 'compare_result' in st.session_state:
         d = st.session_state.compare_result
         
-        # --- METRICS SUMMARY ---
+        # --- METRICS COMPARE ---
         st.markdown("### 📊 RINGKASAN COMPARE")
-        total_real_plus = len(d['real_plus'])
-        total_system_plus = len(d['system_plus'])
-        qty_real_plus = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
-        qty_system_plus = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
+        total_real = len(d['real_plus'])
+        total_sys = len(d['system_plus'])
+        qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
+        qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
         
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("🔥 REAL + Items", total_real_plus)
-        m2.metric("🔥 QTY REAL +", qty_real_plus)
-        m3.metric("💻 SYSTEM + Items", total_system_plus)
-        m4.metric("💻 QTY SYSTEM +", qty_system_plus)
+        m1.metric("🔥 REAL + Items", total_real)
+        m2.metric("🔥 QTY REAL +", qty_real)
+        m3.metric("💻 SYSTEM + Items", total_sys)
+        m4.metric("💻 QTY SYSTEM +", qty_sys)
         
         st.markdown("---")
+        
+        # Tabs Data Compare
+        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
+        with t1: st.dataframe(d['res_scan'], use_container_width=True)
+        with t2: st.dataframe(d['res_stock'], use_container_width=True)
+        with t3: st.dataframe(d['real_plus'], use_container_width=True)
+        with t4: st.dataframe(d['system_plus'], use_container_width=True)
 
-        # --- SEKSI UPLOAD (STEP 2: ALLOCATION) ---
+        st.markdown("---")
+
+        # --- STEP 2: ALLOCATION ---
         st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
         
-        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE (Stock Sumber Alokasi)", type=['xlsx','csv'], key="up_bin_cov_v5")
+        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v7")
 
         if up_bin_cov:
-            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v5"):
+            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v7"):
                 try:
                     df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
                     
                     with st.spinner("Memproses Alokasi..."):
-                        # Jalankan Allocation Logic
-                        allocated_data = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
+                        allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
                         
-                        # Simpan ke session state
                         st.session_state.allocation_result = allocated_data
+                        st.session_state.sys_updated_result = sys_updated
                         st.success("✅ Allocation Selesai!")
                 except Exception as e:
                     st.error(f"❌ Error Allocation: {e}")
 
-    # --- TAMPILKAN HASIL AKHIR (SETELAH ALLOCATION) ---
-    if 'allocation_result' in st.session_state:
-        st.markdown("---")
-        st.subheader("📋 HASIL AKHIR (REAL + DENGAN ALOKASI)")
+    # --- TAMPILKAN HASIL ALLOCATION & METRICS ---
+    if     alloc_data = st.session_state.allocation_result
+    sys_updated = st.session_state.sys_updated_result
+    
+    # --- METRICS ALLOCATION ---
+    st.markdown("### 📊 RINGKASAN ALLOCATION")
+    full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
+    partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
+    no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
+    
+    a1, a2, a3 = st.columns(3)
+    a1.metric("✅ FULL ALLOCATION", full_alloc)
+    a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
+    a3.metric("❌ NO ALLOCATION", no_alloc)
+    
+    st.markdown("---")
+    
+    # Tabs Hasil Allocation & Data System Terupdate
+    ta1, ta2, ta3 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)", "📥 DOWNLOAD"])
+    
+    with ta1:
+        st.dataframe(alloc_data, use_container_width=True)
         
-        df_final = st.session_state.allocation_result
+    with ta2:
+        st.dataframe(sys_updated, use_container_width=True)
         
-        # Metrics Allocation
-        st.markdown("### 📊 RINGKASAN ALLOCATION")
-        full_alloc = len(df_final[df_final['STATUS'] == "FULL ALLOCATION"])
-        partial_alloc = len(df_final[df_final['STATUS'] == "PARTIAL ALLOCATION"])
-        no_alloc = len(df_final[df_final['STATUS'] == "NO ALLOCATION"])
-        
-        a1, a2, a3 = st.columns(3)
-        a1.metric("✅ FULL ALLOCATION", full_alloc)
-        a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
-        a3.metric("❌ NO ALLOCATION", no_alloc)
-
-        # Tabs显示结果
-        t1, t2 = st.tabs(["🔥 REAL + (Dengan Alokasi)", "📥 DOWNLOAD EXCEL"])
-        
-        with t1:
-            st.dataframe(df_final, use_container_width=True)
-            
-        with t2:
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                # Simpan Compare
-                d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-                d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
-                d['real_plus'].to_excel(writer, sheet_name='REAL + (awal)', index=False)
-                d['system_plus'].to_excel(writer, sheet_name='SYSTEM + (awal)', index=False)
-                                # Simpan Allocation
-                df_final.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
-            
-            st.download_button(
-                label="📥 DOWNLOAD HASIL EXCEL",
-                data=output.getvalue(),
-                file_name="Hasil_SO_Allocation_Final.xlsx",
-                use_container_width=True
-            )
-
-    # --- FUNGSI PEMBANTU TAMPILAN DATAFRAME ---
-    def prepare_df(df):
-        if df is None or df.empty:
-            return df
-        df = df.copy()
-        df = df.reset_index(drop=True)
-        new_cols = []
-        for i, col in enumerate(df.columns):
-            c_str = str(col).strip()
-            if c_str == "" or "Unnamed" in c_str:
-                new_cols.append(f"Col_{i}")
-            else:
-                new_cols.append(c_str)
-        df.columns = new_cols
-        df = df.loc[:, ~df.columns.duplicated()]
-        return df
-
-    # --- TAMPILKAN DATA AWAL (COMPARE) JIKA BELUM RUN ALLOCATION ---
-    if 'compare_result' in st.session_state and 'allocation_result' not in st.session_state:
-        d = st.session_state.compare_result
-        
-        # Tabs untuk Data Compare
-        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
-        
-        with t1:
-            st.dataframe(prepare_df(d['res_scan']), use_container_width=True)
-        with t2:
-            st.dataframe(prepare_df(d['res_stock']), use_container_width=True)
-        with t3:
-            st.dataframe(prepare_df(d['real_plus']), use_container_width=True)
-        with t4:
-            st.dataframe(prepare_df(d['system_plus']), use_container_width=True)
-            
-        # Download Button Hasil Compare Awal
+    with ta3:
+        # Download Excel
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            prepare_df(d['res_scan']).to_excel(writer, sheet_name='DATA SCAN', index=False)
-            prepare_df(d['res_stock']).to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
-            prepare_df(d['real_plus']).to_excel(writer, sheet_name='REAL +', index=False)
-            prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM +', index=False)
+            d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+            d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
+            alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
+            sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
         
         st.download_button(
-            "📥 DOWNLOAD HASIL COMPARE (EXCEL)", 
-            output.getvalue(), 
-            "Hasil_SO_Compare.xlsx", 
+            label="📥 DOWNLOAD HASIL EXCEL",
+            data=output.getvalue(),
+            file_name="Hasil_Allocation_Final.xlsx",
             use_container_width=True
         )
-
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
