@@ -700,13 +700,13 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
 # 4. MENU UTAMA
 # =========================================================
 def menu_Stock_Opname():
-    st.title("🚀 UltraFast Stock Compare (Logic Fixed)")
+    st.title("STOCK OPNAME")
     
     c1, c2 = st.columns(2)
     with c1:
-        up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx'], key="up_scan_so")
+        up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="up_scan_so")
     with c2:
-        up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx'], key="up_stock_so")
+        up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="up_stock_so")
 
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
