@@ -769,7 +769,7 @@ def menu_Stock_Opname():
                     st.error(f"❌ Error Allocation: {e}")
 
     # --- TAMPILKAN HASIL ALLOCATION & METRICS ---
-    if alloc_data = st.session_state.allocation_result
+    alloc_data = st.session_state.allocation_result
     sys_updated = st.session_state.sys_updated_result
     
     # --- METRICS ALLOCATION ---
