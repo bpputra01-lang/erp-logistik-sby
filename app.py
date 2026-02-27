@@ -3,6 +3,7 @@ import numpy as np
 import streamlit as st
 import io
 import math
+import re
 
 st.set_page_config(
     page_title="LogsbyERP.id",
