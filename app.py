@@ -414,22 +414,7 @@ div.stFormSubmitButton > button {
     div[data-testid="stNotification"] svg {
         fill: white !important;
     }
-        /* --- FIX: Placeholder "Choose options" menjadi Putih --- */
-    /* Targetkan elemen placeholder secara spesifik */
-    div[data-baseweb="select"] div[data-baseweb="value"] {
-        color: rgba(255, 255, 255, 0.7) !important;
-    }
-    /* Jika menggunakan versi Streamlit lama, gunakan ini: */
-    div[data-baseweb="select"] > div > div > div {
-        color: white !important;
-    }
     
-    /* Tags/Chips yang dipilih */
-    div[data-baseweb="tag"] {
-        background-color: #1d3567 !important;
-        color: white !important;
-    }
-
     </style>
     """, unsafe_allow_html=True)
     # UI Login Center
@@ -667,7 +652,61 @@ def menu_Stock_Opname():
         div[data-baseweb="select"] input { color: white !important; }
         div[data-baseweb="select"] span { color: white !important; }
         div[data-baseweb="select"] svg { fill: white !important; }
-        </style>
+            # --- CSS DROPDOWN LEBIH KUAT ---
+    /* Umum Dropdown */
+    div[data-baseweb="select"] {
+        color: white !important;
+    }
+    
+    /* Kotak Utama Dropdown */
+    div[data-baseweb="select"] > div {
+        background-color: #262730 !important;
+        border-color: #464855 !important;
+    }
+    
+    /* Input field di dalam dropdown */
+    div[data-baseweb="select"] input {
+        color: white !important;
+        background-color: transparent !important;
+    }
+    
+    /* Placeholder (Tulisan "Choose...") */
+    div[data-baseweb="select"] input::placeholder {
+        color: white !important;
+        opacity: 0.7;
+    }
+    
+    /* Seluruh teks di dalam kotak dropdown */
+    div[data-baseweb="select"] > div > div {
+        color: white !important;
+    }
+    
+    /* Label/Opsi yang muncul di kotak */
+    div[data-baseweb="select"] span {
+        color: white !important;
+    }
+    
+    /* Ikon Panah */
+    div[data-baseweb="select"] svg {
+        fill: white !important;
+    }
+    
+    /* Dropdown Menu (List pilihannya)) */
+    div[data-baseweb="popover"] {
+        background-color: #262730 !important;
+        color: white !important;
+    }
+    
+    /* Items di dalam list dropdown */
+    div[data-baseweb="popover"] ul li {
+        color: white !important;
+    }
+    
+    /* Hover effect pada items */
+    div[data-baseweb="popover"] ul li:hover {
+        background-color: #1d3567 !important;
+    }
+    </style>
     """, unsafe_allow_html=True)
      
     st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE & ALLOCATION</h1></div>', unsafe_allow_html=True)
