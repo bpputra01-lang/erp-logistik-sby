@@ -1351,18 +1351,19 @@ def engine_compare_draft_jezpro(df_app, df_draft):
         bin_d = str(row.iloc[8]).strip().upper()
         qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
 
-        # Cari Match
-        # --- PERBAIKAN PADA BARIS 1356 ---
-match_data = df_a[
-    ((df_a['9'].astype(str).str.upper() == sku_d) & (df_a['12'].astype(str).str.upper() == bin_d)) | 
-    ((df_a['15'].astype(str).str.upper() == sku_d) & (df_a['16'].astype(str).str.upper() == bin_d))
-]
- # Pastikan baris di bawah ini lurus ke dalam (1 level indentasi dari 'for')
+       # --- 1. CARI MATCH ---
+        # Pastikan baris ini sejajar dengan logika di dalam loop 'for idx, row in df_res.iterrows():'
+        match_data = df_a[
+            ((df_a['9'].astype(str).str.upper() == sku_d) & (df_a['12'].astype(str).str.upper() == bin_d)) | 
+            ((df_a['15'].astype(str).str.upper() == sku_d) & (df_a['16'].astype(str).str.upper() == bin_d))
+        ]
+
+        # Inisialisasi variabel (Harus sejajar dengan match_data)
         qty_j, bin_l, qty_m, note, status = 0, "", 0, "HAPUS ITEM INI DARI DRAFT", "DELETE ITEM"
 
         if not match_data.empty:
             r_app = match_data.iloc[0]
-            # ... dan seterusnya
+            # ... lanjut ke logika penentuan status selanjutnya
 
         if not match_data.empty:
             r_app = match_data.iloc[0]
