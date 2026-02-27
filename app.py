@@ -1177,7 +1177,7 @@ def menu_refill_withdraw():
                 url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=WITHDRAW%20STOCK"
                 requests.post(url, json=data_json)
                 st.toast("WITHDRAW UPLOADED!")
-                
+
 def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
     """
     LOGIKA REFRESH TOTAL:
@@ -1255,6 +1255,113 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
                 df_ds_res.loc[df_ds_res.index[i], 'NOTE'] = "SESUAI"
 
     return df_ds_res, df_app_res
+    def engine_compare_draft_jezpro(df_app, df_draft):
+    """
+    Konversi dari Sub COMPARE_DRAFT_JEZPRO_ULTRAFAST.
+    Membandingkan data Draft Jezpro dengan data AppSheet yang sudah ter-refresh.
+    """
+    import pandas as pd
+    import numpy as np
+
+    # Copy draft untuk diolah
+    df_res = df_draft.copy()
+    
+    # Standarisasi kolom AppSheet (Gunakan index 1-based untuk kemudahan logika VBA)
+    df_a = df_app.copy()
+    df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
+
+    # Inisialisasi kolom baru di Draft
+    new_cols = ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']
+    for col in new_cols:
+        if col not in df_res.columns:
+            df_res[col] = None
+
+    # Loop setiap baris di Draft (df_res)
+    for idx, row in df_res.iterrows():
+        # Draft: TF=A(0), SKU=D(3), BIN=I(8), QTY_DRAFT=H(7)
+        tf_draft = str(row.iloc[0]).strip().upper() if not pd.isna(row.iloc[0]) else ""
+        sku_draft = str(row.iloc[3]).strip().upper()
+        bin_draft = str(row.iloc[8]).strip().upper()
+        qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
+
+        qty_j = 0
+        qty_m = 0
+        bin_l = ""
+        note_k = ""
+        status_n = ""
+        found_match = False
+        tf_is_wrong = False
+
+        # --- TAHAP 1: CARI MATCH DI APPSHEET ---
+        # AppSheet: TF=18(R), SKU=9(I)/15(O), BIN=12(L)/16(P), QTY=13(M)/17(Q)
+        for _, r_app in df_a.iterrows():
+            tf_app = str(r_app.get('18', '')).strip().upper()
+            
+            # Cek Slot 1 (9, 12, 13) dan Slot 2 (15, 16, 17)
+            slots = [('9', '12', '13'), ('15', '16', '17')]
+            for sku_idx, bin_idx, qty_idx in slots:
+                if str(r_app.get(sku_idx, '')).strip().upper() == sku_draft and \
+                   str(r_app.get(bin_idx, '')).strip().upper() == bin_draft:
+                    
+                    # Logika TF (Blank atau Sama)
+                    is_tf_blank = tf_draft in ["", "0", "NAN"] or tf_app in ["", "0", "NAN"]
+                    if is_tf_blank or (tf_draft == tf_app):
+                        qty_j = pd.to_numeric(r_app.get(qty_idx, 0), errors='coerce') or 0
+                        found_match = True
+                        break
+                    else:
+                        tf_is_wrong = True
+            if found_match: break
+
+        # --- TAHAP 2: LOGIKA STATUS ---
+        if found_match:
+            if qty_j < qty_h:
+                note_k = "QTY AMBIL KURANG DARI DRAFT"
+                status_n = "PERLU EDIT QTY DRAFT"
+            elif qty_j == qty_h:
+                note_k = "DRAFT SESUAI"
+                status_n = "OK"
+            else:
+                # Cari Bin Lain (Sub Action di VBA)
+                for _, r_app2 in df_a.iterrows():
+                    sku_app2 = str(r_app2.get('9', '')).strip().upper()
+                    if sku_app2 == "": sku_app2 = str(r_app2.get('15', '')).strip().upper()
+                    
+                    if sku_app2 == sku_draft:
+                        # Cek Bin 1 (12) bukan bin draft
+                        if str(r_app2.get('12', '')).strip().upper() != bin_draft and str(r_app2.get('12', '')) != "":
+                            bin_l = str(r_app2.get('12', ''))
+                            qty_m = pd.to_numeric(r_app2.get('13', 0), errors='coerce') or 0
+                            note_k = "ADA BIN LAIN"
+                            break
+                        # Cek Bin 2 (16) bukan bin draft
+                        elif str(r_app2.get('16', '')).strip().upper() != bin_draft and str(r_app2.get('16', '')) != "":
+                            bin_l = str(r_app2.get('16', ''))
+                            qty_m = pd.to_numeric(r_app2.get('17', 0), errors='coerce') or 0
+                            note_k = "ADA BIN LAIN"
+                            break
+                
+                if note_k == "ADA BIN LAIN":
+                    status_n = "PERLU EDIT BIN & QTY TF" if (qty_j + qty_m) < qty_h else "PERLU EDIT BIN & HAPUS BIN LAMA"
+
+        else: # Not Found Match
+            if tf_is_wrong:
+                note_k = "HAPUS ITEM INI DARI DRAFT"
+                status_n = "DELETE ITEM"
+            else:
+                # Logika cari bin lain tetap dijalankan jika match utama tidak ada
+                note_k = "HAPUS ITEM INI DARI DRAFT"
+                status_n = "DELETE ITEM"
+
+        # --- TAHAP 3: ISI DATA KE DATAFRAME ---
+        # Menggunakan .loc untuk menghindari SettingWithCopyWarning
+        df_res.loc[idx, 'QTY AMBIL'] = qty_j
+        df_res.loc[idx, 'NOTE'] = note_k
+        df_res.loc[idx, 'BIN AMBIL LAIN'] = bin_l
+        df_res.loc[idx, 'QTY BIN LAIN'] = qty_m if qty_m > 0 else ""
+        df_res.loc[idx, 'STATUS'] = status_n
+
+    return df_res
 
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
