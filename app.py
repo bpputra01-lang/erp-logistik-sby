@@ -1357,8 +1357,12 @@ match_data = df_a[
     ((df_a['9'].astype(str).str.upper() == sku_d) & (df_a['12'].astype(str).str.upper() == bin_d)) | 
     ((df_a['15'].astype(str).str.upper() == sku_d) & (df_a['16'].astype(str).str.upper() == bin_d))
 ]
-        
+ # Pastikan baris di bawah ini lurus ke dalam (1 level indentasi dari 'for')
         qty_j, bin_l, qty_m, note, status = 0, "", 0, "HAPUS ITEM INI DARI DRAFT", "DELETE ITEM"
+
+        if not match_data.empty:
+            r_app = match_data.iloc[0]
+            # ... dan seterusnya
 
         if not match_data.empty:
             r_app = match_data.iloc[0]
