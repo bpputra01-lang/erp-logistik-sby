@@ -701,6 +701,29 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
 # =========================================================
 def menu_Stock_Opname():
     st.title("STOCK OPNAME")
+    python
+# =========================================================
+# 4. MENU UTAMA (STOCK OPNAME)
+# =========================================================
+def menu_Stock_Opname():
+    # --- CSS ---
+    st.markdown("""
+        <style>
+        .hero-header { 
+            background-color: #0E1117; 
+            padding: 20px; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+            border: 1px solid #333;
+        }
+        .hero-header h1 {
+            color: #FF4B4B; /* Merah khas Streamlit */
+            margin: 0;
+            font-size: 32px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     with c1:
@@ -808,6 +831,7 @@ def menu_Stock_Opname():
             prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM +', index=False)
         
         st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
+
 def menu_fdr_update():
     st.markdown('<div class="hero-header"><h1>🚚 FDR OUTSTANDING - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
 
