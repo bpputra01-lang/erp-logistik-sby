@@ -1180,9 +1180,9 @@ def menu_refill_withdraw():
 
 def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
     """
-    LOGIKA REFRESH TOTAL:
+    LOGIKA REFRESH TOTAL (FIXED):
     1. Update AppSheet berdasarkan Hasil Cek Real (Kolom G).
-    2. Update DS RTO agar Note menjadi 'SESUAI' karena Qty Scan disamakan dengan Qty Ambil terbaru.
+    2. Update DS RTO agar Note menjadi 'SESUAI' dengan sinkronisasi otomatis.
     """
     import pandas as pd
     import numpy as np
@@ -1190,12 +1190,12 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
     if df_app_awal.empty or df_selisih.empty:
         return df_ds, df_app_awal
 
-    # Copy data agar tidak merusak session state asli sebelum selesai
+    # Copy data agar tidak merusak data asli
     df_app_res = df_app_awal.copy()
     df_ds_res = df_ds.copy()
 
-    # --- 1. MAPPING HASIL CEK REAL ---
-    # SKU: Kolom 0, BIN: Kolom 4, REAL: Kolom 6
+    # --- 1. MAPPING HASIL CEK REAL (Dari Sheet Selisih) ---
+    # SKU: Index 0 (A), BIN: Index 4 (E), REAL: Index 6 (G)
     real_map = {}
     for _, row in df_selisih.iterrows():
         sku_real = str(row.iloc[0]).strip().upper()
@@ -1206,9 +1206,10 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
 
     # --- 2. UPDATE APPSHEET RTO ---
     for idx in df_app_res.index:
-        sku = str(df_app_res.iloc[idx, 8]).strip().upper() # Kolom I
+        # SKU di Appsheet: I(8) atau O(14)
+        sku = str(df_app_res.iloc[idx, 8]).strip().upper()
         if sku in ["", "NAN", "0", "NONE"]:
-            sku = str(df_app_res.iloc[idx, 14]).strip().upper() # Kolom O
+            sku = str(df_app_res.iloc[idx, 14]).strip().upper()
             
         bin1 = str(df_app_res.iloc[idx, 11]).strip().upper() # Kolom L
         bin2 = str(df_app_res.iloc[idx, 15]).strip().upper() # Kolom P
@@ -1223,38 +1224,45 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
             # Logika Kolom N (index 13)
             val_n = str(df_app_res.iloc[idx, 13]).strip()
             if val_n == "" or val_n.lower() == "nan":
-                df_app_res.iloc[idx, 12] = target_qty # Ubah M
+                df_app_res.iloc[idx, 12] = target_qty # Ubah M (Qty Bin 1)
             else:
-                df_app_res.iloc[idx, 16] = target_qty # Ubah Q
+                df_app_res.iloc[idx, 16] = target_qty # Ubah Q (Qty Bin 2)
 
-    # --- 3. SINKRONISASI DS RTO ---
-    # Setelah refresh, kita anggap Qty Scan di DS adalah valid sesuai Cek Real (Ambil)
+    # --- 3. SINKRONISASI DS RTO (Ultrafast Way) ---
     if not df_ds_res.empty:
-        # Kita hitung ulang Qty Ambil di DS berdasarkan data App yang sudah direfresh
-        # Agar status Note di DS berubah menjadi 'SESUAI'
-        sku_list = df_ds_res.iloc[:, 0].astype(str).str.strip().tolist()
+        # Hitung Summary Qty Ambil dari AppSheet yang baru direfresh
+        def get_total_ambil(row_a):
+            q1 = pd.to_numeric(row_a.iloc[12], errors='coerce') or 0
+            q2 = pd.to_numeric(row_a.iloc[16], errors='coerce') or 0
+            return q1 + q2
+
+        # Buat temporary SKU untuk join
+        df_app_res['TEMP_SKU'] = df_app_res.apply(lambda r: str(r.iloc[8]).strip().upper() if str(r.iloc[8]).strip() not in ["", "0", "nan", "None"] else str(r.iloc[14]).strip().upper(), axis=1)
+        df_app_res['TEMP_QTY'] = df_app_res.apply(get_total_ambil, axis=1)
         
-        # Buat summary qty ambil terbaru dari df_app_res
-        new_summary = {}
-        for _, row_a in df_app_res.iterrows():
-            s = str(row_a.iloc[8]).strip().upper()
-            if s in ["", "NAN", "0"]: s = str(row_a.iloc[14]).strip().upper()
-            q = (pd.to_numeric(row_a.iloc[12], errors='coerce') or 0) + \
-                (pd.to_numeric(row_a.iloc[16], errors='coerce') or 0)
-            new_summary[s] = new_summary.get(s, 0) + q
+        # Grouping total qty per SKU
+        sku_summary = df_app_res.groupby('TEMP_SKU')['TEMP_QTY'].sum().to_dict()
+
+        # Update DS_RES secara vectorized (Tanpa Loop For i in Range)
+        first_col = df_ds_res.columns[0] # Kolom SKU
+        scan_col = df_ds_res.columns[1]  # Kolom QTY SCAN
+        ambil_col = df_ds_res.columns[2] # Kolom QTY AMBIL
         
-        # Update DS: Kolom B (Scan) disamakan dengan Kolom C (Ambil) hasil refresh
-        for i in range(len(df_ds_res)):
-            sku_ds = str(df_ds_res.iloc[i, 0]).strip().upper()
-            qty_ambil_baru = new_summary.get(sku_ds, 0)
-            
-            df_ds_res.iloc[i, 2] = qty_ambil_baru # Kolom C (Ambil)
-            df_ds_res.iloc[i, 1] = qty_ambil_baru # Kolom B (Scan) dibuat sama agar SESUAI
-            
-            if 'NOTE' in df_ds_res.columns:
-                df_ds_res.loc[df_ds_res.index[i], 'NOTE'] = "SESUAI"
+        # Update Kolom Qty Ambil berdasarkan summary terbaru
+        df_ds_res[ambil_col] = df_ds_res[first_col].astype(str).str.strip().str.upper().map(sku_summary).fillna(0)
+        
+        # Samakan Qty Scan dengan Qty Ambil agar status jadi "SESUAI"
+        df_ds_res[scan_col] = df_ds_res[ambil_col]
+        
+        # Update Note secara massal
+        if 'NOTE' in df_ds_res.columns:
+            df_ds_res['NOTE'] = "SESUAI"
+
+        # Hapus kolom bantuan
+        df_app_res.drop(columns=['TEMP_SKU', 'TEMP_QTY'], inplace=True)
 
     return df_ds_res, df_app_res
+    
 def engine_compare_draft_jezpro(df_app, df_draft):
     """
     Konversi dari Sub COMPARE_DRAFT_JEZPRO_ULTRAFAST.
