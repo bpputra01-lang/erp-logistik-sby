@@ -699,8 +699,31 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
 # =========================================================
 # 4. MENU UTAMA
 # =========================================================
+# =========================================================
+# 4. MENU UTAMA (STOCK OPNAME)
+# =========================================================
 def menu_Stock_Opname():
-    st.title("STOCK OPNAME")
+    # --- CSS ---
+    st.markdown("""
+        <style>
+        .hero-header { 
+            background-color: #0E1117; 
+            padding: 20px; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+            border: 1px solid #333;
+        }
+        .hero-header h1 {
+            color: #FF4B4B; /* Merah khas Streamlit */
+            margin: 0;
+            font-size: 32px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # --- JUDUL HEADER ---
+    st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE SYSTEM</h1></div>', unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     with c1:
@@ -712,8 +735,16 @@ def menu_Stock_Opname():
         if st.button("▶️ RUN COMPARE", use_container_width=True):
             try:
                 # Load Data
-                df_s_raw = pd.read_excel(up_scan)
-                df_t_raw = pd.read_excel(up_stock)
+                # Menggunakan try-except内部的 karena kadang file berformat berbeda
+                try:
+                    df_s_raw = pd.read_excel(up_scan)
+                except:
+                    df_s_raw = pd.read_csv(up_scan)
+                
+                try:
+                    df_t_raw = pd.read_excel(up_stock)
+                except:
+                    df_t_raw = pd.read_csv(up_stock)
                 
                 with st.spinner("Menghitung ulang data..."):
                     # Proses 1: Scan vs System
@@ -732,8 +763,8 @@ def menu_Stock_Opname():
                         item_dict['SKU'] = item_dict['SKU'].astype(str).str.strip().str.upper()
                         map_name = item_dict.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
                         real_plus['ITEM NAME'] = real_plus['SKU'].map(map_name)
-                    except:
-                        pass
+                    except Exception as e:
+                        st.warning(f"Lookup Gagal: {e}")
 
                     st.session_state.final_data = {
                         'res_scan': res_scan, 'res_stock': res_stock,
@@ -766,40 +797,51 @@ def menu_Stock_Opname():
             df = df.loc[:, ~df.columns.duplicated()]
             return df
 
-       
-
         t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
         
         with t1:
             df1 = prepare_df(d['res_scan'])
-            # Jika masih error, tampilkan tanpa style agar app tidak mati
-            try:
-                st.dataframe(df1.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
-            except:
+            # Cek apakah kolom IS_YELLOW ada sebelum di-style
+            if 'IS_YELLOW' in df1.columns:
+                try:
+                    st.dataframe(df1.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
+                except:
+                    st.dataframe(df1, use_container_width=True)
+            else:
                 st.dataframe(df1, use_container_width=True)
 
         with t2:
             df2 = prepare_df(d['res_stock'])
-            try:
-                st.dataframe(df2.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
-            except:
+            if 'IS_YELLOW' in df2.columns:
+                try:
+                    st.dataframe(df2.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
+                except:
+                    st.dataframe(df2, use_container_width=True)
+            else:
                 st.dataframe(df2, use_container_width=True)
             
         with t3:
             df3 = prepare_df(d['real_plus'])
-            try:
-                st.dataframe(df3.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
-            except:
+            if 'IS_YELLOW' in df3.columns:
+                try:
+                    st.dataframe(df3.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
+                except:
+                    st.dataframe(df3, use_container_width=True)
+            else:
                 st.dataframe(df3, use_container_width=True)
             
         with t4:
             df4 = prepare_df(d['system_plus'])
-            try:
-                st.dataframe(df4.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
-            except:
+            if 'IS_YELLOW' in df4.columns:
+                try:
+                    st.dataframe(df4.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
+                except:
+                    st.dataframe(df4, use_container_width=True)
+            else:
                 st.dataframe(df4, use_container_width=True)
 
         # --- DOWNLOAD BUTTON (Tetap Sama) ---
+        import io # Pastikan import io ada
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             prepare_df(d['res_scan']).to_excel(writer, sheet_name='DATA SCAN', index=False)
@@ -808,7 +850,6 @@ def menu_Stock_Opname():
             prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM +', index=False)
         
         st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
-
 def menu_fdr_update():
     st.markdown('<div class="hero-header"><h1>🚚 FDR OUTSTANDING - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
 
