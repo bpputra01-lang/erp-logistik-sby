@@ -799,47 +799,41 @@ def menu_Stock_Opname():
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
             try:
-                # Load Data
-                df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
-                df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith('xlsx') else pd.read_csv(up_stock)
+                # 1. Load Data Awal
+                df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
+                df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
                 
                 with st.spinner("Memproses filter dan menghitung ulang..."):
-    # Load Data
-    df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx','csv') else pd.read_csv(up_scan)
-    df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith('xlsx') else pd.read_csv(up_stock)
+                    # --- LOGIKA FILTER PADA DATA SYSTEM (df_t_raw) ---
+                    
+                    # 1. Filter Sub Kategori di Kolom G (Index 6)
+                    if exclude_sub:
+                        df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_sub])]
+                    
+                    # 2. Filter BIN System di Kolom B (Index 1) - Menggunakan Regex/Contains
+                    if exclude_bin_sys:
+                        pattern_sys = '|'.join([re.escape(x) for x in exclude_bin_sys])
+                        df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.contains(pattern_sys, case=False, na=False)]
 
-    # --- LOGIKA FILTER PADA DATA SYSTEM (df_t_raw) ---
-    
-    # 1. Filter Sub Kategori di Kolom G (Index 6)
-    if exclude_sub:
-        df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_sub])]
-    
-    # 2. Filter BIN System di Kolom B (Index 1) - Menggunakan Regex/Contains
-    if exclude_bin_sys:
-        pattern_sys = '|'.join([re.escape(x) for x in exclude_bin_sys])
-        df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.contains(pattern_sys, case=False, na=False)]
+                    # --- DATA SCAN (df_s_raw) TIDAK DIFILTER ---
+                    # Dibiarkan utuh sesuai permintaan Anda
 
-    # --- DATA SCAN (df_s_raw) TIDAK DIFILTER ---
-    # Sesuai permintaan: File data scan tidak diapa-apakan agar bisa dicek 
-    # apakah SKU-nya (Kolom B) ada di System atau tidak.
-
-    # Cek apakah data system menjadi kosong setelah filter
-    if df_t_raw.empty:
-        st.error("❌ Data System kosong setelah difilter! Tidak ada data yang bisa dicompare.")
-    else:
-        # Jalankan logic compare
-        # Pastikan fungsi logic_compare Anda mencari SKU di kolom B pada data scan
-        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw, up_scan)
-        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw, up_stock)
-        
-        if res_scan is not None and res_stock is not None:
-            st.session_state.final_data = {
-                'res_scan': res_scan, 
-                'res_stock': res_stock,
-                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
-                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
-            }
-            st.success("✅ Compare Berhasil! Data Scan utuh, Data System difilter.")
+                    # 2. Cek apakah data system menjadi kosong setelah filter
+                    if df_t_raw.empty:
+                        st.error("❌ Data System kosong setelah difilter! Tidak ada data yang bisa dicompare.")
+                    else:
+                        # Jalankan logic compare
+                        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw, up_scan)
+                        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw, up_stock)
+                        
+                        if res_scan is not None and res_stock is not None:
+                            st.session_state.final_data = {
+                                'res_scan': res_scan, 
+                                'res_stock': res_stock,
+                                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
+                                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+                            }
+                            st.success("✅ Compare Berhasil! Data Scan utuh, Data System difilter.")
                         else:
                             st.error("❌ Gagal mendapatkan hasil compare. Periksa format kolom file Anda.")
 
