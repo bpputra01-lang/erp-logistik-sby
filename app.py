@@ -1241,8 +1241,8 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     for _, row in mismatch_df.iterrows():
         sku = row['SKU_UPPER']
         # Cari baris di AppSheet yang mengandung SKU ini
-        mask_app = (df_a['9'].astype(str).str.strip().upper() == sku) | \
-                   (df_a['15'].astype(str).str.strip().upper() == sku)
+        mask_app = (df_a['9'].astype(str).str.strip().str.upper() == sku) | \
+           (df_a['15'].astype(str).str.strip().str.upper() == sku)
         found_rows = df_a[mask_app]
         
         if not found_rows.empty:
