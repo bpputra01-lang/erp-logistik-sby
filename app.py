@@ -1304,6 +1304,74 @@ def engine_refresh_appsheet_v2(df_app_first, df_selisih):
     # Kembalikan nama kolom asli
     df_res.columns = df_app_first.columns
     return df_res
+def engine_refresh_rto(df_app_awal, df_selisih):
+    """
+    LOGIKA REFRESH:
+    1. Menggunakan data Upload APPSHEET Pertama (df_app_awal).
+    2. Update QTY berdasarkan data df_selisih (Hasil Cek Real).
+    3. Cek Kolom N (index ke-13 jika 0-based):
+       - Jika Blank -> Ubah Kolom M (index 12).
+       - Jika Ada Isi -> Ubah Kolom Q (index 16).
+    """
+    import pandas as pd
+    
+    if df_app_awal.empty:
+        return df_app_awal
+
+    # Buat copy agar tidak merusak data asli
+    df_res = df_app_awal.copy()
+    
+    # 1. Buat Mapping dari Hasil Cek Real (Sheet SELISIH)
+    # SKU ada di Kolom A (index 0), BIN di Kolom E (index 4), REAL di Kolom G (index 6)
+    real_map = {}
+    for _, row in df_selisih.iterrows():
+        sku_real = str(row.iloc[0]).strip().upper()
+        bin_real = str(row.iloc[4]).strip().upper()
+        qty_real = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+        
+        # Simpan dalam key gabungan SKU|BIN
+        if sku_real not in ["", "NAN", "NONE"]:
+            real_map[f"{sku_real}|{bin_real}"] = qty_real
+
+    # 2. Update Data AppSheet
+    for idx in df_res.index:
+        # SKU di Appsheet: Kolom I (index 8) atau O (index 14)
+        sku_app = str(df_res.iloc[idx, 8]).strip().upper()
+        if sku_app in ["", "NAN", "0", "NONE"]:
+            sku_app = str(df_res.iloc[idx, 14]).strip().upper()
+            
+        # BIN di Appsheet: Kolom L (index 11) atau P (index 15)
+        bin_app1 = str(df_res.iloc[idx, 11]).strip().upper()
+        bin_app2 = str(df_res.iloc[idx, 15]).strip().upper()
+        
+        # Cek apakah kombinasi SKU & BIN ada di hasil cek real
+        target_qty = None
+        if f"{sku_app}|{bin_app1}" in real_map:
+            target_qty = real_map[f"{sku_app}|{bin_app1}"]
+        elif f"{sku_app}|{bin_app2}" in real_map:
+            target_qty = real_map[f"{sku_app}|{bin_app2}"]
+            
+        # Jika ketemu di hasil cek real, lakukan update qty
+        if target_qty is not None:
+            # Kondisi Kolom N (index 13)
+            val_n = str(df_res.iloc[idx, 13]).strip()
+            
+            if val_n == "" or val_n.lower() == "nan":
+                # Kolom N BLANK -> Ubah Qty di Kolom M (index 12)
+                df_res.iloc[idx, 12] = target_qty
+            else:
+                # Kolom N ADA ISI -> Ubah Qty di Kolom Q (index 16)
+                df_res.iloc[idx, 16] = target_qty
+                
+    return df_res
+    # Contoh implementasi di baris 2822
+if st.button("Refresh Data"):
+    # df_upload_pertama adalah data AppSheet yang diupload di awal
+    # df_selisih_updated adalah data yang kolom 'HASIL CEK REAL'-nya sudah diisi user
+    app_refreshed = engine_refresh_rto(st.session_state.df_upload_pertama, df_selisih_updated)
+    
+    st.success("Data Berhasil Di-refresh!")
+    st.dataframe(app_refreshed)
 def engine_generate_new_draft(df_draft_jezpro):
     """
     Konversi dari Sub GENERATE_NEW_DRAFT_RTO
