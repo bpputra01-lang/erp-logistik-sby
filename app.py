@@ -414,7 +414,22 @@ div.stFormSubmitButton > button {
     div[data-testid="stNotification"] svg {
         fill: white !important;
     }
+        /* --- FIX: Placeholder "Choose options" menjadi Putih --- */
+    /* Targetkan elemen placeholder secara spesifik */
+    div[data-baseweb="select"] div[data-baseweb="value"] {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
+    /* Jika menggunakan versi Streamlit lama, gunakan ini: */
+    div[data-baseweb="select"] > div > div > div {
+        color: white !important;
+    }
     
+    /* Tags/Chips yang dipilih */
+    div[data-baseweb="tag"] {
+        background-color: #1d3567 !important;
+        color: white !important;
+    }
+
     </style>
     """, unsafe_allow_html=True)
     # UI Login Center
@@ -497,6 +512,7 @@ import pandas as pd
 import io
 from openpyxl import load_workbook
 import re
+
 
 # --- FUNGSI DETEKSI WARNA ---
 def get_yellow_skus(file, column_index):
