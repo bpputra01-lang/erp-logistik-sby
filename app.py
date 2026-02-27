@@ -1181,263 +1181,147 @@ def menu_refill_withdraw():
 # =====================================================
 # ENGINE 1: REFRESH DATA RTO (SUDAH DIPERBAIKI)
 # =====================================================
-# =====================================================
-# ENGINE: PROSES AWAL DS RTO vs APPSHEET
-# =====================================================
-def engine_ds_rto_vba_total(df_ds, df_app):
+def menu_rto_v2():
+    import pandas as pd
     import numpy as np
-    
-    # 1. Persiapan Data App
-    df_app_vba = df_app.copy()
-    # Standardisasi nama kolom AppSheet menjadi angka (1, 2, 3...)
-    df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
-    
-    # Filter Status (Hanya DONE dan KURANG AMBIL yang dihitung)
-    if '2' in df_app_vba.columns:
-        mask_status = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
-        df_filtered = df_app_vba[mask_status].copy()
-    else:
-        df_filtered = df_app_vba.copy()
-    
-    # 2. Hitung Total Qty per SKU dari App
-    dict_qty = {}
-    for _, row in df_filtered.iterrows():
-        sku = str(row.get('9', '')).strip()
-        # Fallback ke kolom 15 jika 9 kosong
-        if sku in ["", "nan", "0", "None"]: 
-            sku = str(row.get('15', '')).strip()
+    import io
+
+    st.title("📦 RTO MANAGEMENT V2")
+
+    # --- STATE ---
+    if 'rto_v2' not in st.session_state:
+        st.session_state.rto_v2 = {
+            'app': None, 'ds': None, 'mismatch': None, 'app_updated': None, 'draft': None, 'result': None
+        }
+
+    # --- ENGINE: INITIAL COMPARE ---
+    def run_initial(ds, app):
+        df_app_vba = app.copy()
+        df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
         
-        if sku not in ["", "nan", "0", "None"]:
-            # Qty Bin 1 (Kolom 13) + Qty Bin 2 (Kolom 17)
-            q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
-            q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
-            dict_qty[sku] = dict_qty.get(sku, 0) + (q13 + q17)
-
-    # 3. Proses Data DS (Scan)
-    df_ds_res = df_ds.copy()
-    if len(df_ds_res.columns) >= 2:
-        orig_cols = list(df_ds_res.columns)
-        # Pastikan kolom 0 = SKU, Kolom 1 = Qty Scan
-        df_ds_res.columns = ['SKU', 'QTY SCAN'] + orig_cols[2:]
-    
-    df_ds_res['SKU'] = df_ds_res['SKU'].astype(str).str.strip()
-    df_ds_res['QTY AMBIL'] = df_ds_res['SKU'].map(dict_qty).fillna(0)
-    
-    # Hitung Note (Sesuai / Kurang / Lebih)
-    def get_note(row):
-        scan = pd.to_numeric(row.get('QTY SCAN', 0), errors='coerce') or 0
-        ambil = pd.to_numeric(row.get('QTY AMBIL', 0), errors='coerce') or 0
-        if scan > ambil: return "KELEBIHAN AMBIL"
-        elif scan < ambil: return "KURANG AMBIL"
-        else: return "SESUAI"
-    
-    df_ds_res['NOTE'] = df_ds_res.apply(get_note, axis=1)
-
-    # 4. Cari Item Tambahan (Ada di App, Tidak ada di DS)
-    sku_di_ds = set(df_ds_res['SKU'].unique())
-    list_tambahan = []
-    
-    for sku_app, qty_total in dict_qty.items():
-        if sku_app not in sku_di_ds:
-            list_tambahan.append({
-                'SKU': sku_app,
-                'QTY SCAN': 0,
-                'QTY AMBIL': qty_total,
-                'NOTE': "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
-            })
-    
-    if list_tambahan:
-        df_ds_res = pd.concat([df_ds_res, pd.DataFrame(list_tambahan)], ignore_index=True)
-
-    # 5. Generate Laporan Selisih (Detail Bin)
-    results_selisih = []
-    mismatch_df = df_ds_res[df_ds_res['NOTE'] != 'SESUAI'].copy()
-    
-    # Siapkan helper lookup untuk App
-    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
-    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
-
-    for _, row in mismatch_df.iterrows():
-        sku = row['SKU']
-        q_scan = row['QTY SCAN']
-        q_ambil = row['QTY AMBIL']
-        note = row['NOTE']
-        
-        mask_app = (c9 == sku) | (c15 == sku)
-        found_rows = df_app_vba[mask_app]
-        
-        if not found_rows.empty:
-            for _, r_app in found_rows.iterrows():
-                # Cek Bin 1
-                bin1 = str(r_app.get('12', '')).strip()
-                qty_bin1 = pd.to_numeric(r_app.get('13', 0), errors='coerce') or 0
-                if bin1 not in ["", "nan", "-", "0", "None"] and qty_bin1 > 0:
-                    results_selisih.append([sku, q_scan, q_ambil, note, bin1, qty_bin1, np.nan])
-                
-                # Cek Bin 2
-                bin2 = str(r_app.get('16', '')).strip()
-                qty_bin2 = pd.to_numeric(r_app.get('17', 0), errors='coerce') or 0
-                if bin2 not in ["", "nan", "-", "0", "None"] and qty_bin2 > 0:
-                    results_selisih.append([sku, q_scan, q_ambil, note, bin2, qty_bin2, np.nan])
+        # Filter Status
+        if '2' in df_app_vba.columns:
+            mask = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
+            df_f = df_app_vba[mask]
         else:
-            # Jika tidak ketemu di App
-            results_selisih.append([sku, q_scan, q_ambil, note, "-", 0, np.nan])
+            df_f = df_app_vba
+            
+        # Sum Qty
+        d_qty = {}
+        for _, r in df_f.iterrows():
+            sku = str(r.get('9','')).strip()
+            if sku in ["","nan","0","None"]: sku = str(r.get('15','')).strip()
+            if sku not in ["","nan","0","None"]:
+                q13 = pd.to_numeric(r.get('13',0), errors='coerce') or 0
+                q17 = pd.to_numeric(r.get('17',0), errors='coerce') or 0
+                d_qty[sku] = d_qty.get(sku,0) + (q13+q17)
 
-    df_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
-    df_selisih = df_selisih.drop_duplicates().reset_index(drop=True)
-    
-    return df_ds_res, df_selisih
-    # =====================================================
-# 1. ENGINE UTAMA (DS vs APP) - FIXED
-# =====================================================
-def engine_ds_rto_vba_total(df_ds, df_app):
-    import numpy as np
-    
-    if df_app.empty: return df_ds, pd.DataFrame()
-    
-    # Persiapan Data App
-    df_app_vba = df_app.copy()
-    df_app_vba.columns = [str(i) for i in range(1, len(df_app_vba.columns) + 1)]
-    
-    if '2' in df_app_vba.columns:
-        mask_status = df_app_vba['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
-        df_filtered = df_app_vba[mask_status].copy()
-    else:
-        df_filtered = df_app_vba.copy()
-    
-    # Hitung Total Qty per SKU
-    dict_qty = {}
-    for _, row in df_filtered.iterrows():
-        sku = str(row.get('9', '')).strip()
-        if sku in ["", "nan", "0", "None"]: sku = str(row.get('15', '')).strip()
-        if sku not in ["", "nan", "0", "None"]:
-            q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
-            q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
-            dict_qty[sku] = dict_qty.get(sku, 0) + (q13 + q17)
-
-    # Proses Data DS
-    df_ds_res = df_ds.copy()
-    if len(df_ds_res.columns) >= 2:
-        orig_cols = list(df_ds_res.columns)
-        df_ds_res.columns = ['SKU', 'QTY SCAN'] + orig_cols[2:]
-    
-    df_ds_res['SKU'] = df_ds_res['SKU'].astype(str).str.strip()
-    df_ds_res['QTY AMBIL'] = df_ds_res['SKU'].map(dict_qty).fillna(0)
-    
-    def get_note(row):
-        scan = pd.to_numeric(row.get('QTY SCAN', 0), errors='coerce') or 0
-        ambil = pd.to_numeric(row.get('QTY AMBIL', 0), errors='coerce') or 0
-        if scan > ambil: return "KELEBIHAN AMBIL"
-        elif scan < ambil: return "KURANG AMBIL"
-        else: return "SESUAI"
-    
-    df_ds_res['NOTE'] = df_ds_res.apply(get_note, axis=1)
-
-    # Cari Item Tambahan
-    sku_di_ds = set(df_ds_res['SKU'].unique())
-    list_tambahan = []
-    for sku_app, qty_total in dict_qty.items():
-        if sku_app not in sku_di_ds:
-            list_tambahan.append({'SKU': sku_app, 'QTY SCAN': 0, 'QTY AMBIL': qty_total, 'NOTE': "DI APPSHEET DIAMBIL DI DS TIDAK ADA"})
-    
-    if list_tambahan:
-        df_ds_res = pd.concat([df_ds_res, pd.DataFrame(list_tambahan)], ignore_index=True)
-
-    # Generate Selisih
-    results_selisih = []
-    mismatch_df = df_ds_res[df_ds_res['NOTE'] != 'SESUAI'].copy()
-    
-    c9 = df_app_vba['9'].astype(str).str.strip() if '9' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
-    c15 = df_app_vba['15'].astype(str).str.strip() if '15' in df_app_vba.columns else pd.Series([""]*len(df_app_vba), index=df_app_vba.index)
-
-    for _, row in mismatch_df.iterrows():
-        sku = row['SKU']
-        q_scan = row['QTY SCAN']
-        q_ambil = row['QTY AMBIL']
-        note = row['NOTE']
+        # Process DS
+        df_res = ds.copy()
+        if len(df_res.columns) >= 2:
+            df_res.columns = ['SKU', 'QTY SCAN'] + list(df_res.columns[2:])
+        df_res['SKU'] = df_res['SKU'].astype(str).str.strip()
+        df_res['QTY AMBIL'] = df_res['SKU'].map(d_qty).fillna(0)
         
-        mask_app = (c9 == sku) | (c15 == sku)
-        found_rows = df_app_vba[mask_app]
+        def get_note(row):
+            s = pd.to_numeric(row.get('QTY SCAN',0), errors='coerce') or 0
+            a = pd.to_numeric(row.get('QTY AMBIL',0), errors='coerce') or 0
+            if s > a: return "KELEBIHAN"
+            elif s < a: return "KURANG"
+            return "SESUAI"
         
-        if not found_rows.empty:
-            for _, r_app in found_rows.iterrows():
-                bin1 = str(r_app.get('12', '')).strip()
-                qty_bin1 = pd.to_numeric(r_app.get('13', 0), errors='coerce') or 0
-                if bin1 not in ["", "nan", "-", "0", "None"] and qty_bin1 > 0:
-                    results_selisih.append([sku, q_scan, q_ambil, note, bin1, qty_bin1, np.nan])
+        df_res['NOTE'] = df_res.apply(get_note, axis=1)
+        
+        # Mismatch Detail
+        mis = df_res[df_res['NOTE'] != 'SESUAI'].copy()
+        res = []
+        c9 = df_app_vba['9'].astype(str).str.strip()
+        c15 = df_app_vba['15'].astype(str).str.strip()
+        
+        for _, r in mis.iterrows():
+            sku = r['SKU']
+            mask_app = (c9 == sku) | (c15 == sku)
+            rows = df_app_vba[mask_app]
+            if not rows.empty:
+                for _, ra in rows.iterrows():
+                    b1 = str(ra.get('12','')).strip(); q1 = pd.to_numeric(ra.get('13',0), errors='coerce') or 0
+                    if b1 not in ["","nan","-","0","None"] and q1 > 0: res.append([sku, r['QTY SCAN'], r['QTY AMBIL'], r['NOTE'], b1, q1, 0])
+                    b2 = str(ra.get('16','')).strip(); q2 = pd.to_numeric(ra.get('17',0), errors='coerce') or 0
+                    if b2 not in ["","nan","-","0","None"] and q2 > 0: res.append([sku, r['QTY SCAN'], r['QTY AMBIL'], r['NOTE'], b2, q2, 0])
+            else:
+                res.append([sku, r['QTY SCAN'], r['QTY AMBIL'], r['NOTE'], "-", 0, 0])
                 
-                bin2 = str(r_app.get('16', '')).strip()
-                qty_bin2 = pd.to_numeric(r_app.get('17', 0), errors='coerce') or 0
-                if bin2 not in ["", "nan", "-", "0", "None"] and qty_bin2 > 0:
-                    results_selisih.append([sku, q_scan, q_ambil, note, bin2, qty_bin2, np.nan])
-        else:
-            results_selisih.append([sku, q_scan, q_ambil, note, "-", 0, np.nan])
+        return df_res, pd.DataFrame(res, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY BIN','HASIL CEK REAL'])
 
-    df_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
-    df_selisih = df_selisih.drop_duplicates().reset_index(drop=True)
-    
-    return df_ds_res, df_selisih
+    # --- ENGINE: UPDATE APP (LOOKUP) ---
+    def update_app(app_df, sel_df):
+        df = app_df.copy()
+        df.columns = [str(i) for i in range(1, len(df.columns)+1)]
+        cnt = 0
+        for _, rs in sel_df.iterrows():
+            sku = str(rs.get('SKU','')).strip()
+            bin_val = str(rs.get('BIN','')).strip()
+            qty = pd.to_numeric(rs.get('HASIL CEK REAL',0), errors='coerce') or 0
+            if sku and bin_val and qty > 0:
+                for idx, ra in df.iterrows():
+                    sku_a = str(ra.get('9','')).strip() or str(ra.get('15','')).strip()
+                    if sku_a == sku:
+                        if str(ra.get('12','')).strip() == bin_val:
+                            df.at[idx, '13'] = qty; cnt+=1
+                        if str(ra.get('16','')).strip() == bin_val:
+                            df.at[idx, '17'] = qty; cnt+=1
+        return df, cnt
 
-# =====================================================
-# 2. ENGINE BARU (SIMPLE NEW DRAFT) - OPSI LAIN
-# =====================================================
-def engine_simple_new_draft(df_draft, df_selisih):
-    """
-    Metode alternatif yang lebih aman:
-    Langsung cocokan Draft dengan 'HASIL CEK REAL' dari df_selisih.
-    Jika ada input real, gunakannya. Jika tidak, gunakan qty draft awal.
-    """
-    results = {}
-    
-    # 1. Mapping dari Input Real (df_selisih)
-    real_map = {}
-    for _, row in df_selisih.iterrows():
-        sku = str(row.get('SKU', '')).strip()
-        bin_val = str(row.get('BIN', '')).strip()
-        qty = pd.to_numeric(row.get('HASIL CEK REAL', 0), errors='coerce') or 0
+    # --- ENGINE: COMPARE DRAFT ---
+    def compare_draft(app_df, draft_df):
+        df_a = app_df.copy()
+        df_a.columns = [str(i) for i in range(1, len(df_a.columns)+1)]
+        d_app = {}
+        for _, r in df_a.iterrows():
+            for s in range(2):
+                sku = str(r.get('9' if s==0 else '15','')).strip()
+                bin_val = str(r.get('12' if s==0 else '16','')).strip()
+                qty = pd.to_numeric(r.get('13' if s==0 else '17',0), errors='coerce') or 0
+                if sku and bin_val and qty > 0: d_app[sku+"|"+bin_val] = qty
         
-        key = sku + "|" + bin_val
-        # Hanya masukkan ke map jika Qty Real > 0
-        if qty > 0:
-            real_map[key] = qty
+        res = []
+        for _, r in draft_df.iterrows():
+            sku = str(r.iloc[3]).strip()
+            bin_val = str(r.iloc[8]).strip()
+            qty_d = pd.to_numeric(r.iloc[7], errors='coerce') or 0
+            key = sku+"|"+bin_val
+            qty_a = d_app.get(key, 0)
             
-    # 2. Proses Draft
-    for idx, row in df_draft.iterrows():
-        if len(row) < 13: continue
-            
-        sku = str(row.iloc[3]).strip()
-        bin_i = str(row.iloc[8]).strip()
-        qty_draft = pd.to_numeric(row.iloc[7], errors='coerce') or 0
-        
-        bin_l = str(row.iloc[11]).strip() if len(row) > 11 else ""
-        qty_m_draft = pd.to_numeric(row.iloc[12], errors='coerce') or 0 if len(row) > 12 else 0
-        
-        # LOGIC UTAMA:
-        # Cek di 'real_map'. Jika ada, pakai Qty Real. Jika tidak, pakai Qty Draft.
-        key_main = sku + "|" + bin_i
-        qty_final = real_map.get(key_main, qty_draft)
-        
-        qty_m = 0
-        if bin_l:
-            key_lain = sku + "|" + bin_l
-            qty_m = real_map.get(key_lain, qty_m_draft)
-        
-        # Simpan hasil
-        if qty_final > 0:
-            results[bin_i + "|" + sku] = results.get(bin_i + "|" + sku, 0) + qty_final
-        if qty_m > 0:
-            results[bin_l + "|" + sku] = results.get(bin_l + "|" + sku, 0) + qty_m
+            if qty_a == 0:
+                res.append([sku, qty_d, 0, "HAPUS"])
+            elif qty_a < qty_d:
+                res.append([sku, qty_d, qty_a, "EDIT QTY"])
+            else:
+                res.append([sku, qty_d, qty_a, "OK"])
+                
+        df_res = draft_df.copy()
+        df_res['QTY APP'] = [x[2] for x in res]
+        df_res['STATUS'] = [x[3] for x in res]
+        return df_res
 
-    # 3. Format Output
-    if not results: return pd.DataFrame(columns=['BIN', 'SKU', 'QUANTITY'])
-    
-    data = []
-    for k, v in results.items():
-        parts = k.split("|")
-        if len(parts) == 2:
-            data.append({'BIN': parts[0], 'SKU': parts[1], 'QUANTITY': v})
-            
-    return pd.DataFrame(data).sort_values('BIN')
+    # --- UI ---
+    c1, c2 = st.columns(2)
+    with c1: f_ds = st.file_uploader("Data DS", type=['xlsx','csv'], key="ds_v2")
+    with c2: f_app = st.file_uploader("Data App", type=['xlsx','csv'], key="app_v2")
+
+    if f_ds and f_app:
+        if st.button("🚀 PROSES AWAL"):
+            with st.spinner("Processing..."):
+                ds = pd.read_excel(f_ds) if f_ds.name.endswith('xlsx') else pd.read_csv(f_ds)
+                app = pd.read_excel(f_app) if f_app.name.endswith('xlsx') else pd.read_csv(f_app)
+                _, mis = run_initial(ds, app)
+                st.session_state.rto_v2['ds'] = ds
+                st.session_state.rto_v2['app'] = app
+                st.session_state.rto_v2['mismatch'] = mis
+                st.session_state.rto_v2['app_updated'] = app.copy()
+            st.rerun()
+
+    if st.session_state.rto
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
