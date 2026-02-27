@@ -702,8 +702,7 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
 # =========================================================
 def menu_Stock_Opname():
     st.markdown("""
-        <style>
-        /* 1. Header Utama */
+       <style>
         .hero-header { 
             background-color: #1d3567; 
             padding: 20px; border-radius: 10px; margin-bottom: 20px; 
@@ -711,28 +710,37 @@ def menu_Stock_Opname():
         }
         .hero-header h1 { color: white; margin: 0; font-size: 28px; font-weight: bold; }
         
-        /* 2. Container Filter - Gunakan warna gelap agar teks putih terlihat */
         .filter-container {
-            background-color: #1d3567; 
+            background-color: #f8f9fa;
             padding: 15px;
             border-radius: 10px;
-            border: 1px solid #333;
+            border: 1px solid #e0e0e0;
             margin-bottom: 20px;
         }
 
-        /* 3. PERBAIKAN TOTAL: Target semua jenis label tulisan agar jadi PUTIH */
-        /* Ini menargetkan label di atas kotak multiselect */
-        div[data-testid="stWidgetLabel"] label p, 
-        div[data-testid="stWidgetLabel"] p,
-        label[data-testid="stWidgetLabel"] p {
+        /* --- PERBAIKAN: TULISAN 'CHOOSE OPTIONS' JADI PUTIH --- */
+        
+        /* 1. Target teks placeholder (Choose options) agar berwarna putih */
+        div[data-baseweb="select"] div[aria-hidden="true"] {
             color: white !important;
-            font-weight: bold !important;
-            font-size: 1rem !important;
+            opacity: 1 !important;
         }
 
-        /* Target teks "Choose options" di dalam box agar lebih terang (opsional) */
-        span[data-baseweb="select"] div {
-            color: #cccccc !important;
+        /* 2. Target teks input saat Anda mulai mengetik agar berwarna putih */
+        div[data-baseweb="select"] input {
+            color: white !important;
+        }
+
+        /* 3. Memastikan icon panah dropdown juga berwarna putih agar senada */
+        svg[title="open"] {
+            fill: white !important;
+        }
+
+        /* 4. Karena tulisan di dalam kotak jadi putih, 
+              pastikan isi kotak (background-nya) tetap gelap agar terbaca */
+        div[data-baseweb="select"] > div {
+            background-color: #262730 !important;
+            border-color: #464855 !important;
         }
         </style>
     """, unsafe_allow_html=True)
