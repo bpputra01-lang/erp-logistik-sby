@@ -851,9 +851,17 @@ def menu_Stock_Opname():
         
         st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
 
-# MENU: FDR UPDATE (YANG TELAH DIPERBAIKI & AMAN)
-# =====================================================
-elif menu == "FDR Update"
+# =========================================================
+# 3. MENU: FDR UPDATE (PERBAIKAN FINAL)
+# =========================================================
+
+# PASTIKAN KODE DI BAWAH MENU SEBELUMNYA BAIK, CONTOH:
+# elif menu == "Stock Opname":
+#     menu_Stock_Opname()
+# elif menu == "FDR Update": # <-- PASTIKAN ADA ':' DI AKHIR BARIS INI
+#     ...
+
+elif menu == "FDR Update":
     st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
     
     # --- CSS ---
@@ -889,14 +897,12 @@ elif menu == "FDR Update"
     # --- LOAD FILE (DENGAN ERROR HANDLING) ---
     if u_file and st.session_state.ws_manifest_fdr is None:
         try:
-            # Coba baca file Excel
             st.session_state.ws_manifest_fdr = pd.read_excel(u_file)
             st.success(f"File {u_file.name} berhasil dimuat!")
             st.rerun()
         except ValueError as e:
             st.error(f"❌ Gagal Membaca File: Format tidak sesuai atau file corrupt.")
             st.warning("Pastikan file adalah .xlsx asli dan bukan .csv yang diganti nama.")
-            # Reset session agar user bisa upload ulang
             st.session_state.fdr_current_file = None
             st.session_state.ws_manifest_fdr = None
         except Exception as e:
@@ -977,7 +983,6 @@ elif menu == "FDR Update"
     if st.session_state.dict_kurir_fdr:
         st.subheader(f"🛵 OUTSTANDING COURIER ({len(st.session_state.dict_kurir_fdr)} Kurir)")
         
-        # --- KOLOM DOWNLOAD ---
         d1, d2 = st.columns([2, 1])
         
         with d1:
@@ -985,15 +990,14 @@ elif menu == "FDR Update"
             selected_kurir = st.selectbox("Pilih Kurir untuk Dilihat:", list_kurir, key="select_kurir_view")
         
         with d2:
-            st.write("")  # Spacer
+            st.write("") 
             st.write("### 📥 Download Options")
         
-        # --- DOWNLOAD PARTIAL (SATU KURIR) ---
+        # DOWNLOAD PARTIAL & ALL
         col_dl_partial, col_dl_all = st.columns(2)
         
         with col_dl_partial:
             if selected_kurir:
-                # Konversi ke CSV
                 csv_partial = st.session_state.dict_kurir_fdr[selected_kurir].to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label=f"📥 Download {selected_kurir} (CSV)",
@@ -1004,25 +1008,17 @@ elif menu == "FDR Update"
                 )
         
         with col_dl_all:
-            # --- DOWNLOAD ALL (EXCEL MULTI-SHEET) ---
             if st.session_state.dict_kurir_fdr:
-                # Buat buffer untuk Excel
                 import io
                 output = io.BytesIO()
                 
-                # Gunakan pandas ExcelWriter
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     for nama_kurir, df_kurir in st.session_state.dict_kurir_fdr.items():
-                        # Bersihkan nama sheet (max 31 karakter, tidak boleh ada [ ] : * ? / \$
                         safe_name = "".join([c for c in str(nama_kurir) if c.isalpha() or c.isdigit() or c in (' ', '_')]).rstrip()
-                        if len(safe_name) > 31:
-                            safe_name = safe_name[:31]
-                        
+                        if len(safe_name) > 31: safe_name = safe_name[:31]
                         df_kurir.to_excel(writer, sheet_name=safe_name, index=False)
                 
-                # Siapkan data untuk didownload
                 excel_data = output.getvalue()
-                
                 st.download_button(
                     label="📊 Download ALL (Excel Multi-Sheet)",
                     data=excel_data,
@@ -1032,27 +1028,15 @@ elif menu == "FDR Update"
                 )
         
         st.divider()
-        
-        # TAMPILKAN TABEL YANG DIPILIH
         if selected_kurir:
             st.dataframe(st.session_state.dict_kurir_fdr[selected_kurir], use_container_width=True, hide_index=True)
-        
         st.divider()
 
     # 2. AREA FU IT
     if st.session_state.ws_fu_it_fdr is not None:
         st.subheader(f"📋 PERLU FU IT ({len(st.session_state.ws_fu_it_fdr)} Baris)")
-        
-        # Download Button FU IT
         csv_fu = st.session_state.ws_fu_it_fdr.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Data FU IT (CSV)",
-            data=csv_fu,
-            file_name="Data_FU_IT.csv",
-            mime="text/csv",
-            key="dl_fu_it"
-        )
-        
+        st.download_button("📥 Download Data FU IT (CSV)", csv_fu, "Data_FU_IT.csv", "text/csv", key="dl_fu_it")
         st.dataframe(st.session_state.ws_fu_it_fdr, use_container_width=True, hide_index=True)
         st.divider()
 
