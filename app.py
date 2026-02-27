@@ -644,34 +644,57 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
 
 # --- MENU UTAMA ---
 def menu_Stock_Opname():
-    st.markdown("""
+        st.markdown("""
        <style>
         .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
         .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
-        div[data-baseweb="select"] > div { background-color: #262730 !important; border-color: #464855 !important; color: white !important; }
-        div[data-baseweb="select"] input { color: white !important; }
-        div[data-baseweb="select"] span { color: white !important; }
-        div[data-baseweb="select"] svg { fill: white !important; }
-         * Untuk seluruh elemen dropdown */
-    div.stSelectbox > div {
-        background-color: white !important;
-    }
-    
-    /* Input teks */
-    .stMultiSelect input {
-        color: black !important;
-    }
-    
-    /* Placeholder */
-    .stMultiSelect div[data-baseweb="select"] span {
-        color: black !important;
-    }
-    
-    /* Kotak utama MultiSelect */
-    div[data-baseweb="select"] {
-        background-color: white !important;
-        border: 1px solid #ccc !important;
-    }
+        
+        /* --- DROPDOWN STYLE --- */
+        /* Kotak Utama */
+        div[data-baseweb="select"] > div {
+            background-color: #262730 !important;
+            border-color: #464855 !important;
+            color: white !important;
+        }
+        
+        /* Input Tulisan */
+        div[data-baseweb="select"] input {
+            color: white !important;
+        }
+        
+        /* Tulisan yang dipilih / Placeholder */
+        div[data-baseweb="select"] span {
+            color: white !important;
+        }
+        
+        /* Ikon Panah */
+        div[data-baseweb="select"] svg {
+            fill: white !important;
+        }
+        
+        /* --- PENTING: Placeholder Text Color --- */
+        /* Ini yang menentukan warna "Choose options" */
+        div[data-baseweb="select"] div[data-baseweb="value"] {
+            color: white !important;
+        }
+        
+        /* Tag/Chips yang dipilih */
+        div[data-baseweb="tag"] {
+            background-color: #1d3567 !important;
+            color: white !important;
+        }
+        
+        /* Dropdown Menu (saat dibuka) */
+        div[data-baseweb="popover"] {
+            background-color: #262730 !important;
+            color: white !important;
+        }
+        div[data-baseweb="popover"] ul li {
+            color: white !important;
+        }
+        div[data-baseweb="popover"] ul li:hover {
+            background-color: #1d3567 !important;
+        }
         
         </style>
     """, unsafe_allow_html=True)
