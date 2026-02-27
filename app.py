@@ -804,15 +804,15 @@ def menu_Stock_Opname():
         }
         </style>
         """, unsafe_allow_html=True)
-        
-        full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
-        partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
-        no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
-        
-        a1, a2, a3 = st.columns(3)
-        a1.metric("✅ FULL ALLOCATION", full_alloc)
-        a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
-        a3.metric("❌ NO ALLOCATION", no_alloc)
+    
+    full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
+    partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
+    no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
+    
+    a1, a2, a3 = st.columns(3)
+    a1.metric("✅ FULL ALLOCATION", full_alloc)
+    a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
+    a3.metric("❌ NO ALLOCATION", no_alloc)
     
     st.markdown("---")
     
