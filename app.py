@@ -779,32 +779,40 @@ def menu_Stock_Opname():
         # --- METRICS ALLOCATION (WARNA GELAP) ---
     st.markdown("### 📊 RINGKASAN ALLOCATION")
     
-    # CSS untuk metric box warna gelap
     st.markdown("""
-    <style>
-    div[data-testid="stMetric"] {
-        background-color: #262730;
-        border: 1px solid #464855;
-        padding: 15px;
-        border-radius: 10px;
-    }
-    div[data-testid="stMetric"] label {
-        color: #bbbbbb !important;
-    }
-    div[data-testid="stMetricValue"] {
-        color: #FF4B4B !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
-    partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
-    no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
-    
-    a1, a2, a3 = st.columns(3)
-    a1.metric("✅ FULL ALLOCATION", full_alloc)
-    a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
-    a3.metric("❌ NO ALLOCATION", no_alloc)
+        <style>
+        /* Box Metrics Style */
+        div[data-testid="stMetric"] {
+            background-color: #1d3567 !important;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #1d3567;
+        }
+        div[data-testid="stMetric"] label {
+            color: white !important;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        div[data-testid="stMetricValue"] {
+            color: white !important;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        /* Arrow color adjustment */
+        div[data-testid="stMetric"] svg {
+            fill: white !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
+        partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
+        no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
+        
+        a1, a2, a3 = st.columns(3)
+        a1.metric("✅ FULL ALLOCATION", full_alloc)
+        a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
+        a3.metric("❌ NO ALLOCATION", no_alloc)
     
     st.markdown("---")
     
