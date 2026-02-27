@@ -496,89 +496,6 @@ import streamlit as st
 import pandas as pd
 import io
 from openpyxl import load_workbook
-
-# --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="UltraFast Stock Compare", layout="wide")
-
-# =========================================================
-# 1. FUNGSI DETEKSI WARNA (IDENTIK VBA INTERIOR.COLOR)
-# =========================================================
-def get_yellow_skus(file, column_index):
-    """Mendeteksi SKU yang selnya berwarna kuning (Excel Standard Yellow)"""
-    yellow_set = set()
-    try:
-        wb = load_workbook(file, data_only=True)
-        ws = wb.active
-        for row_idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
-            cell = ws.cell(row=row_idx, column=column_index)
-            # Kode warna kuning (Standard VBA vbYellow atau Tinted)
-            color = str(cell.fill.start_color.index)
-            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
-                sku_val = str(cell.value).strip().upper() if cell.value else ""
-                if sku_val:
-                    yellow_set.add(sku_val)
-    except:
-        pass
-    return yellow_set
-
-# =========================================================
-# 2. LOGIKA COMPARE 1: DATA SCAN VS STOCK (SUB 1)
-# =========================================================
-def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
-    # Mapping Kolom (A=0, B=1, C=2)
-    df_scan_clean = df_scan.iloc[:, [0, 1, 2]].copy()
-    df_scan_clean.columns = ['BIN', 'SKU', 'QTY SCAN']
-    
-    # Mapping Stock (B=1, C=2, J=9)
-    df_stock_lite = df_stock.iloc[:, [1, 2, 9]].copy()
-    df_stock_lite.columns = ['BIN', 'SKU', 'QTY SYSTEM']
-
-    # Logika VBA: Trim & UCase
-    for df in [df_scan_clean, df_stock_lite]:
-        df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
-        df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
-
-    # Dictionary Logic: Sum System Qty by BIN|SKU
-    dict_stock = df_stock_lite.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().to_dict()
-
-    # Process Compare
-    qty_sys_list = []
-    diff_list = []
-    note_list = []
-    
-    for _, row in df_scan_clean.iterrows():
-        key = f"{row['BIN']}|{row['SKU']}"
-        qty_scan = row['QTY_SCAN']
-        qty_sys = dict_stock.get(key, 0)
-        
-        diff = qty_scan - qty_sys
-        qty_sys_list.append(qty_sys)
-        diff_list.append(diff)
-        note_list.append("REAL +" if qty_scan > qty_sys else "OK")
-
-    df_scan_clean['QTY_SYSTEM'] = qty_sys_list
-    df_scan_clean['DIFF'] = diff_list
-    df_scan_clean['NOTE'] = note_list
-    
-
-    return df_scan_clean
-
-# =========================================================
-# 3. LOGIKA COMPARE 2: STOCK VS DATA SCAN (SUB 2)
-# =========================================================
-import streamlit as st
-import pandas as pd
-import io
-from openpyxl import load_workbook
-
-# --- KONFIGURASI HALAMAN ---
-# Pastikan ini ada di bagian paling atas script app.py Anda
-# st.set_page_config(page_title="UltraFast Stock Compare", layout="wide")
-
-import streamlit as st
-import pandas as pd
-import io
-from openpyxl import load_workbook
 import re
 
 # =========================================================
@@ -911,9 +828,9 @@ def menu_Stock_Opname():
             prepare_df(d['res_scan']).to_excel(writer, sheet_name='DATA SCAN', index=False)
             prepare_df(d['res_stock']).to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
             prepare_df(d['real_plus']).to_excel(writer, sheet_name='REAL +', index=False)
-            prepare_df(dto_excel(writer['system_plus'])., sheet_name='SYSTEM +', index=False)
+            prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM +', index=False)
         
-        st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container)
+        st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
