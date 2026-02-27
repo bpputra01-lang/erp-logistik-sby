@@ -3077,7 +3077,7 @@ elif menu == "Compare RTO":
 
 ## MENU: FDR UPDATE (YANG DIPERBAIKI & LENGKAP)
 # =====================================================
-# MENU: FDR UPDATE (DENGAN FITUR DOWNLOAD)
+# MENU: FDR UPDATE (DOWNLOAD EXCEL MULTI-SHEET)
 # =====================================================
 elif menu == "FDR Update":
     st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
@@ -3210,7 +3210,7 @@ elif menu == "FDR Update":
                 # Konversi ke CSV
                 csv_partial = st.session_state.dict_kurir_fdr[selected_kurir].to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label=f"📥 Download {selected_kurir} (Partial)",
+                    label=f"📥 Download {selected_kurir} (CSV)",
                     data=csv_partial,
                     file_name=f"Outstanding_{selected_kurir}.csv",
                     mime="text/csv",
@@ -3218,25 +3218,31 @@ elif menu == "FDR Update":
                 )
         
         with col_dl_all:
-            # --- DOWNLOAD ALL (SEMUA KURIR DALAM 1 ZIP) ---
+            # --- DOWNLOAD ALL (EXCEL MULTI-SHEET) ---
             if st.session_state.dict_kurir_fdr:
-                # Buat buffer untuk ZIP
+                # Buat buffer untuk Excel
                 import io
-                zip_buffer = io.BytesIO()
+                output = io.BytesIO()
                 
-                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                # Gunakan pandas ExcelWriter
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     for nama_kurir, df_kurir in st.session_state.dict_kurir_fdr.items():
-                        # Bersihkan nama file dari karakter aneh
-                        safe_name = "".join([c for c in nama_kurir if c.isalpha() or c.isdigit() or c in (' ', '_')]).rstrip()
-                        csv_data = df_kurir.to_csv(index=False)
-                        zip_file.writestr(f"Outstanding_{safe_name}.csv", csv_data)
+                        # Bersihkan nama sheet (max 31 karakter, tidak boleh ada [ ] : * ? / \$
+                        safe_name = "".join([c for c in str(nama_kurir) if c.isalpha() or c.isdigit() or c in (' ', '_')]).rstrip()
+                        if len(safe_name) > 31:
+                            safe_name = safe_name[:31]
+                        
+                        df_kurir.to_excel(writer, sheet_name=safe_name, index=False)
+                
+                # Siapkan data untuk didownload
+                excel_data = output.getvalue()
                 
                 st.download_button(
-                    label="📦 Download ALL (ZIP)",
-                    data=zip_buffer.getvalue(),
-                    file_name="All_Outstanding_Courier.zip",
-                    mime="application/zip",
-                    key="dl_all_zip"
+                    label="📊 Download ALL (Excel Multi-Sheet)",
+                    data=excel_data,
+                    file_name="All_Outstanding_Courier.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_all_excel"
                 )
         
         st.divider()
@@ -3254,7 +3260,7 @@ elif menu == "FDR Update":
         # Download Button FU IT
         csv_fu = st.session_state.ws_fu_it_fdr.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Download Data FU IT",
+            label="📥 Download Data FU IT (CSV)",
             data=csv_fu,
             file_name="Data_FU_IT.csv",
             mime="text/csv",
