@@ -824,7 +824,7 @@ def menu_fdr_update():
         st.session_state.grid_fdr = pd.DataFrame()  # Inisialisasi awal agar tidak error
 
     # --- 1. TABS SYSTEM ---
-    t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "🛵 SPLIT KURIR"])
+    t1, t2, t3 = st.tabs(["📥 MANIFEST INPUT", "📋 PERLU FU IT", "🛵 OUTSTANDING COURIER"])
 
     with t1:
         st.subheader("🛠️ Macro Control Panel")
