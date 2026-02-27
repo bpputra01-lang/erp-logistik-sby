@@ -3075,8 +3075,7 @@ elif menu == "Compare RTO":
                 csv_new = new_draft.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Download New Draft", csv_new, "NEW_DRAFT_RTO.csv", "text/csv", use_container_width=True)
 
-# =====================================================
-# MENU: FDR UPDATE (YANG DIPERBAIKI)
+## MENU: FDR UPDATE (YANG DIPERBAIKI & LENGKAP)
 # =====================================================
 elif menu == "FDR Update":
     st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
@@ -3144,6 +3143,7 @@ elif menu == "FDR Update":
     if c[1].button("🖥️ NEED FU IT", key="btn_fu_v2"):
         if st.session_state.ws_manifest_fdr is not None:
             df = st.session_state.ws_manifest_fdr.copy()
+            # Asumsi kolom M (index 12) adalah kolom status IT
             mask = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
             st.session_state.ws_fu_it_fdr = df[mask].iloc[:, 0:13]
             st.success(f"✅ {len(st.session_state.ws_fu_it_fdr)} Baris!")
@@ -3154,18 +3154,25 @@ elif menu == "FDR Update":
     if c[2].button("🛵 OUTSTANDING COURIER", key="btn_split_v2"):
         if st.session_state.ws_manifest_fdr is not None:
             df = st.session_state.ws_manifest_fdr.copy()
-            f_val = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
-            m_val = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
             
-            mask = (f_val != "") & (m_val == "")
-            filtered = df[mask].copy()
-            
-            if not filtered.empty:
-                d_kurir = {str(n): g.iloc[:, 0:13] for n, g in filtered.groupby(filtered.iloc[:, 5])}
-                st.session_state.dict_kurir_fdr = d_kurir
-                st.success(f"✅ {len(d_kurir)} Kurir")
+            # Pastikankolom ada
+            if len(df.columns) > 12:
+                f_val = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
+                m_val = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+                
+                # Filter: Ada Nama Kurir (Kolom F) TAPI tidak ada Status IT (Kolom M)
+                mask = (f_val != "") & (m_val == "")
+                filtered = df[mask].copy()
+                
+                if not filtered.empty:
+                    d_kurir = {str(n): g.iloc[:, 0:13] for n, g in filtered.groupby(filtered.iloc[:, 5])}
+                    st.session_state.dict_kurir_fdr = d_kurir
+                    st.success(f"✅ {len(d_kurir)} Kurir Ditampilkan!")
+                else:
+                    st.session_state.dict_kurir_fdr = {}
+                    st.warning("Tidak ada data Outstanding (atau Kolom F/M tidak sesuai).")
             else:
-                st.error("No Data!")
+                st.error("File Excel tidak memiliki cukup kolom (Minimal 13).")
         else:
             st.error("Data Kosong!")
 
@@ -3179,9 +3186,40 @@ elif menu == "FDR Update":
 
     st.divider()
     
-    # --- PREVIEW ---
+    # --- TAMPILAN HASIL (VIEW AREA) ---
+    
+    # 1. Tampilkan Hasil Split Kurir (Jika ada)
+    if st.session_state.dict_kurir_fdr:
+        st.subheader(f"🛵 OUTSTANDING COURIER ({len(st.session_state.dict_kurir_fdr)} Kurir)")
+        
+        # Pilih Kurir untuk Preview
+        list_kurir = list(st.session_state.dict_kurir_fdr.keys())
+        selected_kurir = st.selectbox("Pilih Nama Kurir:", list_kurir, key="select_kurir_view")
+        
+        if selected_kurir:
+            st.dataframe(st.session_state.dict_kurir_fdr[selected_kurir], use_container_width=True, hide_index=True)
+            
+            # Tombol Download per Kurir
+            csv = st.session_state.dict_kurir_fdr[selected_kurir].to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label=f"📥 Download Data {selected_kurir}",
+                data=csv,
+                file_name=f"Outstanding_{selected_kurir}.csv",
+                mime="text/csv",
+                key=f"dl_{selected_kurir}"
+            )
+        
+        st.divider()
+
+    # 2. Tampilkan Data FU IT (Jika ada)
+    if st.session_state.ws_fu_it_fdr is not None:
+        st.subheader(f"📋 PERLU FU IT ({len(st.session_state.ws_fu_it_fdr)} Baris)")
+        st.dataframe(st.session_state.ws_fu_it_fdr, use_container_width=True, hide_index=True)
+        st.divider()
+
+    # 3. Tampilkan Data Master (Manifest)
     if st.session_state.ws_manifest_fdr is not None:
-        st.subheader("📂 MANIFEST DATA")
+        st.subheader("📂 MANIFEST DATA (MASTER)")
         st.dataframe(st.session_state.ws_manifest_fdr, use_container_width=True, hide_index=True)
 
 elif menu == "Refill & Withdraw":
