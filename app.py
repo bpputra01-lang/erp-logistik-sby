@@ -709,15 +709,30 @@ def menu_Stock_Opname():
             text-align: center; border: 1px solid #333;
         }
         .hero-header h1 { color: white; margin: 0; font-size: 28px; font-weight: bold; }
+        
+        /* 1. Mengubah background container menjadi gelap agar teks putih terlihat */
         .filter-container {
-            background-color: #f8f9fa;
+            background-color: #1d3567; 
             padding: 15px;
             border-radius: 10px;
-            border: 1px solid #e0e0e0;
+            border: 1px solid #333;
             margin-bottom: 20px;
+        }
+
+        /* 2. MEMAKSA WARNA TULISAN LABEL MENJADI PUTIH */
+        div[data-testid="stWidgetLabel"] p {
+            color: white !important;
+            font-weight: bold;
+        }
+
+        /* 3. (Opsional) Mengubah warna judul filter manual jika menggunakan st.markdown */
+        .filter-title {
+            color: white !important;
+            font-weight: bold;
         }
         </style>
     """, unsafe_allow_html=True)
+     
     
     # 1. JUDUL HEADER
     st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME – COMPARE SYSTEM</h1></div>', unsafe_allow_html=True)
