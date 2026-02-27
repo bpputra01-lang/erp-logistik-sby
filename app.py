@@ -652,24 +652,25 @@ def menu_Stock_Opname():
         div[data-baseweb="select"] input { color: white !important; }
         div[data-baseweb="select"] span { color: white !important; }
         div[data-baseweb="select"] svg { fill: white !important; }
-          /* Label dropdown */
-    .stSelectbox label {
-        color: white !important;
-    }
-    
-    /* Kotak dropdown utama */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] {
+         * Untuk seluruh elemen dropdown */
+    div.stSelectbox > div {
         background-color: white !important;
     }
     
-    /* Bagian dalam kotak selectbox */
-    div[data-testid="stSelectbox"] > div > div {
+    /* Input teks */
+    .stMultiSelect input {
         color: black !important;
     }
     
-    /* Ikon panah */
-    div[data-testid="stSelectbox"] svg {
-        fill: black !important;
+    /* Placeholder */
+    .stMultiSelect div[data-baseweb="select"] span {
+        color: black !important;
+    }
+    
+    /* Kotak utama MultiSelect */
+    div[data-baseweb="select"] {
+        background-color: white !important;
+        border: 1px solid #ccc !important;
     }
         
         </style>
