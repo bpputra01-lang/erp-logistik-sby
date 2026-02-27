@@ -696,35 +696,59 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
     dt = dt.loc[:, ~dt.columns.duplicated()].copy()
     
     return dt
+
 # =========================================================
-# 4. MENU UTAMA
-# =========================================================
-# =========================================================
-# 4. MENU UTAMA (STOCK OPNAME)
+# 4. MENU UTAMA (STOCK OPNAME) - UPDATED WITH FILTERS
 # =========================================================
 def menu_Stock_Opname():
-    # --- CSS ---
     st.markdown("""
         <style>
         .hero-header { 
             background-color: #0E1117; 
-            padding: 20px; 
-            border-radius: 10px; 
-            margin-bottom: 20px; 
-            text-align: center; 
-            border: 1px solid #333;
+            padding: 20px; border-radius: 10px; margin-bottom: 20px; 
+            text-align: center; border: 1px solid #333;
         }
-        .hero-header h1 {
-            color: #FF4B4B; /* Merah khas Streamlit */
-            margin: 0;
-            font-size: 32px;
-        }
+        .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
         </style>
     """, unsafe_allow_html=True)
     
-    # --- JUDUL HEADER ---
     st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE SYSTEM</h1></div>', unsafe_allow_html=True)
     
+    # --- SIDEBAR FILTERS ---
+    st.sidebar.header("🎯 Filter Pengecualian (Ignore)")
+    
+    # 1. Filter Sub Kategori (Berdasarkan Gambar 1)
+    list_sub_kat = [
+        "GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", 
+        "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", 
+        "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", 
+        "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", 
+        "NUTRITION", "BAG", "EXTRAS SHOES"
+    ]
+    exclude_sub = st.sidebar.multiselect("Hapus Sub Kategori (Stock):", list_sub_kat)
+
+    # 2. Filter BIN Stock System (Berdasarkan Gambar 2)
+    list_bin_stock = [
+        "GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", 
+        "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
+        "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
+        "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "DAU", 
+        "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", 
+        "GUDANG", "SDA", "SMG"
+    ]
+    exclude_bin_sys = st.sidebar.multiselect("Hapus BIN System:", list_bin_stock)
+
+    # 3. Filter BIN Coverage (Berdasarkan Gambar 3)
+    list_bin_cov = [
+        "KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", 
+        "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
+        "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
+        "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", 
+        "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"
+    ]
+    exclude_bin_scan = st.sidebar.multiselect("Hapus BIN Coverage (Scan):", list_bin_cov)
+
+    # --- UPLOADER ---
     c1, c2 = st.columns(2)
     with c1:
         up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="up_scan_so")
@@ -735,42 +759,45 @@ def menu_Stock_Opname():
         if st.button("▶️ RUN COMPARE", use_container_width=True):
             try:
                 # Load Data
-                # Menggunakan try-except内部的 karena kadang file berformat berbeda
-                try:
-                    df_s_raw = pd.read_excel(up_scan)
-                except:
-                    df_s_raw = pd.read_csv(up_scan)
+                df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
+                df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith('xlsx') else pd.read_csv(up_stock)
                 
-                try:
-                    df_t_raw = pd.read_excel(up_stock)
-                except:
-                    df_t_raw = pd.read_csv(up_stock)
-                
-                with st.spinner("Menghitung ulang data..."):
-                    # Proses 1: Scan vs System
+                with st.spinner("Memproses filter dan menghitung ulang..."):
+                    # --- APLIKASI FILTER ---
+                    
+                    # 1 & 2. Filter pada Stock System (Berdasarkan kolom Sub-Kategori [Index 5] dan BIN [Index 1])
+                    # Catatan: Sesuaikan index kolom jika berbeda (VBA Anda menggunakan index 1 untuk BIN)
+                    if exclude_sub:
+                        df_t_raw = df_t_raw[~df_t_raw.iloc[:, 5].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_sub])]
+                    
+                    if exclude_bin_sys:
+                        df_t_raw = df_t_raw[~df_t_raw.iloc[:, 1].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_sys])]
+
+                    # 3. Filter pada Data Scan (Berdasarkan kolom BIN [Index 0])
+                    if exclude_bin_scan:
+                        df_s_raw = df_s_raw[~df_s_raw.iloc[:, 0].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_scan])]
+
+                    # --- PROSES COMPARE (LOGIKA TETAP SAMA) ---
                     res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw, up_scan)
-                    # Proses 2: System vs Scan
                     res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw, up_stock)
                     
-                    # Proses 3: Filter (Identik Sub Generate_REAL_PLUS)
                     real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
                     system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
                     
-                    # Tambahan: Item Name Lookup (Ambil dari master stock kolom E/index 4)
+                    # Item Name Lookup
                     try:
                         item_dict = df_t_raw.iloc[:, [2, 4]].dropna()
                         item_dict.columns = ['SKU', 'NAME']
                         item_dict['SKU'] = item_dict['SKU'].astype(str).str.strip().str.upper()
                         map_name = item_dict.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
                         real_plus['ITEM NAME'] = real_plus['SKU'].map(map_name)
-                    except Exception as e:
-                        st.warning(f"Lookup Gagal: {e}")
+                    except: pass
 
                     st.session_state.final_data = {
                         'res_scan': res_scan, 'res_stock': res_stock,
                         'real_plus': real_plus, 'system_plus': system_plus
                     }
-                st.success("✅ Compare Berhasil!")
+                st.success("✅ Compare Berhasil dengan Filter!")
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
