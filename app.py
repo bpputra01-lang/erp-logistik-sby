@@ -805,7 +805,7 @@ def menu_Stock_Opname():
                 
                 with st.spinner("Memproses filter dan menghitung ulang..."):
     # Load Data
-    df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
+    df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx','csv') else pd.read_csv(up_scan)
     df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith('xlsx') else pd.read_csv(up_stock)
 
     # --- LOGIKA FILTER PADA DATA SYSTEM (df_t_raw) ---
