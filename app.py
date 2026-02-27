@@ -962,20 +962,6 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     
     return df_res, dict_system_source # Return dict baru agar informasinya update (opsional, tidak wajib)
 
-# =========================================================
-# 5. MENU UTAMA
-# =========================================================
-def menu_Stock_Opname():
-    st.markdown("""
-       <style>
-        .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
-        .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
-        div[data-baseweb="select"] > div { background-color: #262730 !important; border-color: #464855 !important; color: white !important; }
-        div[data-baseweb="select"] input { color: white !important; }
-        div[data-baseweb="select"] span { color: white !important; }
-        div[data-baseweb="select"] svg { fill: white !important; }
-        </style>
-    """, unsafe_allow_html=True)
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
