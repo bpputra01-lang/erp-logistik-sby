@@ -769,46 +769,50 @@ def menu_Stock_Opname():
                     st.error(f"❌ Error Allocation: {e}")
 
     # --- TAMPILKAN HASIL ALLOCATION & METRICS ---
-    alloc_data = st.session_state.allocation_result
-    sys_updated = st.session_state.sys_updated_result
-    
-    # --- METRICS ALLOCATION ---
-    st.markdown("### 📊 RINGKASAN ALLOCATION")
-    full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
-    partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
-    no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
-    
-    a1, a2, a3 = st.columns(3)
-    a1.metric("✅ FULL ALLOCATION", full_alloc)
-    a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
-    a3.metric("❌ NO ALLOCATION", no_alloc)
-    
-    st.markdown("---")
-    
-    # Tabs Hasil Allocation & Data System Terupdate
-    ta1, ta2, ta3 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)", "📥 DOWNLOAD"])
-    
-    with ta1:
-        st.dataframe(alloc_data, use_container_width=True)
+    if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state:
+        st.markdown("---")
+        st.subheader("📋 HASIL ALLOCATION")
         
-    with ta2:
-        st.dataframe(sys_updated, use_container_width=True)
+        alloc_data = st.session_state.allocation_result
+        sys_updated = st.session_state.sys_updated_result
         
-    with ta3:
-        # Download Excel
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-            d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
-            alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
-            sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
+        # --- METRICS ALLOCATION ---
+        st.markdown("### 📊 RINGKASAN ALLOCATION")
+        full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
+        partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
+        no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
         
-        st.download_button(
-            label="📥 DOWNLOAD HASIL EXCEL",
-            data=output.getvalue(),
-            file_name="Hasil_Allocation_Final.xlsx",
-            use_container_width=True
-        )
+        a1, a2, a3 = st.columns(3)
+        a1.metric("✅ FULL ALLOCATION", full_alloc)
+        a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
+        a3.metric("❌ NO ALLOCATION", no_alloc)
+        
+        st.markdown("---")
+        
+        # Tabs Hasil Allocation & Data System Terupdate
+        ta1, ta2, ta3 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)", "📥 DOWNLOAD"])
+        
+        with ta1:
+            st.dataframe(alloc_data, use_container_width=True)
+            
+        with ta2:
+            st.dataframe(sys_updated, use_container_width=True)
+            
+        with ta3:
+            # Download Excel
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+                d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
+                alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
+                sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
+            
+            st.download_button(
+                label="📥 DOWNLOAD HASIL EXCEL",
+                data=output.getvalue(),
+                file_name="Hasil_Allocation_Final.xlsx",
+                use_container_width=True
+            )
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
