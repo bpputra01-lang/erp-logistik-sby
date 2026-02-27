@@ -720,37 +720,27 @@ def menu_Stock_Opname():
 
         /* --- PERBAIKAN: TULISAN 'CHOOSE OPTIONS' JADI PUTIH --- */
         
-        /* --- CSS UPDATE: PAKSA CHOOSE OPTIONS JADI PUTIH SOLID --- */
-        
-        /* 1. Target teks placeholder untuk berbagai browser */
-        div[data-baseweb="select"] input::placeholder {
-            color: white !important;
-            -webkit-text-fill-color: white !important;
-            opacity: 1 !important;
-        }
-
-        /* 2. Target kontainer teks 'Choose options' secara spesifik */
-        div[data-baseweb="select"] [data-testid="stText"],
+        /* 1. Target teks placeholder (Choose options) agar berwarna putih */
         div[data-baseweb="select"] div[aria-hidden="true"] {
             color: white !important;
-            -webkit-text-fill-color: white !important;
             opacity: 1 !important;
         }
 
-        /* 3. Menghilangkan filter atau efek pudar bawaan Streamlit */
-        div[role="combobox"] {
+        /* 2. Target teks input saat Anda mulai mengetik agar berwarna putih */
+        div[data-baseweb="select"] input {
             color: white !important;
         }
 
-        /* 4. Memastikan kotak input utama memiliki kontras yang pas */
+        /* 3. Memastikan icon panah dropdown juga berwarna putih agar senada */
+        svg[title="open"] {
+            fill: white !important;
+        }
+
+        /* 4. Karena tulisan di dalam kotak jadi putih, 
+              pastikan isi kotak (background-nya) tetap gelap agar terbaca */
         div[data-baseweb="select"] > div {
-            background-color: #262730 !important; /* Biru Gelap/Hitam */
-            border: 1px solid #464855 !important;
-        }
-
-        /* 5. Target teks label di atas kotak (Sub Kategori, dll) agar tetap putih */
-        div[data-testid="stWidgetLabel"] p {
-            color: white !important;
+            background-color: #262730 !important;
+            border-color: #464855 !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -813,20 +803,23 @@ def menu_Stock_Opname():
                 df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith('xlsx') else pd.read_csv(up_stock)
                 
                 with st.spinner("Memproses filter dan menghitung ulang..."):
-                    # Aplikasi Filter dari Input Multiselect
+                    
+                    # --- PERBAIKAN LOGIKA DISINI ---
+                    # Jika user memilih kategori, maka hanya kategori tersebut yang diproses
                     if exclude_sub:
-                        # Asumsi Sub-Kategori di Kolom Index 5 (F)
-                        df_t_raw = df_t_raw[~df_t_raw.iloc[:, 5].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_sub])]
+                        # Menghapus tanda '~' agar yang dipilih = yang di-compare
+                        df_t_raw = df_t_raw[df_t_raw.iloc[:, 5].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_sub])]
                     
                     if exclude_bin_sys:
-                        # Asumsi BIN System di Kolom Index 1 (B)
-                        df_t_raw = df_t_raw[~df_t_raw.iloc[:, 1].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_sys])]
+                        # Menghapus tanda '~' agar yang dipilih = yang di-compare
+                        df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_sys])]
 
                     if exclude_bin_scan:
-                        # Asumsi BIN Scan di Kolom Index 0 (A)
-                        df_s_raw = df_s_raw[~df_s_raw.iloc[:, 0].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_scan])]
+                        # Menghapus tanda '~' agar yang dipilih = yang di-compare
+                        df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_scan])]
+                    # -------------------------------
 
-                    # Jalankan logic compare yang sudah ada
+                    # Jalankan logic compare
                     res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw, up_scan)
                     res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw, up_stock)
                     
@@ -836,7 +829,7 @@ def menu_Stock_Opname():
                         'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
                         'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
                     }
-                st.success("✅ Compare Berhasil!")
+                st.success("✅ Compare Berhasil (Hanya memproses pilihan Anda)!")
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
