@@ -703,6 +703,7 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
 def menu_Stock_Opname():
     st.markdown("""
         <style>
+        /* 1. Header Utama */
         .hero-header { 
             background-color: #1d3567; 
             padding: 20px; border-radius: 10px; margin-bottom: 20px; 
@@ -710,7 +711,7 @@ def menu_Stock_Opname():
         }
         .hero-header h1 { color: white; margin: 0; font-size: 28px; font-weight: bold; }
         
-        /* 1. Mengubah background container menjadi gelap agar teks putih terlihat */
+        /* 2. Container Filter - Gunakan warna gelap agar teks putih terlihat */
         .filter-container {
             background-color: #1d3567; 
             padding: 15px;
@@ -719,16 +720,19 @@ def menu_Stock_Opname():
             margin-bottom: 20px;
         }
 
-        /* 2. MEMAKSA WARNA TULISAN LABEL MENJADI PUTIH */
-        div[data-testid="stWidgetLabel"] p {
+        /* 3. PERBAIKAN TOTAL: Target semua jenis label tulisan agar jadi PUTIH */
+        /* Ini menargetkan label di atas kotak multiselect */
+        div[data-testid="stWidgetLabel"] label p, 
+        div[data-testid="stWidgetLabel"] p,
+        label[data-testid="stWidgetLabel"] p {
             color: white !important;
-            font-weight: bold;
+            font-weight: bold !important;
+            font-size: 1rem !important;
         }
 
-        /* 3. (Opsional) Mengubah warna judul filter manual jika menggunakan st.markdown */
-        .filter-title {
-            color: white !important;
-            font-weight: bold;
+        /* Target teks "Choose options" di dalam box agar lebih terang (opsional) */
+        span[data-baseweb="select"] div {
+            color: #cccccc !important;
         }
         </style>
     """, unsafe_allow_html=True)
