@@ -1304,7 +1304,7 @@ def engine_refresh_appsheet_v2(df_app_first, df_selisih):
     # Kembalikan nama kolom asli
     df_res.columns = df_app_first.columns
     return df_res
-    def engine_generate_new_draft(df_draft_jezpro):
+def engine_generate_new_draft(df_draft_jezpro):
     """
     Konversi dari Sub GENERATE_NEW_DRAFT_RTO
     """
