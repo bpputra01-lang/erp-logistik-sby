@@ -1362,7 +1362,66 @@ def engine_compare_draft_jezpro(df_app, df_draft):
         df_res.loc[idx, 'STATUS'] = status_n
 
     return df_res
+def engine_generate_new_draft(df_compared):
+    """
+    Konversi dari Sub GENERATE_NEW_DRAFT_RTO.
+    Mengambil data dari Draft Jezpro yang sudah di-compare, 
+    lalu menggabungkan SKU dan BIN sesuai logika Qty J dan Qty M.
+    """
+    import pandas as pd
+    import numpy as np
 
+    if df_compared is None or df_compared.empty:
+        return pd.DataFrame(columns=['BIN', 'SKU', 'QUANTITY'])
+
+    # Dictionary untuk menampung data unik (Key: BIN|SKU)
+    dict_final = {}
+
+    for _, row in df_compared.iterrows():
+        # Berdasarkan posisi kolom DRAFT JEZPRO:
+        # SKU = Kolom D (index 3), BIN_I = Kolom I (index 8)
+        # BIN_L = Kolom L (index 11), QTY_J = Kolom J (index 9), Qty_M = Kolom M (index 12)
+        
+        sku = str(row.iloc[3]).strip().upper()
+        bin_i = str(row.iloc[8]).strip().upper()
+        bin_l = str(row.iloc[11]).strip().upper() if not pd.isna(row.iloc[11]) else ""
+        
+        qty_j = pd.to_numeric(row.get('QTY AMBIL', 0), errors='coerce') or 0
+        qty_m = pd.to_numeric(row.get('QTY BIN LAIN', 0), errors='coerce') or 0
+        
+        # --- LOGIKA 1 & 3 (Jika Qty Utama > 0) ---
+        if qty_j != 0:
+            key_utama = f"{bin_i}|{sku}"
+            dict_final[key_utama] = dict_final.get(key_utama, 0) + qty_j
+            
+            # Jika ada Bin Lain dan Qty-nya ada
+            if bin_l != "" and bin_l != "-" and qty_m != 0:
+                key_lain = f"{bin_l}|{sku}"
+                dict_final[key_lain] = dict_final.get(key_lain, 0) + qty_m
+                
+        # --- LOGIKA 4 (Jika Qty Utama 0 tapi ada Qty di Bin Lain) ---
+        elif qty_j == 0 and bin_l != "" and bin_l != "-" and qty_m != 0:
+            key_lain = f"{bin_l}|{sku}"
+            dict_final[key_lain] = dict_final.get(key_lain, 0) + qty_m
+
+    # Ubah Dictionary kembali menjadi DataFrame
+    final_data = []
+    for key, total_qty in dict_final.items():
+        if total_qty != 0:
+            b, s = key.split("|")
+            final_data.append({
+                'BIN': b,
+                'SKU': s,
+                'QUANTITY': total_qty
+            })
+
+    df_new = pd.DataFrame(final_data)
+
+    if not df_new.empty:
+        # Urutkan berdasarkan BIN agar rapi
+        df_new = df_new.sort_values(by=['BIN', 'SKU']).reset_index(drop=True)
+        
+    return df_new
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
