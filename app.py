@@ -804,34 +804,44 @@ def menu_Stock_Opname():
                 
                 with st.spinner("Memproses filter dan menghitung ulang..."):
                     
-                    # --- PERBAIKAN LOGIKA DISINI ---
-                    # Jika user memilih kategori, maka hanya kategori tersebut yang diproses
+                    # 1. Filter Sub Kategori (Tetap isin karena biasanya pilihan fix)
                     if exclude_sub:
-                        # Menghapus tanda '~' agar yang dipilih = yang di-compare
                         df_t_raw = df_t_raw[df_t_raw.iloc[:, 5].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_sub])]
                     
+                    # 2. Filter BIN System (Menggunakan Logika Regex/Contains)
                     if exclude_bin_sys:
-                        # Menghapus tanda '~' agar yang dipilih = yang di-compare
-                        df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_sys])]
+                        # Membuat pola regex: (GUDANG|LIVE|KL1)
+                        pattern_sys = '|'.join([re.escape(x) for x in exclude_bin_sys])
+                        df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.contains(pattern_sys, case=False, na=False)]
 
+                    # 3. Filter BIN Coverage (Menggunakan Logika Regex/Contains)
                     if exclude_bin_scan:
-                        # Menghapus tanda '~' agar yang dipilih = yang di-compare
-                        df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.strip().str.upper().isin([x.upper() for x in exclude_bin_scan])]
-                    # -------------------------------
+                        # Membuat pola regex: (KARANTINA|TOKO)
+                        pattern_scan = '|'.join([re.escape(x) for x in exclude_bin_scan])
+                        df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.contains(pattern_scan, case=False, na=False)]
 
-                    # Jalankan logic compare
-                    res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw, up_scan)
-                    res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw, up_stock)
-                    
-                    # Simpan ke session state
-                    st.session_state.final_data = {
-                        'res_scan': res_scan, 'res_stock': res_stock,
-                        'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
-                        'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
-                    }
-                st.success("✅ Compare Berhasil (Hanya memproses pilihan Anda)!")
+                    # Cek apakah data kosong setelah difilter untuk menghindari error NoneType
+                    if df_s_raw.empty or df_t_raw.empty:
+                        st.warning("⚠️ Data hasil filter kosong. Pastikan pilihan filter Anda ada di dalam file.")
+                    else:
+                        # Jalankan logic compare
+                        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw, up_scan)
+                        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw, up_stock)
+                        
+                        if res_scan is not None and res_stock is not None:
+                            # Simpan ke session state
+                            st.session_state.final_data = {
+                                'res_scan': res_scan, 
+                                'res_stock': res_stock,
+                                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
+                                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+                            }
+                            st.success("✅ Compare Berhasil!")
+                        else:
+                            st.error("❌ Gagal mendapatkan hasil compare. Periksa format kolom file Anda.")
+
             except Exception as e:
-                st.error(f"❌ Error: {e}")
+                st.error(f"❌ Error Detail: {e}")
 
     if 'final_data' in st.session_state:
         d = st.session_state.final_data
