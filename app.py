@@ -1255,7 +1255,7 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
                 df_ds_res.loc[df_ds_res.index[i], 'NOTE'] = "SESUAI"
 
     return df_ds_res, df_app_res
-    def engine_compare_draft_jezpro(df_app, df_draft):
+def engine_compare_draft_jezpro(df_app, df_draft):
     """
     Konversi dari Sub COMPARE_DRAFT_JEZPRO_ULTRAFAST.
     Membandingkan data Draft Jezpro dengan data AppSheet yang sudah ter-refresh.
