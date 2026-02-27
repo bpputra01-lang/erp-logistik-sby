@@ -777,51 +777,128 @@ def menu_Stock_Opname():
         sys_updated = st.session_state.sys_updated_result
         
         # --- METRICS ALLOCATION (WARNA GELAP) ---
-    st.markdown("### 📊 RINGKASAN ALLOCATION")
-    
-    st.markdown("""
-    <style>
-    .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
-    .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
-    .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
-    partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
-    no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
-    
-    a1, a2, a3 = st.columns(3)
-    a1.metric("✅ FULL ALLOCATION", full_alloc)
-    a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
-    a3.metric("❌ NO ALLOCATION", no_alloc)
-    
-    st.markdown("---")
-    
-    # Tabs Hasil Allocation & Data System Terupdate
-    ta1, ta2 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)"])
-    
-    with ta1:
-        st.dataframe(alloc_data, use_container_width=True)
+         # --- CSS UNTUK METRICS BOX ---
+        st.markdown("""
+        <style>
+        .m-box {
+            background-color: #1d3567;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #333;
+        }
+        .m-lbl {
+            display: block;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .m-val {
+            display: block;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # --- METRICS COMPARE (HTML STYLE) ---
+        st.markdown("### 📊 RINGKASAN COMPARE")
         
-    with ta2:
-        st.dataframe(sys_updated, use_container_width=True)
+        total_real = len(d['real_plus'])
+        total_sys = len(d['system_plus'])
+        qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
+        qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
         
-    # --- DOWNLOAD BUTTON (DI BAWAH TABS) ---
-    st.markdown("---")
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-        d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
-        alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
-        sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
-    
-    st.download_button(
-        label="📥 DOWNLOAD HASIL EXCEL (ALLOCATION)",
-        data=output.getvalue(),
-        file_name="Hasil_Allocation_Final.xlsx",
-        use_container_width=True
-    )
+        st.markdown(f"""
+        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+            <div class="m-box" style="flex:1"><span class="m-lbl">🔥 REAL + ITEMS</span><span class="m-val">{total_real}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{qty_real}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">💻 SYSTEM + ITEMS</span><span class="m-val">{total_sys}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{qty_sys}</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Tabs Data Compare
+        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
+        with t1: st.dataframe(d['res_scan'], use_container_width=True)
+        with t2: st.dataframe(d['res_stock'], use_container_width=True)
+        with t3: st.dataframe(d['real_plus'], use_container_width=True)
+        with t4: st.dataframe(d['system_plus'], use_container_width=True)
+
+        st.markdown("---")
+
+        # --- STEP 2: ALLOCATION ---
+        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
+        
+        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
+
+        if up_bin_cov:
+            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
+                try:
+                    df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+                    
+                    with st.spinner("Memproses Alokasi..."):
+                        allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
+                        
+                        st.session_state.allocation_result = allocated_data
+                        st.session_state.sys_updated_result = sys_updated
+                        st.success("✅ Allocation Selesai!")
+                except Exception as e:
+                    st.error(f"❌ Error Allocation: {e}")
+
+    # --- TAMPILKAN HASIL ALLOCATION & METRICS ---
+    if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state:
+        st.markdown("---")
+        st.subheader("📋 HASIL ALLOCATION")
+        
+        alloc_data = st.session_state.allocation_result
+        sys_updated = st.session_state.sys_updated_result
+        
+        # --- METRICS ALLOCATION (HTML STYLE) ---
+        st.markdown("### 📊 RINGKASAN ALLOCATION")
+        
+        full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
+        partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
+        no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
+        
+        st.markdown(f"""
+        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+            <div class="m-box" style="flex:1"><span class="m-lbl">✅ FULL ALLOCATION</span><span class="m-val">{full_alloc}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">⚠️ PARTIAL ALLOCATION</span><span class="m-val">{partial_alloc}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">❌ NO ALLOCATION</span><span class="m-val">{no_alloc}</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Tabs Hasil Allocation & Data System Terupdate
+        ta1, ta2 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)"])
+        
+        with ta1:
+            st.dataframe(alloc_data, use_container_width=True)
+            
+        with ta2:
+            st.dataframe(sys_updated, use_container_width=True)
+            
+        # --- DOWNLOAD BUTTON (DI BAWAH TABS) ---
+        st.markdown("---")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+            d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
+            alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
+            sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
+        
+        st.download_button(
+            label="📥 DOWNLOAD HASIL EXCEL (ALLOCATION)",
+            data=output.getvalue(),
+            file_name="Hasil_Allocation_Final.xlsx",
+            use_container_width=True
+        )
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
 import pandas as pd
