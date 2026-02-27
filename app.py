@@ -1181,6 +1181,9 @@ def menu_refill_withdraw():
 # =====================================================
 # ENGINE 1: REFRESH DATA RTO (SUDAH DIPERBAIKI)
 # =====================================================
+# =====================================================
+# ENGINE 1: REFRESH DATA RTO (SUDAH DIPERBAIKI)
+# =====================================================
 def engine_refresh_rto(df_ds, df_app, df_selisih):
     dict_ds = {}
     dict_app = {}
@@ -1351,33 +1354,31 @@ def engine_compare_draft_jezpro(df_app_updated, df_draft):
 
 
 # =====================================================
-# ENGINE 3: GENERATE NEW DRAFT (SUDAH DIPERBAIKI)
+# ENGINE 3: GENERATE NEW DRAFT (LENGKAP)
 # =====================================================
 def engine_generate_new_draft(df_draft):
     df = df_draft.copy()
-    
     results = {}
     
     for idx, row in df.iterrows():
         if len(row) < 13:
             continue
         
-        # LOGIKAN UTAMA: Jika STATUS = DELETE, ITEM TIDAK MASUK KE NEW DRAFT
-        # Kolom terakhir diasumsikan STATUS
-        status = str(row.iloc[-1]).strip() if len(row) > 0 else ""
-        if status == "DELETE ITEM":
+        # PASTIKAN: Jika STATUS = DELETE, ITEM TIDAK DIMASUK
+        status = str(row.iloc[-1]).strip().upper() if len(row) > 0 else ""
+        if "DELETE" in status:
             continue
             
         sku = str(row.iloc[3]).strip() if pd.notna(row.iloc[3]) else ''
         bin_i = str(row.iloc[8]).strip() if pd.notna(row.iloc[8]) else ''
         
-        # Ambil QTY AMBIL (SISA) dari Hasil Compare (Index 9)
+        # PENTING: Ambil QTY SISA (Kolom index 9 dari Hasil Compare), BUKAN QTY LAMA
         qty_j = pd.to_numeric(row.iloc[9], errors='coerce') or 0 if pd.notna(row.iloc[9]) else 0
         
         bin_l = str(row.iloc[11]).strip() if len(row) > 11 and pd.notna(row.iloc[11]) else ''
         qty_m = pd.to_numeric(row.iloc[12], errors='coerce') or 0 if len(row) > 12 and pd.notna(row.iloc[12]) else 0
         
-        # Jika Qty Sisa (qty_j) adalah 0, item伯伯伯伯伯伯伯伯伯伯伯伯伯伯伯 tidak dimasukan
+        # Jika Qty Sisa 0, tidak dimasuk ke draft baru
         if qty_j != 0:
             if bin_i:
                 key1 = bin_i + "|" + sku
@@ -1387,7 +1388,58 @@ def engine_generate_new_draft(df_draft):
                 key2 = bin_l + "|" + sku
                 results[key2] = results.get(key2, 0) + qty_m
         
-        elif qty_j == 0 and bin_l and qty_m != 
+        elif qty_j == 0 and bin_l and qty_m != 0:
+            key = bin_l + "|" + sku
+            results[key] = results.get(key, 0) + qty_m
+    
+    if results:
+        data = []
+        for key, qty in results.items():
+            parts = key.split("|")
+            if len(parts) == 2:
+                data.append({'BIN': parts[0], 'SKU': parts[1], 'QUANTITY': qty})
+        
+        df_result = pd.DataFrame(data)
+        df_result = df_result[df_result['QUANTITY'] > 0]
+        df_result = df_result.sort_values('BIN').reset_index(drop=True)
+        return df_result
+    else:
+        return pd.DataFrame(columns=['BIN', 'SKU', 'QUANTITY'])
+
+# =====================================================
+# ENGINE 4: COMPARE DRAFT (PENUNJANG)
+# =====================================================
+def cari_bin_lain(app_sku_dict, sku, bin_sekarang, qty_j, qty_h, tf_draft):
+    qty_m = 0
+    bin_l = ""
+    note_k = ""
+    status_n = ""
+    
+    if sku in app_sku_dict:
+        for data in app_sku_dict[sku]:
+            bin_candidate = data['bin']
+            qty_candidate = data['qty']
+            tf_app = data['tf']
+            
+            if bin_candidate == bin_sekarang:
+                continue
+            
+            is_tf_blank = (tf_draft in ['', '0'] or tf_app in ['', '0'])
+            tf_match = is_tf_blank or (tf_draft == tf_app)
+            
+            if tf_match:
+                bin_l = bin_candidate
+                qty_m = qty_candidate
+                note_k = "ADA BIN LAIN"
+                
+                if (qty_j + qty_m) < qty_h:
+                    status_n = "PERLU EDIT BIN & QTY TF"
+                else:
+                    status_n = "PERLU EDIT BIN & HAPUS BIN LAMA"
+                break
+    
+    return bin_l, qty_m, note_k, status_n
+
 
 def process_refill_overstock(df_all_data, df_stock_tracking):
     # Inisialisasi sesuai Sheet di VBA
