@@ -831,6 +831,151 @@ def menu_Stock_Opname():
             prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM +', index=False)
         
         st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
+# =========================================================
+# 4. LOGIKA ALLOCATION (VBA to Python)
+# =========================================================
+def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
+    # df_real_plus should contain: BIN (A), SKU (B), QTY SCAN (C), QTY SYSTEM (D), DIFF (E)
+    # df_system_plus should contain: BIN (B), SKU (C), DIFF (L/Index 11) -> Ambil dari hasil compare sebelumnya
+    # df_bin_coverage: Ambil Kolom B (BIN) dan Kolom C (SKU) dan Kolom J (Qty Available/Stock)
+    
+    # 1. Siapkan Data Sources
+    # System Plus Source
+    # Kita perlu kolom SKU dan QTY DIFF (kolom L di excel asli, tapi di dataframe kita col 11/12)
+    # Karena struktur compare 2 menghasilkan 'DIFF' di kolom terakhir, kitaambiLast Column
+    sys_source = df_system_plus[['SKU', 'DIFF']].copy() 
+    # Kita asumsikan DIFF di System+ adalah stock yang bisa diambil (System > Scan)
+    # Namun perlu pairing dengan BIN. Dictionary harusnya (BIN, SKU) -> Qty.
+    # 수정: Kita perlu BIN juga dari System Plus.
+    
+    # Ambil kolom BIN dan SKU dari System Plus asli
+    sys_lite = df_system_plus.iloc[:, [1, 2, df_system_plus.columns.get_loc('DIFF')]].copy()
+    sys_lite.columns = ['BIN', 'SKU', 'QTY_DIFF']
+    sys_lite['SKU'] = sys_lite['SKU'].astype(str).str.strip().str.upper()
+    sys_lite['QTY_DIFF'] = pd.to_numeric(sys_lite['QTY_DIFF'], errors='coerce').fillna(0)
+    dict_system_source = sys_lite.groupby(['BIN', 'SKU'])['QTY_DIFF'].sum().to_dict()
+
+    # Bin Coverage Source (Baru)
+    # Format: Kolom B (BIN), Kolom C (SKU), Kolom J (Stock/Qty)
+    cov_lite = df_bin_coverage.iloc[:, [1, 2, 9]].copy() 
+    cov_lite.columns = ['BIN', 'SKU', 'QTY_COV']
+    cov_lite['SKU'] = cov_lite['SKU'].astype(str).str.strip().str.upper()
+    cov_lite['QTY_COV'] = pd.to_numeric(cov_lite['QTY_COV'], errors='coerce').fillna(0)
+    dict_cov_source = cov_lite.groupby(['BIN', 'SKU'])['QTY_COV'].sum().to_dict()
+
+    # 2. Proses Iterasi untuk Real Plus
+    # Kolom: A: BIN, B: SKU, C: QTY SCAN, D: QTY SYSTEM, E: DIFF
+    
+    # Kita buat list baru untuk kolom tambahan
+    bin_alokasi_list = []
+    qty_alokasi_list = []
+    status_list = []
+    
+    # Copy dataframe agar tidak mengubah asli saat loop (meski bisa langsung assign)
+    df_res = df_real_plus.copy()
+
+    for idx, row in df_res.iterrows():
+        sku = row['SKU']
+        current_diff = row['DIFF']
+        
+        allocated_bin = ""
+        allocated_qty = 0
+        status = ""
+        
+        if current_diff > 0:
+            remaining_diff = current_diff
+            is_first_alloc = True
+            temp_alloc_bin = []
+            temp_alloc_qty = 0
+            
+            # TAHAP 1: Cari di System +
+            # Loop through dictionary keys (minspirasi VBA loop j)
+            # Di Python dict kita sulit iterate sambil modify value, jadi kita catat dulu lalu update
+            # Atau kita ubah format dict menjadi list of dict agar bisa di-modify
+            
+            #简易版: Cek total stock available di System & Coverage dulu
+            # Tapi VBA-nya detail per baris. Kita ikut VBA: Coba cari di System dulu.
+            
+            # Kita perlu mencari kombinasi BIN+SKU di dict_system_source yang bernilai > 0
+            # Ini cukup rumit di Python tanpa loop list. 
+            #ESTRATEGI: Konversi dict ke list of dict agar bisa di-loop dan update
+            
+            sys_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_system_source.items() if k[1] == sku and v > 0]
+            
+            for src in sys_list:
+                if remaining_diff <= 0: break
+                qty_avail = src['QTY']
+                if qty_avail > 0:
+                    qty_alloc = min(qty_avail, remaining_diff)
+                    
+                    # Record
+                    temp_alloc_bin.append(src['BIN'])
+                    temp_alloc_qty += qty_alloc
+                    
+                    # Update Source (Kurangi dict)
+                    key = (src['BIN'], sku)
+                    dict_system_source[key] = dict_system_source[key] - qty_alloc
+                    remaining_diff -= qty_alloc
+
+            # TAHAP 2: Cari di BIN Coverage (Jika masih kurang)
+            if remaining_diff > 0:
+                cov_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_cov_source.items() if k[1] == sku and v > 0]
+                
+                for src in cov_list:
+                    if remaining_diff <= 0: break
+                    qty_avail = src['QTY']
+                    if qty_avail > 0:
+                        qty_alloc = min(qty_avail, remaining_diff)
+                        
+                        temp_alloc_bin.append(src['BIN'])
+                        temp_alloc_qty += qty_alloc
+                        
+                        key = (src['BIN'], sku)
+                        dict_cov_source[key] = dict_cov_source[key] - qty_alloc
+                        remaining_diff -= qty_alloc
+
+            # TAHAP 3: Hasil Alokasi
+            if temp_alloc_qty > 0:
+                # Gabungkan jika ada beberapa bin
+                allocated_bin = " & ".join(temp_alloc_bin)[:50] # Batas panjang string
+                allocated_qty = temp_alloc_qty
+                if remaining_diff <= 0:
+                    status = "FULL ALLOCATION"
+                else:
+                    status = "PARTIAL ALLOCATION"
+            else:
+                status = "NO ALLOCATION"
+                allocated_qty = 0 # Atau sisa diff jika mau lihat nol
+
+        else:
+            status = "NO DIFF"
+            
+        # Append ke list
+        bin_alokasi_list.append(allocated_bin)
+        qty_alokasi_list.append(allocated_qty)
+        status_list.append(status)
+
+    # Assign kolom baru
+    df_res['BIN ALOKASI'] = bin_alokasi_list
+    df_res['QTY ALLOCATION'] = qty_alokasi_list
+    df_res['STATUS'] = status_list
+    
+    return df_res, dict_system_source # Return dict baru agar informasinya update (opsional, tidak wajib)
+
+# =========================================================
+# 5. MENU UTAMA
+# =========================================================
+def menu_Stock_Opname():
+    st.markdown("""
+       <style>
+        .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
+        .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
+        div[data-baseweb="select"] > div { background-color: #262730 !important; border-color: #464855 !important; color: white !important; }
+        div[data-baseweb="select"] input { color: white !important; }
+        div[data-baseweb="select"] span { color: white !important; }
+        div[data-baseweb="select"] svg { fill: white !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
