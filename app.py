@@ -751,7 +751,7 @@ def menu_Stock_Opname():
     
     # 2. SEKSI FILTER (Tepat di bawah judul)
     with st.container():
-        st.markdown('<p style="font-weight: bold; color: #1d3567;">🎯 FILTER PENGECUALIAN (IGNORE DATA)</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-weight: bold; color: #1d3567;">🎯 FILTER DATA</p>', unsafe_allow_html=True)
         col_f1, col_f2, col_f3 = st.columns(3)
         
         with col_f1:
@@ -762,7 +762,7 @@ def menu_Stock_Opname():
                 "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", 
                 "NUTRITION", "BAG", "EXTRAS SHOES"
             ]
-            exclude_sub = st.multiselect("Sub Kategori (Ignore):", list_sub_kat)
+            exclude_sub = st.multiselect("Sub Kategori:", list_sub_kat)
 
         with col_f2:
             list_bin_stock = [
@@ -773,7 +773,7 @@ def menu_Stock_Opname():
                 "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", 
                 "GUDANG", "SDA", "SMG"
             ]
-            exclude_bin_sys = st.multiselect("BIN System (Ignore):", list_bin_stock)
+            exclude_bin_sys = st.multiselect("BIN System:", list_bin_stock)
 
         with col_f3:
             list_bin_cov = [
@@ -783,7 +783,7 @@ def menu_Stock_Opname():
                 "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", 
                 "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"
             ]
-            exclude_bin_scan = st.multiselect("BIN Coverage (Ignore):", list_bin_cov)
+            exclude_bin_scan = st.multiselect("BIN Coverage:", list_bin_cov)
 
     st.markdown("---") # Garis pemisah
 
