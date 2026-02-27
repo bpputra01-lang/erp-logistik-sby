@@ -720,27 +720,29 @@ def menu_Stock_Opname():
 
         /* --- PERBAIKAN: TULISAN 'CHOOSE OPTIONS' JADI PUTIH --- */
         
-        /* 1. Target teks placeholder (Choose options) agar berwarna putih */
+        /* 1. Target teks placeholder di dalam kotak */
+        div[data-baseweb="select"] [data-testid="stText"] {
+            color: white !important;
+            -webkit-text-fill-color: white !important;
+        }
+
+        /* 2. Target elemen spesifik yang menampung tulisan 'Choose options' */
         div[data-baseweb="select"] div[aria-hidden="true"] {
             color: white !important;
-            opacity: 1 !important;
+            opacity: 1 !important; /* Menghilangkan efek transparan/abu-abu */
+            -webkit-text-fill-color: white !important;
         }
 
-        /* 2. Target teks input saat Anda mulai mengetik agar berwarna putih */
+        /* 3. Pastikan teks yang kita ketik juga tetap putih */
         div[data-baseweb="select"] input {
             color: white !important;
+            -webkit-text-fill-color: white !important;
         }
 
-        /* 3. Memastikan icon panah dropdown juga berwarna putih agar senada */
-        svg[title="open"] {
-            fill: white !important;
-        }
-
-        /* 4. Karena tulisan di dalam kotak jadi putih, 
-              pastikan isi kotak (background-nya) tetap gelap agar terbaca */
+        /* 4. Background kotak dropdown harus gelap agar tulisan putih terlihat */
         div[data-baseweb="select"] > div {
             background-color: #262730 !important;
-            border-color: #464855 !important;
+            border-radius: 8px;
         }
         </style>
     """, unsafe_allow_html=True)
