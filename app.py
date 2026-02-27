@@ -719,30 +719,39 @@ def menu_Stock_Opname():
             margin-bottom: 20px;
         }
 
-        /* --- PERBAIKAN: TULISAN 'CHOOSE OPTIONS' JADI PUTIH --- */
-        
-        /* 1. Target teks placeholder (Choose options) agar berwarna putih */
-        div[data-baseweb="select"] div[aria-hidden="true"] {
-            color: white !important;
-            opacity: 1 !important;
+        /* --- PERBAIKAN UTAMA --- */
+
+        /* 1. Mengatur Background dan Border Box Utama */
+        /* Kita gunakan > div agar hanya kotak inputnya yang berubah, bukan menu dropdownnya */
+        div[data-baseweb="select"] > div {
+            background-color: #262730 !important;
+            border-color: #464855 !important;
+            color: white !important; /* Warna teks default */
         }
 
-        /* 2. Target teks input saat Anda mulai mengetik agar berwarna putih */
+        /* 2. Mengatur Warna Teks Input (Ketikan) */
         div[data-baseweb="select"] input {
             color: white !important;
         }
 
-        /* 3. Memastikan icon panah dropdown juga berwarna putih agar senada */
-        svg[title="open"] {
+        /* 3. Mengatur Placeholder (Tulisan "Choose options") */
+        /* Streamlit terkadang menggunakan struktur berbeda untuk placeholder, 
+           coba targetkan elemen yang mengandung teks placeholder */
+        div[data-baseweb="select"] div[data-baseweb="value"] {
+            color: rgba(255, 255, 255, 0.6) !important; 
+        }
+        
+        /* 4. Mengatur Ikon PanahDropdown */
+        /* title="open" tidak selalu ada di versi baru, lebih aman gunakan fill saja */
+        div[data-baseweb="select"] svg {
             fill: white !important;
         }
-
-        /* 4. Karena tulisan di dalam kotak jadi putih, 
-              pastikan isi kotak (background-nya) tetap gelap agar terbaca */
-        div[data-baseweb="select"] > div {
-            background-color: #262730 !important;
-            border-color: #464855 !important;
+        
+        /* 5. Override warna teks hitam (jika ada elemen span yang menimpa) */
+        div[data-baseweb="select"] span {
+            color: white !important;
         }
+
         </style>
     """, unsafe_allow_html=True)
      
