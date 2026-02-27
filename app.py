@@ -776,44 +776,62 @@ def menu_Stock_Opname():
         alloc_data = st.session_state.allocation_result
         sys_updated = st.session_state.sys_updated_result
         
-        # --- METRICS ALLOCATION ---
-        st.markdown("### 📊 RINGKASAN ALLOCATION")
-        full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
-        partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
-        no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
+        # --- METRICS ALLOCATION (WARNA GELAP) ---
+    st.markdown("### 📊 RINGKASAN ALLOCATION")
+    
+    # CSS untuk metric box warna gelap
+    st.markdown("""
+    <style>
+    div[data-testid="stMetric"] {
+        background-color: #262730;
+        border: 1px solid #464855;
+        padding: 15px;
+        border-radius: 10px;
+    }
+    div[data-testid="stMetric"] label {
+        color: #bbbbbb !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #FF4B4B !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
+    partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
+    no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
+    
+    a1, a2, a3 = st.columns(3)
+    a1.metric("✅ FULL ALLOCATION", full_alloc)
+    a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
+    a3.metric("❌ NO ALLOCATION", no_alloc)
+    
+    st.markdown("---")
+    
+    # Tabs Hasil Allocation & Data System Terupdate
+    ta1, ta2 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)"])
+    
+    with ta1:
+        st.dataframe(alloc_data, use_container_width=True)
         
-        a1, a2, a3 = st.columns(3)
-        a1.metric("✅ FULL ALLOCATION", full_alloc)
-        a2.metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
-        a3.metric("❌ NO ALLOCATION", no_alloc)
+    with ta2:
+        st.dataframe(sys_updated, use_container_width=True)
         
-        st.markdown("---")
-        
-        # Tabs Hasil Allocation & Data System Terupdate
-        ta1, ta2, ta3 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)", "📥 DOWNLOAD"])
-        
-        with ta1:
-            st.dataframe(alloc_data, use_container_width=True)
-            
-        with ta2:
-            st.dataframe(sys_updated, use_container_width=True)
-            
-        with ta3:
-            # Download Excel
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-                d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
-                alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
-                sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
-            
-            st.download_button(
-                label="📥 DOWNLOAD HASIL EXCEL",
-                data=output.getvalue(),
-                file_name="Hasil_Allocation_Final.xlsx",
-                use_container_width=True
-            )
-
+    # --- DOWNLOAD BUTTON (DI BAWAH TABS) ---
+    st.markdown("---")
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+        d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
+        alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
+        sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
+    
+    st.download_button(
+        label="📥 DOWNLOAD HASIL EXCEL (ALLOCATION)",
+        data=output.getvalue(),
+        file_name="Hasil_Allocation_Final.xlsx",
+        use_container_width=True
+    )
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
 import pandas as pd
