@@ -3072,14 +3072,13 @@ elif menu == "Compare RTO":
 
 # PASTIKAN KODE DI BAWAH MENU SEBELUMNYA BAIK, CONTOH:
 # elif menu == "Stock Opname":
-#     menu_Stock_Opname()
-# elif menu == "FDR Update": # <-- PASTIKAN ADA ':' DI AKHIR BARIS INI
-#     ...
-
+# =========================================================
+# 3. MENU: FDR UPDATE (AUTO RUN & METRICS)
+# =========================================================
 elif menu == "FDR Update":
+    # --- CSS & HEADER ---
     st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
     
-    # --- CSS ---
     st.markdown("""
         <style>
         .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
@@ -3089,177 +3088,103 @@ elif menu == "FDR Update":
     """, unsafe_allow_html=True)
     
     # --- INIT STATE ---
-    if "ws_manifest_fdr" not in st.session_state:
-        st.session_state.ws_manifest_fdr = None
-    if "ws_fu_it_fdr" not in st.session_state:
-        st.session_state.ws_fu_it_fdr = None
-    if "dict_kurir_fdr" not in st.session_state:
-        st.session_state.dict_kurir_fdr = {}
-    if "fdr_current_file" not in st.session_state:
-        st.session_state.fdr_current_file = None
-    
+    if "ws_manifest_fdr" not in st.session_state: st.session_state.ws_manifest_fdr = None
+    if "ws_fu_it_fdr" not in st.session_state: st.session_state.ws_fu_it_fdr = None
+    if "dict_kurir_fdr" not in st.session_state: st.session_state.dict_kurir_fdr = {}
+    if "fdr_current_file" not in st.session_state: st.session_state.fdr_current_file = None
+    if "metrics_data" not in st.session_state: st.session_state.metrics_data = {}
+
     # --- FILE UPLOAD ---
-    u_file = st.file_uploader("📂 Choose Your File", type=["xlsx"], key="fdr_file_v2")
-    
-    # RESET JIKA FILE BERBEDA
+    u_file = st.file_uploader("📂 Upload File Manifest", type=["xlsx"], key="fdr_auto_upload")
+
+    # --- RESET & AUTO PROCESS ---
     if u_file is not None:
         if st.session_state.fdr_current_file != u_file.name:
             st.session_state.ws_manifest_fdr = None
             st.session_state.ws_fu_it_fdr = None
             st.session_state.dict_kurir_fdr = {}
             st.session_state.fdr_current_file = u_file.name
-    
-    # --- LOAD FILE (DENGAN ERROR HANDLING) ---
+            st.session_state.metrics_data = {}
+
+    # --- LOAD & PROSES OTOMATIS ---
     if u_file and st.session_state.ws_manifest_fdr is None:
         try:
-            st.session_state.ws_manifest_fdr = pd.read_excel(u_file)
-            st.success(f"File {u_file.name} berhasil dimuat!")
+            with st.spinner("🔄 Memproses Data..."):
+                df_raw = pd.read_excel(u_file)
+                
+                # Clear Columns Otomatis
+                cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+                existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
+                df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
+                st.session_state.ws_manifest_fdr = df_clean
+
+                # FU IT Otomatis
+                if len(df_clean.columns) > 12:
+                    mask_fu = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
+                    st.session_state.ws_fu_it_fdr = df_clean[mask_fu].iloc[:, 0:13]
+                
+                # Split Kurir Otomatis
+                if len(df_clean.columns) > 12:
+                    f_val = df_clean.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
+                    m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+                    mask_out = (f_val != "") & (m_val == "")
+                    filtered_out = df_clean[mask_out].copy()
+                    if not filtered_out.empty:
+                        st.session_state.dict_kurir_fdr = {str(n): g.iloc[:, 0:13] for n, g in filtered_out.groupby(filtered_out.iloc[:, 5])}
+                
+                # Metrics
+                st.session_state.metrics_data = {
+                    'total': len(st.session_state.ws_manifest_fdr),
+                    'fu': len(st.session_state.ws_fu_it_fdr) if st.session_state.ws_fu_it_fdr is not None else 0,
+                    'kurir': len(st.session_state.dict_kurir_fdr)
+                }
+            st.success("✅ Selesai!")
             st.rerun()
-        except ValueError as e:
-            st.error(f"❌ Gagal Membaca File: Format tidak sesuai atau file corrupt.")
-            st.warning("Pastikan file adalah .xlsx asli dan bukan .csv yang diganti nama.")
-            st.session_state.fdr_current_file = None
-            st.session_state.ws_manifest_fdr = None
         except Exception as e:
-            st.error(f"❌ Terjadi Error: {e}")
-            st.session_state.fdr_current_file = None
-            
-    st.divider()
-    
-    # --- BUTTONS ---
-    c = st.columns(4)
-    
-    # CLEAR COLUMNS
-    if c[0].button("🚮 CLEAR COLUMNS", key="btn_clean_v2"):
-        if st.session_state.ws_manifest_fdr is not None:
-            df = st.session_state.ws_manifest_fdr.copy()
-            cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
-            existing_cols = [df.columns[i] for i in cols_idx if i < len(df.columns)]
-            
-            if existing_cols:
-                df.drop(columns=existing_cols, inplace=True)
-                st.session_state.ws_manifest_fdr = df
-                st.session_state.ws_fu_it_fdr = None
-                st.session_state.dict_kurir_fdr = {}
-                st.success("✅ KOLOM DIBERSIHKAN!")
-                st.rerun()
-            else:
-                st.warning("Kolom sudah bersih!")
-        else:
-            st.error("UPLOAD FILE DULU!")
-
-    # NEED FU IT
-    if c[1].button("🖥️ NEED FU IT", key="btn_fu_v2"):
-        if st.session_state.ws_manifest_fdr is not None:
-            df = st.session_state.ws_manifest_fdr.copy()
-            mask = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
-            st.session_state.ws_fu_it_fdr = df[mask].iloc[:, 0:13]
-            st.success(f"✅ {len(st.session_state.ws_fu_it_fdr)} Baris!")
-        else:
-            st.error("Data Kosong!")
-
-    # OUTSTANDING COURIER
-    if c[2].button("🛵 OUTSTANDING COURIER", key="btn_split_v2"):
-        if st.session_state.ws_manifest_fdr is not None:
-            df = st.session_state.ws_manifest_fdr.copy()
-            
-            if len(df.columns) > 12:
-                f_val = df.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
-                m_val = df.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
-                
-                mask = (f_val != "") & (m_val == "")
-                filtered = df[mask].copy()
-                
-                if not filtered.empty:
-                    d_kurir = {str(n): g.iloc[:, 0:13] for n, g in filtered.groupby(filtered.iloc[:, 5])}
-                    st.session_state.dict_kurir_fdr = d_kurir
-                    st.success(f"✅ {len(d_kurir)} Kurir Ditampilkan!")
-                else:
-                    st.session_state.dict_kurir_fdr = {}
-                    st.warning("Tidak ada data Outstanding.")
-            else:
-                st.error("File Excel tidak memiliki cukup kolom.")
-        else:
-            st.error("Data Kosong!")
-
-    # CLEAR ALL
-    if c[3].button("🗑️ CLEAR ALL", type="primary", key="btn_clear_v2"):
-        st.session_state.ws_manifest_fdr = None
-        st.session_state.ws_fu_it_fdr = None
-        st.session_state.dict_kurir_fdr = {}
-        st.session_state.fdr_current_file = None
-        st.rerun()
-
-    st.divider()
-    
-    # --- AREA TAMPILAN & DOWNLOAD ---
-    
-    # 1. AREA OUTSTANDING COURIER
-    if st.session_state.dict_kurir_fdr:
-        st.subheader(f"🛵 OUTSTANDING COURIER ({len(st.session_state.dict_kurir_fdr)} Kurir)")
-        
-        d1, d2 = st.columns([2, 1])
-        
-        with d1:
-            list_kurir = list(st.session_state.dict_kurir_fdr.keys())
-            selected_kurir = st.selectbox("Pilih Kurir untuk Dilihat:", list_kurir, key="select_kurir_view")
-        
-        with d2:
-            st.write("") 
-            st.write("### 📥 Download Options")
-        
-        # DOWNLOAD PARTIAL & ALL
-        col_dl_partial, col_dl_all = st.columns(2)
-        
-        with col_dl_partial:
-            if selected_kurir:
-                csv_partial = st.session_state.dict_kurir_fdr[selected_kurir].to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label=f"📥 Download {selected_kurir} (CSV)",
-                    data=csv_partial,
-                    file_name=f"Outstanding_{selected_kurir}.csv",
-                    mime="text/csv",
-                    key=f"dl_partial_{selected_kurir}"
-                )
-        
-        with col_dl_all:
-            if st.session_state.dict_kurir_fdr:
-                import io
-                output = io.BytesIO()
-                
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    for nama_kurir, df_kurir in st.session_state.dict_kurir_fdr.items():
-                        safe_name = "".join([c for c in str(nama_kurir) if c.isalpha() or c.isdigit() or c in (' ', '_')]).rstrip()
-                        if len(safe_name) > 31: safe_name = safe_name[:31]
-                        df_kurir.to_excel(writer, sheet_name=safe_name, index=False)
-                
-                excel_data = output.getvalue()
-                st.download_button(
-                    label="📊 Download ALL (Excel Multi-Sheet)",
-                    data=excel_data,
-                    file_name="All_Outstanding_Courier.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_all_excel"
-                )
-        
-        st.divider()
-        if selected_kurir:
-            st.dataframe(st.session_state.dict_kurir_fdr[selected_kurir], use_container_width=True, hide_index=True)
-        st.divider()
-
-    # 2. AREA FU IT
-    if st.session_state.ws_fu_it_fdr is not None:
-        st.subheader(f"📋 PERLU FU IT ({len(st.session_state.ws_fu_it_fdr)} Baris)")
-        csv_fu = st.session_state.ws_fu_it_fdr.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Data FU IT (CSV)", csv_fu, "Data_FU_IT.csv", "text/csv", key="dl_fu_it")
-        st.dataframe(st.session_state.ws_fu_it_fdr, use_container_width=True, hide_index=True)
-        st.divider()
-
-    # 3. AREA MANIFEST MASTER
+            st.error(f"❌ Error: {e}")
+                # --- TAMPILKAN METRICS & UI ---
     if st.session_state.ws_manifest_fdr is not None:
-        st.subheader("📂 MANIFEST DATA (MASTER)")
-        st.dataframe(st.session_state.ws_manifest_fdr, use_container_width=True, hide_index=True)
+        m = st.session_state.metrics_data
         
+        st.markdown(f"""
+        <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+            <div class="m-box" style="flex:1"><span class="m-lbl">TOTAL MANIFEST</span><span class="m-val">{m.get('total', 0)}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">FU IT</span><span class="m-val" style="color:#FFA500">{m.get('fu', 0)}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">KURIR</span><span class="m-val" style="color:#FF4B4B">{m.get('kurir', 0)}</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("🗑️ RESET"): 
+            st.session_state.ws_manifest_fdr = None
+            st.session_state.dict_kurir_fdr = {}
+            st.rerun()
+
+        t1, t2, t3 = st.tabs(["📥 MANIFEST", "📋 FU IT", "🛵 KURIR"])
+
+        with t1:
+            st.dataframe(st.session_state.ws_manifest_fdr, use_container_width=True, hide_index=True)
+
+        with t2:
+            if st.session_state.ws_fu_it_fdr is not None:
+                st.download_button("📥 Download", st.session_state.ws_fu_it_fdr.to_csv(index=False).encode('utf-8'), "FU_IT.csv", "text/csv")
+                st.dataframe(st.session_state.ws_fu_it_fdr, use_container_width=True, hide_index=True)
+
+        with t3:
+            if st.session_state.dict_kurir_fdr:
+                opt = st.selectbox("Pilih Kurir", list(st.session_state.dict_kurir_fdr.keys()))
+                
+                # Download All
+                import io
+                buff = io.BytesIO()
+                with pd.ExcelWriter(buff, engine='xlsxwriter') as w:
+                    for n, d in st.session_state.dict_kurir_fdr.items(): d.to_excel(w, sheet_name=str(n)[:31], index=False)
+                st.download_button("📊 Download All Excel", buff.getvalue(), "All.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                
+                # Download Selected & Table
+                if opt:
+                    st.download_button(f"📥 {opt}", st.session_state.dict_kurir_fdr[opt].to_csv(index=False).encode('utf-8'), f"{opt}.csv", "text/csv")
+                    st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
+
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
