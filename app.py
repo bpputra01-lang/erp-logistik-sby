@@ -3092,7 +3092,7 @@ elif menu == "FDR Update":
     # --- TOMBOL RUN UTAMA ---
     # Hanya aktif jika ada file dan tombol ditekan
     if u_file:
-        if st.button("🚀 PROSES DATA (CLEAR, FU IT, SPLIT)", type="primary", use_container_width=True):
+        if st.button("▶️PROCESS DATA", type="primary", use_container_width=True):
             try:
                 with st.spinner("🔄 Processing..."):
                     # 1. Load & Clear Columns
