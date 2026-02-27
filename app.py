@@ -579,6 +579,7 @@ import streamlit as st
 import pandas as pd
 import io
 from openpyxl import load_workbook
+import re
 
 # =========================================================
 # 1. FUNGSI DETEKSI WARNA (IDENTIK VBA INTERIOR.COLOR)
@@ -586,13 +587,11 @@ from openpyxl import load_workbook
 def get_yellow_skus(file, column_index):
     yellow_set = set()
     try:
-        # Gunakan openpyxl untuk membaca warna sel
         wb = load_workbook(file, data_only=True)
         ws = wb.active
         for row_idx in range(2, ws.max_row + 1):
             cell = ws.cell(row=row_idx, column=column_index)
             color = str(cell.fill.start_color.index)
-            # Kode warna kuning standar Excel
             if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
                 sku_val = str(cell.value).strip().upper() if cell.value else ""
                 if sku_val:
@@ -604,31 +603,25 @@ def get_yellow_skus(file, column_index):
 # =========================================================
 # 2. LOGIKA COMPARE 1: DATA SCAN VS STOCK (Cari REAL +)
 # =========================================================
-def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
-    # Mapping VBA: Scan BIN(A), SKU(B), QTY SCAN(C)
+def logic_compare_scan_to_stock(df_scan, df_stock):
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
     
-    # Mapping VBA: Stock BIN(B), SKU(C), QTY SYSTEM(J)
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
     dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
 
-    # Standarisasi (Trim & UCase)
     for df in [ds, dt]:
         df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
         df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
         qty_col = 'QTY_SCAN' if 'QTY_SCAN' in df.columns else 'QTY_SYSTEM'
         df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce').fillna(0)
 
-    # PENTING: Grouping System (Identik dengan dict.Add key di VBA)
-    # Ini memastikan jika 1 SKU ada di banyak baris di System, totalnya dijumlahkan
     dict_system = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().to_dict()
 
     qty_sys_list = []
     diff_list = []
     note_list = []
 
-    # Bandingkan tiap baris Fisik dengan Total System
     for _, row in ds.iterrows():
         key = (row['BIN'], row['SKU'])
         qty_scan = row['QTY_SCAN']
@@ -643,14 +636,14 @@ def logic_compare_scan_to_stock(df_scan, df_stock, scan_file):
     ds['DIFF'] = diff_list
     ds['NOTE'] = note_list
     
+    return ds
 
 # =========================================================
 # 3. LOGIKA COMPARE 2: STOCK VS DATA SCAN (Cari SYSTEM +)
 # =========================================================
-def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
+def logic_compare_stock_to_scan(df_stock, df_scan):
     dt = df_stock.copy()
     
-    # 1. Grouping Scan (Identik dengan dict.Add key di VBA Sub 2)
     ds_lite = df_scan.iloc[:, [0, 1, 2]].copy()
     ds_lite.columns = ['BIN', 'SKU', 'QTY_SCAN']
     ds_lite['BIN'] = ds_lite['BIN'].astype(str).str.strip().str.upper()
@@ -663,7 +656,6 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
     diff_list = []
     note_list = []
 
-    # 2. Proses Perbandingan
     for _, row in dt.iterrows():
         bin_val = str(row.iloc[1]).strip().upper()
         sku_val = str(row.iloc[2]).strip().upper()
@@ -677,63 +669,114 @@ def logic_compare_stock_to_scan(df_stock, df_scan, stock_file):
         diff_list.append(diff_val)
         note_list.append("SYSTEM +" if qty_sys > qty_scan else "OK")
 
-    # --- BAGIAN PERBAIKAN UTAMA ---
-    
-    # 3. Hapus kolom lama yang mungkin sudah ada di file excel (mencegah duplikat QTY_SO)
-    # Kita hapus variasi penamaan yang mungkin muncul agar tidak bentrok
-    cols_to_drop = ['QTY SO', 'DIFF', 'NOTE',]
+    cols_to_drop = ['QTY SO', 'DIFF', 'NOTE']
     for col in cols_to_drop:
         if col in dt.columns:
             dt = dt.drop(columns=[col])
 
-    # 4. Masukkan data hasil perhitungan yang baru
     dt['QTY_SO'] = qty_so_list
     dt['DIFF'] = diff_list
     dt['NOTE'] = note_list
     
-    
-    # 6. Final Clean: Pastikan tidak ada kolom duplikat tersisa secara teknis
     dt = dt.loc[:, ~dt.columns.duplicated()].copy()
-    
     return dt
 
 # =========================================================
 # 4. MENU UTAMA (STOCK OPNAME)
 # =========================================================
 def menu_Stock_Opname():
-    # --- CSS ---
+    # --- CSS DROPDOWN (BACKGROUND GELAP, TULISAN PUTIH) ---
     st.markdown("""
-        <style>
+       <style>
         .hero-header { 
             background-color: #0E1117; 
-            padding: 20px; 
-            border-radius: 10px; 
-            margin-bottom: 20px; 
-            text-align: center; 
-            border: 1px solid #333;
+            padding: 20px; border-radius: 10px; margin-bottom: 20px; 
+            text-align: center; border: 1px solid #333;
         }
         .hero-header h1 {
-            color: #FF4B4B; /* Merah khas Streamlit */
-            margin: 0;
-            font-size: 32px;
+            color: #FF4B4B; 
+            margin: 0; font-size: 32px;
+        }
+        
+        /* --- STYLE DROPDOWN (WARNA PUTIH & BG GELAP) --- */
+        /* 1. Kotak Utama */
+        div[data-baseweb="select"] > div {
+            background-color: #262730 !important;
+            border-color: #464855 !important;
+            color: white !important;
+        }
+        /* 2. Tulisan Input/Placeholder */
+        div[data-baseweb="select"] input {
+            color: white !important;
+        }
+        /* 3. Tulisan yang Dipilih */
+        div[data-baseweb="select"] span {
+            color: white !important;
+        }
+        /* 4. Ikon Panah */
+        div[data-baseweb="select"] svg {
+            fill: white !important;
         }
         </style>
     """, unsafe_allow_html=True)
-    
+     
     # --- JUDUL HEADER ---
     st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE SYSTEM</h1></div>', unsafe_allow_html=True)
     
+    # --- SEKSI FILTER (3 DROPDOWN) ---
+    with st.container():
+        st.markdown('<p style="font-weight: bold; color: #1d3567; margin-bottom: 10px;">🎯 FILTER DATA (Hapus/Data Tidak Dipilih Diabaikan)</p>', unsafe_allow_html=True)
+        
+        col_f1, col_f2, col_f3 = st.columns(3)
+        
+        # Filter 1: Sub Kategori (Untuk Stock System)
+        with col_f1:
+            list_sub_kat = [
+                "GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", 
+                "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", 
+                "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", 
+                "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", 
+                "NUTRITION", "BAG", "EXTRAS SHOES"
+            ]
+            selected_sub = st.multiselect("🗂️ Sub Kategori (Stock Sys):", list_sub_kat, key="filter_sub_v3")
+
+        # Filter 2: BIN System (Untuk Stock System)
+        with col_f2:
+            list_bin_stock = [
+                "GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", 
+                "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
+                "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
+                "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "DAU", 
+                "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", 
+                "GUDANG", "SDA", "SMG"
+            ]
+            selected_bin_sys = st.multiselect("🏭 BIN System (Stock Sys):", list_bin_stock, key="filter_bin_sys_v3")
+
+        # Filter 3: BIN Coverage (Untuk Data Scan)
+        with col_f3:
+            list_bin_cov = [
+                "KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", 
+                "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
+                "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
+                "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", 
+                "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"
+            ]
+            selected_bin_cov = st.multiselect("📡 BIN Coverage (Data Scan):", list_bin_cov, key="filter_bin_cov_v3")
+
+    st.markdown("---")
+
+    # --- SEKSI UPLOAD ---
     c1, c2 = st.columns(2)
     with c1:
-        up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="up_scan_so")
+        up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="up_scan_v3")
     with c2:
-        up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="up_stock_so")
+        up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="up_stock_v3")
 
+    # --- PROSES COMPARE ---
     if up_scan and up_stock:
-        if st.button("▶️ RUN COMPARE", use_container_width=True):
+        if st.button("▶️ RUN COMPARE", use_container_width=True, key="btn_run_v3"):
             try:
                 # Load Data
-                # Menggunakan try-except内部的 karena kadang file berformat berbeda
                 try:
                     df_s_raw = pd.read_excel(up_scan)
                 except:
@@ -744,45 +787,71 @@ def menu_Stock_Opname():
                 except:
                     df_t_raw = pd.read_csv(up_stock)
                 
-                with st.spinner("Menghitung ulang data..."):
-                    # Proses 1: Scan vs System
-                    res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw, up_scan)
-                    # Proses 2: System vs Scan
-                    res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw, up_stock)
+                with st.spinner("Memproses filter dan menghitung ulang..."):
                     
-                    # Proses 3: Filter (Identik Sub Generate_REAL_PLUS)
-                    real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
-                    system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+                    # --- LOGIKA FILTER 1 & 2: PADA STOCK SYSTEM ---
                     
-                    # Tambahan: Item Name Lookup (Ambil dari master stock kolom E/index 4)
-                    try:
-                        item_dict = df_t_raw.iloc[:, [2, 4]].dropna()
-                        item_dict.columns = ['SKU', 'NAME']
-                        item_dict['SKU'] = item_dict['SKU'].astype(str).str.strip().str.upper()
-                        map_name = item_dict.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-                        real_plus['ITEM NAME'] = real_plus['SKU'].map(map_name)
-                    except Exception as e:
-                        st.warning(f"Lookup Gagal: {e}")
+                    # Filter Sub Kategori (Kolom G / Index 6)
+                    if selected_sub:
+                        df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.strip().str.upper().isin([x.upper() for x in selected_sub])]
+                    
+                    # Filter BIN System (Kolom B / Index 1)
+                    if selected_bin_sys:
+                        mask_bin = df_t_raw.iloc[:, 1].astype(str).str.upper().apply(
+                            lambda x: any(case.upper() in x for case in selected_bin_sys)
+                        )
+                        df_t_raw = df_t_raw[mask_bin]
 
-                    st.session_state.final_data = {
-                        'res_scan': res_scan, 'res_stock': res_stock,
-                        'real_plus': real_plus, 'system_plus': system_plus
-                    }
-                st.success("✅ Compare Berhasil!")
+                    # --- LOGIKA FILTER 3: PADA DATA SCAN ---
+                    
+                    # Filter BIN Coverage (Kolom A / Index 0)
+                    if selected_bin_cov:
+                        mask_cov = df_s_raw.iloc[:, 0].astype(str).str.upper().apply(
+                            lambda x: any(case.upper() in x for case in selected_bin_cov)
+                        )
+                        df_s_raw = df_s_raw[mask_cov]
+                    
+                    # Cek Data Kosong
+                    if df_t_raw.empty:
+                        st.error("❌ Data System kosong setelah difilter! Tidak ada data.")
+                    elif df_s_raw.empty:
+                        st.warning("⚠️ Data Scan kosong setelah difilter!")
+                    else:
+                        # Jalankan Compare
+                        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
+                        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
+                        
+                        real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
+                        system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+                        
+                        # Tambahan: Item Name Lookup (Ambil dari master stock kolom E/index 4)
+                        try:
+                            item_dict = df_t_raw.iloc[:, [2, 4]].dropna()
+                            item_dict.columns = ['SKU', 'NAME']
+                            item_dict['SKU'] = item_dict['SKU'].astype(str).str.strip().str.upper()
+                            map_name = item_dict.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
+                            real_plus['ITEM NAME'] = real_plus['SKU'].map(map_name)
+                        except:
+                            pass # Abaikan jika lookup gagal
+
+                        st.session_state.final_data = {
+                            'res_scan': res_scan, 'res_stock': res_stock,
+                            'real_plus': real_plus, 'system_plus': system_plus
+                        }
+                        st.success("✅ Compare Berhasil!")
+
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
+    # --- TAMPILKAN HASIL ---
     if 'final_data' in st.session_state:
         d = st.session_state.final_data
         
-        # Fungsi pembersih total sebelum masuk ke dataframe
         def prepare_df(df):
             if df is None or df.empty:
                 return df
             df = df.copy()
-            # 1. Pastikan index unik dan bersih (Penting untuk Styler)
             df = df.reset_index(drop=True)
-            # 2. Paksa semua nama kolom jadi string unik
             new_cols = []
             for i, col in enumerate(df.columns):
                 c_str = str(col).strip()
@@ -791,7 +860,6 @@ def menu_Stock_Opname():
                 else:
                     new_cols.append(c_str)
             df.columns = new_cols
-            # 3. Hapus duplikat kolom jika masih ada
             df = df.loc[:, ~df.columns.duplicated()]
             return df
 
@@ -799,7 +867,6 @@ def menu_Stock_Opname():
         
         with t1:
             df1 = prepare_df(d['res_scan'])
-            # Cek apakah kolom IS_YELLOW ada sebelum di-style
             if 'IS_YELLOW' in df1.columns:
                 try:
                     st.dataframe(df1.style.apply(lambda x: ['background-color: #FFFF00' if x.IS_YELLOW == 'YES' else '' for _ in x], axis=1), use_container_width=True)
@@ -838,17 +905,15 @@ def menu_Stock_Opname():
             else:
                 st.dataframe(df4, use_container_width=True)
 
-        # --- DOWNLOAD BUTTON (Tetap Sama) ---
-        import io # Pastikan import io ada
+        # --- DOWNLOAD BUTTON ---
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             prepare_df(d['res_scan']).to_excel(writer, sheet_name='DATA SCAN', index=False)
             prepare_df(d['res_stock']).to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
             prepare_df(d['real_plus']).to_excel(writer, sheet_name='REAL +', index=False)
-            prepare_df(d['system_plus']).to_excel(writer, sheet_name='SYSTEM +', index=False)
+            prepare_df(dto_excel(writer['system_plus'])., sheet_name='SYSTEM +', index=False)
         
-        st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container_width=True)
-
+        st.download_button("📥 DOWNLOAD HASIL (EXCEL)", output.getvalue(), "Hasil_SO_Final.xlsx", use_container)
 
 # --- 1. ENGINE LOGIKA (Gantiin Makro VBA) ---
 
