@@ -720,27 +720,37 @@ def menu_Stock_Opname():
 
         /* --- PERBAIKAN: TULISAN 'CHOOSE OPTIONS' JADI PUTIH --- */
         
-        /* 1. Target teks placeholder (Choose options) agar berwarna putih */
-        div[data-baseweb="select"] div[aria-hidden="true"] {
+        /* --- CSS UPDATE: PAKSA CHOOSE OPTIONS JADI PUTIH SOLID --- */
+        
+        /* 1. Target teks placeholder untuk berbagai browser */
+        div[data-baseweb="select"] input::placeholder {
             color: white !important;
+            -webkit-text-fill-color: white !important;
             opacity: 1 !important;
         }
 
-        /* 2. Target teks input saat Anda mulai mengetik agar berwarna putih */
-        div[data-baseweb="select"] input {
+        /* 2. Target kontainer teks 'Choose options' secara spesifik */
+        div[data-baseweb="select"] [data-testid="stText"],
+        div[data-baseweb="select"] div[aria-hidden="true"] {
+            color: white !important;
+            -webkit-text-fill-color: white !important;
+            opacity: 1 !important;
+        }
+
+        /* 3. Menghilangkan filter atau efek pudar bawaan Streamlit */
+        div[role="combobox"] {
             color: white !important;
         }
 
-        /* 3. Memastikan icon panah dropdown juga berwarna putih agar senada */
-        svg[title="open"] {
-            fill: white !important;
+        /* 4. Memastikan kotak input utama memiliki kontras yang pas */
+        div[data-baseweb="select"] > div {
+            background-color: #262730 !important; /* Biru Gelap/Hitam */
+            border: 1px solid #464855 !important;
         }
 
-        /* 4. Karena tulisan di dalam kotak jadi putih, 
-              pastikan isi kotak (background-nya) tetap gelap agar terbaca */
-        div[data-baseweb="select"] > div {
-            background-color: #262730 !important;
-            border-color: #464855 !important;
+        /* 5. Target teks label di atas kotak (Sub Kategori, dll) agar tetap putih */
+        div[data-testid="stWidgetLabel"] p {
+            color: white !important;
         }
         </style>
     """, unsafe_allow_html=True)
