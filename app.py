@@ -728,7 +728,7 @@ if up_scan and up_stock:
                         'res_stock': res_stock, 
                         'real_plus': real_plus, 
                         'system_plus': system_plus,
-                        'df_s_raw': df_s_raw  # Simpan untuk generate SET UP REAL +
+                        'df_s_raw': df_s_raw
                     }
                     st.success("✅ Compare Selesai! Silahkan lanjut ke Step 2.")
         except Exception as e:
@@ -817,13 +817,16 @@ if 'compare_result' in st.session_state:
 # ============================================================
 # ✅ HASIL ALLOCATION + SET UP REAL + (SETELAH RUN ALLOCATION)
 # ============================================================
-if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state:
+if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state and 'set_up_real_plus' in st.session_state:
     st.markdown("---")
     st.subheader("📋 HASIL ALLOCATION")
     
     alloc_data = st.session_state.allocation_result
     sys_updated = st.session_state.sys_updated_result
     set_up_real_plus = st.session_state.set_up_real_plus
+    
+    # Ambil juga d dari compare_result
+    d = st.session_state.compare_result
     
     # --- METRICS ALLOCATION ---
     st.markdown("### 📊 RINGKASAN ALLOCATION")
