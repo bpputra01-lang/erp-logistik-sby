@@ -738,12 +738,31 @@ def menu_Stock_Opname():
                             real_plus['ITEM NAME'] = real_plus['SKU'].map(map_name)
                         except: pass
 
-                        st.markdown("### 📊 RINGKASAN COMPARE")
+                        # Simpan ke session_state
+                        st.session_state.compare_result = {
+                            'res_scan': res_scan, 
+                            'res_stock': res_stock, 
+                            'real_plus': real_plus, 
+                            'system_plus': system_plus,
+                            'df_s_raw': df_s_raw
+                        }
+                        st.success("✅ Compare Selesai! Silahkan lanjut ke Step 2.")
+                        
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
 
-total_real = len(d['real_plus'])
-total_sys = len(d['system_plus'])
-qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
-qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
+# ============================================================
+# ✅ METRICS & TABS - SETELAH COMPARE (DI LUAR TRY)
+# ============================================================
+if 'compare_result' in st.session_state:
+    d = st.session_state.compare_result
+    
+    st.markdown("### 📊 RINGKASAN COMPARE")
+    
+    total_real = len(d['real_plus'])
+    total_sys = len(d['system_plus'])
+    qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
+    qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
 
 st.markdown(f"""
 <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
