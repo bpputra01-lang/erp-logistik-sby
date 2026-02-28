@@ -727,10 +727,10 @@ def menu_Stock_Opname():
 # --- METRICS COMPARE (HTML STYLE) ---
         st.markdown("### 📊 RINGKASAN COMPARE")
         
-        total_real = len(d['real_plus'])
-        total_sys = len(d['system_plus'])
-        qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
-        qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
+    total_real = len(d['real_plus'])
+    total_sys = len(d['system_plus'])
+    qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
+    qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
         
         st.markdown(f"""
         <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
