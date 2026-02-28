@@ -765,33 +765,36 @@ def menu_Stock_Opname():
                         allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
                         
                         # 🆕 GENERATE SET UP REAL + (SETELAH ALLOCATION)
-                        df_s_raw_copy = d['df_s_raw'].copy()
-                        df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy.iloc[:, 2].astype(str).str.strip().str.upper()
-                        df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy.iloc[:, 0].astype(str).str.strip()
-                        
-                        bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
-                        
-                        real_plus_diff = d['real_plus'][d['real_plus']['DIFF'] > 0].copy() if 'DIFF' in d['real_plus'].columns else pd.DataFrame()
-                        
-                        if not real_plus_diff.empty:
-                            real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
-                            real_plus_diff['BIN TUJUAN'] = real_plus_diff.iloc[:, 1] if real_plus_diff.shape[1] > 1 else ""
-                            real_plus_diff['SKU_COL'] = real_plus_diff['SKU']
-                            real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
-                            real_plus_diff['NOTES'] = "RELOCATION"
-                            
-                            set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU_COL', 'QUANTITY', 'NOTES', 'ITEM NAME']].copy()
-                            set_up_real_plus = set_up_real_plus.rename(columns={'SKU_COL': 'SKU'})
-                        else:
-                            set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES', 'ITEM NAME'])
+df_s_raw_copy = d['df_s_raw'].copy()
+df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
+df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
 
-                        st.session_state.allocation_result = allocated_data
-                        st.session_state.sys_updated_result = sys_updated
-                        st.session_state.set_up_real_plus = set_up_real_plus
-                        
-                        st.success("✅ Allocation Selesai!")
-                except Exception as e:
-                    st.error(f"❌ Error Allocation: {e}")
+bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
+
+# VBA: Ambil dari STOCK SYSTEM (res_stock), bukan REAL +
+real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
+
+if not real_plus_diff.empty:
+    # VBA: BIN AWAL = dari Multiple Adj + (Scan)
+    real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
+    
+    # VBA: BIN TUJUAN = dari Stock System (kolom BIN)
+    real_plus_diff['BIN TUJUAN'] = real_plus_diff['BIN']
+    
+    # VBA: QUANTITY = DIFF, NOTES = RELOCATION
+    real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
+    real_plus_diff['NOTES'] = "RELOCATION"
+    
+    # VBA: Urutan kolom = BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES
+    set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
+else:
+    set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+
+st.session_state.allocation_result = allocated_data
+st.session_state.sys_updated_result = sys_updated
+st.session_state.set_up_real_plus = set_up_real_plus
+
+st.success("✅ Allocation Selesai!")
 
     # ============================================================
     # ✅ HASIL ALLOCATION + SET UP REAL + (SETELAH RUN ALLOCATION)
