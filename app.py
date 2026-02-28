@@ -751,12 +751,12 @@ def menu_Stock_Opname():
         with t4: st.dataframe(d['system_plus'], use_container_width=True)
 
         # --- STEP 2: ALLOCATION ---
-        st.markdown("---")
-        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
+    st.markdown("---")
+    st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
         
-                up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
+    up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
 
-        if up_bin_cov:
+    if up_bin_cov:
             if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
                 try:
                     df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
