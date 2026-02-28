@@ -806,10 +806,11 @@ if up_bin_cov:
         except Exception as e:
             st.error(f"❌ Error Allocation: {e}")
 
-            alloc_data = st.session_state.allocation_result
-sys_updated = st.session_state.sys_updated_result
-set_up_real_plus = st.session_state.set_up_real_plus
-d = st.session_state.compare_result
+            if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state and 'set_up_real_plus' in st.session_state:
+    alloc_data = st.session_state.allocation_result
+    sys_updated = st.session_state.sys_updated_result
+    set_up_real_plus = st.session_state.set_up_real_plus
+    d = st.session_state.compare_result
 
 st.markdown("### 📊 RINGKASAN ALLOCATION")
 
