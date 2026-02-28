@@ -757,14 +757,12 @@ def menu_Stock_Opname():
 if 'compare_result' in st.session_state:
     d = st.session_state.compare_result
     
-    st.markdown("### 📊 RINGKASAN COMPARE")
-    
     total_real = len(d['real_plus'])
     total_sys = len(d['system_plus'])
     qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
     qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
-
-st.markdown(f"""
+    
+    st.markdown(f"""
 <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
     <div class="m-box" style="flex:1"><span class="m-lbl">🔥 REAL + ITEMS</span><span class="m-val">{total_real}</span></div>
     <div class="m-box" style="flex:1"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{qty_real}</span></div>
@@ -772,16 +770,16 @@ st.markdown(f"""
     <div class="m-box" style="flex:1"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{qty_sys}</span></div>
 </div>
 """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Tabs juga harus di dalam block ini
+    t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
+    with t1: st.dataframe(d['res_scan'], use_container_width=True)
+    with t2: st.dataframe(d['res_stock'], use_container_width=True)
+    with t3: st.dataframe(d['real_plus'], use_container_width=True)
+    with t4: st.dataframe(d['system_plus'], use_container_width=True)
 
-st.markdown("---")
-
-t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
-with t1: st.dataframe(d['res_scan'], use_container_width=True)
-with t2: st.dataframe(d['res_stock'], use_container_width=True)
-with t3: st.dataframe(d['real_plus'], use_container_width=True)
-with t4: st.dataframe(d['system_plus'], use_container_width=True)
-
-st.markdown("---")
 
 # --- STEP 2: ALLOCATION ---
 st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
