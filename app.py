@@ -724,28 +724,6 @@ def menu_Stock_Opname():
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
-    # --- TAMPILKAN HASIL COMPARE & METRICS ---
-    if 'compare_result' in st.session_state:
-        d = st.session_state.compare_result
-        
-        
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("🔥 REAL + Items", total_real)
-        m2.metric("🔥 QTY REAL +", qty_real)
-        m3.metric("💻 SYSTEM + Items", total_sys)
-        m4.metric("💻 QTY SYSTEM +", qty_sys)
-        
-        st.markdown("---")
-        
-        # Tabs Data Compare
-        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
-        with t1: st.dataframe(d['res_scan'], use_container_width=True)
-        with t2: st.dataframe(d['res_stock'], use_container_width=True)
-        with t3: st.dataframe(d['real_plus'], use_container_width=True)
-        with t4: st.dataframe(d['system_plus'], use_container_width=True)
-
-        st.markdown("---")
-
 
     # --- TAMPILKAN HASIL ALLOCATION & METRICS ---
     if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state:
