@@ -862,6 +862,16 @@ if 'allocation_result' in st.session_state and 'sys_updated_result' in st.sessio
         d['set_up_real_plus'].to_excel(writer, sheet_name='SET UP REAL +', index=False)  # 🆕 Sheet baru
         alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
         sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
+    # Implementasi Python:
+bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
+
+set_up_real_plus = real_plus[real_plus['DIFF'] > 0].copy()
+
+if not set_up_real_plus.empty:
+    set_up_real_plus['BIN AWAL'] = set_up_real_plus['SKU'].map(bin_awal_map).fillna("NOT FOUND")
+    set_up_real_plus['BIN TUJUAN'] = set_up_real_plus.iloc[:, 1]
+    set_up_real_plus['QUANTITY'] = set_up_real_plus['DIFF']
+    set_up_real_plus['NOTES'] = "RELOCATION"
     
     st.download_button(
         label="📥 DOWNLOAD HASIL EXCEL (ALLOCATION)",
@@ -882,16 +892,7 @@ if 'allocation_result' in st.session_state and 'sys_updated_result' in st.sessio
 #    - QUANTITY = DIFF
 #    - NOTES = "RELOCATION"
 
-# Implementasi Python:
-bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
 
-set_up_real_plus = real_plus[real_plus['DIFF'] > 0].copy()
-
-if not set_up_real_plus.empty:
-    set_up_real_plus['BIN AWAL'] = set_up_real_plus['SKU'].map(bin_awal_map).fillna("NOT FOUND")
-    set_up_real_plus['BIN TUJUAN'] = set_up_real_plus.iloc[:, 1]
-    set_up_real_plus['QUANTITY'] = set_up_real_plus['DIFF']
-    set_up_real_plus['NOTES'] = "RELOCATION"
 
 import pandas as pd
 import numpy as np
