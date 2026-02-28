@@ -728,12 +728,6 @@ def menu_Stock_Opname():
     if 'compare_result' in st.session_state:
         d = st.session_state.compare_result
         
-        # --- METRICS COMPARE ---
-        st.markdown("### 📊 RINGKASAN COMPARE")
-        total_real = len(d['real_plus'])
-        total_sys = len(d['system_plus'])
-        qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
-        qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
         
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("🔥 REAL + Items", total_real)
@@ -743,6 +737,14 @@ def menu_Stock_Opname():
         
         st.markdown("---")
         
+        # Tabs Data Compare
+        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
+        with t1: st.dataframe(d['res_scan'], use_container_width=True)
+        with t2: st.dataframe(d['res_stock'], use_container_width=True)
+        with t3: st.dataframe(d['real_plus'], use_container_width=True)
+        with t4: st.dataframe(d['system_plus'], use_container_width=True)
+
+        st.markdown("---")
 
 
     # --- TAMPILKAN HASIL ALLOCATION & METRICS ---
