@@ -774,7 +774,6 @@ def menu_Stock_Opname():
     # --- TAMPILKAN HASIL ALLOCATION & METRICS ---
     if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state:
         st.markdown("---")
-        st.subheader("📋 HASIL ALLOCATION")
         
         alloc_data = st.session_state.allocation_result
         sys_updated = st.session_state.sys_updated_result
@@ -834,24 +833,6 @@ def menu_Stock_Opname():
 
         st.markdown("---")
 
-        # --- STEP 2: ALLOCATION ---
-        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
-        
-        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
-
-        if up_bin_cov:
-            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
-                try:
-                    df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
-                    
-                    with st.spinner("Memproses Alokasi..."):
-                        allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
-                        
-                        st.session_state.allocation_result = allocated_data
-                        st.session_state.sys_updated_result = sys_updated
-                        st.success("✅ Allocation Selesai!")
-                except Exception as e:
-                    st.error(f"❌ Error Allocation: {e}")
 
     # --- TAMPILKAN HASIL ALLOCATION & METRICS ---
     if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state:
