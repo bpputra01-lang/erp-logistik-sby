@@ -764,37 +764,50 @@ def menu_Stock_Opname():
                     with st.spinner("Memproses Alokasi..."):
                         allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
                         
-# 🆕 GENERATE SET UP REAL + (SETELAH ALLOCATION)
-df_s_raw_copy = d['df_s_raw'].copy()
-df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
-df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
+# --- STEP 2: ALLOCATION ---
+st.markdown("---")
+st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
 
-bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
+up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
 
-# VBA: Ambil dari STOCK SYSTEM (res_stock), bukan REAL +
-real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
+if up_bin_cov:
+    if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
+        try:
+            df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+            
+            with st.spinner("Memproses Alokasi..."):
+                
+                # 1️⃣ LOGIC ALLOCATION
+                allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
+                
+                # 2️⃣ LOGIC SET UP REAL + (SESUAI VBA)
+                df_s_raw_copy = d['df_s_raw'].copy()
+                df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
+                df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
 
-if not real_plus_diff.empty:
-    # VBA: BIN AWAL = dari Multiple Adj + (Scan)
-    real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
-    
-    # VBA: BIN TUJUAN = dari Stock System (kolom BIN)
-    real_plus_diff['BIN TUJUAN'] = real_plus_diff['BIN']
-    
-    # VBA: QUANTITY = DIFF, NOTES = RELOCATION
-    real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
-    real_plus_diff['NOTES'] = "RELOCATION"
-    
-    # VBA: Urutan kolom = BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES
-    set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
-else:
-    set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+                bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
 
-st.session_state.allocation_result = allocated_data
-st.session_state.sys_updated_result = sys_updated
-st.session_state.set_up_real_plus = set_up_real_plus
+                # VBA: Ambil dari STOCK SYSTEM (res_stock), bukan REAL +
+                real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
 
-st.success("✅ Allocation Selesai!")
+                if not real_plus_diff.empty:
+                    real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
+                    real_plus_diff['BIN TUJUAN'] = real_plus_diff['BIN']
+                    real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
+                    real_plus_diff['NOTES'] = "RELOCATION"
+                    
+                    set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
+                else:
+                    set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+
+                st.session_state.allocation_result = allocated_data
+                st.session_state.sys_updated_result = sys_updated
+                st.session_state.set_up_real_plus = set_up_real_plus
+                
+                st.success("✅ Allocation Selesai!")
+                
+        except Exception as e:
+            st.error(f"❌ Error Allocation: {e}")
     # ============================================================
     # ✅ HASIL ALLOCATION + SET UP REAL + (SETELAH RUN ALLOCATION)
     # ============================================================
