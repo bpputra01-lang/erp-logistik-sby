@@ -499,132 +499,252 @@ from collections import defaultdict
 # =========================================================
 # 1. FUNGSI PENDUKUNG
 # =========================================================
-# --- INISIALISASI MEMORI (WAJIB DI ATAS & JANGAN DIUBAH) ---
-# Gunakan sintaks ini supaya data yang sudah ada TIDAK TERTELAN None lagi
-if 'df_res_lookup' not in st.session_state:
-    st.session_state['df_res_lookup'] = None
-if 'df_missing_lookup' not in st.session_state:
-    st.session_state['df_missing_lookup'] = None
-if 'df_karantina_result' not in st.session_state:
-    st.session_state['df_karantina_result'] = None
-if 'df_pivot_mult_result' not in st.session_state:
-    st.session_state['df_pivot_mult_result'] = None
-if 'df_miss_loc_data' not in st.session_state:
-    st.session_state['df_miss_loc_data'] = None
-if 'step4_done' not in st.session_state:
-    st.session_state['step4_done'] = False
-
-def get_yellow_skus(file, column_index):
-    yellow_set = set()
-    try:
-        wb = load_workbook(file, data_only=True)
-        ws = wb.active
-        for row_idx in range(2, ws.max_row + 1):
-            cell = ws.cell(row=row_idx, column=column_index)
-            color = str(cell.fill.start_color.index)
-            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
-                sku_val = str(cell.value).strip().upper() if cell.value else ""
-                if sku_val: yellow_set.add(sku_val)
-    except: pass
-    return yellow_set
-
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock = df_stock_adj.copy()
+    
+    # Padding kolom agar tidak error index out of range
+    target_cols = 12
+    current_cols = df_stock.shape[1]
+    if current_cols < target_cols:
+        for i in range(current_cols, target_cols):
+            df_stock[i] = ""
+
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s
+
     recon_dict = {}
     all_recon_keys = set()
+    
+    # Validasi kolom df_recon
+    min_cols_recon = 7
+    if df_recon.shape[1] < min_cols_recon:
+        st.error(f"File Recon Minimal harus punya {min_cols_recon} kolom (Kolom ke-7 adalah Nilai SO).")
+        return df_stock, pd.DataFrame()
+
     for _, row in df_recon.iterrows():
         try:
             b_recon = clean_val(row.iloc[0])
             s_recon = clean_val(row.iloc[1])
             if b_recon and s_recon:
                 key = f"{b_recon}|{s_recon}"
-                recon_dict[key] = row.iloc[6]
+                # Ambil nilai di kolom ke-7 (index 6)
+                try:
+                    val = float(row.iloc[6])
+                except:
+                    val = 0
+                recon_dict[key] = val
                 all_recon_keys.add(key)
         except: continue
-    while df_stock.shape[1] < 12: df_stock[f"Extra_{df_stock.shape[1]}"] = ""
+
     used_keys = set()
-    def do_lookup(row):
+
+    # --- PROSES LOOKUP ---
+    # Kita gunakan .apply dengan axis=1, tapi lebih aman pakai list comprehension atau iterrows
+    results_lookup = []
+    for idx, row in df_stock.iterrows():
         key = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+        res_val = ""
         if key in recon_dict:
             used_keys.add(key)
-            return recon_dict[key]
-        return ""
-    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
-    def do_diff(row):
+            res_val = recon_dict[key]
+        results_lookup.append(res_val)
+
+    # Assign ke kolom 10 (QTY SO)
+    df_stock.iloc[:, 10] = results_lookup
+
+    # --- PROSES DIFF ---
+    results_diff = []
+    for idx, row in df_stock.iterrows():
         try:
-            v_sys, v_so = row.iloc[9], row.iloc[10]
-            if v_so != "" and v_so is not None: return abs(float(v_sys) - float(v_so))
-        except: return 0
-        return ""
-    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
+            v_sys = row.iloc[9]  # Qty System
+            v_so = row.iloc[10] # Qty SO
+            
+            # Cek jika keduanya bukan string kosong dan bukan None
+            if v_so != "" and v_so is not None:
+                # Coba konversi ke float
+                v_sys_f = float(v_sys) if str(v_sys).strip() != "" else 0
+                v_so_f = float(v_so)
+                diff = abs(v_sys_f - v_so_f)
+                results_diff.append(diff)
+            else:
+                results_diff.append("")
+        except:
+            results_diff.append("")
+            
+    # Assign ke kolom 11 (DIFF)
+    df_stock.iloc[:, 11] = results_diff
+
+    # Ganti nama kolom
     cols = list(df_stock.columns)
-    cols[10], cols[11] = "QTY SO", "DIFF"
+    if len(cols) > 10: cols[10] = "QTY SO"
+    if len(cols) > 11: cols[11] = "DIFF"
     df_stock.columns = cols
+
+    # --- DATA MISSING ---
     missing_keys = all_recon_keys - used_keys
-    df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
+    df_need_single = pd.DataFrame()
+    
+    if missing_keys:
+        # Filter baris dari df_recon yang kuncinya ada di missing_keys
+        mask = df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)
+        df_need_single = df_recon[mask].copy()
+
     return df_stock, df_need_single
 
+
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
+    # Konversi Numerik
     df_f = df_stock_final.copy()
-    for i in [9, 10, 11]: df_f.iloc[:, i] = pd.to_numeric(df_f.iloc[:, i], errors='coerce').fillna(0)
-    df_to_pivot = df_f[df_f.iloc[:, 10] > df_f.iloc[:, 9]].copy()
-    pivot_mult = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
-    pivot_mult.columns = ['SKU_KEY', 'TOTAL_DIFF']
-    master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
-    df_mult_final = pivot_mult.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
-    if not df_mult_final.empty:
-        df_mult_final.iloc[:, -1] = df_mult_final['TOTAL_DIFF']
-        if 'SKU_KEY' in df_mult_final.columns: df_mult_final = df_mult_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
+    
+    # Amankan index kolom angka
+    for i in [9, 10, 11]: 
+        if i < df_f.shape[1]:
+            df_f.iloc[:, i] = pd.to_numeric(df_f.iloc[:, i], errors='coerce').fillna(0)
+
+    # Filter QTY SO > QTY SYSTEM
+    try:
+        df_to_pivot = df_f[df_f.iloc[:, 10] > df_f.iloc[:, 9]].copy()
+    except:
+        df_to_pivot = pd.DataFrame()
+
+    # Pivot Multiple
+    df_mult_final = pd.DataFrame()
+    if not df_to_pivot.empty and df_to_pivot.shape[0] > 0:
+        # Group by SKU (Kolom 2)
+        pivot_mult = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
+        pivot_mult.columns = ['SKU_KEY', 'TOTAL_DIFF']
+        
+        # Merge dengan Master
+        if df_adj_plus_master is not None and not df_adj_plus_master.empty:
+            master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
+            df_mult_final = pivot_mult.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
+            
+            if not df_mult_final.empty:
+                # Ambil kolom terakhir (Total Adj) jika ada
+                if 'TOTAL_DIFF' in df_mult_final.columns:
+                    # Geser nilai Total Diff ke kolom terakhir (misalnya kolom harga)
+                    last_col = df_mult_final.columns[-2] # Kolom sebelum TOTAL_DIFF (jika ada) atau sesuai logika
+                    # Cara aman: Ambil kolom QTY ADJ (kolom hasil pivot)
+                    # Kita cukup return apa adanya, karena di UI sudah nama dfnya
+                    pass
+                
+                if 'SKU_KEY' in df_mult_final.columns: 
+                    df_mult_final = df_mult_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
+
+    # Single Adj
+    df_sing_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
     if not df_recon_missing.empty:
         df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
         df_sing_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
         df_sing_final.columns = ['BIN', 'SKU', 'QTY ADJ']
-    else: df_sing_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+
     return df_mult_final, df_sing_final
+
 
 def logic_setup_karantina_with_check(df_outstanding):
     df = df_outstanding.copy()
-    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # K
-    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0) # O
+    
+    # Amankan Kolom K (10) dan O (14)
+    if df.shape[1] <= 10 or df.shape[1] <= 14:
+        st.error("File kurang kolom. Pastikan ada Kolom K (Qty System) dan Kolom O (Hasil Rekon).")
+        return pd.DataFrame(), pd.DataFrame()
+
+    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
+    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
+    
     df['CHECK_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
+    
+    # Tabel Pengecekan
     df_check = df.iloc[:, [2, 3, 10, 14]].copy()
     df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'HASIL_REKON_O']
     df_check['SELISIH_HITUNG_AI'] = df['CHECK_DIFF']
+    
+    # Filter Karantina
     df_filtered = df[df['CHECK_DIFF'] != 0].copy()
+    
     df_karantina = pd.DataFrame({
-        "BIN AWAL": df_filtered.iloc[:, 2], "BIN TUJUAN": "KARANTINA",
-        "SKU": df_filtered.iloc[:, 3], "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
+        "BIN AWAL": df_filtered.iloc[:, 2],
+        "BIN TUJUAN": "KARANTINA",
+        "SKU": df_filtered.iloc[:, 3],
+        "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
         "NOTES": "MISS LOCATION"
     })
+    
     return df_karantina, df_check
+
 
 def logic_generate_final_reports_v2(df_adj_plus, df_adj_minus, df_karantina, df_miss_loc_internal):
     def process_adj_final(df, status, is_karantina=False):
         if df is None or df.empty: return pd.DataFrame()
         temp = df.copy()
+        
         if is_karantina:
+            # Sesuaikan Kolom Karantina
+            cols_needed = [0, 2, 3, 4] # Index untuk Bin Awal, SKU, Quantity, Notes
+            if temp.shape[1] < 5:
+                 return pd.DataFrame()
+            
             return pd.DataFrame({
-                "BIN": temp.iloc[:, 0], "SKU": temp.iloc[:, 2], "BRAND": "", "ITEM NAME": "", 
-                "VARIANT": "", "SUB KATEGOTI": "", "HARGA BELI": 0, "HARGA JUAL": 0, 
-                "QTY SYSTEM": 0, "QTY SO": temp.iloc[:, 3], "VALUE ADJ": 0, "STATUS ADJ": status
+                "BIN": temp.iloc[:, 0],
+                "SKU": temp.iloc[:, 2],
+                "BRAND": "",
+                "ITEM NAME": "", 
+                "VARIANT": "",
+                "SUB KATEGORI": "",
+                "HARGA BELI": 0,
+                "HARGA JUAL": 0, 
+                "QTY SYSTEM": 0,
+                "QTY SO": temp.iloc[:, 3],
+                "VALUE ADJ": 0,
+                "STATUS ADJ": status
             })
-        res = temp.iloc[:, 1:11].copy()
-        res.columns = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGOTI", "HARGA BELI", "HARGA JUAL", "QTY SYSTEM", "QTY SO"]
-        res["VALUE ADJ"] = (res["QTY SO"] - res["QTY SYSTEM"]) * res["HARGA JUAL"]
+        
+        # Untuk Adj + / -
+        # Asumsi Kolom: BIN, SKU, Brand, Item, Variant, Sub, HB, HJ, Sys, SO
+        needed = temp.shape[1]
+        if needed < 10:
+            # Padding dummy
+            for i in range(needed, 10):
+                temp[i] = 0
+        
+        res = temp.iloc[:, 0:10].copy()
+        res.columns = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGORI", "HARGA BELI", "HARGA JUAL", "QTY SYSTEM", "QTY SO"]
+        
+        # Hitung Value
+        try:
+            res["VALUE ADJ"] = (res["QTY SO"].fillna(0) - res["QTY SYSTEM"].fillna(0)) * res["HARGA JUAL"].fillna(0)
+        except:
+            res["VALUE ADJ"] = 0
+            
         res["STATUS ADJ"] = status
         return res
+
     df_sum_plus = process_adj_final(df_adj_plus, "ADJ +")
     df_sum_minus = process_adj_final(df_adj_minus, "ADJ -")
     df_sum_kar = process_adj_final(df_karantina, "ADJ KARANTINA", True)
+    
     df_summary = pd.concat([df_sum_plus, df_sum_minus, df_sum_kar], ignore_index=True)
-    t_sku = df_miss_loc_internal.iloc[:, 2].nunique() if df_miss_loc_internal is not None else 0
-    t_qty = df_miss_loc_internal.iloc[:, 3].sum() if df_miss_loc_internal is not None else 0
-    return df_summary, df_miss_loc_internal, t_sku, t_qty
+    
+    t_sku = 0
+    t_qty = 0
+    df_miss = pd.DataFrame()
+    
+    if df_miss_loc_internal is not None and not df_miss_loc_internal.empty:
+        df_miss = df_miss_loc_internal.copy()
+        t_sku = df_miss.iloc[:, 2].nunique()
+        t_qty = pd.to_numeric(df_miss.iloc[:, 3], errors='coerce').fillna(0).sum()
+
+    return df_summary, df_miss, t_sku, t_qty
+
+
+# --- INISIALISASI SESSION STATE ---
+if 'step4_done' not in st.session_state: st.session_state.step4_done = False
+if 'step5_done' not in st.session_state: st.session_state.step5_done = False
+if 'step6_done' not in st.session_state: st.session_state.step6_done = False
+
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
@@ -942,207 +1062,202 @@ def menu_Stock_Opname():
                 st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
             st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Report.xlsx", use_container_width=True)
+
 # =========================================================
-    # ⚙️ 4. FINAL ADJUSTMENT CHECKER (LOOKUP & DIFF)
-    # =========================================================
-    st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
-    st.info("Upload 2 file di bawah ini untuk mengisi QTY SO & DIFF.")
-    
-    adj_col1, adj_col2 = st.columns(2)
-    with adj_col1:
-        st.write("**1. File Hasil Recon**")
-        up_recon_4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_4_u1")
-    with adj_col2:
-        st.write("**2. File Cek Stock**")
-        up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_4_u2")
+# ⚙️ 4. FINAL ADJUSTMENT CHECKER (LOOKUP & DIFF)
+# =========================================================
+st.markdown("<br><br><br>---", unsafe_allow_html=True)
+st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
 
-    if up_recon_4 and up_stock_4:
-        if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+# --- TAMPILKAN DATA LAMA JIKA ADA (VIEW MODE) ---
+if st.session_state.step4_done and 'df_res_lookup' in st.session_state:
+    st.info(f"📂 Data Step 4 Tersimpan ({len(st.session_state.df_res_lookup)} baris). Upload ulang file untuk mengupdate, atau lanjut ke step berikutnya.")
+    t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT (Tersimpan)", "🔍 NEED SINGLE ADJ (Tersimpan)"])
+    with t_f:
+        st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
+    with t_m:
+        st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
+    
+    # Download lama (jika tidak upload baru)
+    out4_old = io.BytesIO()
+    with pd.ExcelWriter(out4_old, engine='xlsxwriter') as wr:
+        st.session_state.df_res_lookup.to_excel(wr, sheet_name='FINAL_ADJUSTMENT', index=False)
+        st.session_state.df_missing_lookup.to_excel(wr, sheet_name='NEED_SINGLE_ADJ', index=False)
+    st.download_button("📥 DOWNLOAD DATA TERSIMPAN", data=out4_old.getvalue(), file_name="Adjustment_Lookup.xlsx", use_container_width=True)
+
+st.info("Upload 2 file di bawah ini untuk mengisi QTY SO & DIFF.")
+adj_col1, adj_col2 = st.columns(2)
+with adj_col1:
+    st.write("**1. File Hasil Recon**")
+    up_recon_4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_4_u1")
+with adj_col2:
+    st.write("**2. File Cek Stock**")
+    up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_4_u2")
+
+if up_recon_4 and up_stock_4:
+    if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+        try:
+            df_r4 = pd.read_excel(up_recon_4, engine='openpyxl') if up_recon_4.name.endswith('xlsx') else pd.read_csv(up_recon_4)
+            df_s4 = pd.read_excel(up_stock_4, engine='openpyxl') if up_stock_4.name.endswith('xlsx') else pd.read_csv(up_stock_4)
+            
+            df_res_4, df_missing_4 = logic_cek_adjustment_final(df_r4, df_s4)
+            
+            # SIMPAN KE SESSION STATE
+            st.session_state.df_res_lookup = df_res_4
+            st.session_state.df_missing_lookup = df_missing_4
+            st.session_state.step4_done = True
+            
+            st.success(f"✅ Lookup Selesai! Data tersimpan.")
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Error Step 4: {e}")
+
+# =========================================================
+# ⚙️ 5. PIVOT GENERATOR (VBA LOGIC)
+# =========================================================
+st.markdown("<br><br>---", unsafe_allow_html=True)
+st.subheader("5️⃣ FINAL ADJUSMENT +")
+
+# --- TAMPILKAN DATA LAMA JIKA ADA ---
+if st.session_state.step5_done and 'df_pivot_mult_result' in st.session_state:
+    st.info("📂 Data Step 5 Tersimpan.")
+    t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ + (Tersimpan)", "⚠️ SINGLE ADJ + (Tersimpan)"])
+    with t_mult:
+        st.dataframe(st.session_state.df_pivot_mult_result, use_container_width=True, hide_index=True)
+    with t_sing:
+        st.dataframe(st.session_state.df_pivot_sing_result, use_container_width=True, hide_index=True)
+
+# PROTEKSI: Hanya jalan kalau Step 4 sudah
+if not st.session_state.step4_done:
+    st.warning("⚠️ Jalankan Step 4 dulu!")
+else:
+    st.info("Data dari Step 4 sudah tersimpan. Upload Master untuk Pivot.")
+    up_master_5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_single")
+
+    if up_master_5:
+        if st.button("▶️GENERATE ADJ +", use_container_width=True):
             try:
-                # Load data dengan engine yang aman
-                df_r4 = pd.read_excel(up_recon_4, engine='openpyxl') if up_recon_4.name.endswith('xlsx') else pd.read_csv(up_recon_4)
-                df_s4 = pd.read_excel(up_stock_4, engine='openpyxl') if up_stock_4.name.endswith('xlsx') else pd.read_csv(up_stock_4)
+                df_m5 = pd.read_excel(up_master_5, engine='openpyxl') if up_master_5.name.endswith('xlsx') else pd.read_csv(up_master_5)
                 
-                # Jalankan fungsi lookup
-                df_res_4, df_missing_4 = logic_cek_adjustment_final(df_r4, df_s4)
+                # Ambil dari session state
+                df_lookup_data = st.session_state.df_res_lookup
+                df_missing_data = st.session_state.df_missing_lookup
                 
-                # --- TAMBAHAN FUNGSI MENGUNCI ---
-                st.session_state.df_res_lookup = df_res_4
-                st.session_state.df_missing_lookup = df_missing_4
-                st.session_state.step4_done = True
+                df_mult, df_sing = logic_pivot_adjustment(df_lookup_data, df_m5, df_missing_data)
+
+                # SIMPAN KE SESSION STATE
+                st.session_state.df_pivot_mult_result = df_mult
+                st.session_state.df_pivot_sing_result = df_sing
+                st.session_state.step5_done = True
                 
-                st.success(f"✅ Lookup Selesai! Data siap untuk Step 5.")
-                
-                t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
-                with t_f:
-                    st.dataframe(df_res_4, use_container_width=True, hide_index=True)
-                with t_m:
-                    st.dataframe(df_missing_4, use_container_width=True, hide_index=True)
-                
-                # Download Result Step 4
-                out4 = io.BytesIO()
-                with pd.ExcelWriter(out4, engine='xlsxwriter') as wr:
-                    df_res_4.to_excel(wr, sheet_name='FINAL_ADJUSTMENT', index=False)
-                    df_missing_4.to_excel(wr, sheet_name='NEED_SINGLE_ADJ', index=False)
-                st.download_button("📥 DOWNLOAD RESULT STEP 4", data=out4.getvalue(), file_name="Adjustment_Lookup.xlsx", use_container_width=True)
-                
+                st.success("✅ Pivot Berhasil!")
+                st.rerun()
+
             except Exception as e:
-                st.error(f"❌ Error Step 4: {e}")
+                st.error(f"❌ Error Step 5: {e}")
 
-    # =========================================================
-    # ⚙️ 5. PIVOT GENERATOR (VBA LOGIC) - CUKUP 1 UPLOADER
-    # =========================================================
-    st.markdown("<br><br>---", unsafe_allow_html=True)
-    st.subheader("5️⃣ FINAL ADJUSMENT + ")
-    
-    # Proteksi: Hanya muncul kalau Step 4 sudah dapet hasil
-    if 'step4_done' not in st.session_state:
-        st.warning("⚠️ Jalankan Step 4 dulu supaya data Recon & Cek Stock tersedia.")
-    else:
-        st.info("Data dari Step 4 sudah tersimpan. Sekarang cukup upload file Master Stock untuk Pivot.")
-        
-        # Cuma satu uploader sesuai permintaan
-        up_master_5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_single")
+# =========================================================
+# ⚙️ 6. SET UP KARANTINA GENERATOR
+# =========================================================
+st.markdown("<br><br><br>---", unsafe_allow_html=True)
+st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
 
-        if up_master_5:
-            if st.button("▶️GENERATE ADJ +", use_container_width=True):
-                try:
-                    # Load Master
-                    df_m5 = pd.read_excel(up_master_5, engine='openpyxl') if up_master_5.name.endswith('xlsx') else pd.read_csv(up_master_5)
-                    
-                    # Panggil data dari session state
-                    df_lookup_data = st.session_state.df_res_lookup
-                    df_missing_data = st.session_state.df_missing_lookup
-                    
-                    # Jalankan Logika Pivot VBA
-                    df_mult, df_sing = logic_pivot_adjustment(df_lookup_data, df_m5, df_missing_data)
+# --- TAMPILKAN DATA LAMA JIKA ADA ---
+if st.session_state.step6_done and 'df_karantina_result' in st.session_state:
+    st.info("📂 Data Step 6 Tersimpan.")
+    st.dataframe(st.session_state.df_karantina_result, use_container_width=True, hide_index=True)
 
-                    # --- TAMBAHAN FUNGSI MENGUNCI ---
-                    st.session_state.df_pivot_mult_result = df_mult
-                    st.session_state.step5_done = True
-                    
-                    st.success("✅ Pivot Multiple & Single Berhasil Dibuat!")
-                    
-                    t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
-                    with t_mult:
-                        st.write("**Hasil Pivot SKU (Akumulasi Qty)**")
-                        st.dataframe(df_mult, use_container_width=True, hide_index=True)
-                    with t_sing:
-                        st.write("**Hasil Pivot BIN & SKU (Single Adj)**")
-                        st.dataframe(df_sing, use_container_width=True, hide_index=True)
-                    
-                    # Download Result Step 5
-                    out5 = io.BytesIO()
-                    with pd.ExcelWriter(out5, engine='xlsxwriter') as wr:
-                        df_mult.to_excel(wr, sheet_name='MULTIPLE ADJ +', index=False)
-                        df_sing.to_excel(wr, sheet_name='SINGLE ADJ +', index=False)
-                    st.download_button("📥 DOWNLOAD PIVOT REPORT", data=out5.getvalue(), file_name="Pivot_Adjustment_Final.xlsx", use_container_width=True)
+up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
+
+if up_karantina:
+    if st.button("ATE & BUKTIKAN PERHIT🛠️ GENERUNGAN", use_container_width=True):
+        try:
+            df_raw = pd.read_excel(up_karantina, engine='openpyxl') if up_karantina.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_karantina)
+            
+            df_final, df_debug = logic_setup_karantina_with_check(df_raw)
+
+            # SIMPAN KE SESSION STATE
+            st.session_state.df_karantina_result = df_final
+            st.session_state.step6_done = True
+            
+            # Tabel Pengecekan
+            st.write("### 🔍 Tabel Pengecekan:")
+            st.dataframe(df_debug, use_container_width=True, hide_index=True)
+            st.markdown("---")
+            
+            if not df_final.empty:
+                st.success(f"✅ Ada {len(df_final)} baris selisih.")
+                st.write("### 📦 Hasil Karantina:")
+                st.dataframe(df_final, use_container_width=True, hide_index=True)
                 
-                except Exception as e:
-                    st.error(f"❌ Error Step 5: {e}")
-
-    # =========================================================
-    # ⚙️ 6. SET UP KARANTINA GENERATOR (TRANSPARAN)
-    # =========================================================
-    st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
-    
-    up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
-
-    if up_karantina:
-        if st.button("🛠️ GENERATE & BUKTIKAN PERHITUNGAN", use_container_width=True):
-            try:
-                # Baca file
-                if up_karantina.name.endswith(('.xlsx', '.xls')):
-                    df_raw = pd.read_excel(up_karantina, engine='openpyxl')
-                else:
-                    df_raw = pd.read_csv(up_karantina, index_col=False)
+                out6 = io.BytesIO()
+                with pd.ExcelWriter(out6, engine='xlsxwriter') as wr:
+                    df_final.to_excel(wr, sheet_name='SET UP KARANTINA', index=False)
+                st.download_button("📥 DOWNLOAD SET UP KARANTINA", data=out6.getvalue(), file_name="Set_Up_Karantina.xlsx", use_container_width=True)
+            else:
+                st.warning("⚠️ Semua DIFF = 0.")
                 
-                # Panggil fungsi logic
-                df_final, df_debug = logic_setup_karantina_with_check(df_raw)
-
-                # --- TAMBAHAN FUNGSI MENGUNCI ---
-                st.session_state.df_karantina_result = df_final
-                st.session_state.step6_done = True
-                
-                # --- TABEL PEMBUKTIAN ---
-                st.write("### 🔍 Tabel Pengecekan (Data yang Gue Baca):")
-                st.dataframe(df_debug, use_container_width=True, hide_index=True)
-                
-                st.markdown("---")
-                
-                # --- HASIL AKHIR ---
-                if not df_final.empty:
-                    st.success(f"✅ Ada {len(df_final)} baris yang selisihnya bukan 0. Silakan cek tabel di atas.")
-                    st.write("### 📦 Hasil Akhir Format Karantina:")
-                    st.dataframe(df_final, use_container_width=True, hide_index=True)
+            st.rerun()
                     
-                    # Download
-                    out6 = io.BytesIO()
-                    with pd.ExcelWriter(out6, engine='xlsxwriter') as wr:
-                        df_final.to_excel(wr, sheet_name='SET UP KARANTINA', index=False)
-                    st.download_button("📥 DOWNLOAD SET UP KARANTINA", data=out6.getvalue(), file_name="Set_Up_Karantina.xlsx", use_container_width=True)
-                else:
-                    st.warning("⚠️ Gue nggak nemu selisih (Semua DIFF = 0). Cek lagi kolom K dan O lu.")
-                    
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
 
-    # =========================================================
-    # 🏁 7. FINAL REPORT GENERATOR (INTEGRATED)
-    # =========================================================
-    st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("🏁 7. FINAL REPORT GENERATOR")
-    st.info("Hanya upload file STOCK ADJ -. Data lainnya (Adj +, Karantina, Miss Loc) diambil otomatis dari sistem.")
+# =========================================================
+# 🏁 7. FINAL REPORT GENERATOR
+# =========================================================
+st.markdown("<br><br><br>---", unsafe_allow_html=True)
+st.subheader("🏁 7. FINAL REPORT GENERATOR")
 
-    # Hanya upload SATU file sesuai permintaan lu
+# CEK APAKAH SEMUA STEP SUDAH JALAN
+can_run_7 = (
+    st.session_state.get('step5_done') and 
+    st.session_state.get('step6_done')
+)
+
+if not can_run_7:
+    st.warning("⚠️ Selesaikan Step 4, 5, dan 6 dulu!")
+else:
+    st.info("Siap生成 Laporan Akhir. Upload file ADJ - di bawah.")
     up_minus_final = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx', 'csv'], key="up_minus_v2")
 
     if up_minus_final:
         if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
             try:
-                # 1. Ambil data dari Step-Step sebelumnya (Session State)
-                # Note: df_adj_plus diambil dari hasil Step 5 (df_pivot_mult_result)
+                # Ambil data dari Session State
                 df_adj_plus = st.session_state.get('df_pivot_mult_result') 
                 df_karantina = st.session_state.get('df_karantina_result') 
-                df_miss_loc_internal = st.session_state.get('df_karantina_result') # Menggunakan data karantina sebagai base miss loc
+                df_miss_loc = st.session_state.get('df_karantina_result')
                 
-                # 2. Baca file ADJ - yang baru diupload
                 df_m = pd.read_excel(up_minus_final) if up_minus_final.name.endswith('xlsx') else pd.read_csv(up_minus_final)
 
-                # 3. Jalankan Logika Gabungan
-                df_sum, df_miss, t_sku, t_qty = logic_generate_final_reports_v2(df_adj_plus, df_m, df_karantina, df_miss_loc_internal)
+                df_sum, df_miss, t_sku, t_qty = logic_generate_final_reports_v2(df_adj_plus, df_m, df_karantina, df_miss_loc)
 
-                # --- DOWNLOAD 1: SUMMARY ADJUSTMENT ---
+                # Download Summary
                 out_sum = io.BytesIO()
                 with pd.ExcelWriter(out_sum, engine='xlsxwriter') as wr:
                     df_sum.to_excel(wr, sheet_name='SUM_ADJUSTMENT', index=False)
-                    workbook = wr.book
-                    ws_sum = wr.sheets['SUM_ADJUSTMENT']
-                    header_fmt = workbook.add_format({'bold':True, 'font_color':'white', 'bg_color':'#0070C0', 'border':1, 'align':'center'})
-                    for col_num, value in enumerate(df_sum.columns.values):
-                        ws_sum.write(0, col_num, value, header_fmt)
+                    ws = wr.sheets['SUM_ADJUSTMENT']
+                    hdr = wr.book.add_format({'bold':True, 'font_color':'white', 'bg_color':'#0070C0'})
+                    for c, v in enumerate(df_sum.columns.values): ws.write(0, c, v, hdr)
 
-                # --- DOWNLOAD 2: LIST MISS LOCATION ---
+                # Download Miss Loc
                 out_miss = io.BytesIO()
                 with pd.ExcelWriter(out_miss, engine='xlsxwriter') as wr:
                     df_miss.to_excel(wr, sheet_name='LIST MISS LOCATION', index=False)
-                    ws_ms = wr.sheets['LIST MISS LOCATION']
-                    yellow_fmt = workbook.add_format({'bg_color': 'yellow', 'border': 1, 'bold': True, 'align':'center'})
-                    
-                    # Header Summary
-                    ws_ms.merge_range('F1:G1', 'SUMMARY MISS LOCATION', header_fmt)
-                    ws_ms.write('F2', 'KETERANGAN', header_fmt); ws_ms.write('G2', 'TOTAL', header_fmt)
-                    ws_ms.write('F3', 'TOTAL SKU'); ws_ms.write('G3', f"{t_sku} ITEM", yellow_fmt)
-                    ws_ms.write('F4', 'TOTAL QTY MISS LOCATION'); ws_ms.write('G4', f"{t_qty} ITEM", yellow_fmt)
+                    ws2 = wr.sheets['LIST MISS LOCATION']
+                    yellow = wr.book.add_format({'bg_color': 'yellow', 'bold':True})
+                    ws2.merge_range('F1:G1', 'SUMMARY MISS LOCATION', hdr)
+                    ws2.write('F2', 'KETERANGAN'); ws2.write('G2', 'TOTAL')
+                    ws2.write('F3', 'TOTAL SKU'); ws2.write('G3', f"{t_sku} ITEM", yellow)
+                    ws2.write('F4', 'TOTAL QTY'); ws2.write('G4', f"{t_qty}", yellow)
 
-                st.success("✅ Laporan Berhasil Dibuat!")
-                st.download_button("📥 DOWNLOAD SUMMARY ADJUSTMENT", data=out_sum.getvalue(), file_name="Summary_Adjustment_Final.xlsx", use_container_width=True)
-                st.download_button("📥 DOWNLOAD LIST MISS LOCATION", data=out_miss.getvalue(), file_name="List_Miss_Location_Final.xlsx", use_container_width=True)
+                st.success("✅ Laporan Jadi!")
+                st.download_button("📥 DOWNLOAD SUMMARY ADJ", data=out_sum.getvalue(), file_name="Summary_Adjustment.xlsx", use_container_width=True)
+                st.download_button("📥 DOWNLOAD MISS LOC", data=out_miss.getvalue(), file_name="Miss_Location.xlsx", use_container_width=True)
 
             except Exception as e:
-                st.error(f"❌ Error Step 7: {e}. Pastikan Step 4, 5, dan 6 sudah dijalankan.")
+                st.error(f"❌ Error Step 7: {e}")
             
 import pandas as pd
 import numpy as np
