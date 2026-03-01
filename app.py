@@ -545,91 +545,57 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
     return ds_merged
 
 # ============================================================
-# 🚀 COMPARE 2: SYSTEM VS SCAN (ULTRA FAST)
-# ============================================================
-def logic_compare_stock_to_scan(df_stock, df_scan):
-    dt = df_stock.copy()
-    ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-    
-    # Clean data (vectorized)
-    ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
-    ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
-    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
-    
-    # Groupby (SUPER FAST)
-    ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
-    
-    # Ambil kolom yang needed dari stock
-    dt = dt.iloc[:, [1, 2, 9]].copy()
-    dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-    dt['BIN'] = dt['BIN'].astype(str).str.strip().str.upper()
-    dt['SKU'] = dt['SKU'].astype(str).str.strip().str.upper()
-    dt['QTY_SYSTEM'] = pd.to_numeric(dt['QTY_SYSTEM'], errors='coerce').fillna(0)
-    
-    # Merge (SUPER FAST)
-    dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')
-    dt_merged['QTY_SO'] = dt_merged['QTY_SCAN'].fillna(0)
-    
-    # Hitung DIFF dan NOTE (vectorized)
-    dt_merged['DIFF'] = dt_merged['QTY_SYSTEM'] - dt_merged['QTY_SO']
-    dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
-    
-    # Hapus duplikat kolom
-    if 'QTY_SCAN' in dt_merged.columns:
-        dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
-    
-    return dt_merged
-
-# ============================================================
-# 🚀 LOGIC ALLOCATION (2 SUMBER - SYSTEM + DULU)
+# 🚀 LOGIC ALLOCATION (SESUAI VBA - 2 SUMBER)
 # ============================================================
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     """
-    Tahap 1: Cari di SYSTEM + (mengurangi DIFF)
-    Tahap 2: Cari di BIN COVERAGE (jika masih sisa)
+    VBA: AlokasiDiffRealSystem_SplitWithTwoSources
+    - REAL +: Ambil SKU dan DIFF
+    - SYSTEM +: Sumber 1 (Cari DIFF > 0, kurangi DIFF)
+    - BIN COVERAGE: Sumber 2 (jika masih sisa)
     """
     
-    # === SIAPKAN SOURCE 1: SYSTEM + ===
-    # Ambil kolom penting dari System Plus
-    sys_cols = df_system_plus.columns.tolist()
-    sys_sku_col = sys_cols[2]  # Kolom SKU (C)
-    sys_bin_col = sys_cols[1]  # Kolom BIN (B)
-    sys_diff_col = 'DIFF'      # Kolom DIFF
+    # === AMBIL DATA DARI EXCEL/STREAMIT ===
+    # df_real_plus: punya kolom BIN, SKU, DIFF
+    # df_system_plus: punya kolom BIN, SKU, DIFF
     
-    # Build dictionary untuk System +
+    # Buat dict untuk System +: (BIN, SKU) -> DIFF
     system_dict = {}
     for idx, row in df_system_plus.iterrows():
-        sku = str(row[sys_sku_col]).strip().upper()
-        bin_val = str(row[sys_bin_col]).strip().upper()
-        diff_val = pd.to_numeric(row.get(sys_diff_col, 0), errors='coerce')
+        sku = str(row['SKU']).strip().upper()
+        bin_val = str(row['BIN']).strip().upper()
+        diff_val = row.get('DIFF', 0)
         if pd.notnull(diff_val) and diff_val > 0:
             key = (bin_val, sku)
             system_dict[key] = system_dict.get(key, 0) + diff_val
-
-    # === SIAPKAN SOURCE 2: BIN COVERAGE ===
-    cov_cols = df_bin_coverage.columns.tolist()
-    cov_sku_col = cov_cols[2]  # Kolom SKU
-    cov_bin_col = cov_cols[1]  # Kolom BIN
-    cov_qty_col = cov_cols[9] if len(cov_cols) > 9 else cov_cols[-1]  # Kolom QTY
     
+    # Buat dict untuk Bin Coverage: (BIN, SKU) -> QTY
     coverage_dict = {}
     for idx, row in df_bin_coverage.iterrows():
-        sku = str(row[cov_sku_col]).strip().upper()
-        bin_val = str(row[cov_bin_col]).strip().upper()
-        qty_val = pd.to_numeric(row.get(cov_qty_col, 0), errors='coerce')
-        if pd.notnull(qty_val) and qty_val > 0:
+        sku = str(row.iloc[2]).strip().upper()
+        bin_val = str(row.iloc[1]).strip().upper()
+        qty_val = row.iloc[9] if len(row) > 9 else 0
+        try:
+            qty_val = float(qty_val)
+        except:
+            qty_val = 0
+        if qty_val > 0:
             key = (bin_val, sku)
             coverage_dict[key] = coverage_dict.get(key, 0) + qty_val
-
-    # === PROSES ALLOCATION ===
-    df_result = df_real_plus.copy()
-    df_sys_update = df_system_plus.copy()
     
+    # Copy untuk hasil
+    df_result = df_real_plus.copy()
+    df_sys_updated = df_system_plus.copy()
+    
+    # Tracking untuk update System +
+    sys_updates = []  # List of (BIN, SKU, qty_reduced)
+    
+    # Kolom baru
     bin_alloc_list = []
     qty_alloc_list = []
     status_list = []
     
+    # === LOOP PER ROW REAL + ===
     for idx, row in df_result.iterrows():
         sku = str(row['SKU']).strip().upper()
         diff_needed = row['DIFF']
@@ -639,7 +605,8 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
             bins_used = []
             total_alloc = 0
             
-            # === TAHAP 1: DARI SYSTEM + ===
+            # === TAHAP 1: SYSTEM + (DULU) ===
+            # Cari di system_dict
             for (bin_src, sku_src), qty_src in system_dict.items():
                 if remaining <= 0:
                     break
@@ -647,10 +614,16 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
                     alloc = min(qty_src, remaining)
                     bins_used.append(bin_src)
                     total_alloc += alloc
-                    system_dict[(bin_src, sku)] -= alloc
+                    
+                    # KURANGI di dict (sementara)
+                    system_dict[(bin_src, sku_src)] -= alloc
+                    
+                    # CATAT untuk update System +
+                    sys_updates.append((bin_src, sku_src, alloc))
+                    
                     remaining -= alloc
             
-            # === TAHAP 2: DARI BIN COVERAGE (JIKA SISA) ===
+            # === TAHAP 2: BIN COVERAGE (JIKA SISA) ===
             if remaining > 0:
                 for (bin_src, sku_src), qty_src in coverage_dict.items():
                     if remaining <= 0:
@@ -659,10 +632,13 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
                         alloc = min(qty_src, remaining)
                         bins_used.append(bin_src)
                         total_alloc += alloc
-                        coverage_dict[(bin_src, sku)] -= alloc
+                        
+                        # KURANGI di dict
+                        coverage_dict[(bin_src, sku_src)] -= alloc
+                        
                         remaining -= alloc
             
-            # === STATUS ===
+            # === TAHAP 3: STATUS ===
             if total_alloc > 0:
                 bin_alloc = " & ".join(list(set(bins_used)))[:50]
                 status = "FULL ALLOCATION" if remaining <= 0 else "PARTIAL ALLOCATION"
@@ -679,20 +655,27 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
         qty_alloc_list.append(total_alloc)
         status_list.append(status)
     
-    # Tambah kolom ke hasil
+    # Tambahkan kolom ke hasil
     df_result['BIN ALOKASI'] = bin_alloc_list
     df_result['QTY ALLOCATION'] = qty_alloc_list
     df_result['STATUS'] = status_list
     
-    # Update System + DIFF (pengurangan dari Tahap 1)
-    for (bin_src, sku_src), qty_used in system_dict.items():
-        if qty_used < 0:  # Ada pengurangan
-            mask = (df_sys_update[sys_bin_col].astype(str).str.upper() == bin_src) & \
-                   (df_sys_update[sys_sku_col].astype(str).str.upper() == sku_src)
-            if mask.any():
-                df_sys_update.loc[mask, sys_diff_col] += qty_used  # Minus karena qty_used negatif
+    # === UPDATE SYSTEM + DIFF (Berdasarkan yang sudah dialokasikan) ===
+    # Group by (BIN, SKU) untuk total pengurangan
+    from collections import defaultdict
+    sys_reduction = defaultdict(float)
+    for bin_src, sku_src, qty in sys_updates:
+        sys_reduction[(bin_src, sku_src)] += qty
     
-    return df_result, df_sys_update
+    # Update df_sys_updated
+    for (bin_src, sku_src), qty_reduced in sys_reduction.items():
+        mask = (df_sys_updated['BIN'].astype(str).str.upper() == bin_src) & \
+               (df_sys_updated['SKU'].astype(str).str.upper() == sku_src)
+        if mask.any():
+            # Kurangi DIFF
+            df_sys_updated.loc[mask, 'DIFF'] = df_sys_updated.loc[mask, 'DIFF'] - qty_reduced
+    
+    return df_result, df_sys_updated
 
 
 # ============================================================
