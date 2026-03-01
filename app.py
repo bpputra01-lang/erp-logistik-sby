@@ -542,46 +542,47 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
 # ============================================================
 # 🚀 COMPARE 2: SYSTEM VS SCAN - AMBIL SEMUA KOLOM
 # ============================================================
-def logic_compare_stock_to_scan(df_stock, df_scan):
-    # AMBIL SEMUA KOLOM dari stock
-    dt = df_stock.copy()
+def logic_compare_stock_to_scan(df_stock, df_scan): # AMBIL SEMUA KOLOM dari stock dt = df_stock.copy()
 
-    # AMBIL KOLOM PENTING DARI SCAN (A, B, C = BIN, SKU, QTY)
-    ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-    ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
-    ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
-    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+# AMBIL KOLOM PENTING DARI SCAN (A, B, C = BIN, SKU, QTY)
+ds = df_scan.iloc[:, [0, 1, 2]].copy()
+ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
+ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
+ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
 
-    # BUAT KEY = BIN|SKU (SESUAI VBA)
-    ds['MERGE_KEY'] = ds['BIN'] + '|' + ds['SKU']
-    ds_grouped = ds.groupby('MERGE_KEY')['QTY_SCAN'].sum().reset_index()
+# BUAT KEY = BIN|SKU
+ds['MERGE_KEY'] = ds['BIN'] + '|' + ds['SKU']
+ds_grouped = ds.groupby('MERGE_KEY')['QTY_SCAN'].sum().reset_index()
 
-    # AMBIL KOLOM DARI STOCK: Kolom B=BIN, C=SKU, J=QTY
-    # Index: 0=A, 1=B, 2=C, ..., 9=J
-    dt['BIN'] = dt.iloc[:, 1].astype(str).str.strip().str.upper()  # Kolom B
-    dt['SKU'] = dt.iloc[:, 2].astype(str).str.strip().str.upper()  # Kolom C
-    dt['MERGE_KEY'] = dt['BIN'] + '|' + dt['SKU']
+# AMBIL KOLOM DARI STOCK: Kolom B=BIN, C=SKU, J=QTY
+dt['BIN'] = dt.iloc[:, 1].astype(str).str.strip().str.upper()
+dt['SKU'] = dt.iloc[:, 2].astype(str).str.strip().str.upper()
+dt['MERGE_KEY'] = dt['BIN'] + '|' + dt['SKU']
 
-    # QTY SYSTEM = Kolom J (index 9)
-    dt['QTY_SYSTEM'] = pd.to_numeric(dt.iloc[:, 9], errors='coerce').fillna(0)
+# QTY SYSTEM = Kolom J (index 9)
+dt['QTY_SYSTEM'] = pd.to_numeric(dt.iloc[:, 9], errors='coerce').fillna(0)
 
-    # MERGE KE STOCK SYSTEM
-    dt_merged = dt.merge(ds_grouped, on='MERGE_KEY', how='left')
-    dt_merged['QTY_SCAN'] = dt_merged['QTY_SCAN'].fillna(0)
+# MERGE KE STOCK SYSTEM
+dt_merged = dt.merge(ds_grouped, on='MERGE_KEY', how='left')
+dt_merged['QTY_SCAN'] = dt_merged['QTY_SCAN'].fillna(0)
 
-    # QTY SO = QTY SCAN (SESUAI VBA)
-    dt_merged['QTY SO'] = dt_merged['QTY_SCAN']
+# QTY SO = QTY SCAN
+dt_merged['QTY SO'] = dt_merged['QTY_SCAN']
 
-    # DIFF = QTY SYSTEM - QTY SO
-    dt_merged['DIFF'] = dt_merged['QTY_SYSTEM'] - dt_merged['QTY SO']
+# DIFF = QTY SYSTEM - QTY SO
+dt_merged['DIFF'] = dt_merged['QTY_SYSTEM'] - dt_merged['QTY SO']
 
-    # NOTE: SYSTEM + jika QTY SYSTEM > QTY SO
-    dt_merged['NOTE'] = dt_merged.apply(
-    lambda row: "SYSTEM +" if row['QTY_SYSTEM'] > row['QTY SO'] else axis=1 "OK", 
-
+# NOTE: SYSTEM + jika QTY SYSTEM > QTY SO
+dt_merged['NOTE'] = dt_merged.apply(
+    lambda row: "SYSTEM +" if row['QTY_SYSTEM'] > row['QTY SO'] else "OK", 
+    axis=1
 )
 
+# Hapus kolom temporary
+dt_merged = dt_merged.drop(columns=['QTY_SCAN', 'BIN', 'SKU', 'MERGE_KEY', 'QTY_SYSTEM'])
+
+return dt_merged
 # Hapus kolom temporary
 dt_merged = dt_merged.drop(columns=['QTY_SCAN', 'BIN', 'SKU', 'MERGE_KEY', 'QTY_SYSTEM'])
 
