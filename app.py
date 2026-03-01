@@ -540,13 +540,12 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
     
     return ds_merged
 
-
 # ============================================================
 # 🚀 COMPARE 2: SYSTEM VS SCAN - AMBIL SEMUA KOLOM
 # ============================================================
 def logic_compare_stock_to_scan(df_stock, df_scan):
-    # AMBIL SEMUA KOLOM dari stock (TIDAK DIPOTONG!)
-    dt = df_stock.copy()  # <-- AMBIL SEMUA!
+    # AMBIL SEMUA KOLOM dari stock
+    dt = df_stock.copy()
     
     # Ambil kolom penting dari scan
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
@@ -555,27 +554,23 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
     ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
     
-    # Group scan by SKU
+    # RENAME QTY_SCAN MENJADI QTY_SO SEBELUM MERGE (MENCEGAH DUPLIKAT)
     ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
+    ds_grouped = ds_grouped.rename(columns={'QTY_SCAN': 'QTY_SO'})  # <-- TAMBAHKAN INI!
     
     # Merge
     dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')
-    dt_merged['QTY_SO'] = dt_merged['QTY_SCAN'].fillna(0)
+    dt_merged['QTY_SO'] = dt_merged['QTY_SO'].fillna(0)
     
-    # Hitung DIFF (ambil kolom yang sesuai)
+    # Hitung DIFF
     if 'QTY_SYSTEM' in dt_merged.columns:
         dt_merged['DIFF'] = dt_merged['QTY_SYSTEM'] - dt_merged['QTY_SO']
     elif len(dt_merged.columns) > 9:
-        # Cari kolom qty system (biasanya kolom ke-9 atau ke-10)
-        qty_col = [c for c in dt_merged.columns if 'QTY' in c.upper() and 'SO' not in c.upper()]
+        qty_col = [c for c in dt_merged.columns if 'QTY' in c.upper() and c != 'QTY_SO']
         if qty_col:
             dt_merged['DIFF'] = dt_merged[qty_col[0]] - dt_merged['QTY_SO']
     
     dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
-    
-    # Hapus duplikasi QTY_SCAN jika ada
-    if 'QTY_SCAN' in dt_merged.columns and 'QTY_SO' in dt_merged.columns:
-        dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
     
     return dt_merged
 
