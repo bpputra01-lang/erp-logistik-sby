@@ -709,58 +709,70 @@ def generate_set_up_real_plus(allocated_data):
     return set_up_real_plus
 
 # ============================================================
-# 🚀 LOGIC REAL + RECON (NO ALLOCATION)
+# 🚀 LOGIC REAL + RECON (NO ALLOCATION) - DENGAN KOLOM HASIL
 # ============================================================
 def generate_real_plus_recon(allocated_data):
     """
     VBA: Generate_RealPlusRecon_Final_NoColF
     Filter: STATUS = "NO ALLOCATION"
-    Columns: BIN, SKU, QTY SCAN, QTY SYSTEM, DIFF, ITEM NAME
+    Columns: BIN, SKU, QTY SCAN, QTY SYSTEM, DIFF, ITEM NAME, HASIL RECONCILIATION
     """
     # Filter NO ALLOCATION
     filtered = allocated_data[allocated_data['STATUS'] == "NO ALLOCATION"].copy()
     
     if not filtered.empty:
-        # Ambil kolom yang needed (sesuai VBA)
-        # Cek kolom apa yang ada
-        cols_available = filtered.columns.tolist()
+        # Ambil kolom yang tersedia
+        cols_map = {
+            'BIN': 'BIN',
+            'SKU': 'SKU', 
+            'QTY_SCAN': 'QTY SCAN',
+            'QTY_SYSTEM': 'QTY SYSTEM',
+            'QTY': 'QTY SCAN',
+            'DIFF': 'DIFF',
+            'ITEM NAME': 'ITEM NAME',
+            'ITEM_NAME': 'ITEM NAME'
+        }
         
-        # Pilih kolom yang tersedia
-        recon_cols = []
-        for col in ['BIN', 'SKU', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'ITEM NAME']:
-            if col in cols_available:
-                recon_cols.append(col)
+        # Cari kolom yang tersedia
+        available_cols = []
+        rename_cols = {}
         
-        recon_df = filtered[recon_cols].copy()
+        for old, new in cols_map.items():
+            if old in filtered.columns:
+                available_cols.append(old)
+                rename_cols[old] = new
         
-        # Rename columns sesuai VBA output
-        recon_df.columns = ['BIN', 'SKU', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'ITEM NAME']
+        recon_df = filtered[available_cols].rename(columns=rename_cols)
+        
+        # TAMBAHKAN KOLOM HASIL RECONCILIATION (KOSONG)
+        recon_df['HASIL RECONCILIATION'] = ""
     else:
-        recon_df = pd.DataFrame(columns=['BIN', 'SKU', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'ITEM NAME'])
+        recon_df = pd.DataFrame(columns=['BIN', 'SKU', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'ITEM NAME', 'HASIL RECONCILIATION'])
     
     return recon_df
 
 
 # ============================================================
-# 🚀 LOGIC SYSTEM + OUTSTANDING RECON
+# 🚀 LOGIC SYSTEM + OUTSTANDING RECON - DENGAN KOLOM HASIL
 # ============================================================
 def generate_system_outstanding_recon(df_system):
     """
     VBA: SYSTEM_OUTSTANDING_RECON
     Filter: DIFF != 0
+    Columns: BIN, SKU, ..., DIFF, HASIL REKONSILIASI
     """
     # Filter DIFF != 0
     filtered = df_system[df_system['DIFF'] != 0].copy()
     
-    if filtered.empty:
-        return pd.DataFrame()
-    
-    # Ambil kolom 2-11 (indeks 1-10) jika ada
-    if len(filtered.columns) > 10:
-        # Ambil hanya 10 kolom pertama
-        outstanding_df = filtered.iloc[:, :10].copy()
-    else:
+    if not filtered.empty:
+        # Ambil semua kolom yang ada
         outstanding_df = filtered.copy()
+        
+        # TAMBAHKAN KOLOM HASIL REKONSILIASI (KOSONG)
+        if 'HASIL REKONSILIASI' not in outstanding_df.columns:
+            outstanding_df['HASIL REKONSILIASI'] = ""
+    else:
+        outstanding_df = pd.DataFrame()
     
     return outstanding_df
 
