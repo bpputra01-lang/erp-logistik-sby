@@ -512,26 +512,71 @@ def get_yellow_skus(file, column_index):
                 if sku_val: yellow_set.add(sku_val)
     except: pass
     return yellow_set
+# =========================================================
+# LOGIC CEK ADJUSTMENT FINAL (REPLICA VBA)
+# =========================================================
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
+    """
+    Meniru Sub CEK_ADJUSMENT_FINAL()
+    Input:
+    1. df_recon: Berasal dari sheet 'REAL + RECON'
+       - Kolom A (1): BIN
+       - Kolom B (2): SKU
+       - Kolom G (7): HASIL RECONCILIATION
+    2. df_stock_adj: Berasal dari sheet 'CEK STOCK ADJ +'
+       - Kolom B (2): BIN
+       - Kolom C (3): SKU
+       - Kolom J (10): QTY SYSTEM
+       - Kolom K (11): QTY SO (Akan diisi dari Recon)
+       - Kolom L (12): DIFF (Abs J - K)
+    """
+    
+    # Standardisasi data Stock
     df_stock = df_stock_adj.copy()
+    
+    # 1. Buat Dictionary dari Data Recon (Key: BIN|SKU)
+    # VBA: key = UCase(Trim(CStr(wsRecon.Cells(i, 1).Value))) & "|" & UCase(Trim(CStr(wsRecon.Cells(i, 2).Value)))
     recon_dict = {}
     for _, row in df_recon.iterrows():
         try:
-            # Key: BIN (A) | SKU (B) -> Val: HASIL RECON (G)
+            # Kolom 1 (A) = BIN, Kolom 2 (B) = SKU, Kolom 7 (G) = Nilai Recon
             key = f"{str(row.iloc[0]).strip().upper()}|{str(row.iloc[1]).strip().upper()}"
-            recon_dict[key] = row.iloc[6]
-        except: continue
+            val_recon = row.iloc[6] # Index 6 adalah kolom G
+            recon_dict[key] = val_recon
+        except:
+            continue
 
-    # Update Kolom K (Index 10) & L (Index 11)
-    def update_values(row):
+    # 2. Update Kolom K (Index 10) di Data Stock berdasarkan Key
+    # VBA: wsStock.Cells(dictStock(key), 11).Value = wsRecon.Cells(i, 7).Value
+    def update_qty_so(row):
         key_stock = f"{str(row.iloc[1]).strip().upper()}|{str(row.iloc[2]).strip().upper()}"
-        qty_so = recon_dict.get(key_stock, "")
-        qty_sys = row.iloc[9]
-        diff = abs(float(qty_sys) - float(qty_so)) if (qty_so != "" and qty_so is not None) else ""
-        return pd.Series([qty_so, diff])
+        return recon_dict.get(key_stock, "") # Kosongkan jika tidak ketemu (seperti VBA)
 
-    df_stock.iloc[:, [10, 11]] = df_stock.apply(update_values, axis=1)
-    df_stock.columns = list(df_stock.columns[:10]) + ["QTY SO", "DIFF"]
+    # Pastikan kolom K ada atau buat baru
+    df_stock.iloc[:, 10] = df_stock.apply(update_qty_so, axis=1)
+
+    # 3. Hitung DIFF di Kolom L (Index 11)
+    # VBA: Abs(Val(dataStock(i, 10)) - Val(dataStock(i, 11)))
+    def calculate_diff(row):
+        qty_sys = row.iloc[9]  # Kolom J
+        qty_so = row.iloc[10]  # Kolom K
+        
+        if qty_so != "" and qty_so is not None:
+            try:
+                return abs(float(qty_sys) - float(qty_so))
+            except:
+                return 0
+        return ""
+
+    # Isi kolom L (Index 11)
+    df_stock.iloc[:, 11] = df_stock.apply(calculate_diff, axis=1)
+    
+    # Beri nama Header jika belum ada
+    headers = list(df_stock.columns)
+    headers[10] = "QTY SO"
+    headers[11] = "DIFF"
+    df_stock.columns = headers
+
     return df_stock
 # ============================================================
 # 🚀 COMPARE 2: SYSTEM VS SCAN
