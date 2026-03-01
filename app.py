@@ -865,7 +865,7 @@ def menu_Stock_Opname():
     # --- INI HASIL ALOKASI DENGAN 3 TAB ---
     if 'allocation_result' in st.session_state:
         st.markdown("### ✅ HASIL ALOKASI")
-        ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📦 SET UP REAL +", "📉 UPDATED SYSTEM"])
+        ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📉 UPDATED SYSTEM","📦 SET UP REAL +"])
         with ta1:
             st.dataframe(st.session_state.allocation_result, use_container_width=True)
         with ta2:
