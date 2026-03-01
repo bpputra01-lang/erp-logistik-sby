@@ -908,10 +908,10 @@ def menu_Stock_Opname():
     adj_col1, adj_col2 = st.columns(2)
     with adj_col1:
         st.write("**1. File Hasil Rekon**")
-        up_recon = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx'], key="adj_final_up_1")
+        up_recon = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="adj_final_up_1")
     with adj_col2:
         st.write("**2. File Cek Stock**")
-        up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx'], key="adj_final_up_2")
+        up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx','csv'], key="adj_final_up_2")
 
     if up_recon and up_stock_adj:
         if st.button("🚀 JALANKAN PROSES LOOKUP & DIFF", use_container_width=True):
