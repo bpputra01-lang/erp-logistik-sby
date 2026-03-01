@@ -748,23 +748,19 @@ def generate_system_outstanding_recon(df_system):
     """
     VBA: SYSTEM_OUTSTANDING_RECON
     Filter: DIFF != 0
-    Columns: BIN, SKU, BRAND, ITEM NAME, VARIANT, SUB KATEGORI, QTY SYSTEM, QTY SO, DIFF
     """
     # Filter DIFF != 0
     filtered = df_system[df_system['DIFF'] != 0].copy()
     
-    if not filtered.empty:
-        # Ambil kolom sesuai VBA (kolom 2-12 = indeks 1-11)
-        outstanding_df = filtered.iloc[:, 1:12].copy()
-        
-        # Rename sesuai header VBA
-        outstanding_df.columns = ['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 
-                                  'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF', 
-                                  'NOTE', 'STATUS']
+    if filtered.empty:
+        return pd.DataFrame()
+    
+    # Ambil kolom 2-11 (indeks 1-10) jika ada
+    if len(filtered.columns) > 10:
+        # Ambil hanya 10 kolom pertama
+        outstanding_df = filtered.iloc[:, :10].copy()
     else:
-        outstanding_df = pd.DataFrame(columns=['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 
-                                              'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF', 
-                                              'NOTE', 'STATUS'])
+        outstanding_df = filtered.copy()
     
     return outstanding_df
 
@@ -954,19 +950,19 @@ def menu_Stock_Opname():
         
         colReconBtn, colSpacer = st.columns([1, 3])
         
-        with colReconBtn:
+                with colReconBtn:
             if st.button("📊 Generate All RECON", use_container_width=True, key="btn_recon_all"):
                 with st.spinner("Membuat RECON Reports..."):
                     # Generate REAL + RECON
                     recon_df = generate_real_plus_recon(alloc_data)
                     st.session_state.recon_real_plus = recon_df
                     
-                    # Generate SYSTEM + OUTSTANDING
-                    outstanding_df = generate_system_outstanding_recon(sys_updated)
+                    # Generate SYSTEM + OUTSTANDING (Simple version)
+                    outstanding_df = sys_updated[sys_updated['DIFF'] != 0].copy()
                     st.session_state.outstanding_system = outstanding_df
                     
                     st.success(f"✅ Selesai! REAL: {len(recon_df)} | SYSTEM: {len(outstanding_df)}")
-        
+                    
         # Tampilkan hasil RECON jika sudah dibuat
         if 'recon_real_plus' in st.session_state:
             st.markdown("#### 📋 REAL + RECON (NO ALLOCATION)")
