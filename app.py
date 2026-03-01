@@ -703,7 +703,7 @@ def menu_Stock_Opname():
         qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
         
         st.markdown(f"""
-<div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+<div style="display: flex; gap: 20px; justify-content: center; margin-bottom: 20px;">
     <div class="m-box"><span class="m-lbl">🔥 REAL + ITEMS</span><span class="m-val">{total_real}</span></div>
     <div class="m-box"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{qty_real}</span></div>
     <div class="m-box"><span class="m-lbl">💻 SYSTEM + ITEMS</span><span class="m-val">{total_sys}</span></div>
