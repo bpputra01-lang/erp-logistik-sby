@@ -497,187 +497,178 @@ from collections import defaultdict
 
 
 # =========================================================
-# 1. FUNGSI PENDUKUNG (TETAP UTUH)
+# 1. FUNGSI PENDUKUNG
+# =========================================================
+
+def get_yellow_skus(file, column_index):
+    yellow_set = set()
+    try:
+        wb = load_workbook(file, data_only=True)
+        ws = wb.active
+        for row_idx in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=column_index)
+            color = str(cell.fill.start_color.index)
+            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
+                sku_val = str(cell.value).strip().upper() if cell.value else ""
+                if sku_val: yellow_set.add(sku_val)
+    except: pass
+    return yellow_set
+
+# =========================================================
+# LOGIC CEK ADJUSTMENT FINAL (REPLICA VBA)
 # =========================================================
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock = df_stock_adj.copy()
     
-    # Padding kolom agar tidak error index out of range
-    target_cols = 12
-    current_cols = df_stock.shape[1]
-    if current_cols < target_cols:
-        for i in range(current_cols, target_cols):
-            df_stock[i] = ""
-
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s
 
+    # 1. AMBIL DATA DARI RECON & CATAT SEMUA KEY YANG ADA
     recon_dict = {}
-    all_recon_keys = set()
-    
-    # Validasi kolom df_recon
-    min_cols_recon = 7
-    if df_recon.shape[1] < min_cols_recon:
-        st.error(f"File Recon Minimal harus punya {min_cols_recon} kolom (Kolom ke-7 adalah Nilai SO).")
-        return df_stock, pd.DataFrame()
-
+    all_recon_keys = set() # Untuk tracking mana yang sudah terpakai
     for _, row in df_recon.iterrows():
         try:
             b_recon = clean_val(row.iloc[0])
             s_recon = clean_val(row.iloc[1])
             if b_recon and s_recon:
                 key = f"{b_recon}|{s_recon}"
-                try:
-                    val = float(row.iloc[6])
-                except:
-                    val = 0
-                recon_dict[key] = val
+                val_recon = row.iloc[6]
+                recon_dict[key] = val_recon
                 all_recon_keys.add(key)
         except: continue
 
+    # 2. PASTIKAN KOLOM TARGET STOCK TERSEDIA
+    while df_stock.shape[1] < 12:
+        df_stock[f"Extra_{df_stock.shape[1]}"] = ""
+
+    # 3. LOOKUP KE STOCK & CATAT KEY YANG TERPAKAI
     used_keys = set()
-    results_lookup = []
-    for idx, row in df_stock.iterrows():
-        key = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
-        res_val = ""
-        if key in recon_dict:
-            used_keys.add(key)
-            res_val = recon_dict[key]
-        results_lookup.append(res_val)
+    def do_lookup(row):
+        b_stock = clean_val(row.iloc[1])
+        s_stock = clean_val(row.iloc[2])
+        key_stock = f"{b_stock}|{s_stock}"
+        
+        if key_stock in recon_dict:
+            used_keys.add(key_stock) # Tandai bahwa data recon ini sudah masuk ke file stock
+            return recon_dict[key_stock]
+        return ""
 
-    df_stock.iloc[:, 10] = results_lookup
+    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
 
-    results_diff = []
-    for idx, row in df_stock.iterrows():
+    # 4. HITUNG DIFF
+    def do_diff(row):
         try:
-            v_sys = row.iloc[9]
-            v_so = row.iloc[10]
-            if v_so != "" and v_so is not None:
-                v_sys_f = float(v_sys) if str(v_sys).strip() != "" else 0
-                v_so_f = float(v_so)
-                diff = abs(v_sys_f - v_so_f)
-                results_diff.append(diff)
-            else:
-                results_diff.append("")
-        except:
-            results_diff.append("")
-            
-    df_stock.iloc[:, 11] = results_diff
+            val_sys = row.iloc[9]
+            val_so = row.iloc[10]
+            if val_so != "" and val_so is not None:
+                return abs(float(val_sys) - float(val_so))
+        except: return 0
+        return ""
 
+    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
+
+    # RAPIKAN HEADER UTAMA
     cols = list(df_stock.columns)
-    if len(cols) > 10: cols[10] = "QTY SO"
-    if len(cols) > 11: cols[11] = "DIFF"
+    cols[10], cols[11] = "QTY SO", "DIFF"
     df_stock.columns = cols
 
+    # 5. LOGIKA UNTUK TAB "NEED SINGLE ADJ"
+    # Cari key yang ada di Recon tapi TIDAK ADA di used_keys
     missing_keys = all_recon_keys - used_keys
-    df_need_single = pd.DataFrame()
-    if missing_keys:
-        mask = df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)
-        df_need_single = df_recon[mask].copy()
-
+    df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
+    
     return df_stock, df_need_single
 
+# =========================================================
+# 3. LOGIC PIVOT (CONVERSION DARI VBA)
+# =========================================================
+
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
-    df_f = df_stock_final.copy()
-    for i in [9, 10, 11]: 
-        if i < df_f.shape[1]:
-            df_f.iloc[:, i] = pd.to_numeric(df_f.iloc[:, i], errors='coerce').fillna(0)
+    # --- PROSES MULTIPLE ADJ + (PIVOT SKU) ---
+    # Syarat VBA: QTY SO (Index 10) > QTY SYSTEM (Index 9)
+    # Lalu ambil selisih DIFF (Index 11)
+    
+    # Filter data yang QTY SO > QTY SYSTEM
+    df_filtered = df_stock_final.copy()
+    # Pastikan numerik
+    df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
+    df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
+    df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
+    
+    mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
+    df_to_pivot = df_filtered[mask_multiple].copy()
+    
+    # Pivot: Group by SKU (Index 2), Sum DIFF (Index 11)
+    pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
+    pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
+    
+    # Ambil detail produk dari Master (STOCK ADJ +)
+    # Key Master: SKU (Col index 2), ambil baris pertama yang ketemu
+    master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
+    
+    df_multiple_final = pivot_multiple.merge(
+        master_clean, 
+        left_on='SKU_KEY', 
+        right_on=master_clean.columns[2], 
+        how='left'
+    )
+    
+    # Update Kolom Qty (Kolom terakhir / Index 10) dengan hasil pivot
+    if not df_multiple_final.empty:
+        df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
+        # Buang kolom temporary hasil merge jika ada
+        if 'SKU_KEY' in df_multiple_final.columns: df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
 
-    try:
-        df_to_pivot = df_f[df_f.iloc[:, 10] > df_f.iloc[:, 9]].copy()
-    except:
-        df_to_pivot = pd.DataFrame()
-
-    df_mult_final = pd.DataFrame()
-    if not df_to_pivot.empty and df_to_pivot.shape[0] > 0:
-        pivot_mult = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
-        pivot_mult.columns = ['SKU_KEY', 'TOTAL_DIFF']
-        
-        if df_adj_plus_master is not None and not df_adj_plus_master.empty:
-            master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
-            df_mult_final = pivot_mult.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
-            
-            if not df_mult_final.empty:
-                if 'TOTAL_DIFF' in df_mult_final.columns:
-                    pass
-                if 'SKU_KEY' in df_mult_final.columns: 
-                    df_mult_final = df_mult_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
-
-    df_sing_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+    # --- PROSES SINGLE ADJ + (PIVOT BIN & SKU) ---
+    # Sumber: Data yang tidak ketemu di lookup tadi (Missing dari Recon)
     if not df_recon_missing.empty:
         df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
-        df_sing_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
-        df_sing_final.columns = ['BIN', 'SKU', 'QTY ADJ']
-
-    return df_mult_final, df_sing_final
+        # Group by BIN (Index 0) dan SKU (Index 1), Sum Hasil Recon (Index 6)
+        df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
+        df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
+    else:
+        df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+        
+    return df_multiple_final, df_single_final
 
 def logic_setup_karantina_with_check(df_outstanding):
+    # Buat copy biar data asli aman
     df = df_outstanding.copy()
-    if df.shape[1] <= 10 or df.shape[1] <= 14:
-        st.error("File kurang kolom. Pastikan ada Kolom K (Qty System) dan Kolom O (Hasil Rekon).")
-        return pd.DataFrame(), pd.DataFrame()
-
+    
+    # 1. Kunci Koordinat sesuai gambar lu:
+    # K (Indeks 10) = QTY SYSTEM
+    # O (Indeks 14) = HASIL REKONSILIASI
     df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
     df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
+    
+    # 2. Gue hitung DIFF sendiri di sini (System - Hasil Rekon)
     df['CHECK_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
     
-    df_check = df.iloc[:, [2, 3, 10, 14]].copy()
+    # 3. Data mentah buat lu cek (BIN, SKU, QTY SYS, HASIL REKON, SELISIH)
+    # Ambil kolom C(2), D(3), K(10), O(14)
+    df_check = df.iloc[:, [2, 3, 10, 14]].copy() 
     df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'HASIL_REKON_O']
     df_check['SELISIH_HITUNG_AI'] = df['CHECK_DIFF']
     
-    df_filtered = df[df['CHECK_DIFF'] != 0].copy()
+    # 4. FILTER: Hanya ambil yang selisihnya TIDAK SAMA DENGAN 0
+    # Ini kunci biar yang DIFF 0 (OK) nggak masuk
+    mask = df['CHECK_DIFF'] != 0
+    df_filtered = df[mask].copy()
+    
+    # 5. Susun Hasil Akhir (5 Kolom format Karantina)
     df_karantina = pd.DataFrame({
-        "BIN AWAL": df_filtered.iloc[:, 2],
+        "BIN AWAL": df_filtered.iloc[:, 2],      # Kolom C
         "BIN TUJUAN": "KARANTINA",
-        "SKU": df_filtered.iloc[:, 3],
+        "SKU": df_filtered.iloc[:, 3],           # Kolom D
         "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
         "NOTES": "MISS LOCATION"
     })
+    
     return df_karantina, df_check
 
-def logic_generate_final_reports_v2(df_adj_plus, df_adj_minus, df_karantina, df_miss_loc_internal):
-    def process_adj_final(df, status, is_karantina=False):
-        if df is None or df.empty: return pd.DataFrame()
-        temp = df.copy()
-        
-        if is_karantina:
-            if temp.shape[1] < 4: return pd.DataFrame()
-            return pd.DataFrame({
-                "BIN": temp.iloc[:, 0], "SKU": temp.iloc[:, 2], "BRAND": "", "ITEM NAME": "", 
-                "VARIANT": "", "SUB KATEGORI": "", "HARGA BELI": 0, "HARGA JUAL": 0, 
-                "QTY SYSTEM": 0, "QTY SO": temp.iloc[:, 3], "VALUE ADJ": 0, "STATUS ADJ": status
-            })
-        
-        needed = temp.shape[1]
-        if needed < 10:
-            for i in range(needed, 10): temp[i] = 0
-        
-        res = temp.iloc[:, 0:10].copy()
-        res.columns = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGORI", "HARGA BELI", "HARGA JUAL", "QTY SYSTEM", "QTY SO"]
-        try:
-            res["VALUE ADJ"] = (res["QTY SO"].fillna(0) - res["QTY SYSTEM"].fillna(0)) * res["HARGA JUAL"].fillna(0)
-        except:
-            res["VALUE ADJ"] = 0
-        res["STATUS ADJ"] = status
-        return res
-
-    df_sum_plus = process_adj_final(df_adj_plus, "ADJ +")
-    df_sum_minus = process_adj_final(df_adj_minus, "ADJ -")
-    df_sum_kar = process_adj_final(df_karantina, "ADJ KARANTINA", True)
-    
-    df_summary = pd.concat([df_sum_plus, df_sum_minus, df_sum_kar], ignore_index=True)
-    t_sku, t_qty = 0, 0
-    df_miss = pd.DataFrame()
-    
-    if df_miss_loc_internal is not None and not df_miss_loc_internal.empty:
-        df_miss = df_miss_loc_internal.copy()
-        t_sku = df_miss.iloc[:, 2].nunique()
-        t_qty = pd.to_numeric(df_miss.iloc[:, 3], errors='coerce').fillna(0).sum()
-
-    return df_summary, df_miss, t_sku, t_qty
 
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
@@ -854,6 +845,10 @@ def generate_real_plus_recon(allocated_data):
         return recon_df
     return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
 
+# =========================================================
+# 2. MENU UTAMA
+# =========================================================
+
 def menu_Stock_Opname():
     st.markdown("""
         <style>
@@ -864,15 +859,24 @@ def menu_Stock_Opname():
          .m-val { font-size: 20px; font-weight: bold; color: white; }
         </style>
     """, unsafe_allow_html=True)
+     
     st.markdown('<div class="hero-header"><h1> STOCK OPNAME ANALYZER</h1></div>', unsafe_allow_html=True)
-
-    # Filter Section
+    
+    # --- FILTER SECTION ---
     col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1: selected_sub = st.multiselect("🗂️ Sub Kategori:", ["SHOES", "APPAREL", "BALL"])
-    with col_f2: selected_bin_sys = st.multiselect("🏭 BIN System:", ["GUDANG", "TOKO"])
-    with col_f3: selected_bin_cov = st.multiselect("📡 BIN Coverage:", ["KARANTINA", "STAGING"])
+    with col_f1:
+        list_sub_kat = ["GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", "NUTRITION", "BAG", "EXTRAS SHOES"]
+        selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
+    with col_f2:
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
+        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
+    with col_f3:
+        list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
+        selected_bin_cov = st.multiselect("📡 BIN Coverage:", list_bin_cov)
 
     st.markdown("---")
+
+    # STEP 1: UPLOAD & COMPARE
     st.subheader("1️⃣ Upload & Run Compare")
     c1, c2 = st.columns(2)
     with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'])
@@ -880,19 +884,45 @@ def menu_Stock_Opname():
 
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
-            df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith('xlsx') else pd.read_csv(up_scan)
-            df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith('xlsx') else pd.read_csv(up_stock)
-            
-            res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
-            res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
-            
-            st.session_state.compare_result = {
-                'res_scan': res_scan, 'res_stock': res_stock,
-                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"],
-                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"]
-            }
-            st.success("✅ Compare Selesai!")
+            try:
+                df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
+                df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
+                
+                with st.spinner("Memproses..."):
+                    if selected_sub:
+                        df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.strip().str.upper().isin([x.upper() for x in selected_sub])]
+                    if selected_bin_sys:
+                        mask_bin = df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(case.upper() in x for case in selected_bin_sys))
+                        df_t_raw = df_t_raw[mask_bin]
+                    if selected_bin_cov:
+                        mask_cov = df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(case.upper() in x for case in selected_bin_cov))
+                        df_s_raw = df_s_raw[mask_cov]
 
+                    if df_t_raw.empty: 
+                        st.error("❌ Data System kosong setelah difilter!")
+                    else:
+                        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
+                        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
+                        
+                        try:
+                            item_map_df = df_t_raw.iloc[:, [2, 4]].dropna()
+                            item_map_df.columns = ['SKU', 'ITEM_NAME_MAP']
+                            item_map_df['SKU'] = item_map_df['SKU'].astype(str).str.strip().str.upper()
+                            map_dict = item_map_df.drop_duplicates('SKU').set_index('SKU')['ITEM_NAME_MAP'].to_dict()
+                            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
+                            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.strip().str.upper().map(map_dict)
+                        except: map_dict = {}
+
+                        st.session_state.compare_result = {
+                            'res_scan': res_scan, 'res_stock': res_stock, 
+                            'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
+                            'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
+                            'map_dict': map_dict
+                        }
+                        st.success("✅ Compare Selesai!")
+            except Exception as e: st.error(f"❌ Error: {e}")
+
+    # RESULTS COMPARE
     if 'compare_result' in st.session_state:
         d = st.session_state.compare_result
         st.markdown(f"""
@@ -913,75 +943,188 @@ def menu_Stock_Opname():
         up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'])
         if up_bin_cov:
             if st.button("🚀 RUN ALLOCATION", use_container_width=True):
-                df_cov_raw = pd.read_excel(up_bin_cov)
-                allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
-                st.session_state.allocation_result = allocated
-                st.session_state.sys_updated_result = sys_upd
-                st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated)
-                st.success("✅ Allocation Selesai!")
+                try:
+                    df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+                    allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
+                    allocated_data['ITEM NAME'] = allocated_data['SKU'].map(d['map_dict'])
+                    
+                    st.session_state.allocation_result = allocated_data
+                    st.session_state.sys_updated_result = sys_updated
+                    st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated_data)
+                    st.success("✅ Allocation Selesai!")
+                except Exception as e: st.error(f"❌ Error: {e}")
 
+    # --- INI HASIL ALOKASI DENGAN 3 TAB ---
     if 'allocation_result' in st.session_state:
         st.markdown("### ✅ HASIL ALOKASI")
         ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📉 UPDATED SYSTEM","📦 SET UP REAL +"])
-        with ta1: st.dataframe(st.session_state.allocation_result, use_container_width=True)
-        with ta2: st.dataframe(st.session_state.sys_updated_result, use_container_width=True)
-        with ta3: st.dataframe(st.session_state.set_up_real_plus, use_container_width=True)
+        with ta1:
+            st.dataframe(st.session_state.allocation_result, use_container_width=True)
+        with ta2:
+            st.dataframe(st.session_state.set_up_real_plus, use_container_width=True)
+        with ta3:
+            st.dataframe(st.session_state.sys_updated_result, use_container_width=True)
         
         st.markdown("---")
         st.subheader("3️⃣ RECON REPORTS")
         if st.button("📊 Generate All RECON", use_container_width=True):
             st.session_state.recon_real_plus = generate_real_plus_recon(st.session_state.allocation_result)
-            st.session_state.outstanding_system = st.session_state.sys_updated_result
-            st.success("✅ Recon Report Generated!")
+            filtered_sys = st.session_state.sys_updated_result[st.session_state.sys_updated_result['DIFF'] != 0].copy()
+            outstanding_df = filtered_sys.copy()
+            outstanding_df['HASIL REKONSILIASI'] = ""
+            st.session_state.outstanding_system = outstanding_df
 
-    # --- LANGKAH 4, 5, 6, 7 (Sesuai perbaikan sebelumnya) ---
-    st.markdown("<br><br>---", unsafe_allow_html=True)
+        if 'recon_real_plus' in st.session_state:
+            st.markdown("#### 📋 REAL + RECON (NO ALLOCATION)")
+            st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
+            st.markdown("#### 📋 SYSTEM + OUTSTANDING RECON")
+            st.dataframe(st.session_state.outstanding_system, use_container_width=True)
+            
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+                st.session_state.set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
+                st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
+                st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
+            st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Report.xlsx", use_container_width=True)
+# =========================================================
+    # ⚙️ 4. FINAL ADJUSTMENT CHECKER (LOOKUP & DIFF)
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
-    adj_col1, adj_col2 = st.columns(2)
-    with adj_col1: up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx'], key="u41")
-    with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx'], key="u42")
+    st.info("Upload 2 file di bawah ini untuk mengisi QTY SO & DIFF.")
     
-    if up_r4 and up_s4:
+    adj_col1, adj_col2 = st.columns(2)
+    with adj_col1:
+        st.write("**1. File Hasil Recon**")
+        up_recon_4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_4_u1")
+    with adj_col2:
+        st.write("**2. File Cek Stock**")
+        up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_4_u2")
+
+    if up_recon_4 and up_stock_4:
         if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
-            res4, miss4 = logic_cek_adjustment_final(pd.read_excel(up_r4), pd.read_excel(up_s4))
-            st.session_state.df_res_lookup = res4
-            st.session_state.df_missing_lookup = miss4
-            st.session_state.step4_done = True
-            st.rerun()
-
-    if st.session_state.get('step4_done'):
-        st.dataframe(st.session_state.df_res_lookup, use_container_width=True)
-        st.markdown("---")
-        st.subheader("5️⃣ FINAL ADJUSMENT +")
-        up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5")
-        if up_m5:
-            if st.button("▶️ GENERATE ADJ +", use_container_width=True):
-                df_m, df_s = logic_pivot_adjustment(st.session_state.df_res_lookup, pd.read_excel(up_m5), None)
-                st.session_state.df_pivot_mult_result = df_m
-                st.session_state.step5_done = True
-                st.rerun()
-
-    if st.session_state.get('step5_done'):
-        st.dataframe(st.session_state.df_pivot_mult_result, use_container_width=True)
-        st.markdown("---")
-        st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
-        up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx'], key="u6")
-        if up_k6:
-            if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
-                df_k, _ = logic_setup_karantina_with_check(pd.read_excel(up_k6))
-                st.session_state.df_karantina_result = df_k
-                st.session_state.step6_done = True
-                st.rerun()
-
-    if st.session_state.get('step6_done'):
-        st.dataframe(st.session_state.df_karantina_result, use_container_width=True)
-        st.markdown("---")
-        st.subheader("🏁 7. FINAL REPORT GENERATOR")
-        up_m7 = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx'], key="u7")
-        if up_m7:
-            if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
-                st.success("🏁 All Reports Ready for Download!")
+            try:
+                # Load data dengan engine yang aman
+                df_r4 = pd.read_excel(up_recon_4, engine='openpyxl') if up_recon_4.name.endswith('xlsx') else pd.read_csv(up_recon_4)
+                df_s4 = pd.read_excel(up_stock_4, engine='openpyxl') if up_stock_4.name.endswith('xlsx') else pd.read_csv(up_stock_4)
                 
+                # Jalankan fungsi lookup
+                df_res_4, df_missing_4 = logic_cek_adjustment_final(df_r4, df_s4)
+                
+                # SIMPAN KE SESSION STATE (Kuncinya di sini!)
+                st.session_state.df_res_lookup = df_res_4
+                st.session_state.df_missing_lookup = df_missing_4
+                st.session_state.step4_done = True
+                
+                st.success(f"✅ Lookup Selesai! Data siap untuk Step 5.")
+                
+                t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
+                with t_f:
+                    st.dataframe(df_res_4, use_container_width=True, hide_index=True)
+                with t_m:
+                    st.dataframe(df_missing_4, use_container_width=True, hide_index=True)
+                
+                # Download Result Step 4
+                out4 = io.BytesIO()
+                with pd.ExcelWriter(out4, engine='xlsxwriter') as wr:
+                    df_res_4.to_excel(wr, sheet_name='FINAL_ADJUSTMENT', index=False)
+                    df_missing_4.to_excel(wr, sheet_name='NEED_SINGLE_ADJ', index=False)
+                st.download_button("📥 DOWNLOAD RESULT STEP 4", data=out4.getvalue(), file_name="Adjustment_Lookup.xlsx", use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"❌ Error Step 4: {e}")
+
+    # =========================================================
+    # ⚙️ 5. PIVOT GENERATOR (VBA LOGIC) - CUKUP 1 UPLOADER
+    # =========================================================
+    st.markdown("<br><br>---", unsafe_allow_html=True)
+    st.subheader("5️⃣ FINAL ADJUSMENT + ")
+    
+    # Proteksi: Hanya muncul kalau Step 4 sudah dapet hasil
+    if 'step4_done' not in st.session_state:
+        st.warning("⚠️ Jalankan Step 4 dulu supaya data Recon & Cek Stock tersedia.")
+    else:
+        st.info("Data dari Step 4 sudah tersimpan. Sekarang cukup upload file Master Stock untuk Pivot.")
+        
+        # Cuma satu uploader sesuai permintaan
+        up_master_5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_single")
+
+        if up_master_5:
+            if st.button("▶️GENERATE ADJ +", use_container_width=True):
+                try:
+                    # Load Master
+                    df_m5 = pd.read_excel(up_master_5, engine='openpyxl') if up_master_5.name.endswith('xlsx') else pd.read_csv(up_master_5)
+                    
+                    # Panggil data dari session state
+                    df_lookup_data = st.session_state.df_res_lookup
+                    df_missing_data = st.session_state.df_missing_lookup
+                    
+                    # Jalankan Logika Pivot VBA
+                    df_mult, df_sing = logic_pivot_adjustment(df_lookup_data, df_m5, df_missing_data)
+                    
+                    st.success("✅ Pivot Multiple & Single Berhasil Dibuat!")
+                    
+                    t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+                    with t_mult:
+                        st.write("**Hasil Pivot SKU (Akumulasi Qty)**")
+                        st.dataframe(df_mult, use_container_width=True, hide_index=True)
+                    with t_sing:
+                        st.write("**Hasil Pivot BIN & SKU (Single Adj)**")
+                        st.dataframe(df_sing, use_container_width=True, hide_index=True)
+                    
+                    # Download Result Step 5
+                    out5 = io.BytesIO()
+                    with pd.ExcelWriter(out5, engine='xlsxwriter') as wr:
+                        df_mult.to_excel(wr, sheet_name='MULTIPLE ADJ +', index=False)
+                        df_sing.to_excel(wr, sheet_name='SINGLE ADJ +', index=False)
+                    st.download_button("📥 DOWNLOAD PIVOT REPORT", data=out5.getvalue(), file_name="Pivot_Adjustment_Final.xlsx", use_container_width=True)
+                
+                except Exception as e:
+                    st.error(f"❌ Error Step 5: {e}")
+# =========================================================
+    # ⚙️ 6. SET UP KARANTINA GENERATOR (TRANSPARAN)
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
+    
+    up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
+
+    if up_karantina:
+        if st.button("🛠️ GENERATE & BUKTIKAN PERHITUNGAN", use_container_width=True):
+            try:
+                # Baca file (Pakai index_col=False biar Kolom A nomor urut nggak ngerusak posisi)
+                if up_karantina.name.endswith(('.xlsx', '.xls')):
+                    df_raw = pd.read_excel(up_karantina, engine='openpyxl')
+                else:
+                    df_raw = pd.read_csv(up_karantina, index_col=False)
+                
+                # Panggil fungsi yang tadi didefinisikan di atas
+                df_final, df_debug = logic_setup_karantina_with_check(df_raw)
+                
+                # --- TABEL PEMBUKTIAN ---
+                st.write("### 🔍 Tabel Pengecekan (Data yang Gue Baca):")
+                st.dataframe(df_debug, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                
+                # --- HASIL AKHIR ---
+                if not df_final.empty:
+                    st.success(f"✅ Ada {len(df_final)} baris yang selisihnya bukan 0. Silakan cek tabel di atas.")
+                    st.write("### 📦 Hasil Akhir Format Karantina:")
+                    st.dataframe(df_final, use_container_width=True, hide_index=True)
+                    
+                    # Download
+                    out6 = io.BytesIO()
+                    with pd.ExcelWriter(out6, engine='xlsxwriter') as wr:
+                        df_final.to_excel(wr, sheet_name='SET UP KARANTINA', index=False)
+                    st.download_button("📥 DOWNLOAD SET UP KARANTINA", data=out6.getvalue(), file_name="Set_Up_Karantina.xlsx", use_container_width=True)
+                else:
+                    st.warning("⚠️ Gue nggak nemu selisih (Semua DIFF = 0). Cek lagi kolom K dan O lu.")
+                    
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+            
 import pandas as pd
 import numpy as np
 import streamlit as st
