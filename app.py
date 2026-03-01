@@ -499,6 +499,20 @@ from collections import defaultdict
 # =========================================================
 # 1. FUNGSI PENDUKUNG
 # =========================================================
+# --- INISIALISASI MEMORI (WAJIB DI ATAS & JANGAN DIUBAH) ---
+# Gunakan sintaks ini supaya data yang sudah ada TIDAK TERTELAN None lagi
+if 'df_res_lookup' not in st.session_state:
+    st.session_state['df_res_lookup'] = None
+if 'df_missing_lookup' not in st.session_state:
+    st.session_state['df_missing_lookup'] = None
+if 'df_karantina_result' not in st.session_state:
+    st.session_state['df_karantina_result'] = None
+if 'df_pivot_mult_result' not in st.session_state:
+    st.session_state['df_pivot_mult_result'] = None
+if 'df_miss_loc_data' not in st.session_state:
+    st.session_state['df_miss_loc_data'] = None
+if 'step4_done' not in st.session_state:
+    st.session_state['step4_done'] = False
 
 def get_yellow_skus(file, column_index):
     yellow_set = set()
@@ -513,12 +527,6 @@ def get_yellow_skus(file, column_index):
                 if sku_val: yellow_set.add(sku_val)
     except: pass
     return yellow_set
-
-
-# --- INISIALISASI MEMORI (SESSION STATE) ---
-if 'df_res_lookup' not in st.session_state: st.session_state['df_res_lookup'] = None
-if 'df_karantina_result' not in st.session_state: st.session_state['df_karantina_result'] = None
-if 'df_miss_loc_data' not in st.session_state: st.session_state['df_miss_loc_data'] = None
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock = df_stock_adj.copy()
