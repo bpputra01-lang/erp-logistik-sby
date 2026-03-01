@@ -722,7 +722,7 @@ def menu_Stock_Opname():
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
-    # ============================================================
+# ============================================================
 # ✅ METRICS & TABS - SETELAH COMPARE
 # ============================================================
 if 'compare_result' in st.session_state:
@@ -750,7 +750,7 @@ if 'compare_result' in st.session_state:
     with t3: st.dataframe(d['real_plus'], use_container_width=True)
     with t4: st.dataframe(d['system_plus'], use_container_width=True)
 
-    # --- STEP 2: ALLOCATION ---
+    # --- STEP 2: ALLOCATION (UPLOAD & RUN) ---
     st.markdown("---")
     st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
     
@@ -794,23 +794,24 @@ if 'compare_result' in st.session_state:
             except Exception as e:
                 st.error(f"❌ Error Allocation: {e}")
 
-    # ============================================================
-    # ✅ HASIL ALLOCATION + SET UP REAL +
-    # ============================================================
-    if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state and 'set_up_real_plus' in st.session_state:
-        st.markdown("---")
-        st.subheader("📋 HASIL ALLOCATION")
-        
-        alloc_data = st.session_state.allocation_result
-        sys_updated = st.session_state.sys_updated_result
-        set_up_real_plus = st.session_state.set_up_real_plus
-        
-        full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
-        partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
-        no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
-        total_set_up = len(set_up_real_plus)
-        
-        st.markdown(f"""
+# ============================================================
+# ✅ HASIL ALLOCATION + SET UP REAL + (DI LUAR compare_result)
+# ============================================================
+if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state and 'set_up_real_plus' in st.session_state:
+    st.markdown("---")
+    st.subheader("📋 HASIL ALLOCATION")
+    
+    alloc_data = st.session_state.allocation_result
+    sys_updated = st.session_state.sys_updated_result
+    set_up_real_plus = st.session_state.set_up_real_plus
+    d = st.session_state.compare_result
+    
+    full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
+    partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
+    no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
+    total_set_up = len(set_up_real_plus)
+    
+    st.markdown(f"""
 <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
     <div class="m-box" style="flex:1"><span class="m-lbl">✅ FULL ALLOCATION</span><span class="m-val">{full_alloc}</span></div>
     <div class="m-box" style="flex:1"><span class="m-lbl">⚠️ PARTIAL ALLOCATION</span><span class="m-val">{partial_alloc}</span></div>
@@ -818,38 +819,39 @@ if 'compare_result' in st.session_state:
     <div class="m-box" style="flex:1; background-color: #e74c3c;"><span class="m-lbl">📦 SET UP REAL +</span><span class="m-val">{total_set_up}</span></div>
 </div>
 """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    ta1, ta2, ta3 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)", "📦 SET UP REAL +"])
+    
+    with ta1:
+        st.dataframe(alloc_data, use_container_width=True)
+    with ta2:
+        st.dataframe(sys_updated, use_container_width=True)
+    with ta3:
+        st.dataframe(set_up_real_plus, use_container_width=True)
         
-        st.markdown("---")
-        
-        ta1, ta2, ta3 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)", "📦 SET UP REAL +"])
-        
-        with ta1:
-            st.dataframe(alloc_data, use_container_width=True)
-        with ta2:
-            st.dataframe(sys_updated, use_container_width=True)
-        with ta3:
-            st.dataframe(set_up_real_plus, use_container_width=True)
-            
-        st.markdown("---")
-        st.subheader("📥 DOWNLOAD HASIL")
-        
-        output_alloc = io.BytesIO()
-        with pd.ExcelWriter(output_alloc, engine='xlsxwriter') as writer:
-            d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-            d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
-            d['real_plus'].to_excel(writer, sheet_name='REAL +', index=False)
-            d['system_plus'].to_excel(writer, sheet_name='SYSTEM +', index=False)
-            set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
-            alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
-            sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
-        
-        st.download_button(
-            label="📥 DOWNLOAD HASIL EXCEL (ALLOCATION + SET UP REAL +)",
-            data=output_alloc.getvalue(),
-            file_name="Hasil_Allocation_SetUpRealPlus.xlsx",
-            use_container_width=True,
-            key="dl_alloc_final_v1"
-        )
+    st.markdown("---")
+    st.subheader("📥 DOWNLOAD HASIL")
+    
+    output_alloc = io.BytesIO()
+    with pd.ExcelWriter(output_alloc, engine='xlsxwriter') as writer:
+        d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+        d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM (Old)', index=False)
+        d['real_plus'].to_excel(writer, sheet_name='REAL +', index=False)
+        d['system_plus'].to_excel(writer, sheet_name='SYSTEM +', index=False)
+        set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
+        alloc_data.to_excel(writer, sheet_name='REAL + ALLOCATION', index=False)
+        sys_updated.to_excel(writer, sheet_name='STOCK SYSTEM (New)', index=False)
+    
+    st.download_button(
+        label="📥 DOWNLOAD HASIL EXCEL (ALLOCATION + SET UP REAL +)",
+        data=output_alloc.getvalue(),
+        file_name="Hasil_Allocation_SetUpRealPlus.xlsx",
+        use_container_width=True,
+        key="dl_alloc_final_v1"
+    )
+    
 import pandas as pd
 import numpy as np
 import streamlit as st
