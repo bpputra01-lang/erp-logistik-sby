@@ -668,8 +668,6 @@ def logic_setup_karantina_with_check(df_outstanding):
     })
     
     return df_karantina, df_check
-
-
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
