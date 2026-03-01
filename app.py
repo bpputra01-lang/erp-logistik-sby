@@ -581,6 +581,58 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
     
     return df_stock, df_need_single
+
+# =========================================================
+# 3. LOGIC PIVOT (CONVERSION DARI VBA)
+# =========================================================
+
+def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
+    # --- PROSES MULTIPLE ADJ + (PIVOT SKU) ---
+    # Syarat VBA: QTY SO (Index 10) > QTY SYSTEM (Index 9)
+    # Lalu ambil selisih DIFF (Index 11)
+    
+    # Filter data yang QTY SO > QTY SYSTEM
+    df_filtered = df_stock_final.copy()
+    # Pastikan numerik
+    df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
+    df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
+    df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
+    
+    mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
+    df_to_pivot = df_filtered[mask_multiple].copy()
+    
+    # Pivot: Group by SKU (Index 2), Sum DIFF (Index 11)
+    pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
+    pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
+    
+    # Ambil detail produk dari Master (STOCK ADJ +)
+    # Key Master: SKU (Col index 2), ambil baris pertama yang ketemu
+    master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
+    
+    df_multiple_final = pivot_multiple.merge(
+        master_clean, 
+        left_on='SKU_KEY', 
+        right_on=master_clean.columns[2], 
+        how='left'
+    )
+    
+    # Update Kolom Qty (Kolom terakhir / Index 10) dengan hasil pivot
+    if not df_multiple_final.empty:
+        df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
+        # Buang kolom temporary hasil merge jika ada
+        if 'SKU_KEY' in df_multiple_final.columns: df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
+
+    # --- PROSES SINGLE ADJ + (PIVOT BIN & SKU) ---
+    # Sumber: Data yang tidak ketemu di lookup tadi (Missing dari Recon)
+    if not df_recon_missing.empty:
+        df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
+        # Group by BIN (Index 0) dan SKU (Index 1), Sum Hasil Recon (Index 6)
+        df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
+        df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
+    else:
+        df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+        
+    return df_multiple_final, df_single_final
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
@@ -945,6 +997,64 @@ def menu_Stock_Opname():
                 
             except Exception as e: 
                 st.error(f"❌ Error: {e}")
+    # Tambahkan file uploader ketiga di bagian UI lu:
+st.markdown("---")
+st.subheader("⚙️ FINAL ADJUSTMENT & PIVOT GENERATOR")
+st.info("Upload 3 file untuk menghasilkan report Multiple & Single Adj")
+
+adj_col1, adj_col2, adj_col3 = st.columns(3)
+with adj_col1:
+    up_recon = st.file_uploader("1. File HASIL RECON", type=['xlsx', 'csv'], key="u1")
+with adj_col2:
+    up_stock_adj = st.file_uploader("2. File CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u2")
+with adj_col3:
+    up_master = st.file_uploader("3. File STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="u3")
+
+if up_recon and up_stock_adj and up_master:
+    if st.button("🔥 GENERATE PIVOT ADJUSTMENT", use_container_width=True):
+        try:
+            # Load Files
+            df_recon_in = pd.read_excel(up_recon) if up_recon.name.endswith('xlsx') else pd.read_csv(up_recon)
+            df_stock_in = pd.read_excel(up_stock_adj) if up_stock_adj.name.endswith('xlsx') else pd.read_csv(up_stock_adj)
+            df_master_in = pd.read_excel(up_master) if up_master.name.endswith('xlsx') else pd.read_csv(up_master)
+            
+            # 1. Jalankan Lookup Final (yang sebelumnya kita buat)
+            df_res_lookup, df_missing = logic_cek_adjustment_final(df_recon_in, df_stock_in)
+            
+            # 2. Jalankan Logika Pivot (Conversion dari VBA)
+            df_multiple, df_single = logic_pivot_adjustment(df_res_lookup, df_master_in, df_missing)
+            
+            st.success("✅ Macro Python Berhasil Dijalankan!")
+            
+            # TAMPILKAN HASIL DALAM TABS
+            t_res, t_mult, t_sing = st.tabs(["📋 LOOKUP RESULT", "📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+            
+            with t_res:
+                st.dataframe(df_res_lookup, use_container_width=True, hide_index=True)
+            with t_mult:
+                st.write("**Hasil Pivot SKU (QTY diakumulasikan)**")
+                st.dataframe(df_multiple, use_container_width=True, hide_index=True)
+            with t_sing:
+                st.write("**Hasil Pivot BIN & SKU dari data Missing**")
+                st.dataframe(df_single, use_container_width=True, hide_index=True)
+            
+            # DOWNLOAD ALL
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_res_lookup.to_excel(writer, sheet_name='CEK STOCK ADJ +', index=False)
+                df_multiple.to_excel(writer, sheet_name='MULTIPLE ADJ +', index=False)
+                df_single.to_excel(writer, sheet_name='SINGLE ADJ +', index=False)
+                df_missing.to_excel(writer, sheet_name='NEED SINGLE ADJ', index=False)
+                
+            st.download_button(
+                "📥 DOWNLOAD FINAL REPORT (4 SHEETS)", 
+                data=output.getvalue(), 
+                file_name="Final_Adjustment_Pivot.xlsx", 
+                use_container_width=True
+            )
+            
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
             
 import pandas as pd
 import numpy as np
