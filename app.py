@@ -997,111 +997,152 @@ def menu_Stock_Opname():
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
             st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Report.xlsx", use_container_width=True)
 # =========================================================
-# 2. SESSION STATE & UI
+# 2. MENU UTAMA & UI STREAMLIT
 # =========================================================
-if 'step4_done' not in st.session_state: st.session_state.step4_done = False
-if 'step5_done' not in st.session_state: st.session_state.step5_done = False
-if 'step6_done' not in st.session_state: st.session_state.step6_done = False
 
-st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
+def menu_Stock_Opname():
+    # Style CSS
+    st.markdown("""
+        <style>
+         .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
+         .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
+         .m-box { background: #262730; padding: 15px; border-radius: 8px; border: 1px solid #464855; text-align: center; flex: 1; }
+         .m-lbl { display: block; font-size: 12px; color: #808495; margin-bottom: 5px; }
+         .m-val { font-size: 20px; font-weight: bold; color: white; }
+        </style>
+    """, unsafe_allow_html=True)
+     
+    st.markdown('<div class="hero-header"><h1> STOCK OPNAME ANALYZER</h1></div>', unsafe_allow_html=True)
+    
+    # Inisialisasi Session State (Brankas Data)
+    for key in ['step4_done', 'step5_done', 'step6_done', 'df_res_lookup', 'df_missing_lookup', 
+                'df_pivot_mult_result', 'df_pivot_sing_result', 'df_karantina_result']:
+        if key not in st.session_state:
+            st.session_state[key] = False if 'done' in key else None
 
-if st.session_state.step4_done and 'df_res_lookup' in st.session_state:
-    st.info(f"📂 Data Step 4 Tersimpan ({len(st.session_state.df_res_lookup)} baris).")
-    t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
-    with t_f: st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
-    with t_m: st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
+    # --- FILTER SECTION ---
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+        selected_sub = st.multiselect("🗂️ Sub Kategori:", ["SHOES", "APPAREL", "ACCESSORIES"]) # Contoh list
+    with col_f2:
+        selected_bin_sys = st.multiselect("🏭 BIN System:", ["GUDANG", "TOKO", "LIVE"])
+    with col_f3:
+        selected_bin_cov = st.multiselect("📡 BIN Coverage:", ["KARANTINA", "STAGING"])
 
-adj_col1, adj_col2 = st.columns(2)
-with adj_col1:
-    up_recon_4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_4_u1")
-with adj_col2:
-    up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_4_u2")
+    st.markdown("---")
 
-if up_recon_4 and up_stock_4:
-    if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
-        try:
-            df_r4 = pd.read_excel(up_recon_4) if up_recon_4.name.endswith('xlsx') else pd.read_csv(up_recon_4)
-            df_s4 = pd.read_excel(up_stock_4) if up_stock_4.name.endswith('xlsx') else pd.read_csv(up_stock_4)
+    # STEP 1, 2, 3 (Simplified untuk flow)
+    st.subheader("1️⃣ Upload & Run Compare")
+    c1, c2 = st.columns(2)
+    with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
+    with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
+
+    if up_scan and up_stock:
+        if st.button("▶️ RUN COMPARE", use_container_width=True):
+            st.success("Compare Logic Executed (Data Simulated)")
+            # Simpan dummy hasil ke session state agar flow jalan
+            st.session_state.compare_result = True 
+
+    # =========================================================
+    # ⚙️ 4. FINAL ADJUSTMENT CHECKER
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
+
+    if st.session_state.step4_done:
+        st.info(f"📂 Data Step 4 Tersimpan.")
+        t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
+        with t_f: st.dataframe(st.session_state.df_res_lookup, use_container_width=True)
+        with t_m: st.dataframe(st.session_state.df_missing_lookup, use_container_width=True)
+
+    adj_col1, adj_col2 = st.columns(2)
+    with adj_col1:
+        up_recon_4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx'], key="adj4_1")
+    with adj_col2:
+        up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx'], key="adj4_2")
+
+    if up_recon_4 and up_stock_4:
+        if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+            df_r4 = pd.read_excel(up_recon_4)
+            df_s4 = pd.read_excel(up_stock_4)
             res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
             st.session_state.df_res_lookup = res4
             st.session_state.df_missing_lookup = miss4
             st.session_state.step4_done = True
-            st.success("✅ Lookup Selesai!")
             st.rerun()
-        except Exception as e: st.error(f"❌ Error Step 4: {e}")
 
-st.markdown("---")
-st.subheader("5️⃣ FINAL ADJUSMENT +")
+    # =========================================================
+    # ⚙️ 5. PIVOT GENERATOR
+    # =========================================================
+    st.markdown("<br><br>---", unsafe_allow_html=True)
+    st.subheader("5️⃣ FINAL ADJUSMENT +")
 
-if st.session_state.step5_done and 'df_pivot_mult_result' in st.session_state:
-    st.info("📂 Data Step 5 Tersimpan.")
-    t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
-    with t_mult: st.dataframe(st.session_state.df_pivot_mult_result, use_container_width=True, hide_index=True)
-    with t_sing:
-        if 'df_pivot_sing_result' in st.session_state:
-            st.dataframe(st.session_state.df_pivot_sing_result, use_container_width=True, hide_index=True)
+    if st.session_state.step5_done:
+        st.info("📂 Data Step 5 Tersimpan.")
+        t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+        with t_mult: st.dataframe(st.session_state.df_pivot_mult_result, use_container_width=True)
+        with t_sing: st.dataframe(st.session_state.df_pivot_sing_result, use_container_width=True)
 
-if not st.session_state.step4_done:
-    st.warning("⚠️ Jalankan Step 4 dulu!")
-else:
-    up_master_5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_single")
-    if up_master_5:
-        if st.button("▶️ GENERATE ADJ +", use_container_width=True):
-            try:
-                df_m5 = pd.read_excel(up_master_5)
-                df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5, st.session_state.df_missing_lookup)
+    if st.session_state.step4_done:
+        up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="adj5")
+        if up_m5:
+            if st.button("▶️ GENERATE ADJ +", use_container_width=True):
+                df_m5_data = pd.read_excel(up_m5)
+                df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5_data, st.session_state.df_missing_lookup)
                 st.session_state.df_pivot_mult_result = df_mult
                 st.session_state.df_pivot_sing_result = df_sing
                 st.session_state.step5_done = True
-                st.success("✅ Pivot Berhasil!")
                 st.rerun()
-            except Exception as e: st.error(f"❌ Error Step 5: {e}")
+    else:
+        st.warning("⚠️ Jalankan Step 4 dulu!")
 
-st.markdown("---")
-st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
+    # =========================================================
+    # ⚙️ 6. SET UP KARANTINA GENERATOR
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
 
-if st.session_state.step6_done and 'df_karantina_result' in st.session_state:
-    st.info("📂 Data Step 6 Tersimpan.")
-    st.dataframe(st.session_state.df_karantina_result, use_container_width=True, hide_index=True)
+    if st.session_state.step6_done:
+        st.info("📂 Data Step 6 Tersimpan.")
+        st.dataframe(st.session_state.df_karantina_result, use_container_width=True)
 
-up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
-if up_karantina:
-    if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
-        try:
-            df_raw = pd.read_excel(up_karantina)
-            df_f, df_d = logic_setup_karantina_with_check(df_raw)
-            st.session_state.df_karantina_result = df_f
+    up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx'], key="adj6")
+    if up_k6:
+        if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
+            df_raw6 = pd.read_excel(up_k6)
+            df_kar, _ = logic_setup_karantina_with_check(df_raw6)
+            st.session_state.df_karantina_result = df_kar
             st.session_state.step6_done = True
-            st.success("✅ Karantina Selesai!")
             st.rerun()
-        except Exception as e: st.error(f"❌ Error Step 6: {e}")
 
-st.markdown("---")
-st.subheader("🏁 7. FINAL REPORT GENERATOR")
+    # =========================================================
+    # 🏁 7. FINAL REPORT GENERATOR
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("🏁 7. FINAL REPORT GENERATOR")
 
-if not (st.session_state.step5_done and st.session_state.step6_done):
-    st.warning("⚠️ Selesaikan Step 4, 5, dan 6 dulu!")
-else:
-    up_minus_final = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx', 'csv'], key="up_minus_v2")
-    if up_minus_final:
-        if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
-            try:
-                df_m = pd.read_excel(up_minus_final)
+    if st.session_state.step5_done and st.session_state.step6_done:
+        up_m7 = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx'], key="adj7")
+        if up_m7:
+            if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
+                df_minus_data = pd.read_excel(up_m7)
                 df_sum, df_miss, t_sku, t_qty = logic_generate_final_reports_v2(
                     st.session_state.df_pivot_mult_result, 
-                    df_m, 
+                    df_minus_data, 
                     st.session_state.df_karantina_result, 
                     st.session_state.df_karantina_result
                 )
                 
-                st.success("✅ Laporan Jadi!")
-                st.dataframe(df_sum.head())
+                st.success("✅ Laporan Berhasil Dibuat!")
+                st.dataframe(df_sum)
                 
-                out_sum = io.BytesIO()
-                with pd.ExcelWriter(out_sum, engine='xlsxwriter') as wr:
-                    df_sum.to_excel(wr, sheet_name='SUM_ADJUSTMENT', index=False)
-                st.download_button("📥 DOWNLOAD SUMMARY", data=out_sum.getvalue(), file_name="Summary.xlsx")
-            except Exception as e: st.error(f"❌ Error Step 7: {e}")
+                # Download logic
+                out = io.BytesIO()
+                with pd.ExcelWriter(out, engine='xlsxwriter') as wr:
+                    df_sum.to_excel(wr, sheet_name='SUMMARY', index=False)
+                st.download_button("📥 DOWNLOAD REPORT", data=out.getvalue(), file_name="Final_SO_Report.xlsx")
+    else:
+        st.warning("⚠️ Selesaikan Step 4, 5, dan 6 dulu!")
                 
 import pandas as pd
 import numpy as np
