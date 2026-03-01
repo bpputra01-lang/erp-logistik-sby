@@ -518,62 +518,69 @@ def get_yellow_skus(file, column_index):
 # LOGIC CEK ADJUSTMENT FINAL (REPLICA VBA)
 # =========================================================
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    # Buat copy biar file asli aman
     df_stock = df_stock_adj.copy()
     
-    # Fungsi pembantu untuk bersihin string (SKU/BIN biar match)
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. AMBIL DATA DARI RECON
+    # 1. AMBIL DATA DARI RECON & CATAT SEMUA KEY YANG ADA
     recon_dict = {}
+    all_recon_keys = set() # Untuk tracking mana yang sudah terpakai
     for _, row in df_recon.iterrows():
         try:
-            # Kita pakai iloc, tapi pastikan df_recon dibaca TANPA index tambahan
-            b_recon = clean_val(row.iloc[0]) # Kolom A
-            s_recon = clean_val(row.iloc[1]) # Kolom B
+            b_recon = clean_val(row.iloc[0])
+            s_recon = clean_val(row.iloc[1])
             if b_recon and s_recon:
                 key = f"{b_recon}|{s_recon}"
-                val_recon = row.iloc[6] # Kolom G (Hasil Recon)
+                val_recon = row.iloc[6]
                 recon_dict[key] = val_recon
-        except:
-            continue
+                all_recon_keys.add(key)
+        except: continue
 
-    # 2. PASTIKAN KOLOM TARGET TERSEDIA (Kolom 11 & 12)
+    # 2. PASTIKAN KOLOM TARGET STOCK TERSEDIA
     while df_stock.shape[1] < 12:
         df_stock[f"Extra_{df_stock.shape[1]}"] = ""
 
-    # 3. LOOKUP & ISI KE STOCK
+    # 3. LOOKUP KE STOCK & CATAT KEY YANG TERPAKAI
+    used_keys = set()
     def do_lookup(row):
-        b_stock = clean_val(row.iloc[1]) # Kolom B (BIN)
-        s_stock = clean_val(row.iloc[2]) # Kolom C (SKU)
+        b_stock = clean_val(row.iloc[1])
+        s_stock = clean_val(row.iloc[2])
         key_stock = f"{b_stock}|{s_stock}"
-        return recon_dict.get(key_stock, "")
+        
+        if key_stock in recon_dict:
+            used_keys.add(key_stock) # Tandai bahwa data recon ini sudah masuk ke file stock
+            return recon_dict[key_stock]
+        return ""
 
-    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1) # Isi Kolom 11 (K)
+    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
 
     # 4. HITUNG DIFF
     def do_diff(row):
         try:
-            val_sys = row.iloc[9]  # Kolom J (Qty System)
-            val_so = row.iloc[10] # Kolom K (Qty SO yang baru diisi)
+            val_sys = row.iloc[9]
+            val_so = row.iloc[10]
             if val_so != "" and val_so is not None:
                 return abs(float(val_sys) - float(val_so))
-        except:
-            return 0
+        except: return 0
         return ""
 
-    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1) # Isi Kolom 12 (L)
+    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
 
-    # GANTI HEADER
+    # RAPIKAN HEADER UTAMA
     cols = list(df_stock.columns)
     cols[10], cols[11] = "QTY SO", "DIFF"
     df_stock.columns = cols
+
+    # 5. LOGIKA UNTUK TAB "NEED SINGLE ADJ"
+    # Cari key yang ada di Recon tapi TIDAK ADA di used_keys
+    missing_keys = all_recon_keys - used_keys
+    df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
     
-    return df_stock
+    return df_stock, df_need_single
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
@@ -907,30 +914,37 @@ def menu_Stock_Opname():
         up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_final_up_2")
 
     if up_recon and up_stock_adj:
-        if st.button("🚀 RUN PROCESS", use_container_width=True):
+        if st.button("🚀 JALANKAN PROSES LOOKUP & DIFF", use_container_width=True):
             try:
-                # BACA FILE
                 df_recon_in = pd.read_excel(up_recon) if up_recon.name.endswith('xlsx') else pd.read_csv(up_recon)
                 df_stock_in = pd.read_excel(up_stock_adj) if up_stock_adj.name.endswith('xlsx') else pd.read_csv(up_stock_adj)
                 
-                # RUN LOGIC
-                df_res = logic_cek_adjustment_final(df_recon_in, df_stock_in)
+                # Fungsi sekarang return 2 variabel
+                df_res, df_missing = logic_cek_adjustment_final(df_recon_in, df_stock_in)
                 
-                st.success("✅ Proses Selesai!")
+                st.success(f"✅ Selesai! Ditemukan {len(df_missing)} data yang perlu Single Adj.")
                 
-                # TAMPILKAN TANPA KOLOM ANGKA DI KIRI (HIDE INDEX)
-                st.dataframe(df_res, use_container_width=True, hide_index=True)
+                # BUAT TAB BARU DISINI
+                t_final, t_missing = st.tabs(["📊 FINAL ADJUSTMENT", "⚠️ NEED SINGLE ADJ"])
                 
-                # DOWNLOAD TANPA INDEX
+                with t_final:
+                    st.write("Data yang berhasil di-lookup ke file Stock Adj +")
+                    st.dataframe(df_res, use_container_width=True, hide_index=True)
+                
+                with t_missing:
+                    st.write("Data di Hasil Recon yang TIDAK DITEMUKAN di file Stock Adj +")
+                    st.dataframe(df_missing, use_container_width=True, hide_index=True)
+                
+                # DOWNLOAD (Masukin dua-duanya ke sheet berbeda)
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     df_res.to_excel(writer, sheet_name='FINAL_ADJUSTMENT', index=False)
+                    df_missing.to_excel(writer, sheet_name='NEED_SINGLE_ADJ', index=False)
                 
-                st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="Adj_Final.xlsx", use_container_width=True)
+                st.download_button("📥 DOWNLOAD ALL SHEETS", data=output.getvalue(), file_name="Final_Adj_Report.xlsx", use_container_width=True)
                 
             except Exception as e: 
                 st.error(f"❌ Error: {e}")
-
             
 import pandas as pd
 import numpy as np
