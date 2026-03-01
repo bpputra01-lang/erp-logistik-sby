@@ -1028,17 +1028,32 @@ def menu_Stock_Opname():
                     recon_df = generate_real_plus_recon(alloc_data)
                     st.session_state.recon_real_plus = recon_df
                     
-                    # Generate SYSTEM + OUTSTANDING
-                    # AMBIL DARI sys_updated (TAB SYSTEM + NEW) - FILTER DIFF != 0
-                    outstanding_df = sys_updated[sys_updated['DIFF'] != 0].copy()
-                    
-                    # COPY SEMUA KOLOM (TIDAK USAH DI RENAME)
-                    # TAMBAHKAN KOLOM HASIL REKONSILIASI DI AKHIR
-                    outstanding_df['HASIL REKONSILIASI'] = ""
-                    
-                    st.session_state.outstanding_system = outstanding_df
-                    
-                    st.success(f"✅ Selesai! REAL: {len(recon_df)} | SYSTEM: {len(outstanding_df)}")
+                                    # Generate SYSTEM + OUTSTANDING - PAKAI KOLOM VBA
+                filtered = sys_updated[sys_updated['DIFF'] != 0].copy()
+                
+                # KOLOM SESUAI VBA
+                vba_cols = ['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF']
+                
+                # Ambil kolom yang ada dari sys_updated
+                final_cols = []
+                for col in vba_cols:
+                    if col in filtered.columns:
+                        final_cols.append(col)
+                
+                # Tambah kolom lain yang belum ada
+                for col in filtered.columns:
+                    if col not in final_cols:
+                        final_cols.append(col)
+                
+                # Reorder columns
+                outstanding_df = filtered[final_cols].copy()
+                
+                # TAMBAHKAN KOLOM HASIL REKONSILIASI DI AKHIR
+                outstanding_df['HASIL REKONSILIASI'] = ""
+                
+                st.session_state.outstanding_system = outstanding_df
+                
+                st.successelesai! REAL(f"✅ S: {len(recon_df)} | SYSTEM: {len(outstanding_df)}")
         # Tampilkan hasil RECON jika sudah dibuat
         if 'recon_real_plus' in st.session_state:
             st.markdown("#### 📋 REAL + RECON (NO ALLOCATION)")
