@@ -698,27 +698,34 @@ def generate_set_up_real_plus(d):
         set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
     
     return set_up_real_plus
+        # ===========================
+        # STEP 2: ALLOCATION
+        # ===========================
+        st.markdown("---")
+        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
+        
+        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
 
-if up_bin_cov:
-    if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
-        try:
-            df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
-            
-            with st.spinner("Memproses Alokasi..."):
-                # 1️⃣ ALLOCATION
-                allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
-                
-                # 2️⃣ SET UP REAL +
-                set_up_real_plus = generate_set_up_real_plus(d)
+        if up_bin_cov:
+            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
+                try:
+                    df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+                    
+                    with st.spinner("Memproses Alokasi..."):
+                        # 1️⃣ ALLOCATION
+                        allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
+                        
+                        # 2️⃣ SET UP REAL +
+                        set_up_real_plus = generate_set_up_real_plus(d)
 
-                st.session_state.allocation_result = allocated_data
-                st.session_state.sys_updated_result = sys_updated
-                st.session_state.set_up_real_plus = set_up_real_plus
-                
-                st.success("✅ Allocation Selesai!")
-                
-        except Exception as e:
-            st.error(f"❌ Error: {e}")
+                        st.session_state.allocation_result = allocated_data
+                        st.session_state.sys_updated_result = sys_updated
+                        st.session_state.set_up_real_plus = set_up_real_plus
+                        
+                        st.success("✅ Allocation Selesai!")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
 # =========================================================
