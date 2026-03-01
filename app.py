@@ -585,14 +585,23 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
 # 🚀 LOGIC ALLOCATION (SESUAI VBA - 2 SUMBER)
 # ============================================================
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
-    # Prepare System Plus (Source 1)
+    """
+    VBA: AlokasiDiffRealSystem_SplitWithTwoSources
+    - Source 1: SYSTEM + (CARI DULU - mengurangi DIFF di System)
+    - Source 2: BIN COVERAGE (BARU JIKA SISA)
+    """
+    
+    # === SOURCE 1: SYSTEM + ===
+    # Ambil SKU dan DIFF dari System +
     sys_lite = df_system_plus.iloc[:, [1, 2, df_system_plus.columns.get_loc('DIFF')]].copy()
     sys_lite.columns = ['BIN', 'SKU', 'QTY_DIFF']
     sys_lite['SKU'] = sys_lite['SKU'].astype(str).str.strip().str.upper()
     sys_lite['QTY_DIFF'] = pd.to_numeric(sys_lite['QTY_DIFF'], errors='coerce').fillna(0)
+    
+    # Group by SKU & BIN - untuk tracking per lokasi
     dict_system_source = sys_lite.groupby(['BIN', 'SKU'])['QTY_DIFF'].sum().to_dict()
 
-    # Prepare Bin Coverage (Source 2)
+    # === SOURCE 2: BIN COVERAGE ===
     cov_lite = df_bin_coverage.iloc[:, [1, 2, 9]].copy() 
     cov_lite.columns = ['BIN', 'SKU', 'QTY_COV']
     cov_lite['SKU'] = cov_lite['SKU'].astype(str).str.strip().str.upper()
@@ -608,46 +617,62 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     qty_alokasi_list = []
     status_list = []
 
-    # Loop per row
+    # Loop per row REAL +
     for idx, row in df_res.iterrows():
         sku = row['SKU']
-        current_diff = row['DIFF']
+        current_diff = row['DIFF']  # Qty yang needed untuk REAL +
         
         if current_diff > 0:
             remaining_diff = current_diff
             temp_alloc_bin = []
             temp_alloc_qty = 0
             
-            # TAHAP 1: CARI DI SYSTEM +
+            # ===========================
+            # TAHAP 1: CARI DI SYSTEM + (DULU)
+            # ===========================
+            # Cek semua BIN di System + yang punya SKU sama & DIFF > 0
             sys_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_system_source.items() if k[1] == sku and v > 0]
+            
             for src in sys_list:
                 if remaining_diff <= 0:
                     break
+                    
                 qty_alloc = min(src['QTY'], remaining_diff)
                 temp_alloc_bin.append(src['BIN'])
                 temp_alloc_qty += qty_alloc
+                
+                # KURANGI QTY di System Source
                 dict_system_source[(src['BIN'], sku)] -= qty_alloc
                 
-                # Update DF System
+                # UPDATE DIFF di System yang Asli (df_sys_updated)
                 mask = (df_sys_updated.iloc[:,1].astype(str).str.upper() == src['BIN']) & (df_sys_updated.iloc[:,2].astype(str).str.upper() == sku)
                 if mask.any():
                     diff_col_idx = df_sys_updated.columns.get_loc('DIFF')
                     df_sys_updated.loc[mask, df_sys_updated.columns[diff_col_idx]] -= qty_alloc
+                
                 remaining_diff -= qty_alloc
 
-            # TAHAP 2: CARI DI BIN COVERAGE
+            # ===========================
+            # TAHAP 2: CARI DI BIN COVERAGE (JIKA SISA)
+            # ===========================
             if remaining_diff > 0:
                 cov_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_cov_source.items() if k[1] == sku and v > 0]
+                
                 for src in cov_list:
                     if remaining_diff <= 0:
                         break
                     qty_alloc = min(src['QTY'], remaining_diff)
                     temp_alloc_bin.append(src['BIN'])
                     temp_alloc_qty += qty_alloc
+                    
+                    # KURANGI QTY di Bin Coverage Source
                     dict_cov_source[(src['BIN'], sku)] -= qty_alloc
+                    
                     remaining_diff -= qty_alloc
 
-            # TAHAP 3: STATUS
+            # ===========================
+            # TAHAP 3: TENTUKAN STATUS
+            # ===========================
             if temp_alloc_qty > 0:
                 allocated_bin = " & ".join(list(set(temp_alloc_bin)))[:50]
                 allocated_qty = temp_alloc_qty
