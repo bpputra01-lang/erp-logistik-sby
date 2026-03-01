@@ -581,49 +581,68 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     
     return dt_merged
 
+# ============================================================
+# 🚀 LOGIC ALLOCATION (ULTRA FAST)
+# ============================================================
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
+    # Source 1: System Plus
     sys_lite = df_system_plus.iloc[:, [1, 2, df_system_plus.columns.get_loc('DIFF')]].copy()
     sys_lite.columns = ['BIN', 'SKU', 'QTY_DIFF']
     sys_lite['SKU'] = sys_lite['SKU'].astype(str).str.strip().str.upper()
     sys_lite['QTY_DIFF'] = pd.to_numeric(sys_lite['QTY_DIFF'], errors='coerce').fillna(0)
+    
+    # Group by SKU (SUPER FAST)
     dict_system_source = sys_lite.groupby(['BIN', 'SKU'])['QTY_DIFF'].sum().to_dict()
 
+    # Source 2: Bin Coverage
     cov_lite = df_bin_coverage.iloc[:, [1, 2, 9]].copy() 
     cov_lite.columns = ['BIN', 'SKU', 'QTY_COV']
     cov_lite['SKU'] = cov_lite['SKU'].astype(str).str.strip().str.upper()
     cov_lite['QTY_COV'] = pd.to_numeric(cov_lite['QTY_COV'], errors='coerce').fillna(0)
     dict_cov_source = cov_lite.groupby(['BIN', 'SKU'])['QTY_COV'].sum().to_dict()
 
+    # Copy dataframe
     df_res = df_real_plus.copy()
     df_sys_updated = df_system_plus.copy()
-    bin_alokasi_list, qty_alokasi_list, status_list = [], [], []
+    
+    # Prepare columns
+    bin_alokasi_list = []
+    qty_alokasi_list = []
+    status_list = []
 
+    # Loop tetap diperlukan untuk alokasi per row
     for idx, row in df_res.iterrows():
         sku = row['SKU']
         current_diff = row['DIFF']
         
         if current_diff > 0:
             remaining_diff = current_diff
-            temp_alloc_bin, temp_alloc_qty = [], 0
+            temp_alloc_bin = []
+            temp_alloc_qty = 0
             
+            # Tahap 1: System +
             sys_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_system_source.items() if k[1] == sku and v > 0]
             for src in sys_list:
-                if remaining_diff <= 0: break
+                if remaining_diff <= 0:
+                    break
                 qty_alloc = min(src['QTY'], remaining_diff)
                 temp_alloc_bin.append(src['BIN'])
                 temp_alloc_qty += qty_alloc
                 dict_system_source[(src['BIN'], sku)] -= qty_alloc
                 
-                mask = (df_sys_updated.iloc[:,1].str.upper() == src['BIN']) & (df_sys_updated.iloc[:,2].str.upper() == sku)
+                # Update DF System
+                mask = (df_sys_updated.iloc[:,1].astype(str).str.upper() == src['BIN']) & (df_sys_updated.iloc[:,2].astype(str).str.upper() == sku)
                 if mask.any():
                     diff_col_idx = df_sys_updated.columns.get_loc('DIFF')
                     df_sys_updated.loc[mask, df_sys_updated.columns[diff_col_idx]] -= qty_alloc
                 remaining_diff -= qty_alloc
 
+            # Tahap 2: Bin Coverage
             if remaining_diff > 0:
                 cov_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_cov_source.items() if k[1] == sku and v > 0]
                 for src in cov_list:
-                    if remaining_diff <= 0: break
+                    if remaining_diff <= 0:
+                        break
                     qty_alloc = min(src['QTY'], remaining_diff)
                     temp_alloc_bin.append(src['BIN'])
                     temp_alloc_qty += qty_alloc
@@ -649,6 +668,37 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     
     return df_res, df_sys_updated
 
+
+# ============================================================
+# 🚀 SET UP REAL + (SESUAI VBA)
+# ============================================================
+def generate_set_up_real_plus(d, df_s_raw):
+    # Mapping BIN dari Scan (Multiple Adj +)
+    df_s_raw_copy = df_s_raw.copy()
+    df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
+    df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
+    bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
+
+    # Ambil dari STOCK SYSTEM (res_stock), bukan REAL +
+    real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
+
+    if not real_plus_diff.empty:
+        # BIN AWAL = dari Multiple Adj + (Scan)
+        real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
+        
+        # BIN TUJUAN = dari Stock System (kolom BIN)
+        real_plus_diff['BIN TUJUAN'] = real_plus_diff['BIN']
+        
+        # QUANTITY = DIFF, NOTES = RELOCATION
+        real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
+        real_plus_diff['NOTES'] = "RELOCATION"
+        
+        # Urutan kolom sesuai VBA
+        set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
+    else:
+        set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+    
+    return set_up_real_plus
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
 # =========================================================
