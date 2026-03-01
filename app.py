@@ -513,6 +513,53 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
+    def logic_cek_adjustment_final(df_recon, df_stock_system):
+    """
+    MENIRU MACRO: Sub CEK_ADJUSMENT_FINAL()
+    - Kolom 10 (J): QTY SYSTEM
+    - Kolom 11 (K): QTY SO (Hasil Recon)
+    - Kolom 12 (L): DIFF (Absolute J - K)
+    """
+    # Copy agar tidak merusak data asli
+    df_final = df_stock_system.copy()
+    
+    # 1. Standardisasi Key (BIN | SKU)
+    df_recon['KEY'] = df_recon['BIN'].astype(str).str.strip().str.upper() + "|" + \
+                      df_recon['SKU'].astype(str).str.strip().str.upper()
+    
+    # Ambil Nama Kolom berdasarkan index untuk Stock System
+    col_bin_sys = df_final.columns[1]
+    col_sku_sys = df_final.columns[2]
+    col_qty_sys = df_final.columns[9]  # Index 9 = Kolom J
+    col_qty_so  = df_final.columns[10] # Index 10 = Kolom K
+    
+    df_final['KEY'] = df_final[col_bin_sys].astype(str).str.strip().str.upper() + "|" + \
+                      df_final[col_sku_sys].astype(str).str.strip().str.upper()
+
+    # 2. Lookup QTY RECON ke Kolom K (QTY SO)
+    # Buat dictionary dari df_recon {KEY: HASIL RECONCILIATION}
+    recon_map = df_recon.set_index('KEY')['HASIL RECONCILIATION'].to_dict()
+    
+    # Update kolom K jika Key cocok
+    df_final[col_qty_so] = df_final['KEY'].map(recon_map)
+    
+    # 3. Hitung DIFF (Kolom L) -> Abs(J - K)
+    def calculate_diff(row):
+        val_k = row[col_qty_so]
+        if pd.notnull(val_k) and str(val_k) != "":
+            try:
+                return abs(float(row[col_qty_sys]) - float(val_k))
+            except:
+                return 0
+        return ""
+
+    df_final['DIFF_ADJ'] = df_final.apply(calculate_diff, axis=1)
+    
+    # Identifikasi yang tidak ditemukan (Warnai Kuning di VBA)
+    not_found_keys = set(df_recon['KEY']) - set(df_final['KEY'])
+    
+    return df_final.drop(columns=['KEY']), not_found_keys
+
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
