@@ -888,7 +888,7 @@ def menu_Stock_Opname():
     # =========================================================
     # ⚙️ FINAL ADJUSTMENT CHECKER (DI PALING BAWAH)
     # =========================================================
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.markdown("4️⃣FINAL ADJUSTMENT CHECKER")
     st.info("Upload dua file di bawah ini untuk menjalankan logika 'CEK_ADJUSMENT_FINAL'")
 
