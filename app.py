@@ -1002,7 +1002,7 @@ def menu_Stock_Opname():
     # ⚙️ 5. PIVOT GENERATOR (VBA LOGIC) - CUKUP 1 UPLOADER
     # =========================================================
     st.markdown("<br><br>---", unsafe_allow_html=True)
-    st.subheader("5️⃣ PIVOT GENERATOR (VBA CONVERSION)")
+    st.subheader("5️⃣ FINAL ADJUSMENT + ")
     
     # Proteksi: Hanya muncul kalau Step 4 sudah dapet hasil
     if 'step4_done' not in st.session_state:
