@@ -1085,7 +1085,6 @@ def menu_Stock_Opname():
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
-    st.info("Gue bakal tampilin tabel pengecekan biar lu liat gue ngitungnya bener apa engga.")
     
     up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
 
