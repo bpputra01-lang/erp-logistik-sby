@@ -977,7 +977,7 @@ def menu_Stock_Opname():
                     st.success("✅ Allocation Selesai!")
             except Exception as e:
                 st.error(f"❌ Error: {e}")
-        # ===========================
+    # ===========================
     # HASIL ALLOCATION
     # ===========================
     if 'allocation_result' in st.session_state:
@@ -1028,8 +1028,42 @@ def menu_Stock_Opname():
                     recon_df = generate_real_plus_recon(alloc_data)
                     st.session_state.recon_real_plus = recon_df
                     
-                    # Generate SYSTEM + OUTSTANDING (Simple version)
-                    outstanding_df = sys_updated[sys_updated['DIFF'] != 0].copy()
+                    # Generate SYSTEM + OUTSTANDING - LENGKAP
+                    filtered = sys_updated[sys_updated['DIFF'] != 0].copy()
+                    
+                    # Rename & Order kolom sesuai VBA
+                    cols_map = {}
+                    for col in filtered.columns:
+                        c = col.upper().strip()
+                        if 'BIN' in c: cols_map[col] = 'BIN'
+                        elif 'SKU' in c: cols_map[col] = 'SKU'
+                        elif 'BRAND' in c: cols_map[col] = 'BRAND'
+                        elif 'ITEM NAME' in c or 'ITEM_NAME' in c: cols_map[col] = 'ITEM NAME'
+                        elif 'VARIANT' in c: cols_map[col] = 'VARIANT'
+                        elif 'SUB KAT' in c: cols_map[col] = 'SUB KATEGORI'
+                        elif c == 'QTY SYSTEM': cols_map[col] = 'QTY SYSTEM'
+                        elif 'QTY SO' in c or 'QTY_SO' in c: cols_map[col] = 'QTY SO'
+                        elif c == 'DIFF': cols_map[col] = 'DIFF'
+                    
+                    # Rename columns
+                    outstanding_df = filtered.rename(columns=cols_map)
+                    
+                    # Urutkan kolom sesuai VBA
+                    vba_cols = ['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF']
+                    final_cols = []
+                    for c in vba_cols:
+                        if c in outstanding_df.columns:
+                            final_cols.append(c)
+                    # Tambah kolom lain yang belum ada
+                    for c in outstanding_df.columns:
+                        if c not in final_cols:
+                            final_cols.append(c)
+                    
+                    outstanding_df = outstanding_df[final_cols]
+                    
+                    # TAMBAHKAN KOLOM HASIL REKONSILIASI
+                    outstanding_df['HASIL REKONSILIASI'] = ""
+                    
                     st.session_state.outstanding_system = outstanding_df
                     
                     st.success(f"✅ Selesai! REAL: {len(recon_df)} | SYSTEM: {len(outstanding_df)}")
