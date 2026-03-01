@@ -742,7 +742,7 @@ def menu_Stock_Opname():
 </div>
 """, unsafe_allow_html=True)
         
-            st.markdown("---")
+    st.markdown("---")
     
     t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
     with t1: st.dataframe(d['res_scan'], use_container_width=True)
