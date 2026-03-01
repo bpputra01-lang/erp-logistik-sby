@@ -701,8 +701,8 @@ def generate_set_up_real_plus(d):
         # ===========================
         # STEP 2: ALLOCATION
         # ===========================
-        st.markdown("---")
-        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
+    st.markdown("---")
+    st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
         
         up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
 
