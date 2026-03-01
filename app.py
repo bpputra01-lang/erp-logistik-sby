@@ -722,7 +722,7 @@ def menu_Stock_Opname():
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
- # ============================================================
+    # ============================================================
 # ✅ METRICS & TABS - SETELAH COMPARE
 # ============================================================
 if 'compare_result' in st.session_state:
@@ -733,12 +733,14 @@ if 'compare_result' in st.session_state:
     qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
     qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
     
-    # Metrics menggunakan st.columns + st.metric
-    cols = st.columns(4)
-    cols[0].metric("🔥 REAL + ITEMS", total_real)
-    cols[1].metric("🔥 QTY REAL +", qty_real)
-    cols[2].metric("💻 SYSTEM + ITEMS", total_sys)
-    cols[3].metric("💻 QTY SYSTEM +", qty_sys)
+    st.markdown(f"""
+<div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+    <div class="m-box" style="flex:1"><span class="m-lbl">🔥 REAL + ITEMS</span><span class="m-val">{total_real}</span></div>
+    <div class="m-box" style="flex:1"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{qty_real}</span></div>
+    <div class="m-box" style="flex:1"><span class="m-lbl">💻 SYSTEM + ITEMS</span><span class="m-val">{total_sys}</span></div>
+    <div class="m-box" style="flex:1"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{qty_sys}</span></div>
+</div>
+""", unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -747,7 +749,7 @@ if 'compare_result' in st.session_state:
     with t2: st.dataframe(d['res_stock'], use_container_width=True)
     with t3: st.dataframe(d['real_plus'], use_container_width=True)
     with t4: st.dataframe(d['system_plus'], use_container_width=True)
-    
+
     # --- STEP 2: ALLOCATION ---
     st.markdown("---")
     st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
@@ -808,11 +810,14 @@ if 'compare_result' in st.session_state:
         no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
         total_set_up = len(set_up_real_plus)
         
-        cols = st.columns(4)
-        cols[0].metric("✅ FULL ALLOCATION", full_alloc)
-        cols[1].metric("⚠️ PARTIAL ALLOCATION", partial_alloc)
-        cols[2].metric("❌ NO ALLOCATION", no_alloc)
-        cols[3].metric("📦 SET UP REAL +", total_set_up)
+        st.markdown(f"""
+<div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+    <div class="m-box" style="flex:1"><span class="m-lbl">✅ FULL ALLOCATION</span><span class="m-val">{full_alloc}</span></div>
+    <div class="m-box" style="flex:1"><span class="m-lbl">⚠️ PARTIAL ALLOCATION</span><span class="m-val">{partial_alloc}</span></div>
+    <div class="m-box" style="flex:1"><span class="m-lbl">❌ NO ALLOCATION</span><span class="m-val">{no_alloc}</span></div>
+    <div class="m-box" style="flex:1; background-color: #e74c3c;"><span class="m-lbl">📦 SET UP REAL +</span><span class="m-val">{total_set_up}</span></div>
+</div>
+""", unsafe_allow_html=True)
         
         st.markdown("---")
         
