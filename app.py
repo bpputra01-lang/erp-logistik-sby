@@ -865,7 +865,7 @@ def menu_Stock_Opname():
 
     if 'allocation_result' in st.session_state:
         st.markdown("---")
-        st.markdown("### 📊 RECON REPORTS")
+        st.markdown("### 3️⃣RECON REPORTS")
         if st.button("📊 Generate All RECON", use_container_width=True):
             st.session_state.recon_real_plus = generate_real_plus_recon(st.session_state.allocation_result)
             
@@ -888,8 +888,8 @@ def menu_Stock_Opname():
     # =========================================================
     # ⚙️ FINAL ADJUSTMENT CHECKER (DI PALING BAWAH)
     # =========================================================
-    st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.markdown("### ⚙️ FINAL ADJUSTMENT CHECKER")
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("4️⃣FINAL ADJUSTMENT CHECKER")
     st.info("Upload dua file di bawah ini untuk menjalankan logika 'CEK_ADJUSMENT_FINAL'")
 
     adj_col1, adj_col2 = st.columns(2)
