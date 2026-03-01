@@ -922,6 +922,34 @@ def menu_Stock_Opname():
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
             
             st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Stock_Opname_Report.xlsx", use_container_width=True)
+        # STEP 2: ADJUSTMENT FINAL (LOGIC BARU)
+    if 'compare_result' in st.session_state:
+        st.markdown("---")
+        st.subheader("2️⃣ Final Adjustment Check")
+        st.info("Logika ini akan memasukkan 'HASIL RECONCILIATION' ke Kolom K di file Stock System Anda.")
+        
+        # Simulasikan Input HASIL RECONCILIATION (Karena di Streamlit User harus isi dulu)
+        recon_data = st.session_state.compare_result['real_plus']
+        if 'HASIL RECONCILIATION' not in recon_data.columns:
+            recon_data['HASIL RECONCILIATION'] = recon_data['QTY_SCAN'] # Default awal
+        
+        edited_recon = st.data_editor(recon_data, key="editor_recon", use_container_width=True)
+        
+        if st.button("⚙️ RUN CEK ADJUSMENT FINAL"):
+            df_adj, not_found = logic_cek_adjustment_final(edited_recon, st.session_state.compare_result['res_stock'])
+            st.session_state.adjustment_final = df_adj
+            
+            if not_found:
+                st.warning(f"Ada {len(not_found)} data recon yang tidak ditemukan di Stock System (Mismatch Key).")
+            st.success("Proses Adjustment Selesai! DIFF (Abs J-K) telah dihitung.")
+            st.dataframe(df_adj)
+
+            # DOWNLOAD
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_adj.to_excel(writer, sheet_name='CEK STOCK ADJ +', index=False)
+                edited_recon.to_excel(writer, sheet_name='REAL + RECON', index=False)
+            st.download_button("📥 DOWNLOAD FINAL ADJUSTMENT", data=output.getvalue(), file_name="Adjustment_Final.xlsx")
 import pandas as pd
 import numpy as np
 import streamlit as st
