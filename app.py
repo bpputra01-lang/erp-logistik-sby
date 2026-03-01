@@ -753,7 +753,7 @@ def generate_real_plus_recon(allocated_data):
 
 
 # ============================================================
-# 🚀 LOGIC SYSTEM + OUTSTANDING RECON - DENGAN KOLOM HASIL
+# 🚀 LOGIC SYSTEM + OUTSTANDING RECON - DENGAN HASIL REKONSILIASI
 # ============================================================
 def generate_system_outstanding_recon(df_system):
     """
@@ -768,14 +768,15 @@ def generate_system_outstanding_recon(df_system):
         # Ambil semua kolom yang ada
         outstanding_df = filtered.copy()
         
-        # TAMBAHKAN KOLOM HASIL REKONSILIASI (KOSONG)
-        if 'HASIL REKONSILIASI' not in outstanding_df.columns:
-            outstanding_df['HASIL REKONSILIASI'] = ""
+        # TAMBAHKAN KOLOM HASIL REKONSILIASI DI AKHIR
+        outstanding_df['HASIL REKONSILIASI'] = ""
     else:
-        outstanding_df = pd.DataFrame()
+        # Buatkan dataframe dengan kolom lengkap
+        outstanding_df = pd.DataFrame(columns=['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 
+                                               'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 
+                                               'DIFF', 'HASIL REKONSILIASI'])
     
     return outstanding_df
-
 
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
