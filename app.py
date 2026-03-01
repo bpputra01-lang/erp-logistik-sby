@@ -512,57 +512,74 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
+# ============================================================
+# 🚀 COMPARE 1: SCAN VS SYSTEM (ULTRA FAST)
+# ============================================================
 def logic_compare_scan_to_stock(df_scan, df_stock):
+    # Ambil kolom yang needed
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
     dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-    for df in [ds, dt]:
-        df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
-        df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
-        qty_col = 'QTY_SCAN' if 'QTY_SCAN' in df.columns else 'QTY_SYSTEM'
-        df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce').fillna(0)
-    dict_system = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().to_dict()
-    qty_sys_list, diff_list, note_list = [], [], []
-    for _, row in ds.iterrows():
-        key = (row['BIN'], row['SKU'])
-        qty_scan = row['QTY_SCAN']
-        qty_sys = dict_system.get(key, 0)
-        diff = qty_scan - qty_sys
-        qty_sys_list.append(qty_sys)
-        diff_list.append(diff)
-        note_list.append("REAL +" if qty_scan > qty_sys else "OK")
-    ds['QTY_SYSTEM'] = qty_sys_list
-    ds['DIFF'] = diff_list
-    ds['NOTE'] = note_list
-    return ds
+    
+    # Clean data (vectorized)
+    ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
+    ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
+    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+    
+    dt['BIN'] = dt['BIN'].astype(str).str.strip().str.upper()
+    dt['SKU'] = dt['SKU'].astype(str).str.strip().str.upper()
+    dt['QTY_SYSTEM'] = pd.to_numeric(dt['QTY_SYSTEM'], errors='coerce').fillna(0)
+    
+    # Groupby (SUPER FAST - vectorized)
+    dt_grouped = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
+    
+    # Merge (SUPER FAST - vectorized)
+    ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left')
+    ds_merged['QTY_SYSTEM'] = ds_merged['QTY_SYSTEM'].fillna(0)
+    
+    # Hitung DIFF dan NOTE (vectorized)
+    ds_merged['DIFF'] = ds_merged['QTY_SCAN'] - ds_merged['QTY_SYSTEM']
+    ds_merged['NOTE'] = ds_merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else "OK")
+    
+    return ds_merged
 
+# ============================================================
+# 🚀 COMPARE 2: SYSTEM VS SCAN (ULTRA FAST)
+# ============================================================
 def logic_compare_stock_to_scan(df_stock, df_scan):
     dt = df_stock.copy()
-    ds_lite = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds_lite.columns = ['BIN', 'SKU', 'QTY_SCAN']
-    ds_lite['BIN'] = ds_lite['BIN'].astype(str).str.strip().str.upper()
-    ds_lite['SKU'] = ds_lite['SKU'].astype(str).str.strip().str.upper()
-    ds_lite['QTY_SCAN'] = pd.to_numeric(ds_lite['QTY_SCAN'], errors='coerce').fillna(0)
-    dict_scan = ds_lite.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().to_dict()
-    qty_so_list, diff_list, note_list = [], [], []
-    for _, row in dt.iterrows():
-        bin_val = str(row.iloc[1]).strip().upper()
-        sku_val = str(row.iloc[2]).strip().upper()
-        qty_sys = pd.to_numeric(row.iloc[9], errors='coerce') if pd.notnull(row.iloc[9]) else 0
-        key = (bin_val, sku_val)
-        qty_scan = dict_scan.get(key, 0)
-        qty_so_list.append(qty_scan)
-        diff_val = qty_sys - qty_scan
-        diff_list.append(diff_val)
-        note_list.append("SYSTEM +" if qty_sys > qty_scan else "OK")
-    for col in ['QTY SO', 'DIFF', 'NOTE']:
-        if col in dt.columns: dt = dt.drop(columns=[col])
-    dt['QTY_SO'] = qty_so_list
-    dt['DIFF'] = diff_list
-    dt['NOTE'] = note_list
-    dt = dt.loc[:, ~dt.columns.duplicated()].copy()
-    return dt
+    ds = df_scan.iloc[:, [0, 1, 2]].copy()
+    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    
+    # Clean data (vectorized)
+    ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
+    ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
+    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+    
+    # Groupby (SUPER FAST)
+    ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
+    
+    # Ambil kolom yang needed dari stock
+    dt = dt.iloc[:, [1, 2, 9]].copy()
+    dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+    dt['BIN'] = dt['BIN'].astype(str).str.strip().str.upper()
+    dt['SKU'] = dt['SKU'].astype(str).str.strip().str.upper()
+    dt['QTY_SYSTEM'] = pd.to_numeric(dt['QTY_SYSTEM'], errors='coerce').fillna(0)
+    
+    # Merge (SUPER FAST)
+    dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')
+    dt_merged['QTY_SO'] = dt_merged['QTY_SCAN'].fillna(0)
+    
+    # Hitung DIFF dan NOTE (vectorized)
+    dt_merged['DIFF'] = dt_merged['QTY_SYSTEM'] - dt_merged['QTY_SO']
+    dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
+    
+    # Hapus duplikat kolom
+    if 'QTY_SCAN' in dt_merged.columns:
+        dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
+    
+    return dt_merged
 
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     sys_lite = df_system_plus.iloc[:, [1, 2, df_system_plus.columns.get_loc('DIFF')]].copy()
