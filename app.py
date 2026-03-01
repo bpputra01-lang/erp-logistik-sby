@@ -700,51 +700,6 @@ def generate_set_up_real_plus(d):
     return set_up_real_plus
 
 
-# ============================================================
-# 🚀 MENU UTAMA - SEMUA KODE DISINI
-# ============================================================
-def menu_Stock_Opname():
-    # --- CSS & HEADER ---
-    st.markdown("""...""", unsafe_allow_html=True)
-    
-    # --- FILTER ---
-    # ... filter code ...
-    
-    # --- STEP 1: COMPARE ---
-    # ... upload & button compare ...
-    
-    # ===========================
-    # HASIL COMPARE
-    # ===========================
-    if 'compare_result' in st.session_state:
-        d = st.session_state.compare_result
-        
-        # ... metrics & tabs ...
-        
-        # ===========================
-        # STEP 2: ALLOCATION
-        # ===========================
-        st.markdown("---")
-        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
-        
-        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
-
-        if up_bin_cov:
-            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
-                try:
-                    df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
-                    
-                    with st.spinner("Memproses Alokasi..."):
-                        allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
-                        set_up_real_plus = generate_set_up_real_plus(d)
-
-                        st.session_state.allocation_result = allocated_data
-                        st.session_state.sys_updated_result = sys_updated
-                        st.session_state.set_up_real_plus = set_up_real_plus
-                        
-                        st.success("✅ Allocation Selesai!")
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
 # =========================================================
@@ -863,9 +818,9 @@ def menu_Stock_Opname():
     # ===========================
     # STEP 2: ALLOCATION
     # ===========================
-    if 'compare_result' in st.session_state:
-        d = st.session_state.compare_result  # <-- PENTING: defined di sini!
-        
+        # ===========================
+        # STEP 2: ALLOCATION
+        # ===========================
         st.markdown("---")
         st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
         
@@ -878,32 +833,15 @@ def menu_Stock_Opname():
                     
                     with st.spinner("Memproses Alokasi..."):
                         allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
-                        
-                        df_s_raw_copy = d['df_s_raw'].copy()
-                        df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
-                        df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
-                        bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
-
-                        real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
-
-                        if not real_plus_diff.empty:
-                            real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
-                            real_plus_diff['BIN TUJUAN'] = real_plus_diff['BIN']
-                            real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
-                            real_plus_diff['NOTES'] = "RELOCATION"
-                            set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
-                        else:
-                            set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+                        set_up_real_plus = generate_set_up_real_plus(d)
 
                         st.session_state.allocation_result = allocated_data
                         st.session_state.sys_updated_result = sys_updated
                         st.session_state.set_up_real_plus = set_up_real_plus
                         
                         st.success("✅ Allocation Selesai!")
-                        
                 except Exception as e:
-                    st.error(f"❌ Error Allocation: {e}")
-
+                    st.error(f"❌ Error: {e}")
     # ===========================
     # HASIL ALLOCATION
     # ===========================
