@@ -830,7 +830,7 @@ def menu_Stock_Opname():
                         st.success("✅ Compare Selesai!")
             except Exception as e: st.error(f"❌ Error: {e}")
 
-    # RESULTS
+    # RESULTS COMPARE
     if 'compare_result' in st.session_state:
         d = st.session_state.compare_result
         st.markdown(f"""
@@ -855,16 +855,23 @@ def menu_Stock_Opname():
                     df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
                     allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
                     allocated_data['ITEM NAME'] = allocated_data['SKU'].map(d['map_dict'])
+                    
                     st.session_state.allocation_result = allocated_data
                     st.session_state.sys_updated_result = sys_updated
                     st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated_data)
                     st.success("✅ Allocation Selesai!")
                 except Exception as e: st.error(f"❌ Error: {e}")
 
-    # --- BAGIAN BARU: MEMUNCULKAN HASIL ALOKASI ---
+    # --- INI HASIL ALOKASI DENGAN 3 TAB ---
     if 'allocation_result' in st.session_state:
         st.markdown("### ✅ HASIL ALOKASI")
-        st.dataframe(st.session_state.allocation_result, use_container_width=True)
+        ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📦 SET UP REAL +", "📉 UPDATED SYSTEM"])
+        with ta1:
+            st.dataframe(st.session_state.allocation_result, use_container_width=True)
+        with ta2:
+            st.dataframe(st.session_state.set_up_real_plus, use_container_width=True)
+        with ta3:
+            st.dataframe(st.session_state.sys_updated_result, use_container_width=True)
         
         st.markdown("---")
         st.subheader("3️⃣ RECON REPORTS")
