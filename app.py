@@ -690,124 +690,145 @@ def menu_Stock_Opname():
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
-    # ===========================
-    # HASIL COMPARE (JIKA SUDAH RUN)
-    # ===========================
-    if 'compare_result' in st.session_state:
-        d = st.session_state.compare_result
-        
-        # Metrics
-        total_real = len(d['real_plus'])
-        total_sys = len(d['system_plus'])
-        qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
-        qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
-        
-        st.markdown(f"""
-<div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
-    <div class="m-box"><span class="m-lbl">🔥 REAL + ITEMS</span><span class="m-val">{total_real}</span></div>
-    <div class="m-box"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{qty_real}</span></div>
-    <div class="m-box"><span class="m-lbl">💻 SYSTEM + ITEMS</span><span class="m-val">{total_sys}</span></div>
-    <div class="m-box"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{qty_sys}</span></div>
+    # ============================================================
+# HASIL COMPARE - JIKA SUDAH RUN COMPARE
+# ============================================================
+if 'compare_result' in st.session_state:
+    d = st.session_state.compare_result
+    
+    # ✅ PASTIKAN INI DI DALAM BLOK if compare_result
+    total_real = len(d['real_plus'])
+    total_sys = len(d['system_plus'])
+    qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
+    qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
+    
+    st.markdown(f"""
+<div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;">
+    <div class="m-box" style="flex: 1 1 200px; max-width: 250px; min-width: 150px;">
+        <span class="m-lbl">🔥 REAL + ITEMS</span>
+        <span class="m-val">{total_real}</span>
+    </div>
+    <div class="m-box" style="flex: 1 1 200px; max-width: 250px; min-width: 150px;">
+        <span class="m-lbl">🔥 QTY REAL +</span>
+        <span class="m-val">{qty_real}</span>
+    </div>
+    <div class="m-box" style="flex: 1 1 200px; max-width: 250px; min-width: 150px;">
+        <span class="m-lbl">💻 SYSTEM + ITEMS</span>
+        <span class="m-val">{total_sys}</span>
+    </div>
+    <div class="m-box" style="flex: 1 1 200px; max-width: 250px; min-width: 150px;">
+        <span class="m-lbl">💻 QTY SYSTEM +</span>
+        <span class="m-val">{qty_sys}</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Tabs Data
-        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
-        with t1: st.dataframe(d['res_scan'], use_container_width=True)
-        with t2: st.dataframe(d['res_stock'], use_container_width=True)
-        with t3: st.dataframe(d['real_plus'], use_container_width=True)
-        with t4: st.dataframe(d['system_plus'], use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Tabs Data
+    t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
+    with t1: st.dataframe(d['res_scan'], use_container_width=True)
+    with t2: st.dataframe(d['res_stock'], use_container_width=True)
+    with t3: st.dataframe(d['real_plus'], use_container_width=True)
+    with t4: st.dataframe(d['system_plus'], use_container_width=True)
 
-    # ===========================
-    # STEP 2: ALLOCATION (JIKA COMPARE SUDAH DONE)
-    # ===========================
-    if 'compare_result' in st.session_state:
-        st.markdown("---")
-        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
-        
-        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
+    # ============================================================
+    # STEP 2: ALLOCATION - JIKA COMPARE SUDAH DONE
+    # ============================================================
+    st.markdown("---")
+    st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
+    
+    up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
 
-        if up_bin_cov:
-            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
-                try:
-                    df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+    if up_bin_cov:
+        if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
+            try:
+                df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+                
+                with st.spinner("Memproses Alokasi..."):
+                    allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
                     
-                    with st.spinner("Memproses Alokasi..."):
-                        # Logic ALLOCATION
-                        allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
-                        
-                        # Logic SET UP REAL +
-                        df_s_raw_copy = d['df_s_raw'].copy()
-                        df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
-                        df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
-                        bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
+                    df_s_raw_copy = d['df_s_raw'].copy()
+                    df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
+                    df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
+                    bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
 
-                        real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
+                    real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
 
-                        if not real_plus_diff.empty:
-                            real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
-                            real_plus_diff['BIN TUJUAN'] = real_plus_diff['BIN']
-                            real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
-                            real_plus_diff['NOTES'] = "RELOCATION"
-                            set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
-                        else:
-                            set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+                    if not real_plus_diff.empty:
+                        real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
+                        real_plus_diff['BIN TUJUAN'] = real_plus_diff['BIN']
+                        real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
+                        real_plus_diff['NOTES'] = "RELOCATION"
+                        set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
+                    else:
+                        set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
 
-                        st.session_state.allocation_result = allocated_data
-                        st.session_state.sys_updated_result = sys_updated
-                        st.session_state.set_up_real_plus = set_up_real_plus
-                        
-                        st.success("✅ Allocation Selesai!")
-                        
-                except Exception as e:
-                    st.error(f"❌ Error Allocation: {e}")
+                    st.session_state.allocation_result = allocated_data
+                    st.session_state.sys_updated_result = sys_updated
+                    st.session_state.set_up_real_plus = set_up_real_plus
+                    
+                    st.success("✅ Allocation Selesai!")
+                    
+            except Exception as e:
+                st.error(f"❌ Error Allocation: {e}")
 
-    # ===========================
-    # HASIL ALLOCATION (JIKA SUDAH RUN)
-    # ===========================
-    if 'allocation_result' in st.session_state:
-        st.markdown("---")
-        st.subheader("📋 HASIL ALLOCATION")
-        
-        alloc_data = st.session_state.allocation_result
-        sys_updated = st.session_state.sys_updated_result
-        set_up_real_plus = st.session_state.set_up_real_plus
-        d = st.session_state.compare_result
-        
-        full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
-        partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
-        no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
-        total_set_up = len(set_up_real_plus)
-        
-        st.markdown(f"""
-<div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
-    <div class="m-box"><span class="m-lbl">✅ FULL</span><span class="m-val">{full_alloc}</span></div>
-    <div class="m-box"><span class="m-lbl">⚠️ PARTIAL</span><span class="m-val">{partial_alloc}</span></div>
-    <div class="m-box"><span class="m-lbl">❌ NO</span><span class="m-val">{no_alloc}</span></div>
-    <div class="m-box" style="background:#e74c3c"><span class="m-lbl">📦 SET UP</span><span class="m-val">{total_set_up}</span></div>
+# ============================================================
+# HASIL ALLOCATION - JIKA SUDAH RUN
+# ============================================================
+if 'allocation_result' in st.session_state:
+    st.markdown("---")
+    st.subheader("📋 HASIL ALLOCATION")
+    
+    alloc_data = st.session_state.allocation_result
+    sys_updated = st.session_state.sys_updated_result
+    set_up_real_plus = st.session_state.set_up_real_plus
+    d = st.session_state.compare_result
+    
+    full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
+    partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
+    no_alloc = len(alloc_data[alloc_data['STATUS'] == "NO ALLOCATION"])
+    total_set_up = len(set_up_real_plus)
+    
+    st.markdown(f"""
+<div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;">
+    <div class="m-box" style="flex: 1 1 200px; max-width: 250px; min-width: 150px;">
+        <span class="m-lbl">✅ FULL ALLOCATION</span>
+        <span class="m-val">{full_alloc}</span>
+    </div>
+    <div class="m-box" style="flex: 1 1 200px; max-width: 250px; min-width: 150px;">
+        <span class="m-lbl">⚠️ PARTIAL ALLOCATION</span>
+        <span class="m-val">{partial_alloc}</span>
+    </div>
+    <div class="m-box" style="flex: 1 1 200px; max-width: 250px; min-width: 150px;">
+        <span class="m-lbl">❌ NO ALLOCATION</span>
+        <span class="m-val">{no_alloc}</span>
+    </div>
+    <div class="m-box" style="flex: 1 1 200px; max-width: 250px; min-width: 150px; background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%); border: 1px solid #e74c3c;">
+        <span class="m-lbl">📦 SET UP REAL +</span>
+        <span class="m-val">{total_set_up}</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        ta1, ta2, ta3 = st.tabs(["🔥 ALLOCATION", "📊 SYSTEM (NEW)", "📦 SET UP REAL +"])
-        with ta1: st.dataframe(alloc_data, use_container_width=True)
-        with ta2: st.dataframe(sys_updated, use_container_width=True)
-        with ta3: st.dataframe(set_up_real_plus, use_container_width=True)
-        
-        st.markdown("---")
-        st.subheader("📥 DOWNLOAD")
-        
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-            d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
-            set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
-            alloc_data.to_excel(writer, sheet_name='ALLOCATION', index=False)
-        
-        st.download_button("📥 DOWNLOAD", data=output.getvalue(), file_name="Hasil.xlsx", use_container_width=True)
+    
+    st.markdown("---")
+    
+    ta1, ta2, ta3 = st.tabs(["🔥 ALLOCATION", "📊 SYSTEM (NEW)", "📦 SET UP REAL +"])
+    with ta1: st.dataframe(alloc_data, use_container_width=True)
+    with ta2: st.dataframe(sys_updated, use_container_width=True)
+    with ta3: st.dataframe(set_up_real_plus, use_container_width=True)
+    
+    st.markdown("---")
+    st.subheader("📥 DOWNLOAD")
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+        d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
+        set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
+        alloc_data.to_excel(writer, sheet_name='ALLOCATION', index=False)
+    
+    st.download_button("📥 DOWNLOAD", data=output.getvalue(), file_name="Hasil.xlsx", use_container_width=True)
 
 import pandas as pd
 import numpy as np
