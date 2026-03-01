@@ -567,11 +567,11 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     
     # Hitung DIFF = QTY - QTY_SO
     if 'QTY' in dt_merged.columns:
-        dt_merged['DIFF'] = dt_merged['QTY SYSTEM'] - dt_merged['QTY SO']
+        dt_merged['DIFF'] = dt_merged['QTY'] - dt_merged['QTY SO']
     else:
         dt_merged['DIFF'] = 0
     
-    dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
+    dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "OK" if x > 0 else "SYSTEM +")
     
     # Hapus kolom temporary QTY_SCAN
     dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
