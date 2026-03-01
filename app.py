@@ -528,60 +528,49 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. TAHAP AMBIL REFERENSI DARI FILE HASIL RECON
-    # Recon: BIN (Col 0), SKU (Col 1), Hasil Recon (Col 6)
+    # 1. AMBIL DATA DARI RECON
     recon_dict = {}
     for _, row in df_recon.iterrows():
         try:
-            b_recon = clean_val(row.iloc[0])
-            s_recon = clean_val(row.iloc[1])
+            # Kita pakai iloc, tapi pastikan df_recon dibaca TANPA index tambahan
+            b_recon = clean_val(row.iloc[0]) # Kolom A
+            s_recon = clean_val(row.iloc[1]) # Kolom B
             if b_recon and s_recon:
                 key = f"{b_recon}|{s_recon}"
-                # Ambil nilai hasil recon (Index 6 / Kolom G)
-                val_recon = row.iloc[6]
+                val_recon = row.iloc[6] # Kolom G (Hasil Recon)
                 recon_dict[key] = val_recon
         except:
             continue
 
-    # 2. PASTIKAN KOLOM TARGET TERSEDIA (Sampai Index 11 untuk Kolom ke-12)
-    # Kita paksa kolomnya ada sampai minimal 12 kolom
+    # 2. PASTIKAN KOLOM TARGET TERSEDIA (Kolom 11 & 12)
     while df_stock.shape[1] < 12:
-        df_stock[f"New_Col_{df_stock.shape[1]}"] = ""
+        df_stock[f"Extra_{df_stock.shape[1]}"] = ""
 
-    # 3. LOOKUP & ISI KE FILE STOCK (Target Kolom 11 & 12)
+    # 3. LOOKUP & ISI KE STOCK
     def do_lookup(row):
-        # Stock Adj: BIN (Col 1), SKU (Col 2)
-        b_stock = clean_val(row.iloc[1])
-        s_stock = clean_val(row.iloc[2])
+        b_stock = clean_val(row.iloc[1]) # Kolom B (BIN)
+        s_stock = clean_val(row.iloc[2]) # Kolom C (SKU)
         key_stock = f"{b_stock}|{s_stock}"
         return recon_dict.get(key_stock, "")
 
-    # ISI KOLOM KE-11 (Index 10) -> QTY SO
-    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
+    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1) # Isi Kolom 11 (K)
 
-    # 4. HITUNG DIFF DI KOLOM KE-12 (Index 11) -> DIFF
+    # 4. HITUNG DIFF
     def do_diff(row):
         try:
-            # QTY SYSTEM biasanya ada di Col 9 (Index 9)
-            val_sys = row.iloc[9]
-            # QTY SO yang baru kita isi di Index 10
-            val_so = row.iloc[10]
-            
+            val_sys = row.iloc[9]  # Kolom J (Qty System)
+            val_so = row.iloc[10] # Kolom K (Qty SO yang baru diisi)
             if val_so != "" and val_so is not None:
-                q_sys = float(val_sys) if str(val_sys).strip() != "" else 0
-                q_so = float(val_so)
-                return abs(q_sys - q_so)
+                return abs(float(val_sys) - float(val_so))
         except:
             return 0
         return ""
 
-    # ISI KOLOM KE-12 (Index 11) -> DIFF
-    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
+    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1) # Isi Kolom 12 (L)
 
-    # GANTI HEADER BIAR RAPI
+    # GANTI HEADER
     cols = list(df_stock.columns)
-    cols[10] = "QTY SO"
-    cols[11] = "DIFF"
+    cols[10], cols[11] = "QTY SO", "DIFF"
     df_stock.columns = cols
     
     return df_stock
@@ -918,40 +907,29 @@ def menu_Stock_Opname():
         up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_final_up_2")
 
     if up_recon and up_stock_adj:
-        if st.button("🚀 JALANKAN PROSES LOOKUP & DIFF", use_container_width=True):
+        if st.button("🚀 RUN PROCESS", use_container_width=True):
             try:
-                # --- LOGIC PEMBACAAN FILE FLEXIBLE ---
-                # Baca file 1 (Recon)
-                if up_recon.name.endswith(('.xlsx', '.xls')):
-                    df_recon_in = pd.read_excel(up_recon, engine='openpyxl')
-                else:
-                    df_recon_in = pd.read_csv(up_recon)
-
-                # Baca file 2 (Stock Adj)
-                if up_stock_adj.name.endswith(('.xlsx', '.xls')):
-                    df_stock_in = pd.read_excel(up_stock_adj, engine='openpyxl')
-                else:
-                    df_stock_in = pd.read_csv(up_stock_adj)
+                # BACA FILE
+                df_recon_in = pd.read_excel(up_recon) if up_recon.name.endswith('xlsx') else pd.read_csv(up_recon)
+                df_stock_in = pd.read_excel(up_stock_adj) if up_stock_adj.name.endswith('xlsx') else pd.read_csv(up_stock_adj)
                 
-                # Jalankan Logika
+                # RUN LOGIC
                 df_res = logic_cek_adjustment_final(df_recon_in, df_stock_in)
                 
                 st.success("✅ Proses Selesai!")
-                st.dataframe(df_res, use_container_width=True)
                 
-                # Download Result (Tetap Excel biar rapi)
+                # TAMPILKAN TANPA KOLOM ANGKA DI KIRI (HIDE INDEX)
+                st.dataframe(df_res, use_container_width=True, hide_index=True)
+                
+                # DOWNLOAD TANPA INDEX
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     df_res.to_excel(writer, sheet_name='FINAL_ADJUSTMENT', index=False)
                 
-                st.download_button(
-                    label="📥 DOWNLOAD HASIL ADJUSTMENT", 
-                    data=output.getvalue(), 
-                    file_name="Adjustment_Final_Result.xlsx", 
-                    use_container_width=True
-                )
+                st.download_button("📥 DOWNLOAD HASIL", data=output.getvalue(), file_name="Adj_Final.xlsx", use_container_width=True)
+                
             except Exception as e: 
-                st.error(f"❌ Error saat membaca file: {e}")
+                st.error(f"❌ Error: {e}")
 
             
 import pandas as pd
