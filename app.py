@@ -518,64 +518,76 @@ def get_yellow_skus(file, column_index):
 # LOGIC CEK ADJUSTMENT FINAL (REPLICA VBA)
 # =========================================================
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    # Kita buat copy dari file STOCK ADJ karena ini yang akan kita isi datanya
-    df_target_stock = df_stock_adj.copy()
+    # Buat copy biar file asli aman
+    df_stock = df_stock_adj.copy()
     
-    # 1. TAHAP AMBIL DATA (REFERENSI) DARI FILE RECON
-    # Kita simpan di dictionary biar lookup-nya cepat
-    recon_lookup = {}
+    # Fungsi pembantu untuk bersihin string (biar 123.0 jadi 123)
+    def clean_val(x):
+        if pd.isna(x): return ""
+        # Hilangkan .0 kalau ada (biasanya SKU angka dibaca float)
+        s = str(x).strip().upper()
+        if s.endswith('.0'): s = s[:-2]
+        return s
+
+    # 1. TAHAP AMBIL REFERENSI DARI RECON
+    recon_dict = {}
     for _, row in df_recon.iterrows():
         try:
-            # File Recon: BIN (Kolom 0) | SKU (Kolom 1)
-            bin_recon = str(row.iloc[0]).strip().upper()
-            sku_recon = str(row.iloc[1]).strip().upper()
-            key = f"{bin_recon}|{sku_recon}"
+            # Recon: BIN (Col 0), SKU (Col 1), Hasil Recon (Col 6)
+            b_recon = clean_val(row.iloc[0])
+            s_recon = clean_val(row.iloc[1])
             
-            # Nilai yang mau diambil: Hasil Recon (Kolom 6)
-            val_hasil_recon = row.iloc[6] 
-            recon_lookup[key] = val_hasil_recon
+            if b_recon and s_recon:
+                key = f"{b_recon}|{s_recon}"
+                # Ambil nilai hasil recon (Col 6)
+                val_recon = row.iloc[6]
+                recon_dict[key] = val_recon
         except:
             continue
 
-    # 2. TAHAP PENGISIAN KE FILE STOCK ADJ (TARGET)
-    # Pastikan file stock punya minimal 12 kolom agar iloc [10] dan [11] tidak error
-    while df_target_stock.shape[1] < 12:
-        df_target_stock[f"Temp_Col_{df_target_stock.shape[1]}"] = ""
+    # 2. PASTIKAN KOLOM TARGET TERSEDIA (Indeks 10 & 11)
+    while df_stock.shape[1] < 12:
+        df_stock[f"New_Col_{df_stock.shape[1]}"] = ""
 
-    # Fungsi untuk mencari nilai dari kamus recon_lookup
-    def get_value_for_stock(row_stock):
+    # 3. LOOKUP & ISI KE STOCK
+    def do_lookup(row):
+        # Stock: BIN (Col 1), SKU (Col 2)
+        b_stock = clean_val(row.iloc[1])
+        s_stock = clean_val(row.iloc[2])
+        key_stock = f"{b_stock}|{s_stock}"
+        
+        # Ambil dari dict, kalau gak ada kasih string kosong
+        return recon_dict.get(key_stock, "")
+
+    # Isi kolom 10 (QTY SO)
+    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
+
+    # 4. HITUNG DIFF (Kolom 11)
+    def do_diff(row):
         try:
-            # File Stock Adj: BIN ada di Kolom 1, SKU ada di Kolom 2
-            bin_s = str(row_stock.iloc[1]).strip().upper()
-            sku_s = str(row_stock.iloc[2]).strip().upper()
-            key_s = f"{bin_s}|{sku_s}"
-            return recon_lookup.get(key_s, "")
-        except:
-            return ""
-
-    # ISI KOLOM KE-10 (Index 10) di file Stock
-    df_target_stock.iloc[:, 10] = df_target_stock.apply(get_value_for_stock, axis=1)
-
-    # HITUNG SELISIH DI KOLOM KE-11 (Index 11) di file Stock
-    def calc_selisih(row_stock):
-        try:
-            qty_system = float(row_stock.iloc[9]) if row_stock.iloc[9] != "" else 0
-            qty_so = row_stock.iloc[10] # Ini nilai yang baru kita isi tadi
-            if qty_so != "" and qty_so is not None:
-                return abs(qty_system - float(qty_so))
+            # QTY SYSTEM (Col 9)
+            val_sys = row.iloc[9]
+            # QTY SO yang baru diisi (Col 10)
+            val_so = row.iloc[10]
+            
+            if val_so != "" and val_so is not None:
+                # Pastikan angka
+                q_sys = float(val_sys) if str(val_sys).strip() != "" else 0
+                q_so = float(val_so)
+                return abs(q_sys - q_so)
         except:
             return 0
         return ""
 
-    df_target_stock.iloc[:, 11] = df_target_stock.apply(calc_selisih, axis=1)
+    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
 
-    # Ganti Nama Header Kolom 10 & 11 di file Stock agar jelas
-    cols = list(df_target_stock.columns)
+    # RAPIKAN HEADER
+    cols = list(df_stock.columns)
     cols[10] = "QTY SO"
     cols[11] = "DIFF"
-    df_target_stock.columns = cols
+    df_stock.columns = cols
     
-    return df_target_stock
+    return df_stock
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
