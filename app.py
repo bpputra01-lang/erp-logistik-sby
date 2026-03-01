@@ -947,36 +947,33 @@ def menu_Stock_Opname():
         
         st.markdown("---")
         
-                # ===========================
-        # TOMBOL RECON
+        # ===========================
+        # TOMBOL RECON - 1 TOMBOL SAJA
         # ===========================
         st.markdown("### 📊 RECON REPORTS")
         
-        colRecon1, colRecon2 = st.columns(2)
+        colReconBtn, colSpacer = st.columns([1, 3])
         
-        with colRecon1:
-            st.markdown("<div style='text-align: center;'>REAL + RECON</div>", unsafe_allow_html=True)
-            if st.button("📊 Generate", use_container_width=True, key="btn_recon_real"):
-                with st.spinner("Membuat..."):
+        with colReconBtn:
+            if st.button("📊 Generate All RECON", use_container_width=True, key="btn_recon_all"):
+                with st.spinner("Membuat RECON Reports..."):
+                    # Generate REAL + RECON
                     recon_df = generate_real_plus_recon(alloc_data)
                     st.session_state.recon_real_plus = recon_df
-                    st.success(f"✅ {len(recon_df)} data")
-        
-        with colRecon2:
-            st.markdown("<div style='text-align: center;'>SYSTEM + OUTSTANDING</div>", unsafe_allow_html=True)
-            if st.button("📊 Generate", use_container_width=True, key="btn_recon_sys"):
-                with st.spinner("Membuat..."):
+                    
+                    # Generate SYSTEM + OUTSTANDING
                     outstanding_df = generate_system_outstanding_recon(sys_updated)
                     st.session_state.outstanding_system = outstanding_df
-                    st.success(f"✅ {len(outstanding_df)} data")
+                    
+                    st.success(f"✅ Selesai! REAL: {len(recon_df)} | SYSTEM: {len(outstanding_df)}")
         
         # Tampilkan hasil RECON jika sudah dibuat
         if 'recon_real_plus' in st.session_state:
-            st.markdown("### 📋 REAL + RECON (NO ALLOCATION)")
+            st.markdown("#### 📋 REAL + RECON (NO ALLOCATION)")
             st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
         
         if 'outstanding_system' in st.session_state:
-            st.markdown("### 📋 SYSTEM + OUTSTANDING RECON")
+            st.markdown("#### 📋 SYSTEM + OUTSTANDING RECON")
             st.dataframe(st.session_state.outstanding_system, use_container_width=True)
         
         st.markdown("---")
@@ -989,7 +986,7 @@ def menu_Stock_Opname():
             set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
             alloc_data.to_excel(writer, sheet_name='ALLOCATION', index=False)
             
-            # Sheet RECON jika ada
+            # Sheet RECON - dibuat otomatis
             if 'recon_real_plus' in st.session_state:
                 st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
             if 'outstanding_system' in st.session_state:
