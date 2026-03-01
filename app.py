@@ -544,37 +544,37 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
 # 🚀 COMPARE 2: SYSTEM VS SCAN - AMBIL SEMUA KOLOM
 # ============================================================
 def logic_compare_stock_to_scan(df_stock, df_scan):
-    # AMBIL SEMUA KOLOM dari stock (termasuk QTY_SO yang sudah ada)
+    # AMBIL SEMUA KOLOM dari stock
     dt = df_stock.copy()
     
     # Ambil kolom penting dari scan
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN', 'SKU', 'QTY_SCAN_TEMP']
+    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
     ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
     ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
-    ds['QTY_SCAN_TEMP'] = pd.to_numeric(ds['QTY_SCAN_TEMP'], errors='coerce').fillna(0)
+    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
     
     # Group scan by SKU & BIN
-    ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN_TEMP'].sum().reset_index()
+    ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
     
-    # Merge
+    # Merge ke stock
     dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')
-    dt_merged['QTY_SCAN_TEMP'] = dt_merged['QTY_SCAN_TEMP'].fillna(0)
+    dt_merged['QTY_SCAN'] = dt_merged['QTY_SCAN'].fillna(0)
     
-    # Hitung DIFF - PAKAI KOLOM QTY SO YANG SUDAH ADA
-    # DIFF = QTY_SYSTEM - QTY_SO - QTY_SCAN_TEMP
-    if 'QTY_SYSTEM' in dt_merged.columns and 'QTY_SO' in dt_merged.columns:
-        dt_merged['DIFF'] = dt_merged['QTY_SYSTEM'] - dt_merged['QTY_SO'] - dt_merged['QTY_SCAN_TEMP']
+    # ISI KOLOM QTY_SO DARI QTY_SCAN (SESUAI PERMINTAAN)
+    # Kolom QTY_SO yang sudah ada di file, diisi dengan hasil scan
+    dt_merged['QTY_SO'] = dt_merged['QTY_SCAN']
+    
+    # Hitung DIFF = QTY - QTY_SO
+    if 'QTY' in dt_merged.columns:
+        dt_merged['DIFF'] = dt_merged['QTY'] - dt_merged['QTY_SO']
     else:
-        # Cari kolom QTY (ambil 2 kolom pertama)
-        qty_cols = [c for c in dt_merged.columns if 'QTY' in c.upper() and 'TEMP' not in c.upper()]
-        if len(qty_cols) >= 2:
-            dt_merged['DIFF'] = dt_merged[qty_cols[0]] - dt_merged[qty_cols[1]] - dt_merged['QTY_SCAN_TEMP']
+        dt_merged['DIFF'] = 0
     
     dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
     
-    # HAPUS KOLOM TEMPORARY
-    dt_merged = dt_merged.drop(columns=['QTY_SCAN_TEMP'])
+    # Hapus kolom temporary QTY_SCAN
+    dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
     
     return dt_merged
 
