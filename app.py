@@ -512,80 +512,72 @@ def get_yellow_skus(file, column_index):
                 if sku_val: yellow_set.add(sku_val)
     except: pass
     return yellow_set
-def logic_cek_adjustment_final(df_recon, df_stock_system):
+# =========================================================
+# LOGIC CEK ADJUSTMENT FINAL (REPLICA VBA)
+# =========================================================
+def logic_cek_adjustment_final(df_recon, df_stock_adj):
     """
-    MENIRU MACRO: Sub CEK_ADJUSMENT_FINAL()
-    - Kolom 10 (J): QTY SYSTEM
-    - Kolom 11 (K): QTY SO (Hasil Recon)
-    - Kolom 12 (L): DIFF (Absolute J - K)
+    Meniru Sub CEK_ADJUSMENT_FINAL()
+    Input:
+    1. df_recon: Berasal dari sheet 'REAL + RECON'
+       - Kolom A (1): BIN
+       - Kolom B (2): SKU
+       - Kolom G (7): HASIL RECONCILIATION
+    2. df_stock_adj: Berasal dari sheet 'CEK STOCK ADJ +'
+       - Kolom B (2): BIN
+       - Kolom C (3): SKU
+       - Kolom J (10): QTY SYSTEM
+       - Kolom K (11): QTY SO (Akan diisi dari Recon)
+       - Kolom L (12): DIFF (Abs J - K)
     """
-    # Copy agar tidak merusak data asli
-    df_final = df_stock_system.copy()
     
-    # 1. Standardisasi Key (BIN | SKU)
-    df_recon['KEY'] = df_recon['BIN'].astype(str).str.strip().str.upper() + "|" + \
-                      df_recon['SKU'].astype(str).str.strip().str.upper()
+    # Standardisasi data Stock
+    df_stock = df_stock_adj.copy()
     
-    # Ambil Nama Kolom berdasarkan index untuk Stock System
-    col_bin_sys = df_final.columns[1]
-    col_sku_sys = df_final.columns[2]
-    col_qty_sys = df_final.columns[9]  # Index 9 = Kolom J
-    col_qty_so  = df_final.columns[10] # Index 10 = Kolom K
-    
-    df_final['KEY'] = df_final[col_bin_sys].astype(str).str.strip().str.upper() + "|" + \
-                      df_final[col_sku_sys].astype(str).str.strip().str.upper()
+    # 1. Buat Dictionary dari Data Recon (Key: BIN|SKU)
+    # VBA: key = UCase(Trim(CStr(wsRecon.Cells(i, 1).Value))) & "|" & UCase(Trim(CStr(wsRecon.Cells(i, 2).Value)))
+    recon_dict = {}
+    for _, row in df_recon.iterrows():
+        try:
+            # Kolom 1 (A) = BIN, Kolom 2 (B) = SKU, Kolom 7 (G) = Nilai Recon
+            key = f"{str(row.iloc[0]).strip().upper()}|{str(row.iloc[1]).strip().upper()}"
+            val_recon = row.iloc[6] # Index 6 adalah kolom G
+            recon_dict[key] = val_recon
+        except:
+            continue
 
-    # 2. Lookup QTY RECON ke Kolom K (QTY SO)
-    # Buat dictionary dari df_recon {KEY: HASIL RECONCILIATION}
-    recon_map = df_recon.set_index('KEY')['HASIL RECONCILIATION'].to_dict()
-    
-    # Update kolom K jika Key cocok
-    df_final[col_qty_so] = df_final['KEY'].map(recon_map)
-    
-    # 3. Hitung DIFF (Kolom L) -> Abs(J - K)
+    # 2. Update Kolom K (Index 10) di Data Stock berdasarkan Key
+    # VBA: wsStock.Cells(dictStock(key), 11).Value = wsRecon.Cells(i, 7).Value
+    def update_qty_so(row):
+        key_stock = f"{str(row.iloc[1]).strip().upper()}|{str(row.iloc[2]).strip().upper()}"
+        return recon_dict.get(key_stock, "") # Kosongkan jika tidak ketemu (seperti VBA)
+
+    # Pastikan kolom K ada atau buat baru
+    df_stock.iloc[:, 10] = df_stock.apply(update_qty_so, axis=1)
+
+    # 3. Hitung DIFF di Kolom L (Index 11)
+    # VBA: Abs(Val(dataStock(i, 10)) - Val(dataStock(i, 11)))
     def calculate_diff(row):
-        val_k = row[col_qty_so]
-        if pd.notnull(val_k) and str(val_k) != "":
+        qty_sys = row.iloc[9]  # Kolom J
+        qty_so = row.iloc[10]  # Kolom K
+        
+        if qty_so != "" and qty_so is not None:
             try:
-                return abs(float(row[col_qty_sys]) - float(val_k))
+                return abs(float(qty_sys) - float(qty_so))
             except:
                 return 0
         return ""
 
-    df_final['DIFF_ADJ'] = df_final.apply(calculate_diff, axis=1)
+    # Isi kolom L (Index 11)
+    df_stock.iloc[:, 11] = df_stock.apply(calculate_diff, axis=1)
     
-    # Identifikasi yang tidak ditemukan (Warnai Kuning di VBA)
-    not_found_keys = set(df_recon['KEY']) - set(df_final['KEY'])
-    
-    return df_final.drop(columns=['KEY']), not_found_keys
+    # Beri nama Header jika belum ada
+    headers = list(df_stock.columns)
+    headers[10] = "QTY SO"
+    headers[11] = "DIFF"
+    df_stock.columns = headers
 
-# ============================================================
-# 🚀 COMPARE 1: SCAN VS SYSTEM
-# ============================================================
-def logic_compare_scan_to_stock(df_scan, df_stock):
-    ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-    
-    dt = df_stock.iloc[:, [1, 2, 9]].copy()
-    dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-    
-    for df in [ds, dt]:
-        df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
-        df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
-    
-    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
-    dt['QTY_SYSTEM'] = pd.to_numeric(dt['QTY_SYSTEM'], errors='coerce').fillna(0)
-    
-    dt_grouped = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
-    
-    ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left')
-    ds_merged['QTY_SYSTEM'] = ds_merged['QTY_SYSTEM'].fillna(0)
-    
-    ds_merged['DIFF'] = ds_merged['QTY_SCAN'] - ds_merged['QTY_SYSTEM']
-    ds_merged['NOTE'] = ds_merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else "OK")
-    
-    return ds_merged
-
+    return df_stock
 # ============================================================
 # 🚀 COMPARE 2: SYSTEM VS SCAN
 # ============================================================
@@ -922,34 +914,50 @@ def menu_Stock_Opname():
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
             
             st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Stock_Opname_Report.xlsx", use_container_width=True)
-        # STEP 2: ADJUSTMENT FINAL (LOGIC BARU)
-    if 'compare_result' in st.session_state:
-        st.markdown("---")
-        st.subheader("2️⃣ Final Adjustment Check")
-        st.info("Logika ini akan memasukkan 'HASIL RECONCILIATION' ke Kolom K di file Stock System Anda.")
-        
-        # Simulasikan Input HASIL RECONCILIATION (Karena di Streamlit User harus isi dulu)
-        recon_data = st.session_state.compare_result['real_plus']
-        if 'HASIL RECONCILIATION' not in recon_data.columns:
-            recon_data['HASIL RECONCILIATION'] = recon_data['QTY_SCAN'] # Default awal
-        
-        edited_recon = st.data_editor(recon_data, key="editor_recon", use_container_width=True)
-        
-        if st.button("⚙️ RUN CEK ADJUSMENT FINAL"):
-            df_adj, not_found = logic_cek_adjustment_final(edited_recon, st.session_state.compare_result['res_stock'])
-            st.session_state.adjustment_final = df_adj
-            
-            if not_found:
-                st.warning(f"Ada {len(not_found)} data recon yang tidak ditemukan di Stock System (Mismatch Key).")
-            st.success("Proses Adjustment Selesai! DIFF (Abs J-K) telah dihitung.")
-            st.dataframe(df_adj)
+    st.markdown("### ⚙️ FINAL ADJUSTMENT CHECKER")
+st.info("Upload dua file di bawah ini untuk menjalankan logika 'CEK_ADJUSMENT_FINAL'")
 
-            # DOWNLOAD
+col1, col2 = st.columns(2)
+
+with col1:
+    st.write("**1. File Hasil Rekon**")
+    up_recon = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx'], key="adj_1")
+
+with col2:
+    st.write("**2. File Cek Stock**")
+    up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx'], key="adj_2")
+
+if up_recon and up_stock_adj:
+    if st.button("🚀 JALANKAN PROSES LOOKUP & DIFF"):
+        try:
+            # Load Data
+            df_recon_raw = pd.read_excel(up_recon)
+            df_stock_raw = pd.read_excel(up_stock_adj)
+            
+            # Jalankan Logic
+            df_final_result = logic_cek_adjustment_final(df_recon_raw, df_stock_raw)
+            
+            st.success("✅ Proses Selesai! DIFF telah terhitung.")
+            
+            # Preview Hasil
+            st.dataframe(df_final_result, use_container_width=True)
+            
+            # Download Button
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_adj.to_excel(writer, sheet_name='CEK STOCK ADJ +', index=False)
-                edited_recon.to_excel(writer, sheet_name='REAL + RECON', index=False)
-            st.download_button("📥 DOWNLOAD FINAL ADJUSTMENT", data=output.getvalue(), file_name="Adjustment_Final.xlsx")
+                df_final_result.to_excel(writer, sheet_name='FINAL_ADJUSTMENT', index=False)
+            
+            st.download_button(
+                label="📥 DOWNLOAD HASIL ADJUSTMENT",
+                data=output.getvalue(),
+                file_name="Adjustment_Final_Result.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            
+        except Exception as e:
+            st.error(f"Terjadi kesalahan: {e}")
+            st.warning("Pastikan struktur kolom (BIN di B, SKU di C, dst) sesuai dengan standar Macro.")
+            
 import pandas as pd
 import numpy as np
 import streamlit as st
