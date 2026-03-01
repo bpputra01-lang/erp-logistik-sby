@@ -582,19 +582,17 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     return dt_merged
 
 # ============================================================
-# 🚀 LOGIC ALLOCATION (ULTRA FAST)
+# 🚀 LOGIC ALLOCATION (SESUAI VBA - 2 SUMBER)
 # ============================================================
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
-    # Source 1: System Plus
+    # Prepare System Plus (Source 1)
     sys_lite = df_system_plus.iloc[:, [1, 2, df_system_plus.columns.get_loc('DIFF')]].copy()
     sys_lite.columns = ['BIN', 'SKU', 'QTY_DIFF']
     sys_lite['SKU'] = sys_lite['SKU'].astype(str).str.strip().str.upper()
     sys_lite['QTY_DIFF'] = pd.to_numeric(sys_lite['QTY_DIFF'], errors='coerce').fillna(0)
-    
-    # Group by SKU (SUPER FAST)
     dict_system_source = sys_lite.groupby(['BIN', 'SKU'])['QTY_DIFF'].sum().to_dict()
 
-    # Source 2: Bin Coverage
+    # Prepare Bin Coverage (Source 2)
     cov_lite = df_bin_coverage.iloc[:, [1, 2, 9]].copy() 
     cov_lite.columns = ['BIN', 'SKU', 'QTY_COV']
     cov_lite['SKU'] = cov_lite['SKU'].astype(str).str.strip().str.upper()
@@ -605,12 +603,12 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     df_res = df_real_plus.copy()
     df_sys_updated = df_system_plus.copy()
     
-    # Prepare columns
+    # Prepare lists
     bin_alokasi_list = []
     qty_alokasi_list = []
     status_list = []
 
-    # Loop tetap diperlukan untuk alokasi per row
+    # Loop per row
     for idx, row in df_res.iterrows():
         sku = row['SKU']
         current_diff = row['DIFF']
@@ -620,7 +618,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
             temp_alloc_bin = []
             temp_alloc_qty = 0
             
-            # Tahap 1: System +
+            # TAHAP 1: CARI DI SYSTEM +
             sys_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_system_source.items() if k[1] == sku and v > 0]
             for src in sys_list:
                 if remaining_diff <= 0:
@@ -637,7 +635,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
                     df_sys_updated.loc[mask, df_sys_updated.columns[diff_col_idx]] -= qty_alloc
                 remaining_diff -= qty_alloc
 
-            # Tahap 2: Bin Coverage
+            # TAHAP 2: CARI DI BIN COVERAGE
             if remaining_diff > 0:
                 cov_list = [{'BIN': k[0], 'SKU': k[1], 'QTY': v} for k, v in dict_cov_source.items() if k[1] == sku and v > 0]
                 for src in cov_list:
@@ -649,6 +647,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
                     dict_cov_source[(src['BIN'], sku)] -= qty_alloc
                     remaining_diff -= qty_alloc
 
+            # TAHAP 3: STATUS
             if temp_alloc_qty > 0:
                 allocated_bin = " & ".join(list(set(temp_alloc_bin)))[:50]
                 allocated_qty = temp_alloc_qty
@@ -662,6 +661,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
         qty_alokasi_list.append(allocated_qty)
         status_list.append(status)
 
+    # Add new columns
     df_res['BIN ALOKASI'] = bin_alokasi_list
     df_res['QTY ALLOCATION'] = qty_alokasi_list
     df_res['STATUS'] = status_list
@@ -670,35 +670,55 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
 
 
 # ============================================================
-# 🚀 SET UP REAL + (SESUAI VBA)
+# 🚀 SET UP REAL + BIN TO BIN (SESUAI VBA)
 # ============================================================
-def generate_set_up_real_plus(d, df_s_raw):
-    # Mapping BIN dari Scan (Multiple Adj +)
-    df_s_raw_copy = df_s_raw.copy()
-    df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
-    df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
-    bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
-
-    # Ambil dari STOCK SYSTEM (res_stock), bukan REAL +
-    real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
-
-    if not real_plus_diff.empty:
-        # BIN AWAL = dari Multiple Adj + (Scan)
-        real_plus_diff['BIN AWAL'] = real_plus_diff['SKU'].map(bin_awal_map).fillna("NOT FOUND")
+def generate_set_up_real_plus(d):
+    # Ambil dari REAL + yang sudah di-allocation
+    real_plus_alloc = d['real_plus'].copy()
+    
+    # Filter: hanya FULL & PARTIAL ALLOCATION
+    filtered = real_plus_alloc[real_plus_alloc['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
+    
+    if not filtered.empty:
+        # BIN AWAL = dari kolom BIN ALOKASI
+        filtered['BIN AWAL'] = filtered['BIN ALOKASI']
         
-        # BIN TUJUAN = dari Stock System (kolom BIN)
-        real_plus_diff['BIN TUJUAN'] = real_plus_diff['BIN']
+        # BIN TUJUAN = dari kolom BIN (asli scan)
+        filtered['BIN TUJUAN'] = filtered['BIN']
         
-        # QUANTITY = DIFF, NOTES = RELOCATION
-        real_plus_diff['QUANTITY'] = real_plus_diff['DIFF']
-        real_plus_diff['NOTES'] = "RELOCATION"
+        # QUANTITY = QTY ALLOCATION
+        filtered['QUANTITY'] = filtered['QTY ALLOCATION']
         
-        # Urutan kolom sesuai VBA
-        set_up_real_plus = real_plus_diff[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
+        # NOTES = RELOCATION
+        filtered['NOTES'] = "RELOCATION"
+        
+        # Urutan kolom: BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES
+        set_up_real_plus = filtered[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
     else:
         set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
     
     return set_up_real_plus
+
+    if up_bin_cov:
+    if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
+        try:
+            df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+            
+            with st.spinner("Memproses Alokasi..."):
+                # 1️⃣ ALLOCATION
+                allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
+                
+                # 2️⃣ SET UP REAL +
+                set_up_real_plus = generate_set_up_real_plus(d)
+
+                st.session_state.allocation_result = allocated_data
+                st.session_state.sys_updated_result = sys_updated
+                st.session_state.set_up_real_plus = set_up_real_plus
+                
+                st.success("✅ Allocation Selesai!")
+                
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
 # =========================================================
