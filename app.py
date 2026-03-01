@@ -672,12 +672,12 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
 # ============================================================
 # 🚀 SET UP REAL + BIN TO BIN (SESUAI VBA)
 # ============================================================
-def generate_set_up_real_plus(d):
-    # Ambil dari REAL + yang sudah di-allocation
-    real_plus_alloc = d['real_plus'].copy()
-    
+def generate_set_up_real_plus(allocated_data):
+    """
+    Pakai allocated_data (yang sudah ada STATUS), bukan d['real_plus']
+    """
     # Filter: hanya FULL & PARTIAL ALLOCATION
-    filtered = real_plus_alloc[real_plus_alloc['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
+    filtered = allocated_data[allocated_data['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
     
     if not filtered.empty:
         # BIN AWAL = dari kolom BIN ALOKASI
@@ -824,24 +824,25 @@ def menu_Stock_Opname():
         st.markdown("---")
         st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
         
-        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
-
         if up_bin_cov:
-            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
-                try:
-                    df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
-                    
-                    with st.spinner("Memproses Alokasi..."):
-                        allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
-                        set_up_real_plus = generate_set_up_real_plus(d)
+    if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
+        try:
+            df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+            
+            with st.spinner("Memproses Alokasi..."):
+                # 1️⃣ ALLOCATION - hasil nya ada STATUS
+                allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
+                
+                # 2️⃣ SET UP REAL + - Pakai allocated_data (bukan d['real_plus'])
+                set_up_real_plus = generate_set_up_real_plus(allocated_data)
 
-                        st.session_state.allocation_result = allocated_data
-                        st.session_state.sys_updated_result = sys_updated
-                        st.session_state.set_up_real_plus = set_up_real_plus
-                        
-                        st.success("✅ Allocation Selesai!")
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
+                st.session_state.allocation_result = allocated_data
+                st.session_state.sys_updated_result = sys_updated
+                st.session_state.set_up_real_plus = set_up_real_plus
+                
+                st.success("✅ Allocation Selesai!")
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
     # ===========================
     # HASIL ALLOCATION
     # ===========================
