@@ -514,199 +514,108 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
-# =========================================================
-# LOGIC CEK ADJUSTMENT FINAL (REPLICA VBA)
-# =========================================================
+# --- INISIALISASI MEMORI (SESSION STATE) ---
+if 'df_res_lookup' not in st.session_state: st.session_state['df_res_lookup'] = None
+if 'df_karantina_result' not in st.session_state: st.session_state['df_karantina_result'] = None
+if 'df_miss_loc_data' not in st.session_state: st.session_state['df_miss_loc_data'] = None
+
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock = df_stock_adj.copy()
-    
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s
-
-    # 1. AMBIL DATA DARI RECON & CATAT SEMUA KEY YANG ADA
     recon_dict = {}
-    all_recon_keys = set() # Untuk tracking mana yang sudah terpakai
+    all_recon_keys = set()
     for _, row in df_recon.iterrows():
         try:
             b_recon = clean_val(row.iloc[0])
             s_recon = clean_val(row.iloc[1])
             if b_recon and s_recon:
                 key = f"{b_recon}|{s_recon}"
-                val_recon = row.iloc[6]
-                recon_dict[key] = val_recon
+                recon_dict[key] = row.iloc[6]
                 all_recon_keys.add(key)
         except: continue
-
-    # 2. PASTIKAN KOLOM TARGET STOCK TERSEDIA
-    while df_stock.shape[1] < 12:
-        df_stock[f"Extra_{df_stock.shape[1]}"] = ""
-
-    # 3. LOOKUP KE STOCK & CATAT KEY YANG TERPAKAI
+    while df_stock.shape[1] < 12: df_stock[f"Extra_{df_stock.shape[1]}"] = ""
     used_keys = set()
     def do_lookup(row):
-        b_stock = clean_val(row.iloc[1])
-        s_stock = clean_val(row.iloc[2])
-        key_stock = f"{b_stock}|{s_stock}"
-        
-        if key_stock in recon_dict:
-            used_keys.add(key_stock) # Tandai bahwa data recon ini sudah masuk ke file stock
-            return recon_dict[key_stock]
+        key = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+        if key in recon_dict:
+            used_keys.add(key)
+            return recon_dict[key]
         return ""
-
     df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
-
-    # 4. HITUNG DIFF
     def do_diff(row):
         try:
-            val_sys = row.iloc[9]
-            val_so = row.iloc[10]
-            if val_so != "" and val_so is not None:
-                return abs(float(val_sys) - float(val_so))
+            v_sys, v_so = row.iloc[9], row.iloc[10]
+            if v_so != "" and v_so is not None: return abs(float(v_sys) - float(v_so))
         except: return 0
         return ""
-
     df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
-
-    # RAPIKAN HEADER UTAMA
     cols = list(df_stock.columns)
     cols[10], cols[11] = "QTY SO", "DIFF"
     df_stock.columns = cols
-
-    # 5. LOGIKA UNTUK TAB "NEED SINGLE ADJ"
-    # Cari key yang ada di Recon tapi TIDAK ADA di used_keys
     missing_keys = all_recon_keys - used_keys
     df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
-    
     return df_stock, df_need_single
 
-# =========================================================
-# 3. LOGIC PIVOT (CONVERSION DARI VBA)
-# =========================================================
-
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
-    # --- PROSES MULTIPLE ADJ + (PIVOT SKU) ---
-    # Syarat VBA: QTY SO (Index 10) > QTY SYSTEM (Index 9)
-    # Lalu ambil selisih DIFF (Index 11)
-    
-    # Filter data yang QTY SO > QTY SYSTEM
-    df_filtered = df_stock_final.copy()
-    # Pastikan numerik
-    df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
-    df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
-    df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
-    
-    mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
-    df_to_pivot = df_filtered[mask_multiple].copy()
-    
-    # Pivot: Group by SKU (Index 2), Sum DIFF (Index 11)
-    pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
-    pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
-    
-    # Ambil detail produk dari Master (STOCK ADJ +)
-    # Key Master: SKU (Col index 2), ambil baris pertama yang ketemu
+    df_f = df_stock_final.copy()
+    for i in [9, 10, 11]: df_f.iloc[:, i] = pd.to_numeric(df_f.iloc[:, i], errors='coerce').fillna(0)
+    df_to_pivot = df_f[df_f.iloc[:, 10] > df_f.iloc[:, 9]].copy()
+    pivot_mult = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
+    pivot_mult.columns = ['SKU_KEY', 'TOTAL_DIFF']
     master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
-    
-    df_multiple_final = pivot_multiple.merge(
-        master_clean, 
-        left_on='SKU_KEY', 
-        right_on=master_clean.columns[2], 
-        how='left'
-    )
-    
-    # Update Kolom Qty (Kolom terakhir / Index 10) dengan hasil pivot
-    if not df_multiple_final.empty:
-        df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
-        # Buang kolom temporary hasil merge jika ada
-        if 'SKU_KEY' in df_multiple_final.columns: df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
-
-    # --- PROSES SINGLE ADJ + (PIVOT BIN & SKU) ---
-    # Sumber: Data yang tidak ketemu di lookup tadi (Missing dari Recon)
+    df_mult_final = pivot_mult.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
+    if not df_mult_final.empty:
+        df_mult_final.iloc[:, -1] = df_mult_final['TOTAL_DIFF']
+        if 'SKU_KEY' in df_mult_final.columns: df_mult_final = df_mult_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
     if not df_recon_missing.empty:
         df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
-        # Group by BIN (Index 0) dan SKU (Index 1), Sum Hasil Recon (Index 6)
-        df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
-        df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
-    else:
-        df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
-        
-    return df_multiple_final, df_single_final
+        df_sing_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
+        df_sing_final.columns = ['BIN', 'SKU', 'QTY ADJ']
+    else: df_sing_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+    return df_mult_final, df_sing_final
 
 def logic_setup_karantina_with_check(df_outstanding):
-    # Buat copy biar data asli aman
     df = df_outstanding.copy()
-    
-    # 1. Kunci Koordinat sesuai gambar lu:
-    # K (Indeks 10) = QTY SYSTEM
-    # O (Indeks 14) = HASIL REKONSILIASI
-    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
-    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
-    
-    # 2. Gue hitung DIFF sendiri di sini (System - Hasil Rekon)
+    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # K
+    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0) # O
     df['CHECK_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
-    
-    # 3. Data mentah buat lu cek (BIN, SKU, QTY SYS, HASIL REKON, SELISIH)
-    # Ambil kolom C(2), D(3), K(10), O(14)
-    df_check = df.iloc[:, [2, 3, 10, 14]].copy() 
+    df_check = df.iloc[:, [2, 3, 10, 14]].copy()
     df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'HASIL_REKON_O']
     df_check['SELISIH_HITUNG_AI'] = df['CHECK_DIFF']
-    
-    # 4. FILTER: Hanya ambil yang selisihnya TIDAK SAMA DENGAN 0
-    # Ini kunci biar yang DIFF 0 (OK) nggak masuk
-    mask = df['CHECK_DIFF'] != 0
-    df_filtered = df[mask].copy()
-    
-    # 5. Susun Hasil Akhir (5 Kolom format Karantina)
+    df_filtered = df[df['CHECK_DIFF'] != 0].copy()
     df_karantina = pd.DataFrame({
-        "BIN AWAL": df_filtered.iloc[:, 2],      # Kolom C
-        "BIN TUJUAN": "KARANTINA",
-        "SKU": df_filtered.iloc[:, 3],           # Kolom D
-        "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
+        "BIN AWAL": df_filtered.iloc[:, 2], "BIN TUJUAN": "KARANTINA",
+        "SKU": df_filtered.iloc[:, 3], "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
         "NOTES": "MISS LOCATION"
     })
-    
     return df_karantina, df_check
 
 def logic_generate_final_reports_v2(df_adj_plus, df_adj_minus, df_karantina, df_miss_loc_internal):
-    # --- PART 1: SUMMARY ADJUSTMENT ---
     def process_adj_final(df, status, is_karantina=False):
         if df is None or df.empty: return pd.DataFrame()
         temp = df.copy()
-        
         if is_karantina:
-            # Mapping Karantina (BIN AWAL, SKU, QUANTITY)
-            res = pd.DataFrame({
-                "BIN": temp.iloc[:, 0], "SKU": temp.iloc[:, 2],
-                "BRAND": "", "ITEM NAME": "", "VARIANT": "", "SUB KATEGOTI": "", 
-                "HARGA BELI": 0, "HARGA JUAL": 0, "QTY SYSTEM": 0,
-                "QTY SO": temp.iloc[:, 3], "VALUE ADJ": 0, "STATUS ADJ": status
+            return pd.DataFrame({
+                "BIN": temp.iloc[:, 0], "SKU": temp.iloc[:, 2], "BRAND": "", "ITEM NAME": "", 
+                "VARIANT": "", "SUB KATEGOTI": "", "HARGA BELI": 0, "HARGA JUAL": 0, 
+                "QTY SYSTEM": 0, "QTY SO": temp.iloc[:, 3], "VALUE ADJ": 0, "STATUS ADJ": status
             })
-        else:
-            # Ambil kolom B sampai K (index 1-10)
-            res = temp.iloc[:, 1:11].copy()
-            res.columns = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGOTI", "HARGA BELI", "HARGA JUAL", "QTY SYSTEM", "QTY SO"]
-            res["VALUE ADJ"] = (res["QTY SO"] - res["QTY SYSTEM"]) * res["HARGA JUAL"]
-            res["STATUS ADJ"] = status
+        res = temp.iloc[:, 1:11].copy()
+        res.columns = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGOTI", "HARGA BELI", "HARGA JUAL", "QTY SYSTEM", "QTY SO"]
+        res["VALUE ADJ"] = (res["QTY SO"] - res["QTY SYSTEM"]) * res["HARGA JUAL"]
+        res["STATUS ADJ"] = status
         return res
-
     df_sum_plus = process_adj_final(df_adj_plus, "ADJ +")
     df_sum_minus = process_adj_final(df_adj_minus, "ADJ -")
     df_sum_kar = process_adj_final(df_karantina, "ADJ KARANTINA", True)
-    
-    df_summary_final = pd.concat([df_sum_plus, df_sum_minus, df_sum_kar], ignore_index=True)
-
-    # --- PART 2: LIST MISS LOCATION ---
-    # Diambil langsung dari df_miss_loc_internal (Step sebelumnya)
-    if df_miss_loc_internal is not None and not df_miss_loc_internal.empty:
-        total_sku_miss = df_miss_loc_internal.iloc[:, 2].nunique()
-        total_qty_miss = df_miss_loc_internal.iloc[:, 3].sum()
-    else:
-        total_sku_miss = 0
-        total_qty_miss = 0
-
-    return df_summary_final, df_miss_loc_internal, total_sku_miss, total_qty_miss
+    df_summary = pd.concat([df_sum_plus, df_sum_minus, df_sum_kar], ignore_index=True)
+    t_sku = df_miss_loc_internal.iloc[:, 2].nunique() if df_miss_loc_internal is not None else 0
+    t_qty = df_miss_loc_internal.iloc[:, 3].sum() if df_miss_loc_internal is not None else 0
+    return df_summary, df_miss_loc_internal, t_sku, t_qty
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
