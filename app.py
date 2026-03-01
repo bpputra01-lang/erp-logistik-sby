@@ -722,7 +722,7 @@ def menu_Stock_Opname():
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
-    # ============================================================
+ # ============================================================
 # ✅ METRICS & TABS - SETELAH COMPARE
 # ============================================================
 if 'compare_result' in st.session_state:
@@ -747,7 +747,7 @@ if 'compare_result' in st.session_state:
     with t2: st.dataframe(d['res_stock'], use_container_width=True)
     with t3: st.dataframe(d['real_plus'], use_container_width=True)
     with t4: st.dataframe(d['system_plus'], use_container_width=True)
-
+    
     # --- STEP 2: ALLOCATION ---
     st.markdown("---")
     st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
