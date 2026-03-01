@@ -861,7 +861,11 @@ def menu_Stock_Opname():
                     st.success("✅ Allocation Selesai!")
                 except Exception as e: st.error(f"❌ Error: {e}")
 
+    # --- BAGIAN BARU: MEMUNCULKAN HASIL ALOKASI ---
     if 'allocation_result' in st.session_state:
+        st.markdown("### ✅ HASIL ALOKASI")
+        st.dataframe(st.session_state.allocation_result, use_container_width=True)
+        
         st.markdown("---")
         st.subheader("3️⃣ RECON REPORTS")
         if st.button("📊 Generate All RECON", use_container_width=True):
