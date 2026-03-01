@@ -947,26 +947,28 @@ def menu_Stock_Opname():
         
         st.markdown("---")
         
-        # ===========================
+                # ===========================
         # TOMBOL RECON
         # ===========================
-        st.subheader("📊 RECON REPORTS")
+        st.markdown("### 📊 RECON REPORTS")
         
         colRecon1, colRecon2 = st.columns(2)
         
         with colRecon1:
-            if st.button("📊 REAL + RECON (NO ALLOCATION)", use_container_width=True, key="btn_recon_real"):
-                with st.spinner("Membuat REAL + RECON..."):
+            st.markdown("<div style='text-align: center;'>REAL + RECON</div>", unsafe_allow_html=True)
+            if st.button("📊 Generate", use_container_width=True, key="btn_recon_real"):
+                with st.spinner("Membuat..."):
                     recon_df = generate_real_plus_recon(alloc_data)
                     st.session_state.recon_real_plus = recon_df
-                    st.success(f"✅ Selesai! {len(recon_df)} data")
+                    st.success(f"✅ {len(recon_df)} data")
         
         with colRecon2:
-            if st.button("📊 SYSTEM + OUTSTANDING RECON", use_container_width=True, key="btn_recon_sys"):
-                with st.spinner("Membuat SYSTEM + OUTSTANDING RECON..."):
+            st.markdown("<div style='text-align: center;'>SYSTEM + OUTSTANDING</div>", unsafe_allow_html=True)
+            if st.button("📊 Generate", use_container_width=True, key="btn_recon_sys"):
+                with st.spinner("Membuat..."):
                     outstanding_df = generate_system_outstanding_recon(sys_updated)
                     st.session_state.outstanding_system = outstanding_df
-                    st.success(f"✅ Selesai! {len(outstanding_df)} data")
+                    st.success(f"✅ {len(outstanding_df)} data")
         
         # Tampilkan hasil RECON jika sudah dibuat
         if 'recon_real_plus' in st.session_state:
