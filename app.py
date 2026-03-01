@@ -958,7 +958,7 @@ def logic_cek_adjustment_final(df_recon, df_stock):
 
     return dt_final, mismatch
 
-    def save_with_formatting(df_stock_final, df_mismatch, filename):
+def save_with_formatting(df_stock_final, df_mismatch, filename):
     with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
         # Simpan Sheet Stock
         df_stock_final.to_excel(writer, sheet_name='CEK STOCK ADJ +', index=False)
