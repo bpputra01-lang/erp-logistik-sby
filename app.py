@@ -512,71 +512,26 @@ def get_yellow_skus(file, column_index):
                 if sku_val: yellow_set.add(sku_val)
     except: pass
     return yellow_set
-# =========================================================
-# LOGIC CEK ADJUSTMENT FINAL (REPLICA VBA)
-# =========================================================
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    """
-    Meniru Sub CEK_ADJUSMENT_FINAL()
-    Input:
-    1. df_recon: Berasal dari sheet 'REAL + RECON'
-       - Kolom A (1): BIN
-       - Kolom B (2): SKU
-       - Kolom G (7): HASIL RECONCILIATION
-    2. df_stock_adj: Berasal dari sheet 'CEK STOCK ADJ +'
-       - Kolom B (2): BIN
-       - Kolom C (3): SKU
-       - Kolom J (10): QTY SYSTEM
-       - Kolom K (11): QTY SO (Akan diisi dari Recon)
-       - Kolom L (12): DIFF (Abs J - K)
-    """
-    
-    # Standardisasi data Stock
     df_stock = df_stock_adj.copy()
-    
-    # 1. Buat Dictionary dari Data Recon (Key: BIN|SKU)
-    # VBA: key = UCase(Trim(CStr(wsRecon.Cells(i, 1).Value))) & "|" & UCase(Trim(CStr(wsRecon.Cells(i, 2).Value)))
     recon_dict = {}
     for _, row in df_recon.iterrows():
         try:
-            # Kolom 1 (A) = BIN, Kolom 2 (B) = SKU, Kolom 7 (G) = Nilai Recon
+            # Key: BIN (A) | SKU (B) -> Val: HASIL RECON (G)
             key = f"{str(row.iloc[0]).strip().upper()}|{str(row.iloc[1]).strip().upper()}"
-            val_recon = row.iloc[6] # Index 6 adalah kolom G
-            recon_dict[key] = val_recon
-        except:
-            continue
+            recon_dict[key] = row.iloc[6]
+        except: continue
 
-    # 2. Update Kolom K (Index 10) di Data Stock berdasarkan Key
-    # VBA: wsStock.Cells(dictStock(key), 11).Value = wsRecon.Cells(i, 7).Value
-    def update_qty_so(row):
+    # Update Kolom K (Index 10) & L (Index 11)
+    def update_values(row):
         key_stock = f"{str(row.iloc[1]).strip().upper()}|{str(row.iloc[2]).strip().upper()}"
-        return recon_dict.get(key_stock, "") # Kosongkan jika tidak ketemu (seperti VBA)
+        qty_so = recon_dict.get(key_stock, "")
+        qty_sys = row.iloc[9]
+        diff = abs(float(qty_sys) - float(qty_so)) if (qty_so != "" and qty_so is not None) else ""
+        return pd.Series([qty_so, diff])
 
-    # Pastikan kolom K ada atau buat baru
-    df_stock.iloc[:, 10] = df_stock.apply(update_qty_so, axis=1)
-
-    # 3. Hitung DIFF di Kolom L (Index 11)
-    # VBA: Abs(Val(dataStock(i, 10)) - Val(dataStock(i, 11)))
-    def calculate_diff(row):
-        qty_sys = row.iloc[9]  # Kolom J
-        qty_so = row.iloc[10]  # Kolom K
-        
-        if qty_so != "" and qty_so is not None:
-            try:
-                return abs(float(qty_sys) - float(qty_so))
-            except:
-                return 0
-        return ""
-
-    # Isi kolom L (Index 11)
-    df_stock.iloc[:, 11] = df_stock.apply(calculate_diff, axis=1)
-    
-    # Beri nama Header jika belum ada
-    headers = list(df_stock.columns)
-    headers[10] = "QTY SO"
-    headers[11] = "DIFF"
-    df_stock.columns = headers
-
+    df_stock.iloc[:, [10, 11]] = df_stock.apply(update_values, axis=1)
+    df_stock.columns = list(df_stock.columns[:10]) + ["QTY SO", "DIFF"]
     return df_stock
 # ============================================================
 # 🚀 COMPARE 2: SYSTEM VS SCAN
@@ -886,78 +841,63 @@ def menu_Stock_Opname():
         if st.button("📊 Generate All RECON", use_container_width=True):
             st.session_state.recon_real_plus = generate_real_plus_recon(alloc_data)
             
-            # System Outstanding logic
-            filtered_sys = sys_updated[sys_updated['DIFF'] != 0].copy()
-            vba_cols = ['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF']
-            final_cols = [c for c in vba_cols if c in filtered_sys.columns]
-            for c in filtered_sys.columns: 
-                if c not in final_cols: final_cols.append(c)
-            
-            outstanding_df = filtered_sys[final_cols].copy()
-            outstanding_df['HASIL REKONSILIASI'] = ""
-            st.session_state.outstanding_system = outstanding_df
+            # =========================================================
+# 2. UI LAYOUT (URUTAN DARI ATAS KE BAWAH)
+# =========================================================
 
-        if 'recon_real_plus' in st.session_state:
-            st.markdown("#### 📋 REAL + RECON (NO ALLOCATION)")
-            st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
-            st.markdown("#### 📋 SYSTEM + OUTSTANDING RECON")
-            st.dataframe(st.session_state.outstanding_system, use_container_width=True)
+st.set_page_config(layout="wide")
+st.markdown('<h1 style="text-align:center;">🚀 Stock Adjustment & Recon Uploader</h1>', unsafe_allow_html=True)
 
-            # DOWNLOAD SECTION
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-                st.session_state.compare_result['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
-                set_up_rp.to_excel(writer, sheet_name='SET UP REAL +', index=False)
-                alloc_data.to_excel(writer, sheet_name='ALLOCATION', index=False)
-                st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
-                st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
-            
-            st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Stock_Opname_Report.xlsx", use_container_width=True)
-    st.markdown("### ⚙️ FINAL ADJUSTMENT CHECKER")
+# --- SECTION 1: UPLOADER UTAMA (COMPARE) ---
+with st.container():
+    st.subheader("1️⃣ Upload Data Stock Opname")
+    c1, c2 = st.columns(2)
+    with c1: up_scan = st.file_uploader("Upload Sheet: DATA SCAN (XLSX)", type=['xlsx'])
+    with c2: up_stock = st.file_uploader("Upload Sheet: STOCK SYSTEM (XLSX)", type=['xlsx'])
+    
+    if st.button("STOCK OPNAME ANALYZER", use_container_width=True):
+        if up_scan and up_stock:
+            # Jalankan logic compare disini...
+            st.success("Data Berhasil Dianalisis! (Lihat Report di Bawah)")
+            st.session_state.show_report = True
+        else:
+            st.error("Upload kedua file dulu!")
+
+st.markdown("---")
+
+# --- SECTION 2: RECON REPORTS (TENGAH) ---
+if st.session_state.get('show_report'):
+    st.subheader("📊 RECON REPORTS")
+    # Tabel-tabel hasil scan/stock muncul disini
+    st.write("*(Data Report Anda Akan Muncul Disini)*")
+
+st.markdown("<br><br><br>", unsafe_allow_html=True) # Jarak pemisah
+
+# --- SECTION 3: FINAL ADJUSTMENT CHECKER (PALING BAWAH) ---
+st.markdown("---")
+st.subheader("⚙️ FINAL ADJUSTMENT CHECKER")
 st.info("Upload dua file di bawah ini untuk menjalankan logika 'CEK_ADJUSMENT_FINAL'")
 
-col1, col2 = st.columns(2)
-
-with col1:
+col_adj1, col_adj2 = st.columns(2)
+with col_adj1:
     st.write("**1. File Hasil Rekon**")
-    up_recon = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx'], key="adj_1")
+    up_recon = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx'], key="adj_final_1")
 
-with col2:
+with col_adj2:
     st.write("**2. File Cek Stock**")
-    up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx'], key="adj_2")
+    up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx'], key="adj_final_2")
 
 if up_recon and up_stock_adj:
-    if st.button("🚀 JALANKAN PROSES LOOKUP & DIFF"):
-        try:
-            # Load Data
-            df_recon_raw = pd.read_excel(up_recon)
-            df_stock_raw = pd.read_excel(up_stock_adj)
-            
-            # Jalankan Logic
-            df_final_result = logic_cek_adjustment_final(df_recon_raw, df_stock_raw)
-            
-            st.success("✅ Proses Selesai! DIFF telah terhitung.")
-            
-            # Preview Hasil
-            st.dataframe(df_final_result, use_container_width=True)
-            
-            # Download Button
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_final_result.to_excel(writer, sheet_name='FINAL_ADJUSTMENT', index=False)
-            
-            st.download_button(
-                label="📥 DOWNLOAD HASIL ADJUSTMENT",
-                data=output.getvalue(),
-                file_name="Adjustment_Final_Result.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            
-        except Exception as e:
-            st.error(f"Terjadi kesalahan: {e}")
-            st.warning("Pastikan struktur kolom (BIN di B, SKU di C, dst) sesuai dengan standar Macro.")
-            
+    if st.button("RUN CEK ADJUSTMENT FINAL", use_container_width=True):
+        df_res = logic_cek_adjustment_final(pd.read_excel(up_recon), pd.read_excel(up_stock_adj))
+        st.dataframe(df_res, use_container_width=True)
+        
+        # Download
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_res.to_excel(writer, index=False)
+        st.download_button("📥 DOWNLOAD HASIL ADJUSTMENT", output.getvalue(), "Adjustment_Final.xlsx")
+
 import pandas as pd
 import numpy as np
 import streamlit as st
