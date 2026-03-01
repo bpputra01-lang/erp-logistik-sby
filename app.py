@@ -948,8 +948,8 @@ def menu_Stock_Opname():
         st.markdown("---")
         st.subheader("📥 DOWNLOAD")
         
-         output = io.BytesIO()
-         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
             d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
             set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
