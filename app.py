@@ -890,36 +890,35 @@ def generate_system_outstanding_recon(df_system):
     
     return outstanding_df
 
-# --- 1. FUNGSI LOGIKA (TIDAK DIUBAH BANYAK, CUMAN DIATUR FORMATNYA) ---
+# =========================================================
+# 2. FUNGSI LOGIKA REKONSILIASI
+# =========================================================
 def logic_cek_adjustment_final(df_recon, df_stock):
-    # Asumsi: df_recon dan df_stock sudah di-load dengan header=None (Index Based)
-    
-    # Ambil Kolom Penting
-    # Recon: 0=BIN, 1=SKU, 6=QTY (G)
+    # Ambil Kolom Penting (0-based index)
+    # Recon: Kolom 0=BIN, 1=SKU, 6=QTY (G)
     dr = df_recon.iloc[:, [0, 1, 6]].copy()
     dr.columns = ['BIN_RECON', 'SKU_RECON', 'QTY_RECON_VAL']
     
     # Stock: 1=BIN, 2=SKU, 9=QTY_SYSTEM, 10=QTY_SO
     dt = df_stock.copy()
     
-    # Konversi Data (Clean & Uppercase)
+    # Clean Data (Uppercase & Strip)
     dr['BIN_RECON'] = dr['BIN_RECON'].astype(str).str.strip().str.upper()
     dr['SKU_RECON'] = dr['SKU_RECON'].astype(str).str.strip().str.upper()
     dr['QTY_RECON_VAL'] = pd.to_numeric(dr['QTY_RECON_VAL'], errors='coerce').fillna(0)
     
-    # Konversi Stock
-    # Kolom 1 (B), 2 (C)
+    # Konversi Kolom di Stock (Indeks 1, 2, 9, 10)
+    # Kolom B (1), C (2)
     dt.iloc[:, 1] = dt.iloc[:, 1].astype(str).str.strip().str.upper()
     dt.iloc[:, 2] = dt.iloc[:, 2].astype(str).str.strip().str.upper()
-    # Kolom 9 (J), 10 (K) - Diasumsikan numerik
+    # Kolom J (9), K (10)
     dt.iloc[:, 9] = pd.to_numeric(dt.iloc[:, 9], errors='coerce').fillna(0)
     dt.iloc[:, 10] = pd.to_numeric(dt.iloc[:, 10], errors='coerce').fillna(0)
 
-    # Merge (Left Join: Stock -> Recon)
-    # Kita rename dulu agar keynya sama
+    # Rename Kolom Induk untuk Merge
     dt_for_merge = dt.rename(columns={1: 'BIN_TEMP', 2: 'SKU_TEMP'})
     
-    # Merge
+    # Merge (Left Join)
     merged = dt_for_merge.merge(
         dr, 
         left_on=['BIN_TEMP', 'SKU_TEMP'], 
@@ -928,53 +927,44 @@ def logic_cek_adjustment_final(df_recon, df_stock):
     )
     
     # Update Kolom K (Index 10) dengan QTY Recon
-    # Jika tidak ada di Recon (NaN), isi dengan 0
     merged.iloc[:, 10] = merged['QTY_RECON_VAL'].fillna(0)
     
-    # Hitung DIFF (System - SO) | Dalam VBA: System - Scan
-    # Karena VBA Diff = QtySystem - QtyScan (atau sebaliknya tergantung versi).
-    # Disini sesuai request user: Diff = Abs(QtySystem - QtyRecon)
+    # Hitung DIFF (System - SO)
     diff_val = abs(merged.iloc[:, 9] - merged.iloc[:, 10])
     merged['DIFF'] = diff_val
 
     # Cari Mismatch (Data di Recon yang tidak ada di Stock)
-    # Bandingkan Key
     stock_keys = set(zip(dt_for_merge['BIN_TEMP'], dt_for_merge['SKU_TEMP']))
     recon_keys = set(zip(dr['BIN_RECON'], dr['SKU_RECON']))
-    
     missing_keys = recon_keys - stock_keys
     
-    # Filter dataframe Recon untuk dapat yang tidak cocok
     df_mismatch = dr[dr.apply(lambda x: (x['BIN_RECON'], x['SKU_RECON']) in missing_keys, axis=1)]
 
-    # Kembalikan Nama Kolom Standard (Opsional) atau pertahankan index integer
-    # Kita kembalikan seperti input asli tapi sisipkan Diff di akhir
+    # Kembalikan dataframe hasil (sudah digabungkan) & error
     return merged, df_mismatch
 
-# --- 2. INTERFACE STREAMLIT ---
+# =========================================================
+# 3. INTERFACE STREAMLIT
+# =========================================================
 st.set_page_config(page_title="Recon & Adjustment Tool", layout="wide")
 st.title("🚀 Stock Adjustment & Recon Uploader")
 
-# Membuat 2 Kolom untuk Upload
+# Layout 2 Kolom Upload
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 1. Upload Data Recon")
-    file_recon = st.file_uploader("File: REAL + RECON", type=['xlsx'], key="recon")
+    file_recon = st.file_uploader("Upload Sheet: REAL + RECON", type=['xlsx'], key="recon")
 
 with col2:
-    st.markdown("### 2. Upload Data Stock System")
-    file_stock = st.file_uploader("File: CEK STOCK ADJ +", type=['xlsx'], key="stock")
+    file_stock = st.file_uploader("Upload Sheet: CEK STOCK ADJ +", type=['xlsx'], key="stock")
 
-# Cek apakah kedua file ada
+# Logika Utama Dijalankan di Dalam Tombol
 if file_recon and file_stock:
-    
-    # PENTING: Baca dengan header=None agar index kolom numerik (0,1,2...) sesuai VBA
-    df_r = pd.read_excel(file_recon, header=None)
-    df_s = pd.read_excel(file_stock, header=None)
-
-    # Tombol Proses
     if st.button("RUNNING RECON & DIFF", type="primary"):
+        
+        # Load Data (header=None agar index sesuai VBA)
+        df_r = pd.read_excel(file_recon, header=None)
+        df_s = pd.read_excel(file_stock, header=None)
         
         # Jalankan Logika
         with st.spinner("Sedang Memproses..."):
@@ -984,29 +974,29 @@ if file_recon and file_stock:
         
         # --- TAMPILAN HASIL (DI BAWAH TOMBOL) ---
         
-        # 1. Info Mismatch (Warning)
-        if not df_error.empty:
-            st.warning(f"⚠️ Ditemukan {len(df_error)} item di RECON yang tidak ada di STOCK (MISMATCH).")
-            with st.expander("Lihat Detail Mismatch"):
-                st.dataframe(df_error)
-        
-        # 2. Preview Data (10 Baris Pertama)
+        # 1. Preview Data (10 Baris Pertama)
         st.subheader("📊 Preview Hasil (10 Baris Pertama)")
         st.dataframe(df_hasil.head(10), use_container_width=True)
         
-        # 3. Tombol Download
+        # 2. Tombol Download Utama
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_hasil.to_excel(writer, index=False, sheet_name='CEK STOCK ADJ +')
             if not df_error.empty:
                 df_error.to_excel(writer, index=False, sheet_name='MISMATCH_DATA')
-                
+        
         st.download_button(
             label="📥 DOWNLOAD HASIL RECON (XLSX)",
             data=output.getvalue(),
             file_name="HASIL_ADJUSTMENT_FINAL.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+        
+        # 3. Warning Mismatch (Opsional)
+        if not df_error.empty:
+            st.warning(f"⚠️ Ditemukan {len(df_error)} data di Recon yang tidak ditemukan di Stock (Mismatch).")
+            with st.expander("Lihat Detail Mismatch"):
+                st.dataframe(df_error)
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
 # =========================================================
