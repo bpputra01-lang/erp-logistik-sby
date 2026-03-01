@@ -637,25 +637,27 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
 def logic_setup_karantina(df_outstanding):
     df = df_outstanding.copy()
     
-    # 1. Pastikan kolom target adalah angka (K=Qty System, O=Hasil Rekon)
-    # Berdasarkan gambar, data dimulai dari kolom indeks 0 (nomor urut)
-    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # Kolom K
-    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0) # Kolom O
+    # 1. Pastikan kolom target adalah angka berdasarkan posisi gambar lu:
+    # Kolom K (10) = QTY SYSTEM
+    # Kolom O (14) = HASIL REKONSILIASI
+    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
+    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
     
-    # 2. Hitung Selisih sesuai permintaan lu (Qty System - Hasil Rekon)
-    df['DIFF_CALC'] = df.iloc[:, 10] - df.iloc[:, 14]
+    # 2. Hitung Selisih Murni (System - Hasil Rekon)
+    # Kita tidak pakai kolom P dari Excel lu, tapi kita hitung sendiri biar akurat
+    df['DIFF_INTERNAL'] = df.iloc[:, 10] - df.iloc[:, 14]
     
-    # 3. FILTER UTAMA: Hanya ambil yang DIFF-nya TIDAK SAMA DENGAN 0
-    # Data yang DIFF-nya 0 (OK) akan dibuang dari list karantina
-    mask = df['DIFF_CALC'] != 0
+    # 3. FILTER: Hanya ambil yang selisihnya TIDAK SAMA DENGAN 0
+    # Ini akan otomatis menangkap semua baris yang lu tandain (1 atau 2)
+    mask = df['DIFF_INTERNAL'] != 0
     df_filtered = df[mask].copy()
     
-    # 4. Susun 5 Kolom format SET UP KARANTINA
+    # 4. Susun 5 Kolom Hasil Akhir untuk SET UP KARANTINA
     result_data = {
         "BIN AWAL": df_filtered.iloc[:, 2],      # Kolom C (BIN)
         "BIN TUJUAN": "KARANTINA",               # Fix String
         "SKU": df_filtered.iloc[:, 3],           # Kolom D (SKU)
-        "QUANTITY": df_filtered['DIFF_CALC'].abs(), # Jumlah yang dipindah (Absolut)
+        "QUANTITY": df_filtered['DIFF_INTERNAL'].abs(), # Hasil pengurangan tadi (Positif)
         "NOTES": "MISS LOCATION"                 # Fix String
     }
     
