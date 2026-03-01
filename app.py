@@ -557,11 +557,10 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
 
     # MERGE KE STOCK SYSTEM
-    dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')
+    dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')  # <-- BENAR: dt_merged
     dt_merged['QTY_SCAN'] = dt_merged['QTY_SCAN'].fillna(0)
 
     # QTY SO = QTY SCAN
-    # CARI KOLOM QTY SYSTEM (biasanya 'QTY' atau 'QTY SYSTEM')
     qty_system_cols = [c for c in dt_merged.columns if 'QTY' in c.upper() and 'SCAN' not in c.upper()]
     
     if qty_system_cols:
@@ -582,7 +581,7 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     # Hapus kolom temporary QTY_SCAN
     dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
 
-    return dt_merge
+    return dt_merged
 # ============================================================
 # 🚀 LOGIC ALLOCATION (SESUAI VBA - 2 SUMBER)
 # ============================================================
