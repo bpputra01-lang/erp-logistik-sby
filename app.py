@@ -698,8 +698,31 @@ def generate_set_up_real_plus(d):
         set_up_real_plus = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
     
     return set_up_real_plus
+
+
+# ============================================================
+# 🚀 MENU UTAMA - SEMUA KODE DISINI
+# ============================================================
+def menu_Stock_Opname():
+    # --- CSS & HEADER ---
+    st.markdown("""...""", unsafe_allow_html=True)
+    
+    # --- FILTER ---
+    # ... filter code ...
+    
+    # --- STEP 1: COMPARE ---
+    # ... upload & button compare ...
+    
+    # ===========================
+    # HASIL COMPARE
+    # ===========================
+    if 'compare_result' in st.session_state:
+        d = st.session_state.compare_result
+        
+        # ... metrics & tabs ...
+        
         # ===========================
-        # STEP 2: ALLOCATION  <-- MASUK DISINI
+        # STEP 2: ALLOCATION
         # ===========================
         st.markdown("---")
         st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
@@ -712,10 +735,7 @@ def generate_set_up_real_plus(d):
                     df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
                     
                     with st.spinner("Memproses Alokasi..."):
-                        # 1️⃣ ALLOCATION
                         allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
-                        
-                        # 2️⃣ SET UP REAL +
                         set_up_real_plus = generate_set_up_real_plus(d)
 
                         st.session_state.allocation_result = allocated_data
@@ -723,7 +743,6 @@ def generate_set_up_real_plus(d):
                         st.session_state.set_up_real_plus = set_up_real_plus
                         
                         st.success("✅ Allocation Selesai!")
-                        
                 except Exception as e:
                     st.error(f"❌ Error: {e}")
 # =========================================================
