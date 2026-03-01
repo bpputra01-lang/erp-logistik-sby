@@ -1075,55 +1075,45 @@ def menu_Stock_Opname():
                 except Exception as e:
                     st.error(f"❌ Error Step 5: {e}")
 # =========================================================
-    # ⚙️ 6. SET UP KARANTINA GENERATOR
+    # ⚙️ 6. SET UP KARANTINA GENERATOR (DENGAN PENGECEKAN)
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
     
-    # Hanya 1 uploader sesuai flow lu
     up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
 
     if up_karantina:
-        if st.button("🛠️ GENERATE SET UP KARANTINA", use_container_width=True):
+        if st.button("🛠️ GENERATE & CEK PERHITUNGAN", use_container_width=True):
             try:
-                # BACA FILE: Pakai engine openpyxl dan jangan jadikan Kolom A sebagai index
-                if up_karantina.name.endswith(('.xlsx', '.xls')):
-                    df_out_in = pd.read_excel(up_karantina, engine='openpyxl')
-                else:
-                    df_out_in = pd.read_csv(up_karantina, index_col=False)
+                # Baca file (Kolom A jangan jadi index)
+                df_raw = pd.read_excel(up_karantina, engine='openpyxl') if up_karantina.name.endswith('xlsx') else pd.read_csv(up_karantina, index_col=False)
                 
-                # Jalankan Logika yang sudah disesuaikan kolomnya (C, D, K, N)
-                df_karantina_result = logic_setup_karantina(df_out_in)
+                # Jalankan Logika
+                df_final, df_debug = logic_setup_karantina_with_check(df_raw)
                 
-                if not df_karantina_result.empty:
-                    st.success(f"✅ Berhasil! {len(df_karantina_result)} data ditemukan (QTY SYSTEM > HASIL REKON).")
+                # TAMPILKAN HASIL PERHITUNGAN GUE BIAR LU CEK
+                st.write("### 🔍 Tabel Pengecekan (Gue ngitung ini):")
+                st.info("Gue cuma ambil data yang 'SELISIH_SAYA' tidak sama dengan 0 untuk masuk ke Karantina.")
+                st.dataframe(df_debug, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                
+                # TAMPILKAN HASIL AKHIR
+                if not df_final.empty:
+                    st.success(f"✅ Selesai! Ada {len(df_final)} baris yang selisihnya bukan 0.")
+                    st.write("### 📦 Hasil Akhir (Format SET UP KARANTINA):")
+                    st.dataframe(df_final, use_container_width=True, hide_index=True)
                     
-                    st.dataframe(df_karantina_result, use_container_width=True, hide_index=True)
-                    
-                    # Simpan ke Excel dengan Header Hitam (VBA Style)
+                    # Tombol Download
                     out6 = io.BytesIO()
                     with pd.ExcelWriter(out6, engine='xlsxwriter') as wr:
-                        df_karantina_result.to_excel(wr, sheet_name='SET UP KARANTINA', index=False)
-                        
-                        workbook = wr.book
-                        worksheet = wr.sheets['SET UP KARANTINA']
-                        header_fmt = workbook.add_format({
-                            'bold': True, 
-                            'font_color': 'white', 
-                            'bg_color': 'black', 
-                            'border': 1, 
-                            'align': 'center'
-                        })
-                        
-                        for col_num, value in enumerate(df_karantina_result.columns.values):
-                            worksheet.write(0, col_num, value, header_fmt)
-                    
+                        df_final.to_excel(wr, sheet_name='SET UP KARANTINA', index=False)
                     st.download_button("📥 DOWNLOAD SET UP KARANTINA", data=out6.getvalue(), file_name="Set_Up_Karantina.xlsx", use_container_width=True)
                 else:
-                    st.warning("⚠️ Tidak ada data. Pastikan Kolom K (Qty System) > Kolom N (Hasil Recon).")
+                    st.warning("⚠️ Tidak ada data dengan selisih (Semua 0).")
                     
             except Exception as e:
-                st.error(f"❌ Error: {e}. Cek apakah urutan kolom sudah sesuai gambar.")
+                st.error(f"❌ Error: {e}")
             
 import pandas as pd
 import numpy as np
