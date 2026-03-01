@@ -950,7 +950,7 @@ def menu_Stock_Opname():
         
         colReconBtn, colSpacer = st.columns([1, 3])
         
-                with colReconBtn:
+            with colReconBtn:
             if st.button("📊 Generate All RECON", use_container_width=True, key="btn_recon_all"):
                 with st.spinner("Membuat RECON Reports..."):
                     # Generate REAL + RECON
@@ -962,7 +962,7 @@ def menu_Stock_Opname():
                     st.session_state.outstanding_system = outstanding_df
                     
                     st.success(f"✅ Selesai! REAL: {len(recon_df)} | SYSTEM: {len(outstanding_df)}")
-                    
+
         # Tampilkan hasil RECON jika sudah dibuat
         if 'recon_real_plus' in st.session_state:
             st.markdown("#### 📋 REAL + RECON (NO ALLOCATION)")
