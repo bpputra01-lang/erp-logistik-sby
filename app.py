@@ -638,27 +638,23 @@ def logic_setup_karantina(df_outstanding):
     # Buat copy agar data asli aman
     df = df_outstanding.copy()
     
-    # BERDASARKAN GAMBAR LU:
-    # BIN ada di Kolom C (Indeks 2)
-    # SKU ada di Kolom D (Indeks 3)
-    # QTY SYSTEM ada di Kolom K (Indeks 10)
-    # HASIL REKONSILIASI ada di Kolom N (Indeks 13)
+    # 1. PASTIIN KOLOM K (10) DAN N (13) ADALAH ANGKA
+    # Kita pakai .iloc supaya tidak peduli apa nama headernya, yang penting posisinya
+    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # QTY SYSTEM (K)
+    df.iloc[:, 13] = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(0) # HASIL REKON (N)
     
-    # Pastikan data Qty terbaca sebagai angka
-    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # Kolom K
-    df.iloc[:, 13] = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(0) # Kolom N
-    
-    # Syarat: QTY SYSTEM (K) > HASIL REKONSILIASI (N)
+    # 2. LOGIKA UTAMA: Hanya ambil jika Qty System > Hasil Rekon
+    # Jika Qty System (K) lebih besar, berarti ada selisih yang harus dikarantina
     mask = df.iloc[:, 10] > df.iloc[:, 13]
     df_filtered = df[mask].copy()
     
-    # Susun 5 kolom hasil akhir
+    # 3. SUSUN DATA KARANTINA (5 KOLOM)
     result_data = {
         "BIN AWAL": df_filtered.iloc[:, 2],      # Kolom C (BIN)
-        "BIN TUJUAN": "KARANTINA",               # Fix
+        "BIN TUJUAN": "KARANTINA",               # Fix String
         "SKU": df_filtered.iloc[:, 3],           # Kolom D (SKU)
-        "QUANTITY": df_filtered.iloc[:, 10] - df_filtered.iloc[:, 13], # K - N
-        "NOTES": "MISS LOCATION"                 # Fix
+        "QUANTITY": df_filtered.iloc[:, 10] - df_filtered.iloc[:, 13], # Selisih K - N
+        "NOTES": "MISS LOCATION"                 # Fix String
     }
     
     return pd.DataFrame(result_data)
