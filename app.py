@@ -910,7 +910,7 @@ def menu_Stock_Opname():
                     st.success("✅ Allocation Selesai!")
             except Exception as e:
                 st.error(f"❌ Error: {e}")
-    # ===========================
+        # ===========================
     # HASIL ALLOCATION
     # ===========================
     if 'allocation_result' in st.session_state:
@@ -944,6 +944,38 @@ def menu_Stock_Opname():
         with ta1: st.dataframe(alloc_data, use_container_width=True)
         with ta2: st.dataframe(sys_updated, use_container_width=True)
         with ta3: st.dataframe(set_up_real_plus, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # ===========================
+        # TOMBOL RECON
+        # ===========================
+        st.subheader("📊 RECON REPORTS")
+        
+        colRecon1, colRecon2 = st.columns(2)
+        
+        with colRecon1:
+            if st.button("📊 REAL + RECON (NO ALLOCATION)", use_container_width=True, key="btn_recon_real"):
+                with st.spinner("Membuat REAL + RECON..."):
+                    recon_df = generate_real_plus_recon(alloc_data)
+                    st.session_state.recon_real_plus = recon_df
+                    st.success(f"✅ Selesai! {len(recon_df)} data")
+        
+        with colRecon2:
+            if st.button("📊 SYSTEM + OUTSTANDING RECON", use_container_width=True, key="btn_recon_sys"):
+                with st.spinner("Membuat SYSTEM + OUTSTANDING RECON..."):
+                    outstanding_df = generate_system_outstanding_recon(sys_updated)
+                    st.session_state.outstanding_system = outstanding_df
+                    st.success(f"✅ Selesai! {len(outstanding_df)} data")
+        
+        # Tampilkan hasil RECON jika sudah dibuat
+        if 'recon_real_plus' in st.session_state:
+            st.markdown("### 📋 REAL + RECON (NO ALLOCATION)")
+            st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
+        
+        if 'outstanding_system' in st.session_state:
+            st.markdown("### 📋 SYSTEM + OUTSTANDING RECON")
+            st.dataframe(st.session_state.outstanding_system, use_container_width=True)
         
         st.markdown("---")
         st.subheader("📥 DOWNLOAD")
