@@ -708,6 +708,66 @@ def generate_set_up_real_plus(allocated_data):
     
     return set_up_real_plus
 
+# ============================================================
+# 🚀 LOGIC REAL + RECON (NO ALLOCATION)
+# ============================================================
+def generate_real_plus_recon(allocated_data):
+    """
+    VBA: Generate_RealPlusRecon_Final_NoColF
+    Filter: STATUS = "NO ALLOCATION"
+    Columns: BIN, SKU, QTY SCAN, QTY SYSTEM, DIFF, ITEM NAME
+    """
+    # Filter NO ALLOCATION
+    filtered = allocated_data[allocated_data['STATUS'] == "NO ALLOCATION"].copy()
+    
+    if not filtered.empty:
+        # Ambil kolom yang needed (sesuai VBA)
+        # Cek kolom apa yang ada
+        cols_available = filtered.columns.tolist()
+        
+        # Pilih kolom yang tersedia
+        recon_cols = []
+        for col in ['BIN', 'SKU', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'ITEM NAME']:
+            if col in cols_available:
+                recon_cols.append(col)
+        
+        recon_df = filtered[recon_cols].copy()
+        
+        # Rename columns sesuai VBA output
+        recon_df.columns = ['BIN', 'SKU', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'ITEM NAME']
+    else:
+        recon_df = pd.DataFrame(columns=['BIN', 'SKU', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'ITEM NAME'])
+    
+    return recon_df
+
+
+# ============================================================
+# 🚀 LOGIC SYSTEM + OUTSTANDING RECON
+# ============================================================
+def generate_system_outstanding_recon(df_system):
+    """
+    VBA: SYSTEM_OUTSTANDING_RECON
+    Filter: DIFF != 0
+    Columns: BIN, SKU, BRAND, ITEM NAME, VARIANT, SUB KATEGORI, QTY SYSTEM, QTY SO, DIFF
+    """
+    # Filter DIFF != 0
+    filtered = df_system[df_system['DIFF'] != 0].copy()
+    
+    if not filtered.empty:
+        # Ambil kolom sesuai VBA (kolom 2-12 = indeks 1-11)
+        outstanding_df = filtered.iloc[:, 1:12].copy()
+        
+        # Rename sesuai header VBA
+        outstanding_df.columns = ['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 
+                                  'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF', 
+                                  'NOTE', 'STATUS']
+    else:
+        outstanding_df = pd.DataFrame(columns=['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 
+                                              'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF', 
+                                              'NOTE', 'STATUS'])
+    
+    return outstanding_df
+
 
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
@@ -888,14 +948,20 @@ def menu_Stock_Opname():
         st.markdown("---")
         st.subheader("📥 DOWNLOAD")
         
-        output = io.BytesIO()
+         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             d['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
             d['res_stock'].to_excel(writer, sheet_name='STOCK SYSTEM', index=False)
             set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
             alloc_data.to_excel(writer, sheet_name='ALLOCATION', index=False)
+            
+            # Sheet RECON jika ada
+            if 'recon_real_plus' in st.session_state:
+                st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
+            if 'outstanding_system' in st.session_state:
+                st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         
-        st.download_button("📥 DOWNLOAD", data=output.getvalue(), file_name="Hasil.xlsx", use_container_width=True)
+        st.download_button("📥 DOWNLOAD ALL", data=output.getvalue(), file_name="Hasil_Allocation.xlsx", use_container_width=True)
 
 import pandas as pd
 import numpy as np
