@@ -951,91 +951,93 @@ def menu_Stock_Opname():
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
             st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Report.xlsx", use_container_width=True)
 # =========================================================
-    # ⚙️ 4. FINAL ADJUSTMENT CHECKER & PIVOT GENERATOR
+    # ⚙️ 4. FINAL ADJUSTMENT CHECKER (LOOKUP & DIFF)
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("4️⃣ FINAL ADJUSTMENT & PIVOT GENERATOR")
-    st.info("Upload 3 file di bawah ini untuk menjalankan logika LOOKUP dan PIVOT (VBA Conversion)")
+    st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
+    st.info("Upload 2 file di bawah ini untuk menjalankan logika LOOKUP (Cek Adjustment)")
     
-    adj_col1, adj_col2, adj_col3 = st.columns(3)
+    adj_col1, adj_col2 = st.columns(2)
     with adj_col1:
         st.write("**1. File Hasil Recon**")
-        up_recon = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_final_up_1")
+        up_recon_4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_4_u1")
     with adj_col2:
         st.write("**2. File Cek Stock**")
-        up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_final_up_2")
-    with adj_col3:
-        st.write("**3. File Master Stock**")
-        up_master = st.file_uploader("Upload Sheet STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="adj_final_up_3")
+        up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_4_u2")
 
-    if up_recon and up_stock_adj and up_master:
-        if st.button("🚀 JALANKAN PROSES PIVOT & ADJUSTMENT", use_container_width=True):
+    if up_recon_4 and up_stock_4:
+        if st.button("🚀 JALANKAN LOOKUP & DIFF", use_container_width=True):
             try:
-                # --- LOAD DATA ---
-                if up_recon.name.endswith(('.xlsx', '.xls')):
-                    df_recon_in = pd.read_excel(up_recon, engine='openpyxl')
-                else:
-                    df_recon_in = pd.read_csv(up_recon)
+                df_recon_4 = pd.read_excel(up_recon_4) if up_recon_4.name.endswith('xlsx') else pd.read_csv(up_recon_4)
+                df_stock_4 = pd.read_excel(up_stock_4) if up_stock_4.name.endswith('xlsx') else pd.read_csv(up_stock_4)
+                
+                # Jalankan fungsi lookup yang return 2 variabel
+                df_res_4, df_missing_4 = logic_cek_adjustment_final(df_recon_4, df_stock_4)
+                
+                st.success(f"✅ Selesai! Ditemukan {len(df_missing_4)} data yang masuk ke NEED SINGLE ADJ.")
+                
+                tab_a, tab_b = st.tabs(["📊 FINAL ADJUSTMENT", "⚠️ NEED SINGLE ADJ"])
+                with tab_a:
+                    st.dataframe(df_res_4, use_container_width=True, hide_index=True)
+                with tab_b:
+                    st.dataframe(df_missing_4, use_container_width=True, hide_index=True)
+                
+                output_4 = io.BytesIO()
+                with pd.ExcelWriter(output_4, engine='xlsxwriter') as writer:
+                    df_res_4.to_excel(writer, sheet_name='FINAL_ADJUSTMENT', index=False)
+                    df_missing_4.to_excel(writer, sheet_name='NEED_SINGLE_ADJ', index=False)
+                st.download_button("📥 DOWNLOAD RESULT (2 SHEETS)", data=output_4.getvalue(), file_name="Adjustment_Lookup.xlsx", use_container_width=True)
+            except Exception as e: st.error(f"❌ Error: {e}")
 
-                if up_stock_adj.name.endswith(('.xlsx', '.xls')):
-                    df_stock_in = pd.read_excel(up_stock_adj, engine='openpyxl')
-                else:
-                    df_stock_in = pd.read_csv(up_stock_adj)
 
-                if up_master.name.endswith(('.xlsx', '.xls')):
-                    df_master_in = pd.read_excel(up_master, engine='openpyxl')
-                else:
-                    df_master_in = pd.read_csv(up_master)
+    # =========================================================
+    # ⚙️ 5. PIVOT GENERATOR (VBA LOGIC)
+    # =========================================================
+    st.markdown("<br><br>---", unsafe_allow_html=True)
+    st.subheader("5️⃣ PIVOT GENERATOR (VBA CONVERSION)")
+    st.info("Upload 3 file di bawah ini untuk memproses MULTIPLE & SINGLE ADJ (Hasil Pivot)")
+    
+    piv_col1, piv_col2, piv_col3 = st.columns(3)
+    with piv_col1:
+        st.write("**1. File Hasil Recon**")
+        up_recon_5 = st.file_uploader("Upload REAL + RECON", type=['xlsx', 'csv'], key="piv_5_u1")
+    with piv_col2:
+        st.write("**2. File Cek Stock (Sudah di-Lookup)**")
+        up_stock_5 = st.file_uploader("Upload CEK STOCK ADJ +", type=['xlsx', 'csv'], key="piv_5_u2")
+    with piv_col3:
+        st.write("**3. File Master Stock**")
+        up_master_5 = st.file_uploader("Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_u3")
+
+    if up_recon_5 and up_stock_5 and up_master_5:
+        if st.button("🔥 GENERATE PIVOT (MULTIPLE & SINGLE)", use_container_width=True):
+            try:
+                # Load
+                df_r5 = pd.read_excel(up_recon_5) if up_recon_5.name.endswith('xlsx') else pd.read_csv(up_recon_5)
+                df_s5 = pd.read_excel(up_stock_5) if up_stock_5.name.endswith('xlsx') else pd.read_csv(up_stock_5)
+                df_m5 = pd.read_excel(up_master_5) if up_master_5.name.endswith('xlsx') else pd.read_csv(up_master_5)
                 
-                # 1. Jalankan Lookup Final (Logic Cek Adjustment)
-                df_res_lookup, df_missing = logic_cek_adjustment_final(df_recon_in, df_stock_in)
+                # 1. Re-run lookup internal buat dapetin df_missing
+                df_res_lookup, df_missing = logic_cek_adjustment_final(df_r5, df_s5)
                 
-                # 2. Jalankan Logika Pivot (Conversion dari VBA)
-                df_multiple, df_single = logic_pivot_adjustment(df_res_lookup, df_master_in, df_missing)
+                # 2. Run Pivot Logic
+                df_multiple, df_single = logic_pivot_adjustment(df_res_lookup, df_m5, df_missing)
                 
-                st.success(f"✅ Selesai! Ditemukan {len(df_missing)} data yang perlu Single Adj.")
+                st.success("✅ Pivot Selesai Dibuat!")
                 
-                # BUAT TAB HASIL
-                t_res, t_mult, t_sing, t_miss = st.tabs([
-                    "📊 CEK STOCK ADJ +", 
-                    "📦 MULTIPLE ADJ +", 
-                    "⚠️ SINGLE ADJ +",
-                    "🔍 NEED SINGLE ADJ"
-                ])
-                
-                with t_res:
-                    st.write("Data yang berhasil di-lookup ke file Stock Adj +")
-                    st.dataframe(df_res_lookup, use_container_width=True, hide_index=True)
-                
-                with t_mult:
-                    st.write("**Hasil Pivot SKU (QTY diakumulasikan sesuai VBA)**")
+                tab_m, tab_s = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+                with tab_m:
+                    st.write("**Hasil Pivot SKU (Akumulasi Qty)**")
                     st.dataframe(df_multiple, use_container_width=True, hide_index=True)
-                
-                with t_sing:
-                    st.write("**Hasil Pivot BIN & SKU dari data Missing (Single Adj)**")
+                with tab_s:
+                    st.write("**Hasil Pivot BIN & SKU (Single Adj)**")
                     st.dataframe(df_single, use_container_width=True, hide_index=True)
-
-                with t_miss:
-                    st.write("Data di Hasil Recon yang TIDAK DITEMUKAN di file Stock Adj +")
-                    st.dataframe(df_missing, use_container_width=True, hide_index=True)
                 
-                # DOWNLOAD ALL (4 Sheets)
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_res_lookup.to_excel(writer, sheet_name='CEK STOCK ADJ +', index=False)
+                output_5 = io.BytesIO()
+                with pd.ExcelWriter(output_5, engine='xlsxwriter') as writer:
                     df_multiple.to_excel(writer, sheet_name='MULTIPLE ADJ +', index=False)
                     df_single.to_excel(writer, sheet_name='SINGLE ADJ +', index=False)
-                    df_missing.to_excel(writer, sheet_name='NEED SINGLE ADJ', index=False)
-                
-                st.download_button(
-                    "📥 DOWNLOAD FINAL REPORT (4 SHEETS)", 
-                    data=output.getvalue(), 
-                    file_name="Final_Adjustment_Pivot_Report.xlsx", 
-                    use_container_width=True
-                )
-                
-            except Exception as e: 
-                st.error(f"❌ Error: {e}")
+                st.download_button("📥 DOWNLOAD PIVOT REPORT", data=output_5.getvalue(), file_name="Pivot_Adjustment_Final.xlsx", use_container_width=True)
+            except Exception as e: st.error(f"❌ Error: {e}")
             
 import pandas as pd
 import numpy as np
