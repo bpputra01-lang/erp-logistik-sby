@@ -514,6 +514,7 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
+
 # --- INISIALISASI MEMORI (SESSION STATE) ---
 if 'df_res_lookup' not in st.session_state: st.session_state['df_res_lookup'] = None
 if 'df_karantina_result' not in st.session_state: st.session_state['df_karantina_result'] = None
@@ -934,123 +935,195 @@ def menu_Stock_Opname():
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
             st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Report.xlsx", use_container_width=True)
 # =========================================================
-# ⚙️ 4. FINAL ADJUSTMENT CHECKER (LOOKUP & DIFF)
-# =========================================================
-st.markdown("<br><br><br>---", unsafe_allow_html=True)
-st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
-st.info("Upload 2 file di bawah ini untuk mengisi QTY SO & DIFF.")
+    # ⚙️ 4. FINAL ADJUSTMENT CHECKER (LOOKUP & DIFF)
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
+    st.info("Upload 2 file di bawah ini untuk mengisi QTY SO & DIFF.")
+    
+    adj_col1, adj_col2 = st.columns(2)
+    with adj_col1:
+        st.write("**1. File Hasil Recon**")
+        up_recon_4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_4_u1")
+    with adj_col2:
+        st.write("**2. File Cek Stock**")
+        up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_4_u2")
 
-adj_col1, adj_col2 = st.columns(2)
-with adj_col1:
-    st.write("**1. File Hasil Recon**")
-    up_recon_4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_4_u1")
-with adj_col2:
-    st.write("**2. File Cek Stock**")
-    up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_4_u2")
-
-if up_recon_4 and up_stock_4:
-    if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
-        try:
-            df_r4 = pd.read_excel(up_recon_4) if up_recon_4.name.endswith('xlsx') else pd.read_csv(up_recon_4)
-            df_s4 = pd.read_excel(up_stock_4) if up_stock_4.name.endswith('xlsx') else pd.read_csv(up_stock_4)
-            
-            # Logic
-            df_res_4, df_missing_4 = logic_cek_adjustment_final(df_r4, df_s4)
-            
-            # SIMPAN KE MEMORI (Tanpa render ke atas)
-            st.session_state['df_res_lookup'] = df_res_4
-            st.session_state['df_missing_lookup'] = df_missing_4
-            
-            # TAMPILKAN DI SINI (Di bawah tombol)
-            st.success("✅ Lookup Selesai!")
-            t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
-            with t_f: st.dataframe(df_res_4, use_container_width=True)
-            with t_m: st.dataframe(df_missing_4, use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"❌ Error Step 4: {e}")
-
-# =========================================================
-# ⚙️ 5. PIVOT GENERATOR (VBA LOGIC)
-# =========================================================
-st.markdown("<br><br>---", unsafe_allow_html=True)
-st.subheader("5️⃣ FINAL ADJUSMENT + ")
-up_master_5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_single")
-
-if up_master_5:
-    if st.button("▶️ GENERATE ADJ +", use_container_width=True):
-        try:
-            # Ambil data dari Step 4 yang sudah di memori
-            df_lookup_data = st.session_state.get('df_res_lookup')
-            df_missing_data = st.session_state.get('df_missing_lookup')
-            
-            if df_lookup_data is None:
-                st.error("❌ Data Step 4 belum ada! Jalankan Step 4 dulu Bos.")
-            else:
-                df_m5 = pd.read_excel(up_master_5)
-                df_mult, df_sing = logic_pivot_adjustment(df_lookup_data, df_m5, df_missing_data)
+    if up_recon_4 and up_stock_4:
+        if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+            try:
+                # Load data dengan engine yang aman
+                df_r4 = pd.read_excel(up_recon_4, engine='openpyxl') if up_recon_4.name.endswith('xlsx') else pd.read_csv(up_recon_4)
+                df_s4 = pd.read_excel(up_stock_4, engine='openpyxl') if up_stock_4.name.endswith('xlsx') else pd.read_csv(up_stock_4)
                 
-                # SIMPAN HASIL PIVOT
-                st.session_state['df_final_pivot_mult'] = df_mult
+                # Jalankan fungsi lookup
+                df_res_4, df_missing_4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
-                st.success("✅ Pivot Berhasil!")
-                t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
-                with t_mult: st.dataframe(df_mult, use_container_width=True)
-                with t_sing: st.dataframe(df_sing, use_container_width=True)
-        except Exception as e:
-            st.error(f"❌ Error Step 5: {e}")
-
-# =========================================================
-# ⚙️ 6. SET UP KARANTINA GENERATOR
-# =========================================================
-st.markdown("<br><br><br>---", unsafe_allow_html=True)
-st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
-up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx'], key="up_karantina_final")
-
-if up_karantina:
-    if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
-        try:
-            df_raw = pd.read_excel(up_karantina)
-            df_final, df_debug = logic_setup_karantina_with_check(df_raw)
-            
-            # SIMPAN KE MEMORI
-            st.session_state['df_karantina_result'] = df_final
-            
-            st.write("### 🔍 Tabel Pengecekan:")
-            st.dataframe(df_debug, use_container_width=True)
-            st.success(f"✅ Berhasil! {len(df_final)} baris selisih.")
-        except Exception as e:
-            st.error(f"❌ Error Step 6: {e}")
-
-# =========================================================
-# 🏁 7. FINAL REPORT GENERATOR (INTEGRATED)
-# =========================================================
-st.markdown("<br><br><br>---", unsafe_allow_html=True)
-st.subheader("🏁 7. FINAL REPORT GENERATOR")
-up_minus_final = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx'], key="up_minus_v2")
-
-if up_minus_final:
-    if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
-        try:
-            # Tarik data dari memori Step 5 & 6
-            df_adj_plus = st.session_state.get('df_final_pivot_mult')
-            df_karantina = st.session_state.get('df_karantina_result')
-            
-            if df_adj_plus is None or df_karantina is None:
-                st.error("❌ Data Step 5 atau 6 hilang! Jalankan tombol di atas dulu.")
-            else:
-                df_m = pd.read_excel(up_minus_final)
-                # Gunakan df_karantina juga untuk list miss loc
-                df_sum, df_miss, t_sku, t_qty = logic_generate_final_reports_v2(df_adj_plus, df_m, df_karantina, df_karantina)
-
-                # RENDER DOWNLOAD BUTTON DI SINI (Di bawah tombol klik)
-                st.success("✅ Laporan Final Selesai!")
+                # SIMPAN KE SESSION STATE (Kuncinya di sini!)
+                st.session_state.df_res_lookup = df_res_4
+                st.session_state.df_missing_lookup = df_missing_4
+                st.session_state.step4_done = True
                 
-                # --- DOWNLOAD PROCESS --- (Gunakan BytesIO seperti sebelumnya)
-                # ... (kode download lu yang lama tetap di sini) ...
-                st.write("Laporan siap diunduh.")
-        except Exception as e:
-            st.error(f"❌ Error Step 7: {e}")
+                st.success(f"✅ Lookup Selesai! Data siap untuk Step 5.")
+                
+                t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
+                with t_f:
+                    st.dataframe(df_res_4, use_container_width=True, hide_index=True)
+                with t_m:
+                    st.dataframe(df_missing_4, use_container_width=True, hide_index=True)
+                
+                # Download Result Step 4
+                out4 = io.BytesIO()
+                with pd.ExcelWriter(out4, engine='xlsxwriter') as wr:
+                    df_res_4.to_excel(wr, sheet_name='FINAL_ADJUSTMENT', index=False)
+                    df_missing_4.to_excel(wr, sheet_name='NEED_SINGLE_ADJ', index=False)
+                st.download_button("📥 DOWNLOAD RESULT STEP 4", data=out4.getvalue(), file_name="Adjustment_Lookup.xlsx", use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"❌ Error Step 4: {e}")
+
+    # =========================================================
+    # ⚙️ 5. PIVOT GENERATOR (VBA LOGIC) - CUKUP 1 UPLOADER
+    # =========================================================
+    st.markdown("<br><br>---", unsafe_allow_html=True)
+    st.subheader("5️⃣ FINAL ADJUSMENT + ")
+    
+    # Proteksi: Hanya muncul kalau Step 4 sudah dapet hasil
+    if 'step4_done' not in st.session_state:
+        st.warning("⚠️ Jalankan Step 4 dulu supaya data Recon & Cek Stock tersedia.")
+    else:
+        st.info("Data dari Step 4 sudah tersimpan. Sekarang cukup upload file Master Stock untuk Pivot.")
+        
+        # Cuma satu uploader sesuai permintaan
+        up_master_5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_single")
+
+        if up_master_5:
+            if st.button("▶️GENERATE ADJ +", use_container_width=True):
+                try:
+                    # Load Master
+                    df_m5 = pd.read_excel(up_master_5, engine='openpyxl') if up_master_5.name.endswith('xlsx') else pd.read_csv(up_master_5)
+                    
+                    # Panggil data dari session state
+                    df_lookup_data = st.session_state.df_res_lookup
+                    df_missing_data = st.session_state.df_missing_lookup
+                    
+                    # Jalankan Logika Pivot VBA
+                    df_mult, df_sing = logic_pivot_adjustment(df_lookup_data, df_m5, df_missing_data)
+                    
+                    st.success("✅ Pivot Multiple & Single Berhasil Dibuat!")
+                    
+                    t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+                    with t_mult:
+                        st.write("**Hasil Pivot SKU (Akumulasi Qty)**")
+                        st.dataframe(df_mult, use_container_width=True, hide_index=True)
+                    with t_sing:
+                        st.write("**Hasil Pivot BIN & SKU (Single Adj)**")
+                        st.dataframe(df_sing, use_container_width=True, hide_index=True)
+                    
+                    # Download Result Step 5
+                    out5 = io.BytesIO()
+                    with pd.ExcelWriter(out5, engine='xlsxwriter') as wr:
+                        df_mult.to_excel(wr, sheet_name='MULTIPLE ADJ +', index=False)
+                        df_sing.to_excel(wr, sheet_name='SINGLE ADJ +', index=False)
+                    st.download_button("📥 DOWNLOAD PIVOT REPORT", data=out5.getvalue(), file_name="Pivot_Adjustment_Final.xlsx", use_container_width=True)
+                
+                except Exception as e:
+                    st.error(f"❌ Error Step 5: {e}")
+# =========================================================
+    # ⚙️ 6. SET UP KARANTINA GENERATOR (TRANSPARAN)
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
+    
+    up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
+
+    if up_karantina:
+        if st.button("🛠️ GENERATE & BUKTIKAN PERHITUNGAN", use_container_width=True):
+            try:
+                # Baca file (Pakai index_col=False biar Kolom A nomor urut nggak ngerusak posisi)
+                if up_karantina.name.endswith(('.xlsx', '.xls')):
+                    df_raw = pd.read_excel(up_karantina, engine='openpyxl')
+                else:
+                    df_raw = pd.read_csv(up_karantina, index_col=False)
+                
+                # Panggil fungsi yang tadi didefinisikan di atas
+                df_final, df_debug = logic_setup_karantina_with_check(df_raw)
+                
+                # --- TABEL PEMBUKTIAN ---
+                st.write("### 🔍 Tabel Pengecekan (Data yang Gue Baca):")
+                st.dataframe(df_debug, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                
+                # --- HASIL AKHIR ---
+                if not df_final.empty:
+                    st.success(f"✅ Ada {len(df_final)} baris yang selisihnya bukan 0. Silakan cek tabel di atas.")
+                    st.write("### 📦 Hasil Akhir Format Karantina:")
+                    st.dataframe(df_final, use_container_width=True, hide_index=True)
+                    
+                    # Download
+                    out6 = io.BytesIO()
+                    with pd.ExcelWriter(out6, engine='xlsxwriter') as wr:
+                        df_final.to_excel(wr, sheet_name='SET UP KARANTINA', index=False)
+                    st.download_button("📥 DOWNLOAD SET UP KARANTINA", data=out6.getvalue(), file_name="Set_Up_Karantina.xlsx", use_container_width=True)
+                else:
+                    st.warning("⚠️ Gue nggak nemu selisih (Semua DIFF = 0). Cek lagi kolom K dan O lu.")
+                    
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+# =========================================================
+    # 🏁 7. FINAL REPORT GENERATOR (INTEGRATED)
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("🏁 7. FINAL REPORT GENERATOR")
+    st.info("Hanya upload file STOCK ADJ -. Data lainnya (Adj +, Karantina, Miss Loc) diambil otomatis dari sistem.")
+
+    # Hanya upload SATU file sesuai permintaan lu
+    up_minus_final = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx', 'csv'], key="up_minus_v2")
+
+    if up_minus_final:
+        if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
+            try:
+                # 1. Ambil data dari Step-Step sebelumnya (Session State)
+                df_adj_plus = st.session_state.get('df_res_lookup') # Dari Step Pivot
+                df_karantina = st.session_state.get('df_karantina_result') # Dari Step Karantina
+                df_miss_loc_internal = st.session_state.get('df_miss_loc_data') # Dari Step Miss Loc
+                
+                # 2. Baca file ADJ - yang baru diupload
+                df_m = pd.read_excel(up_minus_final) if up_minus_final.name.endswith('xlsx') else pd.read_csv(up_minus_final)
+
+                # 3. Jalankan Logika Gabungan
+                df_sum, df_miss, t_sku, t_qty = logic_generate_final_reports_v2(df_adj_plus, df_m, df_karantina, df_miss_loc_internal)
+
+                # --- DOWNLOAD 1: SUMMARY ADJUSTMENT ---
+                out_sum = io.BytesIO()
+                with pd.ExcelWriter(out_sum, engine='xlsxwriter') as wr:
+                    df_sum.to_excel(wr, sheet_name='SUM_ADJUSTMENT', index=False)
+                    workbook = wr.book
+                    ws_sum = wr.sheets['SUM_ADJUSTMENT']
+                    header_fmt = workbook.add_format({'bold':True, 'font_color':'white', 'bg_color':'#0070C0', 'border':1, 'align':'center'})
+                    for col_num, value in enumerate(df_sum.columns.values):
+                        ws_sum.write(0, col_num, value, header_fmt)
+
+                # --- DOWNLOAD 2: LIST MISS LOCATION ---
+                out_miss = io.BytesIO()
+                with pd.ExcelWriter(out_miss, engine='xlsxwriter') as wr:
+                    df_miss.to_excel(wr, sheet_name='LIST MISS LOCATION', index=False)
+                    ws_ms = wr.sheets['LIST MISS LOCATION']
+                    yellow_fmt = workbook.add_format({'bg_color': 'yellow', 'border': 1, 'bold': True, 'align':'center'})
+                    
+                    # Header Summary
+                    ws_ms.merge_range('F1:G1', 'SUMMARY MISS LOCATION', header_fmt)
+                    ws_ms.write('F2', 'KETERANGAN', header_fmt); ws_ms.write('G2', 'TOTAL', header_fmt)
+                    ws_ms.write('F3', 'TOTAL SKU'); ws_ms.write('G3', f"{t_sku} ITEM", yellow_fmt)
+                    ws_ms.write('F4', 'TOTAL QTY MISS LOCATION'); ws_ms.write('G4', f"{t_qty} ITEM", yellow_fmt)
+
+                st.success("✅ Laporan Berhasil Dibuat!")
+                st.download_button("📥 DOWNLOAD SUMMARY ADJUSTMENT", data=out_sum.getvalue(), file_name="Summary_Adjustment_Final.xlsx", use_container_width=True)
+                st.download_button("📥 DOWNLOAD LIST MISS LOCATION", data=out_miss.getvalue(), file_name="List_Miss_Location_Final.xlsx", use_container_width=True)
+
+            except Exception as e:
+                st.error(f"❌ Error Step 7: {e}. Pastikan Step 4, 5, dan 6 sudah dijalankan.")
             
 import pandas as pd
 import numpy as np
