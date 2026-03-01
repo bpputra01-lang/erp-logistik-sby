@@ -849,14 +849,12 @@ def menu_Stock_Opname():
         st.markdown("---")
         st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
         up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'])
-
         if up_bin_cov:
             if st.button("🚀 RUN ALLOCATION", use_container_width=True):
                 try:
                     df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
                     allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
                     allocated_data['ITEM NAME'] = allocated_data['SKU'].map(d['map_dict'])
-                    
                     st.session_state.allocation_result = allocated_data
                     st.session_state.sys_updated_result = sys_updated
                     st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated_data)
@@ -865,17 +863,11 @@ def menu_Stock_Opname():
 
     if 'allocation_result' in st.session_state:
         st.markdown("---")
-        st.markdown("### 3️⃣RECON REPORTS")
+        st.subheader("3️⃣ RECON REPORTS")
         if st.button("📊 Generate All RECON", use_container_width=True):
             st.session_state.recon_real_plus = generate_real_plus_recon(st.session_state.allocation_result)
-            
             filtered_sys = st.session_state.sys_updated_result[st.session_state.sys_updated_result['DIFF'] != 0].copy()
-            vba_cols = ['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF']
-            final_cols = [c for c in vba_cols if c in filtered_sys.columns]
-            for c in filtered_sys.columns: 
-                if c not in final_cols: final_cols.append(c)
-            
-            outstanding_df = filtered_sys[final_cols].copy()
+            outstanding_df = filtered_sys.copy()
             outstanding_df['HASIL REKONSILIASI'] = ""
             st.session_state.outstanding_system = outstanding_df
 
@@ -884,7 +876,14 @@ def menu_Stock_Opname():
             st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
             st.markdown("#### 📋 SYSTEM + OUTSTANDING RECON")
             st.dataframe(st.session_state.outstanding_system, use_container_width=True)
-
+            
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+                st.session_state.set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
+                st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
+                st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
+            st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Report.xlsx", use_container_width=True)
  # =========================================================
     # ⚙️ FINAL ADJUSTMENT CHECKER (DI PALING BAWAH)
     # =========================================================
