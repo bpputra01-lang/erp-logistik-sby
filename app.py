@@ -926,7 +926,7 @@ def menu_Stock_Opname():
             # =========================================================
             st.markdown("<br><br><br>---", unsafe_allow_html=True)
             st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
-            up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx'], key="u6_karantina")
+            up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx','csv'], key="u6_karantina")
 
             if up_k6:
                 if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
