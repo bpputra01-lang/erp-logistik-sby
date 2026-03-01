@@ -699,7 +699,7 @@ def generate_set_up_real_plus(d):
     
     return set_up_real_plus
 
-    if up_bin_cov:
+if up_bin_cov:
     if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
         try:
             df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
