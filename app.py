@@ -1060,6 +1060,7 @@ def menu_Stock_Opname():
 if 'step4_done' not in st.session_state: st.session_state.step4_done = False
 if 'step5_done' not in st.session_state: st.session_state.step5_done = False
 if 'step6_done' not in st.session_state: st.session_state.step6_done = False
+
 # =========================================================
 # ⚙️ 4. FINAL ADJUSTMENT CHECKER (LOOKUP & DIFF)
 # =========================================================
@@ -1068,14 +1069,13 @@ st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
 
 # --- TAMPILKAN DATA LAMA JIKA ADA (VIEW MODE) ---
 if st.session_state.step4_done and 'df_res_lookup' in st.session_state:
-    st.info(f"📂 Data Step 4 Tersimpan ({len(st.session_state.df_res_lookup)} baris). Upload ulang file untuk mengupdate, atau lanjut ke step berikutnya.")
-    t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT (Tersimpan)", "🔍 NEED SINGLE ADJ (Tersimpan)"])
+    st.info(f"📂 Data Step 4 Tersimpan ({len(st.session_state.df_res_lookup)} baris).")
+    t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
     with t_f:
         st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
     with t_m:
         st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
     
-    # Download lama (jika tidak upload baru)
     out4_old = io.BytesIO()
     with pd.ExcelWriter(out4_old, engine='xlsxwriter') as wr:
         st.session_state.df_res_lookup.to_excel(wr, sheet_name='FINAL_ADJUSTMENT', index=False)
@@ -1099,7 +1099,6 @@ if up_recon_4 and up_stock_4:
             
             df_res_4, df_missing_4 = logic_cek_adjustment_final(df_r4, df_s4)
             
-            # SIMPAN KE SESSION STATE
             st.session_state.df_res_lookup = df_res_4
             st.session_state.df_missing_lookup = df_missing_4
             st.session_state.step4_done = True
@@ -1116,16 +1115,20 @@ if up_recon_4 and up_stock_4:
 st.markdown("<br><br>---", unsafe_allow_html=True)
 st.subheader("5️⃣ FINAL ADJUSMENT +")
 
-# --- TAMPILKAN DATA LAMA JIKA ADA ---
+# --- TAMPILKAN DATA LAMA JIKA ADA (VIEW MODE) ---
+# PERBAIKAN: Cek dulu apakah data ada sebelum akses
 if st.session_state.step5_done and 'df_pivot_mult_result' in st.session_state:
-    st.info("📂 Data Step 5 Tersimpan.")
-    t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ + (Tersimpan)", "⚠️ SINGLE ADJ + (Tersimpan)"])
+    st.info Step 5 Tersimpan.")
+    t_mult, t("📂 Data_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
     with t_mult:
         st.dataframe(st.session_state.df_pivot_mult_result, use_container_width=True, hide_index=True)
     with t_sing:
-        st.dataframe(st.session_state.df_pivot_sing_result, use_container_width=True, hide_index=True)
+        # Cek jika df_pivot_sing_result ada
+        if 'df_pivot_sing_result' in st.session_state:
+            st.dataframe(st.session_state.df_pivot_sing_result, use_container_width=True, hide_index=True)
+        else:
+            st.warning("Data Single Adj tidak tersedia.")
 
-# PROTEKSI: Hanya jalan kalau Step 4 sudah
 if not st.session_state.step4_done:
     st.warning("⚠️ Jalankan Step 4 dulu!")
 else:
@@ -1137,15 +1140,14 @@ else:
             try:
                 df_m5 = pd.read_excel(up_master_5, engine='openpyxl') if up_master_5.name.endswith('xlsx') else pd.read_csv(up_master_5)
                 
-                # Ambil dari session state
                 df_lookup_data = st.session_state.df_res_lookup
                 df_missing_data = st.session_state.df_missing_lookup
                 
                 df_mult, df_sing = logic_pivot_adjustment(df_lookup_data, df_m5, df_missing_data)
 
-                # SIMPAN KE SESSION STATE
+                # SIMPAN KE SESSION STATE (LENGKAP)
                 st.session_state.df_pivot_mult_result = df_mult
-                st.session_state.df_pivot_sing_result = df_sing
+                st.session_state.df_pivot_sing_result = df_sing  # <-- INI YANG DITAMBAHKAN
                 st.session_state.step5_done = True
                 
                 st.success("✅ Pivot Berhasil!")
@@ -1168,17 +1170,15 @@ if st.session_state.step6_done and 'df_karantina_result' in st.session_state:
 up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
 
 if up_karantina:
-    if st.button("ATE & BUKTIKAN PERHIT🛠️ GENERUNGAN", use_container_width=True):
+    if st.button("🛠️ GENERATE & BUKTIKAN PERHITUNGAN", use_container_width=True):
         try:
             df_raw = pd.read_excel(up_karantina, engine='openpyxl') if up_karantina.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_karantina)
             
             df_final, df_debug = logic_setup_karantina_with_check(df_raw)
 
-            # SIMPAN KE SESSION STATE
             st.session_state.df_karantina_result = df_final
             st.session_state.step6_done = True
             
-            # Tabel Pengecekan
             st.write("### 🔍 Tabel Pengecekan:")
             st.dataframe(df_debug, use_container_width=True, hide_index=True)
             st.markdown("---")
@@ -1206,7 +1206,6 @@ if up_karantina:
 st.markdown("<br><br><br>---", unsafe_allow_html=True)
 st.subheader("🏁 7. FINAL REPORT GENERATOR")
 
-# CEK APAKAH SEMUA STEP SUDAH JALAN
 can_run_7 = (
     st.session_state.get('step5_done') and 
     st.session_state.get('step6_done')
@@ -1215,13 +1214,12 @@ can_run_7 = (
 if not can_run_7:
     st.warning("⚠️ Selesaikan Step 4, 5, dan 6 dulu!")
 else:
-    st.info("Siap生成 Laporan Akhir. Upload file ADJ - di bawah.")
+    st.info("Siap Generate Laporan Akhir. Upload file ADJ - di bawah.")
     up_minus_final = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx', 'csv'], key="up_minus_v2")
 
     if up_minus_final:
         if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
             try:
-                # Ambil data dari Session State
                 df_adj_plus = st.session_state.get('df_pivot_mult_result') 
                 df_karantina = st.session_state.get('df_karantina_result') 
                 df_miss_loc = st.session_state.get('df_karantina_result')
@@ -1255,7 +1253,7 @@ else:
 
             except Exception as e:
                 st.error(f"❌ Error Step 7: {e}")
-            
+                
 import pandas as pd
 import numpy as np
 import streamlit as st
