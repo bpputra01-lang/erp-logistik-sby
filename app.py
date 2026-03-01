@@ -634,34 +634,40 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         
     return df_multiple_final, df_single_final
 
-def logic_setup_karantina(df_outstanding):
+def logic_setup_karantina_with_check(df_outstanding):
+    # Buat copy biar data asli aman
     df = df_outstanding.copy()
     
-    # 1. Pastikan kolom target adalah angka berdasarkan posisi gambar lu:
-    # Kolom K (10) = QTY SYSTEM
-    # Kolom O (14) = HASIL REKONSILIASI
+    # 1. Kunci Koordinat sesuai gambar lu:
+    # K (Indeks 10) = QTY SYSTEM
+    # O (Indeks 14) = HASIL REKONSILIASI
     df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
     df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
     
-    # 2. Hitung Selisih Murni (System - Hasil Rekon)
-    # Kita tidak pakai kolom P dari Excel lu, tapi kita hitung sendiri biar akurat
-    df['DIFF_INTERNAL'] = df.iloc[:, 10] - df.iloc[:, 14]
+    # 2. Gue hitung DIFF sendiri di sini (System - Hasil Rekon)
+    df['CHECK_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
     
-    # 3. FILTER: Hanya ambil yang selisihnya TIDAK SAMA DENGAN 0
-    # Ini akan otomatis menangkap semua baris yang lu tandain (1 atau 2)
-    mask = df['DIFF_INTERNAL'] != 0
+    # 3. Data mentah buat lu cek (BIN, SKU, QTY SYS, HASIL REKON, SELISIH)
+    # Ambil kolom C(2), D(3), K(10), O(14)
+    df_check = df.iloc[:, [2, 3, 10, 14]].copy() 
+    df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'HASIL_REKON_O']
+    df_check['SELISIH_HITUNG_AI'] = df['CHECK_DIFF']
+    
+    # 4. FILTER: Hanya ambil yang selisihnya TIDAK SAMA DENGAN 0
+    # Ini kunci biar yang DIFF 0 (OK) nggak masuk
+    mask = df['CHECK_DIFF'] != 0
     df_filtered = df[mask].copy()
     
-    # 4. Susun 5 Kolom Hasil Akhir untuk SET UP KARANTINA
-    result_data = {
-        "BIN AWAL": df_filtered.iloc[:, 2],      # Kolom C (BIN)
-        "BIN TUJUAN": "KARANTINA",               # Fix String
-        "SKU": df_filtered.iloc[:, 3],           # Kolom D (SKU)
-        "QUANTITY": df_filtered['DIFF_INTERNAL'].abs(), # Hasil pengurangan tadi (Positif)
-        "NOTES": "MISS LOCATION"                 # Fix String
-    }
+    # 5. Susun Hasil Akhir (5 Kolom format Karantina)
+    df_karantina = pd.DataFrame({
+        "BIN AWAL": df_filtered.iloc[:, 2],      # Kolom C
+        "BIN TUJUAN": "KARANTINA",
+        "SKU": df_filtered.iloc[:, 3],           # Kolom D
+        "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
+        "NOTES": "MISS LOCATION"
+    })
     
-    return pd.DataFrame(result_data)
+    return df_karantina, df_check
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
@@ -1075,42 +1081,45 @@ def menu_Stock_Opname():
                 except Exception as e:
                     st.error(f"❌ Error Step 5: {e}")
 # =========================================================
-    # ⚙️ 6. SET UP KARANTINA GENERATOR (DENGAN PENGECEKAN)
+    # ⚙️ 6. SET UP KARANTINA GENERATOR (TRANSPARAN)
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
+    st.info("Gue bakal tampilin tabel pengecekan biar lu liat gue ngitungnya bener apa engga.")
     
     up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
 
     if up_karantina:
-        if st.button("🛠️ GENERATE & CEK PERHITUNGAN", use_container_width=True):
+        if st.button("🛠️ GENERATE & BUKTIKAN PERHITUNGAN", use_container_width=True):
             try:
-                # Baca file (Kolom A jangan jadi index)
-                df_raw = pd.read_excel(up_karantina, engine='openpyxl') if up_karantina.name.endswith('xlsx') else pd.read_csv(up_karantina, index_col=False)
+                # Baca file (Pakai index_col=False biar Kolom A nomor urut nggak ngerusak posisi)
+                if up_karantina.name.endswith(('.xlsx', '.xls')):
+                    df_raw = pd.read_excel(up_karantina, engine='openpyxl')
+                else:
+                    df_raw = pd.read_csv(up_karantina, index_col=False)
                 
-                # Jalankan Logika
+                # Panggil fungsi yang tadi didefinisikan di atas
                 df_final, df_debug = logic_setup_karantina_with_check(df_raw)
                 
-                # TAMPILKAN HASIL PERHITUNGAN GUE BIAR LU CEK
-                st.write("### 🔍 Tabel Pengecekan (Gue ngitung ini):")
-                st.info("Gue cuma ambil data yang 'SELISIH_SAYA' tidak sama dengan 0 untuk masuk ke Karantina.")
+                # --- TABEL PEMBUKTIAN ---
+                st.write("### 🔍 Tabel Pengecekan (Data yang Gue Baca):")
                 st.dataframe(df_debug, use_container_width=True, hide_index=True)
                 
                 st.markdown("---")
                 
-                # TAMPILKAN HASIL AKHIR
+                # --- HASIL AKHIR ---
                 if not df_final.empty:
-                    st.success(f"✅ Selesai! Ada {len(df_final)} baris yang selisihnya bukan 0.")
-                    st.write("### 📦 Hasil Akhir (Format SET UP KARANTINA):")
+                    st.success(f"✅ Ada {len(df_final)} baris yang selisihnya bukan 0. Silakan cek tabel di atas.")
+                    st.write("### 📦 Hasil Akhir Format Karantina:")
                     st.dataframe(df_final, use_container_width=True, hide_index=True)
                     
-                    # Tombol Download
+                    # Download
                     out6 = io.BytesIO()
                     with pd.ExcelWriter(out6, engine='xlsxwriter') as wr:
                         df_final.to_excel(wr, sheet_name='SET UP KARANTINA', index=False)
                     st.download_button("📥 DOWNLOAD SET UP KARANTINA", data=out6.getvalue(), file_name="Set_Up_Karantina.xlsx", use_container_width=True)
                 else:
-                    st.warning("⚠️ Tidak ada data dengan selisih (Semua 0).")
+                    st.warning("⚠️ Gue nggak nemu selisih (Semua DIFF = 0). Cek lagi kolom K dan O lu.")
                     
             except Exception as e:
                 st.error(f"❌ Error: {e}")
