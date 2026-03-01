@@ -753,23 +753,82 @@ def generate_real_plus_recon(allocated_data):
 
 
 # ============================================================
-# 🚀 LOGIC SYSTEM + OUTSTANDING RECON - DENGAN HASIL REKONSILIASI
+# 🚀 LOGIC SYSTEM + OUTSTANDING RECON - LENGKAP SESUAI VBA
 # ============================================================
 def generate_system_outstanding_recon(df_system):
     """
     VBA: SYSTEM_OUTSTANDING_RECON
     Filter: DIFF != 0
-    Columns: BIN, SKU, ..., DIFF, HASIL REKONSILIASI
+    Columns (sesuai VBA): BIN, SKU, BRAND, ITEM NAME, VARIANT, SUB KATEGORI, QTY SYSTEM, QTY SO, DIFF, HASIL REKONSILIASI
     """
     # Filter DIFF != 0
     filtered = df_system[df_system['DIFF'] != 0].copy()
     
     if not filtered.empty:
-        # Ambil semua kolom yang ada
-        outstanding_df = filtered.copy()
+        # Mapping kolom yang ada di system_plus ke nama VBA
+        # Sesuaikan dengan kolom aktual yang ada
+        cols_available = filtered.columns.tolist()
+        
+        # Rename mapping
+        rename_map = {}
+        select_cols = []
+        
+        for col in cols_available:
+            col_upper = col.upper().strip()
+            
+            if 'BIN' in col_upper:
+                rename_map[col] = 'BIN'
+                select_cols.append(col)
+            elif 'SKU' in col_upper:
+                rename_map[col] = 'SKU'
+                select_cols.append(col)
+            elif 'BRAND' in col_upper:
+                rename_map[col] = 'BRAND'
+                select_cols.append(col)
+            elif 'ITEM NAME' in col_upper or 'ITEM_NAME' in col_upper:
+                rename_map[col] = 'ITEM NAME'
+                select_cols.append(col)
+            elif 'VARIANT' in col_upper:
+                rename_map[col] = 'VARIANT'
+                select_cols.append(col)
+            elif 'SUB KATEGORI' in col_upper or 'SUB_KATEGORI' in col_upper or 'SUB' in col_upper:
+                rename_map[col] = 'SUB KATEGORI'
+                select_cols.append(col)
+            elif 'QTY SYSTEM' in col_upper or 'QTY_SYSTEM' in col_upper or 'QTY' == col_upper:
+                rename_map[col] = 'QTY SYSTEM'
+                select_cols.append(col)
+            elif 'QTY SO' in col_upper or 'QTY_SO' in col_upper or 'SO' in col_upper:
+                rename_map[col] = 'QTY SO'
+                select_cols.append(col)
+            elif 'DIFF' in col_upper:
+                rename_map[col] = 'DIFF'
+                select_cols.append(col)
+        
+        # Select dan Rename
+        if select_cols:
+            outstanding_df = filtered[select_cols].rename(columns=rename_map)
+        else:
+            outstanding_df = filtered.copy()
+        
+        # Urutkan kolom sesuai VBA (jika ada)
+        vba_order = ['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY SYSTEM', 'QTY SO', 'DIFF']
+        final_cols = []
+        for c in vba_order:
+            if c in outstanding_df.columns:
+                final_cols.append(c)
+            else:
+                # Cari kolom yang belum ada
+                for col in outstanding_df.columns:
+                    if col not in final_cols:
+                        final_cols.append(col)
+                        break
+        
+        # Reorder columns
+        outstanding_df = outstanding_df[final_cols]
         
         # TAMBAHKAN KOLOM HASIL REKONSILIASI DI AKHIR
         outstanding_df['HASIL REKONSILIASI'] = ""
+        
     else:
         # Buatkan dataframe dengan kolom lengkap
         outstanding_df = pd.DataFrame(columns=['BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 
@@ -777,7 +836,6 @@ def generate_system_outstanding_recon(df_system):
                                                'DIFF', 'HASIL REKONSILIASI'])
     
     return outstanding_df
-
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
 # =========================================================
