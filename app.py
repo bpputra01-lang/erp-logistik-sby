@@ -959,7 +959,7 @@ def menu_Stock_Opname():
                 # Jalankan fungsi lookup
                 df_res_4, df_missing_4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
-                # SIMPAN KE SESSION STATE (Kuncinya di sini!)
+                # --- TAMBAHAN FUNGSI MENGUNCI ---
                 st.session_state.df_res_lookup = df_res_4
                 st.session_state.df_missing_lookup = df_missing_4
                 st.session_state.step4_done = True
@@ -1009,6 +1009,10 @@ def menu_Stock_Opname():
                     
                     # Jalankan Logika Pivot VBA
                     df_mult, df_sing = logic_pivot_adjustment(df_lookup_data, df_m5, df_missing_data)
+
+                    # --- TAMBAHAN FUNGSI MENGUNCI ---
+                    st.session_state.df_pivot_mult_result = df_mult
+                    st.session_state.step5_done = True
                     
                     st.success("✅ Pivot Multiple & Single Berhasil Dibuat!")
                     
@@ -1029,7 +1033,8 @@ def menu_Stock_Opname():
                 
                 except Exception as e:
                     st.error(f"❌ Error Step 5: {e}")
-# =========================================================
+
+    # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (TRANSPARAN)
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
@@ -1040,14 +1045,18 @@ def menu_Stock_Opname():
     if up_karantina:
         if st.button("🛠️ GENERATE & BUKTIKAN PERHITUNGAN", use_container_width=True):
             try:
-                # Baca file (Pakai index_col=False biar Kolom A nomor urut nggak ngerusak posisi)
+                # Baca file
                 if up_karantina.name.endswith(('.xlsx', '.xls')):
                     df_raw = pd.read_excel(up_karantina, engine='openpyxl')
                 else:
                     df_raw = pd.read_csv(up_karantina, index_col=False)
                 
-                # Panggil fungsi yang tadi didefinisikan di atas
+                # Panggil fungsi logic
                 df_final, df_debug = logic_setup_karantina_with_check(df_raw)
+
+                # --- TAMBAHAN FUNGSI MENGUNCI ---
+                st.session_state.df_karantina_result = df_final
+                st.session_state.step6_done = True
                 
                 # --- TABEL PEMBUKTIAN ---
                 st.write("### 🔍 Tabel Pengecekan (Data yang Gue Baca):")
@@ -1071,7 +1080,8 @@ def menu_Stock_Opname():
                     
             except Exception as e:
                 st.error(f"❌ Error: {e}")
-# =========================================================
+
+    # =========================================================
     # 🏁 7. FINAL REPORT GENERATOR (INTEGRATED)
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
@@ -1085,9 +1095,10 @@ def menu_Stock_Opname():
         if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
             try:
                 # 1. Ambil data dari Step-Step sebelumnya (Session State)
-                df_adj_plus = st.session_state.get('df_res_lookup') # Dari Step Pivot
-                df_karantina = st.session_state.get('df_karantina_result') # Dari Step Karantina
-                df_miss_loc_internal = st.session_state.get('df_miss_loc_data') # Dari Step Miss Loc
+                # Note: df_adj_plus diambil dari hasil Step 5 (df_pivot_mult_result)
+                df_adj_plus = st.session_state.get('df_pivot_mult_result') 
+                df_karantina = st.session_state.get('df_karantina_result') 
+                df_miss_loc_internal = st.session_state.get('df_karantina_result') # Menggunakan data karantina sebagai base miss loc
                 
                 # 2. Baca file ADJ - yang baru diupload
                 df_m = pd.read_excel(up_minus_final) if up_minus_final.name.endswith('xlsx') else pd.read_csv(up_minus_final)
