@@ -706,12 +706,12 @@ def generate_set_up_real_plus(d):
         
     up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
 
-        if up_bin_cov:
-            if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
-                try:
-                    df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+    if up_bin_cov:
+        if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
+            try:
+                df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
                     
-                    with st.spinner("Memproses Alokasi..."):
+                with st.spinner("Memproses Alokasi..."):
                         # 1️⃣ ALLOCATION
                         allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
                         
