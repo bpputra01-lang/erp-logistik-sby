@@ -795,7 +795,7 @@ def menu_Stock_Opname():
             except Exception as e:
                 st.error(f"❌ Error Allocation: {e}")
 
-            # ============================================================
+        # ============================================================
         # ✅ HASIL ALLOCATION + SET UP REAL +
         # ============================================================
         if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state and 'set_up_real_plus' in st.session_state:
@@ -823,9 +823,7 @@ def menu_Stock_Opname():
             
             st.markdown("---")
             
-            ta1, ta2, ta3 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)", "📦 SET UP            with ta1 REAL +"])
-            
-:
+            ta1, ta2, ta3 = st.tabs(["🔥 REAL + (With Allocation)", "📊 STOCK SYSTEM (Updated)", "📦 SET UP with ta1 REAL +"]) :
                 st.dataframe(alloc_data, use_container_width=True)
             with ta2:
                 st.dataframe(sys_updated, use_container_width=True)
