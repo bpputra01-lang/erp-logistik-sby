@@ -890,113 +890,74 @@ def generate_system_outstanding_recon(df_system):
     
     return outstanding_df
 
-# =========================================================
-# 2. FUNGSI LOGIKA REKONSILIASI
-# =========================================================
-def logic_cek_adjustment_final(df_recon, df_stock):
-    # Ambil Kolom Penting (0-based index)
-    # Recon: Kolom 0=BIN, 1=SKU, 6=QTY (G)
-    dr = df_recon.iloc[:, [0, 1, 6]].copy()
-    dr.columns = ['BIN_RECON', 'SKU_RECON', 'QTY_RECON_VAL']
-    
-    # Stock: 1=BIN, 2=SKU, 9=QTY_SYSTEM, 10=QTY_SO
-    dt = df_stock.copy()
-    
-    # Clean Data (Uppercase & Strip)
-    dr['BIN_RECON'] = dr['BIN_RECON'].astype(str).str.strip().str.upper()
-    dr['SKU_RECON'] = dr['SKU_RECON'].astype(str).str.strip().str.upper()
-    dr['QTY_RECON_VAL'] = pd.to_numeric(dr['QTY_RECON_VAL'], errors='coerce').fillna(0)
-    
-    # Konversi Kolom di Stock (Indeks 1, 2, 9, 10)
-    # Kolom B (1), C (2)
-    dt.iloc[:, 1] = dt.iloc[:, 1].astype(str).str.strip().str.upper()
-    dt.iloc[:, 2] = dt.iloc[:, 2].astype(str).str.strip().str.upper()
-    # Kolom J (9), K (10)
-    dt.iloc[:, 9] = pd.to_numeric(dt.iloc[:, 9], errors='coerce').fillna(0)
-    dt.iloc[:, 10] = pd.to_numeric(dt.iloc[:, 10], errors='coerce').fillna(0)
-
-    # Rename Kolom Induk untuk Merge
-    dt_for_merge = dt.rename(columns={1: 'BIN_TEMP', 2: 'SKU_TEMP'})
-    
-    # Merge (Left Join)
-    merged = dt_for_merge.merge(
-        dr, 
-        left_on=['BIN_TEMP', 'SKU_TEMP'], 
-        right_on=['BIN_RECON', 'SKU_RECON'], 
-        how='left'
-    )
-    
-    # Update Kolom K (Index 10) dengan QTY Recon
-    merged.iloc[:, 10] = merged['QTY_RECON_VAL'].fillna(0)
-    
-    # Hitung DIFF (System - SO)
-    diff_val = abs(merged.iloc[:, 9] - merged.iloc[:, 10])
-    merged['DIFF'] = diff_val
-
-    # Cari Mismatch (Data di Recon yang tidak ada di Stock)
-    stock_keys = set(zip(dt_for_merge['BIN_TEMP'], dt_for_merge['SKU_TEMP']))
-    recon_keys = set(zip(dr['BIN_RECON'], dr['SKU_RECON']))
-    missing_keys = recon_keys - stock_keys
-    
-    df_mismatch = dr[dr.apply(lambda x: (x['BIN_RECON'], x['SKU_RECON']) in missing_keys, axis=1)]
-
-    # Kembalikan dataframe hasil (sudah digabungkan) & error
-    return merged, df_mismatch
-
-# =========================================================
-# 3. INTERFACE STREAMLIT
-# =========================================================
-st.set_page_config(page_title="Recon & Adjustment Tool", layout="wide")
+# --- 2. HEADER & UPLOADERS ---
 st.title("🚀 Stock Adjustment & Recon Uploader")
 
-# Layout 2 Kolom Upload
-col1, col2 = st.columns(2)
+col_up1, col_up2 = st.columns(2)
+with col_up1:
+    file_recon = st.file_uploader("Upload Sheet: REAL + RECON", type=['xlsx'])
+with col_up2:
+    file_stock = st.file_uploader("Upload Sheet: CEK STOCK ADJ +", type=['xlsx'])
 
-with col1:
-    file_recon = st.file_uploader("Upload Sheet: REAL + RECON", type=['xlsx'], key="recon")
+# --- 3. ANALYZER BUTTON ---
+# Gunakan session_state agar hasil tidak hilang saat filter diubah
+if "processed" not in st.session_state:
+    st.session_state.processed = False
 
-with col2:
-    file_stock = st.file_uploader("Upload Sheet: CEK STOCK ADJ +", type=['xlsx'], key="stock")
+if st.button("STOCK OPNAME ANALYZER", use_container_width=True):
+    if file_recon and file_stock:
+        # Load data (Simulasi)
+        df_r = pd.read_excel(file_recon)
+        df_s = pd.read_excel(file_stock)
+        
+        # Jalankan Logika (Gunakan fungsi logic_cek_adjustment_final sebelumnya)
+        # st.session_state.df_hasil, _ = logic_cek_adjustment_final(df_r, df_s)
+        
+        st.session_state.processed = True
+    else:
+        st.error("Silahkan upload kedua file terlebih dahulu!")
 
-# Logika Utama Dijalankan di Dalam Tombol
-if file_recon and file_stock:
-    if st.button("RUNNING RECON & DIFF", type="primary"):
-        
-        # Load Data (header=None agar index sesuai VBA)
-        df_r = pd.read_excel(file_recon, header=None)
-        df_s = pd.read_excel(file_stock, header=None)
-        
-        # Jalankan Logika
-        with st.spinner("Sedang Memproses..."):
-            df_hasil, df_error = logic_cek_adjustment_final(df_r, df_s)
-        
-        st.success("✅ Proses Selesai! Data sudah dihitung.")
-        
-        # --- TAMPILAN HASIL (DI BAWAH TOMBOL) ---
-        
-        # 1. Preview Data (10 Baris Pertama)
-        st.subheader("📊 Preview Hasil (10 Baris Pertama)")
-        st.dataframe(df_hasil.head(10), use_container_width=True)
-        
-        # 2. Tombol Download Utama
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df_hasil.to_excel(writer, index=False, sheet_name='CEK STOCK ADJ +')
-            if not df_error.empty:
-                df_error.to_excel(writer, index=False, sheet_name='MISMATCH_DATA')
-        
-        st.download_button(
-            label="📥 DOWNLOAD HASIL RECON (XLSX)",
-            data=output.getvalue(),
-            file_name="HASIL_ADJUSTMENT_FINAL.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        
-        # 3. Warning Mismatch (Opsional)
-        if not df_error.empty:
-            st.warning(f"⚠️ Ditemukan {len(df_error)} data di Recon yang tidak ditemukan di Stock (Mismatch).")
-            with st.expander("Lihat Detail Mismatch"):
-                st.dataframe(df_error)
+st.markdown("---")
+
+# --- 4. FILTER AREA (SUB KATEGORI, BIN, DLL) ---
+col_f1, col_f2, col_f3 = st.columns(3)
+with col_f1:
+    st.write("📂 **Sub Kategori:**")
+    st.multiselect("", ["SHOES", "SANDALS", "APPAREL"], default=["SHOES", "SANDALS"], key="f_sub", label_visibility="collapsed")
+with col_f2:
+    st.write("🏭 **BIN System:**")
+    st.multiselect("", ["GL3-DC-A", "GL3-DC-B", "GL3-DC-C"], default=["GL3-DC-A"], key="f_bin", label_visibility="collapsed")
+with col_f3:
+    st.write("📡 **BIN Coverage:**")
+    st.multiselect("", ["ZONE 1", "ZONE 2"], key="f_cov", label_visibility="collapsed")
+
+# --- 5. RECON REPORTS AREA (MUNCUL DI BAWAH) ---
+# Bagian ini hanya muncul jika tombol analyzer sudah diklik
+if st.session_state.processed:
+    st.markdown("### 📊 RECON REPORTS")
+    
+    # Tombol Generate All RECON (Kecil di kiri)
+    col_gen, _ = st.columns([1, 4])
+    with col_gen:
+        if st.button("📊 Generate All RECON"):
+            st.toast("Generating report...")
+
+    st.markdown("### 📋 REAL + RECON (NO ALLOCATION)")
+    
+    # Tampilkan tabel (Contoh data agar sesuai gambar 2)
+    # Ganti dengan st.dataframe(st.session_state.df_hasil) untuk data asli
+    st.dataframe(
+        pd.DataFrame({
+            "BIN": ["GL3-DC-B3-1", "GL3-DC-C5-1"],
+            "SKU": ["910530741", "101134542"],
+            "QTY SCAN": [1, 2],
+            "QTY SYSTEM": [0, 0],
+            "DIFF": [1, 2],
+            "ITEM NAME": ["9105307 ENERCHARGE M1 - BLACK/YELLOW", "None"],
+            "HASIL RECONCILIATION": ["", ""]
+        }), 
+        use_container_width=True
+    )
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
 # =========================================================
