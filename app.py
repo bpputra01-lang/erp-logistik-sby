@@ -540,45 +540,51 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
     
     return ds_merged
 
-# ============================================================
-# 🚀 COMPARE 2: SYSTEM VS SCAN - AMBIL SEMUA KOLOM
-# ============================================================
+
 # ============================================================
 # 🚀 COMPARE 2: SYSTEM VS SCAN - AMBIL SEMUA KOLOM
 # ============================================================
 def logic_compare_stock_to_scan(df_stock, df_scan):
-    # AMBIL SEMUA KOLOM dari stock
-    dt = df_stock.copy()
-    
-    # Ambil kolom penting dari scan
-    ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-    ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
-    ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
-    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
-    
-    # Group scan by SKU & BIN
-    ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
-    
-    # Merge ke stock
-    dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')
-    
-    # ISI KOLOM QTY_SO (YANG SUDAH ADA) DARI QTY_SCAN
-    dt_merged['QTY_SO'] = dt_merged['QTY_SCAN'].fillna(0)
-    
-    # Hitung DIFF = QTY - QTY_SO
-    if 'QTY' in dt_merged.columns:
-        dt_merged['DIFF'] = dt_merged['QTY'] - dt_merged['QTY_SO']
-    else:
-        dt_merged['DIFF'] = 0
-    
-    # NOTE: SYSTEM + jika DIFF > 0
-    dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
-    
-    # Hapus kolom temporary QTY_SCAN
-    dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
-    
-    return dt_merged
+# AMBIL SEMUA KOLOM dari stock
+dt = df_stock.copy()
+
+# AMBIL KOLOM PENTING DARI SCAN (A, B, C = BIN, SKU, QTY)
+ds = df_scan.iloc[:, [0, 1, 2]].copy()
+ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
+ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
+ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+
+# GROUP BY BIN+SKU (SUM QTY SCAN) - SESUAI VBA
+ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
+
+# MERGE KE STOCK SYSTEM
+dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')
+dt_merged['QTY_SCAN'] = dt_merged['QTY_SCAN'].fillna(0)
+
+# QTY SO = QTY SCAN (SESUAI VBA: outQtySO = qtyScan)
+dt_merged['QTY SO'] = dt_merged['QTY_SCAN']
+
+# DIFF = QTY SYSTEM - QTY SO (SESUAI VBA: qtySystem - qtyScan)
+# QTY SYSTEM ada di kolom J (index 9)
+if 'QTY' in dt_merged.columns:
+    dt_merged['DIFF'] = dt_merged['QTY'] - dt_merged['QTY SO']
+else:
+    # Cari kolom QTY
+    qty_col = [c for c in dt_merged.columns if c.upper() == 'QTY']
+    if qty_col:
+        dt_merged['DIFF'] = dt_merged[qty_col[0]] - dt_merged['QTY SO']
+
+# NOTE: SYSTEM + jika QTY > QTY SO, else OK (SESUAI VBA)
+dt_merged['NOTE'] = dt_merged.apply(
+    lambda row: "SYSTEM +" if row.get('QTY', 0) > row['QTY SO'] else "OK", 
+    axis=1
+)
+
+# Hapus kolom temporary QTY_SCAN
+dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
+
+return dt_merged
 # ============================================================
 # 🚀 LOGIC ALLOCATION (SESUAI VBA - 2 SUMBER)
 # ============================================================
