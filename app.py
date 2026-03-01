@@ -895,36 +895,56 @@ def menu_Stock_Opname():
                 st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
             st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Report.xlsx", use_container_width=True)
- # =========================================================
+# =========================================================
     # ⚙️ FINAL ADJUSTMENT CHECKER (DI PALING BAWAH)
     # =========================================================
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    
-    # Menggunakan subheader agar ukuran font besar dan otomatis bold
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
-    
     st.info("Upload dua file di bawah ini untuk menjalankan logika 'CEK_ADJUSMENT_FINAL'")
-
+    
     adj_col1, adj_col2 = st.columns(2)
     with adj_col1:
         st.write("**1. File Hasil Rekon**")
-        up_recon = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="adj_final_up_1")
+        up_recon = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="adj_final_up_1")
     with adj_col2:
         st.write("**2. File Cek Stock**")
-        up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx','csv'], key="adj_final_up_2")
+        up_stock_adj = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_final_up_2")
 
     if up_recon and up_stock_adj:
         if st.button("🚀 JALANKAN PROSES LOOKUP & DIFF", use_container_width=True):
             try:
-                df_res = logic_cek_adjustment_final(pd.read_excel(up_recon), pd.read_excel(up_stock_adj))
+                # --- LOGIC PEMBACAAN FILE FLEXIBLE ---
+                # Baca file 1 (Recon)
+                if up_recon.name.endswith(('.xlsx', '.xls')):
+                    df_recon_in = pd.read_excel(up_recon, engine='openpyxl')
+                else:
+                    df_recon_in = pd.read_csv(up_recon)
+
+                # Baca file 2 (Stock Adj)
+                if up_stock_adj.name.endswith(('.xlsx', '.xls')):
+                    df_stock_in = pd.read_excel(up_stock_adj, engine='openpyxl')
+                else:
+                    df_stock_in = pd.read_csv(up_stock_adj)
+                
+                # Jalankan Logika
+                df_res = logic_cek_adjustment_final(df_recon_in, df_stock_in)
+                
                 st.success("✅ Proses Selesai!")
                 st.dataframe(df_res, use_container_width=True)
                 
+                # Download Result (Tetap Excel biar rapi)
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     df_res.to_excel(writer, sheet_name='FINAL_ADJUSTMENT', index=False)
-                st.download_button("📥 DOWNLOAD HASIL ADJUSTMENT", data=output.getvalue(), file_name="Adjustment_Final_Result.xlsx", use_container_width=True)
-            except Exception as e: st.error(f"❌ Error: {e}")
+                
+                st.download_button(
+                    label="📥 DOWNLOAD HASIL ADJUSTMENT", 
+                    data=output.getvalue(), 
+                    file_name="Adjustment_Final_Result.xlsx", 
+                    use_container_width=True
+                )
+            except Exception as e: 
+                st.error(f"❌ Error saat membaca file: {e}")
 
             
 import pandas as pd
