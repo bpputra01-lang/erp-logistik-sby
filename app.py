@@ -764,7 +764,7 @@ def menu_Stock_Opname():
                     with st.spinner("Memproses Alokasi..."):
                         allocated_data, sys_updated = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov_raw)
                         
-                        # 🆕 GENERATE SET UP REAL + (SETELAH ALLOCATION)
+# 🆕 GENERATE SET UP REAL + (SETELAH ALLOCATION)
 df_s_raw_copy = d['df_s_raw'].copy()
 df_s_raw_copy['SKU_UPPER'] = df_s_raw_copy['SKU'].astype(str).str.strip().str.upper()
 df_s_raw_copy['BIN_SCAN'] = df_s_raw_copy['BIN'].astype(str).str.strip()
@@ -795,7 +795,6 @@ st.session_state.sys_updated_result = sys_updated
 st.session_state.set_up_real_plus = set_up_real_plus
 
 st.success("✅ Allocation Selesai!")
-
     # ============================================================
     # ✅ HASIL ALLOCATION + SET UP REAL + (SETELAH RUN ALLOCATION)
     # ============================================================
