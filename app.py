@@ -550,46 +550,53 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
 # 🚀 COMPARE 2: SYSTEM VS SCAN - AMBIL SEMUA KOLOM
 # ============================================================
 def logic_compare_stock_to_scan(df_stock, df_scan):
-    # 1. Ambil SEMUA KOLOM dari stock (df_stock asli)
+    # 1. Copy original agar tidak merusak df asli
     dt = df_stock.copy()
     
-    # 2. Ambil & Grouping Data Scan (Penting: Macro menggunakan Dictionary untuk SUM QTY SCAN)
+    # 2. Persiapkan Data Scan (Group by BIN & SKU)
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    ds.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
     
-    ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
-    ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
-    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+    # Clean up (Strip & Upper)
+    ds['BIN_SCAN'] = ds['BIN_SCAN'].astype(str).str.strip().str.upper()
+    ds['SKU_SCAN'] = ds['SKU_SCAN'].astype(str).str.strip().str.upper()
+    ds['QTY_TOTAL_SCAN'] = pd.to_numeric(ds['QTY_TOTAL_SCAN'], errors='coerce').fillna(0)
     
-    # Grouping agar tidak duplikat saat merge
-    ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
+    # Sum QTY Scan (Sesuai Logika Dictionary di Macro)
+    ds_grouped = ds.groupby(['BIN_SCAN', 'SKU_SCAN'])['QTY_TOTAL_SCAN'].sum().reset_index()
     
-    # 3. Clean Key Kolom di Stock (BIN=Kolom 1/B, SKU=Kolom 2/C)
-    # Kita asumsikan dt adalah dataframe utuh dari sheet "STOCK SYSTEM"
-    dt.iloc[:, 1] = dt.iloc[:, 1].astype(str).str.strip().str.upper() # BIN
-    dt.iloc[:, 2] = dt.iloc[:, 2].astype(str).str.strip().str.upper() # SKU
+    # 3. Identifikasi Nama Kolom Target di df_stock
+    # Berdasarkan macro Anda: BIN=Kolom 1(B), SKU=Kolom 2(C), QTY SYSTEM=Kolom 9(J), QTY SO=Kolom 10(K)
+    col_bin_sys = dt.columns[1]
+    col_sku_sys = dt.columns[2]
+    col_qty_sys = dt.columns[9]
+    col_qty_so  = dt.columns[10] # Kolom K (QTY SO) yang sudah ada di file
     
-    # 4. Merge
-    # Kita rename kolom temporary untuk merge agar akurat
-    dt_merged = dt.merge(ds_grouped, 
-                         left_on=[dt.columns[1], dt.columns[2]], 
-                         right_on=['BIN', 'SKU'], 
-                         how='left')
+    # Clean up key di df_stock untuk merging
+    dt[col_bin_sys] = dt[col_bin_sys].astype(str).str.strip().str.upper()
+    dt[col_sku_sys] = dt[col_sku_sys].astype(str).str.strip().str.upper()
+
+    # 4. Merge (Left Join) untuk mengambil hasil scan ke dalam sheet system
+    dt_merged = dt.merge(
+        ds_grouped, 
+        left_on=[col_bin_sys, col_sku_sys], 
+        right_on=['BIN_SCAN', 'SKU_SCAN'], 
+        how='left'
+    )
     
-    # 5. Hitung DIFF (QTY SYSTEM - QTY SO)
-    # QTY SYSTEM ada di kolom ke-10 (indeks 9)
-    qty_sys_col = dt.columns[9] 
-    dt_merged['QTY_SO'] = dt_merged['QTY_SCAN'].fillna(0)
-    dt_merged['DIFF'] = dt_merged[qty_sys_col] - dt_merged['QTY_SO']
+    # 5. MASUKKAN KE KOLOM ASLI (Tanpa membuat kolom baru)
+    # Kita isi kolom QTY SO bawaan dengan hasil merge, lalu isi NaN dengan 0
+    dt_merged[col_qty_so] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
     
-    # 6. Note & Cleanup
+    # 6. Update DIFF dan NOTE
+    # DIFF = QTY SYSTEM - QTY SO
+    dt_merged['DIFF'] = dt_merged[col_qty_sys] - dt_merged[col_qty_so]
     dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
     
-    # Hapus kolom temporary BIN/SKU hasil merge jika double
-    cols_to_drop = [c for c in ['BIN', 'SKU', 'QTY_SCAN'] if c in dt_merged.columns]
-    dt_merged = dt_merged.drop(columns=cols_to_drop)
+    # 7. Cleanup kolom temporary hasil merge
+    dt_final = dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'])
     
-    return dt_merged
+    return dt_final
 # ============================================================
 # 🚀 LOGIC ALLOCATION (SESUAI VBA - 2 SUMBER)
 # ============================================================
