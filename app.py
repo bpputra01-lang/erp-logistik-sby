@@ -1014,7 +1014,7 @@ def menu_Stock_Opname():
         up_master_5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_single")
 
         if up_master_5:
-            if st.button("GENERATE (MULTIPLE & SINGLE ADJ)", use_container_width=True):
+            if st.button("GENERATE ADJ +)", use_container_width=True):
                 try:
                     # Load Master
                     df_m5 = pd.read_excel(up_master_5, engine='openpyxl') if up_master_5.name.endswith('xlsx') else pd.read_csv(up_master_5)
