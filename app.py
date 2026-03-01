@@ -649,7 +649,7 @@ def menu_Stock_Opname():
         </style>
     """, unsafe_allow_html=True)
      
-    st.markdown('<div class="hero-header"><h1>📦 STOCK OPNAME - COMPARE & ALLOCATION</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1> STOCK OPNAME ANALYZER</h1></div>', unsafe_allow_html=True)
     
     # --- FILTER SECTION ---
     with st.container():
