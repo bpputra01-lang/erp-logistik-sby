@@ -635,25 +635,28 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
     return df_multiple_final, df_single_final
 
 def logic_setup_karantina(df_outstanding):
-    # Buat copy agar data asli aman
     df = df_outstanding.copy()
     
-    # 1. PASTIIN KOLOM K (10) DAN N (13) ADALAH ANGKA
-    # Kita pakai .iloc supaya tidak peduli apa nama headernya, yang penting posisinya
-    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # QTY SYSTEM (K)
-    df.iloc[:, 13] = pd.to_numeric(df.iloc[:, 13], errors='coerce').fillna(0) # HASIL REKON (N)
+    # 1. Pastikan kolom terbaca sebagai angka sesuai gambar lu:
+    # Kolom K (10) = QTY SYSTEM
+    # Kolom O (14) = HASIL REKONSILIASI
+    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
+    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
     
-    # 2. LOGIKA UTAMA: Hanya ambil jika Qty System > Hasil Rekon
-    # Jika Qty System (K) lebih besar, berarti ada selisih yang harus dikarantina
-    mask = df.iloc[:, 10] > df.iloc[:, 13]
+    # 2. Hitung Selisih (Diff)
+    # Kita hanya memindahkan yang ada selisih (bukan 0)
+    df['CALC_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
+    
+    # 3. Filter: Hanya ambil yang selisihnya TIDAK SAMA DENGAN 0
+    mask = df['CALC_DIFF'] != 0
     df_filtered = df[mask].copy()
     
-    # 3. SUSUN DATA KARANTINA (5 KOLOM)
+    # 4. Susun Hasil Akhir (5 Kolom)
     result_data = {
         "BIN AWAL": df_filtered.iloc[:, 2],      # Kolom C (BIN)
         "BIN TUJUAN": "KARANTINA",               # Fix String
         "SKU": df_filtered.iloc[:, 3],           # Kolom D (SKU)
-        "QUANTITY": df_filtered.iloc[:, 10] - df_filtered.iloc[:, 13], # Selisih K - N
+        "QUANTITY": df_filtered['CALC_DIFF'].abs(), # Pakai Absolute agar angka selalu positif
         "NOTES": "MISS LOCATION"                 # Fix String
     }
     
