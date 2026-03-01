@@ -1021,7 +1021,7 @@ def menu_Stock_Opname():
         
         colReconBtn, colSpacer = st.columns([1, 3])
         
-                with colReconBtn:
+        with colReconBtn:
             if st.button("📊 Generate All RECON", use_container_width=True, key="btn_recon_all"):
                 with st.spinner("Membuat RECON Reports..."):
                     # Generate REAL + RECON
