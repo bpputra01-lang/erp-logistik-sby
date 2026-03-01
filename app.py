@@ -891,97 +891,85 @@ def generate_system_outstanding_recon(df_system):
     return outstanding_df
 
 def logic_cek_adjustment_final(df_recon, df_stock):
-    """
-    df_recon: Data dari sheet 'REAL + RECON' (A:BIN, B:SKU, G:QTY_RECON)
-    df_stock: Data dari sheet 'CEK STOCK ADJ +' (B:BIN, C:SKU, J:QTY_SYS, K:QTY_SO)
-    """
-    # 1. Persiapkan Data Recon (Basis Lookup)
-    # Kolom 0=BIN, 1=SKU, 6=QTY_HASIL_RECON (Kolom G)
+    dt = df_stock.copy()
+    # Recon: Kolom 0=BIN, 1=SKU, 6=QTY_RECON (G)
     dr = df_recon.iloc[:, [0, 1, 6]].copy()
     dr.columns = ['BIN_RECON', 'SKU_RECON', 'QTY_RECON_VAL']
     
-    # Clean Recon Keys
+    # Cleaning
     dr['BIN_RECON'] = dr['BIN_RECON'].astype(str).str.strip().str.upper()
     dr['SKU_RECON'] = dr['SKU_RECON'].astype(str).str.strip().str.upper()
     
-    # 2. Persiapkan Data Stock (Target Update)
-    dt = df_stock.copy()
-    col_bin_stock = dt.columns[1]  # Kolom B
-    col_sku_stock = dt.columns[2]  # Kolom C
-    col_qty_sys   = dt.columns[9]  # Kolom J
+    col_bin_stock = dt.columns[1] # Kolom B
+    col_sku_stock = dt.columns[2] # Kolom C
+    col_qty_sys   = dt.columns[9] # Kolom J
     col_qty_so    = dt.columns[10] # Kolom K (Existing)
     
-    # Clean Stock Keys
     dt[col_bin_stock] = dt[col_bin_stock].astype(str).str.strip().str.upper()
     dt[col_sku_stock] = dt[col_sku_stock].astype(str).str.strip().str.upper()
 
-    # 3. Proses Lookup (VLOOKUP Logic)
-    # Kita gabungkan data recon ke dalam stock
-    dt_merged = dt.merge(
-        dr, 
-        left_on=[col_bin_stock, col_sku_stock], 
-        right_on=['BIN_RECON', 'SKU_RECON'], 
-        how='left'
-    )
+    # Merge / Lookup
+    dt_merged = dt.merge(dr, left_on=[col_bin_stock, col_sku_stock], 
+                         right_on=['BIN_RECON', 'SKU_RECON'], how='left')
 
-    # 4. Masukkan hasil recon ke Kolom K (QTY SO)
-    # Jika ditemukan di Recon, ambil nilainya. Jika tidak, biarkan nilai aslinya/NaN
+    # Update Kolom K (QTY SO) & Hitung DIFF (Abs J - K)
     dt_merged[col_qty_so] = dt_merged['QTY_RECON_VAL']
-
-    # 5. Hitung DIFF (Logika Absolute J - K)
-    # Sesuai Macro: Abs(Val(dataStock(i, 10)) - Val(dataStock(i, 11)))
-    def calculate_diff(row):
-        sys_val = pd.to_numeric(row[col_qty_sys], errors='coerce')
-        so_val = pd.to_numeric(row[col_qty_so], errors='coerce')
-        
-        if pd.notna(so_val):
-            return abs(np.nan_to_num(sys_val) - so_val)
-        return np.nan # Kosongkan jika K kosong
-
-    dt_merged['DIFF'] = dt_merged.apply(calculate_diff, axis=1)
-
-    # 6. Identifikasi Mismatch (Untuk pewarnaan nantinya)
-    # Baris di Recon yang TIDAK ada di Stock
-    mismatch = dr[~dr.set_index(['BIN_RECON', 'SKU_RECON']).index.isin(
-        dt.set_index([col_bin_stock, col_sku_stock]).index
-    )]
-
-    # 7. Cleanup & Reorder (Kembalikan ke format asli + kolom L)
-    # Hapus kolom temporary merge
-    dt_final = dt_merged.drop(columns=['BIN_RECON', 'SKU_RECON', 'QTY_RECON_VAL'])
     
-    # Pastikan kolom DIFF ada di posisi Kolom L (Indeks 11)
-    if 'DIFF' in dt_final.columns:
-        cols = list(dt_final.columns)
-        # Jika DIFF ada di akhir, kita pastikan dia kolom ke-12 (L)
-        dt_final = dt_final.iloc[:, :12] 
+    def calc_diff(row):
+        if pd.notna(row[col_qty_so]):
+            return abs(pd.to_numeric(row[col_qty_sys], errors='coerce', default=0) - row[col_qty_so])
+        return np.nan
 
+    dt_merged['DIFF'] = dt_merged.apply(calc_diff, axis=1)
+    
+    # Buat Sheet Mismatch (Yellow Warning)
+    mismatch = dr[~dr.set_index(['BIN_RECON', 'SKU_RECON']).index.isin(
+               dt.set_index([col_bin_stock, col_sku_stock]).index)]
+    
+    # Cleanup kolom temp merge
+    dt_final = dt_merged.drop(columns=['BIN_RECON', 'SKU_RECON', 'QTY_RECON_VAL'])
     return dt_final, mismatch
 
-def save_with_formatting(df_stock_final, df_mismatch, filename):
-    with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
-        # Simpan Sheet Stock
-        df_stock_final.to_excel(writer, sheet_name='CEK STOCK ADJ +', index=False)
-        
-        # Simpan Sheet Recon (Simulasi mismatch kuning)
-        # Note: df_recon_original harus dilewatkan ke fungsi ini jika ingin komplit
-        # Di sini kita buat sheet baru untuk yang bermasalah saja
-        df_mismatch.to_excel(writer, sheet_name='MISMATCH_YELLOW', index=False)
-        
-        workbook  = writer.book
-        worksheet = writer.sheets['CEK STOCK ADJ +']
-        
-        # Format Kolom L (DIFF) sesuai Macro (Borders & Center)
-        format_diff = workbook.add_format({
-            'border': 1,
-            'align': 'center',
-            'num_format': '#,##0'
-        })
-        
-        # Terapkan ke kolom L (indeks 11)
-        worksheet.set_column(11, 11, 12, format_diff)
+# --- INTERFACE STREAMLIT (Uploader & Tombol) ---
+st.set_page_config(page_title="Recon & Adjustment Tool", layout="wide")
+st.title("🚀 Stock Adjustment & Recon Uploader")
 
-    print(f"File {filename} berhasil di-upload/disimpan.")
+col1, col2 = st.columns(2)
+
+with col1:
+    file_recon = st.file_uploader("Upload Sheet: REAL + RECON", type=['xlsx'])
+with col2:
+    file_stock = st.file_uploader("Upload Sheet: CEK STOCK ADJ +", type=['xlsx'])
+
+if file_recon and file_stock:
+    if st.button("RUNNING RECON & DIFF"):
+        # Load Data
+        df_r = pd.read_excel(file_recon)
+        df_s = pd.read_excel(file_stock)
+        
+        # Jalankan Logika
+        df_hasil, df_error = logic_cek_adjustment_final(df_r, df_s)
+        
+        st.success("Proses Selesai! DIFF terisi hanya pada baris yang memiliki QTY SO.")
+        
+        if not df_error.empty:
+            st.warning(f"Ada {len(df_error)} data di Recon yang tidak ditemukan di Stock (Mismatch).")
+            st.dataframe(df_error) # Menampilkan data "Yellow"
+
+        # --- TOMBOL DOWNLOAD HASIL ---
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_hasil.to_excel(writer, index=False, sheet_name='CEK STOCK ADJ +')
+            # Tambahkan sheet mismatch jika ada
+            if not df_error.empty:
+                df_error.to_excel(writer, index=False, sheet_name='MISMATCH_YELLOW')
+        
+        st.download_button(
+            label="📥 DOWNLOAD HASIL RECON (XLSX)",
+            data=output.getvalue(),
+            file_name="HASIL_ADJUSTMENT_FINAL.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 # =========================================================
 # 2. MENU UTAMA - SEMUA KODE DI DALAM FUNGSI INI
 # =========================================================
