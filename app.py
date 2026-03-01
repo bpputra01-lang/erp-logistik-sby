@@ -704,7 +704,7 @@ def generate_set_up_real_plus(d):
     st.markdown("---")
     st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
         
-        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
+    up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="up_bin_cov_v10")
 
         if up_bin_cov:
             if st.button("🚀 RUN ALLOCATION", use_container_width=True, key="btn_run_alloc_v10"):
