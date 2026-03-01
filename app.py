@@ -669,57 +669,44 @@ def logic_setup_karantina_with_check(df_outstanding):
     
     return df_karantina, df_check
 
-def logic_generate_final_reports(df_plus, df_minus, df_karantina, df_miss_loc_setup):
+def logic_generate_final_reports_v2(df_adj_plus, df_adj_minus, df_karantina, df_miss_loc_internal):
     # --- PART 1: SUMMARY ADJUSTMENT ---
-    # Gabungkan data Adj +, Adj -, dan Karantina
-    # Kita standarisasi kolomnya: BIN, SKU, BRAND, ITEM NAME, VARIANT, SUB KATEGOTI, HARGA BELI, HARGA JUAL, QTY SYSTEM, QTY SO, VALUE ADJ, STATUS ADJ
-    
-    def process_adj(df, status, is_karantina=False):
+    def process_adj_final(df, status, is_karantina=False):
         if df is None or df.empty: return pd.DataFrame()
         temp = df.copy()
-        # Jika karantina, mapping kolomnya berbeda (BIN AWAL, SKU, QUANTITY)
+        
         if is_karantina:
+            # Mapping Karantina (BIN AWAL, SKU, QUANTITY)
             res = pd.DataFrame({
-                "BIN": temp["BIN AWAL"],
-                "SKU": temp["SKU"],
+                "BIN": temp.iloc[:, 0], "SKU": temp.iloc[:, 2],
                 "BRAND": "", "ITEM NAME": "", "VARIANT": "", "SUB KATEGOTI": "", 
                 "HARGA BELI": 0, "HARGA JUAL": 0, "QTY SYSTEM": 0,
-                "QTY SO": temp["QUANTITY"],
-                "VALUE ADJ": 0,
-                "STATUS ADJ": status
+                "QTY SO": temp.iloc[:, 3], "VALUE ADJ": 0, "STATUS ADJ": status
             })
         else:
-            # Ambil kolom B sampai K (index 1-10) dari sheet asal
+            # Ambil kolom B sampai K (index 1-10)
             res = temp.iloc[:, 1:11].copy()
             res.columns = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGOTI", "HARGA BELI", "HARGA JUAL", "QTY SYSTEM", "QTY SO"]
-            # Hitung Value Adj: (QTY SO - QTY SYSTEM) * PRICE (Harga Jual)
             res["VALUE ADJ"] = (res["QTY SO"] - res["QTY SYSTEM"]) * res["HARGA JUAL"]
             res["STATUS ADJ"] = status
         return res
 
-    df_sum_plus = process_adj(df_plus, "ADJ +")
-    df_sum_minus = process_adj(df_minus, "ADJ -")
-    df_sum_kar = process_adj(df_karantina, "ADJ KARANTINA", True)
+    df_sum_plus = process_adj_final(df_adj_plus, "ADJ +")
+    df_sum_minus = process_adj_final(df_adj_minus, "ADJ -")
+    df_sum_kar = process_adj_final(df_karantina, "ADJ KARANTINA", True)
     
     df_summary_final = pd.concat([df_sum_plus, df_sum_minus, df_sum_kar], ignore_index=True)
 
     # --- PART 2: LIST MISS LOCATION ---
-    # Sumber: SET UP REAL + BIN TO BIN
-    if df_miss_loc_setup is not None and not df_miss_loc_setup.empty:
-        df_miss = pd.DataFrame({
-            "BIN SYSTEM +": df_miss_loc_setup.iloc[:, 0],
-            "BIN REAL +": df_miss_loc_setup.iloc[:, 1],
-            "SKU": df_miss_loc_setup.iloc[:, 2],
-            "QTY MISS LOC.": df_miss_loc_setup.iloc[:, 3]
-        })
-        total_sku_miss = df_miss["SKU"].nunique()
-        total_qty_miss = df_miss["QTY MISS LOC."].sum()
+    # Diambil langsung dari df_miss_loc_internal (Step sebelumnya)
+    if df_miss_loc_internal is not None and not df_miss_loc_internal.empty:
+        total_sku_miss = df_miss_loc_internal.iloc[:, 2].nunique()
+        total_qty_miss = df_miss_loc_internal.iloc[:, 3].sum()
     else:
-        df_miss = pd.DataFrame()
         total_sku_miss = 0
         total_qty_miss = 0
 
-    return df_summary_final, df_miss, total_sku_miss, total_qty_miss
+    return df_summary_final, df_miss_loc_internal, total_sku_miss, total_qty_miss
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
@@ -1174,64 +1161,59 @@ def menu_Stock_Opname():
                     
             except Exception as e:
                 st.error(f"❌ Error: {e}")
-    # =========================================================
-    # ⚙️ 7. FINAL REPORT GENERATOR (ADJ SUMMARY & MISS LOC)
+# =========================================================
+    # 🏁 7. FINAL REPORT GENERATOR (INTEGRATED)
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("7️⃣ FINAL REPORT GENERATOR")
-    st.info("Step ini akan menggabungkan hasil dari Step 5 (Pivot) dan Step 6 (Karantina) serta Miss Location.")
+    st.subheader("🏁 7. FINAL REPORT GENERATOR")
+    st.info("Hanya upload file STOCK ADJ -. Data lainnya (Adj +, Karantina, Miss Loc) diambil otomatis dari sistem.")
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx', 'csv'], key="final_minus")
-    with col_b:
-        up_miss_setup = st.file_uploader("📥 Upload SET UP REAL + BIN TO BIN", type=['xlsx', 'csv'], key="final_miss")
+    # Hanya upload SATU file sesuai permintaan lu
+    up_minus_final = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx', 'csv'], key="up_minus_v2")
 
-    if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
-        # Cek ketersediaan data dari step sebelumnya di session_state
-        if 'df_res_lookup' not in st.session_state:
-            st.error("❌ Data dari Step sebelumnya tidak ditemukan. Jalankan Step 4-6 dulu.")
-        else:
+    if up_minus_final:
+        if st.button("🏁 GENERATE ALL FINAL REPORTS", use_container_width=True):
             try:
-                # Load data pendukung
-                df_p5 = st.session_state.get('df_res_lookup') # Ambil dari memory
-                df_kar = st.session_state.get('df_karantina_result') # Pastikan Step 6 simpan ini ke state
+                # 1. Ambil data dari Step-Step sebelumnya (Session State)
+                df_adj_plus = st.session_state.get('df_res_lookup') # Dari Step Pivot
+                df_karantina = st.session_state.get('df_karantina_result') # Dari Step Karantina
+                df_miss_loc_internal = st.session_state.get('df_miss_loc_data') # Dari Step Miss Loc
                 
-                df_m = pd.read_excel(up_minus) if up_minus.name.endswith('xlsx') else pd.read_csv(up_minus)
-                df_ms = pd.read_excel(up_miss_setup) if up_miss_setup.name.endswith('xlsx') else pd.read_csv(up_miss_setup)
+                # 2. Baca file ADJ - yang baru diupload
+                df_m = pd.read_excel(up_minus_final) if up_minus_final.name.endswith('xlsx') else pd.read_csv(up_minus_final)
 
-                # Jalankan Logika
-                df_sum, df_miss, t_sku, t_qty = logic_generate_final_reports(df_p5, df_m, df_kar, df_ms)
+                # 3. Jalankan Logika Gabungan
+                df_sum, df_miss, t_sku, t_qty = logic_generate_final_reports_v2(df_adj_plus, df_m, df_karantina, df_miss_loc_internal)
 
-                # --- EXCEL DOWNLOAD 1: SUMMARY ADJUSTMENT ---
+                # --- DOWNLOAD 1: SUMMARY ADJUSTMENT ---
                 out_sum = io.BytesIO()
                 with pd.ExcelWriter(out_sum, engine='xlsxwriter') as wr:
                     df_sum.to_excel(wr, sheet_name='SUM_ADJUSTMENT', index=False)
-                    # Styling Header Blue ala VBA
                     workbook = wr.book
-                    worksheet = wr.sheets['SUM_ADJUSTMENT']
-                    header_fmt = workbook.add_format({'bold':True, 'font_color':'white', 'bg_color':'#0070C0', 'border':1})
+                    ws_sum = wr.sheets['SUM_ADJUSTMENT']
+                    header_fmt = workbook.add_format({'bold':True, 'font_color':'white', 'bg_color':'#0070C0', 'border':1, 'align':'center'})
                     for col_num, value in enumerate(df_sum.columns.values):
-                        worksheet.write(0, col_num, value, header_fmt)
-                
-                # --- EXCEL DOWNLOAD 2: LIST MISS LOCATION ---
+                        ws_sum.write(0, col_num, value, header_fmt)
+
+                # --- DOWNLOAD 2: LIST MISS LOCATION ---
                 out_miss = io.BytesIO()
                 with pd.ExcelWriter(out_miss, engine='xlsxwriter') as wr:
                     df_miss.to_excel(wr, sheet_name='LIST MISS LOCATION', index=False)
-                    # Summary Table ala VBA (Kuning & Bold)
-                    ws = wr.sheets['LIST MISS LOCATION']
-                    yellow_fmt = workbook.add_format({'bg_color': 'yellow', 'border': 1, 'bold': True})
-                    ws.write('F1', 'SUMMARY MISS LOCATION', header_fmt)
-                    ws.write('F2', 'KETERANGAN', header_fmt); ws.write('G2', 'TOTAL', header_fmt)
-                    ws.write('F3', 'TOTAL SKU'); ws.write('G3', f"{t_sku} ITEM", yellow_fmt)
-                    ws.write('F4', 'TOTAL QTY MISS LOCATION'); ws.write('G4', f"{t_qty} ITEM", yellow_fmt)
+                    ws_ms = wr.sheets['LIST MISS LOCATION']
+                    yellow_fmt = workbook.add_format({'bg_color': 'yellow', 'border': 1, 'bold': True, 'align':'center'})
+                    
+                    # Header Summary
+                    ws_ms.merge_range('F1:G1', 'SUMMARY MISS LOCATION', header_fmt)
+                    ws_ms.write('F2', 'KETERANGAN', header_fmt); ws_ms.write('G2', 'TOTAL', header_fmt)
+                    ws_ms.write('F3', 'TOTAL SKU'); ws_ms.write('G3', f"{t_sku} ITEM", yellow_fmt)
+                    ws_ms.write('F4', 'TOTAL QTY MISS LOCATION'); ws_ms.write('G4', f"{t_qty} ITEM", yellow_fmt)
 
-                st.success("✅ Semua Laporan Berhasil Dibuat!")
-                st.download_button("📥 DOWNLOAD SUMMARY ADJUSTMENT", data=out_sum.getvalue(), file_name="Summary_Adjustment_Final.xlsx")
-                st.download_button("📥 DOWNLOAD LIST MISS LOCATION", data=out_miss.getvalue(), file_name="List_Miss_Location_Final.xlsx")
+                st.success("✅ Laporan Berhasil Dibuat!")
+                st.download_button("📥 DOWNLOAD SUMMARY ADJUSTMENT", data=out_sum.getvalue(), file_name="Summary_Adjustment_Final.xlsx", use_container_width=True)
+                st.download_button("📥 DOWNLOAD LIST MISS LOCATION", data=out_miss.getvalue(), file_name="List_Miss_Location_Final.xlsx", use_container_width=True)
 
             except Exception as e:
-                st.error(f"❌ Error: {e}")
+                st.error(f"❌ Error Step 7: {e}. Pastikan Step 4, 5, dan 6 sudah dijalankan.")
             
 import pandas as pd
 import numpy as np
