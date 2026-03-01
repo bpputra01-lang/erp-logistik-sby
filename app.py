@@ -512,8 +512,7 @@ def get_yellow_skus(file, column_index):
                 if sku_val: yellow_set.add(sku_val)
     except: pass
     return yellow_set
-
-    def logic_cek_adjustment_final(df_recon, df_stock_system):
+def logic_cek_adjustment_final(df_recon, df_stock_system):
     """
     MENIRU MACRO: Sub CEK_ADJUSMENT_FINAL()
     - Kolom 10 (J): QTY SYSTEM
