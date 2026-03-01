@@ -739,12 +739,6 @@ def logic_generate_final_reports_v2(df_adj_plus, df_adj_minus, df_karantina, df_
 
     return df_summary, df_miss, t_sku, t_qty
 
-
-# --- INISIALISASI SESSION STATE ---
-if 'step4_done' not in st.session_state: st.session_state.step4_done = False
-if 'step5_done' not in st.session_state: st.session_state.step5_done = False
-if 'step6_done' not in st.session_state: st.session_state.step6_done = False
-
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
@@ -1062,7 +1056,10 @@ def menu_Stock_Opname():
                 st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
             st.download_button("📥 DOWNLOAD ALL EXCEL", data=output.getvalue(), file_name="Report.xlsx", use_container_width=True)
-
+# --- INISIALISASI SESSION STATE ---
+if 'step4_done' not in st.session_state: st.session_state.step4_done = False
+if 'step5_done' not in st.session_state: st.session_state.step5_done = False
+if 'step6_done' not in st.session_state: st.session_state.step6_done = False
 # =========================================================
 # ⚙️ 4. FINAL ADJUSTMENT CHECKER (LOOKUP & DIFF)
 # =========================================================
