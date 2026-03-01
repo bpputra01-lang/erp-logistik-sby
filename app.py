@@ -966,7 +966,7 @@ def menu_Stock_Opname():
         up_stock_4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="adj_4_u2")
 
     if up_recon_4 and up_stock_4:
-        if st.button("🚀 JALANKAN LOOKUP & DIFF", use_container_width=True):
+        if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
             try:
                 # Load data dengan engine yang aman
                 df_r4 = pd.read_excel(up_recon_4, engine='openpyxl') if up_recon_4.name.endswith('xlsx') else pd.read_csv(up_recon_4)
@@ -1014,7 +1014,7 @@ def menu_Stock_Opname():
         up_master_5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="piv_5_single")
 
         if up_master_5:
-            if st.button("GENERATE ADJ +", use_container_width=True):
+            if st.button("▶️GENERATE ADJ +", use_container_width=True):
                 try:
                     # Load Master
                     df_m5 = pd.read_excel(up_master_5, engine='openpyxl') if up_master_5.name.endswith('xlsx') else pd.read_csv(up_master_5)
