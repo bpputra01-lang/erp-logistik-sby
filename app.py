@@ -633,6 +633,31 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
         
     return df_multiple_final, df_single_final
+
+def logic_setup_karantina(df_outstanding):
+    # Kolom A=0 (BIN), B=1 (SKU), G=6 (QTY SYSTEM), J=9 (HASIL REKONSILIASI)
+    df = df_outstanding.copy()
+    
+    # Pastikan data numerik untuk perhitungan
+    df.iloc[:, 6] = pd.to_numeric(df.iloc[:, 6], errors='coerce').fillna(0) # G
+    df.iloc[:, 9] = pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0) # J
+    
+    # Filter: QTY SYSTEM (G) > HASIL REKONSILIASI (J)
+    mask = df.iloc[:, 6] > df.iloc[:, 9]
+    df_filtered = df[mask].copy()
+    
+    # Buat DataFrame baru dengan 5 kolom sesuai format VBA
+    # BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES
+    result_data = {
+        "BIN AWAL": df_filtered.iloc[:, 0],
+        "BIN TUJUAN": "KARANTINA",
+        "SKU": df_filtered.iloc[:, 1],
+        "QUANTITY": df_filtered.iloc[:, 6] - df_filtered.iloc[:, 9],
+        "NOTES": "MISS LOCATION"
+    }
+    
+    df_karantina = pd.DataFrame(result_data)
+    return df_karantina
 # ============================================================
 # 🚀 COMPARE 1: SCAN VS SYSTEM
 # ============================================================
@@ -1045,6 +1070,59 @@ def menu_Stock_Opname():
                 
                 except Exception as e:
                     st.error(f"❌ Error Step 5: {e}")
+        # =========================================================
+    # ⚙️ 6. SET UP KARANTINA GENERATOR (VBA LOGIC)
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
+    st.info("Logika: Filter QTY SYSTEM > HASIL REKONSILIASI dari sheet 'SYSTEM + OUTSTANDING RECON'")
+    
+    up_karantina = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'csv'], key="up_karantina_final")
+
+    if up_karantina:
+        if st.button("🛠️ GENERATE SET UP KARANTINA", use_container_width=True):
+            try:
+                # Load data
+                df_out_in = pd.read_excel(up_karantina, engine='openpyxl') if up_karantina.name.endswith('xlsx') else pd.read_csv(up_karantina)
+                
+                # Jalankan Logika
+                df_karantina_result = logic_setup_karantina(df_out_in)
+                
+                if not df_karantina_result.empty:
+                    st.success(f"✅ Berhasil! Ditemukan {len(df_karantina_result)} baris untuk Karantina.")
+                    
+                    # Tampilkan preview
+                    st.dataframe(df_karantina_result, use_container_width=True, hide_index=True)
+                    
+                    # Download
+                    out6 = io.BytesIO()
+                    with pd.ExcelWriter(out6, engine='xlsxwriter') as wr:
+                        df_karantina_result.to_excel(wr, sheet_name='SET UP KARANTINA', index=False)
+                        
+                        # Formatting Header (Hitam, Font Putih, Bold) ala VBA
+                        workbook = wr.book
+                        worksheet = wr.sheets['SET UP KARANTINA']
+                        header_format = workbook.add_format({
+                            'bold': True,
+                            'font_color': 'white',
+                            'bg_color': 'black',
+                            'border': 1,
+                            'align': 'center'
+                        })
+                        for col_num, value in enumerate(df_karantina_result.columns.values):
+                            worksheet.write(0, col_num, value, header_format)
+                    
+                    st.download_button(
+                        "📥 DOWNLOAD SET UP KARANTINA", 
+                        data=out6.getvalue(), 
+                        file_name="Set_Up_Karantina.xlsx", 
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("⚠️ Tidak ada data yang memenuhi syarat (QTY SYSTEM > HASIL REKONSILIASI).")
+                    
+            except Exception as e:
+                st.error(f"❌ Error Step 6: {e}")
             
 import pandas as pd
 import numpy as np
