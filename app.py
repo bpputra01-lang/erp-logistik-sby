@@ -888,7 +888,7 @@ def menu_Stock_Opname():
  # =========================================================
     # ⚙️ FINAL ADJUSTMENT CHECKER (DI PALING BAWAH)
     # =========================================================
-    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
     
     # Menggunakan subheader agar ukuran font besar dan otomatis bold
     st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
