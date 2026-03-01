@@ -723,25 +723,23 @@ def menu_Stock_Opname():
                 st.error(f"❌ Error: {e}")
 
     # ============================================================
-    # ✅ METRICS & TABS - SETELAH COMPARE
-    # ============================================================
-    if 'compare_result' in st.session_state:
-        d = st.session_state.compare_result
-        
-        total_real = len(d['real_plus'])
-        total_sys = len(d['system_plus'])
-        qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
-        qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
-        
-        st.markdown(f"""
-<div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
-    <div class="m-box" style="flex:1"><span class="m-lbl">🔥 REAL + ITEMS</span><span class="m-val">{total_real}</span></div>
-    <div class="m-box" style="flex:1"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{qty_real}</span></div>
-    <div class="m-box" style="flex:1"><span class="m-lbl">💻 SYSTEM + ITEMS</span><span class="m-val">{total_sys}</span></div>
-    <div class="m-box" style="flex:1"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{qty_sys}</span></div>
-</div>
-""", unsafe_allow_html=True)
-        
+# ✅ METRICS & TABS - SETELAH COMPARE
+# ============================================================
+if 'compare_result' in st.session_state:
+    d = st.session_state.compare_result
+    
+    total_real = len(d['real_plus'])
+    total_sys = len(d['system_plus'])
+    qty_real = int(d['real_plus']['DIFF'].sum()) if not d['real_plus'].empty else 0
+    qty_sys = int(d['system_plus']['DIFF'].sum()) if not d['system_plus'].empty else 0
+    
+    # Metrics menggunakan st.columns + st.metric
+    cols = st.columns(4)
+    cols[0].metric("🔥 REAL + ITEMS", total_real)
+    cols[1].metric("🔥 QTY REAL +", qty_real)
+    cols[2].metric("💻 SYSTEM + ITEMS", total_sys)
+    cols[3].metric("💻 QTY SYSTEM +", qty_sys)
+    
     st.markdown("---")
     
     t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
@@ -773,7 +771,6 @@ def menu_Stock_Opname():
 
                     bin_awal_map = df_s_raw_copy.groupby('SKU_UPPER')['BIN_SCAN'].first().to_dict()
 
-                    # VBA: Ambil dari STOCK SYSTEM (res_stock), bukan REAL +
                     real_plus_diff = d['res_stock'][d['res_stock']['DIFF'] > 0].copy()
 
                     if not real_plus_diff.empty:
@@ -795,7 +792,8 @@ def menu_Stock_Opname():
             except Exception as e:
                 st.error(f"❌ Error Allocation: {e}")
 
-            # ✅ HASIL ALLOCATION + SET UP REAL +
+    # ============================================================
+    # ✅ HASIL ALLOCATION + SET UP REAL +
     # ============================================================
     if 'allocation_result' in st.session_state and 'sys_updated_result' in st.session_state and 'set_up_real_plus' in st.session_state:
         st.markdown("---")
@@ -804,9 +802,6 @@ def menu_Stock_Opname():
         alloc_data = st.session_state.allocation_result
         sys_updated = st.session_state.sys_updated_result
         set_up_real_plus = st.session_state.set_up_real_plus
-        d = st.session_state.compare_result
-        
-        st.markdown("### 📊 RINGKASAN ALLOCATION")
         
         full_alloc = len(alloc_data[alloc_data['STATUS'] == "FULL ALLOCATION"])
         partial_alloc = len(alloc_data[alloc_data['STATUS'] == "PARTIAL ALLOCATION"])
