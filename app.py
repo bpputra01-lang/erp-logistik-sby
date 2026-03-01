@@ -553,35 +553,39 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
     ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
 
-    # GROUP BY BIN+SKU (SUM QTY SCAN)
-    ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
+    # BUAT KEY = BIN|SKU (SESUAI VBA)
+    ds['MERGE_KEY'] = ds['BIN'] + '|' + ds['SKU']
+    ds_grouped = ds.groupby('MERGE_KEY')['QTY_SCAN'].sum().reset_index()
+
+    # AMBIL KOLOM DARI STOCK: Kolom B=BIN, C=SKU, J=QTY
+    # Index: 0=A, 1=B, 2=C, ..., 9=J
+    dt['BIN'] = dt.iloc[:, 1].astype(str).str.strip().str.upper()  # Kolom B
+    dt['SKU'] = dt.iloc[:, 2].astype(str).str.strip().str.upper()  # Kolom C
+    dt['MERGE_KEY'] = dt['BIN'] + '|' + dt['SKU']
+
+    # QTY SYSTEM = Kolom J (index 9)
+    dt['QTY_SYSTEM'] = pd.to_numeric(dt.iloc[:, 9], errors='coerce').fillna(0)
 
     # MERGE KE STOCK SYSTEM
-    dt_merged = dt.merge(ds_grouped, on=['BIN', 'SKU'], how='left')  # <-- BENAR: dt_merged
+    dt_merged = dt.merge(ds_grouped, on='MERGE_KEY', how='left')
     dt_merged['QTY_SCAN'] = dt_merged['QTY_SCAN'].fillna(0)
 
-    # QTY SO = QTY SCAN
-    qty_system_cols = [c for c in dt_merged.columns if 'QTY' in c.upper() and 'SCAN' not in c.upper()]
-    
-    if qty_system_cols:
-        qty_sys_col = qty_system_cols[0]
-        
-        # QTY SO = QTY SCAN
-        dt_merged['QTY SO'] = dt_merged['QTY_SCAN']
-        
-        # DIFF = QTY SYSTEM - QTY SO
-        dt_merged['DIFF'] = dt_merged[qty_sys_col] - dt_merged['QTY SO']
-        
-        # NOTE: SYSTEM + jika QTY SYSTEM > QTY SO
-        dt_merged['NOTE'] = dt_merged.apply(
-            lambda row: "SYSTEM +" if row[qty_sys_col] > row['QTY SO'] else "OK", 
-            axis=1
-        )
+    # QTY SO = QTY SCAN (SESUAI VBA)
+    dt_merged['QTY SO'] = dt_merged['QTY_SCAN']
 
-    # Hapus kolom temporary QTY_SCAN
-    dt_merged = dt_merged.drop(columns=['QTY_SCAN'])
+    # DIFF = QTY SYSTEM - QTY SO
+    dt_merged['DIFF'] = dt_merged['QTY_SYSTEM'] - dt_merged['QTY SO']
 
-    return dt_merged
+    # NOTE: SYSTEM + jika QTY SYSTEM > QTY SO
+    dt_merged['NOTE'] = dt_merged.apply(
+    lambda row: "SYSTEM +" if row['QTY_SYSTEM'] > row['QTY SO'] else axis=1 "OK", 
+
+)
+
+# Hapus kolom temporary
+dt_merged = dt_merged.drop(columns=['QTY_SCAN', 'BIN', 'SKU', 'MERGE_KEY', 'QTY_SYSTEM'])
+
+return dt_merged
 # ============================================================
 # 🚀 LOGIC ALLOCATION (SESUAI VBA - 2 SUMBER)
 # ============================================================
