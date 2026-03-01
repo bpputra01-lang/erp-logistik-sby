@@ -922,33 +922,37 @@ def menu_Stock_Opname():
             with t_sing: st.dataframe(st.session_state.df_sing_5, use_container_width=True)
 
             # =========================================================
-            # ⚙️ 6. SET UP KARANTINA GENERATOR
-            # =========================================================
-            st.markdown("<br><br><br>---", unsafe_allow_html=True)
-            st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
-            up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx','csv'], key="u6_karantina")
+# ⚙️ 6. SET UP KARANTINA GENERATOR (DIPERBAIKI)
+# =========================================================
+st.markdown("<br><br><br>---", unsafe_allow_html=True)
+st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
+up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
 
-            if up_k6:
-                if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
-                    df_raw6 = pd.read_excel(up_k6)
-                    df_final6, df_debug6 = logic_setup_karantina_with_check(df_raw6)
-                    st.session_state.df_karantina_6 = df_final6
-                    st.session_state.df_debug_6 = df_debug6
-                    st.session_state.step6_done = True
-                    st.rerun()
-
-            if st.session_state.step6_done:
-                st.write("### 🔍 Tabel Pengecekan:")
-                st.dataframe(st.session_state.df_debug_6, use_container_width=True)
-                st.write("### 📦 Hasil Akhir Format Karantina:")
-                st.dataframe(st.session_state.df_karantina_6, use_container_width=True)
-                
-                # FINAL DOWNLOAD BUTTONS
-                out_final = io.BytesIO()
-                with pd.ExcelWriter(out_final, engine='xlsxwriter') as wr:
-                    if st.session_state.df_mult_5 is not None: st.session_state.df_mult_5.to_excel(wr, sheet_name='MULTIPLE_ADJ_PLUS', index=False)
-                    if st.session_state.df_karantina_6 is not None: st.session_state.df_karantina_6.to_excel(wr, sheet_name='SET_UP_KARANTINA', index=False)
-                st.download_button("📥 DOWNLOAD FINAL REPORT (STEP 5-6)", data=out_final.getvalue(), file_name="Final_Adjustment_SO.xlsx", use_container_width=True)
+if up_k6:
+    if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
+        try:
+            # PENTING: Reset pointer file sebelum dibaca
+            up_k6.seek(0)
+            
+            # Deteksi format file
+            if up_k6.name.endswith(('.xlsx', '.xls')):
+                # Tambahkan engine='openpyxl' secara eksplisit
+                df_raw6 = pd.read_excel(up_k6, engine='openpyxl')
+            else:
+                df_raw6 = pd.read_csv(up_k6)
+            
+            # Jalankan logika
+            df_final6, df_debug6 = logic_setup_karantina_with_check(df_raw6)
+            
+            # Simpan ke state
+            st.session_state.df_karantina_6 = df_final6
+            st.session_state.df_debug_6 = df_debug6
+            st.session_state.step6_done = True
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Error saat membaca file: {str(e)}")
+            st.info("Pastikan file yang diupload adalah format Excel (.xlsx) yang tidak terpassword.")
 
             
 import pandas as pd
