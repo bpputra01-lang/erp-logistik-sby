@@ -8,10 +8,262 @@ st.set_page_config(
     page_title="LogsbyERP.id",
     page_icon="🚛",)
   
+# GANTI SEMUA BAGIAN <style> (.biasanya di awal & di login) 
+# DENGAN KODE DI BAWAH INI:
+
 st.markdown("""
     <style>
     /* ============================================
-       FONTS IMPORT
+       FONTS IMPORT & THEME VARIABLES
+       ============================================ */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
+
+    /* Definisi Variabel Warna Otomatis (Native Streamlit Theme Support) */
+    :root {
+        --text-color: #31333F;
+        --background-color: #FFFFFF;
+        --secondary-background-color: #F0F2F6;
+        --accent-color: #FF4B4B;
+        --font-family: 'Inter', sans-serif;
+    }
+
+    /* DARK MODE DETECTION (Otomatis merubah warna jika Tema Streamlit diubah ke Dark) */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            #F0F --text-color:2F6;
+            --background-color: #1E1E1E;
+            --secondary-background-color: #2D2D2D;
+            --accent-color: #FF4B4B;
+        }
+        
+        /* --- OVERRIDE TEKS YANG TIDAK KELIHATAN DI DARK MODE --- */
+        
+        /* Label Input/Widget */
+        div[data-testid="stWidgetLabel"] p, 
+        .stTextInput label, 
+        .stSelectbox label, 
+        .stFileUploader label,
+        div[data-testid="stMarkdownContainer"] p {
+            color: var(--text-color) !important;
+            font-weight: 600 !important;
+        }
+
+        /* Tab Label agar terlihat di dark mode */
+        button[data-baseweb="tab"] {
+            color: #CCCCCC !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] {
+            color: #FFFFFF !important;
+            border-bottom: 2px solid #FF4B4B !important;
+        }
+
+        /* Sidebar Text */
+        [data-testid="stSidebar"] {
+            background-color: #1a1d2e !important;
+        }
+        [data-testid="stSidebar"] .stMarkdown, 
+        [data-testid="stSidebar"] p, 
+        [data-testid="stSidebar"] span {
+            color: #E0E0E0 !important;
+        }
+    }
+
+    /* ============================================
+       1. LAYOUT & SPACING
+       ============================================ */
+    .block-container {
+        padding-top: 3.5rem !important;
+        padding-bottom: 0rem !important;
+    }
+    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+    [data-testid="stSidebarNav"] { display: none !important; }
+
+    /* ============================================
+       2. APP BACKGROUND (LIGHT MODE DEFAULT)
+       ============================================ */
+    .stApp {
+        background-color: #f5f7fa !important;
+    }
+
+    /* ============================================
+       3. SIDEBAR - PREMIUM DARK
+       ============================================ */
+    [data-testid="stSidebar"] {
+        background-color: #1a1d2e !important;
+        border-right: 1px solid rgba(197, 160, 89, 0.15) !important;
+    }
+
+    /* ============================================
+       4. HERO HEADER - PREMIUM BLUE
+       ============================================ */
+    .hero-header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%) !important;
+        color: white !important;
+        padding: 10px 22px !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.25) !important;
+        margin-top: 0px !important;
+        margin-bottom: 25px !important;
+        display: inline-block !important;
+        width: auto !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .hero-header h1 {
+        color: white !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 19px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        letter-spacing: 0.3px;
+        line-height: 1.3;
+    }
+
+    /* ============================================
+       5. MAIN BUTTONS - NAVY BLUE
+       ============================================ */
+    div.stButton > button {
+        background: linear-gradient(135deg, #002b5b 0%, #003874 100%) !important;
+        color: white !important;
+        border-radius: 8px !important;
+        border: 1px solid #001a35 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        height: 3em !important;
+        transition: all 0.25s ease !important;
+        box-shadow: 0 2px 8px rgba(0, 43, 91, 0.2) !important;
+    }
+    div.stButton > button:hover {
+        background: linear-gradient(135deg, #003874 0%, #004a9e 100%) !important;
+        border-color: #ffc107 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(0, 43, 91, 0.3) !important;
+    }
+
+    /* Clear/Reset Buttons - Red */
+    div.stButton > button[key*="reset"],
+    div.stButton > button[key*="clear"] {
+        background: linear-gradient(135deg, #8b0000 0%, #a00000 100%) !important;
+        border-color: #4a0000 !important;
+    }
+
+    /* ============================================
+       6. FILE UPLOADER
+       ============================================ */
+    [data-testid="stFileUploader"] {
+        background-color: #f0f2f6;
+        border: 2px dashed rgba(0, 43, 91, 0.3) !important;
+        border-radius: 10px;
+        padding: 12px;
+    }
+
+    /* ============================================
+       7. METRIC BOXES - PREMIUM CARD
+       ============================================ */
+    .m-box {
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+        padding: 18px 20px !important;
+        border-radius: 10px !important;
+        border-left: 4px solid #C5A059 !important;
+        margin-bottom: 10px !important;
+        text-align: left !important;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
+    }
+    .m-lbl {
+        color: rgba(255, 255, 255, 0.65) !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .m-val {
+        color: #C5A059 !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+    }
+
+    /* ============================================
+       8. INPUT BOXES - GOLD BORDER (Sesuaikan tema)
+       ============================================ */
+    /* Wrapper Input */
+    div[data-baseweb="input"], 
+    div[data-baseweb="select"] > div {
+        background-color: #1a1d2e !important; 
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Teks di dalam input */
+    input {
+        color: #ffffff !important;
+    }
+    
+    /* Placeholder color */
+    input::placeholder {
+        color: rgba(255, 255, 255, 0.5) !important;
+    }
+
+    /* Label (Judul) Inputs - Menggunakan warna dinamis */
+    div[data-testid="stWidgetLabel"] p {
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+    }
+    
+    /* Force warna label hitam di Light Mode (karena background light), 
+       dan putih/terang di Dark Mode (otomatis ditangani CSS variabel di atas) */
+    @media (prefers-color-scheme: light) {
+        div[data-testid="stWidgetLabel"] p {
+            color: #1F2937 !important; /* Hitam Pekat untuk Light Mode */
+        }
+    }
+
+    /* ============================================
+       9. RADIO BUTTONS & TABS
+       ============================================ */
+    div.row-widget.stRadio > div { background-color: transparent !important; }
+    div.row-widget.stRadio label {
+        color: #a0a5b5 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 13px !important;
+        padding: 8px 14px !important;
+        border-radius: 6px !important;
+        background: rgba(26, 29, 46, 0.5) !important;
+        border: 1px solid rgba(197, 160, 89, 0.15) !important;
+    }
+    div.row-widget.stRadio label:hover {
+        background: rgba(197, 160, 89, 0.1) !important;
+        border-color: rgba(197, 160, 89, 0.3) !important;
+        color: #C5A059 !important;
+    }
+
+    /* ============================================
+       10. BUTTONS LAYOUT
+       ============================================ */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        justify-content: flex-start !important;
+    }
+    [data-testid="column"] {
+        flex: 0 1 auto !important;
+        width: auto !important;
+    }
+    div.stButton > button {
+        width: 170px !important;
+        min-height: 3.3em !important;
+        white-space: normal
+# ============================================================
+# GANTI SEMUA BAGIAN <style> (.biasanya di awal & di login) 
+# DENGAN KODE LENGKAP DI BAWAH INI:
+# ============================================================
+    /* ============================================
+       FONTS IMPORT & THEME VARIABLES
        ============================================ */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
 
@@ -93,11 +345,6 @@ st.markdown("""
         background: linear-gradient(135deg, #8b0000 0%, #a00000 100%) !important;
         border-color: #4a0000 !important;
     }
-    div.stButton > button[key*="reset"]:hover,
-    div.stButton > button[key*="clear"]:hover {
-        background: linear-gradient(135deg, #a00000 0%, #b50000 100%) !important;
-        border-color: #ff4444 !important;
-    }
 
     /* ============================================
        6. FILE UPLOADER
@@ -107,13 +354,6 @@ st.markdown("""
         border: 2px dashed rgba(0, 43, 91, 0.3) !important;
         border-radius: 10px;
         padding: 12px;
-    }
-    [data-testid="stFileUploader"] button {
-        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important;
-        color: #1a1d2e !important;
-        font-weight: 600 !important;
-        border-radius: 6px !important;
-        font-size: 12px !important;
     }
 
     /* ============================================
@@ -146,7 +386,20 @@ st.markdown("""
     }
 
     /* ============================================
-       8. RADIO BUTTONS
+       8. INPUT BOXES - GOLD BORDER
+       ============================================ */
+    div[data-baseweb="input"], 
+    div[data-baseweb="select"] > div {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+    }
+    input {
+        color: #ffffff !important;
+    }
+
+    /* ============================================
+       9. RADIO BUTTONS & TABS
        ============================================ */
     div.row-widget.stRadio > div { background-color: transparent !important; }
     div.row-widget.stRadio label {
@@ -157,50 +410,11 @@ st.markdown("""
         border-radius: 6px !important;
         background: rgba(26, 29, 46, 0.5) !important;
         border: 1px solid rgba(197, 160, 89, 0.15) !important;
-        transition: all 0.2s ease !important;
     }
     div.row-widget.stRadio label:hover {
         background: rgba(197, 160, 89, 0.1) !important;
         border-color: rgba(197, 160, 89, 0.3) !important;
         color: #C5A059 !important;
-    }
-
-    /* ============================================
-       9. INPUT BOXES - GOLD BORDER
-       ============================================ */
-    div[data-baseweb="select"] > div,
-    [data-testid="stFileUploaderSection"] {
-        background-color: #1a1d2e !important;
-        border: 1px solid rgba(197, 160, 89, 0.3) !important;
-        border-radius: 8px !important;
-    }
-    div[data-baseweb="select"] > div:focus-within,
-    [data-testid="stFileUploaderSection"]:focus-within {
-        border-color: #C5A059 !important;
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
-    }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
-    [data-testid="stFileUploaderText"] > span,
-    [data-testid="stFileUploaderText"] > small {
-        color: #e0e0e0 !important;
-        -webkit-text-fill-color: #e0e0e0 !important;
-    }
-
-    /* Text inputs */
-    div[data-baseweb="input"] {
-        background-color: #1a1d2e !important;
-        border: 1px solid rgba(197, 160, 89, 0.3) !important;
-        border-radius: 8px !important;
-        padding: 10px 14px !important;
-    }
-    div[data-baseweb="input"]:focus-within {
-        border-color: #C5A059 !important;
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
-    }
-    input {
-        color: #ffffff !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 14px !important;
     }
 
     /* ============================================
@@ -211,13 +425,10 @@ st.markdown("""
         flex-wrap: wrap !important;
         gap: 10px !important;
         justify-content: flex-start !important;
-        width: 100% !important;
     }
     [data-testid="column"] {
         flex: 0 1 auto !important;
         width: auto !important;
-        min-width: fit-content !important;
-        max-width: fit-content !important;
     }
     div.stButton > button {
         width: 170px !important;
@@ -256,167 +467,86 @@ st.markdown("""
         border-color: #C5A059 !important;
         color: #FFD700 !important;
     }
-    [data-testid="stSidebar"] div.stButton > button p {
-        color: inherit !important;
-        font-family: 'Inter', sans-serif !important;
-    }
 
     /* ============================================
-       12. LABELS
+       12. LABELS - PERBAIKAN TEKS DI DARK MODE
        ============================================ */
+    /* Default Light Mode Colors */
     [data-testid="stWidgetLabel"] p {
         color: #2d3748 !important;
         font-family: 'Inter', sans-serif !important;
         font-weight: 600 !important;
         font-size: 13px !important;
     }
+
+    /* --- DARK MODE SUPPORT (OTOMATIS) --- */
+    @media (prefers-color-scheme: dark) {
+        /* Ubah Background App */
+        .stApp {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Ubah Teks Label Supaya Terlihat di Dark Mode */
+        [data-testid="stWidgetLabel"] p,
+        .stTextInput label,
+        .stSelectbox label,
+        .stFileUploader label,
+        [data-testid="stMarkdownContainer"] p {
+            color: #E2E8F0 !important; /* Putih Terang */
+            text-shadow: 0px 0px 1px rgba(0,0,0,0.5); /* Overlay faint shadow agar kontras */
+        }
+        
+        /* Tab Labels - Pastikan terlihat */
+        button[data-baseweb="tab"] {
+            color: #A0AEC0 !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] {
+            color: #FFFFFF !important;
+            border-bottom: 2px solid #FF4B4B !important;
+        }
+        
+        /* Metric Box Text - Tetap Terlihat */
+        .m-box {
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%) !important;
+        }
+        
+        /* Input Background di Dark Mode */
+        div[data-baseweb="input"] {
+            background-color: #2D3748 !important;
+            border: 1px solid #4A5568 !important;
+        }
+        
+        /* Radio Button Text */
+        div.row-widget.stRadio label {
+            color: #E2E8F0 !important;
+            background: rgba(45, 55, 72, 0.8) !important;
+        }
+        
+        /* Sidebar Text */
+        [data-testid="stSidebar"] .stMarkdown p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] label {
+            color: #E2E8F0 !important;
+        }
+    }
+
+    /* ============================================
+       13. SUCCESS & ERROR NOTIFICATIONS
+       ============================================ */
+    div[data-testid="stNotification"] {
+        border-radius: 8px !important;
+    }
+    /* Override Streamlit notification colors for dark mode visibility */
+    @media (prefers-color-scheme: dark) {
+        div[data-testid="stNotification"] {
+            background-color: #22543D !important; /* Dark Green */
+            color: #FFFFFF !important;
+            border: 1px solid #48BB78 !important;
+        }
+    }
     </style>
 """, unsafe_allow_html=True)
-    # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
-import streamlit as st
 
-# 1. Inisialisasi session state login
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
-# --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
-if not st.session_state.logged_in:
-    st.markdown("""
-        <style>
-        /* 1. Background & Layout */
-        .stApp {
-            background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), 
-                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
-            background-size: cover !important;
-        }
-        [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
-    
-
-        /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
-button[data-testid="stFormSubmitButton"], 
-div.stFormSubmitButton > button {
-    background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 12px !important;
-    
-    /* GANTI BAGIAN INI */
-    padding: 18px 20px !important; /* Naikin dari 14px ke 18px biar lega */
-    line-height: 1.2 !important;   /* Pastikan teks di tengah vertikal */
-    height: auto !important;       /* Biar tinggi tombol ngikutin padding */
-    
-    font-weight: 800 !important;
-    font-size: 16px !important;
-    letter-spacing: 1px !important;
-    width: 100% !important;
-    box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
-    text-transform: uppercase !important;
-}
-
-        /* Paksa warna tetep emas pas kursor nempel */
-        button[data-testid="stFormSubmitButton"]:hover {
-            background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
-            color: #1e1e2f !important;
-            box-shadow: 0 20px 25px rgba(197, 160, 89, 0.5) !important;
-            transform: translateY(-2px);
-        }
-
-        /* 4. Input Box biar gelap & elegan - PERBAIKAN UTAMA DISINI */
-        /* container input */
-        div[data-baseweb="input"] {
-            background-color: #1a2634 !important;
-            border: 1px solid #C5A059 !important;
-            border-radius: 10px !important;
-            padding: 8px 12px !important;
-        }
-        
-        /* container input focus */
-        div[data-baseweb="input"]:focus-within {
-            border-color: #D4AF37 !important;
-            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
-        }
-        
-        /* input field (termasuk password) */
-        input[type="text"], 
-        input[type="password"],
-        input[type="email"],
-        div[data-baseweb="input"] input {
-            background-color: transparent !important;
-            border: none !important;
-            color: #C5A059 !important;
-            font-weight: 600 !important;
-            font-size: 15px !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            width: 100% !important;
-            outline: none !important;
-            box-shadow: none !important;
-        }
-        
-        /* placeholder styling */
-        input::placeholder {
-            color: rgba(197, 160, 89, 0.5) !important;
-            opacity: 1 !important;
-        }
-        
-        /* Firefox placeholder */
-        input::-webkit-input-placeholder {
-            color: rgba(197, 160, 89, 0.5) !important;
-        }
-        
-        /* password field dots styling */
-        input[type="password"] {
-            letter-spacing: 2px !important;
-        }
-
-        /* Label styling */
-        [data-testid="stWidgetLabel"] p {
-            color: #E0E0E0 !important;
-            font-weight: 600 !important;
-            font-size: 14px !important;
-            margin-bottom: 8px !important;
-        }
-
-        /* Form spacing */
-        .stForm {
-            background-color: transparent !important;
-            border: none !important;
-        }
-        
-        /* Input wrapper styling */
-        div[data-testid="stTextInput"] div[data-baseweb="input"] {
-            background-color: #1a2634 !important;
-            border: 1px solid #C5A059 !important;
-            border-radius: 10px !important;
-            padding: 12px 16px !important;
-            min-height: 50px !important;
-        }
-        
-        /* Pastikan password dots terlihat jelas */
-        div[data-testid="stTextInput"] input {
-            color: #C5A059 !important;
-            -webkit-text-fill-color: #C5A059 !important;
-        }
-
-        /* Hilangkan background overlay Streamlit */
-        .stTextInput > div > div {
-            background-color: transparent !important;
-        }
-
-        /* Ubah background st.success jadi hijau solid */
-    div[data-testid="stNotification"] {
-        background-color: #1e7e34 !important; /* Hijau Tua Surabaya */
-        color: white !important;               /* Tulisan Putih */
-        border-radius: 10px !important;
-        border: 1px solid #C5A059 !important;  /* Kasih border emas dikit biar matching */
-    }
-    /* Pastikan ikon centangnya juga putih */
-    div[data-testid="stNotification"] svg {
-        fill: white !important;
-    }
-    
-    </style>
-    """, unsafe_allow_html=True)
     # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
