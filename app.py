@@ -2915,16 +2915,23 @@ if menu == "Compare RTO":
         st.dataframe(df_comp, use_container_width=True, hide_index=True)
         st.download_button("📥 Download Draft Compared", df_comp.to_csv(index=False).encode('utf-8'), "DRAFT_COMPARED.csv", "text/csv", use_container_width=True)
 
+       # --- GENERATE NEW DRAFT ---
+    st.subheader("🏁 GENERATE NEW DRAFT")
+    
+    if st.session_state.rto_draft_compared is not None:
         if st.button("🏁 GENERATE NEW DRAFT", use_container_width=True):
-            st.session_state.rto_new_draft = engine_generate_new_draft(df_comp)
-            st.success(f"✅ Generate Selesai! Total: {total_qty} Pcs")
-
-    if st.session_state.rto_new_draft is not None:
-        st.divider()
-        st.subheader("🏁 FINAL NEW DRAFT")
-        st.dataframe(st.session_state.rto_new_draft, use_container_width=True, hide_index=True)
-        st.download_button("📥 Download New Draft", st.session_state.rto_new_draft.to_csv(index=False).encode('utf-8'), "NEW_DRAFT_RTO.csv", "text/csv", use_container_width=True)
-
+            with st.spinner("Memproses..."):
+                new_draft = engine_generate_new_draft(st.session_state.rto_draft_compared)
+                st.session_state.rto_new_draft = new_draft
+                
+                total_qty = int(new_draft['QUANTITY'].sum()) if not new_draft.empty else 0
+                
+                st.success(f"✅ Generate Selesai! Total: {total_qty} Pcs")
+                st.dataframe(new_draft, use_container_width=True, hide_index=True)
+                
+                csv_new = new_draft.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Download New Draft", csv_new, "NEW_DRAFT_RTO.csv", "text/csv", use_container_width=True)
+                
 ## MENU: FDR UPDATE (YANG DIPERBAIKI & LENGKAP)
 # =====================================================
 # =========================================================
