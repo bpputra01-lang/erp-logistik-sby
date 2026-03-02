@@ -293,65 +293,64 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-    # UI Login Center
-    _, col_mid, _ = st.columns([1, 2, 1])
-    with col_mid:
-        # Buka Container Card
-        st.markdown('<div class="login-card">', unsafe_allow_html=True)
-        
-        # JUDUL
-        st.markdown("""
-            <h2 style="
-                color: #C5A059; 
-                margin-top: -60px; 
-                margin-bottom: -5px; 
-                font-family: 'Inter', sans-serif; 
-                font-weight: 800; 
-                text-align: center;
-            ">SURABAYA DISTRIBUTION CENTER</h2>
-        """, unsafe_allow_html=True)
-        
-        # SUB-JUDUL
-        st.markdown("""
-            <p style="
-                color: #FFFFFF; 
-                font-size: 14px; 
-                margin-bottom: 15px; 
-                text-align: center;
-            ">🐊Surabaya Logistics Management System</p>
-        """, unsafe_allow_html=True)
+   # UI Login Center
+_, col_mid, _ = st.columns([1, 2, 1])
+with col_mid:
+    # Buka Container Card
+    st.markdown('<div class="login-card">', unsafe_allow_html=True)
+    
+    # JUDUL
+    st.markdown("""
+        <h2 style="
+            color: #C5A059; 
+            margin-top: -60px; 
+            margin-bottom: -5px; 
+            font-family: 'Inter', sans-serif; 
+            font-weight: 800; 
+            text-align: center;
+        ">SURABAYA DISTRIBUTION CENTER</h2>
+    """, unsafe_allow_html=True)
+    
+    # SUB-JUDUL
+    st.markdown("""
+        <p style="
+            color: #FFFFFF; 
+            font-size: 14px; 
+            margin-bottom: 15px; 
+            text-align: center;
+        ">🐊Surabaya Logistics Management System</p>
+    """, unsafe_allow_html=True)
 
-       # BUNGKUS FORM
-        with st.form("login_form"):
-            user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
-            pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
-            
-            st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
-            
-            submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
-            
-            # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
-            if submit_button:
-                if user_input == "admin" and pass_input == "sby123":
-                    st.session_state.logged_in = True
-                    st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
-                    st.rerun()
-                else:
-                    st.error("Username atau Password salah!")
+    # BUNGKUS FORM (INI YANG PERLU DIPERBAIKI - JANGAN ADA SPASI DI DEPAN)
+    with st.form("login_form"):
+        user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
+        pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
         
-        # Tutup Container Card
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
+        
+        submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
+        
+        # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
+        if submit_button:
+            if user_input == "admin" and pass_input == "sby123":
+                st.session_state.logged_in = True
+                st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
+                st.rerun()
+            else:
+                st.error("Username atau Password salah!")
+    
+    # Tutup Container Card
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.stop()
+st.stop()
+
 # --- DASHBOARD UTAMA (Jalan setelah login) ---
-
 # Cek apakah notifikasi sudah pernah muncul
 if 'login_success' not in st.session_state:
     st.toast("Berhasil Login! Selamat datang di dashboard.", icon="✅")
     # Set True supaya pas klik menu lain di dashboard, pop-up gak muncul terus-terusan
     st.session_state.login_success = True
-
-
+    
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
 import pandas as pd
 import numpy as np
