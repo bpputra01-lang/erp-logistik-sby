@@ -1677,7 +1677,7 @@ def putaway_system(df_ds, df_asal):
     
     # 3. BUAT DATAFRAME COMPARE
     df_comp = pd.DataFrame(out_data, columns=[
-        "BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QTY BIN SYSTEM", "DIFF", "STATUS"
+        "BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QUANTITY", "DIFF", "STATUS"
     ])
     
     # 4. UPDATE df_asal dengan qty baru
@@ -2284,7 +2284,7 @@ elif menu == "Putaway System":
                 
                 # PERBAIKAN: GUNAKAN SUM QTY, BUKAN LEN
                 total_compare_qty = int(df_comp['QTY PUTAWAY'].sum()) if not df_comp.empty else 0
-                total_list_qty = int(df_plist['QTY BIN SYSTEM'].sum()) if not df_plist.empty else 0
+                total_list_qty = int(df_plist['QUANTITY'].sum()) if not df_plist.empty else 0
                 total_kurang_qty = int(df_kurang['QTY'].sum()) if not df_kurang.empty else 0
                 
                 # QTY LT3
