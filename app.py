@@ -1272,20 +1272,16 @@ import numpy as np
 import streamlit as st
 
 # =========================================================
-# ⚙️ 1. DEFINISI SEMUA ENGINE (LOGIKA TIDAK DIUBAH)
+# ⚙️ 1. DEFINISI SEMUA ENGINE (LOGIKA TETAP SAMA)
 # =========================================================
 
 def engine_ds_rto_vba_total(df_ds, df_app):
-    """
-    LOGIKA AWAL: Membandingkan DS RTO dengan AppSheet RTO.
-    """
     import pandas as pd
     import numpy as np
 
     if df_ds is None or df_app is None:
         return pd.DataFrame(), pd.DataFrame()
 
-    # --- 1. PREPARASI DATA APPSHEET ---
     df_a = df_app.copy()
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
@@ -1303,7 +1299,6 @@ def engine_ds_rto_vba_total(df_ds, df_app):
             q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
             dict_qty_total[sku] = dict_qty_total.get(sku, 0) + (q13 + q17)
 
-    # --- 2. PROSES DATAFRAME DS RTO ---
     res_ds = df_ds.copy()
     cols = list(res_ds.columns)
     sku_col = cols[0]
@@ -1321,10 +1316,7 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     res_ds['NOTE'] = res_ds.apply(check_note, axis=1)
 
-    # --- 3. GENERATE SHEET SELISIH (Logika Identik VBA) ---
     results_selisih = []
-    
-    # A. Ambil dari DS yang tidak sesuai
     mismatch_ds = res_ds[res_ds['NOTE'] != 'SESUAI'].copy()
     for _, row in mismatch_ds.iterrows():
         sku = row['SKU_UPPER']
@@ -1334,23 +1326,19 @@ def engine_ds_rto_vba_total(df_ds, df_app):
         
         if not found_rows.empty:
             for _, r_app in found_rows.iterrows():
-                # Bin 1
                 if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
                     results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('12'), r_app.get('13', 0), 0])
-                # Bin 2
                 if str(r_app.get('16', '')).strip() not in ["", "nan", "0"]:
                     results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('16'), r_app.get('17', 0), 0])
         else:
             results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], "-", 0, 0])
 
-    # B. TAMBAHAN: Cek SKU yang ada di Appsheet tapi TIDAK ADA di DS (Sesuai VBA)
     skus_in_ds = set(res_ds['SKU_UPPER'].unique())
     for sku_app, total_qty in dict_qty_total.items():
         if sku_app not in skus_in_ds:
             mask_app = (df_a['9'].astype(str).str.strip().str.upper() == sku_app) | \
                        (df_a['15'].astype(str).str.strip().str.upper() == sku_app)
             found_rows = df_a[mask_app]
-            
             for _, r_app in found_rows.iterrows():
                 note_khusus = "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
                 if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
@@ -1369,7 +1357,6 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
     df_app_res = df_app_awal.copy()
     df_ds_res = df_ds.copy()
 
-    # --- 1. MAPPING HASIL CEK REAL ---
     real_map = {}
     for _, row in df_selisih.iterrows():
         sku_real = str(row.iloc[0]).strip().upper()
@@ -1378,7 +1365,6 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
         if sku_real not in ["", "NAN", "NONE"]:
             real_map[f"{sku_real}|{bin_real}"] = qty_real
 
-    # --- 2. UPDATE APPSHEET RTO ---
     for idx in df_app_res.index:
         try:
             sku = str(df_app_res.iloc[idx, 8]).strip().upper()
@@ -1397,7 +1383,6 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
         except Exception:
             continue
 
-    # --- 3. SINKRONISASI DS RTO ---
     if not df_ds_res.empty:
         df_app_res['TMP_SKU'] = df_app_res.apply(lambda r: str(r.iloc[8]).strip().upper() if str(r.iloc[8]).strip() not in ["","0","nan"] else str(r.iloc[14]).strip().upper(), axis=1)
         df_app_res['TMP_QTY'] = df_app_res.apply(lambda r: (pd.to_numeric(r.iloc[12], errors='coerce') or 0) + (pd.to_numeric(r.iloc[16], errors='coerce') or 0), axis=1)
