@@ -759,7 +759,6 @@ def menu_Stock_Opname():
     if 'recon_real_plus' not in st.session_state: st.session_state.recon_real_plus = None
     if 'outstanding_system' not in st.session_state: st.session_state.outstanding_system = None
     
-    # State untuk Step 4, 5, 6 (Agar tidak hilang)
     if 'df_res_lookup' not in st.session_state: st.session_state.df_res_lookup = None
     if 'df_missing_lookup' not in st.session_state: st.session_state.df_missing_lookup = None
     if 'step4_done' not in st.session_state: st.session_state.step4_done = False
@@ -769,8 +768,6 @@ def menu_Stock_Opname():
     if 'step5_done' not in st.session_state: st.session_state.step5_done = False
     
     if 'df_karantina_6' not in st.session_state: st.session_state.df_karantina_6 = None
-    if 'df_debug_6' not in st.session_state: st.session_state.df_debug_6 = None
-    if 'step6_done' not in st.session_state: st.session_state.step6_done = False
 
     # --- FILTER SECTION ---
     col_f1, col_f2, col_f3 = st.columns(3)
@@ -875,12 +872,9 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
-    # =========================================================
-    # ⚙️ 4. FINAL ADJUSTMENT CHECKER
-    # =========================================================
+    # --- STEP 4 ---
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
-    
     adj_col1, adj_col2 = st.columns(2)
     with adj_col1: up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx'], key="u4_recon")
     with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx'], key="u4_stock")
@@ -900,9 +894,7 @@ def menu_Stock_Opname():
         with t_f: st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
         with t_m: st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
 
-        # =========================================================
-        # ⚙️ 5. PIVOT GENERATOR
-        # =========================================================
+        # --- STEP 5 ---
         st.markdown("<br><br>---", unsafe_allow_html=True)
         st.subheader("5️⃣ FINAL ADJUSMENT +")
         up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5_master")
@@ -921,56 +913,35 @@ def menu_Stock_Opname():
             with t_mult: st.dataframe(st.session_state.df_mult_5, use_container_width=True)
             with t_sing: st.dataframe(st.session_state.df_sing_5, use_container_width=True)
 
-# =========================================================
-# ⚙️ 6. SET UP KARANTINA GENERATOR (VERSI MANDIRI)
-# =========================================================
-st.markdown("<br><br><br>---", unsafe_allow_html=True)
-st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
+    # =========================================================
+    # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
 
-# Inisialisasi state agar hasil tidak hilang saat interaksi lain
-if 'df_karantina_6' not in st.session_state:
-    st.session_state.df_karantina_6 = None
+    up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
 
-up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
+    if up_k6:
+        if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
+            try:
+                up_k6.seek(0)
+                if up_k6.name.endswith(('.xlsx', '.xls')):
+                    df_raw6 = pd.read_excel(up_k6, engine='openpyxl')
+                else:
+                    df_raw6 = pd.read_csv(up_k6)
+                
+                df_final6, _ = logic_setup_karantina_with_check(df_raw6)
+                st.session_state.df_karantina_6 = df_final6
+                st.success("✅ Analisis Karantina Selesai!")
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
 
-if up_k6:
-    if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
-        try:
-            # PENTING: Reset pointer file agar tidak ValueError
-            up_k6.seek(0)
-            
-            # Deteksi format file & Paksa engine openpyxl untuk .xlsx
-            if up_k6.name.endswith(('.xlsx', '.xls')):
-                df_raw6 = pd.read_excel(up_k6, engine='openpyxl')
-            else:
-                df_raw6 = pd.read_csv(up_k6)
-            
-            # Jalankan logika (Pastikan fungsi ini sudah didefinisikan di atas)
-            df_final6, df_debug6 = logic_setup_karantina_with_check(df_raw6)
-            
-            # Simpan hasil ke session_state
-            st.session_state.df_karantina_6 = df_final6
-            st.success("✅ Analisis Karantina Selesai!")
-            
-        except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
-
-# Tampilkan hasil jika data sudah ada di state (Tanpa terkunci Step lain)
-if st.session_state.df_karantina_6 is not None:
-    st.dataframe(st.session_state.df_karantina_6, use_container_width=True)
-    
-    # Tombol Download Langsung
-    import io
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        st.session_state.df_karantina_6.to_excel(writer, index=False)
-    
-    st.download_button(
-        label="📥 DOWNLOAD HASIL KARANTINA",
-        data=output.getvalue(),
-        file_name="Hasil_Karantina.xlsx",
-    )
-
+    if st.session_state.df_karantina_6 is not None:
+        st.dataframe(st.session_state.df_karantina_6, use_container_width=True)
+        out6 = io.BytesIO()
+        with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
+            st.session_state.df_karantina_6.to_excel(writer, index=False)
+        st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
             
 import pandas as pd
 import numpy as np
