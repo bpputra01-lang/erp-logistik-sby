@@ -503,6 +503,389 @@ from openpyxl import load_workbook
 from collections import defaultdict
 
 # =========================================================
+# 1. FUNGSI MENU PANDUAN APLIKASI (USER GUIDE)
+# =========================================================
+def menu_panduan():
+    st.markdown("""
+    <style>
+        .guide-header {
+            background: linear-gradient(135deg, #002b5b 0%, #003874 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .guide-header h1 {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 24px;
+        }
+        .step-box {
+            background-color: #ffffff;
+            border-left: 5px solid #C5A059;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0 10px 10px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .step-title {
+            font-weight: bold;
+            color: #002b5b;
+            font-size: 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .step-title::before {
+            content: '📋';
+            margin-right: 10px;
+        }
+        .code-block {
+            background-color: #f0f2f6;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #333;
+            margin-top: 5px;
+        }
+        .logic-flow {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #444;
+        }
+        .logic-highlight {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+        .tab-content {
+            padding: 10px 0;
+        }
+    </style>
+    
+    <div class="guide-header">
+        <h1>📘 PANDUAN LENGKAP ERP LOGISTIC SURABAYA</h1>
+        <p>Memahami Alur Logika, Format File, dan Cara Penggunaan Sistem</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Pilih Menu Panduan
+    pilih_panduan = st.selectbox(
+        "Pilih Modul yang Ingin Dipelajari:",
+        [
+            "📦 Stock Opname (SO)",
+            "📬 Putaway System",
+            "🔍 Scan Out Validation",
+            "♻️ Refill & Overstock",
+            "🔄 Refill & Withdraw",
+            "⚠️ Stock Minus",
+            "🔄 Compare RTO",
+            "🚚 FDR Update"
+        ]
+    )
+
+    if pilih_panduan == "📦 Stock Opname (SO)":
+        with st.expander("📦 1. STOCK OPNAME (SO) - Analyzer", expanded=True):
+            st.markdown("""
+            <div class="step-box">
+                <div class="step-title">Tentang Menu Ini</div>
+                <div class="logic-flow">
+                    Menu ini digunakan untuk membandingkan hasil scan fisik dengan inventaris sistem, serta membuat daftar adjustment.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("""
+                ### 📥 Input File Wajib:
+                **1. Data Scan** (Hasil scan fisik)
+                - Kolom A: `BIN`
+                - Kolom B: `SKU`
+                
+                **2. Stock System** (Data stock di ERP)
+                - Kolom B: `BIN`
+                - Kolom C: `SKU`
+                - Kolom J: `QTY` (Jumlah stock)
+                - Kolom F: `Sub Kategori`
+                
+                **3. File Bin Coverage** (Opsional)
+                - Data stock di gudang lain untuk kebutuhan alokasi.
+                """)
+            with col2:
+                st.markdown("""
+                ### ⚙️ Logic Thinking (Alur Pikir)
+                
+                1. **Compare**: Membandingkan Qty Scan vs Qty System.
+                   - Jika Scan > System = **REAL +** (Kelebihan Fisik)
+                   - Jika System > Scan = **SYSTEM +** (Kekurangan Fisik)
+                
+                2. **Allocation**: Sistem mencoba mencari stock untuk memenuhi kebutuhan "Real +" dengan cara melihat stock di Bin lain (Coverage).
+                
+                3. **Step 4 (Adjustment)**: Mencocokkan dengan data Recon (Qty SO).
+                
+                4. **Step 5 (Final Adj)**: Generate list adjustment akhir.
+                
+                5. **Step 6 (Karantina)**: Generate list pemindahan ke bin "KARANTINA" jika terjadi selisih yang tidak bisa di-rekon.
+                """)
+
+    elif pilih_panduan == "📬 Putaway System":
+        with st.expander("📬 2. PUTAWAY SYSTEM - Comparation", expanded=True):
+            st.markdown("""
+            <div class="step-box">
+                <div class="step-title">Tentang Menu Ini</div>
+                <div class="logic-flow">
+                    Menu ini digunakan untuk menemukan barang yang akan dipindahkan (Setup) dengan mencari sumber stocknya di gudang.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("""
+                ### 📥 Input File:
+                **1. DS Putaway** (Daftar barcode mau dipindah)
+                - Kolom A: `BIN TUJUAN`
+                - Kolom B: `SKU`
+                - Kolom C: `QTY`
+                
+                **2. Asal Bin** (Data Stock Gudang)
+                - Kolom B: `BIN`
+                - Kolom C: `SKU`
+                - Kolom J: `QTY` (Jumlah stock di gudang)
+                """)
+            with col2:
+                st.markdown("""
+                ### ⚙️ Logic Priority (Prioritas Pencarian)
+                
+                1. **STAGGING LT.3**: Dicari dulu (Tempat transit utama).
+                2. **STAGING / KARANTINA**: Dicari kedua (Tempat stock sementara).
+                3. **BIN NORMAL**: Dicari terakhir (Rak/Gudang biasa).
+                
+                *Jika tidak ketemu, status akan muncul di tab "Kurang Setup".*
+                
+                ### Output:
+                - **List Setup**: Barang yang sudah ketemu sumbernya.
+                - **Kurang Setup**: Barang yang tidak ditemukan stocknya.
+                - **STG.LT.3 Outstanding**: Sisa stock di Staging LT.3.
+                """)
+
+    elif pilih_panduan == "🔍 Scan Out Validation":
+        with st.expander("🔍 3. SCAN OUT VALIDATION", expanded=True):
+            st.markdown("""
+            <div class="step-box">
+                <div class="step-title">Tentang Menu Ini</div>
+                <div class="logic-flow">
+                    Menu untuk memvalidasi status barang yang discan (Barcode keluar). Apakah barang tersebut sudah Terjual atau hanya Dipindahkan (Set Up) sebelumnya.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("""
+                ### 📥 Input File:
+                **1. Data Scan**
+                - Kolom A: `BIN`
+                - Kolom B: `SKU`
+                
+                **2. History Set Up** (Riwayat mutasi barang)
+                - Kolom D: `SKU`
+                - Kolom I: `BIN`
+                - Kolom K: `Qty`
+                - Kolom M: `BIN After`
+                
+                **3. Stock Tracking** (Data Penjualan/Invoice)
+                - Kolom A: `Invoice`
+                - Kolom B: `SKU`
+                - Kolom G: `BIN`
+                - Kolom K: `Qty`
+                """)
+            with col2:
+                st.markdown("""
+                ### ⚙️ Logic Validasi:
+                
+                1. **Cek Invoice**: Apakah ada di Stock Tracking?
+                   - Ya (Ada INV) = ✅ **TERJUAL**
+                
+                2. **Cek History**: Jika tidak terjual, cek History.
+                   - Cocok = ✅ **DONE AND MATCH**
+                   - Tidak Cocok (Qty/Bin berbeda) = ⚠️ **MISSMATCH**
+                
+                3. **Tidak Ada**: ❌ **BELUM TERSETUP & TIDAK TERJUAL**
+                   - Hasil: Harus dikirim ke Karantina.
+                """)
+
+    elif pilih_panduan == "♻️ Refill & Overstock":
+        with st.expander("♻️ 4. REFILL & OVERSTOCK SYSTEM", expanded=True):
+            st.markdown("""
+            <div class="step-box">
+                <div class="step-title">Tentang Menu Ini</div>
+                <div class="logic-flow">
+                    Menu untuk menyeimbangkan stock antara area GL3 (Rak Utama) dan GL4 (Gudang Penyimpanan)/Toko.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("""
+                ### 📥 Input File:
+                **1. All Data Stock**
+                - Data stock seluruh gudang (GL3 & GL4).
+                
+                **2. Stock Tracking**
+                - Riwayat transaksi (Invoice, Lokasi, Qty).
+                """)
+            with col2:
+                st.markdown("""
+                ### ⚙️ Logic:
+                
+                1. **Filter GL3 vs GL4**: Memisahkan Rak Utama dan Gudang Belakang.
+                
+                2. **Refill**: 
+                   - Jika Qty GL3 < 3, ambil dari GL4 
+                   - Prioritas: bukan LIVE/Rak.
+                
+                3. **Overstock**: 
+                   - Jika Qty GL3 > 24:
+                     - Jika Transaksi Toko < 7, maka Overstock.
+                """)
+
+    elif pilih_panduan == "🔄 Refill & Withdraw":
+        with st.expander("🔄 5. REFILL & WITHDRAW", expanded=True):
+            st.markdown("""
+            <div class="step-box">
+                <div class="step-title">Tentang Menu Ini</div>
+                <div class="logic-flow">
+                    Menu untuk menyeimbangkan stock antara gudang Surabaya (DC) dan Toko (Area 02).
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("""
+                ### 📥 Input File:
+                **1. All Stock SBY**
+                - Data Stock Surabaya (DC + Toko).
+                
+                **2. Data Transaksi**
+                - Riwayat transaksi Toko.
+                """)
+            with col2:
+                st.markdown("""
+                ### ⚙️ Logic:
+                
+                - **Refill**: District Toko kekurang stock (Tot02 + TotDC <= 3).
+                - **Withdraw**: District Toko kelebihan stock (TotDC > 3).
+                - **Auto Balance**: Memaksa refill/withdraw jika kondisi stok di Toko 0 tapi di DC ada.
+                
+                **Upload ke Appsheet**: Hasil bisa di-upload langsung ke Appsheet.
+                """)
+
+    elif pilih_panduan == "⚠️ Stock Minus":
+        with st.expander("⚠️ 6. STOCK MINUS CLEARANCE", expanded=True):
+            st.markdown("""
+            <div class="step-box">
+                <div class="step-title">Tentang Menu Ini</div>
+                <div class="logic-flow">
+                    Menu untuk membersihkan/menutupi stock minus dengan mencari stock dari bin lain.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("""
+                ### 📥 Input:
+                **File Excel dari Jezpro**
+                - Berisi data stock minus.
+                """)
+            with col2:
+                st.markdown("""
+                ### ⚙️ Logic:
+                
+                1. Mapping seluruh stock positif per SKU & BIN.
+                2. Mencari stock untuk memenuhi kebutuhan Minus dengan prioritas:
+                   - **Toko** (ambil dari LT.2/GL2-STORE).
+                   - **LT.2** (ambil dari Toko).
+                   - **Stagging** (Inbound/Outbound).
+                   - **Karantina**.
+                
+                ### Output: 
+                - Sheet **SET_UP**: Instruksi pemindahan.
+                - Sheet **JUSTIFIKASI**: Item minus yang tidak bisa ditutupi.
+                """)
+
+    elif pilih_panduan == "🔄 Compare RTO":
+        with st.expander("🔄 7. COMPARE RTO (Return To Owner)", expanded=True):
+            st.markdown("""
+            <div class="step-box">
+                <div class="step-title">Tentang Menu Ini</div>
+                <div class="logic-flow">
+                    Menu untuk memvalidasi data Retur barang antara sistem lama (DS/Excel) dengan Appsheet.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("""
+                ### 📥 Input:
+                **1. DS RTO**: Data ScanRetur.
+                **2. Appsheet RTO**: Data di Aplikasi.
+                **3. Draft Jezpro**: (Opsional) Draft untuk dicek.
+                """)
+            with col2:
+                st.markdown("""
+                ### ⚙️ Engines:
+                
+                1. **Engine Total**: Cek kesesuaian Qty Scan vs Qty Ambil Appsheet.
+                2. **Engine Refresh**: Update data Appsheet setelah cek fisik (Cek Real).
+                3. **Engine Compare Jezpro**: Membandingkan Draft vs Appsheet (Cek Bin & Qty).
+                """)
+
+    elif pilih_panduan == "🚚 FDR Update":
+        with st.expander("🚚 8. FDR UPDATE - MANIFEST CHECKER", expanded=True):
+            st.markdown("""
+            <div class="step-box">
+                <div class="step-title">Tentang Menu Ini</div>
+                <div class="logic-flow">
+                    Menu untuk memproses manifest pengiriman FDR (Foot & Distribution Retail).
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.markdown("""
+                ### 📥 Input:
+                **File Manifest** (Excel)
+                - Berisi data pengiriman.
+                """)
+            with col2:
+                st.markdown("""
+                ### ⚙️ Logic:
+                
+                1. **Load Data**: Membersihkan kolom kosong.
+                2. **FU IT**: Memfilter data yang kolom ke-13 (M) tidak kosong.
+                3. **Split Kurir**: Memisahkan data berdasarkan nama kurir.
+                
+                ### Output:
+                - Tab Manifest (Semua data).
+                - Tab FU IT (Follow Up IT).
+                - Tab Kurir (Data per kurir).
+                """)
+
+    # Footer Panduan
+    st.markdown("---")
+    st.info("💡 **Tips**: Jika masih bingung dengan format file, coba lihat contoh file yang di-upload di setiap menu.")
+    
+# =========================================================
 # 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
 # =========================================================
 
