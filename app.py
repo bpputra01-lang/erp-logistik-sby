@@ -3436,3 +3436,6 @@ elif menu == "Refill & Withdraw":
 # --- Navigasi ---
 elif menu == "Stock Opname":
     menu_Stock_Opname()
+
+if menu == "Panduan Aplikasi":
+    menu_panduan()
