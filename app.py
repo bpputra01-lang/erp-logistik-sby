@@ -969,7 +969,6 @@ if st.session_state.df_karantina_6 is not None:
         label="📥 DOWNLOAD HASIL KARANTINA",
         data=output.getvalue(),
         file_name="Hasil_Karantina.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
             
