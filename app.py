@@ -1971,6 +1971,225 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     return df_res, df_draft
 
+# =========================================================
+# 4. MENU: PANDUAN APLIKASI (USER GUIDE)
+# =========================================================
+def menu_panduan():
+    st.markdown("""
+    <style>
+        .guide-header {
+            background: linear-gradient(135deg, #002b5b 0%, #003874 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .guide-header h1 {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 24px;
+        }
+        .step-box {
+            background-color: #ffffff;
+            border-left: 5px solid #C5A059;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0 10px 10px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .step-title {
+            font-weight: bold;
+            color: #002b5b;
+            font-size: 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .step-title::before {
+            content: '📋';
+            margin-right: 10px;
+        }
+        .code-block {
+            background-color: #f0f2f6;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #333;
+            margin-top: 5px;
+        }
+        .logic-flow {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #444;
+        }
+        .logic-highlight {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+    </style>
+    
+    <div class="guide-header">
+        <h1>📘 PANDUAN LENGKAP ERP LOGISTIC SURABAYA</h1>
+        <p>Memahami Alur Logika, Format File, dan Cara Penggunaan Sistem</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- STOK OPNAME ---
+    with st.expander("📦 1. STOCK OPNAME (SO) - Analyzer", expanded=True):
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.markdown("""
+            **📥 Input File Wajib:**
+            1.  **Data Scan**: Hasil scan fisik.
+                *   Kolom A: `BIN`
+                *   Kolom B: `SKU`
+            2.  **Stock System**: Data stock di ERP.
+                *   Kolom B: `BIN`
+                *   Kolom C: `SKU`
+                *   Kolom J: `QTY`
+            """)
+        with col2:
+            st.markdown("""
+            **⚙️ Logic Thinking (Alur Pikir):**
+            1.  **Compare**: Membandingkan Qty Scan vs Qty System.
+                *   Jika Scan > System = **REAL +** (Kelebihan Fisik).
+                *   Jika System > Scan = **SYSTEM +** (Kekurangan Fisik).
+            2.  **Allocation**: Mencari stock di gudang lain (Coverage) untuk memenuhi kebutuhan "Real +".
+            3.  **Step 4 (Adj)**: Lookup ke data Recon (Qty SO).
+            4.  **Step 6**: Generate pemindahan ke **KARANTINA** jika ada selisih.
+            """)
+
+    # --- PUTAWAY SYSTEM ---
+    with st.expander("📬 2. PUTAWAY SYSTEM - Comparation"):
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.markdown("""
+            **📥 Input File:**
+            1.  **DS Putaway**: Daftar barcode mau dipindah.
+                *   Kolom A: `BIN TUJUAN`
+                *   Kolom B: `SKU`
+                *   Kolom C: `QTY`
+            2.  **Asal Bin**: Data Stock Gudang.
+                *   Kolom B: `BIN`
+                *   Kolom C: `SKU`
+                *   Kolom J: `QTY`
+            """)
+        with col2:
+            st.markdown("""
+            **⚙️ Logic Priority (Cari Sumber):**
+            1.  **STAGGING LT.3**: Dicari dulu (Tempat transit utama).
+            2.  **STAGING / KARANTINA**: Dicari kedua (Tempat stock sementara).
+            3.  **BIN NORMAL**: Dicari terakhir (Rak/Gudang biasa).
+            *Jika tidak ketemu, status akan muncul di tab "Kurang Setup".*
+            """)
+
+    # --- SCAN OUT VALIDATION ---
+    with st.expander("🔍 3. SCAN OUT VALIDATION"):
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.markdown("""
+            **📥 Input File:**
+            1.  **Data Scan**: Kolom A (`BIN`), Kolom B (`SKU`).
+            2.  **History Set Up**: Riwayat mutasi barang.
+                *   Kolom D: `SKU`
+                *   Kolom I: `BIN`
+                *   Kolom K: `Qty`
+            3.  **Stock Tracking**: Data Penjualan (Invoice).
+                *   Kolom A: `Invoice`
+                *   Kolom B: `SKU`
+                *   Kolom G: `BIN`
+            """)
+        with col2:
+            st.markdown("""
+            **⚙️ Logic Validasi:**
+            1.  **Cek Invoice**: Apakah ada di *Stock Tracking*?
+                *   Ya (Ada INV) = ✅ **TERJUAL**.
+            2.  **Cek History**: Jika tidak terjual, cek *History*.
+                *   Cocok = ✅ **DONE AND MATCH**.
+                *   Tidak Cocok = ⚠️ **MISSMATCH**.
+            3.  **Tidak Ada**: ❌ **BELUM TERSETUP & TIDAK TERJUAL** (Harus ke Karantina).
+            """)
+
+    # --- REFILL & OVERSTOCK ---
+    with st.expander("♻️ 4. REFILL & OVERSTOCK SYSTEM"):
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.markdown("""
+            **📥 Input File:**
+            1.  **All Data Stock**: Data seluruh gudang.
+            2.  **Stock Tracking**: Riwayat transaksi.
+            """)
+        with col2:
+            st.markdown("""
+            **⚙️ Logic:**
+            1.  **Filter GL3 vs GL4**: Memisahkan Rak Utama dan Gudang Belakang.
+            2.  **Refill**: Jika Qty GL3 < 3, ambil dari GL4 (Prioritas: bukan LIVE/Rak).
+            3.  **Overstock**: Jika Qty GL3 > 24:
+                *   Jika Transaksi Toko < 7, maka Overstock.
+            """)
+
+    # --- STOCK MINUS ---
+    with st.expander("⚠️ 5. STOCK MINUS CLEARANCE"):
+        st.markdown("""
+        **📥 Input:** File Excel dari Jezpro.
+        
+        **⚙️ Logic:**
+        1.  Mapping seluruh stock positif per SKU & BIN.
+        2.  Mencari stock untuk memenuhi kebutuhan Minus dengan prioritas:
+            *   **Toko** (ambil dari LT.2/GL2-STORE).
+            *   **LT.2** (ambil dari Toko).
+            *   **Stagging (Inbound/Outbound)**.
+            *   **Karantina**.
+        
+        **Output:** 
+        *   Sheet **SET_UP**: Instruksi pemindahan untuk menutupi Minus.
+        *   Sheet **JUSTIFIKASI**: Item minus yang tidak bisa ditutupi stocknya.
+        """)
+
+    # --- COMPARE RTO ---
+    with st.expander("🔄 6. COMPARE RTO (Return To Owner)"):
+        st.markdown("""
+        **📥 Input:**
+        1.  **DS RTO**: Data ScanRetur.
+        2.  **Appsheet RTO**: Data di Aplikasi.
+        
+        **⚙️ Engines:**
+        1.  **Engine Total**: Cek kesesuaian Qty Scan vs Qty Ambil Appsheet.
+        2.  **Engine Refresh**: Update data Appsheet setelah cek fisik (Cek Real).
+        3.  **Engine Compare Jezpro**: Membandingkan Draft yang akan diinput vs Data Appsheet (Cek Bin & Qty).
+        """)
+
+    # --- REFILL & WITHDRAW ---
+    with st.expander("🔄 7. REFILL & WITHDRAW"):
+        st.markdown("""
+        **📥 Input:**
+        1.  **All Stock SBY**: Data Stock Surabaya.
+        2.  **Data Transaksi**: Riwayat transaksi Toko.
+        
+        **⚙️ Logic:**
+        *   **Refill**: District Toko kekurang stock (Tot02 + TotDC <= 3).
+        *   **Withdraw**: District Toko kelebihan stock (TotDC > 3).
+        *   **Auto Balance**: Memaksa refill/withdraw jika kondisi stok di Toko 0 tapi di DC ada.
+        """)
+
+# --- NAVIGASI & ROUTING ---
+# (Tambahkan ini di bagian Sidebar你们的代码中)
+
+# --- KELOMPOK 3: BANTUAN ---
+st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">BANTUAN</p>', unsafe_allow_html=True)
+
+m3_list = ["Panduan Aplikasi"]
+
+def change_m3():
+    st.session_state.main_menu = st.session_state.m3_key
+
+idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
+menu_3 = st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
+
 with st.sidebar:
        st.markdown("""
     <style>
