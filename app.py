@@ -6,9 +6,8 @@ import math
 
 st.set_page_config(
     page_title="LogsbyERP.id",
-    page_icon="🚛",
-)
-
+    page_icon="🚛",)
+  
 st.markdown("""
     <style>
     /* ============================================
@@ -27,10 +26,10 @@ st.markdown("""
     [data-testid="stSidebarNav"] { display: none !important; }
 
     /* ============================================
-       2. APP BACKGROUND - ADAPTIVE
+       2. APP BACKGROUND
        ============================================ */
     .stApp {
-        background-color: var(--background-color) !important;
+        background-color: #f5f7fa !important;
     }
 
     /* ============================================
@@ -88,34 +87,49 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0, 43, 91, 0.3) !important;
     }
 
+    /* Clear/Reset Buttons - Red */
+    div.stButton > button[key*="reset"],
+    div.stButton > button[key*="clear"] {
+        background: linear-gradient(135deg, #8b0000 0%, #a00000 100%) !important;
+        border-color: #4a0000 !important;
+    }
+    div.stButton > button[key*="reset"]:hover,
+    div.stButton > button[key*="clear"]:hover {
+        background: linear-gradient(135deg, #a00000 0%, #b50000 100%) !important;
+        border-color: #ff4444 !important;
+    }
+
     /* ============================================
        6. FILE UPLOADER
        ============================================ */
     [data-testid="stFileUploader"] {
-        background-color: var(--secondary-background-color) !important;
-        border: 2px dashed rgba(197, 160, 89, 0.3) !important;
+        background-color: #f0f2f6;
+        border: 2px dashed rgba(0, 43, 91, 0.3) !important;
         border-radius: 10px;
         padding: 12px;
     }
+    [data-testid="stFileUploader"] button {
+        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important;
+        color: #1a1d2e !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+    }
 
     /* ============================================
-       7. METRIC BOXES - ADAPTIVE THEME (PERBAIKAN)
+       7. METRIC BOXES - PREMIUM CARD
        ============================================ */
     .m-box {
-        /* Menggunakan warna background sekunder tema (Otomatis Putih/Gelap) */
-        background-color: var(--secondary-background-color) !important; 
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
         padding: 18px 20px !important;
         border-radius: 10px !important;
         border-left: 4px solid #C5A059 !important;
         margin-bottom: 10px !important;
         text-align: left !important;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1) !important;
-        border: 1px solid rgba(128, 128, 128, 0.1) !important;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
     }
     .m-lbl {
-        /* Menggunakan variabel warna teks utama tema dengan transparansi */
-        color: var(--text-color) !important;
-        opacity: 0.7;
+        color: rgba(255, 255, 255, 0.65) !important;
         font-family: 'Inter', sans-serif !important;
         font-size: 10px !important;
         font-weight: 600 !important;
@@ -125,7 +139,6 @@ st.markdown("""
         margin-bottom: 6px;
     }
     .m-val {
-        /* Warna nilai tetap Emas agar premium, tapi kontras di mode apapun */
         color: #C5A059 !important;
         font-family: 'Poppins', sans-serif !important;
         font-size: 24px !important;
@@ -135,108 +148,275 @@ st.markdown("""
     /* ============================================
        8. RADIO BUTTONS
        ============================================ */
+    div.row-widget.stRadio > div { background-color: transparent !important; }
     div.row-widget.stRadio label {
-        color: var(--text-color) !important;
-        background: var(--secondary-background-color) !important;
+        color: #a0a5b5 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 13px !important;
+        padding: 8px 14px !important;
+        border-radius: 6px !important;
+        background: rgba(26, 29, 46, 0.5) !important;
         border: 1px solid rgba(197, 160, 89, 0.15) !important;
+        transition: all 0.2s ease !important;
+    }
+    div.row-widget.stRadio label:hover {
+        background: rgba(197, 160, 89, 0.1) !important;
+        border-color: rgba(197, 160, 89, 0.3) !important;
+        color: #C5A059 !important;
     }
 
     /* ============================================
-       9. INPUT BOXES - ADAPTIVE
+       9. INPUT BOXES - GOLD BORDER
        ============================================ */
     div[data-baseweb="select"] > div,
-    div[data-baseweb="input"] {
-        background-color: var(--secondary-background-color) !important;
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a1d2e !important;
         border: 1px solid rgba(197, 160, 89, 0.3) !important;
-        color: var(--text-color) !important;
+        border-radius: 8px !important;
     }
-    
+    div[data-baseweb="select"] > div:focus-within,
+    [data-testid="stFileUploaderSection"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    [data-testid="stFileUploaderText"] > span,
+    [data-testid="stFileUploaderText"] > small {
+        color: #e0e0e0 !important;
+        -webkit-text-fill-color: #e0e0e0 !important;
+    }
+
+    /* Text inputs */
+    div[data-baseweb="input"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+    }
+    div[data-baseweb="input"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
     input {
-        color: var(--text-color) !important;
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 14px !important;
     }
 
     /* ============================================
-       12. LABELS - ADAPTIVE
+       10. BUTTONS LAYOUT
+       ============================================ */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+    }
+    [data-testid="column"] {
+        flex: 0 1 auto !important;
+        width: auto !important;
+        min-width: fit-content !important;
+        max-width: fit-content !important;
+    }
+    div.stButton > button {
+        width: 170px !important;
+        min-height: 3.3em !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        padding: 10px 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        font-size: 13px !important;
+        line-height: 1.3 !important;
+    }
+
+    /* ============================================
+       11. SIDEBAR BUTTONS - GOLD THEME
+       ============================================ */
+    [data-testid="stSidebar"] div.stButton > button {
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important;
+        color: #C5A059 !important;
+        border: 1px solid rgba(197, 160, 89, 0.25) !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 42px !important;
+        border-radius: 8px !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+        transition: all 0.25s ease !important;
+        margin-bottom: 6px !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button:hover {
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important;
+        border-color: #C5A059 !important;
+        color: #FFD700 !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button p {
+        color: inherit !important;
+        font-family: 'Inter', sans-serif !important;
+    }
+
+    /* ============================================
+       12. LABELS
        ============================================ */
     [data-testid="stWidgetLabel"] p {
-        color: var(--text-color) !important;
+        color: #2d3748 !important;
         font-family: 'Inter', sans-serif !important;
         font-weight: 600 !important;
         font-size: 13px !important;
     }
     </style>
 """, unsafe_allow_html=True)
+    # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
+import streamlit as st
 
 # 1. Inisialisasi session state login
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# --- FUNGSI LOGIN ---
+# --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
+        /* 1. Background & Layout */
         .stApp {
             background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), 
                         url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
             background-size: cover !important;
         }
         [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
+    
 
-        button[data-testid="stFormSubmitButton"] {
-            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
-            color: #ffffff !important;
-            padding: 18px 20px !important;
-            font-weight: 800 !important;
-            text-transform: uppercase !important;
-            width: 100% !important;
-            border-radius: 12px !important;
+        /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
+button[data-testid="stFormSubmitButton"], 
+div.stFormSubmitButton > button {
+    background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    
+    /* GANTI BAGIAN INI */
+    padding: 18px 20px !important; /* Naikin dari 14px ke 18px biar lega */
+    line-height: 1.2 !important;   /* Pastikan teks di tengah vertikal */
+    height: auto !important;       /* Biar tinggi tombol ngikutin padding */
+    
+    font-weight: 800 !important;
+    font-size: 16px !important;
+    letter-spacing: 1px !important;
+    width: 100% !important;
+    box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
+    text-transform: uppercase !important;
+}
+
+        /* Paksa warna tetep emas pas kursor nempel */
+        button[data-testid="stFormSubmitButton"]:hover {
+            background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
+            color: #1e1e2f !important;
+            box-shadow: 0 20px 25px rgba(197, 160, 89, 0.5) !important;
+            transform: translateY(-2px);
         }
 
+        /* 4. Input Box biar gelap & elegan - PERBAIKAN UTAMA DISINI */
+        /* container input */
+        div[data-baseweb="input"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 10px !important;
+            padding: 8px 12px !important;
+        }
+        
+        /* container input focus */
+        div[data-baseweb="input"]:focus-within {
+            border-color: #D4AF37 !important;
+            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
+        }
+        
+        /* input field (termasuk password) */
+        input[type="text"], 
+        input[type="password"],
+        input[type="email"],
+        div[data-baseweb="input"] input {
+            background-color: transparent !important;
+            border: none !important;
+            color: #C5A059 !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        
+        /* placeholder styling */
+        input::placeholder {
+            color: rgba(197, 160, 89, 0.5) !important;
+            opacity: 1 !important;
+        }
+        
+        /* Firefox placeholder */
+        input::-webkit-input-placeholder {
+            color: rgba(197, 160, 89, 0.5) !important;
+        }
+        
+        /* password field dots styling */
+        input[type="password"] {
+            letter-spacing: 2px !important;
+        }
+
+        /* Label styling */
+        [data-testid="stWidgetLabel"] p {
+            color: #E0E0E0 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            margin-bottom: 8px !important;
+        }
+
+        /* Form spacing */
+        .stForm {
+            background-color: transparent !important;
+            border: none !important;
+        }
+        
+        /* Input wrapper styling */
         div[data-testid="stTextInput"] div[data-baseweb="input"] {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
-            color: #C5A059 !important;
+            border-radius: 10px !important;
+            padding: 12px 16px !important;
+            min-height: 50px !important;
         }
         
+        /* Pastikan password dots terlihat jelas */
         div[data-testid="stTextInput"] input {
             color: #C5A059 !important;
             -webkit-text-fill-color: #C5A059 !important;
         }
 
-        div[data-testid="stNotification"] {
-            background-color: #1e7e34 !important;
-            color: white !important;
-            border: 1px solid #C5A059 !important;
+        /* Hilangkan background overlay Streamlit */
+        .stTextInput > div > div {
+            background-color: transparent !important;
         }
-        </style>
+
+        /* Ubah background st.success jadi hijau solid */
+    div[data-testid="stNotification"] {
+        background-color: #1e7e34 !important; /* Hijau Tua Surabaya */
+        color: white !important;               /* Tulisan Putih */
+        border-radius: 10px !important;
+        border: 1px solid #C5A059 !important;  /* Kasih border emas dikit biar matching */
+    }
+    /* Pastikan ikon centangnya juga putih */
+    div[data-testid="stNotification"] svg {
+        fill: white !important;
+    }
+    
+    </style>
     """, unsafe_allow_html=True)
-    
-    with st.container():
-        st.markdown('<div style="text-align: center; color: white;"><h2>LOGIN SYSTEM</h2></div>', unsafe_allow_html=True)
-        with st.form("login_form"):
-            user = st.text_input("Username")
-            pw = st.text_input("Password", type="password")
-            if st.form_submit_button("MASUK KE SISTEM"):
-                if user == "admin" and pw == "123":
-                    st.session_state.logged_in = True
-                    st.rerun()
-                else:
-                    st.error("Login Gagal!")
-
-# --- KONTEN DASHBOARD (Muncul jika sudah login) ---
-else:
-    st.markdown('<div class="hero-header"><h1>🚛 LOGSBY ERP DASHBOARD</h1></div>', unsafe_allow_html=True)
-    
-    # Contoh Metric Box Adaptif
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown('<div class="m-box"><span class="m-lbl">Total Qty</span><span class="m-val">1,250 Pcs</span></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown('<div class="m-box"><span class="m-lbl">Sesuai</span><span class="m-val">1,100 Pcs</span></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown('<div class="m-box"><span class="m-lbl">Selisih</span><span class="m-val">150 Pcs</span></div>', unsafe_allow_html=True)
-
-    # Tambahkan fitur lainnya di bawah sini
     # UI Login Center
     _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
