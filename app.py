@@ -3023,7 +3023,7 @@ elif menu == "Compare RTO":
         st.dataframe(st.session_state.rto_draft_compared, use_container_width=True, hide_index=True)
         
         csv_draft = st.session_state.rto_draft_compared.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Draft Compared", csv_draft, "DRAFT_COMPARED.csv", "text/csv", use_container_width=True)
+        st.download_button("📥 Download Summary Draft", csv_draft, "DRAFT_COMPARED.csv", "text/csv", use_container_width=True)
 
     st.divider()
     
