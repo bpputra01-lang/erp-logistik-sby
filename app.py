@@ -8,10 +8,6 @@ st.set_page_config(
     page_title="LogsbyERP.id",
     page_icon="🚛",)
   
-# ============================================================
-# PASTE KODE INI DI PALING ATAS FILE (SETELAH import & st.set_page_config)
-# ============================================================
-
 st.markdown("""
     <style>
     /* ============================================
@@ -97,6 +93,11 @@ st.markdown("""
         background: linear-gradient(135deg, #8b0000 0%, #a00000 100%) !important;
         border-color: #4a0000 !important;
     }
+    div.stButton > button[key*="reset"]:hover,
+    div.stButton > button[key*="clear"]:hover {
+        background: linear-gradient(135deg, #a00000 0%, #b50000 100%) !important;
+        border-color: #ff4444 !important;
+    }
 
     /* ============================================
        6. FILE UPLOADER
@@ -106,6 +107,13 @@ st.markdown("""
         border: 2px dashed rgba(0, 43, 91, 0.3) !important;
         border-radius: 10px;
         padding: 12px;
+    }
+    [data-testid="stFileUploader"] button {
+        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important;
+        color: #1a1d2e !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
     }
 
     /* ============================================
@@ -138,20 +146,7 @@ st.markdown("""
     }
 
     /* ============================================
-       8. INPUT BOXES - GOLD BORDER
-       ============================================ */
-    div[data-baseweb="input"], 
-    div[data-baseweb="select"] > div {
-        background-color: #1a1d2e !important;
-        border: 1px solid rgba(197, 160, 89, 0.3) !important;
-        border-radius: 8px !important;
-    }
-    input {
-        color: #ffffff !important;
-    }
-
-    /* ============================================
-       9. RADIO BUTTONS & TABS
+       8. RADIO BUTTONS
        ============================================ */
     div.row-widget.stRadio > div { background-color: transparent !important; }
     div.row-widget.stRadio label {
@@ -162,11 +157,50 @@ st.markdown("""
         border-radius: 6px !important;
         background: rgba(26, 29, 46, 0.5) !important;
         border: 1px solid rgba(197, 160, 89, 0.15) !important;
+        transition: all 0.2s ease !important;
     }
     div.row-widget.stRadio label:hover {
         background: rgba(197, 160, 89, 0.1) !important;
         border-color: rgba(197, 160, 89, 0.3) !important;
         color: #C5A059 !important;
+    }
+
+    /* ============================================
+       9. INPUT BOXES - GOLD BORDER
+       ============================================ */
+    div[data-baseweb="select"] > div,
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+    }
+    div[data-baseweb="select"] > div:focus-within,
+    [data-testid="stFileUploaderSection"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    [data-testid="stFileUploaderText"] > span,
+    [data-testid="stFileUploaderText"] > small {
+        color: #e0e0e0 !important;
+        -webkit-text-fill-color: #e0e0e0 !important;
+    }
+
+    /* Text inputs */
+    div[data-baseweb="input"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+    }
+    div[data-baseweb="input"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    input {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 14px !important;
     }
 
     /* ============================================
@@ -177,10 +211,13 @@ st.markdown("""
         flex-wrap: wrap !important;
         gap: 10px !important;
         justify-content: flex-start !important;
+        width: 100% !important;
     }
     [data-testid="column"] {
         flex: 0 1 auto !important;
         width: auto !important;
+        min-width: fit-content !important;
+        max-width: fit-content !important;
     }
     div.stButton > button {
         width: 170px !important;
@@ -219,9 +256,13 @@ st.markdown("""
         border-color: #C5A059 !important;
         color: #FFD700 !important;
     }
+    [data-testid="stSidebar"] div.stButton > button p {
+        color: inherit !important;
+        font-family: 'Inter', sans-serif !important;
+    }
 
     /* ============================================
-       12. LABELS - DEFAULT (LIGHT MODE)
+       12. LABELS
        ============================================ */
     [data-testid="stWidgetLabel"] p {
         color: #2d3748 !important;
@@ -229,128 +270,212 @@ st.markdown("""
         font-weight: 600 !important;
         font-size: 13px !important;
     }
-
-    /* ============================================
-       13. DARK MODE SUPPORT - OTOMATIS
-       ============================================ */
-    @media (prefers-color-scheme: dark) {
-        /* Background App jadi Gelap */
-        .stApp {
-            background-color: #0e1117 !important;
-        }
-        
-        /* Label/Teks jadi Putih di Dark Mode */
-        [data-testid="stWidgetLabel"] p,
-        .stTextInput label,
-        .stSelectbox label,
-        .stFileUploader label,
-        [data-testid="stMarkdownContainer"] p {
-            color: #E2E8F0 !important;
-            text-shadow: 0px 0px 1px rgba(0,0,0,0.5);
-        }
-        
-        /* Tab Labels - Agar terlihat di dark mode */
-        button[data-baseweb="tab"] {
-            color: #A0AEC0 !important;
-        }
-        button[data-baseweb="tab"][aria-selected="true"] {
-            color: #FFFFFF !important;
-            border-bottom: 2px solid #FF4B4B !important;
-        }
-        
-        /* Metric Box Text - Tetap Terlihat */
-        .m-box {
-            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%) !important;
-        }
-        
-        /* Input Background di Dark Mode */
-        div[data-baseweb="input"] {
-            background-color: #2D3748 !important;
-            border: 1px solid #4A5568 !important;
-        }
-        
-        /* Sidebar Text */
-        [data-testid="stSidebar"] .stMarkdown p,
-        [data-testid="stSidebar"] span,
-        [data-testid="stSidebar"] label {
-            color: #E2E8F0 !important;
-        }
-    }
-
-    /* ============================================
-       14. SUCCESS & ERROR NOTIFICATIONS
-       ============================================ */
-    div[data-testid="stNotification"] {
-        border-radius: 8px !important;
-    }
-    @media (prefers-color-scheme: dark) {
-        div[data-testid="stNotification"] {
-            background-color: #22543D !important;
-            color: #FFFFFF !important;
-            border: 1px solid #48BB78 !important;
-        }
-    }
     </style>
 """, unsafe_allow_html=True)
+    # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
+import streamlit as st
 
-   # UI Login Center
-_, col_mid, _ = st.columns([1, 2, 1])
-with col_mid:
-    # Buka Container Card
-    st.markdown('<div class="login-card">', unsafe_allow_html=True)
-    
-    # JUDUL
+# 1. Inisialisasi session state login
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+# --- FUNGSI LOGIN (Hanya muncul jika belum logged_in) ---
+if not st.session_state.logged_in:
     st.markdown("""
-        <h2 style="
-            color: #C5A059; 
-            margin-top: -60px; 
-            margin-bottom: -5px; 
-            font-family: 'Inter', sans-serif; 
-            font-weight: 800; 
-            text-align: center;
-        ">SURABAYA DISTRIBUTION CENTER</h2>
-    """, unsafe_allow_html=True)
+        <style>
+        /* 1. Background & Layout */
+        .stApp {
+            background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
+            background-size: cover !important;
+        }
+        [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
     
-    # SUB-JUDUL
-    st.markdown("""
-        <p style="
-            color: #FFFFFF; 
-            font-size: 14px; 
-            margin-bottom: 15px; 
-            text-align: center;
-        ">🐊Surabaya Logistics Management System</p>
-    """, unsafe_allow_html=True)
 
-    # BUNGKUS FORM (INI YANG PERLU DIPERBAIKI - JANGAN ADA SPASI DI DEPAN)
-    with st.form("login_form"):
-        user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
-        pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
-        
-        st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
-        
-        submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
-        
-        # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
-        if submit_button:
-            if user_input == "admin" and pass_input == "sby123":
-                st.session_state.logged_in = True
-                st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
-                st.rerun()
-            else:
-                st.error("Username atau Password salah!")
+        /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
+button[data-testid="stFormSubmitButton"], 
+div.stFormSubmitButton > button {
+    background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
     
-    # Tutup Container Card
-    st.markdown('</div>', unsafe_allow_html=True)
+    /* GANTI BAGIAN INI */
+    padding: 18px 20px !important; /* Naikin dari 14px ke 18px biar lega */
+    line-height: 1.2 !important;   /* Pastikan teks di tengah vertikal */
+    height: auto !important;       /* Biar tinggi tombol ngikutin padding */
+    
+    font-weight: 800 !important;
+    font-size: 16px !important;
+    letter-spacing: 1px !important;
+    width: 100% !important;
+    box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
+    text-transform: uppercase !important;
+}
 
-st.stop()
+        /* Paksa warna tetep emas pas kursor nempel */
+        button[data-testid="stFormSubmitButton"]:hover {
+            background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
+            color: #1e1e2f !important;
+            box-shadow: 0 20px 25px rgba(197, 160, 89, 0.5) !important;
+            transform: translateY(-2px);
+        }
 
+        /* 4. Input Box biar gelap & elegan - PERBAIKAN UTAMA DISINI */
+        /* container input */
+        div[data-baseweb="input"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 10px !important;
+            padding: 8px 12px !important;
+        }
+        
+        /* container input focus */
+        div[data-baseweb="input"]:focus-within {
+            border-color: #D4AF37 !important;
+            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
+        }
+        
+        /* input field (termasuk password) */
+        input[type="text"], 
+        input[type="password"],
+        input[type="email"],
+        div[data-baseweb="input"] input {
+            background-color: transparent !important;
+            border: none !important;
+            color: #C5A059 !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        
+        /* placeholder styling */
+        input::placeholder {
+            color: rgba(197, 160, 89, 0.5) !important;
+            opacity: 1 !important;
+        }
+        
+        /* Firefox placeholder */
+        input::-webkit-input-placeholder {
+            color: rgba(197, 160, 89, 0.5) !important;
+        }
+        
+        /* password field dots styling */
+        input[type="password"] {
+            letter-spacing: 2px !important;
+        }
+
+        /* Label styling */
+        [data-testid="stWidgetLabel"] p {
+            color: #E0E0E0 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            margin-bottom: 8px !important;
+        }
+
+        /* Form spacing */
+        .stForm {
+            background-color: transparent !important;
+            border: none !important;
+        }
+        
+        /* Input wrapper styling */
+        div[data-testid="stTextInput"] div[data-baseweb="input"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 10px !important;
+            padding: 12px 16px !important;
+            min-height: 50px !important;
+        }
+        
+        /* Pastikan password dots terlihat jelas */
+        div[data-testid="stTextInput"] input {
+            color: #C5A059 !important;
+            -webkit-text-fill-color: #C5A059 !important;
+        }
+
+        /* Hilangkan background overlay Streamlit */
+        .stTextInput > div > div {
+            background-color: transparent !important;
+        }
+
+        /* Ubah background st.success jadi hijau solid */
+    div[data-testid="stNotification"] {
+        background-color: #1e7e34 !important; /* Hijau Tua Surabaya */
+        color: white !important;               /* Tulisan Putih */
+        border-radius: 10px !important;
+        border: 1px solid #C5A059 !important;  /* Kasih border emas dikit biar matching */
+    }
+    /* Pastikan ikon centangnya juga putih */
+    div[data-testid="stNotification"] svg {
+        fill: white !important;
+    }
+    
+    </style>
+    """, unsafe_allow_html=True)
+    # UI Login Center
+    _, col_mid, _ = st.columns([1, 2, 1])
+    with col_mid:
+        # Buka Container Card
+        st.markdown('<div class="login-card">', unsafe_allow_html=True)
+        
+        # JUDUL
+        st.markdown("""
+            <h2 style="
+                color: #C5A059; 
+                margin-top: -60px; 
+                margin-bottom: -5px; 
+                font-family: 'Inter', sans-serif; 
+                font-weight: 800; 
+                text-align: center;
+            ">SURABAYA DISTRIBUTION CENTER</h2>
+        """, unsafe_allow_html=True)
+        
+        # SUB-JUDUL
+        st.markdown("""
+            <p style="
+                color: #FFFFFF; 
+                font-size: 14px; 
+                margin-bottom: 15px; 
+                text-align: center;
+            ">🐊Surabaya Logistics Management System</p>
+        """, unsafe_allow_html=True)
+
+       # BUNGKUS FORM
+        with st.form("login_form"):
+            user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
+            pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
+            
+            st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
+            
+            submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
+            
+            # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
+            if submit_button:
+                if user_input == "admin" and pass_input == "sby123":
+                    st.session_state.logged_in = True
+                    st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
+                    st.rerun()
+                else:
+                    st.error("Username atau Password salah!")
+        
+        # Tutup Container Card
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.stop()
 # --- DASHBOARD UTAMA (Jalan setelah login) ---
+
 # Cek apakah notifikasi sudah pernah muncul
 if 'login_success' not in st.session_state:
     st.toast("Berhasil Login! Selamat datang di dashboard.", icon="✅")
     # Set True supaya pas klik menu lain di dashboard, pop-up gak muncul terus-terusan
     st.session_state.login_success = True
-    
+
+
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
 import pandas as pd
 import numpy as np
