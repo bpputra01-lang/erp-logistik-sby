@@ -1267,7 +1267,18 @@ def menu_refill_withdraw():
                 requests.post(url, json=data_json)
                 st.toast("WITHDRAW UPLOADED!")
 
-def engine_ds_rto_vba_total_fixed(df_ds, df_app):
+import pandas as pd
+import numpy as np
+import streamlit as st
+
+# =========================================================
+# ⚙️ 1. DEFINISI SEMUA ENGINE (LOGIKA TIDAK DIUBAH)
+# =========================================================
+
+def engine_ds_rto_vba_total(df_ds, df_app):
+    """
+    LOGIKA AWAL: Membandingkan DS RTO dengan AppSheet RTO.
+    """
     import pandas as pd
     import numpy as np
 
@@ -1336,7 +1347,6 @@ def engine_ds_rto_vba_total_fixed(df_ds, df_app):
     skus_in_ds = set(res_ds['SKU_UPPER'].unique())
     for sku_app, total_qty in dict_qty_total.items():
         if sku_app not in skus_in_ds:
-            # Cari detail barisnya di Appsheet untuk ambil BIN-nya
             mask_app = (df_a['9'].astype(str).str.strip().str.upper() == sku_app) | \
                        (df_a['15'].astype(str).str.strip().str.upper() == sku_app)
             found_rows = df_a[mask_app]
@@ -1350,13 +1360,9 @@ def engine_ds_rto_vba_total_fixed(df_ds, df_app):
 
     res_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
     res_ds.drop(columns=['SKU_UPPER'], inplace=True)
-
     return res_ds, res_selisih
 
 def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
-    import pandas as pd
-    import numpy as np
-
     if df_app_awal.empty or df_selisih.empty:
         return df_ds, df_app_awal
 
@@ -1372,20 +1378,17 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
         if sku_real not in ["", "NAN", "NONE"]:
             real_map[f"{sku_real}|{bin_real}"] = qty_real
 
-    # --- 2. UPDATE APPSHEET RTO (Logika Kolom N) ---
+    # --- 2. UPDATE APPSHEET RTO ---
     for idx in df_app_res.index:
         try:
-            # SKU: I(8) atau O(14) | BIN: L(11) atau P(15)
             sku = str(df_app_res.iloc[idx, 8]).strip().upper()
             if sku in ["", "NAN", "0", "NONE"]:
                 sku = str(df_app_res.iloc[idx, 14]).strip().upper()
             
             b1, b2 = str(df_app_res.iloc[idx, 11]).strip().upper(), str(df_app_res.iloc[idx, 15]).strip().upper()
-            
             target_qty = real_map.get(f"{sku}|{b1}") if f"{sku}|{b1}" in real_map else real_map.get(f"{sku}|{b2}")
 
             if target_qty is not None:
-                # Kolom N (index 13) Blank -> M (index 12) | N Isi -> Q (index 16)
                 val_n = str(df_app_res.iloc[idx, 13]).strip()
                 if val_n == "" or val_n.lower() == "nan":
                     df_app_res.iloc[idx, 12] = target_qty
@@ -1394,18 +1397,15 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
         except Exception:
             continue
 
-    # --- 3. SINKRONISASI DS RTO (Ultrafast) ---
+    # --- 3. SINKRONISASI DS RTO ---
     if not df_ds_res.empty:
-        # Hitung Summary Qty Ambil terbaru dari AppSheet
         df_app_res['TMP_SKU'] = df_app_res.apply(lambda r: str(r.iloc[8]).strip().upper() if str(r.iloc[8]).strip() not in ["","0","nan"] else str(r.iloc[14]).strip().upper(), axis=1)
         df_app_res['TMP_QTY'] = df_app_res.apply(lambda r: (pd.to_numeric(r.iloc[12], errors='coerce') or 0) + (pd.to_numeric(r.iloc[16], errors='coerce') or 0), axis=1)
         
         summary_map = df_app_res.groupby('TMP_SKU')['TMP_QTY'].sum().to_dict()
-
-        # Update DS menggunakan Mapping (Tanpa Loop)
         sku_col, scan_col, ambil_col = df_ds_res.columns[0], df_ds_res.columns[1], df_ds_res.columns[2]
         df_ds_res[ambil_col] = df_ds_res[sku_col].astype(str).str.strip().str.upper().map(summary_map).fillna(0)
-        df_ds_res[scan_col] = df_ds_res[ambil_col] # Samakan agar SESUAI
+        df_ds_res[scan_col] = df_ds_res[ambil_col] 
         
         if 'NOTE' in df_ds_res.columns:
             df_ds_res['NOTE'] = "SESUAI"
@@ -1415,19 +1415,14 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
     return df_ds_res, df_app_res
 
 def engine_compare_draft_jezpro(df_app, df_draft):
-    import pandas as pd
-    import numpy as np
-
     df_res = df_draft.copy()
     df_a = df_app.copy()
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
 
-    # Buat Mapping Bin Lain di awal (Optimasi Ultrafast)
     bin_map = {}
     for _, r in df_a.iterrows():
         s = str(r.get('9', '')).strip().upper() if str(r.get('9','')) not in ["","0","nan"] else str(r.get('15','')).strip().upper()
         if s not in ["", "NAN"]:
-            # Simpan semua bin yang tersedia untuk SKU tersebut
             bins = bin_map.get(s, [])
             if str(r.get('12','')) != "": bins.append((str(r.get('12','')), pd.to_numeric(r.get('13',0), errors='coerce') or 0))
             if str(r.get('16','')) != "": bins.append((str(r.get('16','')), pd.to_numeric(r.get('17',0), errors='coerce') or 0))
@@ -1439,19 +1434,12 @@ def engine_compare_draft_jezpro(df_app, df_draft):
         bin_d = str(row.iloc[8]).strip().upper()
         qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
 
-       # --- 1. CARI MATCH ---
-        # Pastikan baris ini sejajar dengan logika di dalam loop 'for idx, row in df_res.iterrows():'
         match_data = df_a[
             ((df_a['9'].astype(str).str.upper() == sku_d) & (df_a['12'].astype(str).str.upper() == bin_d)) | 
             ((df_a['15'].astype(str).str.upper() == sku_d) & (df_a['16'].astype(str).str.upper() == bin_d))
         ]
 
-        # Inisialisasi variabel (Harus sejajar dengan match_data)
         qty_j, bin_l, qty_m, note, status = 0, "", 0, "HAPUS ITEM INI DARI DRAFT", "DELETE ITEM"
-
-        if not match_data.empty:
-            r_app = match_data.iloc[0]
-            # ... lanjut ke logika penentuan status selanjutnya
 
         if not match_data.empty:
             r_app = match_data.iloc[0]
@@ -1464,7 +1452,6 @@ def engine_compare_draft_jezpro(df_app, df_draft):
                 elif qty_j == qty_h:
                     note, status = "DRAFT SESUAI", "OK"
                 else:
-                    # Cari Bin Lain dari Mapping
                     for b_ext, q_ext in bin_map.get(sku_d, []):
                         if b_ext.upper() != bin_d:
                             bin_l, qty_m, note = b_ext, q_ext, "ADA BIN LAIN"
@@ -1474,8 +1461,8 @@ def engine_compare_draft_jezpro(df_app, df_draft):
         df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [qty_j, note, bin_l, qty_m if qty_m > 0 else "", status]
 
     return df_res
+
 def engine_generate_new_draft(df_compared):
-    import pandas as pd
     if df_compared is None or df_compared.empty:
         return pd.DataFrame(columns=['BIN', 'SKU', 'QUANTITY'])
 
