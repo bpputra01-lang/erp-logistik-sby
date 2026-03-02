@@ -844,7 +844,7 @@ def menu_Stock_Opname():
 
     if st.session_state.allocation_result is not None:
         st.markdown("### ✅ HASIL ALOKASI")
-        ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📦 SET UP REAL +", "📉 UPDATED SYSTEM"])
+        ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📉 UPDATED SYSTEM", "📦 SET UP REAL +"])
         with ta1: st.dataframe(st.session_state.allocation_result, use_container_width=True)
         with ta2: st.dataframe(st.session_state.set_up_real_plus, use_container_width=True)
         with ta3: st.dataframe(st.session_state.sys_updated_result, use_container_width=True)
