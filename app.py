@@ -8,262 +8,14 @@ st.set_page_config(
     page_title="LogsbyERP.id",
     page_icon="🚛",)
   
-# GANTI SEMUA BAGIAN <style> (.biasanya di awal & di login) 
-# DENGAN KODE DI BAWAH INI:
+# ============================================================
+# PASTE KODE INI DI PALING ATAS FILE (SETELAH import & st.set_page_config)
+# ============================================================
 
 st.markdown("""
     <style>
     /* ============================================
-       FONTS IMPORT & THEME VARIABLES
-       ============================================ */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
-
-    /* Definisi Variabel Warna Otomatis (Native Streamlit Theme Support) */
-    :root {
-        --text-color: #31333F;
-        --background-color: #FFFFFF;
-        --secondary-background-color: #F0F2F6;
-        --accent-color: #FF4B4B;
-        --font-family: 'Inter', sans-serif;
-    }
-
-    /* DARK MODE DETECTION (Otomatis merubah warna jika Tema Streamlit diubah ke Dark) */
-    @media (prefers-color-scheme: dark) {
-        :root {
-            #F0F --text-color:2F6;
-            --background-color: #1E1E1E;
-            --secondary-background-color: #2D2D2D;
-            --accent-color: #FF4B4B;
-        }
-        
-        /* --- OVERRIDE TEKS YANG TIDAK KELIHATAN DI DARK MODE --- */
-        
-        /* Label Input/Widget */
-        div[data-testid="stWidgetLabel"] p, 
-        .stTextInput label, 
-        .stSelectbox label, 
-        .stFileUploader label,
-        div[data-testid="stMarkdownContainer"] p {
-            color: var(--text-color) !important;
-            font-weight: 600 !important;
-        }
-
-        /* Tab Label agar terlihat di dark mode */
-        button[data-baseweb="tab"] {
-            color: #CCCCCC !important;
-        }
-        button[data-baseweb="tab"][aria-selected="true"] {
-            color: #FFFFFF !important;
-            border-bottom: 2px solid #FF4B4B !important;
-        }
-
-        /* Sidebar Text */
-        [data-testid="stSidebar"] {
-            background-color: #1a1d2e !important;
-        }
-        [data-testid="stSidebar"] .stMarkdown, 
-        [data-testid="stSidebar"] p, 
-        [data-testid="stSidebar"] span {
-            color: #E0E0E0 !important;
-        }
-    }
-
-    /* ============================================
-       1. LAYOUT & SPACING
-       ============================================ */
-    .block-container {
-        padding-top: 3.5rem !important;
-        padding-bottom: 0rem !important;
-    }
-    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
-    [data-testid="stSidebarNav"] { display: none !important; }
-
-    /* ============================================
-       2. APP BACKGROUND (LIGHT MODE DEFAULT)
-       ============================================ */
-    .stApp {
-        background-color: #f5f7fa !important;
-    }
-
-    /* ============================================
-       3. SIDEBAR - PREMIUM DARK
-       ============================================ */
-    [data-testid="stSidebar"] {
-        background-color: #1a1d2e !important;
-        border-right: 1px solid rgba(197, 160, 89, 0.15) !important;
-    }
-
-    /* ============================================
-       4. HERO HEADER - PREMIUM BLUE
-       ============================================ */
-    .hero-header {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%) !important;
-        color: white !important;
-        padding: 10px 22px !important;
-        border-radius: 10px !important;
-        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.25) !important;
-        margin-top: 0px !important;
-        margin-bottom: 25px !important;
-        display: inline-block !important;
-        width: auto !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
-    .hero-header h1 {
-        color: white !important;
-        font-family: 'Poppins', sans-serif !important;
-        font-size: 19px !important;
-        font-weight: 700 !important;
-        margin: 0 !important;
-        letter-spacing: 0.3px;
-        line-height: 1.3;
-    }
-
-    /* ============================================
-       5. MAIN BUTTONS - NAVY BLUE
-       ============================================ */
-    div.stButton > button {
-        background: linear-gradient(135deg, #002b5b 0%, #003874 100%) !important;
-        color: white !important;
-        border-radius: 8px !important;
-        border: 1px solid #001a35 !important;
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
-        height: 3em !important;
-        transition: all 0.25s ease !important;
-        box-shadow: 0 2px 8px rgba(0, 43, 91, 0.2) !important;
-    }
-    div.stButton > button:hover {
-        background: linear-gradient(135deg, #003874 0%, #004a9e 100%) !important;
-        border-color: #ffc107 !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(0, 43, 91, 0.3) !important;
-    }
-
-    /* Clear/Reset Buttons - Red */
-    div.stButton > button[key*="reset"],
-    div.stButton > button[key*="clear"] {
-        background: linear-gradient(135deg, #8b0000 0%, #a00000 100%) !important;
-        border-color: #4a0000 !important;
-    }
-
-    /* ============================================
-       6. FILE UPLOADER
-       ============================================ */
-    [data-testid="stFileUploader"] {
-        background-color: #f0f2f6;
-        border: 2px dashed rgba(0, 43, 91, 0.3) !important;
-        border-radius: 10px;
-        padding: 12px;
-    }
-
-    /* ============================================
-       7. METRIC BOXES - PREMIUM CARD
-       ============================================ */
-    .m-box {
-        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
-        padding: 18px 20px !important;
-        border-radius: 10px !important;
-        border-left: 4px solid #C5A059 !important;
-        margin-bottom: 10px !important;
-        text-align: left !important;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
-    }
-    .m-lbl {
-        color: rgba(255, 255, 255, 0.65) !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 10px !important;
-        font-weight: 600 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1px !important;
-        display: block;
-        margin-bottom: 6px;
-    }
-    .m-val {
-        color: #C5A059 !important;
-        font-family: 'Poppins', sans-serif !important;
-        font-size: 24px !important;
-        font-weight: 700 !important;
-    }
-
-    /* ============================================
-       8. INPUT BOXES - GOLD BORDER (Sesuaikan tema)
-       ============================================ */
-    /* Wrapper Input */
-    div[data-baseweb="input"], 
-    div[data-baseweb="select"] > div {
-        background-color: #1a1d2e !important; 
-        border: 1px solid rgba(197, 160, 89, 0.3) !important;
-        border-radius: 8px !important;
-    }
-    
-    /* Teks di dalam input */
-    input {
-        color: #ffffff !important;
-    }
-    
-    /* Placeholder color */
-    input::placeholder {
-        color: rgba(255, 255, 255, 0.5) !important;
-    }
-
-    /* Label (Judul) Inputs - Menggunakan warna dinamis */
-    div[data-testid="stWidgetLabel"] p {
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
-    }
-    
-    /* Force warna label hitam di Light Mode (karena background light), 
-       dan putih/terang di Dark Mode (otomatis ditangani CSS variabel di atas) */
-    @media (prefers-color-scheme: light) {
-        div[data-testid="stWidgetLabel"] p {
-            color: #1F2937 !important; /* Hitam Pekat untuk Light Mode */
-        }
-    }
-
-    /* ============================================
-       9. RADIO BUTTONS & TABS
-       ============================================ */
-    div.row-widget.stRadio > div { background-color: transparent !important; }
-    div.row-widget.stRadio label {
-        color: #a0a5b5 !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 13px !important;
-        padding: 8px 14px !important;
-        border-radius: 6px !important;
-        background: rgba(26, 29, 46, 0.5) !important;
-        border: 1px solid rgba(197, 160, 89, 0.15) !important;
-    }
-    div.row-widget.stRadio label:hover {
-        background: rgba(197, 160, 89, 0.1) !important;
-        border-color: rgba(197, 160, 89, 0.3) !important;
-        color: #C5A059 !important;
-    }
-
-    /* ============================================
-       10. BUTTONS LAYOUT
-       ============================================ */
-    [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 10px !important;
-        justify-content: flex-start !important;
-    }
-    [data-testid="column"] {
-        flex: 0 1 auto !important;
-        width: auto !important;
-    }
-    div.stButton > button {
-        width: 170px !important;
-        min-height: 3.3em !important;
-        white-space: normal
-# ============================================================
-# GANTI SEMUA BAGIAN <style> (.biasanya di awal & di login) 
-# DENGAN KODE LENGKAP DI BAWAH INI:
-# ============================================================
-    /* ============================================
-       FONTS IMPORT & THEME VARIABLES
+       FONTS IMPORT
        ============================================ */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
 
@@ -469,9 +221,8 @@ st.markdown("""
     }
 
     /* ============================================
-       12. LABELS - PERBAIKAN TEKS DI DARK MODE
+       12. LABELS - DEFAULT (LIGHT MODE)
        ============================================ */
-    /* Default Light Mode Colors */
     [data-testid="stWidgetLabel"] p {
         color: #2d3748 !important;
         font-family: 'Inter', sans-serif !important;
@@ -479,24 +230,26 @@ st.markdown("""
         font-size: 13px !important;
     }
 
-    /* --- DARK MODE SUPPORT (OTOMATIS) --- */
+    /* ============================================
+       13. DARK MODE SUPPORT - OTOMATIS
+       ============================================ */
     @media (prefers-color-scheme: dark) {
-        /* Ubah Background App */
+        /* Background App jadi Gelap */
         .stApp {
             background-color: #0e1117 !important;
         }
         
-        /* Ubah Teks Label Supaya Terlihat di Dark Mode */
+        /* Label/Teks jadi Putih di Dark Mode */
         [data-testid="stWidgetLabel"] p,
         .stTextInput label,
         .stSelectbox label,
         .stFileUploader label,
         [data-testid="stMarkdownContainer"] p {
-            color: #E2E8F0 !important; /* Putih Terang */
-            text-shadow: 0px 0px 1px rgba(0,0,0,0.5); /* Overlay faint shadow agar kontras */
+            color: #E2E8F0 !important;
+            text-shadow: 0px 0px 1px rgba(0,0,0,0.5);
         }
         
-        /* Tab Labels - Pastikan terlihat */
+        /* Tab Labels - Agar terlihat di dark mode */
         button[data-baseweb="tab"] {
             color: #A0AEC0 !important;
         }
@@ -516,12 +269,6 @@ st.markdown("""
             border: 1px solid #4A5568 !important;
         }
         
-        /* Radio Button Text */
-        div.row-widget.stRadio label {
-            color: #E2E8F0 !important;
-            background: rgba(45, 55, 72, 0.8) !important;
-        }
-        
         /* Sidebar Text */
         [data-testid="stSidebar"] .stMarkdown p,
         [data-testid="stSidebar"] span,
@@ -531,15 +278,14 @@ st.markdown("""
     }
 
     /* ============================================
-       13. SUCCESS & ERROR NOTIFICATIONS
+       14. SUCCESS & ERROR NOTIFICATIONS
        ============================================ */
     div[data-testid="stNotification"] {
         border-radius: 8px !important;
     }
-    /* Override Streamlit notification colors for dark mode visibility */
     @media (prefers-color-scheme: dark) {
         div[data-testid="stNotification"] {
-            background-color: #22543D !important; /* Dark Green */
+            background-color: #22543D !important;
             color: #FFFFFF !important;
             border: 1px solid #48BB78 !important;
         }
