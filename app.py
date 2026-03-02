@@ -1272,16 +1272,20 @@ import numpy as np
 import streamlit as st
 
 # =========================================================
-# ⚙️ 1. DEFINISI SEMUA ENGINE (LOGIKA TETAP SAMA)
+# ⚙️ 1. DEFINISI SEMUA ENGINE (LOGIKA TIDAK DIUBAH)
 # =========================================================
 
 def engine_ds_rto_vba_total(df_ds, df_app):
+    """
+    LOGIKA AWAL: Membandingkan DS RTO dengan AppSheet RTO.
+    """
     import pandas as pd
     import numpy as np
 
     if df_ds is None or df_app is None:
         return pd.DataFrame(), pd.DataFrame()
 
+    # --- 1. PREPARASI DATA APPSHEET ---
     df_a = df_app.copy()
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
@@ -1299,6 +1303,7 @@ def engine_ds_rto_vba_total(df_ds, df_app):
             q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
             dict_qty_total[sku] = dict_qty_total.get(sku, 0) + (q13 + q17)
 
+    # --- 2. PROSES DATAFRAME DS RTO ---
     res_ds = df_ds.copy()
     cols = list(res_ds.columns)
     sku_col = cols[0]
@@ -1316,7 +1321,10 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     res_ds['NOTE'] = res_ds.apply(check_note, axis=1)
 
+    # --- 3. GENERATE SHEET SELISIH (Logika Identik VBA) ---
     results_selisih = []
+    
+    # A. Ambil dari DS yang tidak sesuai
     mismatch_ds = res_ds[res_ds['NOTE'] != 'SESUAI'].copy()
     for _, row in mismatch_ds.iterrows():
         sku = row['SKU_UPPER']
@@ -1326,19 +1334,23 @@ def engine_ds_rto_vba_total(df_ds, df_app):
         
         if not found_rows.empty:
             for _, r_app in found_rows.iterrows():
+                # Bin 1
                 if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
                     results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('12'), r_app.get('13', 0), 0])
+                # Bin 2
                 if str(r_app.get('16', '')).strip() not in ["", "nan", "0"]:
                     results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('16'), r_app.get('17', 0), 0])
         else:
             results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], "-", 0, 0])
 
+    # B. TAMBAHAN: Cek SKU yang ada di Appsheet tapi TIDAK ADA di DS (Sesuai VBA)
     skus_in_ds = set(res_ds['SKU_UPPER'].unique())
     for sku_app, total_qty in dict_qty_total.items():
         if sku_app not in skus_in_ds:
             mask_app = (df_a['9'].astype(str).str.strip().str.upper() == sku_app) | \
                        (df_a['15'].astype(str).str.strip().str.upper() == sku_app)
             found_rows = df_a[mask_app]
+            
             for _, r_app in found_rows.iterrows():
                 note_khusus = "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
                 if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
@@ -1357,6 +1369,7 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
     df_app_res = df_app_awal.copy()
     df_ds_res = df_ds.copy()
 
+    # --- 1. MAPPING HASIL CEK REAL ---
     real_map = {}
     for _, row in df_selisih.iterrows():
         sku_real = str(row.iloc[0]).strip().upper()
@@ -1365,6 +1378,7 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
         if sku_real not in ["", "NAN", "NONE"]:
             real_map[f"{sku_real}|{bin_real}"] = qty_real
 
+    # --- 2. UPDATE APPSHEET RTO ---
     for idx in df_app_res.index:
         try:
             sku = str(df_app_res.iloc[idx, 8]).strip().upper()
@@ -1383,6 +1397,7 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
         except Exception:
             continue
 
+    # --- 3. SINKRONISASI DS RTO ---
     if not df_ds_res.empty:
         df_app_res['TMP_SKU'] = df_app_res.apply(lambda r: str(r.iloc[8]).strip().upper() if str(r.iloc[8]).strip() not in ["","0","nan"] else str(r.iloc[14]).strip().upper(), axis=1)
         df_app_res['TMP_QTY'] = df_app_res.apply(lambda r: (pd.to_numeric(r.iloc[12], errors='coerce') or 0) + (pd.to_numeric(r.iloc[16], errors='coerce') or 0), axis=1)
@@ -2871,10 +2886,9 @@ elif menu == "Stock Minus":
             st.code(traceback.format_exc())
 
 
-elif menu == "Compare RTO":
+if menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
     
-    # --- CSS ---
     st.markdown("""
         <style>
         .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
@@ -2883,132 +2897,84 @@ elif menu == "Compare RTO":
         </style>
     """, unsafe_allow_html=True)
     
-    # --- INIT SESSION STATE ---
-    if 'rto_df_ds' not in st.session_state:
-        st.session_state.rto_df_ds = None
-    if 'rto_df_selisih' not in st.session_state:
-        st.session_state.rto_df_selisih = None
-    if 'rto_df_app' not in st.session_state:
-        st.session_state.rto_df_app = None
-    if 'rto_draft_compared' not in st.session_state:
-        st.session_state.rto_draft_compared = None
-    if 'rto_new_draft' not in st.session_state:
-        st.session_state.rto_new_draft = None
+    if 'rto_df_ds' not in st.session_state: st.session_state.rto_df_ds = None
+    if 'rto_df_selisih' not in st.session_state: st.session_state.rto_df_selisih = None
+    if 'rto_df_app' not in st.session_state: st.session_state.rto_df_app = None
+    if 'rto_draft_compared' not in st.session_state: st.session_state.rto_draft_compared = None
     
-    # --- FILE UPLOAD ---
     c1, c2 = st.columns(2)
     with c1: f1 = st.file_uploader("1. DS RTO", type=['xlsx','csv'], key="rto_f1")
     with c2: f2 = st.file_uploader("2. APPSHEET RTO", type=['xlsx','csv'], key="rto_f2")
     
-    st.divider()
-    
-    # --- PROSES AWAL (DS vs APPSHEET) ---
     if f1 and f2:
         if st.button("▶️ JALANKAN PROSES", use_container_width=True):
             with st.spinner("Memproses..."):
                 df1 = pd.read_excel(f1) if f1.name.endswith('xlsx') else pd.read_csv(f1)
                 df2 = pd.read_excel(f2) if f2.name.endswith('xlsx') else pd.read_csv(f2)
-                
                 st.session_state.rto_df_app = df2.copy()
                 res_ds, res_selisih = engine_ds_rto_vba_total(df1, df2)
-                
                 st.session_state.rto_df_ds = res_ds
                 st.session_state.rto_df_selisih = res_selisih
-                
                 st.success("✅ Proses Awal Selesai!")
     
-    # --- TAMPILKAN HASIL AWAL ---
     if st.session_state.rto_df_selisih is not None:
         st.divider()
-        st.subheader("📊 HASIL COMPARE AWAL (DS vs APPSHEET)")
+        st.subheader("📊 DASHBOARD KUALITAS SCAN (QTY SCAN)")
         
-        total_rows = len(st.session_state.rto_df_selisih)
-        match_count = len(st.session_state.rto_df_ds[st.session_state.rto_df_ds['NOTE'] == 'SESUAI']) if 'NOTE' in st.session_state.rto_df_ds.columns else 0
-        lebih_count = len(st.session_state.rto_df_ds[st.session_state.rto_df_ds['NOTE'] == 'KELEBIHAN AMBIL']) if 'NOTE' in st.session_state.rto_df_ds.columns else 0
-        kurang_count = len(st.session_state.rto_df_ds[st.session_state.rto_df_ds['NOTE'] == 'KURANG AMBIL']) if 'NOTE' in st.session_state.rto_df_ds.columns else 0
+        df_ds = st.session_state.rto_df_ds
+        scan_col = df_ds.columns[1] # Qty Scan adalah kolom ke-2
+        
+        # HITUNG TOTAL QTY PER KATEGORI
+        qty_total = int(pd.to_numeric(df_ds[scan_col], errors='coerce').sum())
+        qty_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
+        qty_lebih = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').sum())
+        qty_kurang = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').sum())
         
         mc1, mc2, mc3, mc4 = st.columns(4)
-        with mc1:
-            st.markdown(f'<div class="m-box"><span class="m-lbl">Total Rows</span><span class="m-val">{total_rows}</span></div>', unsafe_allow_html=True)
-        with mc2:
-            st.markdown(f'<div class="m-box"><span class="m-lbl">SESUAI</span><span class="m-val">{match_count}</span></div>', unsafe_allow_html=True)
-        with mc3:
-            st.markdown(f'<div class="m-box"><span class="m-lbl">KELEBIHAN</span><span class="m-val">{lebih_count}</span></div>', unsafe_allow_html=True)
-        with mc4:
-            st.markdown(f'<div class="m-box"><span class="m-lbl">KURANG</span><span class="m-val">{kurang_count}</span></div>', unsafe_allow_html=True)
+        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{qty_total}</span></div>', unsafe_allow_html=True)
+        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{qty_sesuai}</span></div>', unsafe_allow_html=True)
+        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{qty_lebih}</span></div>', unsafe_allow_html=True)
+        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{qty_kurang}</span></div>', unsafe_allow_html=True)
         
         st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
-        
-        csv_selisih = st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Sheet Selisih", csv_selisih, "SELISIH_RTO.csv", "text/csv", use_container_width=True)
 
     st.divider()
-    
-    # --- REFRESH DATA (SETELAH CEK REAL) ---
-    st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
-    f_cek = st.file_uploader("📥 Upload File Hasil Cek Real (isian dari Sheet Selisih)", type=['xlsx','csv'], key="rto_cek")
-    
+    st.subheader("🔄 REFRESH DATA")
+    f_cek = st.file_uploader("Upload File Cek Real", type=['xlsx','csv'], key="rto_cek")
     if f_cek and st.session_state.rto_df_app is not None:
-        if st.button("🔄 REFRESH DATA", use_container_width=True):
-            with st.spinner("Memproses Refresh..."):
-                df_cek = pd.read_excel(f_cek) if f_cek.name.endswith('xlsx') else pd.read_csv(f_cek)
-                
-                ds_refreshed, app_refreshed = engine_refresh_rto(
-                    st.session_state.rto_df_ds,
-                    st.session_state.rto_df_app,
-                    df_cek
-                )
-                
-                st.session_state.rto_df_ds = ds_refreshed
-                st.session_state.rto_df_app = app_refreshed
-                
-                st.success("✅ Refresh Selesai!")
+        if st.button("🔄 REFRESH", use_container_width=True):
+            df_cek = pd.read_excel(f_cek) if f_cek.name.endswith('xlsx') else pd.read_csv(f_cek)
+            ds_ref, app_ref = engine_refresh_rto(st.session_state.rto_df_ds, st.session_state.rto_df_app, df_cek)
+            st.session_state.rto_df_ds, st.session_state.rto_df_app = ds_ref, app_ref
+            st.success("✅ Refreshed!")
 
     st.divider()
-    
-    # --- COMPARE DRAFT JEZPRO ---
     st.subheader("📝 COMPARE DRAFT JEZPRO")
-    
-    # Upload Draft + Appsheet (sudah diupload di atas)
-    if f2:
-        f_draft = st.file_uploader("📥 Upload DRAFT JEZPRO", type=['xlsx','csv'], key="rto_draft_jezpro")
-        
-        if f_draft and st.session_state.rto_df_app is not None:
-            if st.button("🔍 COMPARE DRAFT JEZPRO", use_container_width=True):
-                with st.spinner("Memproses..."):
-                    df_draft = pd.read_excel(f_draft) if f_draft.name.endswith('xlsx') else pd.read_csv(f_draft)
-                    
-                    # Panggil engine compare draft
-                    df_compared = engine_compare_draft_jezpro(st.session_state.rto_df_app, df_draft)
-                    st.session_state.rto_draft_compared = df_compared
-                    
-                    st.success("✅ Compare Draft Selesai!")
-    
-    # Tampilkan hasil compare draft
+    f_draft = st.file_uploader("Upload Draft Jezpro", type=['xlsx','csv'], key="jez_draft")
+    if f_draft and st.session_state.rto_df_app is not None:
+        if st.button("🔍 COMPARE DRAFT", use_container_width=True):
+            df_draft = pd.read_excel(f_draft) if f_draft.name.endswith('xlsx') else pd.read_csv(f_draft)
+            st.session_state.rto_draft_compared = engine_compare_draft_jezpro(st.session_state.rto_df_app, df_draft)
+            st.success("✅ Compare Draft Selesai!")
+
     if st.session_state.rto_draft_compared is not None:
         st.divider()
-        st.subheader("📊 HASIL COMPARE DRAFT JEZPRO")
+        st.subheader("📊 DASHBOARD DRAFT (QTY AMBIL)")
+        df_comp = st.session_state.rto_draft_compared
         
-        # Metrics
-        total_draft = len(st.session_state.rto_draft_compared)
-        ok_count = len(st.session_state.rto_draft_compared[st.session_state.rto_draft_compared['STATUS'] == 'OK']) if 'STATUS' in st.session_state.rto_draft_compared.columns else 0
-        perlu_edit = len(st.session_state.rto_draft_compared[st.session_state.rto_draft_compared['STATUS'].str.contains('EDIT', na=False)]) if 'STATUS' in st.session_state.rto_draft_compared.columns else 0
-        delete_count = len(st.session_state.rto_draft_compared[st.session_state.rto_draft_compared['STATUS'] == 'DELETE ITEM']) if 'STATUS' in st.session_state.rto_draft_compared.columns else 0
+        # HITUNG TOTAL QTY AMBIL PER STATUS
+        total_q_draft = int(pd.to_numeric(df_comp['QTY AMBIL'], errors='coerce').sum())
+        q_ok = int(pd.to_numeric(df_comp[df_comp['STATUS'] == 'OK']['QTY AMBIL'], errors='coerce').sum())
+        q_edit = int(pd.to_numeric(df_comp[df_comp['STATUS'].str.contains('EDIT', na=False)]['QTY AMBIL'], errors='coerce').sum())
+        q_del = int(pd.to_numeric(df_comp[df_comp['STATUS'] == 'DELETE ITEM']['QTY AMBIL'], errors='coerce').sum())
         
         dc1, dc2, dc3, dc4 = st.columns(4)
-        with dc1:
-            st.markdown(f'<div class="m-box"><span class="m-lbl">Total Draft</span><span class="m-val">{total_draft}</span></div>', unsafe_allow_html=True)
-        with dc2:
-            st.markdown(f'<div class="m-box"><span class="m-lbl">OK</span><span class="m-val">{ok_count}</span></div>', unsafe_allow_html=True)
-        with dc3:
-            st.markdown(f'<div class="m-box"><span class="m-lbl">Perlu Edit</span><span class="m-val">{perlu_edit}</span></div>', unsafe_allow_html=True)
-        with dc4:
-            st.markdown(f'<div class="m-box"><span class="m-lbl">Delete</span><span class="m-val">{delete_count}</span></div>', unsafe_allow_html=True)
+        with dc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Ambil</span><span class="m-val">{total_q_draft}</span></div>', unsafe_allow_html=True)
+        with dc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty OK</span><span class="m-val">{q_ok}</span></div>', unsafe_allow_html=True)
+        with dc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Perlu Edit</span><span class="m-val">{q_edit}</span></div>', unsafe_allow_html=True)
+        with dc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Delete</span><span class="m-val">{q_del}</span></div>', unsafe_allow_html=True)
         
-        st.dataframe(st.session_state.rto_draft_compared, use_container_width=True, hide_index=True)
-        
-        csv_draft = st.session_state.rto_draft_compared.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Summary Draft", csv_draft, "DRAFT_COMPARED.csv", "text/csv", use_container_width=True)
+        st.dataframe(df_comp, use_container_width=True, hide_index=True)
 
     st.divider()
     
