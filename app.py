@@ -884,7 +884,7 @@ def menu_panduan():
     # Footer Panduan
     st.markdown("---")
     st.info("💡 **Tips**: Jika masih bingung dengan format file, coba lihat contoh file yang di-upload di setiap menu.")
-    
+
 # =========================================================
 # 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
 # =========================================================
@@ -2604,7 +2604,7 @@ with st.sidebar:
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
     
-    m2_list = ["Stock Opname", "Putaway System", "Scan Out Validation", "Refill & Overstock","Refill & Withdraw","Stock Minus", "Compare RTO", "FDR Update"]
+    m2_list = ["Stock Opname", "Putaway System", "Scan Out Validation", "Refill & Overstock","Refill & Withdraw","Stock Minus", "Compare RTO", "FDR Update","Guidance Book"]
     
     def change_m2():
         st.session_state.main_menu = st.session_state.m2_key
