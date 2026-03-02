@@ -1267,12 +1267,7 @@ def menu_refill_withdraw():
                 requests.post(url, json=data_json)
                 st.toast("WITHDRAW UPLOADED!")
 
-def engine_ds_rto_vba_total(df_ds, df_app):
-    """
-    LOGIKA AWAL: Membandingkan DS RTO dengan AppSheet RTO.
-    Menghitung total Qty Ambil dari AppSheet (Slot 1 & Slot 2) 
-    dan menentukan status SESUAI/KELEBIHAN/KURANG.
-    """
+def engine_ds_rto_vba_total_fixed(df_ds, df_app):
     import pandas as pd
     import numpy as np
 
@@ -1281,30 +1276,24 @@ def engine_ds_rto_vba_total(df_ds, df_app):
 
     # --- 1. PREPARASI DATA APPSHEET ---
     df_a = df_app.copy()
-    # Beri nama kolom angka agar aman diakses (1-based index)
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
-    # Ambil baris yang statusnya DONE atau KURANG AMBIL (Kolom B / index 2)
     mask_status = df_a['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
     df_filtered = df_a[mask_status].copy()
 
-    # Mapping Qty Total per SKU (Gabungan Slot 1 & Slot 2)
     dict_qty_total = {}
     for _, row in df_filtered.iterrows():
-        # SKU Utama di Kolom 9 (I) atau Kolom 15 (O)
         sku = str(row.get('9', '')).strip().upper()
         if sku in ["", "NAN", "0", "NONE"]: 
             sku = str(row.get('15', '')).strip().upper()
         
         if sku not in ["", "NAN", "0", "NONE"]:
-            # Qty Bin 1 (13/M) + Qty Bin 2 (17/Q)
             q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
             q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
             dict_qty_total[sku] = dict_qty_total.get(sku, 0) + (q13 + q17)
 
     # --- 2. PROSES DATAFRAME DS RTO ---
     res_ds = df_ds.copy()
-    # Standarisasi 3 kolom pertama: SKU, QTY SCAN, QTY AMBIL
     cols = list(res_ds.columns)
     sku_col = cols[0]
     scan_col = cols[1]
@@ -1312,7 +1301,6 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     res_ds['SKU_UPPER'] = res_ds[sku_col].astype(str).str.strip().str.upper()
     res_ds['QTY AMBIL'] = res_ds['SKU_UPPER'].map(dict_qty_total).fillna(0)
     
-    # Logika Penentuan Note
     def check_note(row):
         scan = pd.to_numeric(row[scan_col], errors='coerce') or 0
         ambil = row['QTY AMBIL']
@@ -1322,38 +1310,49 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     res_ds['NOTE'] = res_ds.apply(check_note, axis=1)
 
-    # --- 3. GENERATE SHEET SELISIH (Detail per BIN) ---
+    # --- 3. GENERATE SHEET SELISIH (Logika Identik VBA) ---
     results_selisih = []
-    # Hanya yang tidak sesuai yang masuk ke sheet selisih
-    mismatch_df = res_ds[res_ds['NOTE'] != 'SESUAI'].copy()
     
-    for _, row in mismatch_df.iterrows():
+    # A. Ambil dari DS yang tidak sesuai
+    mismatch_ds = res_ds[res_ds['NOTE'] != 'SESUAI'].copy()
+    for _, row in mismatch_ds.iterrows():
         sku = row['SKU_UPPER']
-        # Cari baris di AppSheet yang mengandung SKU ini
         mask_app = (df_a['9'].astype(str).str.strip().str.upper() == sku) | \
-           (df_a['15'].astype(str).str.strip().str.upper() == sku)
+                   (df_a['15'].astype(str).str.strip().str.upper() == sku)
         found_rows = df_a[mask_app]
         
         if not found_rows.empty:
             for _, r_app in found_rows.iterrows():
-                # Cek Bin 1
-                b1 = str(r_app.get('12', '')).strip()
-                if b1 not in ["", "nan", "0"]:
-                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], b1, r_app.get('13', 0), 0])
-                # Cek Bin 2
-                b2 = str(r_app.get('16', '')).strip()
-                if b2 not in ["", "nan", "0"]:
-                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], b2, r_app.get('17', 0), 0])
+                # Bin 1
+                if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
+                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('12'), r_app.get('13', 0), 0])
+                # Bin 2
+                if str(r_app.get('16', '')).strip() not in ["", "nan", "0"]:
+                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('16'), r_app.get('17', 0), 0])
         else:
-            # Jika SKU di DS tidak ada di AppSheet sama sekali
             results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], "-", 0, 0])
 
+    # B. TAMBAHAN: Cek SKU yang ada di Appsheet tapi TIDAK ADA di DS (Sesuai VBA)
+    skus_in_ds = set(res_ds['SKU_UPPER'].unique())
+    for sku_app, total_qty in dict_qty_total.items():
+        if sku_app not in skus_in_ds:
+            # Cari detail barisnya di Appsheet untuk ambil BIN-nya
+            mask_app = (df_a['9'].astype(str).str.strip().str.upper() == sku_app) | \
+                       (df_a['15'].astype(str).str.strip().str.upper() == sku_app)
+            found_rows = df_a[mask_app]
+            
+            for _, r_app in found_rows.iterrows():
+                note_khusus = "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
+                if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
+                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('12'), r_app.get('13', 0), 0])
+                if str(r_app.get('16', '')).strip() not in ["", "nan", "0"]:
+                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('16'), r_app.get('17', 0), 0])
+
     res_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
-    
-    # Bersihkan kolom sementara
     res_ds.drop(columns=['SKU_UPPER'], inplace=True)
-    
+
     return res_ds, res_selisih
+
 def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
     import pandas as pd
     import numpy as np
