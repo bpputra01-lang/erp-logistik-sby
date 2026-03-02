@@ -1694,11 +1694,11 @@ def putaway_system(df_ds, df_asal):
             "BIN DITEMUKAN": "BIN AWAL", 
             "BIN ASAL": "BIN TUJUAN"
         })
-        df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "STATUS"]]
-        df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"]
+        df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
+        df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
         df_plist['NOTES'] = "PUTAWAY"
     else:
-        df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QTY BIN SYSTEM", "NOTES"])
+        df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
     # 6. REKAP KURANG SETUP
     df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
@@ -2284,7 +2284,7 @@ elif menu == "Putaway System":
                 
                 # PERBAIKAN: GUNAKAN SUM QTY, BUKAN LEN
                 total_compare_qty = int(df_comp['QTY PUTAWAY'].sum()) if not df_comp.empty else 0
-                total_list_qty = int(df_plist['QTY BIN SYSTEM'].sum()) if not df_plist.empty else 0
+                total_list_qty = int(df_plist['QUANTITY'].sum()) if not df_plist.empty else 0
                 total_kurang_qty = int(df_kurang['QTY'].sum()) if not df_kurang.empty else 0
                 
                 # QTY LT3
