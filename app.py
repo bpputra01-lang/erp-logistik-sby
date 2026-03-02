@@ -2917,7 +2917,7 @@ if menu == "Compare RTO":
 
         if st.button("🏁 GENERATE NEW DRAFT", use_container_width=True):
             st.session_state.rto_new_draft = engine_generate_new_draft(df_comp)
-            st.success("✅ New Draft Generated!")
+            st.success(f"✅ Generate Selesai! Total: {total_qty} Pcs")
 
     if st.session_state.rto_new_draft is not None:
         st.divider()
