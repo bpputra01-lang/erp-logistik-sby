@@ -942,14 +942,15 @@ def menu_Stock_Opname():
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    # Jalankan Logika Pivot
-                    df_mult, df_sing = logic_pivot_adjustment(
-                        st.session_state.df_res_lookup, 
-                        df_m5, 
-                        st.session_state.df_missing_lookup
-                    )
-                    
-                    # ✅ PERBAIKAN LOGIC: Cukup cek DIFF > 0 (Tanpa bandingin QTY SO vs SYSTEM)
+      # Jalankan Logika Pivot
+                df_mult, df_sing = logic_pivot_adjustment(
+                    st.session_state.df_res_lookup, 
+                    df_m5, 
+                    st.session_state.df_missing_lookup
+                )
+                
+                # ✅ PERBAIKAN LOGIC: Cukup cek DIFF > 0 (Tanpa bandingin QTY SO vs SYSTEM)
+                # Pastikan blok ini sejajar di dalam blok 'try'
                 if 'diff' in df_mult.columns:
                     df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce')
                     df_mult = df_mult[(df_mult['diff'] > 0) & (df_mult['diff'].notna())].reset_index(drop=True)
