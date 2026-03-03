@@ -736,34 +736,35 @@ def generate_real_plus_recon(allocated_data):
     return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
 
 def logic_miss_location_report(df_setup_real):
-    """Replikasi Macro Create_List_Miss_Location_FINAL_REVISED_V7"""
-    if df_setup_real is None or df_setup_real.empty:
-        return None
+    # Safety Check: Pastikan datanya ada dan benar-benar DataFrame
+    if df_setup_real is None or not isinstance(df_setup_real, pd.DataFrame) or df_setup_real.empty:
+        return None, None
     
-    # Ambil kolom A sampai D (BIN SYSTEM, BIN REAL, SKU, QTY)
-    df_out = df_setup_real.iloc[:, 0:4].copy()
-    df_out.columns = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
-    
-    # Hitung Summary
-    total_sku = df_out["SKU"].nunique()
-    total_qty = df_out["QTY MISS LOC."].sum()
-    
-    summary_data = {
-        "KETERANGAN": ["TOTAL SKU", "TOTAL QTY MISS LOCATION"],
-        "TOTAL": [f"{total_sku} ITEM", f"{total_qty} ITEM"]
-    }
-    df_sum = pd.DataFrame(summary_data)
-    
-    return df_out, df_sum
+    try:
+        # Ambil kolom A sampai D (Indeks 0-3) sesuai Macro
+        df_out = df_setup_real.iloc[:, 0:4].copy()
+        df_out.columns = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
+        
+        # Hitung Summary
+        total_sku = df_out["SKU"].nunique()
+        total_qty = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').sum()
+        
+        df_sum = pd.DataFrame({
+            "KETERANGAN": ["TOTAL SKU", "TOTAL QTY MISS LOCATION"],
+            "TOTAL": [f"{int(total_sku)} ITEM", f"{int(total_qty)} ITEM"]
+        })
+        return df_out, df_sum
+    except Exception as e:
+        st.error(f"Error pada logic Miss Loc: {e}")
+        return None, None
 
 def logic_sum_adjustment_final(df_plus, df_minus):
-    """Replikasi Macro Create_SUM_ADJUSTMENT_FINAL_UPDATED"""
-    # Helper untuk proses hitung value
+    # Replikasi Macro Sum Adjustment
     def process_adj(df, status):
-        if df is None or df.empty: return pd.DataFrame()
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty: 
+            return pd.DataFrame()
         temp = df.copy()
-        # Perhitungan Total Value: (QTY SO - QTY SYSTEM) * HARGA JUAL (Kolom index 7)
-        # Sesuai Macro: (Val(col 11) - Val(col 10)) * Val(col 8)
+        # Perhitungan: (QTY SO - QTY SYSTEM) * HARGA JUAL (Indeks 7)
         temp['VALUE ADJ'] = (temp.iloc[:, 10] - temp.iloc[:, 9]) * temp.iloc[:, 7]
         temp['STATUS ADJ'] = status
         return temp
@@ -773,25 +774,21 @@ def logic_sum_adjustment_final(df_plus, df_minus):
     
     df_combined = pd.concat([df_final_plus, df_final_minus], ignore_index=True)
     
-    # Perhitungan Summary untuk Tabel Q
-    summary = {
-        "METRIC": [
-            "Total SKU Adj.", "Total Value Adj. +", "Total Value Adj. -", 
-            "Total QTY Adj. +", "Total QTY Adj. -", "Total Value", "Total QTY"
-        ],
+    summary = pd.DataFrame({
+        "METRIC": ["Total SKU Adj.", "Total Value Adj. +", "Total Value Adj. -", "Total QTY Adj. +", "Total QTY Adj. -", "Total Value", "Total QTY"],
         "VALUE": [
             len(df_combined),
             df_final_plus['VALUE ADJ'].sum() if not df_final_plus.empty else 0,
             df_final_minus['VALUE ADJ'].sum() if not df_final_minus.empty else 0,
             (df_final_plus.iloc[:, 10] - df_final_plus.iloc[:, 9]).sum() if not df_final_plus.empty else 0,
             (df_final_minus.iloc[:, 10] - df_final_minus.iloc[:, 9]).sum() if not df_final_minus.empty else 0,
-            0, 0 # Akan dihitung di bawah
+            0, 0
         ]
-    }
-    summary["VALUE"][5] = summary["VALUE"][1] + summary["VALUE"][2] # Total Value
-    summary["VALUE"][6] = summary["VALUE"][3] + summary["VALUE"][4] # Total QTY
+    })
+    summary.at[5, "VALUE"] = summary.at[1, "VALUE"] + summary.at[2, "VALUE"]
+    summary.at[6, "VALUE"] = summary.at[3, "VALUE"] + summary.at[4, "VALUE"]
     
-    return df_combined, pd.DataFrame(summary)
+    return df_combined, summary
 
 # =========================================================
 # 2. MENU UTAMA & STATE MANAGEMENT
@@ -1057,7 +1054,7 @@ def menu_Stock_Opname():
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
     # =========================================================
-    # ⚙️ 6. FINAL REPORT GENERATOR (REPLIKASI MACRO VBA)
+    # ⚙️ 6. FINAL REPORT GENERATOR (MACRO REPLICATION)
     # =========================================================
     st.markdown("---")
     st.subheader("6️⃣ FINAL REPORTS GENERATOR (Macro Replication)")
@@ -1066,31 +1063,37 @@ def menu_Stock_Opname():
     
     with c_rep1:
         st.write("📊 **Miss Location Report**")
-        if st.button("🛠️ GENERATE MISS LOC REPORT", use_container_width=True):
-            if st.session_state.set_up_real_plus is not None:
-                df_miss, df_miss_sum = logic_miss_location_report(st.session_state.set_up_real_plus)
-                st.session_state.report_miss = {"data": df_miss, "sum": df_miss_sum}
-                st.success("Miss Location Report Generated!")
+        if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_macro_miss"):
+            # Pastikan data set_up_real_plus tersedia
+            data_source = st.session_state.get('set_up_real_plus')
+            if data_source is not None:
+                df_miss, df_sum_miss = logic_miss_location_report(data_source)
+                if df_miss is not None:
+                    st.session_state.report_miss = {"data": df_miss, "sum": df_sum_miss}
+                    st.success("Laporan Miss Location Siap!")
+                else:
+                    st.error("Gagal memproses data. Cek format kolom!")
             else:
-                st.warning("Data Set Up Real + Belum Ada!")
+                st.warning("Data 'SET UP REAL +' belum tersedia. Jalankan Step 2!")
 
     with c_rep2:
         st.write("💰 **Sum Adjustment Report**")
-        # Asumsi: Lu upload file STOCK ADJ - di sini karena Macro butuh itu
-        up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_rep")
+        up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_vba")
         
-        if st.button("🛠️ GENERATE SUM ADJ REPORT", use_container_width=True):
-            if "df_mult_final" in st.session_state and up_minus:
-                df_minus_raw = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
-                df_adj_all, df_adj_sum = logic_sum_adjustment_final(st.session_state.df_mult_final, df_minus_raw)
+        if st.button("🛠️ GENERATE SUM ADJ REPORT", key="btn_macro_adj"):
+            df_p = st.session_state.get('df_mult_final')
+            if df_p is not None and up_minus:
+                df_m = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
+                df_adj_all, df_adj_sum = logic_sum_adjustment_final(df_p, df_m)
                 st.session_state.report_adj = {"data": df_adj_all, "sum": df_adj_sum}
-                st.success("Adjustment Summary Generated!")
+                st.success("Summary Adjustment Siap!")
             else:
-                st.warning("Pastikan Step 4 Selesai & File ADJ - diupload!")
+                st.warning("Upload file ADJ - dan pastikan Step 4 sudah dijalankan!")
 
-    # --- DISPLAY & INTEGRATE TO MASTER DOWNLOAD ---
-    if "report_miss" in st.session_state or "report_adj" in st.session_state:
-        st.info("💡 Laporan Macro berhasil dibuat dan akan otomatis masuk ke **MASTER REPORT** di bawah.")
+    # Tampilkan Preview Singkat
+    if "report_miss" in st.session_state:
+        with st.expander("👁️ Preview Miss Location"):
+            st.dataframe(st.session_state.report_miss["sum"], use_container_width=True)
 
 # =========================================================
     # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (SUPER LENGKAP)
