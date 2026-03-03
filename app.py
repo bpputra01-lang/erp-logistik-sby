@@ -1090,10 +1090,10 @@ def menu_Stock_Opname():
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
 # =========================================================
-    # 📊 MISS LOCATION REPORT
+    # 📊 MISS LOCATION REPORT (FIXED RED ALERT)
     # =========================================================
     st.markdown("#### 📊 MISS LOCATION REPORT")
-    if st.button("▶️ GENERATE MISS LOC", key="btn_gen_miss_final_v5"):
+    if st.button("▶️ GENERATE MISS LOC", key="btn_gen_miss_final_v6"):
         data_src = st.session_state.get('set_up_real_plus')
         df_res, count_sku, count_qty = logic_miss_location_report(data_src)
         st.session_state.report_miss = {"data": df_res, "sku": count_sku, "qty": count_qty}
@@ -1101,28 +1101,26 @@ def menu_Stock_Opname():
 
     if "report_miss" in st.session_state:
         df_ml_data = st.session_state.report_miss["data"]
-        
-        # --- OVERVIEW MISS LOCATION (FORCE RED ALERT) ---
         m_sku_val = int(st.session_state.report_miss["sku"])
         m_qty_val = int(st.session_state.report_miss["qty"])
         
-        # Logika Alert: Kalau ADA isi (!= 0) MERAH, kalau BERSIH (0) HIJAU
-        color_alert_ml = "#FF4B4B" if m_sku_val != 0 or m_qty_val != 0 else "#00FF00"
+        # WARNA MERAH TETAP (HARDCODED)
+        fixed_red = "#FF4B4B"
 
         m1, m2 = st.columns(2)
         with m1:
             st.markdown(f"""
-                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {color_alert_ml};">
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {fixed_red};">
                     <p style="color: #808495; font-size: 14px; margin-bottom: 5px;">📦 TOTAL SKU MISS LOC.</p>
-                    <h2 style="color: {color_alert_ml}; margin: 0; font-weight: bold;">{m_sku_val} <span style="font-size: 18px;">ITEM</span></h2>
+                    <h2 style="color: {fixed_red}; margin: 0; font-weight: bold;">{m_sku_val} <span style="font-size: 18px;">ITEM</span></h2>
                 </div>
             """, unsafe_allow_html=True)
             
         with m2:
             st.markdown(f"""
-                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {color_alert_ml};">
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {fixed_red};">
                     <p style="color: #808495; font-size: 14px; margin-bottom: 5px;">🔥 TOTAL QTY MISS LOC.</p>
-                    <h2 style="color: {color_alert_ml}; margin: 0; font-weight: bold;">{m_qty_val} <span style="font-size: 18px;">ITEM</span></h2>
+                    <h2 style="color: {fixed_red}; margin: 0; font-weight: bold;">{m_qty_val} <span style="font-size: 18px;">ITEM</span></h2>
                 </div>
             """, unsafe_allow_html=True)
 
@@ -1130,16 +1128,14 @@ def menu_Stock_Opname():
         st.markdown("<br>", unsafe_allow_html=True)
         t_ml_1, t_ml_2 = st.tabs(["📄 Detail List", "📊 Summary"])
         
-        # Siapkan DataFrame Summary (Pakai variabel yang sudah di-int tadi)
         df_sum_ml = pd.DataFrame({
             "METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"],
-            "VALUE": [m_sku_val, m_qty_val] # Fixed NameError di sini
+            "VALUE": [m_sku_val, m_qty_val]
         })
 
         with t_ml_1:
             st.dataframe(df_ml_data, use_container_width=True, hide_index=True)
             
-            # --- DOWNLOAD EXCEL TANPA IO ---
             fname_ml = "Miss_Location_Report.xlsx"
             with pd.ExcelWriter(fname_ml, engine='xlsxwriter') as writer:
                 df_ml_data.to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
@@ -1147,14 +1143,14 @@ def menu_Stock_Opname():
             
             with open(fname_ml, "rb") as f:
                 st.download_button(
-                    label="📥 DOWNLOAD MISS LOC REPORT (EXCEL)",
+                    label="📥 DOWNLOAD MISS LOC REPORT",
                     data=f,
                     file_name=fname_ml,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
 
         with t_ml_2:
-            st.table(df_sum_ml) # Tampilan bersih tanpa desimal
+            st.table(df_sum_ml)
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
