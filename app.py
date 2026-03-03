@@ -872,6 +872,15 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
+# --- DEFINISI FUNGSI UTAMA (Pindahkan ke atas script) ---
+def get_diff_col(df):
+    """Mencari nama kolom selisih yang benar secara otomatis"""
+    possible_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value', 'diff_val']
+    for col in possible_cols:
+        if col in df.columns:
+            return col
+    return None
+
 # --- STEP 4 ---
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
@@ -900,17 +909,9 @@ def menu_Stock_Opname():
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
                 # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK
-                # Fungsi helper untuk mencari kolom diff yang benar
-                def get_diff_col(df):
-                    possible_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value']
-                    for col in possible_cols:
-                        if col in df.columns:
-                            return col
-                    return None
-
-                # Filter Step 4
                 diff_col_4 = get_diff_col(res4)
                 if diff_col_4:
+                    # Filter: Harus > 0 DAN tidak kosong (notna)
                     res4 = res4[(res4[diff_col_4] > 0) & (res4[diff_col_4].notna())].reset_index(drop=True)
                     miss4 = miss4[(miss4[diff_col_4] > 0) & (miss4[diff_col_4].notna())].reset_index(drop=True)
                 else:
@@ -950,7 +951,6 @@ def menu_Stock_Opname():
                     )
                     
                     # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK DI STEP 5
-                    # Pastikan data yang masuk ke session state sudah bersih
                     diff_col_5 = get_diff_col(df_mult)
                     if diff_col_5:
                         df_mult = df_mult[(df_mult[diff_col_5] > 0) & (df_mult[diff_col_5].notna())].reset_index(drop=True)
