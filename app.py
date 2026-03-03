@@ -949,25 +949,22 @@ def menu_Stock_Opname():
                         st.session_state.df_missing_lookup
                     )
                     
-                    # ✅ FILTERING STEP 5: QTY SO > QTY SYSTEM DAN DIFF > 0
-                    if 'qty_so' in df_mult.columns and 'qty_system' in df_mult.columns:
-                        df_mult['qty_so'] = pd.to_numeric(df_mult['qty_so'], errors='coerce')
-                        df_mult['qty_system'] = pd.to_numeric(df_mult['qty_system'], errors='coerce')
-                        df_mult['diff'] = df_mult['qty_so'] - df_mult['qty_system']
-                        
-                        df_mult = df_mult[(df_mult['qty_so'] > df_mult['qty_system']) & (df_mult['diff'] > 0)].reset_index(drop=True)
-                    
-                    if 'diff' in df_sing.columns:
-                        df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce')
-                        df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
+                    # ✅ PERBAIKAN LOGIC: Cukup cek DIFF > 0 (Tanpa bandingin QTY SO vs SYSTEM)
+                if 'diff' in df_mult.columns:
+                    df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce')
+                    df_mult = df_mult[(df_mult['diff'] > 0) & (df_mult['diff'].notna())].reset_index(drop=True)
+                
+                if 'diff' in df_sing.columns:
+                    df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce')
+                    df_sing = df_sing[(df_sing['diff'] > 0) & (df_sing['diff'].notna())].reset_index(drop=True)
 
-                    st.session_state.df_mult_5 = df_mult
-                    st.session_state.df_sing_5 = df_sing
-                    st.session_state.step5_done = True
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
-                    st.stop()
+                st.session_state.df_mult_5 = df_mult
+                st.session_state.df_sing_5 = df_sing
+                st.session_state.step5_done = True
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                st.stop()
 
         if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
             t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
