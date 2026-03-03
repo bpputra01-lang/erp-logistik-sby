@@ -1143,7 +1143,7 @@ def menu_Stock_Opname():
             
             with open(fname_ml, "rb") as f:
                 st.download_button(
-                    label="📥 DOWNLOAD MISS LOC REPORT (2 SHEET)",
+                    label="📥 DOWNLOAD MISS LOC REPORT",
                     data=f,
                     file_name=fname_ml,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
