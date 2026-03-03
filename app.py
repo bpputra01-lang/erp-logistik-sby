@@ -945,19 +945,30 @@ def menu_Stock_Opname():
         if up_m5:
             if st.button("▶️ GENERATE ADJ +", use_container_width=True):
                 try:
+                    # Baca file master
                     if up_m5.name.endswith(('.csv',)):
                         df_m5 = pd.read_csv(up_m5)
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    # ✅ JALANKAN LOGIKA PIVOT (PASTIKAN SEJAJAR LURUS SAMA IF DI ATAS)
+                    # 1️⃣ JALANKAN LOGIKA PIVOT
                     df_mult, df_sing = logic_pivot_adjustment(
                         st.session_state.df_res_lookup, 
                         df_m5, 
                         st.session_state.df_missing_lookup
                     )
                     
-                    # ✅ FILTER KETAT: Buang data bocor yang DIFF-nya 0
+                    # 2️⃣ PEMBERSIHAN DATA MULTIPLE (Biar gak bocor data QTY 0)
+                    if 'qty_so' in df_mult.columns and 'qty_system' in df_mult.columns:
+                        df_mult['qty_so'] = pd.to_numeric(df_mult['qty_so'], errors='coerce').fillna(0)
+                        df_mult['qty_system'] = pd.to_numeric(df_mult['qty_system'], errors='coerce').fillna(0)
+                        
+                        # Hapus item yang QTY SYSTEM & SO nya 0 (Data siluman dari Master)
+                        df_mult = df_mult[
+                            (df_mult['qty_so'] > 0) | (df_mult['qty_system'] > 0)
+                        ].reset_index(drop=True)
+
+                    # 3️⃣ FILTER FINAL DIFF > 0
                     if 'diff' in df_mult.columns:
                         df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce').fillna(0)
                         df_mult = df_mult[df_mult['diff'] > 0].reset_index(drop=True)
@@ -966,6 +977,7 @@ def menu_Stock_Opname():
                         df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce').fillna(0)
                         df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
 
+                    # Simpan hasil ke state
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
                     st.session_state.step5_done = True
@@ -973,21 +985,22 @@ def menu_Stock_Opname():
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
                     st.stop()
-        # ✅ PINDAHKAN KE SINI (DI LUAR "if up_m5") AGAR TIDAK HILANG SAAT DOWNLOAD
+
+        # ✅ BAGIAN TAMPILAN (DI LUAR IF UPLOADER)
         if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
             t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
             with t_mult: 
-                st.dataframe(st.session_state.df_mult_5, use_container_width=True)
-                # ✅ TOMBOL DOWNLOAD
+                st.dataframe(st.session_state.df_mult_5, use_container_width=True, hide_index=True)
+                # Tombol Download stay di sini
                 st.download_button(
                     label="📥 Download Multiple Adjustment CSV",
                     data=st.session_state.df_mult_5.to_csv(index=False).encode('utf-8'),
                     file_name="multiple_adjustment_plus.csv",
                     mime="text/csv",
-                    key="dl_mult_final_v5"
+                    key="dl_mult_final_v_final"
                 )
             with t_sing: 
-                st.dataframe(st.session_state.df_sing_5, use_container_width=True)
+                st.dataframe(st.session_state.df_sing_5, use_container_width=True, hide_index=True)
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
