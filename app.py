@@ -899,22 +899,22 @@ def menu_Stock_Opname():
                 # Jalankan Logika
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
-                # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK
-                # Fungsi helper untuk mencari kolom diff yang benar
-                def get_diff_col(df):
-                    possible_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value']
-                    for col in possible_cols:
-                        if col in df.columns:
-                            return col
-                    return None
-
-                # Filter Step 4
-                diff_col_4 = get_diff_col(res4)
-                if diff_col_4:
-                    res4 = res4[(res4[diff_col_4] > 0) & (res4[diff_col_4].notna())].reset_index(drop=True)
-                    miss4 = miss4[(miss4[diff_col_4] > 0) & (miss4[diff_col_4].notna())].reset_index(drop=True)
-                else:
-                    st.warning("⚠️ Kolom 'diff' tidak ditemukan di hasil logika. Cek nama kolom di dataframe.")
+                # ✅ LOGIC LOOKUP: Hanya ambil yang sesuai SKU & BIN (QTY SO tidak blank)
+                if 'qty_so' in res4.columns and 'qty_system' in res4.columns:
+                    res4['qty_so'] = pd.to_numeric(res4['qty_so'], errors='coerce')
+                    res4['qty_system'] = pd.to_numeric(res4['qty_system'], errors='coerce')
+                    
+                    # Hitung DIFF hanya jika QTY SO ada isinya
+                    res4['diff'] = res4.apply(
+                        lambda x: abs(x['qty_system'] - x['qty_so']) if pd.notnull(x['qty_so']) else np.nan, 
+                        axis=1
+                    )
+                    # Filter: Hanya baris hasil lookup yang masuk (QTY SO tidak blank) dan DIFF > 0
+                    res4 = res4[(res4['qty_so'].notna()) & (res4['diff'] > 0)].reset_index(drop=True)
+                
+                if 'diff' in miss4.columns:
+                    miss4['diff'] = pd.to_numeric(miss4['diff'], errors='coerce')
+                    miss4 = miss4[miss4['diff'] > 0].reset_index(drop=True)
 
                 st.session_state.df_res_lookup = res4
                 st.session_state.df_missing_lookup = miss4
@@ -949,14 +949,17 @@ def menu_Stock_Opname():
                         st.session_state.df_missing_lookup
                     )
                     
-                    # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK DI STEP 5
-                    # Pastikan data yang masuk ke session state sudah bersih
-                    diff_col_5 = get_diff_col(df_mult)
-                    if diff_col_5:
-                        df_mult = df_mult[(df_mult[diff_col_5] > 0) & (df_mult[diff_col_5].notna())].reset_index(drop=True)
-                        df_sing = df_sing[(df_sing[diff_col_5] > 0) & (df_sing[diff_col_5].notna())].reset_index(drop=True)
-                    else:
-                        st.warning("⚠️ Kolom 'diff' tidak ditemukan di hasil pivot. Cek nama kolom di dataframe.")
+                    # ✅ FILTERING STEP 5: QTY SO > QTY SYSTEM DAN DIFF > 0
+                    if 'qty_so' in df_mult.columns and 'qty_system' in df_mult.columns:
+                        df_mult['qty_so'] = pd.to_numeric(df_mult['qty_so'], errors='coerce')
+                        df_mult['qty_system'] = pd.to_numeric(df_mult['qty_system'], errors='coerce')
+                        df_mult['diff'] = df_mult['qty_so'] - df_mult['qty_system']
+                        
+                        df_mult = df_mult[(df_mult['qty_so'] > df_mult['qty_system']) & (df_mult['diff'] > 0)].reset_index(drop=True)
+                    
+                    if 'diff' in df_sing.columns:
+                        df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce')
+                        df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
 
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
@@ -968,7 +971,16 @@ def menu_Stock_Opname():
 
         if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
             t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
-            with t_mult: st.dataframe(st.session_state.df_mult_5, use_container_width=True)
+            with t_mult: 
+                st.dataframe(st.session_state.df_mult_5, use_container_width=True)
+                # ✅ DOWNLOAD BUTTON
+                st.download_button(
+                    label="📥 Download Multiple Adjustment CSV",
+                    data=st.session_state.df_mult_5.to_csv(index=False).encode('utf-8'),
+                    file_name="multiple_adjustment_plus.csv",
+                    mime="text/csv",
+                    key="dl_mult_final"
+                )
             with t_sing: st.dataframe(st.session_state.df_sing_5, use_container_width=True)
 
     # =========================================================
