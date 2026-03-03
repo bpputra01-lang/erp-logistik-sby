@@ -734,6 +734,14 @@ def generate_real_plus_recon(allocated_data):
         recon_df['HASIL RECONCILIATION'] = ""
         return recon_df
     return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
+# --- DEFINISI FUNGSI UTAMA (Pindahkan ke atas script) ---
+def get_diff_col(df):
+    """Mencari nama kolom selisih yang benar secara otomatis"""
+    possible_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value', 'diff_val']
+    for col in possible_cols:
+        if col in df.columns:
+            return col
+    return None
 
 # =========================================================
 # 2. MENU UTAMA & STATE MANAGEMENT
@@ -872,14 +880,6 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
-# --- DEFINISI FUNGSI UTAMA (Pindahkan ke atas script) ---
-def get_diff_col(df):
-    """Mencari nama kolom selisih yang benar secara otomatis"""
-    possible_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value', 'diff_val']
-    for col in possible_cols:
-        if col in df.columns:
-            return col
-    return None
 
 # --- STEP 4 ---
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
