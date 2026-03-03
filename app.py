@@ -1122,14 +1122,34 @@ def menu_Stock_Opname():
                 </div>
             """, unsafe_allow_html=True)
 
-        # Tab & Download Miss Loc
+        # --- TAB AREA MISS LOC DENGAN DOWNLOAD 2 SHEET ---
+        st.markdown("<br>", unsafe_allow_html=True)
         t_ml_1, t_ml_2 = st.tabs(["📄 Detail List", "📊 Summary"])
+        
         with t_ml_1:
             st.dataframe(st.session_state.report_miss["data"], use_container_width=True, hide_index=True)
-            st.download_button("📥 DOWNLOAD MISS LOC (CSV)", st.session_state.report_miss["data"].to_csv(index=False), "Miss_Location.csv", "text/csv")
+            
+            # Logic Download Excel 2 Sheet (Detail & Summary) Tanpa IO
+            fname_ml = "Miss_Location_Report.xlsx"
+            df_sum_ml = pd.DataFrame({
+                "METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"],
+                "VALUE": [int(m_sku), int(m_qty)]
+            })
+
+            with pd.ExcelWriter(fname_ml, engine='xlsxwriter') as writer:
+                st.session_state.report_miss["data"].to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
+                df_sum_ml.to_excel(writer, sheet_name='SUMMARY', index=False)
+            
+            with open(fname_ml, "rb") as f:
+                st.download_button(
+                    label="📥 DOWNLOAD MISS LOC REPORT (EXCEL 2 SHEET)",
+                    data=f,
+                    file_name=fname_ml,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
         with t_ml_2:
-            st.write(f"Total SKU Terdeteksi: **{st.session_state.report_miss['sku']}**")
-            st.write(f"Total Quantity Terdeteksi: **{st.session_state.report_miss['qty']}**")
+            st.table(df_sum_ml) # Nampilin tabel summary yang bersih (Integer)
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
