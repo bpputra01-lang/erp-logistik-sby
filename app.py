@@ -882,7 +882,6 @@ def menu_Stock_Opname():
     if up_r4 and up_s4:
         if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
             try:
-                # Baca file sesuai tipe
                 if up_r4.name.endswith(('.csv',)):
                     df_r4 = pd.read_csv(up_r4)
                 else:
@@ -893,23 +892,16 @@ def menu_Stock_Opname():
                 else:
                     df_s4 = pd.read_excel(up_s4)
                 
-                # ✅ PERBAIKAN: HAPUS INDEX STREAMLIT HANYA DI REAL + RECON
                 df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
-                
-                # Jalankan Logika
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
-                # ✅ LOGIC LOOKUP: Hanya ambil yang sesuai SKU & BIN (QTY SO tidak blank)
                 if 'qty_so' in res4.columns and 'qty_system' in res4.columns:
                     res4['qty_so'] = pd.to_numeric(res4['qty_so'], errors='coerce')
                     res4['qty_system'] = pd.to_numeric(res4['qty_system'], errors='coerce')
-                    
-                    # Hitung DIFF hanya jika QTY SO ada isinya
                     res4['diff'] = res4.apply(
                         lambda x: abs(x['qty_system'] - x['qty_so']) if pd.notnull(x['qty_so']) else np.nan, 
                         axis=1
                     )
-                    # Filter: Hanya baris hasil lookup yang masuk (QTY SO tidak blank) dan DIFF > 0
                     res4 = res4[(res4['qty_so'].notna()) & (res4['diff'] > 0)].reset_index(drop=True)
                 
                 if 'diff' in miss4.columns:
@@ -924,9 +916,20 @@ def menu_Stock_Opname():
                 st.error(f"❌ Error: {str(e)}")
                 st.stop()
 
+    # ✅ PINDAHKAN KE SINI (DI LUAR "if up_r4 and up_s4")
+    # Biar tab dan tombol download tetep muncul meski halaman refresh
     if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
         t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
-        with t_f: st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
+        with t_f: 
+            st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
+            # ✅ INI TOMBOL DOWNLOADNYA DI BAWAH TABEL
+            st.download_button(
+                label="📥 Download Final Adjustment Result",
+                data=st.session_state.df_res_lookup.to_csv(index=False).encode('utf-8'),
+                file_name="final_adjustment_step4.csv",
+                mime="text/csv",
+                key="btn_dl_step4_final_fixed"
+            )
         with t_m: st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
 
  # --- STEP 5 ---
