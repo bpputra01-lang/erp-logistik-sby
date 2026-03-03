@@ -930,7 +930,7 @@ def menu_Stock_Opname():
 
         # --- AREA TAMPILAN HASIL ---
         if "process_done" in st.session_state and st.session_state.process_done:
-            st.success("✅ Proses Selesai! Semua data sampah otomatis dibuang.")
+            st.success("✅ Proses Selesai!")
             
             t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 HASIL CEK ADJ +"])
             
