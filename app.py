@@ -909,7 +909,8 @@ if up_r4 and up_s4:
             st.error(f"❌ Error membaca file: {str(e)}")
             st.stop()
 
-if st.session_state.step4_done:
+# ✅ PERBAIKAN: Cek apakah step4_done ada di session_state
+if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
     t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
     with t_f: 
         st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
@@ -945,7 +946,8 @@ if st.session_state.step4_done:
                 st.error(f"❌ Error membaca file: {str(e)}")
                 st.stop()
 
-    if st.session_state.step5_done:
+    # ✅ PERBAIKAN: Cek apakah step5_done ada di session_state
+    if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
         t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
         with t_mult: 
             st.dataframe(st.session_state.df_mult_5, use_container_width=True)
