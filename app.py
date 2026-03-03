@@ -1136,7 +1136,7 @@ def menu_Stock_Opname():
             
             with open(fname_ml, "rb") as f:
                 st.download_button(
-                    label="📥 DOWNLOAD MISS LOC REPORT (EXCEL 2 SHEET)",
+                    label="📥 DOWNLOAD MISS LOC REPORT",
                     data=f,
                     file_name=fname_ml,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1208,7 +1208,7 @@ def menu_Stock_Opname():
             # Generate file langsung ke local disk temporary streamlit
             with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
                 st.session_state.report_adj["data"].to_excel(writer, sheet_name='DETAIL_DATA', index=False)
-                df_disp.to_excel(writer, sheet_name='SUMMARY_METRICS', index=False)
+                df_disp.to_excel(writer, sheet_name='SUMMARY_ADJUSMENT', index=False)
             
             # Kirim ke user
             with open(file_name, "rb") as f:
