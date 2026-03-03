@@ -1146,55 +1146,47 @@ def menu_Stock_Opname():
             st.success("✅ Adjustment Berhasil Dibuat!")
             st.rerun()
 
-    # --- OVERVIEW ADJUSTMENT (LENGKAP 6 BOX & DINAMIS) ---
+# --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
-        df_s = st.session_state.report_adj["sum"].copy()
-        
+        df_s = st.session_state.report_adj["sum"]
         def get_v(m): return df_s.loc[df_s['METRIC'] == m, 'VALUE'].values[0]
 
-        # Financial Values
-        v_plus, v_minus, v_net = get_v('Total Value Adj. +'), get_v('Total Value Adj. -'), get_v('Total Value')
-        # Inventory Quantities
-        sku_total = get_v('Total SKU Adj.')
-        qty_plus, qty_minus = get_v('Total QTY Adj. +'), get_v('Total QTY Adj. -')
-        
-        # --- BARIS 1: FINANCIAL OVERVIEW (HIJAU/MERAH) ---
+        # Financial & Inventory Data
+        vals = {
+            "v_p": get_v('Total Value Adj. +'), "v_m": get_v('Total Value Adj. -'), "v_n": get_v('Total Value'),
+            "s_t": get_v('Total SKU Adj.'), "q_p": get_v('Total QTY Adj. +'), "q_m": get_v('Total QTY Adj. -')
+        }
+
+        # Helper buat nentuin warna
+        def color(val): return "#00FF00" if val >= 0 else "#FF4B4B"
+
+        # Baris 1: Value
         v1, v2, v3 = st.columns(3)
-        with v1:
-            c = "#00FF00" if v_plus >= 0 else "#FF4B4B"
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 13px;">📈 TOTAL VALUE ADJ (+)</p><h3 style="color: {c}; margin: 0;">Rp {v_plus:,.0f}</h3></div>', unsafe_allow_html=True)
-        with v2:
-            c = "#FF4B4B" if v_minus < 0 else "#00FF00"
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 13px;">📉 TOTAL VALUE ADJ (-)</p><h3 style="color: {c}; margin: 0;">Rp {v_minus:,.0f}</h3></div>', unsafe_allow_html=True)
-        with v3:
-            c = "#00FF00" if v_net >= 0 else "#FF4B4B"
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 13px;">⚖️ NET VALUE ADJ</p><h3 style="color: {c}; margin: 0;">Rp {v_net:,.0f}</h3></div>', unsafe_allow_html=True)
+        for i, (k, title) in enumerate([("v_p", "TOTAL VALUE ADJ (+)"), ("v_m", "TOTAL VALUE ADJ (-)"), ("v_n", "NET VALUE ADJ")]):
+            with [v1, v2, v3][i]:
+                c = color(vals[k])
+                st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 13px;">{title}</p><h3 style="color: {c}; margin: 0;">Rp {vals[k]:,.0f}</h3></div>', unsafe_allow_html=True)
 
         st.markdown("<div style='margin: 10px;'></div>", unsafe_allow_html=True)
 
-        # --- BARIS 2: INVENTORY OVERVIEW (STYLE GOLD) ---
+        # Baris 2: Inventory (SKU/QTY) - Sekarang Seirama!
         q1, q2, q3 = st.columns(3)
-        with q1:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 13px;">📦 TOTAL SKU ADJ</p><h3 style="color: #FFD700; margin: 0;">{sku_total:,.0f} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
-        with q2:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 13px;">➕ TOTAL QTY ADJ (+)</p><h3 style="color: #FFD700; margin: 0;">{qty_plus:,.0f} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
-        with q3:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 13px;">➖ TOTAL QTY ADJ (-)</p><h3 style="color: #FFD700; margin: 0;">{qty_minus:,.0f} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
+        for i, (k, title) in enumerate([("s_t", "TOTAL SKU ADJ"), ("q_p", "TOTAL QTY ADJ (+)"), ("q_m", "TOTAL QTY ADJ (-)")]):
+            with [q1, q2, q3][i]:
+                c = color(vals[k])
+                st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 13px;">{title}</p><h3 style="color: {c}; margin: 0;">{int(vals[k])} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
 
-        # --- TAB & SUMMARY TABLE CLEANUP ---
+        # Tab Area
         st.markdown("<br>", unsafe_allow_html=True)
-        tab_adj_1, tab_adj_2 = st.tabs(["📄 Data Report", "📊 Summary Metrics"])
-        
-        with tab_adj_1:
+        t1, t2 = st.tabs(["📄 Detail Report", "📊 Summary Metrics"])
+        with t1:
             st.dataframe(st.session_state.report_adj["data"], use_container_width=True, hide_index=True)
-            st.download_button("📥 DOWNLOAD DETAIL (CSV)", st.session_state.report_adj["data"].to_csv(index=False), "Adjustment_Detail.csv", "text/csv")
-            
-        with tab_adj_2:
-            # Hilangkan desimal untuk angka non-duit
-            df_display = df_s.copy()
-            # Masking: Mana yang mengandung kata 'Value' tetap float/decimal formatting, sisanya (SKU/QTY) dipaksa Integer
-            df_display['VALUE'] = df_display.apply(lambda x: f"{x['VALUE']:,.0f}" if 'Value' in x['METRIC'] else int(x['VALUE']), axis=1)
-            st.table(df_display)
+            st.download_button("📥 DOWNLOAD CSV", st.session_state.report_adj["data"].to_csv(index=False), "Report.csv", "text/csv")
+        with t2:
+            # Angka SKU/QTY dipaksa jadi Integer (Tanpa .000)
+            df_disp = df_s.copy()
+            df_disp['VALUE'] = df_disp.apply(lambda x: f"{x['VALUE']:,.0f}" if 'Value' in x['METRIC'] else int(x['VALUE']), axis=1)
+            st.table(df_disp)
 # =========================================================
     # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (SUPER LENGKAP)
     # =========================================================
