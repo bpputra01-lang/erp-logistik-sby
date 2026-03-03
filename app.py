@@ -769,7 +769,7 @@ def menu_Stock_Opname():
     
     if 'df_karantina_6' not in st.session_state: st.session_state.df_karantina_6 = None
 
-    # --- FILTER SECTION ---
+  # --- FILTER SECTION ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
         list_sub_kat = ["GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", "NUTRITION", "BAG", "EXTRAS SHOES"]
@@ -791,29 +791,52 @@ def menu_Stock_Opname():
 
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
-            df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
-            df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
-            
-            if selected_sub: df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-            if selected_bin_sys: df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
-            if selected_bin_cov: df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
+            try:
+                # Baca file dengan pengecekan tipe
+                if up_scan.name.endswith(('.xlsx', '.xls')):
+                    df_s_raw = pd.read_excel(up_scan)
+                else:
+                    df_s_raw = pd.read_csv(up_scan)
+                    
+                if up_stock.name.endswith(('.xlsx', '.xls')):
+                    df_t_raw = pd.read_excel(up_stock)
+                else:
+                    df_t_raw = pd.read_csv(up_stock)
+                
+                # Filter Sub Kategori (Column 6)
+                if selected_sub:
+                    df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+                
+                # Filter BIN System (Column 1)
+                if selected_bin_sys:
+                    df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
+                
+                # Filter BIN COVERAGE (Column 0) - DIPERBAIKI
+                if selected_bin_cov:
+                    # Pastikan kolom 0 tidak NaN dan string matching lebih robust
+                    df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(
+                        lambda x: any(c.upper() in x for c in selected_bin_cov) if pd.notna(x) else False
+                    )]
+                
+                res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
+                res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
+                
+                item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
+                item_map.columns = ['SKU', 'NAME']
+                map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
+                res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
+                res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict)
 
-            res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
-            res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
-            
-            item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
-            item_map.columns = ['SKU', 'NAME']
-            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
-            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict)
-
-            st.session_state.compare_result = {
-                'res_scan': res_scan, 'res_stock': res_stock, 
-                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
-                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
-                'map_dict': map_dict
-            }
-            st.rerun()
+                st.session_state.compare_result = {
+                    'res_scan': res_scan, 'res_stock': res_stock, 
+                    'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
+                    'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
+                    'map_dict': map_dict
+                }
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                st.stop()
 
     if st.session_state.compare_result:
         d = st.session_state.compare_result
@@ -834,13 +857,21 @@ def menu_Stock_Opname():
         up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="step2_cov")
         if up_bin_cov:
             if st.button("🚀 RUN ALLOCATION", use_container_width=True):
-                df_cov = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
-                allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov)
-                allocated['ITEM NAME'] = allocated['SKU'].map(d['map_dict'])
-                st.session_state.allocation_result = allocated
-                st.session_state.sys_updated_result = sys_upd
-                st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated)
-                st.rerun()
+                try:
+                    if up_bin_cov.name.endswith(('.xlsx', '.xls')):
+                        df_cov = pd.read_excel(up_bin_cov)
+                    else:
+                        df_cov = pd.read_csv(up_bin_cov)
+                        
+                    allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov)
+                    allocated['ITEM NAME'] = allocated['SKU'].map(d['map_dict'])
+                    st.session_state.allocation_result = allocated
+                    st.session_state.sys_updated_result = sys_upd
+                    st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+                    st.stop()
 
     if st.session_state.allocation_result is not None:
         st.markdown("### ✅ HASIL ALOKASI")
@@ -892,8 +923,45 @@ def menu_Stock_Opname():
                     df_s4 = pd.read_csv(up_s4)
                 else:
                     df_s4 = pd.read_excel(up_s4)
-                    
-                res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+                
+                # --- LOGIC SESUAI VBA CEK_ADJUSMENT_FINAL ---
+                # 1. Buat dictionary dari Stock (Column B & C = key, Column C = index)
+                dict_stock = {}
+                last_row_stock = len(df_s4)
+                for i in range(1, last_row_stock):  # Skip header (0-based)
+                    key = str(df_s4.iloc[i, 1]).upper().strip() + "|" + str(df_s4.iloc[i, 2]).upper().strip()
+                    if key not in dict_stock:
+                        dict_stock[key] = i  # Store row index
+                
+                # 2. Lookup Recon ke Stock
+                last_row_recon = len(df_r4)
+                df_r4['MATCHED'] = False
+                df_r4['COLOR'] = 'white'
+                
+                for i in range(1, last_row_recon):
+                    key = str(df_r4.iloc[i, 0]).upper().strip() + "|" + str(df_r4.iloc[i, 1]).upper().strip()
+                    if key in dict_stock:
+                        df_r4.at[i, 'MATCHED'] = True
+                        # Masukkan hasil recon ke kolom K (index 10)
+                        df_s4.at[dict_stock[key], 10] = df_r4.iloc[i, 6]
+                    else:
+                        df_r4.at[i, 'COLOR'] = 'yellow'
+                
+                # 3. Hitung DIFF (ABS Column J - Column K)
+                # Column J = index 9, Column K = index 10, Column L = index 11
+                df_s4['DIFF'] = ''
+                for i in range(1, last_row_stock):
+                    col_k = df_s4.iloc[i, 10]
+                    if pd.notna(col_k) and col_k != '':
+                        col_j = df_s4.iloc[i, 9]
+                        df_s4.at[i, 'DIFF'] = abs(float(col_j) - float(col_k))
+                    else:
+                        df_s4.at[i, 'DIFF'] = ''
+                
+                # 4. Simpan hasil
+                res4 = df_s4.copy()
+                miss4 = df_r4[df_r4['COLOR'] == 'yellow'].copy()
+                
                 st.session_state.df_res_lookup = res4
                 st.session_state.df_missing_lookup = miss4
                 st.session_state.step4_done = True
@@ -919,8 +987,70 @@ def menu_Stock_Opname():
                         df_m5 = pd.read_csv(up_m5)
                     else:
                         df_m5 = pd.read_excel(up_m5)
-                        
-                    df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5, st.session_state.df_missing_lookup)
+                    
+                    # --- LOGIC SESUAI VBA Generate_Adjustment_Plus_Final_Fix_Pivot ---
+                    # 1. Buat dictionary MASTER (Column C = SKU)
+                    dict_master = {}
+                    last_row_master = len(df_m5)
+                    for i in range(1, last_row_master):
+                        sku_key = str(df_m5.iloc[i, 2]).strip()
+                        if sku_key not in dict_master:
+                            dict_master[sku_key] = i
+                    
+                    # 2. PROSES MULTIPLE ADJ + (Cek SKU Sama Langsung Jumlahkan)
+                    # Syarat: QTY SO (Column 11) > QTY SYSTEM (Column 10)
+                    dict_multiple = {}
+                    last_row_final = len(st.session_state.df_res_lookup)
+                    for i in range(1, last_row_final):
+                        col_k = st.session_state.df_res_lookup.iloc[i, 10]  # QTY SO
+                        col_j = st.session_state.df_res_lookup.iloc[i, 9]   # QTY SYSTEM
+                        if pd.notna(col_k) and pd.notna(col_j):
+                            if float(col_k) > float(col_j):
+                                sku_key = str(st.session_state.df_res_lookup.iloc[i, 2]).strip()
+                                diff_value = st.session_state.df_res_lookup.iloc[i, 11]  # DIFF (Column L)
+                                
+                                if sku_key in dict_multiple:
+                                    dict_multiple[sku_key] = dict_multiple[sku_key] + float(diff_value)
+                                else:
+                                    dict_multiple[sku_key] = float(diff_value)
+                    
+                    # 3. TEMPEL HASIL MULTIPLE KE SHEET
+                    df_mult = df_m5.iloc[:1, :].copy()  # Header
+                    for sku_key, qty in dict_multiple.items():
+                        if sku_key in dict_master:
+                            row_idx = dict_master[sku_key]
+                            new_row = df_m5.iloc[row_idx, :].copy()
+                            new_row.iloc[10] = qty  # QTY Hasil Pivot (Column K)
+                            df_mult = pd.concat([df_mult, new_row.to_frame().T], ignore_index=True)
+                    
+                    # 4. PROSES SINGLE ADJ + (Berdasarkan Warna & Grouping BIN+SKU)
+                    # Dari Sheet REAL + RECON (df_missing_lookup)
+                    dict_single = {}
+                    last_row_recon = len(st.session_state.df_missing_lookup)
+                    for i in range(1, last_row_recon):
+                        # Cek Warna (Column A = index 0)
+                        color = st.session_state.df_missing_lookup.iloc[i, 0]
+                        if color == 'yellow':
+                            bin_val = str(st.session_state.df_missing_lookup.iloc[i, 0]).strip()
+                            sku_val = str(st.session_state.df_missing_lookup.iloc[i, 1]).strip()
+                            qty_val = st.session_state.df_missing_lookup.iloc[i, 6]  # QTY (Column G)
+                            pivot_key = bin_val + "|" + sku_val  # Kunci unik BIN dan SKU
+                            
+                            if pivot_key in dict_single:
+                                dict_single[pivot_key] = dict_single[pivot_key] + float(qty_val)
+                            else:
+                                dict_single[pivot_key] = float(qty_val)
+                    
+                    # 5. TEMPEL HASIL SINGLE KE SHEET
+                    df_sing = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+                    for pivot_key, qty in dict_single.items():
+                        parts = pivot_key.split("|")
+                        df_sing = pd.concat([df_sing, pd.DataFrame({
+                            'BIN': [parts[0]],
+                            'SKU': [parts[1]],
+                            'QTY ADJ': [qty]
+                        })], ignore_index=True)
+                    
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
                     st.session_state.step5_done = True
