@@ -1101,26 +1101,28 @@ def menu_Stock_Opname():
 
     if "report_miss" in st.session_state:
         df_ml_data = st.session_state.report_miss["data"]
-        m_sku = st.session_state.report_miss["sku"]
-        m_qty = st.session_state.report_miss["qty"]
+       # --- OVERVIEW MISS LOCATION (FORCE RED ALERT) ---
+        m_sku_val = int(st.session_state.report_miss["sku"])
+        m_qty_val = int(st.session_state.report_miss["qty"])
         
-        # WARNA MERAH MEMBARA (Karena Miss Loc itu masalah)
-        # Merah kalau ada isinya (!= 0), Hijau cuma kalau 0
-        c_ml = "#FF4B4B" if m_sku != 0 else "#00FF00"
+        # Logika: Kalau TIDAK NOL (!= 0) wajib MERAH. Kalau NOL baru HIJAU.
+        # Gue pake nama variabel unik 'color_alert_ml' biar gak ketuker
+        color_alert_ml = "#FF4B4B" if m_sku_val != 0 or m_qty_val != 0 else "#00FF00"
 
         m1, m2 = st.columns(2)
         with m1:
             st.markdown(f"""
-                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c_ml};">
-                    <p style="color: #808495; font-size: 14px;">📦 TOTAL SKU MISS LOC.</p>
-                    <h2 style="color: {c_ml}; margin: 0;">{int(m_sku)} <span style="font-size: 18px;">ITEM</span></h2>
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {color_alert_ml};">
+                    <p style="color: #808495; font-size: 14px; margin-bottom: 5px;">📦 TOTAL SKU MISS LOC.</p>
+                    <h2 style="color: {color_alert_ml}; margin: 0; font-weight: bold;">{m_sku_val} <span style="font-size: 18px;">ITEM</span></h2>
                 </div>
             """, unsafe_allow_html=True)
+            
         with m2:
             st.markdown(f"""
-                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c_ml};">
-                    <p style="color: #808495; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p>
-                    <h2 style="color: {c_ml}; margin: 0;">{int(m_qty)} <span style="font-size: 18px;">ITEM</span></h2>
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {color_alert_ml};">
+                    <p style="color: #808495; font-size: 14px; margin-bottom: 5px;">🔥 TOTAL QTY MISS LOC.</p>
+                    <h2 style="color: {color_alert_ml}; margin: 0; font-weight: bold;">{m_qty_val} <span style="font-size: 18px;">ITEM</span></h2>
                 </div>
             """, unsafe_allow_html=True)
 
