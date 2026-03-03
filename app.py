@@ -1174,7 +1174,7 @@ def menu_Stock_Opname():
         for i, (k, title) in enumerate([("s_t", "TOTAL SKU ADJ"), ("q_p", "TOTAL QTY ADJ (+)"), ("q_m", "TOTAL QTY ADJ (-)")]):
             with [q1, q2, q3][i]:
                 c = color(vals[k])
-                st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 13px;">{title}</p><h3 style="color: {c}; margin: 0;">{int(vals[k])} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 20px;">{title}</p><h3 style="color: {c}; margin: 0;">{int(vals[k])} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
 
         # Tab Area
         st.markdown("<br>", unsafe_allow_html=True)
