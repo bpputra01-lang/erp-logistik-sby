@@ -1101,12 +1101,12 @@ def menu_Stock_Opname():
 
     if "report_miss" in st.session_state:
         df_ml_data = st.session_state.report_miss["data"]
-       # --- OVERVIEW MISS LOCATION (FORCE RED ALERT) ---
+        
+        # --- OVERVIEW MISS LOCATION (FORCE RED ALERT) ---
         m_sku_val = int(st.session_state.report_miss["sku"])
         m_qty_val = int(st.session_state.report_miss["qty"])
         
-        # Logika: Kalau TIDAK NOL (!= 0) wajib MERAH. Kalau NOL baru HIJAU.
-        # Gue pake nama variabel unik 'color_alert_ml' biar gak ketuker
+        # Logika Alert: Kalau ADA isi (!= 0) MERAH, kalau BERSIH (0) HIJAU
         color_alert_ml = "#FF4B4B" if m_sku_val != 0 or m_qty_val != 0 else "#00FF00"
 
         m1, m2 = st.columns(2)
@@ -1130,14 +1130,16 @@ def menu_Stock_Opname():
         st.markdown("<br>", unsafe_allow_html=True)
         t_ml_1, t_ml_2 = st.tabs(["📄 Detail List", "📊 Summary"])
         
+        # Siapkan DataFrame Summary (Pakai variabel yang sudah di-int tadi)
         df_sum_ml = pd.DataFrame({
             "METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"],
-            "VALUE": [int(m_sku), int(m_qty)]
+            "VALUE": [m_sku_val, m_qty_val] # Fixed NameError di sini
         })
 
         with t_ml_1:
             st.dataframe(df_ml_data, use_container_width=True, hide_index=True)
             
+            # --- DOWNLOAD EXCEL TANPA IO ---
             fname_ml = "Miss_Location_Report.xlsx"
             with pd.ExcelWriter(fname_ml, engine='xlsxwriter') as writer:
                 df_ml_data.to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
@@ -1145,15 +1147,14 @@ def menu_Stock_Opname():
             
             with open(fname_ml, "rb") as f:
                 st.download_button(
-                    label="📥 DOWNLOAD MISS LOC REPORT",
+                    label="📥 DOWNLOAD MISS LOC REPORT (EXCEL)",
                     data=f,
                     file_name=fname_ml,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
 
         with t_ml_2:
-            # Angka bulat tanpa .000
-            st.table(df_sum_ml)
+            st.table(df_sum_ml) # Tampilan bersih tanpa desimal
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
