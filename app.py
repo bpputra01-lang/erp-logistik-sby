@@ -857,7 +857,11 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
-    # --- HELPER FUNCTION UNTUK MEMBACA FILE (PERBAIKAN ERROR 1) ---
+    import pandas as pd
+import streamlit as st
+import io
+
+# --- HELPER FUNCTION UNTUK MEMBACA FILE (PERBAIKAN ERROR 1) ---
 def read_uploaded_file(uploaded_file):
     if uploaded_file is not None:
         if uploaded_file.name.endswith('.csv'):
