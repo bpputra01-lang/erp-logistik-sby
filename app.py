@@ -931,8 +931,8 @@ def menu_Stock_Opname():
                 df_s4 = df_s4.reset_index(drop=True)
                 
                 # --- LOGIC SESUAI VBA CEK_ADJUSMENT_FINAL (SUPER CEPAT) ---
-                # VBA Mapping: A=0, B=1, C=2, G=6, J=9, K=10, L=11
-                # Python Mapping (setelah skip index): A=0, B=1, C=2, G=6, J=9, K=10, L=11
+                # VBA Mapping: A=0, B=1, C=2, G=6, J=9, K=10
+                # Python Mapping (setelah skip index): A=0, B=1, C=2, G=6, J=9, K=10
                 
                 # 1. Buat dictionary dari Stock (Column B & C = key)
                 dict_stock = {}
@@ -962,6 +962,7 @@ def menu_Stock_Opname():
                             df_r4.at[i, 'COLOR'] = 'yellow'
                 
                 # 3. Hitung DIFF (ABS Column J - Column K)
+                # ✅ PERBAIKAN: Tambahkan kolom DIFF baru, jangan akses index 11
                 df_s4['DIFF'] = ''
                 for i in range(1, last_row_stock):
                     col_k = df_s4.iloc[i, 10]
@@ -1021,7 +1022,7 @@ def menu_Stock_Opname():
                     for i in range(1, last_row_final):
                         col_k = st.session_state.df_res_lookup.iloc[i, 10]  # QTY SO
                         col_j = st.session_state.df_res_lookup.iloc[i, 9]   # QTY SYSTEM
-                        diff_value = st.session_state.df_res_lookup.iloc[i, 11]  # DIFF
+                        diff_value = st.session_state.df_res_lookup.iloc[i, 'DIFF']  # DIFF (kolom baru)
                         
                         # Skip kosong
                         if (pd.notna(col_k) and str(col_k).strip() != '' and
