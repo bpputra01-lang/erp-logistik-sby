@@ -942,7 +942,6 @@ def menu_Stock_Opname():
         st.subheader("5️⃣ FINAL ADJUSMENT +")
         up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5_master")
 
-        if up_m5:
             if up_m5:
             if st.button("▶️ GENERATE ADJ +", use_container_width=True):
                 try:
