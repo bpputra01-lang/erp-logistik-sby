@@ -998,50 +998,58 @@ def menu_Stock_Opname():
             st.session_state.df_karantina_6.to_excel(writer, index=False)
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
-   # =========================================================
-    # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (FAST LOAD)
+# =========================================================
+    # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (ULTRA FAST)
     # =========================================================
-    if "process_done" in st.session_state and st.session_state.process_done:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.info("💡 **Master Report Ready:** File di bawah mencakup data Step 1 sampai Step 5.")
-
-        # Pakai Session State buat nyimpen data binary Excel-nya biar ga render ulang terus
-        if 'master_excel_data' not in st.session_state or st.button("🔄 Refresh Data Download"):
-            output_master = io.BytesIO()
-            with pd.ExcelWriter(output_master, engine='xlsxwriter') as writer:
-                # Sheet 1-4 (Basic)
-                if st.session_state.compare_result:
-                    st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='1_DATA SCAN', index=False)
-                if st.session_state.set_up_real_plus is not None:
-                    st.session_state.set_up_real_plus.to_excel(writer, sheet_name='2_SET UP REAL PLUS', index=False)
-                if st.session_state.recon_real_plus is not None:
-                    st.session_state.recon_real_plus.to_excel(writer, sheet_name='3_REAL PLUS RECON', index=False)
-                if st.session_state.outstanding_system is not None:
-                    st.session_state.outstanding_system.to_excel(writer, sheet_name='4_SYSTEM OUTSTANDING', index=False)
-                
-                # Sheet 5-7 (Adjustment)
-                if "df_mult_final" in st.session_state:
-                    st.session_state.df_mult_final.to_excel(writer, sheet_name='5_MULTIPLE ADJ', index=False)
-                if "df_sing_final" in st.session_state:
-                    st.session_state.df_sing_final.to_excel(writer, sheet_name='6_SINGLE ADJ', index=False)
-                if "df_res4_final" in st.session_state:
-                    st.session_state.df_res4_final.to_excel(writer, sheet_name='7_HASIL CEK LOOKUP', index=False)
-                
-                # Sheet 8 (Karantina)
-                if st.session_state.df_karantina_6 is not None:
-                    st.session_state.df_karantina_6.to_excel(writer, sheet_name='8_SET UP KARANTINA', index=False)
+    @st.fragment
+    def download_section():
+        if "process_done" in st.session_state and st.session_state.process_done:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.info("💡 **Master Report Ready:** File di bawah mencakup data Step 1 sampai Step 5.")
             
-            st.session_state.master_excel_data = output_master.getvalue()
+            # Tombol pemicu buat generate file (biar ga loading otomatis di awal)
+            if st.button("🏗️ PREPARE DOWNLOAD FILE", use_container_width=True):
+                with st.spinner("Sedang menjahit data..."):
+                    output_master = io.BytesIO()
+                    with pd.ExcelWriter(output_master, engine='xlsxwriter') as writer:
+                        # Step 1-4
+                        if st.session_state.compare_result:
+                            st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='1_DATA SCAN', index=False)
+                        if st.session_state.set_up_real_plus is not None:
+                            st.session_state.set_up_real_plus.to_excel(writer, sheet_name='2_SET UP REAL PLUS', index=False)
+                        if st.session_state.recon_real_plus is not None:
+                            st.session_state.recon_real_plus.to_excel(writer, sheet_name='3_REAL PLUS RECON', index=False)
+                        if st.session_state.outstanding_system is not None:
+                            st.session_state.outstanding_system.to_excel(writer, sheet_name='4_SYSTEM OUTSTANDING', index=False)
+                        
+                        # Step 5-7
+                        if "df_mult_final" in st.session_state:
+                            st.session_state.df_mult_final.to_excel(writer, sheet_name='5_MULTIPLE ADJ', index=False)
+                        if "df_sing_final" in st.session_state:
+                            st.session_state.df_sing_final.to_excel(writer, sheet_name='6_SINGLE ADJ', index=False)
+                        if "df_res4_final" in st.session_state:
+                            st.session_state.df_res4_final.to_excel(writer, sheet_name='7_HASIL CEK LOOKUP', index=False)
+                        
+                        # Step 8
+                        if st.session_state.df_karantina_6 is not None:
+                            st.session_state.df_karantina_6.to_excel(writer, sheet_name='8_SET UP KARANTINA', index=False)
+                    
+                    st.session_state.master_excel_ready = output_master.getvalue()
+                    st.success("✅ File siap didownload!")
 
-        # Tombol sekarang tinggal narik data dari session state, jadi INSTANT
-        st.download_button(
-            label="📥 DOWNLOAD MASTER REPORT (.XLSX)",
-            data=st.session_state.master_excel_data,
-            file_name="FINAL_CONSOLIDATED_REPORT.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            key="btn_final_master_instant"
-        )
+            # Tombol download beneran muncul setelah tombol prepare diklik
+            if 'master_excel_ready' in st.session_state:
+                st.download_button(
+                    label="📥 DOWNLOAD MASTER REPORT (.XLSX)",
+                    data=st.session_state.master_excel_ready,
+                    file_name="FINAL_CONSOLIDATED_REPORT.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="btn_final_master_ultra"
+                )
+
+    # Panggil fungsinya
+    download_section()
             
 import pandas as pd
 import numpy as np
