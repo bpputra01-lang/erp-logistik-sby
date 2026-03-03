@@ -872,79 +872,78 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
-# --- STEP 4 & 5 COMBINED (TRIPLE UPLOAD) ---
-st.markdown("<br><br><br>---", unsafe_allow_html=True)
-st.subheader("🚀 FINAL ADJUSTMENT PROCESSOR (3-FILES)")
+# ==========================================================
+        # 🚀 FINAL ADJUSTMENT PROCESSOR (3-FILES COMBINED)
+        # TARUH DI BAWAH SETELAH ANALYZER / STEP SEBELUMNYA
+        # ==========================================================
+        st.markdown("<br><br><br>---", unsafe_allow_html=True)
+        st.subheader("🚀 FINAL ADJUSTMENT PROCESSOR (3-FILES)")
 
-# Siapkan Kolom Upload
-col_a, col_b, col_c = st.columns(3)
-with col_a: up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final")
-with col_b: up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final")
-with col_c: up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final")
+        # Layout 3 kolom sesuai permintaan
+        col_a, col_b, col_c = st.columns(3)
+        with col_a: up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
+        with col_b: up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
+        with col_c: up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
 
-if up_r4 and up_s4 and up_m5:
-    if st.button("🔥 JALANKAN PROSES FINAL", use_container_width=True):
-        try:
-            # --- PEMBACAAN FILE ---
-            df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
-            df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
-            df_m5 = pd.read_excel(up_m5) # Master biasanya Excel
+        if up_r4 and up_s4 and up_m5:
+            if st.button("🔥 JALANKAN PROSES FINAL", use_container_width=True):
+                try:
+                    # Pembacaan file sesuai ekstensi
+                    df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
+                    df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
+                    df_m5 = pd.read_excel(up_m5)
 
-            # --- LOGIC STEP 4 (LOOKUP) ---
-            df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
-            res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+                    # --- LOGIC STEP 4 (LOOKUP) ---
+                    df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
+                    res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+                    
+                    # --- LOGIC STEP 5 (PIVOT) ---
+                    df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
+
+                    # --- FILTER KERAS (ANTI SKU 0-0) ---
+                    def bantai_data_siluman(df):
+                        if df is not None and not df.empty:
+                            # Paksa QTY jadi numerik
+                            df['QTY SYSTEM'] = pd.to_numeric(df['QTY SYSTEM'], errors='coerce').fillna(0)
+                            df['QTY SO'] = pd.to_numeric(df['QTY SO'], errors='coerce').fillna(0)
+                            
+                            # Hitung ulang DIFF biar beneran 0 kalau QTY sama
+                            df['DIFF'] = abs(df['QTY SYSTEM'] - df['QTY SO'])
+                            
+                            # CUMA AMBIL YANG DIFF > 0 (Item 0-0 otomatis mati)
+                            df = df[df['DIFF'] > 0].reset_index(drop=True)
+                        return df
+
+                    df_mult = bantai_data_siluman(df_mult)
+                    df_sing = bantai_data_siluman(df_sing)
+
+                    # Simpan ke state biar nggak ilang pas download
+                    st.session_state.df_mult_final = df_mult
+                    st.session_state.df_sing_final = df_sing
+                    st.session_state.process_done = True
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+                    st.stop()
+
+        # --- AREA TAMPILAN (DI BAWAH UPLOADER) ---
+        if hasattr(st.session_state, 'process_done') and st.session_state.process_done:
+            st.success("✅ Data Berhasil Diproses & SKU 0-0 Telah Dibuang!")
+            t1, t2 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
             
-            # Filter Awal Step 4: Pastikan cuma yang ada selisih
-            if 'qty_so' in res4.columns and 'qty_system' in res4.columns:
-                res4['qty_so'] = pd.to_numeric(res4['qty_so'], errors='coerce').fillna(0)
-                res4['qty_system'] = pd.to_numeric(res4['qty_system'], errors='coerce').fillna(0)
-                res4['diff'] = abs(res4['qty_system'] - res4['qty_so'])
-                res4 = res4[res4['diff'] > 0].reset_index(drop=True)
-
-            # --- LOGIC STEP 5 (PIVOT) ---
-            df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
-
-            # --- PEMBERSIHAN TOTAL (ANTI DATA SILUMAN) ---
-            def clean_final_data(df):
-                if not df.empty:
-                    df['qty_so'] = pd.to_numeric(df['qty_so'], errors='coerce').fillna(0)
-                    df['qty_system'] = pd.to_numeric(df['qty_system'], errors='coerce').fillna(0)
-                    # Paksa hitung ulang DIFF agar item 0-0 terdeteksi
-                    df['diff'] = abs(df['qty_system'] - df['qty_so'])
-                    # Buang yang selisihnya 0 atau data kosong
-                    df = df[df['diff'] > 0].reset_index(drop=True)
-                return df
-
-            df_mult = clean_final_data(df_mult)
-            df_sing = clean_final_data(df_sing)
-
-            # Simpan ke Session State
-            st.session_state.df_mult_final = df_mult
-            st.session_state.df_sing_final = df_sing
-            st.session_state.process_complete = True
-            st.rerun()
-
-        except Exception as e:
-            st.error(f"❌ Terjadi Error: {str(e)}")
-            st.stop()
-
-# --- DISPLAY HASIL AKHIR ---
-if hasattr(st.session_state, 'process_complete') and st.session_state.process_complete:
-    st.success("✅ Proses Selesai! Data sudah difilter ketat.")
-    tab1, tab2 = st.tabs(["📦 RESULT: MULTIPLE ADJ", "⚠️ RESULT: SINGLE ADJ"])
-    
-    with tab1:
-        st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
-        st.download_button(
-            label="📥 Download Result CSV",
-            data=st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'),
-            file_name="final_adj_multiple.csv",
-            mime="text/csv",
-            key="dl_combined_final"
-        )
-    
-    with tab2:
-        st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
+            with t1:
+                st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
+                st.download_button(
+                    label="📥 Download Multiple Adjustment",
+                    data=st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'),
+                    file_name="final_adj_multiple.csv",
+                    mime="text/csv",
+                    key="dl_final_ok"
+                )
+            
+            with t2:
+                st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
