@@ -502,7 +502,6 @@ import io
 from openpyxl import load_workbook
 from collections import defaultdict
 
-
 # =========================================================
 # 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
 # =========================================================
@@ -847,8 +846,8 @@ def menu_Stock_Opname():
         st.markdown("### ✅ HASIL ALOKASI")
         ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📉 UPDATED SYSTEM", "📦 SET UP REAL +"])
         with ta1: st.dataframe(st.session_state.allocation_result, use_container_width=True)
-        with ta2: st.dataframe(st.session_state.set_up_real_plus, use_container_width=True)
-        with ta3: st.dataframe(st.session_state.sys_updated_result, use_container_width=True)
+        with ta2: st.dataframe(st.session_state.sys_updated_result, use_container_width=True)
+        with ta3: st.dataframe(st.session_state.set_up_real_plus, use_container_width=True)
 
         st.markdown("---")
         st.subheader("3️⃣ RECON REPORTS")
@@ -877,8 +876,8 @@ def menu_Stock_Opname():
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
     adj_col1, adj_col2 = st.columns(2)
-    with adj_col1: up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx'], key="u4_recon")
-    with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx'], key="u4_stock")
+    with adj_col1: up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="u4_recon")
+    with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx','csv'], key="u4_stock")
 
     if up_r4 and up_s4:
         if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
