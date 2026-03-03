@@ -1009,7 +1009,7 @@ def menu_Stock_Opname():
             
             # Tombol pemicu buat generate file (biar ga loading otomatis di awal)
             if st.button("🏗️ PREPARE DOWNLOAD FILE", use_container_width=True):
-                with st.spinner("Sedang menjahit data..."):
+                with st.spinner("Proccessing data..."):
                     output_master = io.BytesIO()
                     with pd.ExcelWriter(output_master, engine='xlsxwriter') as writer:
                         # Step 1-4
