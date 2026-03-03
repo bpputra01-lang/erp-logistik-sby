@@ -907,14 +907,28 @@ def menu_Stock_Opname():
                 # Jalankan Logika
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
-                # ✅ FILTERING STEP 4: diff > 0
-                if 'diff' in res4.columns:
-                    res4['diff'] = pd.to_numeric(res4['diff'], errors='coerce')
-                    miss4['diff'] = pd.to_numeric(miss4['diff'], errors='coerce')
-                    res4 = res4[(res4['diff'] > 0) & (res4['diff'].notna())].reset_index(drop=True)
-                    miss4 = miss4[(miss4['diff'] > 0) & (miss4['diff'].notna())].reset_index(drop=True)
+                # ✅ DETEKSI NAMA KOLOM DIFF OTOMATIS
+                possible_diff_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value', 'diff_val']
+                diff_col_res4 = None
+                diff_col_miss4 = None
+                
+                for col in possible_diff_cols:
+                    if col in res4.columns:
+                        diff_col_res4 = col
+                        break
+                for col in possible_diff_cols:
+                    if col in miss4.columns:
+                        diff_col_miss4 = col
+                        break
+                
+                if diff_col_res4 and diff_col_miss4:
+                    res4[diff_col_res4] = pd.to_numeric(res4[diff_col_res4], errors='coerce')
+                    miss4[diff_col_miss4] = pd.to_numeric(miss4[diff_col_miss4], errors='coerce')
+                    res4 = res4[(res4[diff_col_res4] > 0) & (res4[diff_col_res4].notna())].reset_index(drop=True)
+                    miss4 = miss4[(miss4[diff_col_miss4] > 0) & (miss4[diff_col_miss4].notna())].reset_index(drop=True)
+                    st.success(f"✅ Step 4: {len(res4)} item difilter (diff > 0)")
                 else:
-                    st.error("❌ Kolom 'diff' tidak ditemukan!")
+                    st.error(f"❌ Kolom 'diff' tidak ditemukan! Kolom tersedia: {list(res4.columns)}")
                     st.stop()
 
                 st.session_state.df_res_lookup = res4
@@ -950,27 +964,44 @@ def menu_Stock_Opname():
                         st.session_state.df_missing_lookup
                     )
                     
+                    # ✅ DETEKSI NAMA KOLOM DIFF OTOMATIS STEP 5
+                    possible_diff_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value', 'diff_val']
+                    diff_col_mult = None
+                    diff_col_sing = None
+                    
+                    for col in possible_diff_cols:
+                        if col in df_mult.columns:
+                            diff_col_mult = col
+                            break
+                    for col in possible_diff_cols:
+                        if col in df_sing.columns:
+                            diff_col_sing = col
+                            break
+                    
                     # ✅ FILTERING STEP 5: SESUAI VBA
                     # Multiple: QTY SO > QTY SYSTEM DAN diff > 0
-                    if 'qty_so' in df_mult.columns and 'qty_system' in df_mult.columns and 'diff' in df_mult.columns:
-                        df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce')
-                        df_mult = df_mult[
-                            (df_mult['qty_so'] > df_mult['qty_system']) & 
-                            (df_mult['diff'] > 0) & 
-                            (df_mult['diff'].notna())
-                        ].reset_index(drop=True)
-                    
-                    # Single: diff > 0 DAN warna = yellow
-                    if 'diff' in df_sing.columns:
-                        df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce')
-                        if 'warna' in df_sing.columns:
-                            df_sing = df_sing[
-                                (df_sing['diff'] > 0) & 
-                                (df_sing['warna'] == 'yellow') & 
-                                (df_sing['diff'].notna())
+                    if diff_col_mult:
+                        df_mult[diff_col_mult] = pd.to_numeric(df_mult[diff_col_mult], errors='coerce')
+                        if 'qty_so' in df_mult.columns and 'qty_system' in df_mult.columns:
+                            df_mult = df_mult[
+                                (df_mult['qty_so'] > df_mult['qty_system']) & 
+                                (df_mult[diff_col_mult] > 0) & 
+                                (df_mult[diff_col_mult].notna())
                             ].reset_index(drop=True)
                         else:
-                            df_sing = df_sing[(df_sing['diff'] > 0) & (df_sing['diff'].notna())].reset_index(drop=True)
+                            df_mult = df_mult[(df_mult[diff_col_mult] > 0) & (df_mult[diff_col_mult].notna())].reset_index(drop=True)
+                    
+                    # Single: diff > 0 DAN warna = yellow
+                    if diff_col_sing:
+                        df_sing[diff_col_sing] = pd.to_numeric(df_sing[diff_col_sing], errors='coerce')
+                        if 'warna' in df_sing.columns:
+                            df_sing = df_sing[
+                                (df_sing[diff_col_sing] > 0) & 
+                                (df_sing['warna'] == 'yellow') & 
+                                (df_sing[diff_col_sing].notna())
+                            ].reset_index(drop=True)
+                        else:
+                            df_sing = df_sing[(df_sing[diff_col_sing] > 0) & (df_sing[diff_col_sing].notna())].reset_index(drop=True)
 
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
