@@ -907,18 +907,17 @@ if up_r4 and up_s4:
             # Jalankan Logika
             res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
             
-            # ✅ LOGIC PERMINTAAN TERAKHIR: Hanya hitung DIFF jika QTY SO tidak blank
+            # ✅ LOGIC SESUAI PERMINTAAN: DIFF hanya diisi jika QTY SO ada nilainya
             if 'qty_so' in res4.columns and 'qty_system' in res4.columns:
                 res4['qty_so'] = pd.to_numeric(res4['qty_so'], errors='coerce')
                 res4['qty_system'] = pd.to_numeric(res4['qty_system'], errors='coerce')
                 
-                # DIFF hanya diisi jika qty_so ada nilainya (tidak NaN/Blank)
+                # DIFF menyesuaikan: jika qty SO blank, diff blank.
                 res4['diff'] = res4.apply(
                     lambda x: abs(x['qty_system'] - x['qty_so']) if pd.notnull(x['qty_so']) else np.nan, 
                     axis=1
                 )
-                
-                # Filtering sesuai permintaan: hanya yang ada SKU dan BIN yang sesuai (bukan blank)
+                # Hanya ambil yang SKU/BIN sesuai (qty_so tidak blank)
                 res4 = res4[res4['qty_so'].notna()].reset_index(drop=True)
             else:
                 st.error("❌ Kolom 'qty_so' atau 'qty_system' tidak ditemukan!")
@@ -957,11 +956,10 @@ if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
                     st.session_state.df_missing_lookup
                 )
                 
-                # ✅ FILTERING STEP 5: SESUAI VBA (Hanya Selisih > 0)
+                # ✅ FILTERING STEP 5: SESUAI VBA (Hanya Selisih > 0 dan QTY SO > System)
                 if 'qty_so' in df_mult.columns and 'qty_system' in df_mult.columns:
                     df_mult['qty_so'] = pd.to_numeric(df_mult['qty_so'], errors='coerce')
                     df_mult['qty_system'] = pd.to_numeric(df_mult['qty_system'], errors='coerce')
-                    # Recalculate diff di pivot untuk memastikan
                     df_mult['diff'] = df_mult['qty_so'] - df_mult['qty_system']
                     
                     df_mult = df_mult[
@@ -969,7 +967,6 @@ if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
                         (df_mult['diff'] > 0)
                     ].reset_index(drop=True)
                 
-                # Single Adjustment Logic
                 if 'diff' in df_sing.columns:
                     df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce')
                     df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
@@ -986,14 +983,13 @@ if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
         t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
         with t_mult: 
             st.dataframe(st.session_state.df_mult_5, use_container_width=True)
-            # ✅ TAMBAHAN DOWNLOAD DI TAB MULTIPLE
-            csv_mult = st.session_state.df_mult_5.to_csv(index=False).encode('utf-8')
+            # ✅ DOWNLOAD BUTTON DI DALAM TAB
             st.download_button(
                 label="📥 Download Multiple Adjustment CSV",
-                data=csv_mult,
+                data=st.session_state.df_mult_5.to_csv(index=False).encode('utf-8'),
                 file_name="multiple_adjustment_plus.csv",
                 mime="text/csv",
-                key="dl_mult"
+                key="dl_mult_final"
             )
         with t_sing: 
             st.dataframe(st.session_state.df_sing_5, use_container_width=True)
