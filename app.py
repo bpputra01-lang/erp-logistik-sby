@@ -924,8 +924,19 @@ def menu_Stock_Opname():
                 else:
                     df_s4 = pd.read_excel(up_s4)
                 
+                # ✅ PERBAIKAN: RESET INDEX untuk hilangkan nomor baris Streamlit
+                df_r4 = df_r4.reset_index(drop=True)
+                df_s4 = df_s4.reset_index(drop=True)
+                
+                # ✅ PERBAIKAN: Tampilkan info kolom untuk validasi
+                st.info(f"📊 REAL + RECON: {len(df_r4)} baris, {len(df_r4.columns)} kolom")
+                st.info(f"📊 CEK STOCK ADJ +: {len(df_s4)} baris, {len(df_s4.columns)} kolom")
+                st.info(f"📋 Kolom REAL + RECON: {list(df_r4.columns)}")
+                st.info(f"📋 Kolom CEK STOCK ADJ +: {list(df_s4.columns)}")
+                
                 # --- LOGIC SESUAI VBA CEK_ADJUSMENT_FINAL ---
                 # 1. Buat dictionary dari Stock (Column B & C = key, Column C = index)
+                # VBA: Column B = index 1, Column C = index 2
                 dict_stock = {}
                 last_row_stock = len(df_s4)
                 for i in range(1, last_row_stock):  # Skip header (0-based)
@@ -939,6 +950,7 @@ def menu_Stock_Opname():
                 df_r4['COLOR'] = 'white'
                 
                 for i in range(1, last_row_recon):
+                    # VBA: Column A = index 0, Column B = index 1
                     key = str(df_r4.iloc[i, 0]).upper().strip() + "|" + str(df_r4.iloc[i, 1]).upper().strip()
                     if key in dict_stock:
                         df_r4.at[i, 'MATCHED'] = True
@@ -990,6 +1002,9 @@ def menu_Stock_Opname():
                         df_m5 = pd.read_csv(up_m5)
                     else:
                         df_m5 = pd.read_excel(up_m5)
+                    
+                    # ✅ PERBAIKAN: RESET INDEX untuk MASTER juga
+                    df_m5 = df_m5.reset_index(drop=True)
                     
                     # --- LOGIC SESUAI VBA Generate_Adjustment_Plus_Final_Fix_Pivot ---
                     # 1. Buat dictionary MASTER (Column C = SKU)
