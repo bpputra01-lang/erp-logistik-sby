@@ -877,7 +877,7 @@ def menu_Stock_Opname():
         # TARUH DI BAWAH SETELAH ANALYZER / STEP SEBELUMNYA
         # ==========================================================
         st.markdown("<br><br><br>---", unsafe_allow_html=True)
-        st.subheader("4️⃣ FINAL ADJUSTMENT PROCESSOR (3-FILES)")
+        st.subheader("4️⃣ FINAL ADJUSTMENT + PROCESS")
 
         # Layout 3 kolom sesuai permintaan
         col_a, col_b, col_c = st.columns(3)
@@ -930,7 +930,7 @@ def menu_Stock_Opname():
         # --- AREA TAMPILAN (DI BAWAH UPLOADER) ---
         if hasattr(st.session_state, 'process_done') and st.session_state.process_done:
             st.success("✅ Data Berhasil Diproses!")
-            t1, t2 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "HASIL CEK ADJ +"])
             
             with t1:
                 st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
@@ -944,6 +944,9 @@ def menu_Stock_Opname():
             
             with t2:
                 st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
+            with t3:
+                # ✅ Menampilkan data hasil lookup awal (Step 4) biar lu gampang cross-check
+                st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
