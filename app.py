@@ -877,7 +877,7 @@ def menu_Stock_Opname():
         # TARUH DI BAWAH SETELAH ANALYZER / STEP SEBELUMNYA
         # ==========================================================
         st.markdown("<br><br><br>---", unsafe_allow_html=True)
-        st.subheader("🚀 FINAL ADJUSTMENT PROCESSOR (3-FILES)")
+        st.subheader("4️⃣ FINAL ADJUSTMENT PROCESSOR (3-FILES)")
 
         # Layout 3 kolom sesuai permintaan
         col_a, col_b, col_c = st.columns(3)
@@ -929,7 +929,7 @@ def menu_Stock_Opname():
 
         # --- AREA TAMPILAN (DI BAWAH UPLOADER) ---
         if hasattr(st.session_state, 'process_done') and st.session_state.process_done:
-            st.success("✅ Data Berhasil Diproses & SKU 0-0 Telah Dibuang!")
+            st.success("✅ Data Berhasil Diproses!")
             t1, t2 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
             
             with t1:
@@ -948,7 +948,7 @@ def menu_Stock_Opname():
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("6️⃣ SET UP KARANTINA GENERATOR")
+    st.subheader("5️⃣ SET UP KARANTINA GENERATOR")
 
     up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
 
