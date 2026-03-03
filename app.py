@@ -999,54 +999,63 @@ def menu_Stock_Opname():
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
 # =========================================================
-    # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (ULTRA FAST)
+    # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (SUPER LENGKAP)
     # =========================================================
     @st.fragment
     def download_section():
         if "process_done" in st.session_state and st.session_state.process_done:
             st.markdown("<br>", unsafe_allow_html=True)
-            st.info("💡 **Master Report Ready:** File di bawah mencakup data Step 1 sampai Step 5.")
+            st.info("💡 **Master Report Ready:** File ini mencakup SEMUA data dari Step 1 sampai Step 5.")
             
-            # Tombol pemicu buat generate file (biar ga loading otomatis di awal)
-            if st.button("🏗️ PREPARE DOWNLOAD FILE", use_container_width=True):
-                with st.spinner("Proccessing data..."):
+            if st.button("🏗️ PREPARE FULL REPORT (ALL TABS)", use_container_width=True):
+                with st.spinner("Processing Data..."):
                     output_master = io.BytesIO()
                     with pd.ExcelWriter(output_master, engine='xlsxwriter') as writer:
-                        # Step 1-4
+                        
+                        # --- STEP 1: DATA SCAN & STOCK ---
                         if st.session_state.compare_result:
-                            st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='1_DATA SCAN', index=False)
+                            d = st.session_state.compare_result
+                            d['res_scan'].to_excel(writer, sheet_name='1_DATA SCAN', index=False)
+                            d['res_stock'].to_excel(writer, sheet_name='2_STOCK SYSTEM', index=False)
+                            d['real_plus'].to_excel(writer, sheet_name='3_REAL PLUS', index=False)
+                            d['system_plus'].to_excel(writer, sheet_name='4_SYSTEM PLUS', index=False)
+                        
+                        # --- STEP 2: ALOKASI ---
                         if st.session_state.set_up_real_plus is not None:
-                            st.session_state.set_up_real_plus.to_excel(writer, sheet_name='2_SET UP REAL PLUS', index=False)
+                            st.session_state.set_up_real_plus.to_excel(writer, sheet_name='5_SET UP REAL PLUS', index=False)
+                        
+                        # --- STEP 3: RECON ---
                         if st.session_state.recon_real_plus is not None:
-                            st.session_state.recon_real_plus.to_excel(writer, sheet_name='3_REAL PLUS RECON', index=False)
+                            st.session_state.recon_real_plus.to_excel(writer, sheet_name='6_REAL PLUS RECON', index=False)
                         if st.session_state.outstanding_system is not None:
-                            st.session_state.outstanding_system.to_excel(writer, sheet_name='4_SYSTEM OUTSTANDING', index=False)
+                            st.session_state.outstanding_system.to_excel(writer, sheet_name='7_SYSTEM OUTSTANDING', index=False)
                         
-                        # Step 5-7
+                        # --- STEP 4 & 5: ADJUSTMENT ---
                         if "df_mult_final" in st.session_state:
-                            st.session_state.df_mult_final.to_excel(writer, sheet_name='5_MULTIPLE ADJ', index=False)
+                            st.session_state.df_mult_final.to_excel(writer, sheet_name='8_MULTIPLE ADJ PLUS', index=False)
                         if "df_sing_final" in st.session_state:
-                            st.session_state.df_sing_final.to_excel(writer, sheet_name='6_SINGLE ADJ', index=False)
+                            st.session_state.df_sing_final.to_excel(writer, sheet_name='9_SINGLE ADJ PLUS', index=False)
                         if "df_res4_final" in st.session_state:
-                            st.session_state.df_res4_final.to_excel(writer, sheet_name='7_HASIL CEK LOOKUP', index=False)
+                            st.session_state.df_res4_final.to_excel(writer, sheet_name='10_HASIL CEK ADJ', index=False)
                         
-                        # Step 8
+                        # --- STEP 6: KARANTINA ---
                         if st.session_state.df_karantina_6 is not None:
-                            st.session_state.df_karantina_6.to_excel(writer, sheet_name='8_SET UP KARANTINA', index=False)
+                            st.session_state.df_karantina_6.to_excel(writer, sheet_name='11_KARANTINA', index=False)
                     
                     st.session_state.master_excel_ready = output_master.getvalue()
-                    st.success("✅ File siap didownload!")
+                    st.success("✅ All Data Set!.")
 
-            # Tombol download beneran muncul setelah tombol prepare diklik
             if 'master_excel_ready' in st.session_state:
                 st.download_button(
-                    label="📥 DOWNLOAD MASTER REPORT (.XLSX)",
+                    label="📥 DOWNLOAD FULL MASTER REPORT (.XLSX)",
                     data=st.session_state.master_excel_ready,
-                    file_name="FINAL_CONSOLIDATED_REPORT.xlsx",
+                    file_name="FULL_SO_ANALYZER_REPORT.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
-                    key="btn_final_master_ultra"
+                    key="btn_final_master_ultra_fix"
                 )
+
+    download_section()
 
     # Panggil fungsinya
     download_section()
