@@ -881,95 +881,161 @@ def menu_Stock_Opname():
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
 
+
 # --- STEP 4 ---
-    st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
-    adj_col1, adj_col2 = st.columns(2)
-    with adj_col1: up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="u4_recon")
-    with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u4_stock")
+st.markdown("<br><br><br>---", unsafe_allow_html=True)
+st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
+adj_col1, adj_col2 = st.columns(2)
+with adj_col1: 
+    up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="u4_recon")
+with adj_col2: 
+    up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u4_stock")
 
-    if up_r4 and up_s4:
-        if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+if up_r4 and up_s4:
+    if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+        try:
+            # Baca file sesuai tipe
+            if up_r4.name.endswith(('.csv',)):
+                df_r4 = pd.read_csv(up_r4)
+            else:
+                df_r4 = pd.read_excel(up_r4)
+                
+            if up_s4.name.endswith(('.csv',)):
+                df_s4 = pd.read_csv(up_s4)
+            else:
+                df_s4 = pd.read_excel(up_s4)
+            
+            # ✅ PERBAIKAN: HAPUS INDEX STREAMLIT HANYA DI REAL + RECON
+            df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
+            
+            # Jalankan Logika
+            res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+            
+            # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK
+            diff_col_4 = get_diff_col(res4)
+            if diff_col_4:
+                res4[diff_col_4] = pd.to_numeric(res4[diff_col_4], errors='coerce')
+                miss4[diff_col_4] = pd.to_numeric(miss4[diff_col_4], errors='coerce')
+                
+                res4 = res4[res4[diff_col_4] > 0].reset_index(drop=True)
+                miss4 = miss4[miss4[diff_col_4] > 0].reset_index(drop=True)
+                
+                st.success(f"✅ Step 4: {len(res4)} item difilter (diff > 0)")
+            else:
+                st.error("❌ Kolom 'diff' tidak ditemukan di hasil logika!")
+                st.stop()
+
+            st.session_state.df_res_lookup = res4
+            st.session_state.df_missing_lookup = miss4
+            st.session_state.step4_done = True
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
+            st.stop()
+
+if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
+    t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
+    
+    # --- TAB 1: FINAL ADJUSTMENT (dengan download) ---
+    with t_f:
+        st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
+        
+        # ✅ DOWNLOAD BUTTON UNTUK FINAL ADJUSTMENT
+        csv_data = st.session_state.df_res_lookup.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Final Adjustment (CSV)",
+            data=csv_data,
+            file_name="final_adjustment.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    # --- TAB 2: NEED SINGLE ADJ (dengan download) ---
+    with t_m:
+        st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
+        
+        # ✅ DOWNLOAD BUTTON UNTUK NEED SINGLE ADJ
+        csv_data = st.session_state.df_missing_lookup.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Need Single Adj (CSV)",
+            data=csv_data,
+            file_name="need_single_adj.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+    # --- STEP 5 ---
+    st.markdown("<br><br>---", unsafe_allow_html=True)
+    st.subheader("5️⃣ FINAL ADJUSMENT +")
+    up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5_master")
+
+    if up_m5:
+        if st.button("▶️ GENERATE ADJ +", use_container_width=True):
             try:
-                # Baca file sesuai tipe
-                if up_r4.name.endswith(('.csv',)):
-                    df_r4 = pd.read_csv(up_r4)
+                if up_m5.name.endswith(('.csv',)):
+                    df_m5 = pd.read_csv(up_m5)
                 else:
-                    df_r4 = pd.read_excel(up_r4)
+                    df_m5 = pd.read_excel(up_m5)
+                
+                # Jalankan Logika Pivot
+                df_mult, df_sing = logic_pivot_adjustment(
+                    st.session_state.df_res_lookup, 
+                    df_m5, 
+                    st.session_state.df_missing_lookup
+                )
+                
+                # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK DI STEP 5
+                diff_col_5 = get_diff_col(df_mult)
+                if diff_col_5:
+                    df_mult[diff_col_5] = pd.to_numeric(df_mult[diff_col_5], errors='coerce')
+                    df_sing[diff_col_5] = pd.to_numeric(df_sing[diff_col_5], errors='coerce')
                     
-                if up_s4.name.endswith(('.csv',)):
-                    df_s4 = pd.read_csv(up_s4)
+                    df_mult = df_mult[df_mult[diff_col_5] > 0].reset_index(drop=True)
+                    df_sing = df_sing[df_sing[diff_col_5] > 0].reset_index(drop=True)
+                    
+                    st.success(f"✅ Step 5: {len(df_mult)} item difilter (diff > 0)")
                 else:
-                    df_s4 = pd.read_excel(up_s4)
-                
-                # ✅ PERBAIKAN: HAPUS INDEX STREAMLIT HANYA DI REAL + RECON
-                df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
-                
-                # Jalankan Logika
-                res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
-                
-                # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK
-                diff_col_4 = get_diff_col(res4)
-                if diff_col_4:
-                    # Filter: Harus > 0 DAN tidak kosong (notna)
-                    res4 = res4[(res4[diff_col_4] > 0) & (res4[diff_col_4].notna())].reset_index(drop=True)
-                    miss4 = miss4[(miss4[diff_col_4] > 0) & (miss4[diff_col_4].notna())].reset_index(drop=True)
-                else:
-                    st.warning("⚠️ Kolom 'diff' tidak ditemukan di hasil logika. Cek nama kolom di dataframe.")
+                    st.error("❌ Kolom 'diff' tidak ditemukan di hasil pivot!")
+                    st.stop()
 
-                st.session_state.df_res_lookup = res4
-                st.session_state.df_missing_lookup = miss4
-                st.session_state.step4_done = True
+                st.session_state.df_mult_5 = df_mult
+                st.session_state.df_sing_5 = df_sing
+                st.session_state.step5_done = True
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
                 st.stop()
 
-    if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
-        t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
-        with t_f: st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
-        with t_m: st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
-
-        # --- STEP 5 ---
-        st.markdown("<br><br>---", unsafe_allow_html=True)
-        st.subheader("5️⃣ FINAL ADJUSMENT +")
-        up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5_master")
-
-        if up_m5:
-            if st.button("▶️ GENERATE ADJ +", use_container_width=True):
-                try:
-                    if up_m5.name.endswith(('.csv',)):
-                        df_m5 = pd.read_csv(up_m5)
-                    else:
-                        df_m5 = pd.read_excel(up_m5)
-                    
-                    # Jalankan Logika Pivot
-                    df_mult, df_sing = logic_pivot_adjustment(
-                        st.session_state.df_res_lookup, 
-                        df_m5, 
-                        st.session_state.df_missing_lookup
-                    )
-                    
-                    # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK DI STEP 5
-                    diff_col_5 = get_diff_col(df_mult)
-                    if diff_col_5:
-                        df_mult = df_mult[(df_mult[diff_col_5] > 0) & (df_mult[diff_col_5].notna())].reset_index(drop=True)
-                        df_sing = df_sing[(df_sing[diff_col_5] > 0) & (df_sing[diff_col_5].notna())].reset_index(drop=True)
-                    else:
-                        st.warning("⚠️ Kolom 'diff' tidak ditemukan di hasil pivot. Cek nama kolom di dataframe.")
-
-                    st.session_state.df_mult_5 = df_mult
-                    st.session_state.df_sing_5 = df_sing
-                    st.session_state.step5_done = True
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
-                    st.stop()
-
-        if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
-            t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
-            with t_mult: st.dataframe(st.session_state.df_mult_5, use_container_width=True)
-            with t_sing: st.dataframe(st.session_state.df_sing_5, use_container_width=True)
+    if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
+        t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+        
+        # --- TAB 1: MULTIPLE ADJ + (dengan download) ---
+        with t_mult:
+            st.dataframe(st.session_state.df_mult_5, use_container_width=True)
+            
+            # ✅ DOWNLOAD BUTTON UNTUK MULTIPLE ADJ +
+            csv_data = st.session_state.df_mult_5.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Multiple Adj + (CSV)",
+                data=csv_data,
+                file_name="multiple_adj_plus.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        # --- TAB 2: SINGLE ADJ + (dengan download) ---
+        with t_sing:
+            st.dataframe(st.session_state.df_sing_5, use_container_width=True)
+            
+            # ✅ DOWNLOAD BUTTON UNTUK SINGLE ADJ +
+            csv_data = st.session_state.df_sing_5.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Single Adj + (CSV)",
+                data=csv_data,
+                file_name="single_adj_plus.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
 
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
