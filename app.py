@@ -1056,9 +1056,6 @@ def menu_Stock_Opname():
                 )
 
     download_section()
-
-    # Panggil fungsinya
-    download_section()
             
 import pandas as pd
 import numpy as np
