@@ -1134,29 +1134,77 @@ def menu_Stock_Opname():
             st.success("✅ Laporan Summary Adjustment Berhasil Dibuat!")
             st.rerun()
 
-    # --- TAMPILAN OVERVIEW (SUMMARY) ---
+    # --- TAMPILAN DASHBOARD SUMMARY (SUM ADJUSTMENT) ---
     if "report_adj" in st.session_state:
-        st.markdown("### 📈 Adjustment Overview")
-        df_s = st.session_state.report_adj["sum"]
+        st.markdown("### 💰 OVERVIEW ADJUSTMENT")
+        df_s = st.session_state.report_adj.get("sum", pd.DataFrame())
         
-        # Helper untuk ambil nilai dari tabel summary
-        def get_v(m): return df_s.loc[df_s['METRIC'] == m, 'VALUE'].values[0]
+        # Helper untuk ambil value
+        def get_v(m): 
+            try: return df_s.loc[df_s['METRIC'] == m, 'VALUE'].values[0]
+            except: return 0
 
-        # Row 1: Values
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total Value (+)", f"Rp {get_v('Total Value Adj. +'):,.0f}")
-        c2.metric("Total Value (-)", f"Rp {get_v('Total Value Adj. -'):,.0f}")
-        c3.metric("NET VALUE", f"Rp {get_v('Total Value'):,.0f}")
+        # --- BARIS 1: FINANCIAL METRICS (VALUE) ---
+        v1, v2, v3 = st.columns(3)
+        with v1:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #00FF00;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">📈 TOTAL VALUE ADJ (+)</p>
+                    <h3 style="color: #00FF00; margin: 0;">Rp {get_v('Total Value Adj. +'):,.0f}</h3>
+                </div>
+            """, unsafe_allow_html=True)
+        with v2:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">📉 TOTAL VALUE ADJ (-)</p>
+                    <h3 style="color: #FF4B4B; margin: 0;">Rp {get_v('Total Value Adj. -'):,.0f}</h3>
+                </div>
+            """, unsafe_allow_html=True)
+        with v3:
+            net_val = get_v('Total Value')
+            net_color = "#00FF00" if net_val >= 0 else "#FF4B4B"
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {net_color};">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">⚖️ NET VALUE ADJ</p>
+                    <h3 style="color: {net_color}; margin: 0;">Rp {net_val:,.0f}</h3>
+                </div>
+            """, unsafe_allow_html=True)
 
-        # Row 2: Quantities & SKU
-        c4, c5, c6 = st.columns(3)
-        c4.metric("Total SKU", f"{get_v('Total SKU Adj.'):,.0f}")
-        c5.metric("Total QTY (+)", f"{get_v('Total QTY Adj. +'):,.0f}")
-        c6.metric("Total QTY (-)", f"{get_v('Total QTY Adj. -'):,.0f}")
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        # Row 3: Detail Data
-        with st.expander("👁️ VIEW FULL ADJUSTMENT DETAILS (12 COLUMNS)"):
-            st.dataframe(st.session_state.report_adj["data"], use_container_width=True, hide_index=True)
+        # --- BARIS 2: INVENTORY METRICS (QTY & SKU) ---
+        q1, q2, q3 = st.columns(3)
+        with q1:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">📦 TOTAL SKU ADJ</p>
+                    <h3 style="color: #FFD700; margin: 0;">{get_v('Total SKU Adj.'):,.0f} <span style="font-size: 14px;">ITEM</span></h3>
+                </div>
+            """, unsafe_allow_html=True)
+        with q2:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">➕ TOTAL QTY ADJ (+)</p>
+                    <h3 style="color: #FFD700; margin: 0;">{get_v('Total QTY Adj. +'):,.0f} <span style="font-size: 14px;">ITEM</span></h3>
+                </div>
+            """, unsafe_allow_html=True)
+        with q3:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">➖ TOTAL QTY ADJ (-)</p>
+                    <h3 style="color: #FFD700; margin: 0;">{get_v('Total QTY Adj. -'):,.0f} <span style="font-size: 14px;">ITEM</span></h3>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Tabel Preview Detail (12 Kolom sesuai Macro VBA)
+        with st.expander("👁️ VIEW FULL ADJUSTMENT DETAILS (12 COLUMNS)", expanded=False):
+            st.dataframe(
+                st.session_state.report_adj["data"], 
+                use_container_width=True, 
+                hide_index=True
+            )
 # =========================================================
     # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (SUPER LENGKAP)
     # =========================================================
