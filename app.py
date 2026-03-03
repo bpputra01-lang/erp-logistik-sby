@@ -893,10 +893,13 @@ def menu_Stock_Opname():
                 else:
                     df_s4 = pd.read_excel(up_s4)
                 
-                # ✅ PERBAIKAN: HAPUS INDEX STREAMLIT (Kolom pertama = nomor baris)
-                # ✅ TIDAK RESET NAMA KOLOM - HANYA HAPUS KOLOM PERTAMA
+                # ✅ PERBAIKAN: HAPUS KOLOM PERTAMA + RESET NAMA KOLOM (WAJIB!)
                 df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
                 df_s4 = df_s4.iloc[:, 1:].reset_index(drop=True)
+                
+                # ✅ WAJIB: Reset nama kolom jadi unik (0, 1, 2, 3...)
+                df_r4.columns = range(len(df_r4.columns))
+                df_s4.columns = range(len(df_s4.columns))
                 
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                 st.session_state.df_res_lookup = res4
@@ -925,8 +928,11 @@ def menu_Stock_Opname():
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    # ✅ PERBAIKAN: HAPUS INDEX STREAMLIT untuk MASTER juga
+                    # ✅ PERBAIKAN: HAPUS KOLOM PERTAMA + RESET NAMA KOLOM (WAJIB!)
                     df_m5 = df_m5.iloc[:, 1:].reset_index(drop=True)
+                    
+                    # ✅ WAJIB: Reset nama kolom jadi unik (0, 1, 2, 3...)
+                    df_m5.columns = range(len(df_m5.columns))
                     
                     df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5, st.session_state.df_missing_lookup)
                     st.session_state.df_mult_5 = df_mult
