@@ -1090,114 +1090,87 @@ def menu_Stock_Opname():
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
 # =========================================================
-    # ⚙️ 6. FINAL REPORT GENERATOR (INTEGRATED ADJUSTMENT)
+    # ⚙️ 6. FINAL REPORT GENERATOR (FULLY INTEGRATED)
     # =========================================================
     st.markdown("---")
     st.subheader("6️⃣ FINAL REPORTS GENERATOR")
 
     # --- BAGIAN A: MISS LOCATION REPORT ---
     st.markdown("#### 📊 MISS LOCATION REPORT")
-    if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_gen_miss_final"):
+    if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_gen_miss_v3"):
         data_src = st.session_state.get('set_up_real_plus')
-        # Logic: Nampilin 0 kalau data 'empty'
+        # Logic tetap jalan meski data_src 'empty'
         df_res, count_sku, count_qty = logic_miss_location_report(data_src)
-        
-        st.session_state.report_miss = {
-            "data": df_res,
-            "sku": count_sku,
-            "qty": count_qty
-        }
+        st.session_state.report_miss = {"data": df_res, "sku": count_sku, "qty": count_qty}
         st.rerun()
 
-    # Metrics Box Miss Loc
+    # --- OVERVIEW MISS LOCATION ---
     if "report_miss" in st.session_state:
         m1, m2 = st.columns(2)
         with m1:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 14px;">📦 TOTAL SKU MISS LOC.</p><h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss["sku"]} <span style="font-size: 18px;">ITEM</span></h2></div>', unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">📦 TOTAL SKU MISS LOC.</p>
+                    <h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss['sku']} <span style="font-size: 18px;">ITEM</span></h2>
+                </div>
+            """, unsafe_allow_html=True)
         with m2:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p><h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss["qty"]} <span style="font-size: 18px;">ITEM</span></h2></div>', unsafe_allow_html=True)
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p>
+                    <h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss['qty']} <span style="font-size: 18px;">ITEM</span></h2>
+                </div>
+            """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-# --- BAGIAN B: SUMMARY ADJUSTMENT ---
+        # Tab & Download Miss Loc
+        t_ml_1, t_ml_2 = st.tabs(["📄 Detail List", "📊 Summary"])
+        with t_ml_1:
+            st.dataframe(st.session_state.report_miss["data"], use_container_width=True, hide_index=True)
+            st.download_button("📥 DOWNLOAD MISS LOC (CSV)", st.session_state.report_miss["data"].to_csv(index=False), "Miss_Location.csv", "text/csv")
+        with t_ml_2:
+            st.write(f"Total SKU Terdeteksi: **{st.session_state.report_miss['sku']}**")
+            st.write(f"Total Quantity Terdeteksi: **{st.session_state.report_miss['qty']}**")
+
+    st.markdown("<br><hr>", unsafe_allow_html=True)
+
+    # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
     st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
-    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_vba_final")
+    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v3")
     
-    if st.button("🛠️ GENERATE SUMMARY ADJUSTMENT", key="btn_gen_adj_final"):
+    if st.button("🛠️ GENERATE SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
         df_p = st.session_state.get('df_mult_final')
         if df_p is not None and up_minus:
             df_m = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
-            
-            # Jalankan logic replikasi VBA
             df_res, df_summary = logic_sum_adjustment_final(df_p, df_m)
-            
             st.session_state.report_adj = {"data": df_res, "sum": df_summary}
-            st.success("✅ Laporan Summary Adjustment Berhasil Dibuat!")
+            st.success("✅ Adjustment Berhasil Dibuat!")
             st.rerun()
 
+    # --- OVERVIEW ADJUSTMENT (SEIRAMA HIJAU/MERAH) ---
     if "report_adj" in st.session_state:
-        st.markdown("### 💰 OVERVIEW ADJUSTMENT")
-        df_s = st.session_state.report_adj.get("sum", pd.DataFrame())
-        
-        def get_v(m): 
-            try: return df_s.loc[df_s['METRIC'] == m, 'VALUE'].values[0]
-            except: return 0
+        df_s = st.session_state.report_adj["sum"]
+        def get_v(m): return df_s.loc[df_s['METRIC'] == m, 'VALUE'].values[0]
 
-        # --- BARIS 1: FINANCIAL (WARNA DINAMIS) ---
+        v_plus, v_minus, v_net = get_v('Total Value Adj. +'), get_v('Total Value Adj. -'), get_v('Total Value')
+        
         v1, v2, v3 = st.columns(3)
-        
-        # Helper Warna: Positif Hijau, Negatif Merah
-        def get_style(val):
-            color = "#00FF00" if val >= 0 else "#FF4B4B"
-            return f"border-left: 5px solid {color};", color
-
-        val_plus = get_v('Total Value Adj. +')
-        val_minus = get_v('Total Value Adj. -')
-        net_val = get_v('Total Value')
-
         with v1:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; {get_style(val_plus)[0]}"><p style="color: #808495; font-size: 14px;">📈 TOTAL VALUE ADJ (+)</p><h3 style="color: {get_style(val_plus)[1]}; margin: 0;">Rp {val_plus:,.0f}</h3></div>', unsafe_allow_html=True)
+            c = "#00FF00" if v_plus >= 0 else "#FF4B4B"
+            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 14px;">📈 VALUE ADJ (+)</p><h3 style="color: {c}; margin: 0;">Rp {v_plus:,.0f}</h3></div>', unsafe_allow_html=True)
         with v2:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; {get_style(val_minus)[0]}"><p style="color: #808495; font-size: 14px;">📉 TOTAL VALUE ADJ (-)</p><h3 style="color: {get_style(val_minus)[1]}; margin: 0;">Rp {val_minus:,.0f}</h3></div>', unsafe_allow_html=True)
+            c = "#FF4B4B" if v_minus < 0 else "#00FF00"
+            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 14px;">📉 VALUE ADJ (-)</p><h3 style="color: {c}; margin: 0;">Rp {v_minus:,.0f}</h3></div>', unsafe_allow_html=True)
         with v3:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; {get_style(net_val)[0]}"><p style="color: #808495; font-size: 14px;">⚖️ NET VALUE ADJ</p><h3 style="color: {get_style(net_val)[1]}; margin: 0;">Rp {net_val:,.0f}</h3></div>', unsafe_allow_html=True)
+            c = "#00FF00" if v_net >= 0 else "#FF4B4B"
+            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 14px;">⚖️ NET VALUE</p><h3 style="color: {c}; margin: 0;">Rp {v_net:,.0f}</h3></div>', unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # --- BARIS 2: QUANTITY & SKU (STYLE GOLD) ---
-        q1, q2, q3 = st.columns(3)
-        with q1:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 14px;">📦 TOTAL SKU ADJ</p><h3 style="color: #FFD700; margin: 0;">{get_v("Total SKU Adj."):,.0f} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
-        with q2:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 14px;">➕ TOTAL QTY ADJ (+)</p><h3 style="color: #FFD700; margin: 0;">{get_v("Total QTY Adj. +"):,.0f} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
-        with q3:
-            qty_min = get_v("Total QTY Adj. -")
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 14px;">➖ TOTAL QTY ADJ (-)</p><h3 style="color: #FFD700; margin: 0;">{qty_min:,.0f} <span style="font-size: 14px;">ITEM</span></h3></div>', unsafe_allow_html=True)
-
-    # --- TAB VIEW & DOWNLOAD ---
-        st.markdown("---")
-        tab_detail, tab_overview = st.tabs(["📄 Data Report", "📊 Summary Overview"])
-        
-        with tab_detail:
+        # Tab & Download Adjustment
+        tab_adj_1, tab_adj_2 = st.tabs(["📄 Data Report", "📊 Summary Metrics"])
+        with tab_adj_1:
             st.dataframe(st.session_state.report_adj["data"], use_container_width=True, hide_index=True)
-            
-        with tab_overview:
-            st.table(df_s) # Menampilkan tabel summary ala VBA lu
-
-        # --- TOMBOL DOWNLOAD EXCEL ---
-        import io
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            # Sheet 1: Detail
-            st.session_state.report_adj["data"].to_excel(writer, sheet_name='SUM_ADJUSTMENT', index=False)
-            # Sheet 2: Summary
-            df_s.to_excel(writer, sheet_name='OVERVIEW', index=False)
-            
-        st.download_button(
-            label="📥 DOWNLOAD MASTER ADJUSTMENT EXCEL",
-            data=output.getvalue(),
-            file_name="Master_Adjustment_Report.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+            st.download_button("📥 DOWNLOAD DETAIL (CSV)", st.session_state.report_adj["data"].to_csv(index=False), "Adjustment_Detail.csv", "text/csv")
+        with tab_adj_2:
+            st.table(df_s)
 # =========================================================
     # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (SUPER LENGKAP)
     # =========================================================
