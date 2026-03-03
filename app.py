@@ -880,8 +880,9 @@ def menu_Stock_Opname():
     with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u4_stock")
 
     if up_r4 and up_s4:
-        if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+       if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
             try:
+                # Baca file sesuai tipe
                 if up_r4.name.endswith(('.csv',)):
                     df_r4 = pd.read_csv(up_r4)
                 else:
@@ -892,24 +893,30 @@ def menu_Stock_Opname():
                 else:
                     df_s4 = pd.read_excel(up_s4)
                 
+                # ✅ HAPUS INDEX STREAMLIT
                 df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
-                # --- DI DALAM STEP 4 (Blok Try) ---
-            res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
-            
-            if 'qty_so' in res4.columns and 'qty_system' in res4.columns:
-                res4['qty_so'] = pd.to_numeric(res4['qty_so'], errors='coerce').fillna(0)
-                res4['qty_system'] = pd.to_numeric(res4['qty_system'], errors='coerce').fillna(0)
                 
-                # Hitung DIFF murni dari selisih
-                res4['diff'] = abs(res4['qty_system'] - res4['qty_so'])
+                # ✅ JALANKAN LOGIKA (PASTIKAN INDENTASI INI MASUK KE DALAM BLOK TRY)
+                res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
-                # ✅ FILTER MATI: Hanya ambil yang beneran ada selisih > 0
-                res4 = res4[res4['diff'] > 0].reset_index(drop=True)
+                if 'qty_so' in res4.columns and 'qty_system' in res4.columns:
+                    res4['qty_so'] = pd.to_numeric(res4['qty_so'], errors='coerce').fillna(0)
+                    res4['qty_system'] = pd.to_numeric(res4['qty_system'], errors='coerce').fillna(0)
+                    
+                    # Hitung DIFF murni
+                    res4['diff'] = abs(res4['qty_system'] - res4['qty_so'])
+                    
+                    # ✅ FILTER KETAT: Hanya ambil DIFF > 0 biar data nggak bocor di Step 5
+                    res4 = res4[res4['diff'] > 0].reset_index(drop=True)
+                
+                if 'diff' in miss4.columns:
+                    miss4['diff'] = pd.to_numeric(miss4['diff'], errors='coerce').fillna(0)
+                    miss4 = miss4[miss4['diff'] > 0].reset_index(drop=True)
 
-            st.session_state.df_res_lookup = res4 # Data ini yang bakal dipake Step 5
-            st.session_state.df_missing_lookup = miss4
-            st.session_state.step4_done = True
-            st.rerun()
+                st.session_state.df_res_lookup = res4
+                st.session_state.df_missing_lookup = miss4
+                st.session_state.step4_done = True
+                st.rerun()
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
                 st.stop()
