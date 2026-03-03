@@ -896,7 +896,16 @@ def menu_Stock_Opname():
                 # ✅ PERBAIKAN: HAPUS INDEX STREAMLIT HANYA DI REAL + RECON
                 df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
                 
+                # Jalankan Logika
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+                
+                # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 DI STEP 4
+                # Ganti 'diff' dengan nama kolom selisih Anda jika berbeda
+                if 'diff' in res4.columns:
+                    res4 = res4[res4['diff'] > 0].reset_index(drop=True)
+                if 'diff' in miss4.columns:
+                    miss4 = miss4[miss4['diff'] > 0].reset_index(drop=True)
+
                 st.session_state.df_res_lookup = res4
                 st.session_state.df_missing_lookup = miss4
                 st.session_state.step4_done = True
@@ -923,14 +932,20 @@ def menu_Stock_Opname():
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    # ✅ PERBAIKAN: Kirim data yang benar ke logic_pivot_adjustment
-                    # - df_res_lookup = data dari CEK STOCK ADJ + (untuk Multiple)
-                    # - df_missing_lookup = data dari REAL + RECON yang yellow (untuk Single)
+                    # Jalankan Logika Pivot
                     df_mult, df_sing = logic_pivot_adjustment(
                         st.session_state.df_res_lookup, 
                         df_m5, 
                         st.session_state.df_missing_lookup
                     )
+                    
+                    # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 DI STEP 5 (Safety Net)
+                    # Pastikan kolom 'diff' ada di hasil pivot juga
+                    if 'diff' in df_mult.columns:
+                        df_mult = df_mult[df_mult['diff'] > 0].reset_index(drop=True)
+                    if 'diff' in df_sing.columns:
+                        df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
+
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
                     st.session_state.step5_done = True
