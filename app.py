@@ -872,7 +872,7 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
-    # --- STEP 4 ---
+   # --- STEP 4 ---
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
     adj_col1, adj_col2 = st.columns(2)
@@ -894,6 +894,7 @@ def menu_Stock_Opname():
                     df_s4 = pd.read_excel(up_s4)
                 
                 # ✅ PERBAIKAN: HAPUS INDEX STREAMLIT (Kolom pertama = nomor baris)
+                # ✅ TIDAK RESET NAMA KOLOM - HANYA HAPUS KOLOM PERTAMA
                 df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
                 df_s4 = df_s4.iloc[:, 1:].reset_index(drop=True)
                 
