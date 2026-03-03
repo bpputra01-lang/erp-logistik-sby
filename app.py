@@ -756,37 +756,76 @@ def logic_miss_location_report(df_setup_real):
         return pd.DataFrame(columns=columns_ref), 0, 0
 
 def logic_sum_adjustment_final(df_plus, df_minus):
-    # Replikasi Macro Sum Adjustment
-    def process_adj(df, status):
-        if df is None or not isinstance(df, pd.DataFrame) or df.empty: 
-            return pd.DataFrame()
-        temp = df.copy()
-        # Perhitungan: (QTY SO - QTY SYSTEM) * HARGA JUAL (Indeks 7)
-        temp['VALUE ADJ'] = (temp.iloc[:, 10] - temp.iloc[:, 9]) * temp.iloc[:, 7]
-        temp['STATUS ADJ'] = status
+    # Template kolom sesuai Private Sub ApplyHeaderStyle di VBA lu
+    cols_header = [
+        "BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", 
+        "SUB KATEGORI", "HARGA BELI", "HARGA JUAL", 
+        "QTY SYSTEM", "QTY SO", "VALUE ADJ", "STATUS ADJ"
+    ]
+
+    def process_data(df, status):
+        if df is None or df.empty:
+            return pd.DataFrame(columns=cols_header)
+        
+        # VBA lu ambil kolom B-K (Indeks 1-10 di Python)
+        # Kita asumsikan df_plus dan df_minus punya struktur yang sama
+        temp = df.iloc[:, 1:11].copy() 
+        
+        # Penamaan kolom agar pas 11 kolom awal
+        temp.columns = cols_header[:10]
+        
+        # Convert ke numeric biar ga error math
+        price_col = "HARGA JUAL" # Kolom ke-8 di VBA
+        qty_so = "QTY SO"        # Kolom ke-10 di VBA
+        qty_sys = "QTY SYSTEM"   # Kolom ke-9 di VBA
+        
+        for col in [price_col, qty_so, qty_sys]:
+            temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
+
+        # Logic VBA: (QTY SO - QTY SYSTEM) * HARGA JUAL
+        temp["VALUE ADJ"] = (temp[qty_so] - temp[qty_sys]) * temp[price_col]
+        temp["STATUS ADJ"] = status
+        
         return temp
 
-    df_final_plus = process_adj(df_plus, "ADJ +")
-    df_final_minus = process_adj(df_minus, "ADJ -")
+    # Proses masing-masing
+    df_adj_plus = process_data(df_plus, "ADJ +")
+    df_adj_minus = process_data(df_minus, "ADJ -")
+
+    # Gabung (Union)
+    df_final = pd.concat([df_adj_plus, df_adj_minus], ignore_index=True)
+
+    # --- HITUNG SUMMARY (BAGIAN 3 DI VBA LU) ---
+    val_plus = df_adj_plus["VALUE ADJ"].sum()
+    val_minus = df_adj_minus["VALUE ADJ"].sum()
     
-    df_combined = pd.concat([df_final_plus, df_final_minus], ignore_index=True)
-    
-    summary = pd.DataFrame({
-        "METRIC": ["Total SKU Adj.", "Total Value Adj. +", "Total Value Adj. -", "Total QTY Adj. +", "Total QTY Adj. -", "Total Value", "Total QTY"],
+    # VBA: QTY Plus = Abs(QTY SO - QTY SYSTEM)
+    qty_plus = (df_adj_plus["QTY SO"] - df_adj_plus["QTY SYSTEM"]).abs().sum()
+    # VBA: QTY Minus = - Abs(QTY SO - QTY SYSTEM)
+    qty_minus = -(df_adj_minus["QTY SO"] - df_adj_minus["QTY SYSTEM"]).abs().sum()
+
+    df_sum = pd.DataFrame({
+        "METRIC": [
+            "Total SKU Adj.", 
+            "Total Value Adj. +", 
+            "Total Value Adj. -", 
+            "Total QTY Adj. +", 
+            "Total QTY Adj. -", 
+            "Total Value", 
+            "Total QTY"
+        ],
         "VALUE": [
-            len(df_combined),
-            df_final_plus['VALUE ADJ'].sum() if not df_final_plus.empty else 0,
-            df_final_minus['VALUE ADJ'].sum() if not df_final_minus.empty else 0,
-            (df_final_plus.iloc[:, 10] - df_final_plus.iloc[:, 9]).sum() if not df_final_plus.empty else 0,
-            (df_final_minus.iloc[:, 10] - df_final_minus.iloc[:, 9]).sum() if not df_final_minus.empty else 0,
-            0, 0
+            len(df_final[df_final["SKU"].astype(str).str.strip() != ""]), # Total SKU
+            val_plus,
+            val_minus,
+            qty_plus,
+            qty_minus,
+            val_plus + val_minus, # Total Value
+            qty_plus + qty_minus  # Total QTY
         ]
     })
-    summary.at[5, "VALUE"] = summary.at[1, "VALUE"] + summary.at[2, "VALUE"]
-    summary.at[6, "VALUE"] = summary.at[3, "VALUE"] + summary.at[4, "VALUE"]
-    
-    return df_combined, summary
 
+    return df_final, df_sum
 # =========================================================
 # 2. MENU UTAMA & STATE MANAGEMENT
 # =========================================================
@@ -1079,47 +1118,45 @@ def menu_Stock_Opname():
             st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p><h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss["qty"]} <span style="font-size: 18px;">ITEM</span></h2></div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- BAGIAN B: SUMMARY ADJUSTMENT (UPLOAD ADJ - DISINI) ---
+# --- BAGIAN B: SUMMARY ADJUSTMENT ---
     st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
-    st.write("Silakan upload file **STOCK ADJ -** untuk digabung dengan data **ADJ +** dari Step 5.")
-    
-    # Uploader tunggal buat ADJ -
-    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_step")
+    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_vba_final")
     
     if st.button("🛠️ GENERATE SUMMARY ADJUSTMENT", key="btn_gen_adj_final"):
-        df_plus = st.session_state.get('df_mult_final') # Ngambil data ADJ + yang sudah diproses
-        
-        if df_plus is not None and up_minus:
-            try:
-                df_minus = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
-                # Jalankan logic penggabungan
-                df_adj_all, df_adj_sum = logic_sum_adjustment_final(df_plus, df_minus)
-                
-                st.session_state.report_adj = {"data": df_adj_all, "sum": df_adj_sum}
-                st.success("✅ Summary Adjustment Berhasil Digabungkan!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error memproses file ADJ -: {e}")
-        else:
-            st.warning("⚠️ Pastikan Step 5 (ADJ +) sudah selesai dan file ADJ - sudah diupload!")
+        df_p = st.session_state.get('df_mult_final')
+        if df_p is not None and up_minus:
+            df_m = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
+            
+            # Jalankan logic replikasi VBA
+            df_res, df_summary = logic_sum_adjustment_final(df_p, df_m)
+            
+            st.session_state.report_adj = {"data": df_res, "sum": df_summary}
+            st.success("✅ Laporan Summary Adjustment Berhasil Dibuat!")
+            st.rerun()
 
-    # Metrics Box Adjustment
+    # --- TAMPILAN OVERVIEW (SUMMARY) ---
     if "report_adj" in st.session_state:
-        df_sum_adj = st.session_state.report_adj["sum"]
-        def get_adj_val(metric):
-            try: return df_sum_adj.loc[df_sum_adj['METRIC'] == metric, 'VALUE'].values[0]
-            except: return 0
+        st.markdown("### 📈 Adjustment Overview")
+        df_s = st.session_state.report_adj["sum"]
+        
+        # Helper untuk ambil nilai dari tabel summary
+        def get_v(m): return df_s.loc[df_s['METRIC'] == m, 'VALUE'].values[0]
 
-        a1, a2, a3 = st.columns(3)
-        with a1:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;"><p style="color: #808495; font-size: 14px;">📉 VALUE ADJ (-)</p><h3 style="color: #FF4B4B; margin: 0;">Rp {get_adj_val("Total Value Adj. -"):,.0f}</h3></div>', unsafe_allow_html=True)
-        with a2:
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #00FF00;"><p style="color: #808495; font-size: 14px;">📈 VALUE ADJ (+)</p><h3 style="color: #00FF00; margin: 0;">Rp {get_adj_val("Total Value Adj. +"):,.0f}</h3></div>', unsafe_allow_html=True)
-        with a3:
-            net_v = get_adj_val("Total Value")
-            color_net = "#00FF00" if net_v >= 0 else "#FF4B4B"
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {color_net};"><p style="color: #808495; font-size: 14px;">⚖️ NET VALUE</p><h3 style="color: {color_net}; margin: 0;">Rp {net_v:,.0f}</h3></div>', unsafe_allow_html=True)
+        # Row 1: Values
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Value (+)", f"Rp {get_v('Total Value Adj. +'):,.0f}")
+        c2.metric("Total Value (-)", f"Rp {get_v('Total Value Adj. -'):,.0f}")
+        c3.metric("NET VALUE", f"Rp {get_v('Total Value'):,.0f}")
+
+        # Row 2: Quantities & SKU
+        c4, c5, c6 = st.columns(3)
+        c4.metric("Total SKU", f"{get_v('Total SKU Adj.'):,.0f}")
+        c5.metric("Total QTY (+)", f"{get_v('Total QTY Adj. +'):,.0f}")
+        c6.metric("Total QTY (-)", f"{get_v('Total QTY Adj. -'):,.0f}")
+
+        # Row 3: Detail Data
+        with st.expander("👁️ VIEW FULL ADJUSTMENT DETAILS (12 COLUMNS)"):
+            st.dataframe(st.session_state.report_adj["data"], use_container_width=True, hide_index=True)
 # =========================================================
     # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (SUPER LENGKAP)
     # =========================================================
