@@ -734,14 +734,6 @@ def generate_real_plus_recon(allocated_data):
         recon_df['HASIL RECONCILIATION'] = ""
         return recon_df
     return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
-# --- DEFINISI FUNGSI UTAMA (Pindahkan ke atas script) ---
-def get_diff_col(df):
-    """Mencari nama kolom selisih yang benar secara otomatis"""
-    possible_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value', 'diff_val']
-    for col in possible_cols:
-        if col in df.columns:
-            return col
-    return None
 
 # =========================================================
 # 2. MENU UTAMA & STATE MANAGEMENT
@@ -907,29 +899,22 @@ def menu_Stock_Opname():
                 # Jalankan Logika
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
-                # ✅ DETEKSI NAMA KOLOM DIFF OTOMATIS
-                possible_diff_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value', 'diff_val']
-                diff_col_res4 = None
-                diff_col_miss4 = None
-                
-                for col in possible_diff_cols:
-                    if col in res4.columns:
-                        diff_col_res4 = col
-                        break
-                for col in possible_diff_cols:
-                    if col in miss4.columns:
-                        diff_col_miss4 = col
-                        break
-                
-                if diff_col_res4 and diff_col_miss4:
-                    res4[diff_col_res4] = pd.to_numeric(res4[diff_col_res4], errors='coerce')
-                    miss4[diff_col_miss4] = pd.to_numeric(miss4[diff_col_miss4], errors='coerce')
-                    res4 = res4[(res4[diff_col_res4] > 0) & (res4[diff_col_res4].notna())].reset_index(drop=True)
-                    miss4 = miss4[(miss4[diff_col_miss4] > 0) & (miss4[diff_col_miss4].notna())].reset_index(drop=True)
-                    st.success(f"✅ Step 4: {len(res4)} item difilter (diff > 0)")
+                # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK
+                # Fungsi helper untuk mencari kolom diff yang benar
+                def get_diff_col(df):
+                    possible_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value']
+                    for col in possible_cols:
+                        if col in df.columns:
+                            return col
+                    return None
+
+                # Filter Step 4
+                diff_col_4 = get_diff_col(res4)
+                if diff_col_4:
+                    res4 = res4[(res4[diff_col_4] > 0) & (res4[diff_col_4].notna())].reset_index(drop=True)
+                    miss4 = miss4[(miss4[diff_col_4] > 0) & (miss4[diff_col_4].notna())].reset_index(drop=True)
                 else:
-                    st.error(f"❌ Kolom 'diff' tidak ditemukan! Kolom tersedia: {list(res4.columns)}")
-                    st.stop()
+                    st.warning("⚠️ Kolom 'diff' tidak ditemukan di hasil logika. Cek nama kolom di dataframe.")
 
                 st.session_state.df_res_lookup = res4
                 st.session_state.df_missing_lookup = miss4
@@ -964,44 +949,14 @@ def menu_Stock_Opname():
                         st.session_state.df_missing_lookup
                     )
                     
-                    # ✅ DETEKSI NAMA KOLOM DIFF OTOMATIS STEP 5
-                    possible_diff_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value', 'diff_val']
-                    diff_col_mult = None
-                    diff_col_sing = None
-                    
-                    for col in possible_diff_cols:
-                        if col in df_mult.columns:
-                            diff_col_mult = col
-                            break
-                    for col in possible_diff_cols:
-                        if col in df_sing.columns:
-                            diff_col_sing = col
-                            break
-                    
-                    # ✅ FILTERING STEP 5: SESUAI VBA
-                    # Multiple: QTY SO > QTY SYSTEM DAN diff > 0
-                    if diff_col_mult:
-                        df_mult[diff_col_mult] = pd.to_numeric(df_mult[diff_col_mult], errors='coerce')
-                        if 'qty_so' in df_mult.columns and 'qty_system' in df_mult.columns:
-                            df_mult = df_mult[
-                                (df_mult['qty_so'] > df_mult['qty_system']) & 
-                                (df_mult[diff_col_mult] > 0) & 
-                                (df_mult[diff_col_mult].notna())
-                            ].reset_index(drop=True)
-                        else:
-                            df_mult = df_mult[(df_mult[diff_col_mult] > 0) & (df_mult[diff_col_mult].notna())].reset_index(drop=True)
-                    
-                    # Single: diff > 0 DAN warna = yellow
-                    if diff_col_sing:
-                        df_sing[diff_col_sing] = pd.to_numeric(df_sing[diff_col_sing], errors='coerce')
-                        if 'warna' in df_sing.columns:
-                            df_sing = df_sing[
-                                (df_sing[diff_col_sing] > 0) & 
-                                (df_sing['warna'] == 'yellow') & 
-                                (df_sing[diff_col_sing].notna())
-                            ].reset_index(drop=True)
-                        else:
-                            df_sing = df_sing[(df_sing[diff_col_sing] > 0) & (df_sing[diff_col_sing].notna())].reset_index(drop=True)
+                    # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK DI STEP 5
+                    # Pastikan data yang masuk ke session state sudah bersih
+                    diff_col_5 = get_diff_col(df_mult)
+                    if diff_col_5:
+                        df_mult = df_mult[(df_mult[diff_col_5] > 0) & (df_mult[diff_col_5].notna())].reset_index(drop=True)
+                        df_sing = df_sing[(df_sing[diff_col_5] > 0) & (df_sing[diff_col_5].notna())].reset_index(drop=True)
+                    else:
+                        st.warning("⚠️ Kolom 'diff' tidak ditemukan di hasil pivot. Cek nama kolom di dataframe.")
 
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
@@ -1015,6 +970,7 @@ def menu_Stock_Opname():
             t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
             with t_mult: st.dataframe(st.session_state.df_mult_5, use_container_width=True)
             with t_sing: st.dataframe(st.session_state.df_sing_5, use_container_width=True)
+
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
