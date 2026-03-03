@@ -1050,19 +1050,17 @@ def menu_Stock_Opname():
             st.session_state.df_karantina_6.to_excel(writer, index=False)
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
-    # =========================================================
-    # ⚙️ 6. FINAL REPORT GENERATOR (LINEAR SEQUENCE)
+# =========================================================
+    # ⚙️ 6. FINAL REPORT GENERATOR (INTEGRATED ADJUSTMENT)
     # =========================================================
     st.markdown("---")
     st.subheader("6️⃣ FINAL REPORTS GENERATOR")
 
     # --- BAGIAN A: MISS LOCATION REPORT ---
     st.markdown("#### 📊 MISS LOCATION REPORT")
-    st.info("Logic: Mengambil data otomatis dari 'SET UP REAL +' di Step 2.")
-    
-    if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_gen_miss_linear"):
+    if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_gen_miss_final"):
         data_src = st.session_state.get('set_up_real_plus')
-        # Logic tetap sama: nampilin 0 kalau data_src kosong
+        # Logic: Nampilin 0 kalau data 'empty'
         df_res, count_sku, count_qty = logic_miss_location_report(data_src)
         
         st.session_state.report_miss = {
@@ -1072,46 +1070,41 @@ def menu_Stock_Opname():
         }
         st.rerun()
 
-    # Tampilan Metrics Miss Loc
+    # Metrics Box Miss Loc
     if "report_miss" in st.session_state:
         m1, m2 = st.columns(2)
         with m1:
             st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 14px;">📦 TOTAL SKU MISS LOC.</p><h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss["sku"]} <span style="font-size: 18px;">ITEM</span></h2></div>', unsafe_allow_html=True)
         with m2:
             st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;"><p style="color: #808495; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p><h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss["qty"]} <span style="font-size: 18px;">ITEM</span></h2></div>', unsafe_allow_html=True)
-        with st.expander("👁️ View Miss Loc Details"):
-            st.dataframe(st.session_state.report_miss["data"], use_container_width=True, hide_index=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- BAGIAN B: UPLOAD DATA KARANTINA ---
-    st.markdown("#### 📥 UPLOAD DATA KARANTINA")
-    up_karantina = st.file_uploader("Upload File Karantina untuk Master Report", type=['xlsx','csv'], key="up_karantina_master")
-    if up_karantina:
-        df_k_manual = pd.read_excel(up_karantina) if up_karantina.name.endswith('.xlsx') else pd.read_csv(up_karantina)
-        st.session_state.df_karantina_manual = df_k_manual
-        st.success("✅ File Karantina berhasil diunggah!")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- BAGIAN C: SUMMARY ADJUSTMENT REPORT ---
+    # --- BAGIAN B: SUMMARY ADJUSTMENT (UPLOAD ADJ - DISINI) ---
     st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
-    st.info("Logic: Menggabungkan data 'MULTIPLE ADJ +' (Step 4) dengan upload manual 'STOCK ADJ -'.")
+    st.write("Silakan upload file **STOCK ADJ -** untuk digabung dengan data **ADJ +** dari Step 5.")
     
-    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_vba_linear")
+    # Uploader tunggal buat ADJ -
+    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_step")
     
-    if st.button("🛠️ GENERATE SUM ADJ REPORT", key="btn_gen_adj_linear"):
-        df_p = st.session_state.get('df_mult_final') # Data dari Step 4
-        if df_p is not None and up_minus:
-            df_m = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
-            df_adj_all, df_adj_sum = logic_sum_adjustment_final(df_p, df_m)
-            st.session_state.report_adj = {"data": df_adj_all, "sum": df_adj_sum}
-            st.success("✅ Summary Adjustment Berhasil!")
-            st.rerun()
+    if st.button("🛠️ GENERATE SUMMARY ADJUSTMENT", key="btn_gen_adj_final"):
+        df_plus = st.session_state.get('df_mult_final') # Ngambil data ADJ + yang sudah diproses
+        
+        if df_plus is not None and up_minus:
+            try:
+                df_minus = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
+                # Jalankan logic penggabungan
+                df_adj_all, df_adj_sum = logic_sum_adjustment_final(df_plus, df_minus)
+                
+                st.session_state.report_adj = {"data": df_adj_all, "sum": df_adj_sum}
+                st.success("✅ Summary Adjustment Berhasil Digabungkan!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error memproses file ADJ -: {e}")
         else:
-            st.warning("⚠️ Pastikan Step 4 Selesai & File ADJ - diupload!")
+            st.warning("⚠️ Pastikan Step 5 (ADJ +) sudah selesai dan file ADJ - sudah diupload!")
 
-    # Tampilan Metrics Adjustment
+    # Metrics Box Adjustment
     if "report_adj" in st.session_state:
         df_sum_adj = st.session_state.report_adj["sum"]
         def get_adj_val(metric):
@@ -1125,10 +1118,8 @@ def menu_Stock_Opname():
             st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #00FF00;"><p style="color: #808495; font-size: 14px;">📈 VALUE ADJ (+)</p><h3 style="color: #00FF00; margin: 0;">Rp {get_adj_val("Total Value Adj. +"):,.0f}</h3></div>', unsafe_allow_html=True)
         with a3:
             net_v = get_adj_val("Total Value")
-            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFFFFF;"><p style="color: #808495; font-size: 14px;">⚖️ NET VALUE</p><h3 style="color: #FFFFFF; margin: 0;">Rp {net_v:,.0f}</h3></div>', unsafe_allow_html=True)
-        
-        with st.expander("👁️ View Adjustment Details"):
-            st.dataframe(st.session_state.report_adj["data"], use_container_width=True, hide_index=True)
+            color_net = "#00FF00" if net_v >= 0 else "#FF4B4B"
+            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {color_net};"><p style="color: #808495; font-size: 14px;">⚖️ NET VALUE</p><h3 style="color: {color_net}; margin: 0;">Rp {net_v:,.0f}</h3></div>', unsafe_allow_html=True)
 # =========================================================
     # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (SUPER LENGKAP)
     # =========================================================
