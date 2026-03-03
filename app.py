@@ -872,7 +872,7 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
-   # --- STEP 4 ---
+# --- STEP 4 ---
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
     adj_col1, adj_col2 = st.columns(2)
