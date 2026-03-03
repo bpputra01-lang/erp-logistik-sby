@@ -999,22 +999,16 @@ def menu_Stock_Opname():
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
     # =========================================================
-    # 🏆 FINAL STEP: TOMBOL DOWNLOAD ALL-IN-ONE (TERPISAH)
+    # 🏆 FINAL STEP: DOWNLOAD ALL-IN-ONE (SEDERHANA)
     # =========================================================
-    # Tombol ini baru muncul kalau Step 4 minimal sudah dikerjakan
     if "process_done" in st.session_state and st.session_state.process_done:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("""
-            <div style="background-color: #1E2129; padding: 20px; border-radius: 15px; border: 2px solid #FF4B4B; text-align: center;">
-                <h3 style="margin-top: 0;">📦 EXPORT SEMUA LAPORAN</h3>
-                <p style="color: #808495;">Klik tombol di bawah untuk mendownload satu file Excel berisi seluruh Step (1 s/d 5)</p>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.info("💡 **Master Report Ready:** File di bawah mencakup data Step 1 sampai Step 5.")
         
         # Logic Excel Writer
         output_master = io.BytesIO()
         with pd.ExcelWriter(output_master, engine='xlsxwriter') as writer:
-            # 1. Sheet Step 1-3 (Basic Recon)
+            # Sheet 1-4 (Basic)
             if st.session_state.compare_result:
                 st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='1_DATA SCAN', index=False)
             if st.session_state.set_up_real_plus is not None:
@@ -1024,7 +1018,7 @@ def menu_Stock_Opname():
             if st.session_state.outstanding_system is not None:
                 st.session_state.outstanding_system.to_excel(writer, sheet_name='4_SYSTEM OUTSTANDING', index=False)
             
-            # 2. Sheet Step 4 (Final Adjustment)
+            # Sheet 5-7 (Adjustment)
             if "df_mult_final" in st.session_state:
                 st.session_state.df_mult_final.to_excel(writer, sheet_name='5_MULTIPLE ADJ', index=False)
             if "df_sing_final" in st.session_state:
@@ -1032,18 +1026,17 @@ def menu_Stock_Opname():
             if "df_res4_final" in st.session_state:
                 st.session_state.df_res4_final.to_excel(writer, sheet_name='7_HASIL CEK LOOKUP', index=False)
             
-            # 3. Sheet Step 5 (Karantina)
+            # Sheet 8 (Karantina)
             if st.session_state.df_karantina_6 is not None:
                 st.session_state.df_karantina_6.to_excel(writer, sheet_name='8_SET UP KARANTINA', index=False)
 
-        st.markdown("<br>", unsafe_allow_html=True)
         st.download_button(
-            label="📥 DOWNLOAD FULL MASTER REPORT (STEP 1-5)",
+            label="📥 DOWNLOAD MASTER REPORT (.XLSX)",
             data=output_master.getvalue(),
             file_name="FINAL_CONSOLIDATED_REPORT.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
-            key="btn_final_master_export"
+            key="btn_final_master_simple"
         )
             
 import pandas as pd
