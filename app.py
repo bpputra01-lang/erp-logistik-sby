@@ -923,7 +923,19 @@ def menu_Stock_Opname():
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5, st.session_state.df_missing_lookup)
+                    # ✅ PERBAIKAN: Filter data yang ada di REAL + RECON sebelum pivot
+                    df_res = st.session_state.df_res_lookup.copy()
+                    
+                    # Buat key unik dari BIN + SKU untuk filter
+                    df_res['MATCH_KEY'] = df_res.iloc[:, 0].astype(str) + '|' + df_res.iloc[:, 1].astype(str)
+                    df_missing = st.session_state.df_missing_lookup.copy()
+                    df_missing['MATCH_KEY'] = df_missing.iloc[:, 0].astype(str) + '|' + df_missing.iloc[:, 1].astype(str)
+                    
+                    # Ambil hanya data yang ada di missing lookup (REAL + RECON yang tidak match)
+                    valid_keys = set(df_missing['MATCH_KEY'].dropna().unique())
+                    df_res_filtered = df_res[df_res['MATCH_KEY'].isin(valid_keys)].copy()
+                    
+                    df_mult, df_sing = logic_pivot_adjustment(df_res_filtered, df_m5, df_missing)
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
                     st.session_state.step5_done = True
