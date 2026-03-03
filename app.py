@@ -899,12 +899,22 @@ def menu_Stock_Opname():
                 # Jalankan Logika
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                 
-                # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 DI STEP 4
-                # Ganti 'diff' dengan nama kolom selisih Anda jika berbeda
-                if 'diff' in res4.columns:
-                    res4 = res4[res4['diff'] > 0].reset_index(drop=True)
-                if 'diff' in miss4.columns:
-                    miss4 = miss4[miss4['diff'] > 0].reset_index(drop=True)
+                # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK
+                # Fungsi helper untuk mencari kolom diff yang benar
+                def get_diff_col(df):
+                    possible_cols = ['diff', 'diff_qty', 'selisih', 'qty_diff', 'diff_value']
+                    for col in possible_cols:
+                        if col in df.columns:
+                            return col
+                    return None
+
+                # Filter Step 4
+                diff_col_4 = get_diff_col(res4)
+                if diff_col_4:
+                    res4 = res4[(res4[diff_col_4] > 0) & (res4[diff_col_4].notna())].reset_index(drop=True)
+                    miss4 = miss4[(miss4[diff_col_4] > 0) & (miss4[diff_col_4].notna())].reset_index(drop=True)
+                else:
+                    st.warning("⚠️ Kolom 'diff' tidak ditemukan di hasil logika. Cek nama kolom di dataframe.")
 
                 st.session_state.df_res_lookup = res4
                 st.session_state.df_missing_lookup = miss4
@@ -939,12 +949,14 @@ def menu_Stock_Opname():
                         st.session_state.df_missing_lookup
                     )
                     
-                    # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 DI STEP 5 (Safety Net)
-                    # Pastikan kolom 'diff' ada di hasil pivot juga
-                    if 'diff' in df_mult.columns:
-                        df_mult = df_mult[df_mult['diff'] > 0].reset_index(drop=True)
-                    if 'diff' in df_sing.columns:
-                        df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
+                    # ✅ FILTERING: HAPUS DATA YANG DIFF <= 0 ATAU BLANK DI STEP 5
+                    # Pastikan data yang masuk ke session state sudah bersih
+                    diff_col_5 = get_diff_col(df_mult)
+                    if diff_col_5:
+                        df_mult = df_mult[(df_mult[diff_col_5] > 0) & (df_mult[diff_col_5].notna())].reset_index(drop=True)
+                        df_sing = df_sing[(df_sing[diff_col_5] > 0) & (df_sing[diff_col_5].notna())].reset_index(drop=True)
+                    else:
+                        st.warning("⚠️ Kolom 'diff' tidak ditemukan di hasil pivot. Cek nama kolom di dataframe.")
 
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
