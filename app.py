@@ -943,6 +943,7 @@ def menu_Stock_Opname():
         up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5_master")
 
         if up_m5:
+            if up_m5:
             if st.button("▶️ GENERATE ADJ +", use_container_width=True):
                 try:
                     if up_m5.name.endswith(('.csv',)):
@@ -950,33 +951,29 @@ def menu_Stock_Opname():
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    # Jalankan Logika Pivot
-                    # --- DI DALAM STEP 5 (Blok Try) ---
-                # Jalankan Logika Pivot
-                df_mult, df_sing = logic_pivot_adjustment(
-                    st.session_state.df_res_lookup, # Pastikan pake data hasil filter Step 4
-                    df_m5, 
-                    st.session_state.df_missing_lookup
-                )
-                
-                # ✅ FILTER ULANG SEBELUM TAMPIL: Cukup cek DIFF > 0
-                if 'diff' in df_mult.columns:
-                    df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce').fillna(0)
-                    # Buang semua yang diff-nya 0 atau QTY SO & System-nya sama-sama 0
-                    df_mult = df_mult[df_mult['diff'] > 0].reset_index(drop=True)
-                
-                if 'diff' in df_sing.columns:
-                    df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce').fillna(0)
-                    df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
+                    # ✅ JALANKAN LOGIKA PIVOT (PASTIKAN SEJAJAR LURUS SAMA IF DI ATAS)
+                    df_mult, df_sing = logic_pivot_adjustment(
+                        st.session_state.df_res_lookup, 
+                        df_m5, 
+                        st.session_state.df_missing_lookup
+                    )
+                    
+                    # ✅ FILTER KETAT: Buang data bocor yang DIFF-nya 0
+                    if 'diff' in df_mult.columns:
+                        df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce').fillna(0)
+                        df_mult = df_mult[df_mult['diff'] > 0].reset_index(drop=True)
+                    
+                    if 'diff' in df_sing.columns:
+                        df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce').fillna(0)
+                        df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
 
-                st.session_state.df_mult_5 = df_mult
-                st.session_state.df_sing_5 = df_sing
-                st.session_state.step5_done = True
-                st.rerun()
+                    st.session_state.df_mult_5 = df_mult
+                    st.session_state.df_sing_5 = df_sing
+                    st.session_state.step5_done = True
+                    st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
                     st.stop()
-
         # ✅ PINDAHKAN KE SINI (DI LUAR "if up_m5") AGAR TIDAK HILANG SAAT DOWNLOAD
         if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
             t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
