@@ -857,60 +857,67 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 
-# --- STEP 4 ---
-st.markdown("<br><br><br>---", unsafe_allow_html=True)
-st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
-adj_col1, adj_col2 = st.columns(2)
-with adj_col1: up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="u4_recon")
-with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx','csv'], key="u4_stock")
-
-if up_r4 and up_s4:
-    if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
-        df_r4 = load_data(up_r4)
-        df_s4 = load_data(up_s4)
-        
-        if df_r4 is not None and df_s4 is not None:
-            res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
-            st.session_state.df_res_lookup = res4
-            st.session_state.df_missing_lookup = miss4
-            st.session_state.step4_done = True
-            st.rerun()
-
-# Penting: Step 5 harus di luar blok 'if up_r4 and up_s4' 
-# agar tetap muncul setelah rerun selama step4_done = True
-if st.session_state.get('step4_done'):
-    t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
-    with t_f: 
-        st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
-        # Fix Download Kecil: Tambahkan tombol manual
-        st.download_button("📥 Download Result", st.session_state.df_res_lookup.to_csv(index=False), "result.csv")
+# --- STEP 4 CONTAINER ---
+with st.container():
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
     
-    with t_m: 
-        st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
+    adj_col1, adj_col2 = st.columns(2)
+    with adj_col1: 
+        up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="u4_recon")
+    with adj_col2: 
+        up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx','csv'], key="u4_stock")
 
-    # --- STEP 5 (Diletakkan di dalam kondisi step4_done) ---
-    st.markdown("<br><br>---", unsafe_allow_html=True)
-    st.subheader("5️⃣ FINAL ADJUSMENT +")
-    up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5_master")
+    # Logika Proses Step 4
+    if up_r4 and up_s4:
+        if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+            df_r4 = load_data(up_r4) # Pakai helper load_data yg saya kasih tadi
+            df_s4 = load_data(up_s4)
+            if df_r4 is not None and df_s4 is not None:
+                res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+                st.session_state.df_res_lookup = res4
+                st.session_state.df_missing_lookup = miss4
+                st.session_state.step4_done = True
+                st.rerun()
 
-    if up_m5:
-        if st.button("▶️ GENERATE ADJ +", use_container_width=True):
-            df_m5 = load_data(up_m5)
-            # Perbaikan Point 3: Pastikan miss4 dilempar untuk filter item tak dikenal
-            df_mult, df_sing = logic_pivot_adjustment(
-                st.session_state.df_res_lookup, 
-                df_m5, 
-                st.session_state.df_missing_lookup
-            )
-            st.session_state.df_mult_5 = df_mult
-            st.session_state.df_sing_5 = df_sing
-            st.session_state.step5_done = True
-            st.rerun()
+# --- HASIL STEP 4 & INPUT STEP 5 ---
+# Gunakan container berbeda supaya urutannya pakem di bawah Step 4
+if st.session_state.get('step4_done'):
+    with st.container():
+        t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
+        with t_f: 
+            st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
+            st.download_button("📥 Download Result", st.session_state.df_res_lookup.to_csv(index=False), "final_adj.csv", key="dl_step4")
+        
+        with t_m: 
+            st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
 
-    if st.session_state.get('step5_done'):
+        st.markdown("<br>---", unsafe_allow_html=True)
+        st.subheader("5️⃣ FINAL ADJUSMENT +")
+        up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx', 'csv'], key="u5_master")
+
+        if up_m5:
+            if st.button("▶️ GENERATE ADJ +", use_container_width=True):
+                df_m5 = load_data(up_m5)
+                # Saring data agar item tak dikenal tidak masuk (Point 3 Anda)
+                df_mult, df_sing = logic_pivot_adjustment(
+                    st.session_state.df_res_lookup, 
+                    df_m5, 
+                    st.session_state.df_missing_lookup
+                )
+                st.session_state.df_mult_5 = df_mult
+                st.session_state.df_sing_5 = df_sing
+                st.session_state.step5_done = True
+                st.rerun()
+
+# --- HASIL STEP 5 ---
+if st.session_state.get('step5_done'):
+    with st.container():
         t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
-        with t_mult: st.dataframe(st.session_state.df_mult_5, use_container_width=True)
-        with t_sing: st.dataframe(st.session_state.df_sing_5, use_container_width=True)
+        with t_mult: 
+            st.dataframe(st.session_state.df_mult_5, use_container_width=True)
+        with t_sing: 
+            st.dataframe(st.session_state.df_sing_5, use_container_width=True)
 
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
