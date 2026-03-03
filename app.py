@@ -931,10 +931,13 @@ if up_r4 and up_s4:
             st.error(f"❌ Error: {str(e)}")
             st.stop()
 
+# ✅ PASTIKAN HASIL MUNCUL DI BAWAH UPLOADER
 if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
     t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
-    with t_f: st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
-    with t_m: st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
+    with t_f: 
+        st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
+    with t_m: 
+        st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
 
     # --- STEP 5 ---
     st.markdown("<br><br>---", unsafe_allow_html=True)
@@ -979,17 +982,18 @@ if hasattr(st.session_state, 'step4_done') and st.session_state.step4_done:
                 st.error(f"❌ Error: {str(e)}")
                 st.stop()
 
+    # ✅ HASIL STEP 5 JUGA DI BAWAH UPLOADERNYA
     if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
         t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
         with t_mult: 
             st.dataframe(st.session_state.df_mult_5, use_container_width=True)
-            # ✅ DOWNLOAD BUTTON DI DALAM TAB
+            # DOWNLOAD BUTTON
             st.download_button(
                 label="📥 Download Multiple Adjustment CSV",
                 data=st.session_state.df_mult_5.to_csv(index=False).encode('utf-8'),
                 file_name="multiple_adjustment_plus.csv",
                 mime="text/csv",
-                key="dl_mult_final"
+                key="dl_mult_fix_final"
             )
         with t_sing: 
             st.dataframe(st.session_state.df_sing_5, use_container_width=True)
