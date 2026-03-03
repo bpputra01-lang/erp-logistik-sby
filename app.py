@@ -1176,40 +1176,37 @@ def menu_Stock_Opname():
                 c = color(vals[k])
                 st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c};"><p style="color: #808495; font-size: 13px;">{title}</p><h3 style="color: {c}; margin: 0;">{int(vals[k])} <span style="font-size: 20px;">ITEM</span></h3></div>', unsafe_allow_html=True)
 
-        # Tab Area
+   # --- TAB AREA DENGAN DOWNLOAD 2 SHEET ---
         st.markdown("<br>", unsafe_allow_html=True)
-        t1, t2 = st.tabs(["📄 Detail Report", "📊 Summary Metrics"])
+        tab_adj_1, tab_adj_2 = st.tabs(["📄 Detail Report", "📊 Summary Adjusment"])
         
-        with t1:
+        with tab_adj_1:
             st.dataframe(st.session_state.report_adj["data"], use_container_width=True, hide_index=True)
             
-            # --- LOGIC DOWNLOAD 2 TAB JADI 1 FILE (TANPA IO) ---
-            # Kita bikin dataframe bayangan buat ditaruh di bawah data utama sebagai footer summary
-            df_main = st.session_state.report_adj["data"].copy()
-            df_sum_footer = df_s.copy()
+            # --- TOMBOL DOWNLOAD EXCEL (2 SHEET: DETAIL & SUMMARY) ---
+            # Cara ini paling simpel buat pecah sheet tanpa library io manual
+            file_name = "Master_Adjustment_Report.xlsx"
             
-            # Samain tipe data biar bisa digabung buat didownload
-            df_sum_footer.columns = [df_main.columns[0], df_main.columns[1]] # Pakai header kolom pertama data utama
-            
-            # Gabungin Detail + Spasi Kosong + Summary
-            df_for_download = pd.concat([
-                df_main, 
-                pd.DataFrame([["", ""]] , columns=df_sum_footer.columns), # Kasih jarak 1 baris kosong
-                pd.DataFrame([["--- SUMMARY REPORT ---", ""]], columns=df_sum_footer.columns),
-                df_sum_footer
-            ], ignore_index=True)
-            
-            st.download_button(
-                label="📥 DOWNLOAD ALL REPORT (CSV)",
-                data=df_for_download.to_csv(index=False),
-                file_name="Master_Adjustment_Report.csv",
-                mime="text/csv"
-            )
-
-        with t2:
-            # Angka SKU/QTY dipaksa jadi Integer (Tanpa .000)
+            # Kita siapin data summary yang bersih (angka bulat) buat sheet kedua
             df_disp = df_s.copy()
             df_disp['VALUE'] = df_disp.apply(lambda x: f"{x['VALUE']:,.0f}" if 'Value' in x['METRIC'] else int(x['VALUE']), axis=1)
+
+            # Generate file langsung ke local disk temporary streamlit
+            with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
+                st.session_state.report_adj["data"].to_excel(writer, sheet_name='DETAIL_DATA', index=False)
+                df_disp.to_excel(writer, sheet_name='SUMMARY_METRICS', index=False)
+            
+            # Kirim ke user
+            with open(file_name, "rb") as f:
+                st.download_button(
+                    label="📥 DOWNLOAD MASTER REPORT (EXCEL 2 SHEET)",
+                    data=f,
+                    file_name=file_name,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+        with tab_adj_2:
+            # Tampilan di UI tetep rapih
             st.table(df_disp)
 # =========================================================
     # 🏆 FINAL STEP: DOWNLOAD MASTER REPORT (SUPER LENGKAP)
