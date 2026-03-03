@@ -924,31 +924,44 @@ def menu_Stock_Opname():
                 else:
                     df_s4 = pd.read_excel(up_s4)
                 
-                # --- LOGIC SESUAI VBA CEK_ADJUSMENT_FINAL ---
-                # 1. Buat dictionary dari Stock (Column B & C = key, Column C = index)
+                # ✅ PERBAIKAN: SKIP INDEX STREAMLIT (Kolom pertama = nomor baris)
+                df_r4 = df_r4.iloc[:, 1:]  # Skip kolom index pertama
+                df_s4 = df_s4.iloc[:, 1:]  # Skip kolom index pertama
+                df_r4 = df_r4.reset_index(drop=True)
+                df_s4 = df_s4.reset_index(drop=True)
+                
+                # --- LOGIC SESUAI VBA CEK_ADJUSMENT_FINAL (SUPER CEPAT) ---
+                # VBA Mapping: A=0, B=1, C=2, G=6, J=9, K=10, L=11
+                # Python Mapping (setelah skip index): A=0, B=1, C=2, G=6, J=9, K=10, L=11
+                
+                # 1. Buat dictionary dari Stock (Column B & C = key)
                 dict_stock = {}
                 last_row_stock = len(df_s4)
-                for i in range(1, last_row_stock):  # Skip header (0-based)
-                    key = str(df_s4.iloc[i, 1]).upper().strip() + "|" + str(df_s4.iloc[i, 2]).upper().strip()
-                    if key not in dict_stock:
-                        dict_stock[key] = i  # Store row index
+                for i in range(1, last_row_stock):
+                    bin_val = str(df_s4.iloc[i, 1]).upper().strip()
+                    sku_val = str(df_s4.iloc[i, 2]).upper().strip()
+                    if bin_val and sku_val:  # Skip kosong
+                        key = bin_val + "|" + sku_val
+                        if key not in dict_stock:
+                            dict_stock[key] = i
                 
-                # 2. Lookup Recon ke Stock
+                # 2. Lookup Recon ke Stock (SUPER CEPAT)
                 last_row_recon = len(df_r4)
                 df_r4['MATCHED'] = False
                 df_r4['COLOR'] = 'white'
                 
                 for i in range(1, last_row_recon):
-                    key = str(df_r4.iloc[i, 0]).upper().strip() + "|" + str(df_r4.iloc[i, 1]).upper().strip()
-                    if key in dict_stock:
-                        df_r4.at[i, 'MATCHED'] = True
-                        # Masukkan hasil recon ke kolom K (index 10)
-                        df_s4.at[dict_stock[key], 10] = df_r4.iloc[i, 6]
-                    else:
-                        df_r4.at[i, 'COLOR'] = 'yellow'
+                    bin_val = str(df_r4.iloc[i, 0]).upper().strip()
+                    sku_val = str(df_r4.iloc[i, 1]).upper().strip()
+                    if bin_val and sku_val:
+                        key = bin_val + "|" + sku_val
+                        if key in dict_stock:
+                            df_r4.at[i, 'MATCHED'] = True
+                            df_s4.at[dict_stock[key], 10] = df_r4.iloc[i, 6]
+                        else:
+                            df_r4.at[i, 'COLOR'] = 'yellow'
                 
                 # 3. Hitung DIFF (ABS Column J - Column K)
-                # Column J = index 9, Column K = index 10, Column L = index 11
                 df_s4['DIFF'] = ''
                 for i in range(1, last_row_stock):
                     col_k = df_s4.iloc[i, 10]
@@ -956,10 +969,6 @@ def menu_Stock_Opname():
                         col_j = df_s4.iloc[i, 9]
                         if pd.notna(col_j) and str(col_j).strip() != '':
                             df_s4.at[i, 'DIFF'] = abs(float(col_j) - float(col_k))
-                        else:
-                            df_s4.at[i, 'DIFF'] = ''
-                    else:
-                        df_s4.at[i, 'DIFF'] = ''
                 
                 # 4. Simpan hasil
                 res4 = df_s4.copy()
@@ -991,64 +1000,67 @@ def menu_Stock_Opname():
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    # --- LOGIC SESUAI VBA Generate_Adjustment_Plus_Final_Fix_Pivot ---
+                    # ✅ PERBAIKAN: SKIP INDEX STREAMLIT untuk MASTER juga
+                    df_m5 = df_m5.iloc[:, 1:]
+                    df_m5 = df_m5.reset_index(drop=True)
+                    
+                    # --- LOGIC SESUAI VBA Generate_Adjustment_Plus_Final_Fix_Pivot (SUPER CEPAT) ---
+                    
                     # 1. Buat dictionary MASTER (Column C = SKU)
                     dict_master = {}
                     last_row_master = len(df_m5)
                     for i in range(1, last_row_master):
                         sku_key = str(df_m5.iloc[i, 2]).strip()
-                        if sku_key not in dict_master:
-                            dict_master[sku_key] = i
+                        if sku_key:  # Skip kosong
+                            if sku_key not in dict_master:
+                                dict_master[sku_key] = i
                     
                     # 2. PROSES MULTIPLE ADJ + (Cek SKU Sama Langsung Jumlahkan)
-                    # Syarat: QTY SO (Column 11) > QTY SYSTEM (Column 10)
                     dict_multiple = {}
                     last_row_final = len(st.session_state.df_res_lookup)
                     for i in range(1, last_row_final):
                         col_k = st.session_state.df_res_lookup.iloc[i, 10]  # QTY SO
                         col_j = st.session_state.df_res_lookup.iloc[i, 9]   # QTY SYSTEM
-                        diff_value = st.session_state.df_res_lookup.iloc[i, 11]  # DIFF (Column L)
+                        diff_value = st.session_state.df_res_lookup.iloc[i, 11]  # DIFF
                         
-                        # ✅ PERBAIKAN: Cek nilai kosong sebelum convert ke float
+                        # Skip kosong
                         if (pd.notna(col_k) and str(col_k).strip() != '' and
                             pd.notna(col_j) and str(col_j).strip() != '' and
                             pd.notna(diff_value) and str(diff_value).strip() != ''):
                             if float(col_k) > float(col_j):
                                 sku_key = str(st.session_state.df_res_lookup.iloc[i, 2]).strip()
-                                
-                                if sku_key in dict_multiple:
-                                    dict_multiple[sku_key] = dict_multiple[sku_key] + float(diff_value)
-                                else:
-                                    dict_multiple[sku_key] = float(diff_value)
+                                if sku_key:
+                                    if sku_key in dict_multiple:
+                                        dict_multiple[sku_key] = dict_multiple[sku_key] + float(diff_value)
+                                    else:
+                                        dict_multiple[sku_key] = float(diff_value)
                     
                     # 3. TEMPEL HASIL MULTIPLE KE SHEET
-                    df_mult = df_m5.iloc[:1, :].copy()  # Header
+                    df_mult = df_m5.iloc[:1, :].copy()
                     for sku_key, qty in dict_multiple.items():
                         if sku_key in dict_master:
                             row_idx = dict_master[sku_key]
                             new_row = df_m5.iloc[row_idx, :].copy()
-                            new_row.iloc[10] = qty  # QTY Hasil Pivot (Column K)
+                            new_row.iloc[10] = qty
                             df_mult = pd.concat([df_mult, new_row.to_frame().T], ignore_index=True)
                     
                     # 4. PROSES SINGLE ADJ + (Berdasarkan Warna & Grouping BIN+SKU)
-                    # Dari Sheet REAL + RECON (df_missing_lookup)
                     dict_single = {}
                     last_row_recon = len(st.session_state.df_missing_lookup)
                     for i in range(1, last_row_recon):
-                        # Cek Warna (Column A = index 0)
                         color = st.session_state.df_missing_lookup.iloc[i, 0]
-                        qty_val = st.session_state.df_missing_lookup.iloc[i, 6]  # QTY (Column G)
+                        qty_val = st.session_state.df_missing_lookup.iloc[i, 6]
                         
-                        # ✅ PERBAIKAN: Cek warna dan nilai kosong
+                        # Skip kosong
                         if str(color).strip() == 'yellow' and pd.notna(qty_val) and str(qty_val).strip() != '':
                             bin_val = str(st.session_state.df_missing_lookup.iloc[i, 0]).strip()
                             sku_val = str(st.session_state.df_missing_lookup.iloc[i, 1]).strip()
-                            pivot_key = bin_val + "|" + sku_val  # Kunci unik BIN dan SKU
-                            
-                            if pivot_key in dict_single:
-                                dict_single[pivot_key] = dict_single[pivot_key] + float(qty_val)
-                            else:
-                                dict_single[pivot_key] = float(qty_val)
+                            if bin_val and sku_val:
+                                pivot_key = bin_val + "|" + sku_val
+                                if pivot_key in dict_single:
+                                    dict_single[pivot_key] = dict_single[pivot_key] + float(qty_val)
+                                else:
+                                    dict_single[pivot_key] = float(qty_val)
                     
                     # 5. TEMPEL HASIL SINGLE KE SHEET
                     df_sing = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
