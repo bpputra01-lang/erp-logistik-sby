@@ -1051,24 +1051,32 @@ def menu_Stock_Opname():
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
     # =========================================================
-    # ⚙️ 6. FINAL REPORT GENERATOR (METRICS STYLE)
+    # ⚙️ 6. FINAL REPORT GENERATOR (FIXED METRICS)
     # =========================================================
     st.markdown("---")
     st.subheader("6️⃣ FINAL REPORTS GENERATOR")
     
-    if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_miss_loc_final"):
+    # Tombol Generate
+    if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_miss_loc_final_fix"):
         data_src = st.session_state.get('set_up_real_plus')
+        # Panggil logic yang tadi sudah dibuat
         df_res, count_sku, count_qty = logic_miss_location_report(data_src)
         
-        # Simpan ke session state
+        # Simpan ke session state dengan struktur yang pasti
         st.session_state.report_miss = {
             "data": df_res,
             "sku": count_sku,
             "qty": count_qty
         }
+        st.rerun() # Paksa refresh biar metriknya langsung update
 
-    # Tampilkan Metrics Box ala Dashboard
+    # --- Tampilan Metrics Box (Pakai .get untuk menghindari KeyError) ---
+    # Metrics hanya muncul jika tombol sudah pernah dipencet minimal sekali
     if "report_miss" in st.session_state:
+        # Ambil nilai dengan default 0 jika key tidak ditemukan
+        val_sku = st.session_state.report_miss.get('sku', 0)
+        val_qty = st.session_state.report_miss.get('qty', 0)
+        
         m1, m2 = st.columns(2)
         
         # Box 1: Total SKU
@@ -1076,7 +1084,7 @@ def menu_Stock_Opname():
             st.markdown(f"""
                 <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
                     <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">📦 TOTAL SKU MISS LOC.</p>
-                    <h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss['sku']} <span style="font-size: 18px;">ITEM</span></h2>
+                    <h2 style="color: #FFD700; margin: 0;">{val_sku} <span style="font-size: 18px;">ITEM</span></h2>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -1085,17 +1093,17 @@ def menu_Stock_Opname():
             st.markdown(f"""
                 <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
                     <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p>
-                    <h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss['qty']} <span style="font-size: 18px;">ITEM</span></h2>
+                    <h2 style="color: #FFD700; margin: 0;">{val_qty} <span style="font-size: 18px;">ITEM</span></h2>
                 </div>
             """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Tampilkan Tabel (Muncul Header doang kalau data kosong)
+        # Tabel Detail (Muncul Header doang kalau data 'empty')
         with st.expander("📋 VIEW DETAILS LIST MISS LOCATION", expanded=True):
             st.dataframe(
-                st.session_state.report_miss["data"],
-                use_container_width=True,
+                st.session_state.report_miss.get("data", pd.DataFrame()),
+                use_container_width=True, 
                 hide_index=True
             )
     with c_rep2:
