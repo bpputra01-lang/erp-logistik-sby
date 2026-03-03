@@ -952,9 +952,12 @@ def menu_Stock_Opname():
                 df_s4['DIFF'] = ''
                 for i in range(1, last_row_stock):
                     col_k = df_s4.iloc[i, 10]
-                    if pd.notna(col_k) and col_k != '':
+                    if pd.notna(col_k) and str(col_k).strip() != '':
                         col_j = df_s4.iloc[i, 9]
-                        df_s4.at[i, 'DIFF'] = abs(float(col_j) - float(col_k))
+                        if pd.notna(col_j) and str(col_j).strip() != '':
+                            df_s4.at[i, 'DIFF'] = abs(float(col_j) - float(col_k))
+                        else:
+                            df_s4.at[i, 'DIFF'] = ''
                     else:
                         df_s4.at[i, 'DIFF'] = ''
                 
@@ -1004,10 +1007,14 @@ def menu_Stock_Opname():
                     for i in range(1, last_row_final):
                         col_k = st.session_state.df_res_lookup.iloc[i, 10]  # QTY SO
                         col_j = st.session_state.df_res_lookup.iloc[i, 9]   # QTY SYSTEM
-                        if pd.notna(col_k) and pd.notna(col_j):
+                        diff_value = st.session_state.df_res_lookup.iloc[i, 11]  # DIFF (Column L)
+                        
+                        # ✅ PERBAIKAN: Cek nilai kosong sebelum convert ke float
+                        if (pd.notna(col_k) and str(col_k).strip() != '' and
+                            pd.notna(col_j) and str(col_j).strip() != '' and
+                            pd.notna(diff_value) and str(diff_value).strip() != ''):
                             if float(col_k) > float(col_j):
                                 sku_key = str(st.session_state.df_res_lookup.iloc[i, 2]).strip()
-                                diff_value = st.session_state.df_res_lookup.iloc[i, 11]  # DIFF (Column L)
                                 
                                 if sku_key in dict_multiple:
                                     dict_multiple[sku_key] = dict_multiple[sku_key] + float(diff_value)
@@ -1030,10 +1037,12 @@ def menu_Stock_Opname():
                     for i in range(1, last_row_recon):
                         # Cek Warna (Column A = index 0)
                         color = st.session_state.df_missing_lookup.iloc[i, 0]
-                        if color == 'yellow':
+                        qty_val = st.session_state.df_missing_lookup.iloc[i, 6]  # QTY (Column G)
+                        
+                        # ✅ PERBAIKAN: Cek warna dan nilai kosong
+                        if str(color).strip() == 'yellow' and pd.notna(qty_val) and str(qty_val).strip() != '':
                             bin_val = str(st.session_state.df_missing_lookup.iloc[i, 0]).strip()
                             sku_val = str(st.session_state.df_missing_lookup.iloc[i, 1]).strip()
-                            qty_val = st.session_state.df_missing_lookup.iloc[i, 6]  # QTY (Column G)
                             pivot_key = bin_val + "|" + sku_val  # Kunci unik BIN dan SKU
                             
                             if pivot_key in dict_single:
