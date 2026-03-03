@@ -893,7 +893,7 @@ def menu_Stock_Opname():
                 else:
                     df_s4 = pd.read_excel(up_s4)
                 
-                # ✅ PERBAIKAN: HAPUS KOLOM PERTAMA + RESET NAMA KOLOM (WAJIB!)
+                # ✅ PERBAIKAN: HAPUS KOLOM PERTAMA + RESET NAMA KOLOM
                 df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
                 df_s4 = df_s4.iloc[:, 1:].reset_index(drop=True)
                 
@@ -902,6 +902,11 @@ def menu_Stock_Opname():
                 df_s4.columns = range(len(df_s4.columns))
                 
                 res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+                
+                # ✅ PERBAIKAN: HAPUS DUPLIKAT KOLOM DI HASIL
+                res4.columns = range(len(res4.columns))
+                miss4.columns = range(len(miss4.columns))
+                
                 st.session_state.df_res_lookup = res4
                 st.session_state.df_missing_lookup = miss4
                 st.session_state.step4_done = True
@@ -928,13 +933,16 @@ def menu_Stock_Opname():
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    # ✅ PERBAIKAN: HAPUS KOLOM PERTAMA + RESET NAMA KOLOM (WAJIB!)
+                    # ✅ PERBAIKAN: HAPUS KOLOM PERTAMA + RESET NAMA KOLOM
                     df_m5 = df_m5.iloc[:, 1:].reset_index(drop=True)
-                    
-                    # ✅ WAJIB: Reset nama kolom jadi unik (0, 1, 2, 3...)
                     df_m5.columns = range(len(df_m5.columns))
                     
                     df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5, st.session_state.df_missing_lookup)
+                    
+                    # ✅ PERBAIKAN: HAPUS DUPLIKAT KOLOM DI HASIL
+                    df_mult.columns = range(len(df_mult.columns))
+                    df_sing.columns = range(len(df_sing.columns))
+                    
                     st.session_state.df_mult_5 = df_mult
                     st.session_state.df_sing_5 = df_sing
                     st.session_state.step5_done = True
