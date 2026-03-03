@@ -871,66 +871,47 @@ def menu_Stock_Opname():
             st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
-# --- STEP 4 ---
-st.markdown("<br><br><br>---", unsafe_allow_html=True)
-st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
-adj_col1, adj_col2 = st.columns(2)
-# FIX LONCAT: Gue tambahin suffix '_v2' pada key biar Streamlit nge-lock posisinya di sini
-with adj_col1: up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="u4_recon_v2")
-with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx','csv'], key="u4_stock_v2")
 
-if up_r4 and up_s4:
-    if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
-        # FIX ERROR: Baca sesuai format file
-        df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
-        df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
-        
-        # FIX NONE/ITEM TAK DIKENAL: Bersihkan SKU dari spasi hantu
-        df_r4['SKU'] = df_r4['SKU'].astype(str).str.strip()
-        df_s4['SKU'] = df_s4['SKU'].astype(str).str.strip()
+    # --- STEP 4 ---
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
+    adj_col1, adj_col2 = st.columns(2)
+    with adj_col1: up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx','csv'], key="u4_recon")
+    with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u4_stock")
 
-        res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
-        st.session_state.df_res_lookup = res4
-        st.session_state.df_missing_lookup = miss4
-        st.session_state.step4_done = True
-        st.rerun()
-
-if st.session_state.step4_done:
-    t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
-    with t_f: 
-        st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
-        # FIX DOWNLOAD: Tambah tombol manual karena icon dataframe sering ilang
-        st.download_button("📥 Download Result", st.session_state.df_res_lookup.to_csv(index=False).encode('utf-8'), "final_adj.csv", "text/csv", key="btn_dl_4")
-    with t_m: 
-        st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
-
-    # --- STEP 5 ---
-    st.markdown("<br><br>---", unsafe_allow_html=True)
-    st.subheader("5️⃣ FINAL ADJUSMENT +")
-    # FIX LONCAT: Ganti key biar gak tabrakan
-    up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx','csv'], key="u5_master_v2")
-
-    if up_m5:
-        if st.button("▶️ GENERATE ADJ +", use_container_width=True):
-            # FIX ERROR: Baca format file Master
-            df_m5 = pd.read_csv(up_m5) if up_m5.name.endswith('.csv') else pd.read_excel(up_m5)
-            # FIX NONE: Bersihkan SKU Master
-            df_m5['SKU'] = df_m5['SKU'].astype(str).str.strip()
-            
-            df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5, st.session_state.df_missing_lookup)
-            st.session_state.df_mult_5 = df_mult
-            st.session_state.df_sing_5 = df_sing
-            st.session_state.step5_done = True
+    if up_r4 and up_s4:
+        if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
+            df_r4 = pd.read_excel(up_r4)
+            df_s4 = pd.read_excel(up_s4)
+            res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+            st.session_state.df_res_lookup = res4
+            st.session_state.df_missing_lookup = miss4
+            st.session_state.step4_done = True
             st.rerun()
 
-    if st.session_state.step5_done:
-        t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
-        with t_mult: 
-            st.dataframe(st.session_state.df_mult_5, use_container_width=True)
-            st.download_button("📥 Download Multiple", st.session_state.df_mult_5.to_csv(index=False).encode('utf-8'), "mult_adj.csv", "text/csv", key="btn_dl_5a")
-        with t_sing: 
-            st.dataframe(st.session_state.df_sing_5, use_container_width=True)
-            st.download_button("📥 Download Single", st.session_state.df_sing_5.to_csv(index=False).encode('utf-8'), "sing_adj.csv", "text/csv", key="btn_dl_5b")
+    if st.session_state.step4_done:
+        t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
+        with t_f: st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
+        with t_m: st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
+
+        # --- STEP 5 ---
+        st.markdown("<br><br>---", unsafe_allow_html=True)
+        st.subheader("5️⃣ FINAL ADJUSMENT +")
+        up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5_master")
+
+        if up_m5:
+            if st.button("▶️ GENERATE ADJ +", use_container_width=True):
+                df_m5 = pd.read_excel(up_m5)
+                df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5, st.session_state.df_missing_lookup)
+                st.session_state.df_mult_5 = df_mult
+                st.session_state.df_sing_5 = df_sing
+                st.session_state.step5_done = True
+                st.rerun()
+
+        if st.session_state.step5_done:
+            t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+            with t_mult: st.dataframe(st.session_state.df_mult_5, use_container_width=True)
+            with t_sing: st.dataframe(st.session_state.df_sing_5, use_container_width=True)
 
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
