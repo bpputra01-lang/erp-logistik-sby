@@ -1089,55 +1089,49 @@ def menu_Stock_Opname():
             st.session_state.df_karantina_6.to_excel(writer, index=False)
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
-# =========================================================
-    # ⚙️ 6. FINAL REPORT GENERATOR (FULLY INTEGRATED)
-    # =========================================================
-    st.markdown("---")
-    st.subheader("6️⃣ FINAL REPORTS GENERATOR")
-
-    # --- BAGIAN A: MISS LOCATION REPORT ---
+# --- BAGIAN A: MISS LOCATION REPORT ---
     st.markdown("#### 📊 MISS LOCATION REPORT")
-    if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_gen_miss_v3"):
+    if st.button("▶️ GENERATE MISS LOC", key="btn_gen_miss_final_v4"):
         data_src = st.session_state.get('set_up_real_plus')
-        # Logic tetap jalan meski data_src 'empty'
         df_res, count_sku, count_qty = logic_miss_location_report(data_src)
+        # Simpan ke session state biar gak ilang pas rerun
         st.session_state.report_miss = {"data": df_res, "sku": count_sku, "qty": count_qty}
         st.rerun()
 
-    # --- OVERVIEW MISS LOCATION ---
+    # Pastikan variabel didefinisikan dulu dari session state sebelum dipake
     if "report_miss" in st.session_state:
+        # AMBIL DATA DARI SESSION STATE (SOLUSI NAMEERROR)
+        df_ml_data = st.session_state.report_miss["data"]
+        m_sku = st.session_state.report_miss["sku"]
+        m_qty = st.session_state.report_miss["qty"]
+        
+        # Penentuan warna: Positif Hijau, Negatif Merah
+        c_sku = "#00FF00" if m_sku >= 0 else "#FF4B4B"
+        c_qty = "#00FF00" if m_qty >= 0 else "#FF4B4B"
+
         m1, m2 = st.columns(2)
         with m1:
-            st.markdown(f"""
-                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
-                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">📦 TOTAL SKU MISS LOC.</p>
-                    <h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss['sku']} <span style="font-size: 18px;">ITEM</span></h2>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c_sku};"><p style="color: #808495; font-size: 14px;">📦 TOTAL SKU MISS LOC.</p><h2 style="color: {c_sku}; margin: 0;">{int(m_sku)} <span style="font-size: 18px;">ITEM</span></h2></div>', unsafe_allow_html=True)
         with m2:
-            st.markdown(f"""
-                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
-                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p>
-                    <h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss['qty']} <span style="font-size: 18px;">ITEM</span></h2>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {c_qty};"><p style="color: #808495; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p><h2 style="color: {c_qty}; margin: 0;">{int(m_qty)} <span style="font-size: 18px;">ITEM</span></h2></div>', unsafe_allow_html=True)
 
         # --- TAB AREA MISS LOC DENGAN DOWNLOAD 2 SHEET ---
         st.markdown("<br>", unsafe_allow_html=True)
         t_ml_1, t_ml_2 = st.tabs(["📄 Detail List", "📊 Summary"])
         
-        with t_ml_1:
-            st.dataframe(st.session_state.report_miss["data"], use_container_width=True, hide_index=True)
-            
-            # Logic Download Excel 2 Sheet (Detail & Summary) Tanpa IO
-            fname_ml = "Miss_Location_Report.xlsx"
-            df_sum_ml = pd.DataFrame({
-                "METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"],
-                "VALUE": [int(m_sku), int(m_qty)]
-            })
+        # Siapkan DataFrame Summary untuk download dan tabel
+        df_sum_ml = pd.DataFrame({
+            "METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"],
+            "VALUE": [int(m_sku), int(m_qty)]
+        })
 
+        with t_ml_1:
+            st.dataframe(df_ml_data, use_container_width=True, hide_index=True)
+            
+            # Logic Download Excel 2 Sheet Tanpa Library IO manual
+            fname_ml = "Miss_Location_Report.xlsx"
             with pd.ExcelWriter(fname_ml, engine='xlsxwriter') as writer:
-                st.session_state.report_miss["data"].to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
+                df_ml_data.to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
                 df_sum_ml.to_excel(writer, sheet_name='SUMMARY', index=False)
             
             with open(fname_ml, "rb") as f:
@@ -1149,7 +1143,7 @@ def menu_Stock_Opname():
                 )
 
         with t_ml_2:
-            st.table(df_sum_ml) # Nampilin tabel summary yang bersih (Integer)
+            st.table(df_sum_ml) # Tampilan angka bulat tanpa .000
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
