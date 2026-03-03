@@ -893,25 +893,23 @@ def menu_Stock_Opname():
                     df_s4 = pd.read_excel(up_s4)
                 
                 df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
-                res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+                # --- DI DALAM STEP 4 (Blok Try) ---
+            res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+            
+            if 'qty_so' in res4.columns and 'qty_system' in res4.columns:
+                res4['qty_so'] = pd.to_numeric(res4['qty_so'], errors='coerce').fillna(0)
+                res4['qty_system'] = pd.to_numeric(res4['qty_system'], errors='coerce').fillna(0)
                 
-                if 'qty_so' in res4.columns and 'qty_system' in res4.columns:
-                    res4['qty_so'] = pd.to_numeric(res4['qty_so'], errors='coerce')
-                    res4['qty_system'] = pd.to_numeric(res4['qty_system'], errors='coerce')
-                    res4['diff'] = res4.apply(
-                        lambda x: abs(x['qty_system'] - x['qty_so']) if pd.notnull(x['qty_so']) else np.nan, 
-                        axis=1
-                    )
-                    res4 = res4[(res4['qty_so'].notna()) & (res4['diff'] > 0)].reset_index(drop=True)
+                # Hitung DIFF murni dari selisih
+                res4['diff'] = abs(res4['qty_system'] - res4['qty_so'])
                 
-                if 'diff' in miss4.columns:
-                    miss4['diff'] = pd.to_numeric(miss4['diff'], errors='coerce')
-                    miss4 = miss4[miss4['diff'] > 0].reset_index(drop=True)
+                # ✅ FILTER MATI: Hanya ambil yang beneran ada selisih > 0
+                res4 = res4[res4['diff'] > 0].reset_index(drop=True)
 
-                st.session_state.df_res_lookup = res4
-                st.session_state.df_missing_lookup = miss4
-                st.session_state.step4_done = True
-                st.rerun()
+            st.session_state.df_res_lookup = res4 # Data ini yang bakal dipake Step 5
+            st.session_state.df_missing_lookup = miss4
+            st.session_state.step4_done = True
+            st.rerun()
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
                 st.stop()
@@ -946,25 +944,28 @@ def menu_Stock_Opname():
                         df_m5 = pd.read_excel(up_m5)
                     
                     # Jalankan Logika Pivot
-                    df_mult, df_sing = logic_pivot_adjustment(
-                        st.session_state.df_res_lookup, 
-                        df_m5, 
-                        st.session_state.df_missing_lookup
-                    )
-                    
-                    # ✅ LOGIC: Cukup cek DIFF > 0
-                    if 'diff' in df_mult.columns:
-                        df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce')
-                        df_mult = df_mult[(df_mult['diff'] > 0) & (df_mult['diff'].notna())].reset_index(drop=True)
-                    
-                    if 'diff' in df_sing.columns:
-                        df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce')
-                        df_sing = df_sing[(df_sing['diff'] > 0) & (df_sing['diff'].notna())].reset_index(drop=True)
+                    # --- DI DALAM STEP 5 (Blok Try) ---
+                # Jalankan Logika Pivot
+                df_mult, df_sing = logic_pivot_adjustment(
+                    st.session_state.df_res_lookup, # Pastikan pake data hasil filter Step 4
+                    df_m5, 
+                    st.session_state.df_missing_lookup
+                )
+                
+                # ✅ FILTER ULANG SEBELUM TAMPIL: Cukup cek DIFF > 0
+                if 'diff' in df_mult.columns:
+                    df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce').fillna(0)
+                    # Buang semua yang diff-nya 0 atau QTY SO & System-nya sama-sama 0
+                    df_mult = df_mult[df_mult['diff'] > 0].reset_index(drop=True)
+                
+                if 'diff' in df_sing.columns:
+                    df_sing['diff'] = pd.to_numeric(df_sing['diff'], errors='coerce').fillna(0)
+                    df_sing = df_sing[df_sing['diff'] > 0].reset_index(drop=True)
 
-                    st.session_state.df_mult_5 = df_mult
-                    st.session_state.df_sing_5 = df_sing
-                    st.session_state.step5_done = True
-                    st.rerun()
+                st.session_state.df_mult_5 = df_mult
+                st.session_state.df_sing_5 = df_sing
+                st.session_state.step5_done = True
+                st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
                     st.stop()
