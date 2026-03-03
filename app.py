@@ -929,7 +929,7 @@ def menu_Stock_Opname():
         with t_f: st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
         with t_m: st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
 
-        # --- STEP 5 ---
+ # --- STEP 5 ---
         st.markdown("<br><br>---", unsafe_allow_html=True)
         st.subheader("5️⃣ FINAL ADJUSMENT +")
         up_m5 = st.file_uploader("📥 Upload STOCK ADJ + (MASTER)", type=['xlsx'], key="u5_master")
@@ -942,14 +942,14 @@ def menu_Stock_Opname():
                     else:
                         df_m5 = pd.read_excel(up_m5)
                     
-                    # ✅ JALANKAN LOGIKA PIVOT (PASTIKAN SEJAJAR DENGAN IF DI ATAS)
+                    # Jalankan Logika Pivot
                     df_mult, df_sing = logic_pivot_adjustment(
                         st.session_state.df_res_lookup, 
                         df_m5, 
                         st.session_state.df_missing_lookup
                     )
                     
-                    # ✅ PERBAIKAN LOGIC: Cukup cek DIFF > 0
+                    # ✅ LOGIC: Cukup cek DIFF > 0
                     if 'diff' in df_mult.columns:
                         df_mult['diff'] = pd.to_numeric(df_mult['diff'], errors='coerce')
                         df_mult = df_mult[(df_mult['diff'] > 0) & (df_mult['diff'].notna())].reset_index(drop=True)
@@ -966,21 +966,21 @@ def menu_Stock_Opname():
                     st.error(f"❌ Error: {str(e)}")
                     st.stop()
 
-    # ✅ BAGIAN INI HARUS DI LUAR "if up_m5" BIAR TOMBOL DOWNLOADNYA STAY
-    if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
-        t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
-        with t_mult: 
-            st.dataframe(st.session_state.df_mult_5, use_container_width=True)
-            # ✅ INI TOMBOLNYA, PASTI MUNCUL DI BAWAH TABEL
-            st.download_button(
-                label="📥 Download Multiple Adjustment CSV",
-                data=st.session_state.df_mult_5.to_csv(index=False).encode('utf-8'),
-                file_name="multiple_adjustment_plus.csv",
-                mime="text/csv",
-                key="dl_mult_final_v3"
-            )
-        with t_sing: 
-            st.dataframe(st.session_state.df_sing_5, use_container_width=True)
+        # ✅ PINDAHKAN KE SINI (DI LUAR "if up_m5") AGAR TIDAK HILANG SAAT DOWNLOAD
+        if hasattr(st.session_state, 'step5_done') and st.session_state.step5_done:
+            t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
+            with t_mult: 
+                st.dataframe(st.session_state.df_mult_5, use_container_width=True)
+                # ✅ TOMBOL DOWNLOAD
+                st.download_button(
+                    label="📥 Download Multiple Adjustment CSV",
+                    data=st.session_state.df_mult_5.to_csv(index=False).encode('utf-8'),
+                    file_name="multiple_adjustment_plus.csv",
+                    mime="text/csv",
+                    key="dl_mult_final_v5"
+                )
+            with t_sing: 
+                st.dataframe(st.session_state.df_sing_5, use_container_width=True)
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
