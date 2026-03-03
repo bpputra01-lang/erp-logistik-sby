@@ -736,18 +736,26 @@ def generate_real_plus_recon(allocated_data):
     return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
 
 def logic_miss_location_report(df_setup_real):
-    # Safety Check: Pastikan datanya ada dan benar-benar DataFrame
+    # Buat template header default sesuai Macro VBA
+    columns_ref = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
+    
+    # Jika data None atau beneran kosong
     if df_setup_real is None or not isinstance(df_setup_real, pd.DataFrame) or df_setup_real.empty:
-        return None, None
+        df_out = pd.DataFrame(columns=columns_ref) # Cuma Header
+        df_sum = pd.DataFrame({
+            "KETERANGAN": ["TOTAL SKU", "TOTAL QTY MISS LOCATION"],
+            "TOTAL": ["0 ITEM", "0 ITEM"]
+        })
+        return df_out, df_sum
     
     try:
-        # Ambil kolom A sampai D (Indeks 0-3) sesuai Macro
+        # Proses Normal kalau ada isinya
         df_out = df_setup_real.iloc[:, 0:4].copy()
-        df_out.columns = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
+        df_out.columns = columns_ref
+        df_out["QTY MISS LOC."] = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').fillna(0)
         
-        # Hitung Summary
         total_sku = df_out["SKU"].nunique()
-        total_qty = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').sum()
+        total_qty = df_out["QTY MISS LOC."].sum()
         
         df_sum = pd.DataFrame({
             "KETERANGAN": ["TOTAL SKU", "TOTAL QTY MISS LOCATION"],
@@ -755,8 +763,8 @@ def logic_miss_location_report(df_setup_real):
         })
         return df_out, df_sum
     except Exception as e:
-        st.error(f"Error pada logic Miss Loc: {e}")
-        return None, None
+        # Fallback kalau format kolom berantakan
+        return pd.DataFrame(columns=columns_ref), pd.DataFrame({"KETERANGAN": ["ERROR"], "TOTAL": ["CHECK FORMAT"]})
 
 def logic_sum_adjustment_final(df_plus, df_minus):
     # Replikasi Macro Sum Adjustment
@@ -1063,18 +1071,35 @@ def menu_Stock_Opname():
     
     with c_rep1:
         st.write("📊 **Miss Location Report**")
-        if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_macro_miss"):
-            # Pastikan data set_up_real_plus tersedia
+        if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_macro_miss_final_v5"):
             data_source = st.session_state.get('set_up_real_plus')
-            if data_source is not None:
-                df_miss, df_sum_miss = logic_miss_location_report(data_source)
-                if df_miss is not None:
-                    st.session_state.report_miss = {"data": df_miss, "sum": df_sum_miss}
-                    st.success("Laporan Miss Location Siap!")
-                else:
-                    st.error("Gagal memproses data. Cek format kolom!")
+            
+            # Panggil logic (sekarang selalu balikkin data, walau kosong)
+            res_data, res_sum = logic_miss_location_report(data_source)
+            
+            st.session_state.report_miss = {"data": res_data, "sum": res_sum}
+            
+            # Tampilkan Box Metrix ala Dashboard
+            val_qty = res_sum.loc[res_sum['KETERANGAN'] == 'TOTAL QTY MISS LOCATION', 'TOTAL'].values[0]
+            
+            if val_qty == "0 ITEM":
+                st.success("✅ Selesai: 0 Miss Location Ditemukan.")
             else:
-                st.warning("Data 'SET UP REAL +' belum tersedia. Jalankan Step 2!")
+                st.warning(f"⚠️ Ditemukan {val_qty} Miss Location!")
+
+    # --- Area Overview (Selalu Muncul setelah Generate diklik) ---
+    if "report_miss" in st.session_state:
+        st.markdown("### 📋 Overview Miss Location")
+        
+        # Tampilkan Metrix Box (KETERANGAN & TOTAL)
+        st.table(st.session_state.report_miss["sum"])
+        
+        # Tampilkan Tabel Data (Muncul Headernya doang kalau kosong)
+        st.dataframe(
+            st.session_state.report_miss["data"], 
+            use_container_width=True, 
+            hide_index=True
+        )
 
     with c_rep2:
         st.write("💰 **Sum Adjustment Report**")
