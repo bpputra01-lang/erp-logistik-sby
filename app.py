@@ -1179,9 +1179,33 @@ def menu_Stock_Opname():
         # Tab Area
         st.markdown("<br>", unsafe_allow_html=True)
         t1, t2 = st.tabs(["📄 Detail Report", "📊 Summary Metrics"])
+        
         with t1:
             st.dataframe(st.session_state.report_adj["data"], use_container_width=True, hide_index=True)
-            st.download_button("📥 DOWNLOAD CSV", st.session_state.report_adj["data"].to_csv(index=False), "Report.csv", "text/csv")
+            
+            # --- LOGIC DOWNLOAD 2 TAB JADI 1 FILE (TANPA IO) ---
+            # Kita bikin dataframe bayangan buat ditaruh di bawah data utama sebagai footer summary
+            df_main = st.session_state.report_adj["data"].copy()
+            df_sum_footer = df_s.copy()
+            
+            # Samain tipe data biar bisa digabung buat didownload
+            df_sum_footer.columns = [df_main.columns[0], df_main.columns[1]] # Pakai header kolom pertama data utama
+            
+            # Gabungin Detail + Spasi Kosong + Summary
+            df_for_download = pd.concat([
+                df_main, 
+                pd.DataFrame([["", ""]] , columns=df_sum_footer.columns), # Kasih jarak 1 baris kosong
+                pd.DataFrame([["--- SUMMARY REPORT ---", ""]], columns=df_sum_footer.columns),
+                df_sum_footer
+            ], ignore_index=True)
+            
+            st.download_button(
+                label="📥 DOWNLOAD ALL REPORT (CSV)",
+                data=df_for_download.to_csv(index=False),
+                file_name="Master_Adjustment_Report.csv",
+                mime="text/csv"
+            )
+
         with t2:
             # Angka SKU/QTY dipaksa jadi Integer (Tanpa .000)
             df_disp = df_s.copy()
