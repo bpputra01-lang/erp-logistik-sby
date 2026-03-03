@@ -871,7 +871,6 @@ def menu_Stock_Opname():
             st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
-
 # --- STEP 4 ---
 st.markdown("<br><br><br>---", unsafe_allow_html=True)
 st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
@@ -881,11 +880,11 @@ with adj_col2: up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['x
 
 if up_r4 and up_s4:
     if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
-        # Perbaikan Error ValueError (Bisa baca CSV atau Excel)
+        # FIX ERROR VALUEERROR (Bisa baca CSV/Excel)
         df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
         df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
         
-        # Perbaikan Item Tak Dikenal (Cleaning SKU)
+        # FIX ITEM TAK DIKENAL (Cleaning SKU biar sinkron)
         df_r4['SKU'] = df_r4['SKU'].astype(str).str.strip()
         df_s4['SKU'] = df_s4['SKU'].astype(str).str.strip()
 
@@ -893,13 +892,13 @@ if up_r4 and up_s4:
         st.session_state.df_res_lookup = res4
         st.session_state.df_missing_lookup = miss4
         st.session_state.step4_done = True
-        st.rerun()
+        # st.rerun() DIHAPUS BIAR GAK LONCAT KE ATAS
 
 if st.session_state.step4_done:
     t_f, t_m = st.tabs(["📊 FINAL ADJUSTMENT", "🔍 NEED SINGLE ADJ"])
     with t_f: 
         st.dataframe(st.session_state.df_res_lookup, use_container_width=True, hide_index=True)
-        # Tombol download manual karena icon bawaan sering hilang
+        # FIX DOWNLOAD KECIL (Tambah tombol manual biar pasti ada)
         st.download_button("📥 Download Result", st.session_state.df_res_lookup.to_csv(index=False).encode('utf-8'), "final_adj.csv", "text/csv", key="dl_f4")
     with t_m: 
         st.dataframe(st.session_state.df_missing_lookup, use_container_width=True, hide_index=True)
@@ -912,17 +911,16 @@ if st.session_state.step4_done:
 
     if up_m5:
         if st.button("▶️ GENERATE ADJ +", use_container_width=True):
-            # Perbaikan Error ValueError
+            # FIX ERROR VALUEERROR
             df_m5 = pd.read_csv(up_m5) if up_m5.name.endswith('.csv') else pd.read_excel(up_m5)
-            
-            # Perbaikan Item Tak Dikenal (Cleaning SKU Master)
+            # FIX ITEM TAK DIKENAL
             df_m5['SKU'] = df_m5['SKU'].astype(str).str.strip()
             
             df_mult, df_sing = logic_pivot_adjustment(st.session_state.df_res_lookup, df_m5, st.session_state.df_missing_lookup)
             st.session_state.df_mult_5 = df_mult
             st.session_state.df_sing_5 = df_sing
             st.session_state.step5_done = True
-            st.rerun()
+            # st.rerun() DIHAPUS BIAR GAK LONCAT
 
     if st.session_state.step5_done:
         t_mult, t_sing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +"])
