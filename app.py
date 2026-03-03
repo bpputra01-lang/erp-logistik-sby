@@ -878,9 +878,9 @@ st.subheader("4️⃣ FINAL ADJUSTMENT CHECKER")
 adj_col1, adj_col2 = st.columns(2)
 
 with adj_col1:
-    up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'xls'], key="u4_recon")
+    up_r4 = st.file_uploader("Upload Sheet REAL + RECON", type=['xlsx', 'csv'], key="u4_recon")
 with adj_col2:
-    up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'xls'], key="u4_stock")
+    up_s4 = st.file_uploader("Upload Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u4_stock")
 
 if up_r4 and up_s4:
     if st.button("▶️ JALANKAN LOOKUP & DIFF", use_container_width=True):
