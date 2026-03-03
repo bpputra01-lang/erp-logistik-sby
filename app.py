@@ -1137,13 +1137,13 @@ def menu_Stock_Opname():
     st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
     up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v3")
     
-    if st.button("🛠️ GENERATE SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
+    if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
         df_p = st.session_state.get('df_mult_final')
         if df_p is not None and up_minus:
             df_m = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
             df_res, df_summary = logic_sum_adjustment_final(df_p, df_m)
             st.session_state.report_adj = {"data": df_res, "sum": df_summary}
-            st.success("✅ Adjustment Berhasil Dibuat!")
+            st.success("✅ Summary Adjustment Berhasil Dibuat!")
             st.rerun()
 
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
@@ -1199,7 +1199,7 @@ def menu_Stock_Opname():
             # Kirim ke user
             with open(file_name, "rb") as f:
                 st.download_button(
-                    label="📥 DOWNLOAD MASTER REPORT (EXCEL 2 SHEET)",
+                    label="📥 DOWNLOAD MASTER REPORT",
                     data=f,
                     file_name=file_name,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
