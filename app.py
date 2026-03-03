@@ -874,78 +874,96 @@ def menu_Stock_Opname():
 
 # ==========================================================
         # 🚀 FINAL ADJUSTMENT PROCESSOR (3-FILES COMBINED)
-        # TARUH DI BAWAH SETELAH ANALYZER / STEP SEBELUMNYA
         # ==========================================================
         st.markdown("<br><br><br>---", unsafe_allow_html=True)
         st.subheader("4️⃣ FINAL ADJUSTMENT + PROCESS")
 
-        # Layout 3 kolom sesuai permintaan
+        # Layout 3 kolom upload sesuai permintaan
         col_a, col_b, col_c = st.columns(3)
-        with col_a: up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
-        with col_b: up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
-        with col_c: up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
+        with col_a: 
+            up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
+        with col_b: 
+            up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
+        with col_c: 
+            up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
 
         if up_r4 and up_s4 and up_m5:
             if st.button("🔥 JALANKAN PROSES FINAL", use_container_width=True):
                 try:
-                    # Pembacaan file sesuai ekstensi
+                    # 1. Pembacaan file sesuai ekstensi
                     df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
                     df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
                     df_m5 = pd.read_excel(up_m5)
 
-                    # --- LOGIC STEP 4 (LOOKUP) ---
+                    # 2. Logic Step 4 (Lookup)
                     df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
                     res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                     
-                    # --- LOGIC STEP 5 (PIVOT) ---
+                    # 3. Logic Step 5 (Pivot)
                     df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
 
-                    # --- FILTER KERAS (ANTI SKU 0-0) ---
+                    # 4. Fungsi Filter Keras (Anti Data Siluman QTY 0-0)
                     def bantai_data_siluman(df):
                         if df is not None and not df.empty:
-                            # Paksa QTY jadi numerik
+                            # Pastikan kolom QTY jadi angka
                             df['QTY SYSTEM'] = pd.to_numeric(df['QTY SYSTEM'], errors='coerce').fillna(0)
                             df['QTY SO'] = pd.to_numeric(df['QTY SO'], errors='coerce').fillna(0)
                             
-                            # Hitung ulang DIFF biar beneran 0 kalau QTY sama
+                            # Hitung ulang DIFF secara paksa
                             df['DIFF'] = abs(df['QTY SYSTEM'] - df['QTY SO'])
                             
-                            # CUMA AMBIL YANG DIFF > 0 (Item 0-0 otomatis mati)
+                            # Buang baris yang DIFF nya 0 (Item 0-0 otomatis mati)
                             df = df[df['DIFF'] > 0].reset_index(drop=True)
                         return df
 
+                    # Eksekusi pembersihan
                     df_mult = bantai_data_siluman(df_mult)
                     df_sing = bantai_data_siluman(df_sing)
 
-                    # Simpan ke state biar nggak ilang pas download
+                    # 5. Simpan SEMUA hasil ke session_state (Biar Tab 3 gak error)
+                    st.session_state.df_res4_final = res4
                     st.session_state.df_mult_final = df_mult
                     st.session_state.df_sing_final = df_sing
                     st.session_state.process_done = True
+                    
+                    # Refresh halaman untuk nampilin hasil
                     st.rerun()
 
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
                     st.stop()
 
-        # --- AREA TAMPILAN (DI BAWAH UPLOADER) ---
+        # --- AREA TAMPILAN HASIL (DI BAWAH UPLOADER) ---
         if hasattr(st.session_state, 'process_done') and st.session_state.process_done:
-            st.success("✅ Data Berhasil Diproses!")
-            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "HASIL CEK ADJ +"])
+            st.success("✅ Data Berhasil Diproses & Data Sampah Dibuang!")
+            
+            # Membuat 3 Tab Hasil
+            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 HASIL CEK ADJ +"])
             
             with t1:
+                # Menampilkan Tabel Multiple
                 st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
                 st.download_button(
                     label="📥 Download Multiple Adjustment",
                     data=st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'),
                     file_name="final_adj_multiple.csv",
                     mime="text/csv",
-                    key="dl_final_ok"
+                    key="dl_final_mult_fix"
                 )
             
             with t2:
+                # Menampilkan Tabel Single
                 st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
+                st.download_button(
+                    label="📥 Download Single Adjustment",
+                    data=st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'),
+                    file_name="final_adj_single.csv",
+                    mime="text/csv",
+                    key="dl_final_sing_fix"
+                )
+            
             with t3:
-                # ✅ Menampilkan data hasil lookup awal (Step 4) biar lu gampang cross-check
+                # Menampilkan Data Lookup Awal (Res4)
                 st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
