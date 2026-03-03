@@ -982,7 +982,6 @@ def menu_Stock_Opname():
                     key="dl_mult_final"
                 )
             with t_sing: st.dataframe(st.session_state.df_sing_5, use_container_width=True)
-
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
