@@ -736,35 +736,24 @@ def generate_real_plus_recon(allocated_data):
     return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
 
 def logic_miss_location_report(df_setup_real):
-    # Buat template header default sesuai Macro VBA
+    # Header standar sesuai Macro VBA
     columns_ref = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
     
-    # Jika data None atau beneran kosong
+    # Cek jika data kosong atau None
     if df_setup_real is None or not isinstance(df_setup_real, pd.DataFrame) or df_setup_real.empty:
-        df_out = pd.DataFrame(columns=columns_ref) # Cuma Header
-        df_sum = pd.DataFrame({
-            "KETERANGAN": ["TOTAL SKU", "TOTAL QTY MISS LOCATION"],
-            "TOTAL": ["0 ITEM", "0 ITEM"]
-        })
-        return df_out, df_sum
+        return pd.DataFrame(columns=columns_ref), 0, 0
     
     try:
-        # Proses Normal kalau ada isinya
         df_out = df_setup_real.iloc[:, 0:4].copy()
         df_out.columns = columns_ref
         df_out["QTY MISS LOC."] = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').fillna(0)
         
         total_sku = df_out["SKU"].nunique()
-        total_qty = df_out["QTY MISS LOC."].sum()
+        total_qty = int(df_out["QTY MISS LOC."].sum())
         
-        df_sum = pd.DataFrame({
-            "KETERANGAN": ["TOTAL SKU", "TOTAL QTY MISS LOCATION"],
-            "TOTAL": [f"{int(total_sku)} ITEM", f"{int(total_qty)} ITEM"]
-        })
-        return df_out, df_sum
-    except Exception as e:
-        # Fallback kalau format kolom berantakan
-        return pd.DataFrame(columns=columns_ref), pd.DataFrame({"KETERANGAN": ["ERROR"], "TOTAL": ["CHECK FORMAT"]})
+        return df_out, total_sku, total_qty
+    except:
+        return pd.DataFrame(columns=columns_ref), 0, 0
 
 def logic_sum_adjustment_final(df_plus, df_minus):
     # Replikasi Macro Sum Adjustment
@@ -1062,45 +1051,53 @@ def menu_Stock_Opname():
         st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx")
 
     # =========================================================
-    # ⚙️ 6. FINAL REPORT GENERATOR (MACRO REPLICATION)
+    # ⚙️ 6. FINAL REPORT GENERATOR (METRICS STYLE)
     # =========================================================
     st.markdown("---")
-    st.subheader("6️⃣ FINAL REPORTS GENERATOR (Macro Replication)")
+    st.subheader("6️⃣ FINAL REPORTS GENERATOR")
     
-    c_rep1, c_rep2 = st.columns(2)
-    
-    with c_rep1:
-        st.write("📊 **Miss Location Report**")
-        if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_macro_miss_final_v5"):
-            data_source = st.session_state.get('set_up_real_plus')
-            
-            # Panggil logic (sekarang selalu balikkin data, walau kosong)
-            res_data, res_sum = logic_miss_location_report(data_source)
-            
-            st.session_state.report_miss = {"data": res_data, "sum": res_sum}
-            
-            # Tampilkan Box Metrix ala Dashboard
-            val_qty = res_sum.loc[res_sum['KETERANGAN'] == 'TOTAL QTY MISS LOCATION', 'TOTAL'].values[0]
-            
-            if val_qty == "0 ITEM":
-                st.success("✅ Selesai: 0 Miss Location Ditemukan.")
-            else:
-                st.warning(f"⚠️ Ditemukan {val_qty} Miss Location!")
+    if st.button("🛠️ GENERATE MISS LOC REPORT", key="btn_miss_loc_final"):
+        data_src = st.session_state.get('set_up_real_plus')
+        df_res, count_sku, count_qty = logic_miss_location_report(data_src)
+        
+        # Simpan ke session state
+        st.session_state.report_miss = {
+            "data": df_res,
+            "sku": count_sku,
+            "qty": count_qty
+        }
 
-    # --- Area Overview (Selalu Muncul setelah Generate diklik) ---
+    # Tampilkan Metrics Box ala Dashboard
     if "report_miss" in st.session_state:
-        st.markdown("### 📋 Overview Miss Location")
+        m1, m2 = st.columns(2)
         
-        # Tampilkan Metrix Box (KETERANGAN & TOTAL)
-        st.table(st.session_state.report_miss["sum"])
-        
-        # Tampilkan Tabel Data (Muncul Headernya doang kalau kosong)
-        st.dataframe(
-            st.session_state.report_miss["data"], 
-            use_container_width=True, 
-            hide_index=True
-        )
+        # Box 1: Total SKU
+        with m1:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">📦 TOTAL SKU MISS LOC.</p>
+                    <h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss['sku']} <span style="font-size: 18px;">ITEM</span></h2>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        # Box 2: Total QTY
+        with m2:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
+                    <p style="color: #808495; margin-bottom: 5px; font-size: 14px;">🔥 TOTAL QTY MISS LOC.</p>
+                    <h2 style="color: #FFD700; margin: 0;">{st.session_state.report_miss['qty']} <span style="font-size: 18px;">ITEM</span></h2>
+                </div>
+            """, unsafe_allow_html=True)
 
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Tampilkan Tabel (Muncul Header doang kalau data kosong)
+        with st.expander("📋 VIEW DETAILS LIST MISS LOCATION", expanded=True):
+            st.dataframe(
+                st.session_state.report_miss["data"],
+                use_container_width=True,
+                hide_index=True
+            )
     with c_rep2:
         st.write("💰 **Sum Adjustment Report**")
         up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_vba")
