@@ -1025,37 +1025,46 @@ def menu_Stock_Opname():
                     df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
                     df_m5 = pd.read_excel(up_m5)
 
-                    # 2. Logic Step 4 (Lookup)
-                    df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
+                    # 2. Jalankan Logic Lookup
+                    # Note: VBA mulai dari A2, di Pandas index 0 adalah header. 
+                    # Jika file recon kamu ada header, jangan di-slice iloc[:, 1:] kecuali yakin kolom A itu nomor.
                     res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                     
-                    # 3. Logic Step 5 (Pivot)
+                    # 3. Jalankan Logic Pivot
                     df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
 
-                    # 4. Fungsi Pembersih SKU 0-0
-                    def bantai_data_siluman(df):
-                        if df is not None and not df.empty:
+                    # 4. Fungsi Pembersih (Disesuaikan dengan logika VBA: K > J)
+                    def bantai_data_siluman(df, type_adj="multiple"):
+                        if df is None or df.empty: return df
+                        
+                        if type_adj == "multiple":
+                            # Pastikan numerik untuk kalkulasi
                             df['QTY SYSTEM'] = pd.to_numeric(df['QTY SYSTEM'], errors='coerce').fillna(0)
                             df['QTY SO'] = pd.to_numeric(df['QTY SO'], errors='coerce').fillna(0)
-                            # Hitung ulang DIFF biar beneran 0 kalau QTY sama
-                            df['DIFF'] = abs(df['QTY SYSTEM'] - df['QTY SO'])
-                            # Hanya ambil yang selisihnya > 0
-                            df = df[df['DIFF'] > 0].reset_index(drop=True)
-                        return df
+                            df['DIFF'] = pd.to_numeric(df['DIFF'], errors='coerce').fillna(0)
+                            
+                            # Syarat VBA: Hanya jika QTY SO > QTY SYSTEM dan DIFF > 0
+                            mask = (df['QTY SO'] > df['QTY SYSTEM']) & (df['DIFF'] > 0)
+                            return df[mask].reset_index(drop=True)
+                        else:
+                            # Untuk Single Adj
+                            df['QTY ADJ'] = pd.to_numeric(df['QTY ADJ'], errors='coerce').fillna(0)
+                            return df[df['QTY ADJ'] > 0].reset_index(drop=True)
 
-                    df_mult = bantai_data_siluman(df_mult)
-                    df_sing = bantai_data_siluman(df_sing)
+                    # Eksekusi Pembersihan
+                    df_mult_clean = bantai_data_siluman(df_mult, "multiple")
+                    df_sing_clean = bantai_data_siluman(df_sing, "single")
 
                     # 5. Simpan ke Session State
                     st.session_state.df_res4_final = res4
-                    st.session_state.df_mult_final = df_mult
-                    st.session_state.df_sing_final = df_sing
+                    st.session_state.df_mult_final = df_mult_clean
+                    st.session_state.df_sing_final = df_sing_clean
                     st.session_state.process_done = True
                     
                     st.rerun()
 
                 except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
+                    st.error(f"❌ Error pada Proses Final: {str(e)}")
                     st.stop()
 
         # --- AREA TAMPILAN HASIL (CLEAN VERSION) ---
