@@ -524,19 +524,23 @@ def clean_index_if_exists(df):
     if df.empty:
         return df
     col_name = str(df.columns[0]).lower()
+    # Cek apakah kolom pertama adalah kolom angka bawaan (sampah)
     is_unnamed = "unnamed" in col_name or col_name == "0" or col_name == "no"
+    
     first_col_vals = df.iloc[:, 0].dropna()
     is_sequential = False
     if len(first_col_vals) > 1 and np.issubdtype(first_col_vals.dtype, np.number):
         diffs = np.diff(first_col_vals)
         if np.all(diffs == 1):
             is_sequential = True
+            
     if is_unnamed or is_sequential:
+        # Hapus kolom A (nomor) agar BIN kembali ke index 0
         return df.iloc[:, 1:].reset_index(drop=True)
     return df
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    # TAMBAHAN LOGIC: Cek sampah nomor sebelum running
+    # Membersihkan kolom sampah agar BIN=0, SKU=1, HASIL RECON=6
     df_recon = clean_index_if_exists(df_recon)
     df_stock_adj = clean_index_if_exists(df_stock_adj)
 
@@ -544,9 +548,7 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     
     def clean_val(x):
         if pd.isna(x): return ""
-        # Paksa ke string, hapus spasi, dan jadikan uppercase
         s = str(x).strip().upper()
-        # Hilangkan .0 jika berasal dari float (contoh: '123.0' jadi '123')
         if s.endswith('.0'): s = s[:-2]
         return s
 
@@ -554,13 +556,13 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     all_recon_keys = set()
     for _, row in df_recon.iterrows():
         try:
-            # Pastikan kolom 0 (BIN) dan 1 (SKU) dibersihkan total
+            # Sesuai gambar: BIN di A (0), SKU di B (1)
             b_recon = clean_val(row.iloc[0])
             s_recon = clean_val(row.iloc[1])
             if b_recon and s_recon:
                 key = f"{b_recon}|{s_recon}"
-                # Ambil nilai QTY di kolom 6
-                val_recon = row.iloc[6]
+                # Sesuai gambar: HASIL RECONCILIATION di G (6)
+                val_recon = row.iloc[6] 
                 recon_dict[key] = val_recon
                 all_recon_keys.add(key)
         except: continue
@@ -570,46 +572,41 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
 
     used_keys = set()
     def do_lookup(row):
-        # Pembersihan yang sama harus dilakukan di df_stock agar MATCH
-        b_stock = clean_val(row.iloc[1]) # Kolom BIN di Stock
-        s_stock = clean_val(row.iloc[2]) # Kolom SKU di Stock
+        # Di df_stock: Pastikan BIN di kolom 1 dan SKU di kolom 2
+        b_stock = clean_val(row.iloc[1])
+        s_stock = clean_val(row.iloc[2])
         key_stock = f"{b_stock}|{s_stock}"
-        
         if key_stock in recon_dict:
             used_keys.add(key_stock)
             return recon_dict[key_stock]
-        return "" # Jika tidak ketemu, return string kosong (penyebab tidak muncul)
+        return ""
 
-    # Mengisi kolom 10 (QTY SO)
     df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
 
     def do_diff(row):
         try:
             val_sys = row.iloc[9]
             val_so = row.iloc[10]
-            # Pastikan val_so bukan string kosong sebelum dihitung
             if val_so != "" and val_so is not None:
                 return abs(float(val_sys) - float(val_so))
         except: return 0
         return ""
 
     df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
-    
     cols = list(df_stock.columns)
     cols[10], cols[11] = "QTY SO", "DIFF"
     df_stock.columns = cols
 
-    # Pastikan perbandingan missing_keys juga menggunakan clean_val
     missing_keys = all_recon_keys - used_keys
     df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
-    
     return df_stock, df_need_single
 
-# --- FUNGSI LAIN TETAP SAMA SEPERTI SEBELUMNYA ---
+# --- FUNGSI LAINNYA TETAP SAMA ---
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
     df_stock_final = clean_index_if_exists(df_stock_final)
     df_adj_plus_master = clean_index_if_exists(df_adj_plus_master)
     df_recon_missing = clean_index_if_exists(df_recon_missing)
+    
     df_filtered = df_stock_final.copy()
     df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
     df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
