@@ -999,14 +999,12 @@ def menu_Stock_Opname():
             st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
-
 # ==========================================================
-        # 🚀 FINAL ADJUSTMENT PROCESSOR (3-FILES COMBINED)
+        # 🚀 FINAL ADJUSTMENT PROCESSOR (SINKRON DENGAN LOGIC)
         # ==========================================================
         st.markdown("<br><br><br>---", unsafe_allow_html=True)
         st.subheader("4️⃣ FINAL ADJUSTMENT + PROCESS")
 
-        # Layout 3 kolom upload
         col_a, col_b, col_c = st.columns(3)
         with col_a: 
             up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
@@ -1016,85 +1014,79 @@ def menu_Stock_Opname():
             up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
 
         if up_r4 and up_s4 and up_m5:
-            if st.button("🔥 JALANKAN PROSES FINAL", use_container_width=True):
+            if st.button("🔥 JALANKAN PROSES FINAL", use_container_width=True, key="btn_final_proc"):
                 try:
                     # 1. Pembacaan file
                     df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
                     df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
                     df_m5 = pd.read_excel(up_m5)
 
-                    # 2. Logic Step 4 (Lookup)
-                    df_r4 = df_r4.iloc[:, 1:].reset_index(drop=True)
-                    res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+                    # 2. Jalankan Logic Utama
+                    # Sesuai fungsi: row.iloc[0] (BIN), row.iloc[1] (SKU), row.iloc[6] (QTY)
+                    df_r4_clean = df_r4.copy() 
+                    res4, miss4 = logic_cek_adjustment_final(df_r4_clean, df_s4)
                     
-                    # 3. Logic Step 5 (Pivot)
+                    # 3. Jalankan Pivot
+                    # Sesuai fungsi: Multiple dari df_stock_final, Single dari df_recon_missing
                     df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
 
-                    # 4. Fungsi Pembersih SKU 0-0
-                    def bantai_data_siluman(df):
+                    # 4. Pembersihan Data (Hanya untuk yang benar-benar ada isinya)
+                    def clean_final_result(df):
                         if df is not None and not df.empty:
-                            df['QTY SYSTEM'] = pd.to_numeric(df['QTY SYSTEM'], errors='coerce').fillna(0)
-                            df['QTY SO'] = pd.to_numeric(df['QTY SO'], errors='coerce').fillna(0)
-                            # Hitung ulang DIFF biar beneran 0 kalau QTY sama
-                            df['DIFF'] = abs(df['QTY SYSTEM'] - df['QTY SO'])
-                            # Hanya ambil yang selisihnya > 0
-                            df = df[df['DIFF'] > 0].reset_index(drop=True)
+                            # Cari kolom angka terakhir (biasanya QTY ADJ atau hasil merge)
+                            # Kita pastikan tidak ada QTY 0 yang lolos
+                            last_col = df.columns[-1]
+                            df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
+                            df = df[df[last_col] > 0].reset_index(drop=True)
                         return df
 
-                    df_mult = bantai_data_siluman(df_mult)
-                    df_sing = bantai_data_siluman(df_sing)
-
-                    # 5. Simpan ke Session State
+                    st.session_state.df_mult_final = clean_final_result(df_multiple_final)
+                    st.session_state.df_sing_final = clean_final_result(df_single_final)
                     st.session_state.df_res4_final = res4
-                    st.session_state.df_mult_final = df_mult
-                    st.session_state.df_sing_final = df_sing
                     st.session_state.process_done = True
                     
                     st.rerun()
 
                 except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
-                    st.stop()
+                    st.error(f"❌ Terjadi Kesalahan: {str(e)}")
 
-        # --- AREA TAMPILAN HASIL ---
-        if "process_done" in st.session_state and st.session_state.process_done:
-            st.success("✅ Proses Selesai! Semua data sampah otomatis dibuang.")
+        # --- AREA TAMPILAN HASIL (TANPA DUPLIKAT KEY) ---
+        if st.session_state.get("process_done"):
+            st.success("✅ Analisis Selesai! Data selisih 0 otomatis dibuang.")
             
-            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 HASIL CEK ADJ +"])
+            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 HASIL LOOKUP RAW"])
             
             with t1:
-                if "df_mult_final" in st.session_state:
+                if st.session_state.df_mult_final is not None:
                     st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
                     st.download_button(
                         label="📥 Download Multiple Adjustment",
                         data=st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'),
                         file_name="final_adj_multiple.csv",
                         mime="text/csv",
-                        key="dl_final_mult_ok"
+                        key="dl_btn_mult_unique_v1"
                     )
             
             with t2:
-                if "df_sing_final" in st.session_state:
+                if st.session_state.df_sing_final is not None:
                     st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
                     st.download_button(
                         label="📥 Download Single Adjustment",
                         data=st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'),
                         file_name="final_adj_single.csv",
                         mime="text/csv",
-                        key="dl_final_sing_ok"
+                        key="dl_btn_sing_unique_v1"
                     )
             
             with t3:
-                if "df_res4_final" in st.session_state:
-                    # Menampilkan data lookup awal
+                if st.session_state.df_res4_final is not None:
                     st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
-                    # ✅ Tombol Download Tab 3 sesuai permintaan
                     st.download_button(
-                        label="📥 Download Hasil Cek Adjustment",
+                        label="📥 Download Hasil Lookup",
                         data=st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'),
-                        file_name="hasil_cek_adjustment.csv",
+                        file_name="hasil_lookup_full.csv",
                         mime="text/csv",
-                        key="dl_res4_final_ok"
+                        key="dl_btn_res4_unique_v1"
                     )
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
