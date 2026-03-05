@@ -874,7 +874,7 @@ def menu_Stock_Opname():
 
     st.markdown("---")
 
-    # STEP 1
+# STEP 1
 st.subheader("1️⃣ Upload & Run Compare")
 c1, c2 = st.columns(2)
 with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
@@ -885,6 +885,10 @@ if up_scan and up_stock:
         df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
         df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
         
+        # --- PERBAIKAN: Bersihkan sampah kolom A agar iloc filter tidak salah sasaran ---
+        df_s_raw = clean_index_if_exists(df_s_raw)
+        df_t_raw = clean_index_if_exists(df_t_raw)
+        
         if selected_sub: df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
         if selected_bin_sys: df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
         if selected_bin_cov: df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
@@ -894,42 +898,37 @@ if up_scan and up_stock:
         
         item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
         item_map.columns = ['SKU', 'NAME']
-        # Proteksi agar SKU map tidak ada .0 yang bikin mapping gagal
+        # Hilangkan .0 pada SKU agar mapping nama tidak gagal
         item_map['SKU'] = item_map['SKU'].str.replace(r'\.0$', '', regex=True).str.strip()
         map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
         
-        # Mapping nama ke res_scan
         res_scan['ITEM NAME'] = res_scan['SKU'].astype(str).str.replace(r'\.0$', '', regex=True).map(map_dict)
         res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict)
 
-        # --- PERBAIKAN FILTER DISINI ---
-        # Gunakan .str.strip() untuk memastikan tidak ada spasi gaib di kata "REAL +"
-        # Dan pastikan copy() dilakukan setelah mapping nama selesai
-        df_real_plus = res_scan[res_scan['NOTE'].astype(str).str.strip() == "REAL +"].copy()
-        df_system_plus = res_stock[res_stock['NOTE'].astype(str).str.strip() == "SYSTEM +"].copy()
-
+        # --- AMBIL SEMUA REAL + DENGAN STRIP (Mencegah Spasi Gaib) ---
         st.session_state.compare_result = {
             'res_scan': res_scan, 
             'res_stock': res_stock, 
-            'real_plus': df_real_plus, 
-            'system_plus': df_system_plus, 
+            'real_plus': res_scan[res_scan['NOTE'].astype(str).str.strip() == "REAL +"].copy(),
+            'system_plus': res_stock[res_stock['NOTE'].astype(str).str.strip() == "SYSTEM +"].copy(),
             'map_dict': map_dict
         }
         st.rerun()
 
-    if st.session_state.compare_result:
-        d = st.session_state.compare_result
-        st.markdown(f"""
-            <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
-                <div class="m-box"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{int(d['real_plus']['DIFF'].sum())}</span></div>
-                <div class="m-box"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{int(d['system_plus']['DIFF'].sum())}</span></div>
-            </div>
-        """, unsafe_allow_html=True)
-        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
-        with t1: st.dataframe(d['res_scan'], use_container_width=True)
-        with t2: st.dataframe(d['res_stock'], use_container_width=True)
-        with t3: st.dataframe(d['real_plus'], use_container_width=True)
-        with t4: st.dataframe(d['system_plus'], use_container_width=True)
+# --- PENGECEKAN AMAN ---
+if st.session_state.get('compare_result') is not None:
+    d = st.session_state.compare_result
+    st.markdown(f"""
+        <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
+            <div class="m-box"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{int(d['real_plus']['DIFF'].sum())}</span></div>
+            <div class="m-box"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{int(d['system_plus']['DIFF'].sum())}</span></div>
+        </div>
+    """, unsafe_allow_html=True)
+    t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
+    with t1: st.dataframe(d['res_scan'], use_container_width=True)
+    with t2: st.dataframe(d['res_stock'], use_container_width=True)
+    with t3: st.dataframe(d['real_plus'], use_container_width=True)
+    with t4: st.dataframe(d['system_plus'], use_container_width=True)
 
         st.markdown("---")
         st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
