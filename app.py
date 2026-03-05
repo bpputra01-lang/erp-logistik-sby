@@ -875,55 +875,60 @@ def menu_Stock_Opname():
     st.markdown("---")
 
 # STEP 1
-        st.subheader("1️⃣ Upload & Run Compare")
-        c1, c2 = st.columns(2)
-        with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
-        with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
+st.subheader("1️⃣ Upload & Run Compare")
+c1, c2 = st.columns(2)
+with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
+with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
 
-        if up_scan and up_stock:
-            if st.button("▶️ RUN COMPARE", use_container_width=True):
-                df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
-                df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
-                
-                # --- PERBAIKAN: Bersihkan dulu agar iloc filter tidak salah sasaran ---
-                df_s_raw = clean_index_if_exists(df_s_raw)
-                df_t_raw = clean_index_if_exists(df_t_raw)
-                
-                if selected_sub: df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-                if selected_bin_sys: df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
-                if selected_bin_cov: df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
+if up_scan and up_stock:
+    if st.button("▶️ RUN COMPARE", use_container_width=True):
+        df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
+        df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
+        
+        # --- PERBAIKAN 1: Bersihkan dulu agar iloc filter tidak salah sasaran ---
+        df_s_raw = clean_index_if_exists(df_s_raw)
+        df_t_raw = clean_index_if_exists(df_t_raw)
+        
+        # --- PERBAIKAN 2: Filter harus SETELAH data dibersihkan dari nomor urut ---
+        if selected_sub: 
+            df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+        if selected_bin_sys: 
+            df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
+        if selected_bin_cov: 
+            df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
 
-                res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
-                res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
-                
-                # Mapping Name dengan proteksi SKU format .0
-                item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
-                item_map.columns = ['SKU', 'NAME']
-                item_map['SKU'] = item_map['SKU'].str.replace(r'\.0$', '', regex=True).str.strip()
-                map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-                
-                res_scan['ITEM NAME'] = res_scan['SKU'].astype(str).str.replace(r'\.0$', '', regex=True).map(map_dict)
-                res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict)
+        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
+        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
+        
+        # Mapping Name dengan proteksi SKU format .0
+        item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
+        item_map.columns = ['SKU', 'NAME']
+        item_map['SKU'] = item_map['SKU'].str.replace(r'\.0$', '', regex=True).str.strip()
+        map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
+        
+        # Tambahkan pembersihan SKU agar Item Name muncul di semua baris REAL +
+        res_scan['ITEM NAME'] = res_scan['SKU'].astype(str).str.replace(r'\.0$', '', regex=True).map(map_dict)
+        res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict)
 
-                # AMBIL SEMUA REAL + (Gunakan .strip() agar spasi gaib tidak bikin data hilang)
-                st.session_state.compare_result = {
-                    'res_scan': res_scan, 
-                    'res_stock': res_stock, 
-                    'real_plus': res_scan[res_scan['NOTE'].astype(str).str.strip() == "REAL +"].copy(),
-                    'system_plus': res_stock[res_stock['NOTE'].astype(str).str.strip() == "SYSTEM +"].copy()
-                }
-                st.rerun()
+        # --- PERBAIKAN 3: Ambil REAL + menggunakan strip agar spasi tidak menghalangi ---
+        st.session_state.compare_result = {
+            'res_scan': res_scan, 
+            'res_stock': res_stock, 
+            'real_plus': res_scan[res_scan['NOTE'].astype(str).str.strip() == "REAL +"].copy(),
+            'system_plus': res_stock[res_stock['NOTE'].astype(str).str.strip() == "SYSTEM +"].copy()
+        }
+        st.rerun()
 
-        # PASTIKAN BARIS DI BAWAH INI SEJAJAR DENGAN 'if up_scan and up_stock:'
-        if st.session_state.get('compare_result') is not None:
-            d = st.session_state.compare_result
-            st.markdown("---") # Baris 933 sekarang sudah lurus dengan 'if' di atasnya
-            st.markdown(f"""
-                <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
-                    <div class="m-box"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{int(d['real_plus']['DIFF'].sum())}</span></div>
-                    <div class="m-box"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{int(d['system_plus']['DIFF'].sum())}</span></div>
-                </div>
-            """, unsafe_allow_html=True)
+# --- PENAMPILAN DATA (Luruskan dengan "if up_scan and up_stock:") ---
+if st.session_state.get('compare_result') is not None:
+    d = st.session_state.compare_result
+    st.markdown("---")
+    st.markdown(f"""
+        <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
+            <div class="m-box"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{int(d['real_plus']['DIFF'].sum())}</span></div>
+            <div class="m-box"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{int(d['system_plus']['DIFF'].sum())}</span></div>
+        </div>
+    """, unsafe_allow_html=True)
 
         st.markdown("---")
         st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
