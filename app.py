@@ -546,8 +546,8 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
 
     used_keys = set()
     def do_lookup(row):
-        b_stock = clean_val(row.iloc[1])
-        s_stock = clean_val(row.iloc[2])
+        b_stock = clean_val(row.iloc[2])
+        s_stock = clean_val(row.iloc[3])
         key_stock = f"{b_stock}|{s_stock}"
         if key_stock in recon_dict:
             used_keys.add(key_stock)
