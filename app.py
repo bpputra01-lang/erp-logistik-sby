@@ -4,6 +4,9 @@ import streamlit as st
 import io
 import math
 
+import pandas as pd
+from collections import defaultdict
+
 
 st.set_page_config(
     page_title="LogsbyERP.id",
@@ -660,66 +663,97 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
     return dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'])
 
+
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
+    # 1. Siapkan data sumber dalam dictionary
     system_dict = {}
-    for idx, row in df_system_plus.iterrows():
-        sku = str(row['SKU']).strip().upper()
-        bin_val = str(row['BIN']).strip().upper()
-        diff_val = row.get('DIFF', 0)
-        if pd.notnull(diff_val) and diff_val > 0:
-            key = (bin_val, sku)
-            system_dict[key] = system_dict.get(key, 0) + diff_val
+    for _, row in df_system_plus.iterrows():
+        key = (str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper())
+        system_dict[key] = system_dict.get(key, 0) + row.get('DIFF', 0)
     
     coverage_dict = {}
-    for idx, row in df_bin_coverage.iterrows():
-        sku = str(row.iloc[2]).strip().upper()
-        bin_val = str(row.iloc[1]).strip().upper()
-        qty_val = row.iloc[9] if len(row) > 9 else 0
-        try: qty_val = float(qty_val)
-        except: qty_val = 0
-        if qty_val > 0:
-            key = (bin_val, sku)
-            coverage_dict[key] = coverage_dict.get(key, 0) + qty_val
-    
-    df_result = df_real_plus.copy()
+    for _, row in df_bin_coverage.iterrows():
+        # Asumsi kolom: index 1=BIN, index 2=SKU, index 9=QTY
+        key = (str(row.iloc[1]).strip().upper(), str(row.iloc[2]).strip().upper())
+        try: val = float(row.iloc[9])
+        except: val = 0
+        coverage_dict[key] = coverage_dict.get(key, 0) + val
+
+    # 2. List untuk menampung baris baru
+    new_rows = []
     df_sys_updated = df_system_plus.copy()
-    sys_updates = []  
-    bin_alloc_list, qty_alloc_list, status_list = [], [], []
-    
-    for idx, row in df_result.iterrows():
-        sku, diff_needed = str(row['SKU']).strip().upper(), row['DIFF']
-        if diff_needed > 0:
-            remaining, bins_used, total_alloc = diff_needed, [], 0
-            for (bin_src, sku_src), qty_src in system_dict.items():
-                if remaining <= 0: break
-                if sku_src == sku and qty_src > 0:
-                    alloc = min(qty_src, remaining)
-                    bins_used.append(bin_src)
-                    total_alloc += alloc
-                    system_dict[(bin_src, sku_src)] -= alloc
-                    sys_updates.append((bin_src, sku_src, alloc))
-                    remaining -= alloc
-            if remaining > 0:
-                for (bin_src, sku_src), qty_src in coverage_dict.items():
-                    if remaining <= 0: break
-                    if sku_src == sku and qty_src > 0:
-                        alloc = min(qty_src, remaining)
-                        bins_used.append(bin_src)
-                        total_alloc += alloc
-                        coverage_dict[(bin_src, sku_src)] -= alloc
-                        remaining -= alloc
-            bin_alloc_list.append(" & ".join(list(set(bins_used)))[:50] if total_alloc > 0 else "")
-            qty_alloc_list.append(total_alloc)
-            status_list.append("FULL ALLOCATION" if remaining <= 0 else ("PARTIAL ALLOCATION" if total_alloc > 0 else "NO ALLOCATION"))
-        else:
-            bin_alloc_list.append(""); qty_alloc_list.append(0); status_list.append("NO DIFF")
-    
-    df_result['BIN ALOKASI'], df_result['QTY ALLOCATION'], df_result['STATUS'] = bin_alloc_list, qty_alloc_list, status_list
     sys_reduction = defaultdict(float)
-    for b, s, q in sys_updates: sys_reduction[(b, s)] += q
+
+    for _, row in df_real_plus.iterrows():
+        sku = str(row['SKU']).strip().upper()
+        diff_needed = row['DIFF']
+        
+        if diff_needed <= 0:
+            row_copy = row.to_dict()
+            row_copy.update({'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO DIFF'})
+            new_rows.append(row_copy)
+            continue
+
+        remaining = diff_needed
+        
+        # --- TAHAP 1: Cari di System Dictionary ---
+        for (bin_src, sku_src), qty_avail in system_dict.items():
+            if remaining <= 0: break
+            if sku_src == sku and qty_avail > 0:
+                alloc = min(qty_avail, remaining)
+                
+                # Buat baris baru untuk alokasi ini
+                row_alloc = row.to_dict()
+                row_alloc.update({
+                    'BIN ALOKASI': bin_src,
+                    'QTY ALLOCATION': alloc,
+                    'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'
+                })
+                new_rows.append(row_alloc)
+                
+                system_dict[(bin_src, sku_src)] -= alloc
+                sys_reduction[(bin_src, sku_src)] += alloc
+                remaining -= alloc
+
+        # --- TAHAP 2: Cari di Coverage Dictionary (Jika masih sisa) ---
+        if remaining > 0:
+            for (bin_src, sku_src), qty_avail in coverage_dict.items():
+                if remaining <= 0: break
+                if sku_src == sku and qty_avail > 0:
+                    alloc = min(qty_avail, remaining)
+                    
+                    row_alloc = row.to_dict()
+                    row_alloc.update({
+                        'BIN ALOKASI': bin_src,
+                        'QTY ALLOCATION': alloc,
+                        'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'
+                    })
+                    new_rows.append(row_alloc)
+                    
+                    coverage_dict[(bin_src, sku_src)] -= alloc
+                    remaining -= alloc
+
+        # --- TAHAP 3: Jika Masih Sisa (NO ALLOCATION) ---
+        if remaining > 0:
+            row_no = row.to_dict()
+            row_no.update({
+                'DIFF': remaining, # Sisa yang tidak teralokasi
+                'BIN ALOKASI': '',
+                'QTY ALLOCATION': 0,
+                'STATUS': 'NO ALLOCATION'
+            })
+            new_rows.append(row_no)
+
+    # 3. Convert kembali ke DataFrame
+    df_result = pd.DataFrame(new_rows)
+
+    # 4. Update df_sys_updated (Logika pengurangan DIFF di system)
     for (b, s), q in sys_reduction.items():
-        mask = (df_sys_updated['BIN'].astype(str).str.upper() == b) & (df_sys_updated['SKU'].astype(str).str.upper() == s)
-        if mask.any(): df_sys_updated.loc[mask, 'DIFF'] -= q
+        mask = (df_sys_updated['BIN'].astype(str).str.upper() == b) & \
+               (df_sys_updated['SKU'].astype(str).str.upper() == s)
+        if mask.any():
+            df_sys_updated.loc[mask, 'DIFF'] -= q
+
     return df_result, df_sys_updated
 
 def generate_set_up_real_plus(allocated_data):
