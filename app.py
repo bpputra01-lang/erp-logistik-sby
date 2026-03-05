@@ -880,8 +880,8 @@ def menu_Stock_Opname():
     with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
     with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
 
-    if up_scan and up_stock:
-        if st.button("▶️ RUN COMPARE", use_container_width=True):
+if up_scan and up_stock:
+    if st.button("▶️ RUN COMPARE", use_container_width=True):
         df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
         df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
         
