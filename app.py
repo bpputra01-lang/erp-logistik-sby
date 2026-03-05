@@ -532,11 +532,11 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     all_recon_keys = set()
     for _, row in df_recon.iterrows():
         try:
-            b_recon = clean_val(row.iloc[0])
-            s_recon = clean_val(row.iloc[1])
+            b_recon = clean_val(row.iloc[1])
+            s_recon = clean_val(row.iloc[2])
             if b_recon and s_recon:
                 key = f"{b_recon}|{s_recon}"
-                val_recon = row.iloc[6]
+                val_recon = row.iloc[7]
                 recon_dict[key] = val_recon
                 all_recon_keys.add(key)
         except: continue
@@ -609,7 +609,7 @@ def logic_setup_karantina_with_check(df_outstanding):
     df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
     df['CHECK_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
     
-    df_check = df.iloc[:, [1, 2, 9, 13]].copy() 
+    df_check = df.iloc[:, [2, 3, 10, 14]].copy() 
     df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'HASIL_REKON_O']
     df_check['SELISIH_HITUNG_AI'] = df['CHECK_DIFF']
     
