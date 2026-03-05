@@ -527,23 +527,21 @@ def get_yellow_skus(file, column_index):
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock = df_stock_adj.copy()
+    
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s
 
+    # Mapping dari REAL + RECON
     recon_dict = {}
     all_recon_keys = set()
     for _, row in df_recon.iterrows():
         try:
-            b_recon = clean_val(row.iloc[0])
-            s_recon = clean_val(row.iloc[1])
-            if b_recon and s_recon:
-                key = f"{b_recon}|{s_recon}"
-                val_recon = row.iloc[6]
-                recon_dict[key] = val_recon
-                all_recon_keys.add(key)
+            k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
+            recon_dict[k] = row.iloc[6] # Kolom G
+            all_recon_keys.add(k)
         except: continue
 
     while df_stock.shape[1] < 12:
@@ -551,16 +549,16 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
 
     used_keys = set()
     def do_lookup(row):
-        b_stock = clean_val(row.iloc[1])
-        s_stock = clean_val(row.iloc[2])
-        key_stock = f"{b_stock}|{s_stock}"
+        key_stock = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
         if key_stock in recon_dict:
             used_keys.add(key_stock)
             return recon_dict[key_stock]
         return ""
 
+    # Isi QTY SO ke Kolom K (Index 10)
     df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
 
+    # Hitung DIFF ke Kolom L (Index 11)
     def do_diff(row):
         try:
             val_sys = row.iloc[9]
@@ -571,12 +569,17 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         return ""
 
     df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
+    
+    # Beri nama kolom secara paksa agar fungsi bantai_data_siluman tidak error
     cols = list(df_stock.columns)
-    cols[10], cols[11] = "QTY SO", "DIFF"
+    cols[9] = "QTY SYSTEM"  # Pastikan kolom J ada namanya
+    cols[10] = "QTY SO"
+    cols[11] = "DIFF"
     df_stock.columns = cols
 
     missing_keys = all_recon_keys - used_keys
     df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
+    
     return df_stock, df_need_single
 
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
