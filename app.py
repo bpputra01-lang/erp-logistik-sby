@@ -1019,10 +1019,11 @@ def menu_Stock_Opname():
                     st.error(f"❌ Error: {str(e)}")
                     st.stop()
 
-        # --- AREA TAMPILAN HASIL ---
+        # --- AREA TAMPILAN HASIL (CLEAN VERSION) ---
         if "process_done" in st.session_state and st.session_state.process_done:
             st.success("✅ Proses Selesai! Semua data sampah otomatis dibuang.")
             
+            # Buat 3 tab saja, jangan diduplikat kodenya
             t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 HASIL CEK ADJ +"])
             
             with t1:
@@ -1033,7 +1034,7 @@ def menu_Stock_Opname():
                         data=st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'),
                         file_name="final_adj_multiple.csv",
                         mime="text/csv",
-                        key="dl_final_mult_ok"
+                        key="dl_final_mult_unique" # Key unik
                     )
             
             with t2:
@@ -1044,43 +1045,18 @@ def menu_Stock_Opname():
                         data=st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'),
                         file_name="final_adj_single.csv",
                         mime="text/csv",
-                        key="dl_final_sing_ok"
+                        key="dl_final_sing_unique" # Key unik
                     )
             
             with t3:
                 if "df_res4_final" in st.session_state:
-                    # Menampilkan data lookup awal
                     st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
-                    # ✅ Tombol Download Tab 3 sesuai permintaan
                     st.download_button(
                         label="📥 Download Hasil Cek Adjustment",
                         data=st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'),
                         file_name="hasil_cek_adjustment.csv",
                         mime="text/csv",
-                        key="dl_res4_final_ok"
-                    )            
-            with t2:
-                if "df_sing_final" in st.session_state:
-                    st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
-                    st.download_button(
-                        label="📥 Download Single Adjustment",
-                        data=st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'),
-                        file_name="final_adj_single.csv",
-                        mime="text/csv",
-                        key="dl_final_sing_ok"
-                    )
-            
-            with t3:
-                if "df_res4_final" in st.session_state:
-                    # Menampilkan data lookup awal
-                    st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
-                    # ✅ Tombol Download Tab 3 sesuai permintaan
-                    st.download_button(
-                        label="📥 Download Hasil Cek Adjustment",
-                        data=st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'),
-                        file_name="hasil_cek_adjustment.csv",
-                        mime="text/csv",
-                        key="dl_res4_final_ok"
+                        key="dl_res4_final_unique" # Key unik
                     )
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
