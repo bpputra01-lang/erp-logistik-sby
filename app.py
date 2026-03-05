@@ -520,7 +520,40 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
+def clean_index_if_exists(df):
+    """
+    Fungsi untuk mendeteksi dan menghapus kolom 'sampah' nomor di kolom A 
+    sebelum proses running agar index iloc tidak bergeser.
+    """
+    if df.empty:
+        return df
+    
+    # Cek kolom pertama (indeks 0)
+    col_name = str(df.columns[0]).lower()
+    
+    # Kriteria kolom sampah: nama mengandung 'unnamed', 'no', atau '0'
+    is_unnamed = "unnamed" in col_name or col_name == "0" or col_name == "no"
+    
+    # Cek apakah isinya angka berurutan (ciri khas index streamlit/excel)
+    first_col_vals = df.iloc[:, 0].dropna()
+    is_sequential = False
+    if len(first_col_vals) > 1 and np.issubdtype(first_col_vals.dtype, np.number):
+        diffs = np.diff(first_col_vals)
+        if np.all(diffs == 1):
+            is_sequential = True
+            
+    if is_unnamed or is_sequential:
+        # Jika ditemukan sampah, hapus kolom tersebut dan geser sisanya ke kiri
+        return df.iloc[:, 1:].reset_index(drop=True)
+    
+    # Jika tidak ada sampah, lanjut running dengan df asli
+    return df
+
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
+    # TAMBAHAN LOGIC: Cek sampah nomor sebelum running
+    df_recon = clean_index_if_exists(df_recon)
+    df_stock_adj = clean_index_if_exists(df_stock_adj)
+
     df_stock = df_stock_adj.copy()
     def clean_val(x):
         if pd.isna(x): return ""
@@ -575,6 +608,11 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     return df_stock, df_need_single
 
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
+    # TAMBAHAN LOGIC: Cek sampah nomor sebelum running
+    df_stock_final = clean_index_if_exists(df_stock_final)
+    df_adj_plus_master = clean_index_if_exists(df_adj_plus_master)
+    df_recon_missing = clean_index_if_exists(df_recon_missing)
+
     df_filtered = df_stock_final.copy()
     df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
     df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
@@ -604,6 +642,9 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
     return df_multiple_final, df_single_final
 
 def logic_setup_karantina_with_check(df_outstanding):
+    # TAMBAHAN LOGIC: Cek sampah nomor sebelum running
+    df_outstanding = clean_index_if_exists(df_outstanding)
+
     df = df_outstanding.copy()
     df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
     df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
