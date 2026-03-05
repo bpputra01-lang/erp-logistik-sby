@@ -875,39 +875,39 @@ def menu_Stock_Opname():
     st.markdown("---")
 
     # STEP 1
-    st.subheader("1️⃣ Upload & Run Compare")
-    c1, c2 = st.columns(2)
-    with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
-    with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
+st.subheader("1️⃣ Upload & Run Compare")
+c1, c2 = st.columns(2)
+with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
+with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
 
-    if up_scan and up_stock:
-        if st.button("▶️ RUN COMPARE", use_container_width=True):
+if up_scan and up_stock:
+    # Baris 884: Pastikan ada titik dua (:) di akhir if
+    if st.button("▶️ RUN COMPARE", use_container_width=True):
+        # Baris 885: SEMUA baris di bawah ini WAJIB menjorok ke dalam (1 tab atau 4 spasi)
         df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
         df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
         
-        # --- PERBAIKAN 1: BERSIHKAN DULU SEBELUM FILTER ---
+        # 1. BERSIHKAN DULU agar index iloc tidak geser oleh kolom nomor urut
         df_s_raw = clean_index_if_exists(df_s_raw)
         df_t_raw = clean_index_if_exists(df_t_raw)
         
-        # Sekarang ilat[:, 6] dan iloc[:, 1] sudah pasti benar kolomnya
+        # 2. Filter (Sekarang aman karena kolom A sampah sudah dibuang)
         if selected_sub: 
             df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-        # ... (filter lainnya)
-
+        
+        # 3. Jalankan Logic (Pastikan fungsi logic_compare_scan_to_stock sudah memakai cara merge 'left' atau 'outer')
         res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
         res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
         
-        # --- PERBAIKAN 2: NORMALISASI SKU DI MAPPING ---
+        # 4. Mapping Item Name dengan proteksi SKU ".0"
         item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
         item_map.columns = ['SKU', 'NAME']
-        # Hapus .0 agar matching
         item_map['SKU'] = item_map['SKU'].str.replace(r'\.0$', '', regex=True).str.strip()
         map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
         
-        # Pastikan SKU di res_scan juga bersih sebelum mapping
-        res_scan['SKU_CLEAN'] = res_scan['SKU'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-        res_scan['ITEM NAME'] = res_scan['SKU_CLEAN'].map(map_dict)
+        res_scan['ITEM NAME'] = res_scan['SKU'].astype(str).str.replace(r'\.0$', '', regex=True).map(map_dict)
 
+        # 5. Simpan Hasil (Ini yang menentukan apa yang muncul di Tab REAL +)
         st.session_state.compare_result = {
             'res_scan': res_scan, 
             'res_stock': res_stock, 
