@@ -520,32 +520,8 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
-def clean_index_if_exists(df):
-    if df.empty:
-        return df
-    col_name = str(df.columns[0]).lower()
-    # Cek apakah kolom pertama adalah kolom angka bawaan (sampah)
-    is_unnamed = "unnamed" in col_name or col_name == "0" or col_name == "no"
-    
-    first_col_vals = df.iloc[:, 0].dropna()
-    is_sequential = False
-    if len(first_col_vals) > 1 and np.issubdtype(first_col_vals.dtype, np.number):
-        diffs = np.diff(first_col_vals)
-        if np.all(diffs == 1):
-            is_sequential = True
-            
-    if is_unnamed or is_sequential:
-        # Hapus kolom A (nomor) agar BIN kembali ke index 0
-        return df.iloc[:, 1:].reset_index(drop=True)
-    return df
-
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    # Membersihkan kolom sampah agar BIN=0, SKU=1, HASIL RECON=6
-    df_recon = clean_index_if_exists(df_recon)
-    df_stock_adj = clean_index_if_exists(df_stock_adj)
-
     df_stock = df_stock_adj.copy()
-    
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
@@ -556,13 +532,11 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     all_recon_keys = set()
     for _, row in df_recon.iterrows():
         try:
-            # Sesuai gambar: BIN di A (0), SKU di B (1)
             b_recon = clean_val(row.iloc[0])
             s_recon = clean_val(row.iloc[1])
             if b_recon and s_recon:
                 key = f"{b_recon}|{s_recon}"
-                # Sesuai gambar: HASIL RECONCILIATION di G (6)
-                val_recon = row.iloc[6] 
+                val_recon = row.iloc[6]
                 recon_dict[key] = val_recon
                 all_recon_keys.add(key)
         except: continue
@@ -572,7 +546,6 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
 
     used_keys = set()
     def do_lookup(row):
-        # Di df_stock: Pastikan BIN di kolom 1 dan SKU di kolom 2
         b_stock = clean_val(row.iloc[1])
         s_stock = clean_val(row.iloc[2])
         key_stock = f"{b_stock}|{s_stock}"
@@ -601,45 +574,48 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
     return df_stock, df_need_single
 
-# --- FUNGSI LAINNYA TETAP SAMA ---
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
-    df_stock_final = clean_index_if_exists(df_stock_final)
-    df_adj_plus_master = clean_index_if_exists(df_adj_plus_master)
-    df_recon_missing = clean_index_if_exists(df_recon_missing)
-    
     df_filtered = df_stock_final.copy()
     df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
     df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
     df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
+    
     mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
     df_to_pivot = df_filtered[mask_multiple].copy()
+    
     pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
     pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
+    
     master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
     df_multiple_final = pivot_multiple.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
+    
     if not df_multiple_final.empty:
         df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
         if 'SKU_KEY' in df_multiple_final.columns: 
             df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
+
     if not df_recon_missing.empty:
         df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
         df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
         df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
     else:
         df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+        
     return df_multiple_final, df_single_final
 
 def logic_setup_karantina_with_check(df_outstanding):
-    df_outstanding = clean_index_if_exists(df_outstanding)
     df = df_outstanding.copy()
     df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
     df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
     df['CHECK_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
+    
     df_check = df.iloc[:, [2, 3, 10, 14]].copy() 
     df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'HASIL_REKON_O']
     df_check['SELISIH_HITUNG_AI'] = df['CHECK_DIFF']
+    
     mask = df['CHECK_DIFF'] != 0
     df_filtered = df[mask].copy()
+    
     df_karantina = pd.DataFrame({
         "BIN AWAL": df_filtered.iloc[:, 2],
         "BIN TUJUAN": "KARANTINA",
