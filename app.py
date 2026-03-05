@@ -624,95 +624,38 @@ def logic_setup_karantina_with_check(df_outstanding):
         "NOTES": "MISS LOCATION"
     })
     return df_karantina, df_check
-    
-def clean_index_if_exists(df):
-    """
-    Menghapus kolom 'sampah' nomor di paling kiri jika terdeteksi,
-    agar urutan iloc [0, 1, 2] atau [1, 2, 9] tidak salah ambil data.
-    """
-    if df.empty:
-        return df
-    col_name = str(df.columns[0]).lower()
-    # Deteksi kolom index bawaan (Unnamed atau angka berurutan)
-    is_unnamed = "unnamed" in col_name or col_name == "0" or col_name == "no"
-    
-    first_col_vals = df.iloc[:, 0].dropna()
-    is_sequential = False
-    if len(first_col_vals) > 1 and np.issubdtype(first_col_vals.dtype, np.number):
-        diffs = np.diff(first_col_vals)
-        if np.all(diffs == 1):
-            is_sequential = True
-            
-    if is_unnamed or is_sequential:
-        return df.iloc[:, 1:].reset_index(drop=True)
-    return df
 
 def logic_compare_scan_to_stock(df_scan, df_stock):
-    # TAMBAHAN: Bersihkan kolom nomor sampah di awal
-    df_scan = clean_index_if_exists(df_scan)
-    df_stock = clean_index_if_exists(df_stock)
-
-    # Ambil data scan: Kolom 0(BIN), 1(SKU), 2(QTY)
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-    
-    # Ambil data stock: Kolom 1(BIN), 2(SKU), 9(QTY SYSTEM)
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
     dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-    
     for df in [ds, dt]:
-        # Paksa ke string, hapus spasi, dan jadikan Uppercase
         df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
         df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
-        # PROTEKSI: Hilangkan '.0' agar SKU '123' match dengan '123.0'
-        df['SKU'] = df['SKU'].apply(lambda x: x[:-2] if x.endswith('.0') else x)
-
-    # Grouping system dulu agar tidak ada duplikat BIN-SKU saat merge
     dt_grouped = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
-    
-    # Merge Data Scan dengan Data Stock
     ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
-    
-    # DIFF = SCAN - SYSTEM. Jika positif (>0) maka REAL +
     ds_merged['DIFF'] = ds_merged['QTY_SCAN'] - ds_merged['QTY_SYSTEM']
     ds_merged['NOTE'] = ds_merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else "OK")
-    
     return ds_merged
 
 def logic_compare_stock_to_scan(df_stock, df_scan):
-    # TAMBAHAN: Bersihkan kolom nomor sampah di awal
-    df_stock = clean_index_if_exists(df_stock)
-    df_scan = clean_index_if_exists(df_scan)
-
     dt = df_stock.copy()
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
-    
-    # Standarisasi format BIN dan SKU
     ds['BIN_SCAN'] = ds['BIN_SCAN'].astype(str).str.strip().str.upper()
     ds['SKU_SCAN'] = ds['SKU_SCAN'].astype(str).str.strip().str.upper()
-    ds['SKU_SCAN'] = ds['SKU_SCAN'].apply(lambda x: x[:-2] if x.endswith('.0') else x)
-    
     ds_grouped = ds.groupby(['BIN_SCAN', 'SKU_SCAN'])['QTY_TOTAL_SCAN'].sum().reset_index()
-    
-    # Definisi kolom berdasarkan indeks (Sesuai kode asli Anda)
     col_bin_sys = dt.columns[1]
     col_sku_sys = dt.columns[2]
     col_qty_sys = dt.columns[9]
     col_qty_so  = dt.columns[10] 
-    
     dt[col_bin_sys] = dt[col_bin_sys].astype(str).str.strip().str.upper()
     dt[col_sku_sys] = dt[col_sku_sys].astype(str).str.strip().str.upper()
-    dt[col_sku_sys] = dt[col_sku_sys].apply(lambda x: x[:-2] if x.endswith('.0') else x)
-    
     dt_merged = dt.merge(ds_grouped, left_on=[col_bin_sys, col_sku_sys], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
-    
     dt_merged[col_qty_so] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
-    
-    # DIFF = SYSTEM - SCAN. Jika positif (>0) maka SYSTEM +
-    dt_merged['DIFF'] = dt_merged[col_qty_sys].astype(float) - dt_merged[col_qty_so].astype(float)
+    dt_merged['DIFF'] = dt_merged[col_qty_sys] - dt_merged[col_qty_so]
     dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
-    
     return dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'])
 
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
@@ -938,30 +881,40 @@ def menu_Stock_Opname():
     with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
 
     if up_scan and up_stock:
-        if st.button("▶️ RUN COMPARE", use_container_width=True):
-            df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
-            df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
-            
-            if selected_sub: df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-            if selected_bin_sys: df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
-            if selected_bin_cov: df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
+    if st.button("▶️ RUN COMPARE", use_container_width=True):
+        df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
+        df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
+        
+        # --- PERBAIKAN 1: BERSIHKAN DULU SEBELUM FILTER ---
+        df_s_raw = clean_index_if_exists(df_s_raw)
+        df_t_raw = clean_index_if_exists(df_t_raw)
+        
+        # Sekarang ilat[:, 6] dan iloc[:, 1] sudah pasti benar kolomnya
+        if selected_sub: 
+            df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+        # ... (filter lainnya)
 
-            res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
-            res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
-            
-            item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
-            item_map.columns = ['SKU', 'NAME']
-            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
-            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict)
+        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
+        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
+        
+        # --- PERBAIKAN 2: NORMALISASI SKU DI MAPPING ---
+        item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
+        item_map.columns = ['SKU', 'NAME']
+        # Hapus .0 agar matching
+        item_map['SKU'] = item_map['SKU'].str.replace(r'\.0$', '', regex=True).str.strip()
+        map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
+        
+        # Pastikan SKU di res_scan juga bersih sebelum mapping
+        res_scan['SKU_CLEAN'] = res_scan['SKU'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+        res_scan['ITEM NAME'] = res_scan['SKU_CLEAN'].map(map_dict)
 
-            st.session_state.compare_result = {
-                'res_scan': res_scan, 'res_stock': res_stock, 
-                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
-                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
-                'map_dict': map_dict
-            }
-            st.rerun()
+        st.session_state.compare_result = {
+            'res_scan': res_scan, 
+            'res_stock': res_stock, 
+            'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
+            'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+        }
+        st.rerun()
 
     if st.session_state.compare_result:
         d = st.session_state.compare_result
