@@ -4,9 +4,11 @@ import streamlit as st
 import io
 import math
 
+
 st.set_page_config(
     page_title="LogsbyERP.id",
-    page_icon="🚛",)
+    page_icon="🚛",
+    layout="wide",)
   
 st.markdown("""
     <style>
