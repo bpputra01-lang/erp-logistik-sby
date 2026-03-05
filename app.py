@@ -1000,7 +1000,7 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 # ==========================================================
-        # 🚀 FINAL ADJUSTMENT PROCESSOR (SINKRON DENGAN LOGIC)
+        # 🚀 FINAL ADJUSTMENT PROCESSOR (SINKRON TOTAL)
         # ==========================================================
         st.markdown("<br><br><br>---", unsafe_allow_html=True)
         st.subheader("4️⃣ FINAL ADJUSTMENT + PROCESS")
@@ -1014,7 +1014,7 @@ def menu_Stock_Opname():
             up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
 
         if up_r4 and up_s4 and up_m5:
-            if st.button("🔥 JALANKAN PROSES FINAL", use_container_width=True, key="btn_final_proc"):
+            if st.button("🔥 JALANKAN PROSES FINAL", use_container_width=True, key="btn_final_proc_v2"):
                 try:
                     # 1. Pembacaan file
                     df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
@@ -1022,26 +1022,22 @@ def menu_Stock_Opname():
                     df_m5 = pd.read_excel(up_m5)
 
                     # 2. Jalankan Logic Utama
-                    # Sesuai fungsi: row.iloc[0] (BIN), row.iloc[1] (SKU), row.iloc[6] (QTY)
-                    df_r4_clean = df_r4.copy() 
-                    res4, miss4 = logic_cek_adjustment_final(df_r4_clean, df_s4)
+                    res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                     
-                    # 3. Jalankan Pivot
-                    # Sesuai fungsi: Multiple dari df_stock_final, Single dari df_recon_missing
+                    # 3. Jalankan Pivot (Returnnya: df_mult, df_sing)
                     df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
 
-                    # 4. Pembersihan Data (Hanya untuk yang benar-benar ada isinya)
+                    # 4. Pembersihan Data (Ganti nama variabel biar sinkron)
                     def clean_final_result(df):
                         if df is not None and not df.empty:
-                            # Cari kolom angka terakhir (biasanya QTY ADJ atau hasil merge)
-                            # Kita pastikan tidak ada QTY 0 yang lolos
                             last_col = df.columns[-1]
                             df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
                             df = df[df[last_col] > 0].reset_index(drop=True)
                         return df
 
-                    st.session_state.df_mult_final = clean_final_result(df_multiple_final)
-                    st.session_state.df_sing_final = clean_final_result(df_single_final)
+                    # SIMPAN KE SESSION STATE (Pake hasil return di atas)
+                    st.session_state.df_mult_final = clean_final_result(df_mult)
+                    st.session_state.df_sing_final = clean_final_result(df_sing)
                     st.session_state.df_res4_final = res4
                     st.session_state.process_done = True
                     
@@ -1050,7 +1046,7 @@ def menu_Stock_Opname():
                 except Exception as e:
                     st.error(f"❌ Terjadi Kesalahan: {str(e)}")
 
-        # --- AREA TAMPILAN HASIL (TANPA DUPLIKAT KEY) ---
+        # --- AREA TAMPILAN HASIL ---
         if st.session_state.get("process_done"):
             st.success("✅ Analisis Selesai! Data selisih 0 otomatis dibuang.")
             
@@ -1064,7 +1060,7 @@ def menu_Stock_Opname():
                         data=st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'),
                         file_name="final_adj_multiple.csv",
                         mime="text/csv",
-                        key="dl_btn_mult_unique_v1"
+                        key="dl_btn_mult_final_v10"
                     )
             
             with t2:
@@ -1075,7 +1071,7 @@ def menu_Stock_Opname():
                         data=st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'),
                         file_name="final_adj_single.csv",
                         mime="text/csv",
-                        key="dl_btn_sing_unique_v1"
+                        key="dl_btn_sing_final_v10"
                     )
             
             with t3:
@@ -1086,7 +1082,7 @@ def menu_Stock_Opname():
                         data=st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'),
                         file_name="hasil_lookup_full.csv",
                         mime="text/csv",
-                        key="dl_btn_res4_unique_v1"
+                        key="dl_btn_res4_final_v10"
                     )
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
