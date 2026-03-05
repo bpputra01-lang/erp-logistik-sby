@@ -881,38 +881,39 @@ with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="
 with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
 
 if up_scan and up_stock:
-    # Baris 884: Pastikan ada titik dua (:) di akhir if
     if st.button("▶️ RUN COMPARE", use_container_width=True):
-        # Baris 885: SEMUA baris di bawah ini WAJIB menjorok ke dalam (1 tab atau 4 spasi)
         df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
         df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
         
-        # 1. BERSIHKAN DULU agar index iloc tidak geser oleh kolom nomor urut
-        df_s_raw = clean_index_if_exists(df_s_raw)
-        df_t_raw = clean_index_if_exists(df_t_raw)
-        
-        # 2. Filter (Sekarang aman karena kolom A sampah sudah dibuang)
-        if selected_sub: 
-            df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-        
-        # 3. Jalankan Logic (Pastikan fungsi logic_compare_scan_to_stock sudah memakai cara merge 'left' atau 'outer')
+        if selected_sub: df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+        if selected_bin_sys: df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
+        if selected_bin_cov: df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
+
         res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
         res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
         
-        # 4. Mapping Item Name dengan proteksi SKU ".0"
         item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
         item_map.columns = ['SKU', 'NAME']
+        # Proteksi agar SKU map tidak ada .0 yang bikin mapping gagal
         item_map['SKU'] = item_map['SKU'].str.replace(r'\.0$', '', regex=True).str.strip()
         map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
         
+        # Mapping nama ke res_scan
         res_scan['ITEM NAME'] = res_scan['SKU'].astype(str).str.replace(r'\.0$', '', regex=True).map(map_dict)
+        res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().str.replace(r'\.0$', '', regex=True).map(map_dict)
 
-        # 5. Simpan Hasil (Ini yang menentukan apa yang muncul di Tab REAL +)
+        # --- PERBAIKAN FILTER DISINI ---
+        # Gunakan .str.strip() untuk memastikan tidak ada spasi gaib di kata "REAL +"
+        # Dan pastikan copy() dilakukan setelah mapping nama selesai
+        df_real_plus = res_scan[res_scan['NOTE'].astype(str).str.strip() == "REAL +"].copy()
+        df_system_plus = res_stock[res_stock['NOTE'].astype(str).str.strip() == "SYSTEM +"].copy()
+
         st.session_state.compare_result = {
             'res_scan': res_scan, 
             'res_stock': res_stock, 
-            'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
-            'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+            'real_plus': df_real_plus, 
+            'system_plus': df_system_plus, 
+            'map_dict': map_dict
         }
         st.rerun()
 
