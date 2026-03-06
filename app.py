@@ -623,9 +623,9 @@ def logic_setup_karantina_with_check(df_outstanding):
     df_filtered = df[mask].copy()
     
     df_karantina = pd.DataFrame({
-        "BIN AWAL": df_filtered.iloc[:, 2],
+        "BIN AWAL": df_filtered.iloc[:, 1],
         "BIN TUJUAN": "KARANTINA",
-        "SKU": df_filtered.iloc[:, 3],
+        "SKU": df_filtered.iloc[:, 2],
         "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
         "NOTES": "MISS LOCATION"
     })
@@ -1084,7 +1084,7 @@ def menu_Stock_Opname():
     up_k6 = st.file_uploader("📥 Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
 
     if up_k6:
-        if st.button("🛠️ GENERATE KARANTINA", use_container_width=True):
+        if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
             try:
                 up_k6.seek(0)
                 if up_k6.name.endswith(('.xlsx', '.xls')):
