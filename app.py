@@ -609,38 +609,26 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         
     return df_multiple_final, df_single_final
 
-import pandas as pd
-
 def logic_setup_karantina_with_check(df_outstanding):
     df = df_outstanding.copy()
+    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
+    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
+    df['CHECK_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
     
-    # 1. Pastikan kolom angka dikonversi dengan benar (Sesuai header di gambar 2)
-    # Gunakan nama kolom agar tidak terjadi 'out-of-bounds' jika jumlah kolom berubah
-    df['QTY SYSTEM'] = pd.to_numeric(df['QTY SYSTEM'], errors='coerce').fillna(0)
-    df['QTY SO'] = pd.to_numeric(df['QTY SO'], errors='coerce').fillna(0)
+    df_check = df.iloc[:, [2, 3, 10, 14]].copy() 
+    df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'HASIL_REKON_O']
+    df_check['SELISIH_HITUNG_AI'] = df['CHECK_DIFF']
     
-    # 2. Hitung selisih real (QTY SYSTEM - QTY SO)
-    # Jika QTY SYSTEM 172 dan QTY SO 171, maka ada 1 barang yang harus masuk karantina (selisih = 1)
-    df['DIFF'] = df['QTY SYSTEM'] - df['QTY SO']
-    
-    # 3. Buat df_check untuk monitoring internal
-    # Mengambil BIN (B), SKU (C), QTY SYSTEM (J), dan QTY SO (K)
-    df_check = df[['BIN', 'SKU', 'QTY SYSTEM', 'QTY SO', 'DIFF']].copy()
-    df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'QTY_SO_REAL', 'SELISIH_HITUNG_AI']
-    
-    # 4. Filter hanya data yang memiliki selisih (tidak nol)
-    mask = df['DIFF'] != 0
+    mask = df['CHECK_DIFF'] != 0
     df_filtered = df[mask].copy()
     
-    # 5. Susun DataFrame Karantina
     df_karantina = pd.DataFrame({
-        "BIN AWAL": df_filtered['BIN'],
+        "BIN AWAL": df_filtered.iloc[:, 1],
         "BIN TUJUAN": "KARANTINA",
-        "SKU": df_filtered['SKU'],
-        "QUANTITY": df_filtered['DIFF'].abs(), # Ambil nilai absolut jika selisih minus
+        "SKU": df_filtered.iloc[:, 2],
+        "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
         "NOTES": "MISS LOCATION"
     })
-    
     return df_karantina, df_check
 
 def logic_compare_scan_to_stock(df_scan, df_stock):
