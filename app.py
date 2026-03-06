@@ -609,42 +609,26 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         
     return df_multiple_final, df_single_final
 
-import pandas as pd
-
 def logic_setup_karantina_with_check(df_outstanding):
     df = df_outstanding.copy()
+    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
+    df.iloc[:, 14] = pd.to_numeric(df.iloc[:, 14], errors='coerce').fillna(0)
+    df['CHECK_DIFF'] = df.iloc[:, 10] - df.iloc[:, 14]
     
-    # Berdasarkan gambar template system:
-    # QTY SYSTEM = Kolom J (Indeks 9)
-    # DIFF = Kolom L (Indeks 11)
-    # SKU = Kolom C (Indeks 2)
-    # BIN = Kolom B (Indeks 1)
-
-    # Konversi ke angka agar tidak error saat pengurangan
-    df.iloc[:, 9] = pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0)  # QTY SYSTEM
-    df.iloc[:, 11] = pd.to_numeric(df.iloc[:, 11], errors='coerce').fillna(0) # DIFF
-    
-    # Sesuai logika Anda: Selisih adalah QTY SYSTEM - DIFF (atau sesuaikan dengan kebutuhan rekon)
-    df['CHECK_DIFF'] = df.iloc[:, 9] - df.iloc[:, 11]
-    
-    # Membuat DF Check untuk monitoring
-    df_check = df.iloc[:, [1, 2, 9, 11]].copy() 
-    df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'DIFF_SYSTEM']
+    df_check = df.iloc[:, [2, 3, 10, 14]].copy() 
+    df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'HASIL_REKON_O']
     df_check['SELISIH_HITUNG_AI'] = df['CHECK_DIFF']
     
-    # Filter data yang memiliki selisih (tidak 0)
     mask = df['CHECK_DIFF'] != 0
     df_filtered = df[mask].copy()
     
-    # Memasukkan ke DataFrame Karantina
     df_karantina = pd.DataFrame({
-        "BIN AWAL": df_filtered.iloc[:, 1],   # Kolom BIN (B)
+        "BIN AWAL": df_filtered.iloc[:, 1],
         "BIN TUJUAN": "KARANTINA",
-        "SKU": df_filtered.iloc[:, 2],        # Kolom SKU (C)
+        "SKU": df_filtered.iloc[:, 2],
         "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
         "NOTES": "MISS LOCATION"
     })
-    
     return df_karantina, df_check
 
 def logic_compare_scan_to_stock(df_scan, df_stock):
