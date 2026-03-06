@@ -621,15 +621,15 @@ def logic_setup_karantina_with_check(df_outstanding):
     
     # 2. Hitung selisih real (QTY SYSTEM - QTY SO)
     # Jika QTY SYSTEM 172 dan QTY SO 171, maka ada 1 barang yang harus masuk karantina (selisih = 1)
-    df['CHECK_DIFF'] = df['QTY SYSTEM'] - df['QTY SO']
+    df['DIFF'] = df['QTY SYSTEM'] - df['QTY SO']
     
     # 3. Buat df_check untuk monitoring internal
     # Mengambil BIN (B), SKU (C), QTY SYSTEM (J), dan QTY SO (K)
-    df_check = df[['BIN', 'SKU', 'QTY SYSTEM', 'QTY SO', 'CHECK_DIFF']].copy()
+    df_check = df[['BIN', 'SKU', 'QTY SYSTEM', 'QTY SO', 'DIFF']].copy()
     df_check.columns = ['BIN', 'SKU', 'QTY_SYSTEM_K', 'QTY_SO_REAL', 'SELISIH_HITUNG_AI']
     
     # 4. Filter hanya data yang memiliki selisih (tidak nol)
-    mask = df['CHECK_DIFF'] != 0
+    mask = df['DIFF'] != 0
     df_filtered = df[mask].copy()
     
     # 5. Susun DataFrame Karantina
@@ -637,7 +637,7 @@ def logic_setup_karantina_with_check(df_outstanding):
         "BIN AWAL": df_filtered['BIN'],
         "BIN TUJUAN": "KARANTINA",
         "SKU": df_filtered['SKU'],
-        "QUANTITY": df_filtered['CHECK_DIFF'].abs(), # Ambil nilai absolut jika selisih minus
+        "QUANTITY": df_filtered['DIFF'].abs(), # Ambil nilai absolut jika selisih minus
         "NOTES": "MISS LOCATION"
     })
     
