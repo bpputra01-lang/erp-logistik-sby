@@ -947,8 +947,8 @@ def menu_Stock_Opname():
         d = st.session_state.compare_result
         st.markdown(f"""
             <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
-                <div class="m-box"><span class="m-lbl">🔥 QTY REAL +</span><span class="m-val">{int(d['real_plus']['DIFF'].sum())}</span></div>
-                <div class="m-box"><span class="m-lbl">💻 QTY SYSTEM +</span><span class="m-val">{int(d['system_plus']['DIFF'].sum())}</span></div>
+                <div class="m-box"><span class="m-lbl">📦 QTY REAL +</span><span class="m-val">{int(d['real_plus']['DIFF'].sum())}</span></div>
+                <div class="m-box"><span class="m-lbl">🔐 QTY SYSTEM +</span><span class="m-val">{int(d['system_plus']['DIFF'].sum())}</span></div>
             </div>
         """, unsafe_allow_html=True)
         t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "🔥 REAL +", "💻 SYSTEM +"])
@@ -961,7 +961,7 @@ def menu_Stock_Opname():
         st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
         up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="step2_cov")
         if up_bin_cov:
-            if st.button("🚀 RUN ALLOCATION", use_container_width=True):
+            if st.button("▶️ RUN ALLOCATION", use_container_width=True):
                 df_cov = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
                 allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov)
                 allocated['ITEM NAME'] = allocated['SKU'].map(d['map_dict'])
@@ -1014,7 +1014,7 @@ def menu_Stock_Opname():
             up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
 
         if up_r4 and up_s4 and up_m5:
-            if st.button("🔥 JALANKAN PROSES FINAL", use_container_width=True, key="btn_final_proc_v3"):
+            if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
                 try:
                     # 1. Pembacaan file (PASTIKAN NO ILOC GESER DI SINI)
                     df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
@@ -1057,24 +1057,24 @@ def menu_Stock_Opname():
             if is_empty:
                 st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
             else:
-                st.success("✅ Analisis Selesai! Data Berhasil Di-Lookup.")
+                st.success("✅ Analisis Selesai!")
             
-            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 HASIL LOOKUP FULL"])
+            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT"])
             
             with t1:
                 st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
                 if not st.session_state.df_mult_final.empty:
-                    st.download_button("📥 Download Multiple", st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'), "final_adj_multiple.csv", "text/csv", key="dl_mult_final")
+                    st.download_button("📥 Download Multiple Adj +", st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'), "final_adj_multiple.csv", "text/csv", key="dl_mult_final")
             
             with t2:
                 st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
                 if not st.session_state.df_sing_final.empty:
-                    st.download_button("📥 Download Single", st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'), "final_adj_single.csv", "text/csv", key="dl_sing_final")
+                    st.download_button("📥 Download Single Adj +", st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'), "final_adj_single.csv", "text/csv", key="dl_sing_final")
             
             with t3:
                 # Tampilkan hasil lookup biar lu bisa cek kolom K (QTY SO)
                 st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
-                st.download_button("📥 Download Lookup Raw", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
+                st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
