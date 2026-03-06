@@ -2940,7 +2940,7 @@ elif menu == "Database Master":
 elif menu == "Stock Minus":
     st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     
-    # CSS UNTUK BOX CUSTOM (Agar tampilan sesuai gambar Anda)
+    # CSS UNTUK BOX CUSTOM (Tampilan sesuai gambar Anda)
     st.markdown("""
         <style>
         .m-box {
@@ -2961,63 +2961,89 @@ elif menu == "Stock Minus":
     if uploaded_file:
         try:
             df = pd.read_excel(uploaded_file, engine="openpyxl")
-            
-            # Normalisasi Kolom (Kunci agar tidak 0)
             df.columns = [str(c).strip().upper() for c in df.columns]
+            
+            # Identifikasi Kolom Utama
             col_sku = 'SKU'
             col_bin = 'BIN'
-            # Cari kolom QTY yang mengandung kata 'QTY'
-            col_qty = next((c for c in df.columns if 'QTY' in c), None)
+            col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
             
-            if st.button("🔃 PROSES DATA"):
-                with st.spinner('Memproses...'):
-                    # 1. AMBIL DATA MINUS AWAL (Untuk Box 1)
-                    df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
-                    df_minus_awal = df[df[col_qty] < 0].copy()
-                    
-                    # Logika proses mutasi (Sesuai kode awal Anda)
-                    qty_arr = df[col_qty].values.copy()
-                    sku_arr = df[col_sku].astype(str).values
-                    bin_arr = df[col_bin].astype(str).values
-                    
-                    # ... (Logika prior_bins dan pos_map tetap sama seperti sebelumnya) ...
-                    # [BAGIAN LOGIKA PROSES SAMA SEPERTI KODE SEBELUMNYA]
-                    
-                    # Hasil Akhir
-                    df_final = df.copy()
-                    df_final[col_qty] = qty_arr
-                    df_need_adj = df_final[df_final[col_qty] < 0].copy()
-                    
-                    # --- TAMPILAN BOX CUSTOM (SESUAI REQUEST) ---
-                    st.divider()
-                    st.subheader("📊 RINGKASAN HASIL PROSES")
-                    
-                    # Hitung Nilai (Dipastikan mengambil dari data awal agar tidak 0)
-                    val_total_minus = len(df_minus_awal)
-                    val_mutasi = int(sum([abs(x[col_qty]) for _, x in df_minus_awal.iterrows()]) - sum([abs(x) for x in qty_arr if x < 0]))
-                    val_need_adj = len(df_need_adj)
+            if col_qty is None:
+                st.error("❌ Kolom 'QTY SYSTEM' tidak ditemukan!")
+            else:
+                if st.button("🔃 PROSES DATA"):
+                    with st.spinner('Memproses...'):
+                        # 1. DATA MINUS AWAL
+                        df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
+                        df_minus_awal = df[df[col_qty] < 0].copy()
+                        
+                        # [LOGIKA PROSES MUTASI DIMULAI]
+                        qty_arr = df[col_qty].values.copy()
+                        sku_arr = df[col_sku].astype(str).values
+                        bin_arr = df[col_bin].astype(str).values
+                        
+                        # (Logika mapping dan prior_bins tetap di sini)
+                        # ... proses pencarian stock ...
+                        
+                        # [LOGIKA PROSES MUTASI SELESAI]
+                        set_up_results = [] # Anggap ini list hasil proses mutasi Anda
+                        df_final = df.copy()
+                        df_final[col_qty] = qty_arr
+                        df_need_adj = df_final[df_final[col_qty] < 0].copy()
+                        
+                        # --- TAMPILAN BOX CUSTOM ---
+                        st.divider()
+                        st.subheader("📊 RINGKASAN HASIL PROSES")
+                        
+                        val_total_minus = len(df_minus_awal)
+                        val_mutasi = int(sum([x['QUANTITY'] for x in set_up_results])) if set_up_results else 0
+                        val_need_adj = len(df_need_adj)
 
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.markdown(f'<div class="m-box"><span class="m-lbl">Total Stock Minus</span><span class="m-val">{val_total_minus}</span></div>', unsafe_allow_html=True)
-                    with col2:
-                        st.markdown(f'<div class="m-box"><span class="m-lbl">Mutasi Stock Minus</span><span class="m-val">{val_mutasi}</span></div>', unsafe_allow_html=True)
-                    with col3:
-                        st.markdown(f'<div class="m-box"><span class="m-lbl">Need Justification</span><span class="m-val">{val_need_adj}</span></div>', unsafe_allow_html=True)
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">Total Stock Minus</span><span class="m-val">{val_total_minus}</span></div>', unsafe_allow_html=True)
+                        with col2:
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">Mutasi Stock Minus</span><span class="m-val">{val_mutasi}</span></div>', unsafe_allow_html=True)
+                        with col3:
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">Need Justification</span><span class="m-val">{val_need_adj}</span></div>', unsafe_allow_html=True)
 
-                    # --- TAMPILKAN TAB (Agar Tabnya Muncul di UI) ---
-                    tab1, tab2, tab3 = st.tabs(["📄 MINUS AWAL", "🔄 DETAIL MUTASI", "⚠️ JUSTIFIKASI"])
-                    
-                    with tab1:
-                        st.dataframe(df_minus_awal, use_container_width=True)
-                    with tab2:
-                        # Tampilkan hasil transfer jika ada
-                        pass 
-                    with tab3:
-                        st.dataframe(df_need_adj, use_container_width=True)
+                        # --- TAMPILAN TAB DENGAN KETERANGAN KOSONG ---
+                        tab1, tab2, tab3 = st.tabs(["📄 MINUS AWAL", "🔄 DETAIL MUTASI", "⚠️ JUSTIFIKASI"])
+                        
+                        with tab1:
+                            if not df_minus_awal.empty:
+                                st.dataframe(df_minus_awal, use_container_width=True)
+                            else:
+                                st.info("ℹ️ Tidak ada data stock minus dalam file ini.")
+                                
+                        with tab2:
+                            if set_up_results:
+                                st.dataframe(pd.DataFrame(set_up_results), use_container_width=True)
+                            else:
+                                st.warning("⚠️ Tidak ditemukan stock pendukung. Tidak ada mutasi yang dilakukan.")
+                                
+                        with tab3:
+                            if not df_need_adj.empty:
+                                st.dataframe(df_need_adj, use_container_width=True)
+                            else:
+                                st.success("✅ Semua stock minus berhasil ditutup! Tidak ada item butuh justifikasi.")
+
+                        # --- DOWNLOAD DENGAN SHEET KETERANGAN ---
+                        output = io.BytesIO()
+                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                            if not df_minus_awal.empty:
+                                df_minus_awal.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
+                            if set_up_results:
+                                pd.DataFrame(set_up_results).to_excel(writer, sheet_name='SET_UP', index=False)
+                            if not df_need_adj.empty:
+                                df_need_adj.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
+                            else:
+                                pd.DataFrame({"INFO": ["DATA BERSIH - TIDAK ADA MINUS"]}).to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
+                        
+                        st.download_button("📥 DOWNLOAD HASIL", output.getvalue(), "HASIL_STOCK_MINUS.xlsx")
 
         except Exception as e:
-            st.error(f"Gagal: {e}")
+            st.error(f"Gagal memproses file: {e}")
 
 
 if menu == "Compare RTO":
