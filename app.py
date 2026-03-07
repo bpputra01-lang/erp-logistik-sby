@@ -1172,31 +1172,25 @@ def menu_Stock_Opname():
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
-   # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
-st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
-up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v3")
-
-if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
-    df_p = st.session_state.get('df_mult_final')
+# --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
+    st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
+    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v3")
     
-    # PERBAIKAN: Hanya cek df_p (Data Plus), up_minus dibuat opsional
-    if df_p is not None:
-        df_m = None
-        # Jika file minus diupload, baru kita baca
-        if up_minus is not None:
-            try:
+    if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
+        df_p = st.session_state.get('df_mult_final')
+        # Diubah sedikit agar tetap jalan jika up_minus tidak ada (None)
+        if df_p is not None:
+            # Baca file jika ada, jika tidak ada set df_m ke None
+            df_m = None
+            if up_minus:
                 df_m = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
-            except Exception as e:
-                st.error(f"Gagal membaca file minus: {e}")
-        
-        # Jalankan logic (fungsi logic_sum_adjustment_final sudah kita buat aman untuk df_m = None)
-        df_res, df_summary = logic_sum_adjustment_final(df_p, df_m)
-        
-        st.session_state.report_adj = {"data": df_res, "sum": df_summary}
-        st.success("✅ Summary Adjustment Berhasil Dibuat!")
-        st.rerun()
-    else:
-        st.warning("⚠️ Data 'MULTIPLE ADJ +' (Data Plus) tidak ditemukan di session state!")
+            
+            # Panggil fungsi logic (sudah aman menangani df_m = None)
+            df_res, df_summary = logic_sum_adjustment_final(df_p, df_m)
+            
+            st.session_state.report_adj = {"data": df_res, "sum": df_summary}
+            st.success("✅ Summary Adjustment Berhasil Dibuat!")
+            st.rerun()
 
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
