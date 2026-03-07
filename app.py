@@ -801,45 +801,47 @@ def logic_sum_adjustment_final(df_plus, df_minus):
     ]
 
     def process_data(df, status):
-        if df is None or df.empty:
+        # MODIFIKASI: Tetap kembalikan DataFrame kosong jika df adalah None agar tidak error saat concat
+        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             return pd.DataFrame(columns=cols_header)
         
         # VBA lu ambil kolom B-K (Indeks 1-10 di Python)
-        # Kita asumsikan df_plus dan df_minus punya struktur yang sama
         temp = df.iloc[:, 1:11].copy() 
         
-        # Penamaan kolom agar pas 11 kolom awal
+        # Penamaan kolom agar pas 10 kolom awal (Sesuai list cols_header)
         temp.columns = cols_header[:10]
         
-        # Convert ke numeric biar ga error math
-        price_col = "HARGA JUAL" # Kolom ke-8 di VBA
-        qty_so = "QTY SO"        # Kolom ke-10 di VBA
-        qty_sys = "QTY SYSTEM"   # Kolom ke-9 di VBA
+        # FIX: Pengali diubah ke HARGA BELI (Kolom ke-7 di list cols_header)
+        price_col = "HARGA BELI" 
+        qty_so = "QTY SO"        
+        qty_sys = "QTY SYSTEM"   
         
+        # Convert ke numeric biar ga error math
         for col in [price_col, qty_so, qty_sys]:
             temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
 
-        # Logic VBA: (QTY SO - QTY SYSTEM) * HARGA JUAL
+        # Logic: (QTY SO - QTY SYSTEM) * HARGA BELI
         temp["VALUE ADJ"] = (temp[qty_so] - temp[qty_sys]) * temp[price_col]
         temp["STATUS ADJ"] = status
         
         return temp
 
-    # Proses masing-masing
+    # Proses masing-masing (df_minus akan jadi DF kosong jika None, jadi tidak break)
     df_adj_plus = process_data(df_plus, "ADJ +")
     df_adj_minus = process_data(df_minus, "ADJ -")
 
-    # Gabung (Union)
+    # Gabung (Union) - Tetap jalan walau salah satu kosong
     df_final = pd.concat([df_adj_plus, df_adj_minus], ignore_index=True)
 
     # --- HITUNG SUMMARY (BAGIAN 3 DI VBA LU) ---
-    val_plus = df_adj_plus["VALUE ADJ"].sum()
-    val_minus = df_adj_minus["VALUE ADJ"].sum()
+    # Menggunakan .get() atau pengecekan kolom untuk menghindari error jika DF kosong
+    val_plus = df_adj_plus["VALUE ADJ"].sum() if not df_adj_plus.empty else 0
+    val_minus = df_adj_minus["VALUE ADJ"].sum() if not df_adj_minus.empty else 0
     
     # VBA: QTY Plus = Abs(QTY SO - QTY SYSTEM)
-    qty_plus = (df_adj_plus["QTY SO"] - df_adj_plus["QTY SYSTEM"]).abs().sum()
+    qty_plus = (df_adj_plus["QTY SO"] - df_adj_plus["QTY SYSTEM"]).abs().sum() if not df_adj_plus.empty else 0
     # VBA: QTY Minus = - Abs(QTY SO - QTY SYSTEM)
-    qty_minus = -(df_adj_minus["QTY SO"] - df_adj_minus["QTY SYSTEM"]).abs().sum()
+    qty_minus = -(df_adj_minus["QTY SO"] - df_adj_minus["QTY SYSTEM"]).abs().sum() if not df_adj_minus.empty else 0
 
     df_sum = pd.DataFrame({
         "METRIC": [
