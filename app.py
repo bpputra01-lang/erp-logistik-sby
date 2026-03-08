@@ -1141,12 +1141,18 @@ def menu_Stock_Opname():
                 st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
                 st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
 
-            with t4:
+           with t4:
                 df_real = st.session_state.get("df_setup_real_final", pd.DataFrame())
                 st.dataframe(df_real, use_container_width=True, hide_index=True)
-                 if not df_real.empty:
-                    st.download_button("📥 Download Set Up Real +", 
-                    df_real.to_csv(index=False).encode('utf-8'), "set_up_real_plus.csv", "text/csv", key="dl_setup_real")
+                # Pastikan baris 'if' di bawah ini sejajar dengan 'st.dataframe'
+                if not df_real.empty:
+                    st.download_button(
+                        label="📥 Download Set Up Real +", 
+                        data=df_real.to_csv(index=False).encode('utf-8'), 
+                        file_name="set_up_real_plus.csv", 
+                        mime="text/csv", 
+                        key="dl_setup_real"
+                    )
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
