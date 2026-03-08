@@ -306,8 +306,8 @@ div.stFormSubmitButton > button {
     border-radius: 12px !important;
     
     /* GANTI BAGIAN INI */
-    padding: 30px 20px !important; /* Naikin dari 14px ke 18px biar lega */
-    line-height: 1.2 !important;   /* Pastikan teks di tengah vertikal */
+    padding: 18px 20px !important; /* Naikin dari 14px ke 18px biar lega */
+    line-height: 2.0 !important;   /* Pastikan teks di tengah vertikal */
     height: auto !important;       /* Biar tinggi tombol ngikutin padding */
     
     font-weight: 800 !important;
