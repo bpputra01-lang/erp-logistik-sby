@@ -611,67 +611,69 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
     def clean_val(x):
         if pd.isna(x): return ""
-        # Membersihkan spasi dan paksa Uppercase agar matching
+        # Membersihkan spasi, paksa Uppercase, dan hapus .0 dari excel
         s = str(x).strip().upper()
-        if s.startswith("SPE"): s = s[3:].strip() # Hapus prefix SPE
-        if s.endswith('.0'): s = s[:-2] # Hapus format .0 dari Excel
+        if s.startswith("SPE"): s = s[3:].strip() 
+        if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Kumpulkan semua sumber BIN AWAL dari MULTIPLE (Source)
-    # Disimpan dalam LIST agar bisa menangani satu SKU di banyak BIN
+    # 1. Ambil Sumber BIN AWAL dari MULTIPLE (Source)
     source_bins = {}
-    if not df_multiple_adj_plus.empty:
-        # Gunakan QTY ADJ dari kolom G (Index 6)
+    if df_multiple_adj_plus is not None and not df_multiple_adj_plus.empty:
+        # Kolom G (Index 6) adalah QTY ADJ
         qty_src_cleaned = pd.to_numeric(df_multiple_adj_plus.iloc[:, 6], errors='coerce').fillna(0)
         
         for i, row in df_multiple_adj_plus.iterrows():
-            sku = clean_val(row.iloc[2]) # Kolom C
-            bin_asal = row.iloc[1]       # Kolom B
+            sku = clean_val(row.iloc[2]) # SKU di Kolom C
+            bin_asal = row.iloc[1]       # BIN di Kolom B
             qty_asal = float(qty_src_cleaned.iloc[i])
             
             if qty_asal > 0: 
                 if sku not in source_bins: source_bins[sku] = []
                 source_bins[sku].append({"bin": bin_asal, "qty": qty_asal})
 
-    # 2. Ambil Target Relokasi dari CEK STOCK (Hanya yang DIFF > 0)
+    # 2. Ambil Target dari CEK STOCK (Hanya yang DIFF > 0)
     df_stock = df_stock_final.copy()
-    diff_cleaned = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0) # Kolom L
+    # Index 10 = QTY SO, Index 9 = QTY SYSTEM, Index 11 = DIFF
+    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
+    qty_sys = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
+    diff_cleaned = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
 
     setup_real_data = []
     
     for i, row in df_stock.iterrows():
         needed_qty = float(diff_cleaned.iloc[i])
-        sku_key = clean_val(row.iloc[2]) # Kolom C
-        bin_tujuan = row.iloc[1]         # Kolom B
+        # Syarat: Hanya proses jika QTY SO > QTY SYSTEM
+        if qty_so.iloc[i] > qty_sys.iloc[i]:
+            sku_key = clean_val(row.iloc[2]) 
+            bin_tujuan = row.iloc[1]
 
-        # Hanya proses jika DIFF > 0 dan SKU ditemukan di tab MULTIPLE
-        if needed_qty > 0 and sku_key in source_bins:
-            for source in source_bins[sku_key]:
-                if needed_qty <= 0: break
-                if source["qty"] <= 0: continue
+            # LOGIC DISTRIBUSI: Hanya jalankan jika SKU ada di Tab Multiple
+            if sku_key in source_bins and source_bins[sku_key]:
+                current_needed = needed_qty
+                for source in source_bins[sku_key]:
+                    if current_needed <= 0: break
+                    if source["qty"] <= 0: continue
 
-                # Tentukan berapa yang bisa diambil dari BIN awal ini
-                take_qty = min(source["qty"], needed_qty)
-                
-                setup_real_data.append({
-                    "BIN AWAL": source["bin"],
-                    "BIN TUJUAN": bin_tujuan,
-                    "SKU": sku_key,
-                    "QUANTITY": take_qty,
-                    "NOTES": "RELOCATION"
-                })
+                    take_qty = min(source["qty"], current_needed)
+                    setup_real_data.append({
+                        "BIN AWAL": source["bin"],
+                        "BIN TUJUAN": bin_tujuan,
+                        "SKU": sku_key,
+                        "QUANTITY": take_qty,
+                        "NOTES": "RELOCATION"
+                    })
+                    source["qty"] -= take_qty
+                    current_needed -= take_qty
+            # Jika SKU TIDAK ditemukan di source_bins, kita biarkan (Skip), 
+            # sehingga tidak akan ada baris "NOT FOUND" di hasil akhir.
 
-                # Kurangi stok sumber dan kebutuhan tujuan
-                source["qty"] -= take_qty
-                needed_qty -= take_qty
-
-    # 3. Finalisasi DataFrame
+    # 3. Finalisasi
     result_df = pd.DataFrame(setup_real_data)
-    
     if result_df.empty:
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
-    # Pastikan hanya QTY > 0 yang dikembalikan
+    # Filter tambahan: Pastikan hanya QTY > 0 yang muncul
     result_df = result_df[result_df["QUANTITY"] > 0].reset_index(drop=True)
     
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
