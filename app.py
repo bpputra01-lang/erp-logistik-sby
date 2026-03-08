@@ -1368,8 +1368,6 @@ if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3", use_container_wi
             st.rerun()
         except Exception as e:
             st.error(f"Gagal olah data: {e}")
-    else:
-        st.error("Data ADJ (+) di aplikasi masih kosong. Proses step sebelumnya dulu!")
 
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
