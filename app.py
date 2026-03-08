@@ -451,31 +451,13 @@ div.stFormSubmitButton > button {
         """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
-with st.form("login_form"):
-    # CSS KHUSUS BUAT MASALAH TEKS NAIK (TARUH DI DALAM FORM BIAR AMAN)
-    st.markdown("""
-        <style>
-            /* Maksa teks di dalam input box tepat di tengah vertikal */
-            div[data-baseweb="input"] {
-                display: flex !important;
-                align-items: center !important;
-                height: 55px !important; /* Tinggi box yang proporsional */
-                padding: 0 12px !important;
-            }
+        with st.form("login_form"):
+            user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
+            pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
             
-            input[data-testid="stTextInputEnterChatTests"] {
-                line-height: normal !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
-    user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
-    pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
-    
-    # Jarak antara input terakhir ke tombol (Gue kecilin dari 100px ke 20px biar gak kejauhan)
-    st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
-    
-    submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
+            st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
+            
+            submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
             
             # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
             if submit_button:
