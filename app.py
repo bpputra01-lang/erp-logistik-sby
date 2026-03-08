@@ -1141,7 +1141,7 @@ def menu_Stock_Opname():
                 st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
                 st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
 
-           with t4:
+            with t4:
                 df_real = st.session_state.get("df_setup_real_final", pd.DataFrame())
                 st.dataframe(df_real, use_container_width=True, hide_index=True)
                 # Pastikan baris 'if' di bawah ini sejajar dengan 'st.dataframe'
