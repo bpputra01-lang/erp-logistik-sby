@@ -665,6 +665,9 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
     return dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'])
 
 
+import pandas as pd
+from collections import defaultdict
+
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     # 1. Siapkan data sumber dalam dictionary
     system_dict = {}
@@ -739,7 +742,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
             row_no = row.to_dict()
             row_no.update({
                 'DIFF': remaining, # Sisa yang tidak teralokasi
-                'BIN ALOKASI': '',
+                'BIN ALOKASI': 'NOT FOUND',
                 'QTY ALLOCATION': 0,
                 'STATUS': 'NO ALLOCATION'
             })
@@ -755,7 +758,21 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
         if mask.any():
             df_sys_updated.loc[mask, 'DIFF'] -= q
 
-    return df_result, df_sys_updated
+    # 5. [TAMBAHAN] KONVERSI KE FORMAT SET UP REAL + (MACRO SYNC)
+    # Ini bagian yang merapikan hasil tanpa merusak hitungan di atas
+    final_setup_list = []
+    for _, r in df_result.iterrows():
+        final_setup_list.append({
+            'BIN AWAL': r['BIN ALOKASI'],
+            'BIN TUJUAN': r['BIN'],
+            'SKU': r['SKU'],
+            'QUANTITY': r['QTY ALLOCATION'] if r['QTY ALLOCATION'] > 0 else r.get('DIFF', 0),
+            'NOTES': 'RELOCATION'
+        })
+    
+    df_final_macro = pd.DataFrame(final_setup_list)
+
+    return df_final_macro, df_sys_updated
 
 def generate_set_up_real_plus(allocated_data):
     filtered = allocated_data[allocated_data['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
@@ -1002,81 +1019,97 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 # ==========================================================
-        # 🚀 FINAL ADJUSTMENT PROCESSOR (FIX INDEX & LOOKUP)
-        # ==========================================================
-        st.markdown("<br><br><br>---", unsafe_allow_html=True)
-        st.subheader("4️⃣ FINAL ADJUSTMENT + PROCESS")
+# 🚀 FINAL ADJUSTMENT PROCESSOR (FIX INDEX & LOOKUP)
+# ==========================================================
+st.markdown("<br><br><br>---", unsafe_allow_html=True)
+st.subheader("4️⃣ FINAL ADJUSTMENT + PROCESS")
 
-        col_a, col_b, col_c = st.columns(3)
-        with col_a: 
-            up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
-        with col_b: 
-            up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
-        with col_c: 
-            up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
+col_a, col_b, col_c = st.columns(3)
+with col_a: 
+    up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
+with col_b: 
+    up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
+with col_c: 
+    up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
 
-        if up_r4 and up_s4 and up_m5:
-            if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
-                try:
-                    # 1. Pembacaan file (PASTIKAN NO ILOC GESER DI SINI)
-                    df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
-                    df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
-                    df_m5 = pd.read_excel(up_m5)
+if up_r4 and up_s4 and up_m5:
+    if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
+        try:
+            # 1. Pembacaan file (PASTIKAN NO ILOC GESER DI SINI)
+            df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
+            df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
+            df_m5 = pd.read_excel(up_m5)
 
-                    # 2. Sinkronisasi Kolom
-                    # Jangan di-iloc potong depan, biar BIN tetep di index 0 dan SKU di index 1
-                    # Sesuai logic_cek_adjustment_final(df_recon, df_stock_adj)
-                    res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
-                    
-                    # 3. Jalankan Pivot
-                    df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
-
-                    # 4. Pembersihan Data (Pastikan hanya QTY > 0)
-                    def clean_final_result(df):
-                        if df is not None and not df.empty:
-                            last_col = df.columns[-1] # Kolom QTY ADJ atau TOTAL_DIFF
-                            df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
-                            df = df[df[last_col] > 0].reset_index(drop=True)
-                        return df
-
-                    # 5. Simpan ke Session State
-                    st.session_state.df_mult_final = clean_final_result(df_mult)
-                    st.session_state.df_sing_final = clean_final_result(df_sing)
-                    st.session_state.df_res4_final = res4
-                    st.session_state.process_done = True
-                    
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"❌ Terjadi Kesalahan: {str(e)}")
-
-        # --- AREA TAMPILAN HASIL ---
-        if st.session_state.get("process_done"):
-            # Cek apakah hasil lookup beneran ada isinya
-            check_data = st.session_state.df_res4_final
-            is_empty = check_data['QTY SO'].replace('', 0).astype(float).sum() == 0
+            # 2. Sinkronisasi Kolom
+            # Jangan di-iloc potong depan, biar BIN tetep di index 0 dan SKU di index 1
+            # Sesuai logic_cek_adjustment_final(df_recon, df_stock_adj)
+            res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
             
-            if is_empty:
-                st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
-            else:
-                st.success("✅ Analisis Selesai!")
+            # 3. Jalankan Pivot
+            df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
+
+            # 4. Pembersihan Data (Pastikan hanya QTY > 0)
+            def clean_final_result(df):
+                if df is not None and not df.empty:
+                    last_col = df.columns[-1] # Kolom QTY ADJ atau TOTAL_DIFF
+                    df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
+                    df = df[df[last_col] > 0].reset_index(drop=True)
+                return df
+
+            # Simpan hasil sementara untuk proses alokasi
+            df_mult_clean = clean_final_result(df_mult)
+            df_sing_clean = clean_final_result(df_sing)
+
+            # --- TAMBAHAN LOGIKA ALOKASI (MACRO SYNC) ---
+            # Menghasilkan df_final_macro (BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES)
+            df_final_macro, _ = logic_run_allocation(df_mult_clean, res4, df_s4)
+
+            # 5. Simpan ke Session State
+            st.session_state.df_mult_final = df_mult_clean
+            st.session_state.df_sing_final = df_sing_clean
+            st.session_state.df_res4_final = res4
+            st.session_state.df_set_up_real = df_final_macro  # Hasil alokasi header lengkap
+            st.session_state.process_done = True
             
-            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT"])
-            
-            with t1:
-                st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
-                if not st.session_state.df_mult_final.empty:
-                    st.download_button("📥 Download Multiple Adj +", st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'), "final_adj_multiple.csv", "text/csv", key="dl_mult_final")
-            
-            with t2:
-                st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
-                if not st.session_state.df_sing_final.empty:
-                    st.download_button("📥 Download Single Adj +", st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'), "final_adj_single.csv", "text/csv", key="dl_sing_final")
-            
-            with t3:
-                # Tampilkan hasil lookup biar lu bisa cek kolom K (QTY SO)
-                st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
-                st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"❌ Terjadi Kesalahan: {str(e)}")
+
+# --- AREA TAMPILAN HASIL ---
+if st.session_state.get("process_done"):
+    # Cek apakah hasil lookup beneran ada isinya
+    check_data = st.session_state.df_res4_final
+    is_empty = check_data['QTY SO'].replace('', 0).astype(float).sum() == 0
+    
+    if is_empty:
+        st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
+    else:
+        st.success("✅ Analisis Selesai!")
+    
+    # Menambahkan Tab 📋 SET UP REAL + untuk alokasi baru
+    t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "📋 SET UP REAL +", "🔍 CEK ADJ + RESULT"])
+    
+    with t1:
+        st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
+        if not st.session_state.df_mult_final.empty:
+            st.download_button("📥 Download Multiple Adj +", st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'), "final_adj_multiple.csv", "text/csv", key="dl_mult_final")
+    
+    with t2:
+        st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
+        if not st.session_state.df_sing_final.empty:
+            st.download_button("📥 Download Single Adj +", st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'), "final_adj_single.csv", "text/csv", key="dl_sing_final")
+    
+    with t3:
+        # Tampilan Hasil Alokasi (Header: BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES)
+        st.dataframe(st.session_state.df_set_up_real, use_container_width=True, hide_index=True)
+        if not st.session_state.df_set_up_real.empty:
+            st.download_button("📥 Download SET UP REAL +", st.session_state.df_set_up_real.to_csv(index=False).encode('utf-8'), "set_up_real_plus.csv", "text/csv", key="dl_setup_real")
+
+    with t4:
+        # Tampilkan hasil lookup biar lu bisa cek kolom K (QTY SO)
+        st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
+        st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
