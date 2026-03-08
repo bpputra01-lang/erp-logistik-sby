@@ -1340,18 +1340,20 @@ def menu_Stock_Opname():
 # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
 st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
 
-# Gunakan columns biar rapi dua kolom sesuai gambar kedua
+# Posisinya di sini tod, gua bagi dua kolom biar rapi kayak gambar kedua lu
 col_up1, col_up2 = st.columns(2)
 with col_up1:
-    up_plus = st.file_uploader("📥 Upload STOCK ADJ +", type=['xlsx','csv'], key="up_p_final_v3")
+    # Key gua bedain biar gak error duplicate widget ID jancok
+    up_plus = st.file_uploader("📥 Upload STOCK ADJ +", type=['xlsx','csv'], key="up_plus_final_v5")
 with col_up2:
-    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_m_final_v3")
+    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v5")
 
 if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
+    # Ambil data yang lagi lu olah di aplikasi (Plus)
     df_p = st.session_state.get('df_mult_final')
     
     if df_p is not None:
-        # LOGIC HYBRID: Cek upload dulu, kalau kosong baru pake data aplikasi
+        # LOGIC HYBRID: Kalau lu upload, itu yang jadi acuan. Kalau kagak, pake data aplikasi.
         df_p_input = df_p
         if up_plus:
             df_p_input = pd.read_excel(up_plus) if up_plus.name.endswith('.xlsx') else pd.read_csv(up_plus)
@@ -1360,12 +1362,14 @@ if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
         if up_minus:
             df_m_input = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
         
-        # Panggil fungsi logic lu yang lama (Hybrid Mode)
+        # Panggil fungsi logic lu yang sudah bisa handle dua data ini
         df_res, df_summary = logic_sum_adjustment_final(df_p_input, df_m_input)
         
         st.session_state.report_adj = {"data": df_res, "sum": df_summary}
         st.success("✅ Summary Adjustment Berhasil Dibuat!")
         st.rerun()
+    else:
+        st.error("Data ADJ (+) aplikasi kosong! Cek step sebelumnya cok!")
 
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
