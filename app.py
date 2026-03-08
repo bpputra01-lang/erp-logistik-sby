@@ -280,7 +280,6 @@ st.markdown("""
     # --- JANGAN UBAH KODE DI ATAS, TAMBAHKAN DI BAWAHNYA ---
 import streamlit as st
 
-# 1. Inisialisasi session state login
 # Cek session state agar tidak error saat pertama kali dijalankan
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
@@ -387,31 +386,27 @@ if not st.session_state.logged_in:
         }
         </style>
     """, unsafe_allow_html=True)
-        
-        # SUB-JUDUL
-        st.markdown("""
-            <p style="
-                color: #FFFFFF; 
-                font-size: 14px; 
-                margin-bottom: 15px; 
-                text-align: center;
-            ">🐊Surabaya Logistics Management System</p>
-        """, unsafe_allow_html=True)
 
-       # BUNGKUS FORM
-        with st.form("login_form"):
-            user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
-            pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
-            
-            st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
-            
-            submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
-            
-            # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
-            if submit_button:
-                if user_input == "admin" and pass_input == "sby123":
+    # TAMPILAN FORM LOGIN
+    _, col_mid, _ = st.columns([0.5, 2, 0.5])
+    
+    with col_mid:
+        st.markdown('<div class="login-header">', unsafe_allow_html=True)
+        st.markdown("""
+            <h1 style="color: #C5A059; font-weight: 800; margin-bottom: 5px;">SURABAYA DISTRIBUTION CENTER</h1>
+            <p style="color: #E0E0E0; font-size: 1rem;">Surabaya Logistics Management System</p>
+        """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        with st.form("login_gate"):
+            user_input = st.text_input("Username", placeholder="Masukkan username")
+            pass_input = st.text_input("Password", type="password", placeholder="Masukkan password")
+            submit_btn = st.form_submit_button("SIGN IN TO SYSTEM")
+
+            if submit_btn:
+                # Tambahkan logika cek login kamu di sini
+                if user_input == "admin" and pass_input == "admin123":
                     st.session_state.logged_in = True
-                    st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
                     st.rerun()
                 else:
                     st.error("Username atau Password salah!")
