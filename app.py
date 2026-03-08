@@ -678,7 +678,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
             try:
                 # Key: BIN B (Index 1) | SKU C (Index 2)
                 k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
-                val_sys = pd.to_numeric(row.iloc[9], errors='coerce') # KOLOM J (Index 9)
+                val_sys = pd.to_numeric(row.iloc[9], errors='coerce') # KOLOM J
                 sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
             except: continue
 
@@ -690,11 +690,11 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
             try:
                 # Key: BIN B (Index 1) | SKU C (Index 2)
                 k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
-                val_rec = pd.to_numeric(row.iloc[13], errors='coerce') # KOLOM N (Index 13)
+                val_rec = pd.to_numeric(row.iloc[13], errors='coerce') # KOLOM N
                 recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
             except: continue
 
-    # 3. Proses Comparison
+    # 3. Proses Comparison Master List dari Outstanding
     df_master = df_outstanding.copy()
     results = []
 
@@ -703,17 +703,18 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
         sku_val = row.iloc[2]
         key = f"{clean_val(bin_val)}|{clean_val(sku_val)}"
         
-        # Ambil data sesuai alur baru
         q_system = sys_map.get(key, 0) # Dari Kolom J Cek Adj
         q_recon = recon_map.get(key, 0) # Dari Kolom N Outstanding
         diff = q_system - q_recon
 
-        if diff != 0:
+        # FILTER KETAT: Hanya masukkan jika DIFF POSITIF (> 0)
+        # Jika minus atau nol, abaikan, jangan masukkan ke list hasil
+        if diff > 0:
             results.append({
                 "BIN AWAL": bin_val,
                 "BIN TUJUAN": "KARANTINA",
                 "SKU": sku_val,
-                "QUANTITY": abs(diff),
+                "QUANTITY": diff,
                 "NOTES": "MISS LOCATION",
                 "_AUDIT_SYS": q_system,
                 "_AUDIT_REC": q_recon,
@@ -723,7 +724,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     # 4. Output DataFrames
     df_karantina = pd.DataFrame(results)
     
-    # Audit untuk tab pengecekan
+    # Audit hanya untuk melihat baris yang lolos filter positif
     df_check = pd.DataFrame([{
         'BIN': r['BIN AWAL'],
         'SKU': r['SKU'],
@@ -736,7 +737,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
         df_karantina = df_karantina[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
 
     return df_karantina, df_check
-    
+
 def logic_compare_scan_to_stock(df_scan, df_stock):
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
