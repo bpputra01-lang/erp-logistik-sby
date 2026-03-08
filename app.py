@@ -1339,33 +1339,31 @@ def menu_Stock_Opname():
 
 # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
     st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
-    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v3")
-    
-    col_up1, col_up2 = st.columns(2)
-with col_up1:
-    up_plus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ + (Opsional)", type=['xlsx','csv'], key="up_plus_total")
-with col_up2:
-    up_minus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ - (Opsional)", type=['xlsx','csv'], key="up_minus_total")
 
-if st.button("▶️ GENERATE SUMMARY REPORT", key="btn_gen_adj_v3", use_container_width=True):
-    # Data current dari aplikasi
-    df_p_current = st.session_state.get('df_mult_final')
-    df_m_current = None # Sesuaikan jika ada session state untuk adj minus current
-    
-    # Logic: Jika ada file di-upload, prioritas pakai file tersebut (Total Report)
-    # Jika kosong, fungsi logic_sum_adjustment_final akan pakai data current
-    try:
+# 2 Uploader biar bisa handle report total (Hybrid)
+up_plus_total = st.file_uploader("📥 Upload TOTAL STOCK ADJ + (Opsional)", type=['xlsx','csv'], key="up_p_final")
+up_minus_total = st.file_uploader("📥 Upload TOTAL STOCK ADJ - (Opsional)", type=['xlsx','csv'], key="up_m_final")
+
+if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
+    # Data yang lagi diolah di aplikasi (Current)
+    df_p_curr = st.session_state.get('df_mult_final')
+    df_m_curr = None 
+
+    if df_p_curr is not None:
+        # Panggil fungsi logic dengan 4 parameter (2 current, 2 upload)
+        # Sesuai logic: Kalau uploader diisi, dia jadi acuan utama (Total Report)
         df_res, df_summary = logic_sum_adjustment_final(
-            df_p_current, 
-            df_m_current, 
-            up_plus_final, 
-            up_minus_final
+            df_p_curr, 
+            df_m_curr, 
+            up_plus_total, 
+            up_minus_total
         )
         
         st.session_state.report_adj = {"data": df_res, "sum": df_summary}
-        st.success("✅ Master Summary Berhasil Digabungkan!")
+        st.success("✅ Summary Adjustment Berhasil Dibuat!")
         st.rerun()
-
+    else:
+        st.error("Data ADJ (+) aplikasi kosong! Olah dulu datanya atau upload file total di atas.")
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
         df_s = st.session_state.report_adj["sum"]
