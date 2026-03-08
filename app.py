@@ -438,7 +438,7 @@ div.stFormSubmitButton > button {
                 font-weight: 800; 
                 text-align: center;
             ">SURABAYA WAREHOUSE
-        🟢DISTRIBUTION CENTER🟢</h2>
+            DISTRIBUTION CENTER</h2>
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
@@ -448,7 +448,7 @@ div.stFormSubmitButton > button {
                 font-size: 14px; 
                 margin-bottom: 15px; 
                 text-align: center;
-            ">🐊ZKN Warehouse Management System</p>
+            ">ZKN Warehouse Management System</p>
         """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
