@@ -641,18 +641,19 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
     setup_real_data = []
     
     for i in range(len(df_stock)):
-        # SYARAT VBA: If Val(dataStock(i, 11)) > Val(dataStock(i, 10)) Then
-        # Artinya: QTY SO > QTY SYSTEM
+        # SYARAT: QTY SO > QTY SYSTEM
         if qty_so.iloc[i] > qty_system.iloc[i]:
-            sku_key = clean_val(df_stock.iloc[i, 2]) # SKU Kolom C (Index 2)
+            sku_key = clean_val(df_stock.iloc[i, 2]) # SKU Kolom C
             
-            setup_real_data.append({
-                "BIN AWAL": dict_multi.get(sku_key, "NOT FOUND"),
-                "BIN TUJUAN": df_stock.iloc[i, 1], # Kolom B (Index 1)
-                "SKU": sku_key,
-                "QUANTITY": diff_val.iloc[i],     # Kolom L (Index 11)
-                "NOTES": "RELOCATION"             # Notes sesuai request VBA
-            })
+            # LOGIC TAMBAHAN: ABAIKAN JIKA SKU TIDAK ADA DI FILE MULTIPLE (TIDAK ADA NOT FOUND)
+            if sku_key in dict_multi:
+                setup_real_data.append({
+                    "BIN AWAL": dict_multi[sku_key],
+                    "BIN TUJUAN": df_stock.iloc[i, 1], # Kolom B
+                    "SKU": sku_key,
+                    "QUANTITY": diff_val.iloc[i],     # Kolom L
+                    "NOTES": "RELOCATION"             # Sesuai request
+                })
 
     # Return DataFrame dengan susunan kolom sesuai Header VBA
     result_df = pd.DataFrame(setup_real_data)
