@@ -1047,6 +1047,8 @@ def menu_Stock_Opname():
                     
                     # 3. Jalankan Pivot
                     df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
+                    df_mult_clean = clean_final_result(df_mult)
+                    df_final_macro, _ = logic_run_allocation(df_mult_clean, res4, df_s4)
 
                     # 4. Pembersihan Data (Pastikan hanya QTY > 0)
                     def clean_final_result(df):
@@ -1060,6 +1062,7 @@ def menu_Stock_Opname():
                     st.session_state.df_mult_final = clean_final_result(df_mult)
                     st.session_state.df_sing_final = clean_final_result(df_sing)
                     st.session_state.df_res4_final = res4
+                    st.session_state.df_set_up_real = df_final_macro
                     st.session_state.process_done = True
                     
                     st.rerun()
@@ -1078,7 +1081,7 @@ def menu_Stock_Opname():
             else:
                 st.success("✅ Analisis Selesai!")
             
-            t1, t2, t3 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT"])
+            t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "📋 SET UP REAL +", "🔍 CEK ADJ + RESULT"])
             
             with t1:
                 st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
@@ -1089,8 +1092,13 @@ def menu_Stock_Opname():
                 st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
                 if not st.session_state.df_sing_final.empty:
                     st.download_button("📥 Download Single Adj +", st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'), "final_adj_single.csv", "text/csv", key="dl_sing_final")
-            
             with t3:
+                # Ini isi tab tambahannya
+                st.dataframe(st.session_state.df_set_up_real, use_container_width=True, hide_index=True)
+                if not st.session_state.df_set_up_real.empty:
+                    st.download_button("📥 Download SET UP REAL +", st.session_state.df_set_up_real.to_csv(index=False).encode('utf-8'), "set_up_real_plus.csv", "text/csv", key="dl_setup_real")
+            
+            with t4:
                 # Tampilkan hasil lookup biar lu bisa cek kolom K (QTY SO)
                 st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
                 st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
