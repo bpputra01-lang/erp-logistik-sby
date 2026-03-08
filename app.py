@@ -438,7 +438,7 @@ div.stFormSubmitButton > button {
                 font-weight: 800; 
                 text-align: center;
             ">SURABAYA DISTRIBUTION
-            CENTER SURABAYA</h2>
+            CENTER WAREHOUSE</h2>
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
