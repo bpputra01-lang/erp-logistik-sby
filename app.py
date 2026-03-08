@@ -1338,24 +1338,34 @@ def menu_Stock_Opname():
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
 # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
-    st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
-    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v3")
+st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
+
+# Gunakan columns biar rapi dua kolom sesuai gambar kedua
+col_up1, col_up2 = st.columns(2)
+with col_up1:
+    up_plus = st.file_uploader("📥 Upload STOCK ADJ +", type=['xlsx','csv'], key="up_p_final_v3")
+with col_up2:
+    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_m_final_v3")
+
+if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
+    df_p = st.session_state.get('df_mult_final')
     
-    if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
-        df_p = st.session_state.get('df_mult_final')
-        # Diubah sedikit agar tetap jalan jika up_minus tidak ada (None)
-        if df_p is not None:
-            # Baca file jika ada, jika tidak ada set df_m ke None
-            df_m = None
-            if up_minus:
-                df_m = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
+    if df_p is not None:
+        # LOGIC HYBRID: Cek upload dulu, kalau kosong baru pake data aplikasi
+        df_p_input = df_p
+        if up_plus:
+            df_p_input = pd.read_excel(up_plus) if up_plus.name.endswith('.xlsx') else pd.read_csv(up_plus)
             
-            # Panggil fungsi logic (sudah aman menangani df_m = None)
-            df_res, df_summary = logic_sum_adjustment_final(df_p, df_m)
-            
-            st.session_state.report_adj = {"data": df_res, "sum": df_summary}
-            st.success("✅ Summary Adjustment Berhasil Dibuat!")
-            st.rerun()
+        df_m_input = None
+        if up_minus:
+            df_m_input = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
+        
+        # Panggil fungsi logic lu yang lama (Hybrid Mode)
+        df_res, df_summary = logic_sum_adjustment_final(df_p_input, df_m_input)
+        
+        st.session_state.report_adj = {"data": df_res, "sum": df_summary}
+        st.success("✅ Summary Adjustment Berhasil Dibuat!")
+        st.rerun()
 
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
