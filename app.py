@@ -11,7 +11,7 @@ from collections import defaultdict
 st.set_page_config(
     page_title="LogsbyERP.id",
     page_icon="🚛",
-    layout="wide",)
+    )
   
 st.markdown("""
     <style>
