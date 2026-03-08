@@ -663,56 +663,53 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
     
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
-    # 1. Helper Pembersihan Data
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
+        if s.startswith("SPE"): s = s[3:].strip() # Hapus prefix SPE
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 2. Buat Mapping (Dictionary) dari file RECON
-    # Key: "BIN|SKU", Value: Kolom G (Index 6)
+    # 1. Mapping dari file RECON (Cek Adjustment)
     recon_dict = {}
     if df_recon is not None and not df_recon.empty:
         for _, row in df_recon.iterrows():
             try:
-                # Key dari Recon: Kolom A (Index 0) dan Kolom B (Index 1)
+                # Key: BIN|SKU (A|B)
                 k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
-                recon_dict[k] = row.iloc[6] # Ambil Kolom G
+                
+                # AMBIL DARI KOLOM N (Index 13) sesuai request
+                val_recon = pd.to_numeric(row.iloc[13], errors='coerce')
+                
+                # Masukkan ke dictionary jika key belum ada atau update nilai
+                recon_dict[k] = val_recon if not pd.isna(val_recon) else 0
             except: continue
 
-    # 3. Proses DataFrame Outstanding
+    # 2. Proses file OUTSTANDING
     df = df_outstanding.copy()
     
-    # Pastikan kolom QTY SYSTEM (Index 10) adalah numerik
-    df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
+    # QTY SYSTEM di Outstanding (Kolom 10 / Index 9)
+    qty_sys_col = pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0)
 
-    # 4. Lookup QTY RECON ke Outstanding berdasarkan BIN|SKU
     def do_lookup_recon(row):
-        # Key dari Outstanding: Kolom B (Index 1) dan Kolom C (Index 2)
+        # Key di Outstanding: BIN|SKU (B|C)
         key_out = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
-        if key_out in recon_dict:
-            return recon_dict[key_out]
-        return 0 # Jika tidak ditemukan, dianggap 0
+        return recon_dict.get(key_out, 0)
 
-    # Taruh hasil lookup Recon di kolom bantuan (atau Index 14 sesuai kodingan awalmu)
-    qty_recon = df.apply(do_lookup_recon, axis=1)
-    qty_recon = pd.to_numeric(qty_recon, errors='coerce').fillna(0)
+    # 3. Hitung Selisih
+    df['QTY_RECON_FOUND'] = df.apply(do_lookup_recon, axis=1)
+    df['CHECK_DIFF'] = qty_sys_col - df['QTY_RECON_FOUND']
     
-    # 5. Hitung Selisih (CHECK_DIFF)
-    # QTY SYSTEM (Index 10) dikurangi HASIL RECON
-    df['CHECK_DIFF'] = df.iloc[:, 10] - qty_recon
-    
-    # 6. Buat DataFrame Check (Untuk Monitoring)
+    # 4. Buat Data Audit (df_check)
     df_check = pd.DataFrame({
         'BIN': df.iloc[:, 1],
         'SKU': df.iloc[:, 2],
-        'QTY_SYSTEM': df.iloc[:, 10],
-        'QTY_RECON': qty_recon,
+        'QTY_SYSTEM': qty_sys_col,
+        'QTY_RECON_N': df['QTY_RECON_FOUND'],
         'SELISIH': df['CHECK_DIFF']
     })
     
-    # 7. Filter Data untuk Karantina (Hanya yang CHECK_DIFF != 0)
+    # 5. Filter untuk Karantina (Hanya DIFF != 0)
     mask = df['CHECK_DIFF'] != 0
     df_filtered = df[mask].copy()
     
@@ -723,10 +720,6 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
         "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
         "NOTES": "MISS LOCATION"
     })
-
-    # Tambahan: Abaikan jika QUANTITY 0
-    if not df_karantina.empty:
-        df_karantina = df_karantina[df_karantina["QUANTITY"] > 0].reset_index(drop=True)
     
     return df_karantina, df_check
 
