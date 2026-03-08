@@ -1338,32 +1338,39 @@ def menu_Stock_Opname():
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
 # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
-    st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
+st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
 
-# 2 Uploader biar bisa handle report total (Hybrid)
-up_plus_total = st.file_uploader("📥 Upload TOTAL STOCK ADJ + (Opsional)", type=['xlsx','csv'], key="up_p_final")
-up_minus_total = st.file_uploader("📥 Upload TOTAL STOCK ADJ - (Opsional)", type=['xlsx','csv'], key="up_m_final")
+col_up1, col_up2 = st.columns(2)
+with col_up1:
+    up_plus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ + (Opsional)", type=['xlsx','csv'], key="up_minus_final_v3")
+with col_up2:
+    up_minus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ - (Opsional)", type=['xlsx','csv'], key="up_minus_final_v3")
 
-if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
-    # Data yang lagi diolah di aplikasi (Current)
+if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3", use_container_width=True):
+    # Data yang sedang aktif di aplikasi saat ini
     df_p_curr = st.session_state.get('df_mult_final')
-    df_m_curr = None 
-
+    df_m_curr = None # Bisa diisi jika ada session state khusus untuk Adj (-) current
+    
+    # Logic Hybrid: Masukkan 4 parameter ke fungsi (2 current, 2 upload)
+    # Pastikan def logic_sum_adjustment_final(df_p_curr, df_m_curr, up_p=None, up_m=None) sudah diupdate
     if df_p_curr is not None:
-        # Panggil fungsi logic dengan 4 parameter (2 current, 2 upload)
-        # Sesuai logic: Kalau uploader diisi, dia jadi acuan utama (Total Report)
-        df_res, df_summary = logic_sum_adjustment_final(
-            df_p_curr, 
-            df_m_curr, 
-            up_plus_total, 
-            up_minus_total
-        )
-        
-        st.session_state.report_adj = {"data": df_res, "sum": df_summary}
-        st.success("✅ Summary Adjustment Berhasil Dibuat!")
-        st.rerun()
+        try:
+            # Panggil fungsi dengan parameter lengkap agar tidak error 'positional arguments'
+            df_res, df_summary = logic_sum_adjustment_final(
+                df_p_curr, 
+                df_m_curr, 
+                up_plus_final, 
+                up_minus_final
+            )
+            
+            st.session_state.report_adj = {"data": df_res, "sum": df_summary}
+            st.success("✅ Master Summary Berhasil Dibuat!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Gagal olah data: {e}")
     else:
-        st.error("Data ADJ (+) aplikasi kosong! Olah dulu datanya atau upload file total di atas.")
+        st.error("Data ADJ (+) di aplikasi masih kosong. Proses step sebelumnya dulu!")
+
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
         df_s = st.session_state.report_adj["sum"]
