@@ -897,75 +897,76 @@ def logic_miss_location_report(df_setup_real):
     except:
         return pd.DataFrame(columns=columns_ref), 0, 0
 
-def logic_sum_adjustment_final(df_plus, df_minus):
-    # Template kolom sesuai Private Sub ApplyHeaderStyle di VBA lu
+def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, up_minus=None):
+    """
+    Logic Hybrid: 
+    1. Jika ada file upload (up_plus/up_minus), pakai data dari file tersebut.
+    2. Jika tidak ada upload, pakai data current (yang sedang diolah aplikasi).
+    """
     cols_header = [
         "BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", 
         "SUB KATEGORI", "HARGA BELI", "HARGA JUAL", 
         "QTY SYSTEM", "QTY SO", "VALUE ADJ", "STATUS ADJ"
     ]
 
+    def get_active_df(current_df, uploaded_file):
+        # Jika ada file yang di-upload, baca file tersebut
+        if uploaded_file is not None:
+            try:
+                uploaded_file.seek(0)
+                if uploaded_file.name.endswith(('.xlsx', '.xls')):
+                    return pd.read_excel(uploaded_file)
+                else:
+                    return pd.read_csv(uploaded_file)
+            except:
+                return current_df # Balik ke current jika file corrupt
+        return current_df # Pakai data aplikasi jika tidak ada upload
+
     def process_data(df, status):
-        # MODIFIKASI: Tetap kembalikan DataFrame kosong jika df adalah None agar tidak error saat concat
         if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             return pd.DataFrame(columns=cols_header)
         
-        # VBA lu ambil kolom B-K (Indeks 1-10 di Python)
+        # Ambil kolom yang dibutuhkan (Indeks 1-10 sesuai standar VBA lu)
         temp = df.iloc[:, 1:11].copy() 
-        
-        # Penamaan kolom agar pas 10 kolom awal (Sesuai list cols_header)
         temp.columns = cols_header[:10]
         
-        # FIX: Pengali diubah ke HARGA BELI (Kolom ke-7 di list cols_header)
-        price_col = "HARGA BELI" 
-        qty_so = "QTY SO"        
-        qty_sys = "QTY SYSTEM"   
-        
-        # Convert ke numeric biar ga error math
-        for col in [price_col, qty_so, qty_sys]:
+        # Pastikan numerik untuk perhitungan
+        for col in ["HARGA BELI", "QTY SO", "QTY SYSTEM"]:
             temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
 
-        # Logic: (QTY SO - QTY SYSTEM) * HARGA BELI
-        temp["VALUE ADJ"] = (temp[qty_so] - temp[qty_sys]) * temp[price_col]
+        # Hitung Value Adj
+        temp["VALUE ADJ"] = (temp["QTY SO"] - temp["QTY SYSTEM"]) * temp["HARGA BELI"]
         temp["STATUS ADJ"] = status
-        
         return temp
 
-    # Proses masing-masing (df_minus akan jadi DF kosong jika None, jadi tidak break)
-    df_adj_plus = process_data(df_plus, "ADJ +")
-    df_adj_minus = process_data(df_minus, "ADJ -")
+    # Pilih Sumber Data: Prioritas Upload > Current Data
+    active_plus = get_active_df(df_plus_current, up_plus)
+    active_minus = get_active_df(df_minus_current, up_minus)
 
-    # Gabung (Union) - Tetap jalan walau salah satu kosong
+    # Proses Data
+    df_adj_plus = process_data(active_plus, "ADJ +")
+    df_adj_minus = process_data(active_minus, "ADJ -")
+
+    # Gabung untuk report total
     df_final = pd.concat([df_adj_plus, df_adj_minus], ignore_index=True)
 
-    # --- HITUNG SUMMARY (BAGIAN 3 DI VBA LU) ---
-    # Menggunakan .get() atau pengecekan kolom untuk menghindari error jika DF kosong
+    # --- HITUNG SUMMARY ---
     val_plus = df_adj_plus["VALUE ADJ"].sum() if not df_adj_plus.empty else 0
     val_minus = df_adj_minus["VALUE ADJ"].sum() if not df_adj_minus.empty else 0
     
-    # VBA: QTY Plus = Abs(QTY SO - QTY SYSTEM)
     qty_plus = (df_adj_plus["QTY SO"] - df_adj_plus["QTY SYSTEM"]).abs().sum() if not df_adj_plus.empty else 0
-    # VBA: QTY Minus = - Abs(QTY SO - QTY SYSTEM)
     qty_minus = -(df_adj_minus["QTY SO"] - df_adj_minus["QTY SYSTEM"]).abs().sum() if not df_adj_minus.empty else 0
 
     df_sum = pd.DataFrame({
         "METRIC": [
-            "Total SKU Adj.", 
-            "Total Value Adj. +", 
-            "Total Value Adj. -", 
-            "Total QTY Adj. +", 
-            "Total QTY Adj. -", 
-            "Total Value", 
-            "Total QTY"
+            "Total SKU Adj.", "Total Value Adj. +", "Total Value Adj. -", 
+            "Total QTY Adj. +", "Total QTY Adj. -", "Total Value", "Total QTY"
         ],
         "VALUE": [
-            len(df_final[df_final["SKU"].astype(str).str.strip() != ""]), # Total SKU
-            val_plus,
-            val_minus,
-            qty_plus,
-            qty_minus,
-            val_plus + val_minus, # Total Value
-            qty_plus + qty_minus  # Total QTY
+            len(df_final[df_final["SKU"].astype(str).str.strip() != ""]),
+            val_plus, val_minus, qty_plus, qty_minus,
+            val_plus + val_minus,
+            qty_plus + qty_minus
         ]
     })
 
