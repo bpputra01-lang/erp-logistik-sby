@@ -1114,7 +1114,7 @@ def menu_Stock_Opname():
             else:
                 st.success("✅ Analisis Selesai!")
             
-            t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "🛠️ SET UP REAL +"])
+            t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "➡️ SET UP REAL +"])
             
             with t1:
                 st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
@@ -1136,10 +1136,10 @@ def menu_Stock_Opname():
                 df_m_src = st.session_state.get("df_mult_final")
                 df_s_res = st.session_state.get("df_res4_final")
 
-                st.info("🛠️ **Relocation Logic**: Klik tombol di bawah untuk mendistribusikan BIN AWAL ke BIN TUJUAN.")
+                st.info("➡️ Running Relocation Inbound Setelah Running Process Selesai.")
 
                 # Tombol Terpisah hanya untuk Set Up Real +
-                if st.button("🚀 GENERATE SET UP REAL +", use_container_width=True, key="btn_gen_real_plus"):
+                if st.button("▶️ GENERATE SET UP REAL +", use_container_width=True, key="btn_gen_real_plus"):
                     if df_m_src is not None and df_s_res is not None:
                         try:
                             # Jalankan fungsi logic yang sudah kita perbaiki tadi
@@ -1147,7 +1147,7 @@ def menu_Stock_Opname():
                             
                             # Simpan hasil ke session state agar tidak hilang saat pindah tab
                             st.session_state.df_setup_real_final = df_real
-                            st.success("✅ Relokasi Berhasil Dibuat!")
+                            st.success("✅ Mutasi Berhasil Dibuat!")
                         except Exception as e:
                             st.error(f"❌ Gagal memproses relokasi: {str(e)}")
                     else:
