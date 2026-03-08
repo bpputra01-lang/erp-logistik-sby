@@ -1133,7 +1133,7 @@ def menu_Stock_Opname():
                 st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
                 st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
 
-          with t4:
+            with t4:
                 # RUNNING DI SINI: Mengambil data yang sudah jadi dari t1 dan t3
                 df_m_src = st.session_state.get("df_mult_final")
                 df_s_res = st.session_state.get("df_res4_final")
