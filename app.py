@@ -1056,7 +1056,7 @@ if up_r4 and up_s4 and up_m5:
                     df = df[df[last_col] > 0].reset_index(drop=True)
                 return df
 
-            # --- BAGIAN TAMBAHAN (CUMAN DITAMBAHIN DI SINI) ---
+            # --- CUMAN TAMBAHIN LOGIKA DI SINI GAK NGURANGIN APA-APA ---
             df_m_clean = clean_final_result(df_mult)
             df_final_macro, _ = logic_run_allocation(df_m_clean, res4, df_s4)
 
@@ -1064,7 +1064,7 @@ if up_r4 and up_s4 and up_m5:
             st.session_state.df_mult_final = clean_final_result(df_mult)
             st.session_state.df_sing_final = clean_final_result(df_sing)
             st.session_state.df_res4_final = res4
-            st.session_state.df_set_up_real = df_final_macro # Tambahan baru
+            st.session_state.df_set_up_real = df_final_macro # Data tambahan
             st.session_state.process_done = True
             
             st.rerun()
@@ -1083,7 +1083,7 @@ if st.session_state.get("process_done"):
     else:
         st.success("✅ Analisis Selesai!")
     
-    # CUMAN TAMBAH SATU TAB (T3) DAN GESER CEK ADJ KE T4
+    # TETEP 3 TAB ASLI, CUMAN INSERT SATU TAB BARU DI POSISI KE-3
     t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "📋 SET UP REAL +", "🔍 CEK ADJ + RESULT"])
     
     with t1:
@@ -1097,7 +1097,7 @@ if st.session_state.get("process_done"):
             st.download_button("📥 Download Single Adj +", st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'), "final_adj_single.csv", "text/csv", key="dl_sing_final")
     
     with t3:
-        # TAB TAMBAHAN UNTUK DOWNLOAD HASIL MACRO
+        # TAB TAMBAHAN BUAT DOWNLOAD HASIL MACRO
         st.dataframe(st.session_state.df_set_up_real, use_container_width=True, hide_index=True)
         if not st.session_state.df_set_up_real.empty:
             st.download_button("📥 Download SET UP REAL +", st.session_state.df_set_up_real.to_csv(index=False).encode('utf-8'), "set_up_real_plus.csv", "text/csv", key="dl_setup_real")
