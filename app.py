@@ -609,69 +609,58 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         
     return df_multiple_final, df_single_final
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
-    """
-    Mengimplementasikan logic VBA 'Generate_SetUpRealPlus'
-    1. Filter baris: QTY SO (Index 10) > QTY SYSTEM (Index 9)
-    2. Ambil BIN AWAL dari df_multiple_adj_plus (Mapping via SKU)
-    3. Output: BIN AWAL, BIN TUJUAN, SKU, QUANTITY, NOTES
-    """
-    
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
+        # Sesuai preferensi user: hapus prefix SPE jika ada agar matching
+        if s.startswith("SPE"): s = s[3:] 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Siapkan Mapping Dictionary dari Multiple Adj Plus
-    # Berdasarkan VBA: SKU di Kolom C (Index 2), BIN di Kolom B (Index 1)
+    # 1. Dictionary dari MULTIPLE ADJ + (VBA Step 3)
     dict_multi = {}
     if not df_multiple_adj_plus.empty:
         for _, row in df_multiple_adj_plus.iterrows():
+            # VBA: SKU di Kolom C (Index 2), BIN di Kolom B (Index 1)
             sku = clean_val(row.iloc[2])
-            bin_awal = row.iloc[1]
+            bin_asal = row.iloc[1]
             if sku != "" and sku not in dict_multi:
-                dict_multi[sku] = bin_awal
+                dict_multi[sku] = bin_asal
 
-    # 2. Filter Stock Final: QTY SO > QTY SYSTEM
-    # Index 9 = QTY SYSTEM, Index 10 = QTY SO, Index 11 = DIFF
+    # 2. Ambil Data Stock Final (VBA Step 4 & 5)
     df_stock = df_stock_final.copy()
-    df_stock.iloc[:, 9] = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
-    df_stock.iloc[:, 10] = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
     
-    mask_plus = df_stock.iloc[:, 10] > df_stock.iloc[:, 9]
-    df_filtered = df_stock[mask_plus].copy()
+    # Pastikan tipe data numerik untuk perbandingan
+    # Kolom 10 (Index 9) = QTY SYSTEM
+    # Kolom 11 (Index 10) = QTY SO
+    # Kolom 12 (Index 11) = DIFF
+    qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
+    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
+    diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
 
-    # 3. Bangun hasil akhir (SET UP REAL +)
     setup_real_data = []
     
-    for _, row in df_filtered.iterrows():
-        sku = clean_val(row.iloc[2]) # Kolom C
-        
-        # BIN AWAL (Lookup dari Multiple)
-        bin_awal = dict_multi.get(sku, "NOT FOUND")
-        
-        # BIN TUJUAN (Kolom B - Index 1)
-        bin_tujuan = row.iloc[1]
-        
-        # QUANTITY (Kolom L - Index 11 / DIFF)
-        qty = row.iloc[11]
-        
-        setup_real_data.append({
-            "BIN AWAL": bin_awal,
-            "BIN TUJUAN": bin_tujuan,
-            "SKU": sku,
-            "QUANTITY": qty,
-            "NOTES": "RELOCATION"
-        })
+    for i in range(len(df_stock)):
+        # SYARAT VBA: If Val(dataStock(i, 11)) > Val(dataStock(i, 10)) Then
+        # Artinya: QTY SO > QTY SYSTEM
+        if qty_so.iloc[i] > qty_system.iloc[i]:
+            sku_key = clean_val(df_stock.iloc[i, 2]) # SKU Kolom C (Index 2)
+            
+            setup_real_data.append({
+                "BIN AWAL": dict_multi.get(sku_key, "NOT FOUND"),
+                "BIN TUJUAN": df_stock.iloc[i, 1], # Kolom B (Index 1)
+                "SKU": sku_key,
+                "QUANTITY": diff_val.iloc[i],     # Kolom L (Index 11)
+                "NOTES": "RELOCATION"             # Notes sesuai request VBA
+            })
 
-    df_setup_real = pd.DataFrame(setup_real_data)
+    # Return DataFrame dengan susunan kolom sesuai Header VBA
+    result_df = pd.DataFrame(setup_real_data)
+    if result_df.empty:
+        return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
-    # Jika kosong, buat header kosong agar tidak error di dashboard
-    if df_setup_real.empty:
-        df_setup_real = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
-        
-    return df_setup_real
-
+    return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
+    
 def logic_setup_karantina_with_check(df_outstanding):
     df = df_outstanding.copy()
     df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
