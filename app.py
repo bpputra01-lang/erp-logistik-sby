@@ -1344,7 +1344,7 @@ col_up1, col_up2 = st.columns(2)
 with col_up1:
     up_plus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ + (Opsional)", type=['xlsx','csv'], key="up_minus_final_v3")
 with col_up2:
-    up_minus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ - (Opsional)", type=['xlsx','csv'], key="up_minus_final_v3")
+    up_minus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ - (Opsional)", type=['xlsx','csv'], key="up_minus_final_v2")
 
 if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3", use_container_width=True):
     # Data yang sedang aktif di aplikasi saat ini
