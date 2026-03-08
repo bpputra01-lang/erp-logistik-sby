@@ -670,57 +670,73 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Buat Mapping dari file RECON
-    recon_dict = {}
+    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT (Uploader 2)
+    # Target: KOLOM J (Index 9)
+    sys_map = {}
     if df_recon is not None and not df_recon.empty:
         for _, row in df_recon.iterrows():
             try:
-                # Kolom B = Index 1 (BIN), Kolom C = Index 2 (SKU)
-                k = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
-                
-                # Kolom N = Index 13 (Hasil Rekon)
-                val_recon = pd.to_numeric(row.iloc[13], errors='coerce')
-                recon_dict[k] = val_recon if not pd.isna(val_recon) else 0
+                # Key: BIN B (Index 1) | SKU C (Index 2)
+                k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
+                val_sys = pd.to_numeric(row.iloc[9], errors='coerce') # KOLOM J (Index 9)
+                sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
             except: continue
 
-    # 2. Proses file OUTSTANDING
-    df = df_outstanding.copy()
-    
-    # QTY SYSTEM di Outstanding (Kolom 10 / Index 9)
-    qty_sys_col = pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0)
+    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING (Uploader 1)
+    # Target: KOLOM N (Index 13)
+    recon_map = {}
+    if df_outstanding is not None and not df_outstanding.empty:
+        for _, row in df_outstanding.iterrows():
+            try:
+                # Key: BIN B (Index 1) | SKU C (Index 2)
+                k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
+                val_rec = pd.to_numeric(row.iloc[13], errors='coerce') # KOLOM N (Index 13)
+                recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
+            except: continue
 
-    def do_lookup_recon(row):
-        # Key di Outstanding: BIN di B (Index 1), SKU di C (Index 2)
-        key_out = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
-        return recon_dict.get(key_out, 0)
+    # 3. Proses Comparison
+    df_master = df_outstanding.copy()
+    results = []
 
-    # 3. Hitung Selisih
-    df['QTY_RECON_FOUND'] = df.apply(do_lookup_recon, axis=1)
-    df['CHECK_DIFF'] = qty_sys_col - df['QTY_RECON_FOUND']
+    for _, row in df_master.iterrows():
+        bin_val = row.iloc[1]
+        sku_val = row.iloc[2]
+        key = f"{clean_val(bin_val)}|{clean_val(sku_val)}"
+        
+        # Ambil data sesuai alur baru
+        q_system = sys_map.get(key, 0) # Dari Kolom J Cek Adj
+        q_recon = recon_map.get(key, 0) # Dari Kolom N Outstanding
+        diff = q_system - q_recon
+
+        if diff != 0:
+            results.append({
+                "BIN AWAL": bin_val,
+                "BIN TUJUAN": "KARANTINA",
+                "SKU": sku_val,
+                "QUANTITY": abs(diff),
+                "NOTES": "MISS LOCATION",
+                "_AUDIT_SYS": q_system,
+                "_AUDIT_REC": q_recon,
+                "_AUDIT_DIFF": diff
+            })
+
+    # 4. Output DataFrames
+    df_karantina = pd.DataFrame(results)
     
-    # 4. Data Audit (df_check)
-    df_check = pd.DataFrame({
-        'BIN': df.iloc[:, 1],
-        'SKU': df.iloc[:, 2],
-        'QTY_SYSTEM': qty_sys_col,
-        'QTY_RECON_N': df['QTY_RECON_FOUND'],
-        'SELISIH': df['CHECK_DIFF']
-    })
-    
-    # 5. Filter Karantina (Hanya Selisih != 0)
-    mask = df['CHECK_DIFF'] != 0
-    df_filtered = df[mask].copy()
-    
-    df_karantina = pd.DataFrame({
-        "BIN AWAL": df_filtered.iloc[:, 1],
-        "BIN TUJUAN": "KARANTINA",
-        "SKU": df_filtered.iloc[:, 2],
-        "QUANTITY": df_filtered['CHECK_DIFF'].abs(),
-        "NOTES": "MISS LOCATION"
-    })
-    
+    # Audit untuk tab pengecekan
+    df_check = pd.DataFrame([{
+        'BIN': r['BIN AWAL'],
+        'SKU': r['SKU'],
+        'QTY_SYSTEM_J': r['_AUDIT_SYS'],
+        'QTY_RECON_N': r['_AUDIT_REC'],
+        'SELISIH': r['_AUDIT_DIFF']
+    } for r in results]) if results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
+
+    if not df_karantina.empty:
+        df_karantina = df_karantina[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
+
     return df_karantina, df_check
-
+    
 def logic_compare_scan_to_stock(df_scan, df_stock):
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
