@@ -1340,34 +1340,32 @@ def menu_Stock_Opname():
 # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
 st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
 
+# Posisinya tetep di sini tod, gua buat 2 uploader sejajar biar rapi
 col_up1, col_up2 = st.columns(2)
 with col_up1:
-    up_plus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ + (Opsional)", type=['xlsx','csv'], key="up_minus_final_v3")
+    up_plus = st.file_uploader("📥 Upload STOCK ADJ +", type=['xlsx','csv'], key="up_p_final_v3")
 with col_up2:
-    up_minus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ - (Opsional)", type=['xlsx','csv'], key="up_minus_final_v2")
+    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_m_final_v3")
 
-if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3", use_container_width=True):
-    # Data yang sedang aktif di aplikasi saat ini
-    df_p_curr = st.session_state.get('df_mult_final')
-    df_m_curr = None # Bisa diisi jika ada session state khusus untuk Adj (-) current
+if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
+    df_p = st.session_state.get('df_mult_final')
     
-    # Logic Hybrid: Masukkan 4 parameter ke fungsi (2 current, 2 upload)
-    # Pastikan def logic_sum_adjustment_final(df_p_curr, df_m_curr, up_p=None, up_m=None) sudah diupdate
-    if df_p_curr is not None:
-        try:
-            # Panggil fungsi dengan parameter lengkap agar tidak error 'positional arguments'
-            df_res, df_summary = logic_sum_adjustment_final(
-                df_p_curr, 
-                df_m_curr, 
-                up_plus_final, 
-                up_minus_final
-            )
+    if df_p is not None:
+        # Logic Hybrid: Baca file upload jika ada
+        df_p_input = df_p
+        if up_plus:
+            df_p_input = pd.read_excel(up_plus) if up_plus.name.endswith('.xlsx') else pd.read_csv(up_plus)
             
-            st.session_state.report_adj = {"data": df_res, "sum": df_summary}
-            st.success("✅ Master Summary Berhasil Dibuat!")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Gagal olah data: {e}")
+        df_m_input = None
+        if up_minus:
+            df_m_input = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
+        
+        # Panggil fungsi logic dengan data yang sudah difilter (Upload > Current)
+        df_res, df_summary = logic_sum_adjustment_final(df_p_input, df_m_input)
+        
+        st.session_state.report_adj = {"data": df_res, "sum": df_summary}
+        st.success("✅ Summary Adjustment Berhasil Dibuat!")
+        st.rerun()
 
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
