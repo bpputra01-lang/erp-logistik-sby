@@ -1338,25 +1338,35 @@ def menu_Stock_Opname():
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
 # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
-    st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
-    up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v3")
-    
-    if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
-        df_p = st.session_state.get('df_mult_final')
-        # Diubah sedikit agar tetap jalan jika up_minus tidak ada (None)
-        if df_p is not None:
-            # Baca file jika ada, jika tidak ada set df_m ke None
-            df_m = None
-            if up_minus:
-                df_m = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
-            
-            # Panggil fungsi logic (sudah aman menangani df_m = None)
-            df_res, df_summary = logic_sum_adjustment_final(df_p, df_m)
-            
-            st.session_state.report_adj = {"data": df_res, "sum": df_summary}
-            st.success("✅ Summary Adjustment Berhasil Dibuat!")
-            st.rerun()
+st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
 
+# Menambahkan dua uploader untuk report total agar bisa hybrid
+col_up1, col_up2 = st.columns(2)
+with col_up1:
+    up_plus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ + (Opsional)", type=['xlsx','csv'], key="up_plus_total")
+with col_up2:
+    up_minus_final = st.file_uploader("📥 Upload TOTAL STOCK ADJ - (Opsional)", type=['xlsx','csv'], key="up_minus_total")
+
+if st.button("▶️ GENERATE SUMMARY REPORT", key="btn_gen_adj_v3", use_container_width=True):
+    # Data current dari aplikasi
+    df_p_current = st.session_state.get('df_mult_final')
+    df_m_current = None # Sesuaikan jika ada session state untuk adj minus current
+    
+    # Logic: Jika ada file di-upload, prioritas pakai file tersebut (Total Report)
+    # Jika kosong, fungsi logic_sum_adjustment_final akan pakai data current
+    try:
+        df_res, df_summary = logic_sum_adjustment_final(
+            df_p_current, 
+            df_m_current, 
+            up_plus_final, 
+            up_minus_final
+        )
+        
+        st.session_state.report_adj = {"data": df_res, "sum": df_summary}
+        st.success("✅ Master Summary Berhasil Digabungkan!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"❌ Gagal memproses report: {str(e)}")
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
         df_s = st.session_state.report_adj["sum"]
