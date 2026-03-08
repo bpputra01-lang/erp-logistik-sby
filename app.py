@@ -670,15 +670,15 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Mapping dari file RECON (Cek Adjustment)
+    # 1. Buat Mapping dari file RECON
     recon_dict = {}
     if df_recon is not None and not df_recon.empty:
         for _, row in df_recon.iterrows():
             try:
-                # UPDATE INDEX: BIN di Kolom B (Index 1), SKU di Kolom C (Index 2)
+                # Kolom B = Index 1 (BIN), Kolom C = Index 2 (SKU)
                 k = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
                 
-                # AMBIL DARI KOLOM N (Index 13)
+                # Kolom N = Index 13 (Hasil Rekon)
                 val_recon = pd.to_numeric(row.iloc[13], errors='coerce')
                 recon_dict[k] = val_recon if not pd.isna(val_recon) else 0
             except: continue
@@ -690,7 +690,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     qty_sys_col = pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0)
 
     def do_lookup_recon(row):
-        # Key di Outstanding tetap: BIN di Kolom B (Index 1), SKU di Kolom C (Index 2)
+        # Key di Outstanding: BIN di B (Index 1), SKU di C (Index 2)
         key_out = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
         return recon_dict.get(key_out, 0)
 
@@ -698,7 +698,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     df['QTY_RECON_FOUND'] = df.apply(do_lookup_recon, axis=1)
     df['CHECK_DIFF'] = qty_sys_col - df['QTY_RECON_FOUND']
     
-    # 4. Buat Data Audit (df_check)
+    # 4. Data Audit (df_check)
     df_check = pd.DataFrame({
         'BIN': df.iloc[:, 1],
         'SKU': df.iloc[:, 2],
@@ -707,7 +707,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
         'SELISIH': df['CHECK_DIFF']
     })
     
-    # 5. Filter untuk Karantina (Hanya DIFF != 0)
+    # 5. Filter Karantina (Hanya Selisih != 0)
     mask = df['CHECK_DIFF'] != 0
     df_filtered = df[mask].copy()
     
