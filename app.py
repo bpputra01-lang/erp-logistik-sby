@@ -609,61 +609,58 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         
     return df_multiple_final, df_single_final
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
-    if df_stock_final is None or df_multiple_adj_plus is None:
-        return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
-
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
+        # Sesuai preferensi user: hapus prefix SPE jika ada agar matching
+        if s.startswith("SPE"): s = s[3:] 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Ambil Sumber (Multiple) - Kolom G (Index 6) sebagai stok awal
-    source_bins = {}
-    for _, row in df_multiple_adj_plus.iterrows():
-        sku = clean_val(row.iloc[2]) # Kolom C
-        bin_asal = row.iloc[1]       # Kolom B
-        qty_asal = float(row.iloc[6]) if len(row) > 6 else 0
-        if sku not in source_bins: source_bins[sku] = []
-        source_bins[sku].append({"bin": bin_asal, "qty": qty_asal})
+    # 1. Dictionary dari MULTIPLE ADJ + (VBA Step 3)
+    dict_multi = {}
+    if not df_multiple_adj_plus.empty:
+        for _, row in df_multiple_adj_plus.iterrows():
+            # VBA: SKU di Kolom C (Index 2), BIN di Kolom B (Index 1)
+            sku = clean_val(row.iloc[2])
+            bin_asal = row.iloc[1]
+            if sku != "" and sku not in dict_multi:
+                dict_multi[sku] = bin_asal
 
-    # 2. Proses Target (Cek Stock) - DIFF > 0
+    # 2. Ambil Data Stock Final (VBA Step 4 & 5)
+    df_stock = df_stock_final.copy()
+    
+    # Pastikan tipe data numerik untuk perbandingan
+    # Kolom 10 (Index 9) = QTY SYSTEM
+    # Kolom 11 (Index 10) = QTY SO
+    # Kolom 12 (Index 11) = DIFF
+    qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
+    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
+    diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
+
     setup_real_data = []
-    # DIFF ada di kolom ke-12 (Index 11)
-    for _, row in df_stock_final.iterrows():
-        diff_val = float(row.iloc[11]) if not pd.isna(row.iloc[11]) else 0
-        
-        if diff_val > 0:
-            sku_key = clean_val(row.iloc[2]) # Kolom C
-            bin_tujuan = row.iloc[1]         # Kolom B
-            needed_qty = diff_val
+    
+    for i in range(len(df_stock)):
+        # SYARAT VBA: If Val(dataStock(i, 11)) > Val(dataStock(i, 10)) Then
+        # Artinya: QTY SO > QTY SYSTEM
+        if qty_so.iloc[i] > qty_system.iloc[i]:
+            sku_key = clean_val(df_stock.iloc[i, 2]) # SKU Kolom C (Index 2)
+            
+            setup_real_data.append({
+                "BIN AWAL": dict_multi.get(sku_key, "NOT FOUND"),
+                "BIN TUJUAN": df_stock.iloc[i, 1], # Kolom B (Index 1)
+                "SKU": sku_key,
+                "QUANTITY": diff_val.iloc[i],     # Kolom L (Index 11)
+                "NOTES": "RELOCATION"             # Notes sesuai request VBA
+            })
 
-            if sku_key in source_bins:
-                for source in source_bins[sku_key]:
-                    if needed_qty <= 0: break
-                    if source["qty"] <= 0: continue
-
-                    take_qty = min(source["qty"], needed_qty)
-                    setup_real_data.append({
-                        "BIN AWAL": source["bin"],
-                        "BIN TUJUAN": bin_tujuan,
-                        "SKU": sku_key,
-                        "QUANTITY": take_qty,
-                        "NOTES": "RELOCATION"
-                    })
-                    source["qty"] -= take_qty
-                    needed_qty -= take_qty
-            else:
-                setup_real_data.append({
-                    "BIN AWAL": "NOT FOUND",
-                    "BIN TUJUAN": bin_tujuan,
-                    "SKU": sku_key,
-                    "QUANTITY": needed_qty,
-                    "NOTES": "RELOCATION"
-                })
-
-    return pd.DataFrame(setup_real_data)
-
+    # Return DataFrame dengan susunan kolom sesuai Header VBA
+    result_df = pd.DataFrame(setup_real_data)
+    if result_df.empty:
+        return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
+    
+    return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
+    
 def logic_setup_karantina_with_check(df_outstanding):
     df = df_outstanding.copy()
     df.iloc[:, 10] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0)
@@ -1134,22 +1131,41 @@ def menu_Stock_Opname():
                 st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
 
             with t4:
-                # RUNNING DI SINI: Mengambil data yang sudah jadi dari t1 dan t3
+                # Ambil data dari session state hasil running sebelumnya
                 df_m_src = st.session_state.get("df_mult_final")
                 df_s_res = st.session_state.get("df_res4_final")
 
-                if df_m_src is not None and df_s_res is not None:
-                    # Jalankan logic relokasi hanya jika data sumber sudah ada
-                    df_real = logic_setup_real_plus(df_s_res, df_m_src)
+                st.info("🛠️ **Relocation Logic**: Klik tombol di bawah untuk mendistribusikan BIN AWAL ke BIN TUJUAN.")
+
+                # Tombol Terpisah hanya untuk Set Up Real +
+                if st.button("🚀 GENERATE SET UP REAL +", use_container_width=True, key="btn_gen_real_plus"):
+                    if df_m_src is not None and df_s_res is not None:
+                        try:
+                            # Jalankan fungsi logic yang sudah kita perbaiki tadi
+                            df_real = logic_setup_real_plus(df_s_res, df_m_src)
+                            
+                            # Simpan hasil ke session state agar tidak hilang saat pindah tab
+                            st.session_state.df_setup_real_final = df_real
+                            st.success("✅ Relokasi Berhasil Dibuat!")
+                        except Exception as e:
+                            st.error(f"❌ Gagal memproses relokasi: {str(e)}")
+                    else:
+                        st.warning("⚠️ Data Multiple atau Cek Stock belum tersedia. Silahkan RUNNING PROCESS di atas terlebih dahulu.")
+
+                # Tampilkan hasil jika sudah ada di session state
+                if "df_setup_real_final" in st.session_state:
+                    df_hasil = st.session_state.df_setup_real_final
+                    st.dataframe(df_hasil, use_container_width=True, hide_index=True)
                     
-                    st.info("🛠️ Relocation Logic: Mendistribusikan BIN AWAL (Multiple) ke BIN TUJUAN (Cek Stock)")
-                    st.dataframe(df_real, use_container_width=True, hide_index=True)
-                    
-                    if not df_real.empty:
-                        csv_real = df_real.to_csv(index=False).encode('utf-8')
-                        st.download_button("📥 Download Set Up Real +", csv_real, "set_up_real_plus.csv", "text/csv", key="dl_setup_real_v2")
-                else:
-                    st.warning("⚠️ Selesaikan RUNNING PROCESS terlebih dahulu agar data tersedia.")
+                    if not df_hasil.empty:
+                        csv_real = df_hasil.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📥 Download Set Up Real +", 
+                            data=csv_real, 
+                            file_name="set_up_real_plus.csv", 
+                            mime="text/csv", 
+                            key="dl_setup_real_final"
+                        )
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
