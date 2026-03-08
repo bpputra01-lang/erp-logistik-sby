@@ -432,7 +432,7 @@ div.stFormSubmitButton > button {
         st.markdown("""
             <h2 style="
                 color: #C5A059; 
-                margin-top: -300px; 
+                margin-top: -60px; 
                 margin-bottom: -5px; 
                 font-family: 'Inter', sans-serif; 
                 font-weight: 800; 
@@ -455,7 +455,7 @@ div.stFormSubmitButton > button {
             user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
             pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
             
-            st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
+            st.markdown('<div style="margin-top: 100px;"></div>', unsafe_allow_html=True)
             
             submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
             
