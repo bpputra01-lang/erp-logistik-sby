@@ -438,7 +438,7 @@ div.stFormSubmitButton > button {
                 font-weight: 800; 
                 text-align: center;
             ">SURABAYA WAREHOUSE
-            "DISTRIBUTION CENTER"</h2>
+            🟢DISTRIBUTION CENTER🟢</h2>
         """, unsafe_allow_html=True)
         
         # SUB-JUDUL
