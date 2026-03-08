@@ -1338,7 +1338,7 @@ def menu_Stock_Opname():
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
 # --- BAGIAN B: SUMMARY ADJUSTMENT REPORT ---
-st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
+    st.markdown("#### 💰 SUMMARY ADJUSTMENT REPORT")
     up_minus = st.file_uploader("📥 Upload STOCK ADJ -", type=['xlsx','csv'], key="up_minus_final_v3")
     up_plus = st.file_uploader("📥 Upload STOCK ADJ +", type=['xlsx','csv'], key="up_plus_final_v3")
 
