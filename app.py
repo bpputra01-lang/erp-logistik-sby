@@ -11,7 +11,7 @@ from collections import defaultdict
 st.set_page_config(
     page_title="LogsbyERP.id",
     page_icon="🚛",
-    )
+    layout="wide",)
   
 st.markdown("""
     <style>
@@ -306,7 +306,7 @@ div.stFormSubmitButton > button {
     border-radius: 12px !important;
     
     /* GANTI BAGIAN INI */
-    padding: 18px 20px !important; /* Naikin dari 14px ke 18px biar lega */
+    padding: 30px 20px !important; /* Naikin dari 14px ke 18px biar lega */
     line-height: 1.2 !important;   /* Pastikan teks di tengah vertikal */
     height: auto !important;       /* Biar tinggi tombol ngikutin padding */
     
