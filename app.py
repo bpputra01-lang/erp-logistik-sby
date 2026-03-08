@@ -666,7 +666,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
-        if s.startswith("SPE"): s = s[3:].strip() # Hapus prefix SPE
+        if s.startswith("SPE"): s = s[3:].strip() 
         if s.endswith('.0'): s = s[:-2]
         return s
 
@@ -675,13 +675,11 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     if df_recon is not None and not df_recon.empty:
         for _, row in df_recon.iterrows():
             try:
-                # Key: BIN|SKU (A|B)
-                k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
+                # UPDATE INDEX: BIN di Kolom B (Index 1), SKU di Kolom C (Index 2)
+                k = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
                 
-                # AMBIL DARI KOLOM N (Index 13) sesuai request
+                # AMBIL DARI KOLOM N (Index 13)
                 val_recon = pd.to_numeric(row.iloc[13], errors='coerce')
-                
-                # Masukkan ke dictionary jika key belum ada atau update nilai
                 recon_dict[k] = val_recon if not pd.isna(val_recon) else 0
             except: continue
 
@@ -692,7 +690,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     qty_sys_col = pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0)
 
     def do_lookup_recon(row):
-        # Key di Outstanding: BIN|SKU (B|C)
+        # Key di Outstanding tetap: BIN di Kolom B (Index 1), SKU di Kolom C (Index 2)
         key_out = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
         return recon_dict.get(key_out, 0)
 
