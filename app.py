@@ -433,7 +433,7 @@ div.stFormSubmitButton > button {
             <h2 style="
                 color: #C5A059; 
                 margin-top: -60px; 
-                margin-bottom: -5px; 
+                margin-bottom: 10px; 
                 font-family: 'Inter', sans-serif; 
                 font-weight: 800; 
                 text-align: center;
