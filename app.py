@@ -288,6 +288,21 @@ if 'logged_in' not in st.session_state:
 if not st.session_state.logged_in:
     st.markdown("""
         <style>
+
+        /* MEMBUAT SELURUH FORM KE TENGAH LAYAR */
+[data-testid="stVerticalBlock"] > div:has(.stForm) {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-height: 80vh !important; /* Memberi ruang vertikal agar ke tengah */
+    max-width: 500px !important;   /* Lebar maksimal form agar tidak melebar satu layar */
+    margin: 0 auto !important;    /* Mengetengahkan secara horizontal */
+}
+
+/* Memastikan teks judul juga ikut ke tengah */
+.stMarkdown, .stTitle {
+    text-align: center !important;
+}
         /* 1. Background & Layout */
         .stApp {
             background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), 
@@ -307,7 +322,7 @@ div.stFormSubmitButton > button {
     
     /* GANTI BAGIAN INI */
     padding: 18px 20px !important; /* Naikin dari 14px ke 18px biar lega */
-    line-height: 6.0 !important;   /* Pastikan teks di tengah vertikal */
+    line-height: 1.2 !important;   /* Pastikan teks di tengah vertikal */
     height: auto !important;       /* Biar tinggi tombol ngikutin padding */
     
     font-weight: 800 !important;
