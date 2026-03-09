@@ -448,7 +448,7 @@ div.stFormSubmitButton > button {
                 font-size: 14px; 
                 margin-bottom: 15px; 
                 text-align: center;
-            ">ZKN Warehouse Management System</p>
+            ">🟢Warehouse Management System🟢</p>
         """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
