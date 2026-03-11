@@ -2299,86 +2299,95 @@ def putaway_system(df_ds, df_asal):
     
     return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_asal_updated
 
-import pandas as pd
-import numpy as np
-import io
-
 def process_scan_out(df_scan, df_history, df_stock):
     # ========== COPY DATA ==========
     df_scan = df_scan.copy()
     df_history = df_history.copy()
     df_stock = df_stock.copy()
     
-    # ========== NORMALISASI KOLOM ==========
+    # ========== NORMALISASI NAMA KOLOM ==========
     df_scan.columns = [str(col).strip().upper() for col in df_scan.columns]
     df_history.columns = [str(col).strip().upper() for col in df_history.columns]
     df_stock.columns = [str(col).strip().upper() for col in df_stock.columns]
     
-    # RENAME KOLOM (Sesuai Struktur File Lo)
-    df_scan = df_scan.rename(columns={df_scan.columns[0]: 'BIN_AWAL', df_scan.columns[1]: 'SKU'})
-    if len(df_history.columns) > 3: df_history = df_history.rename(columns={df_history.columns[3]: 'SKU'})
-    if len(df_history.columns) > 8: df_history = df_history.rename(columns={df_history.columns[8]: 'BIN_HIST'})
-    if len(df_history.columns) > 10: df_history = df_history.rename(columns={df_history.columns[10]: 'QTY_HIST'})
-    if len(df_history.columns) > 12: df_history = df_history.rename(columns={df_history.columns[12]: 'BIN_AFTER'})
+    # ========== RENAME KOLOM ==========
+    df_scan = df_scan.rename(columns={
+        df_scan.columns[0]: 'BIN_AWAL',
+        df_scan.columns[1]: 'SKU',
+    })
     
-    if len(df_stock.columns) > 0: df_stock = df_stock.rename(columns={df_stock.columns[0]: 'INVOICE'})
-    if len(df_stock.columns) > 1: df_stock = df_stock.rename(columns={df_stock.columns[1]: 'SKU'})
-    if len(df_stock.columns) > 6: df_stock = df_stock.rename(columns={df_stock.columns[6]: 'BIN_STOCK'})
-    if len(df_stock.columns) > 10: df_stock = df_stock.rename(columns={df_stock.columns[10]: 'QTY_STOCK'})
+    if len(df_history.columns) > 3:
+        df_history = df_history.rename(columns={df_history.columns[3]: 'SKU'})
+    if len(df_history.columns) > 8:
+        df_history = df_history.rename(columns={df_history.columns[8]: 'BIN_HIST'})
+    if len(df_history.columns) > 10:
+        df_history = df_history.rename(columns={df_history.columns[10]: 'QTY_HIST'})
+    if len(df_history.columns) > 12:
+        df_history = df_history.rename(columns={df_history.columns[12]: 'BIN_AFTER'})
     
-    # ========== CLEANING DATA ==========
+    if len(df_stock.columns) > 0:
+        df_stock = df_stock.rename(columns={df_stock.columns[0]: 'INVOICE'})
+    if len(df_stock.columns) > 1:
+        df_stock = df_stock.rename(columns={df_stock.columns[1]: 'SKU'})
+    if len(df_stock.columns) > 6:
+        df_stock = df_stock.rename(columns={df_stock.columns[6]: 'BIN_STOCK'})
+    if len(df_stock.columns) > 10:
+        df_stock = df_stock.rename(columns={df_stock.columns[10]: 'QTY_STOCK'})
+    
+    # ========== CLEANING DATA (FIX ERROR 'SERIES' OBJECT HAS NO ATTRIBUTE 'UPPER') ==========
+    # Gunakan .str.upper() dan .str.strip() untuk Series
     for df in [df_scan, df_history, df_stock]:
         for col in ['SKU', 'BIN_AWAL', 'BIN_HIST', 'BIN_STOCK', 'BIN_AFTER', 'INVOICE']:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().upper()
 
+    # Konversi Numeric
     if 'QTY_HIST' in df_history.columns:
         df_history['QTY_HIST'] = pd.to_numeric(df_history['QTY_HIST'], errors='coerce').fillna(0).astype(int)
     if 'QTY_STOCK' in df_stock.columns:
         df_stock['QTY_STOCK'] = pd.to_numeric(df_stock['QTY_STOCK'], errors='coerce').fillna(0).astype(int)
 
+    # ========== LOGIKA PROSES (UNIT BY UNIT) ==========
     final_results = []
 
-    # ========== LOGIKA PROSES UNIT BY UNIT ==========
     for _, scan_row in df_scan.iterrows():
         sku = scan_row['SKU']
         bin_fisik = scan_row['BIN_AWAL']
         
         found_status = False
         keterangan = ""
-        qty_val = 0
-        bin_aft = ""
-        inv = ""
+        qty_setup_terjual = 0
+        bin_after = ""
+        invoice = ""
 
-        # 1. CEK STOCK (TERJUAL) - PRIORITAS UTAMA
-        # Cek SKU dulu tanpa filter BIN supaya tau barangnya ada/tidak di sistem
+        # 1. CEK STOCK (TERJUAL)
+        # Cari SKU yang sama dulu tanpa filter BIN
         st_match_sku = df_stock[df_stock['SKU'] == sku]
         
         if not st_match_sku.empty:
-            # Cek yang BIN-nya sama dulu
+            # Cek yang BIN Match
             exact_stock = st_match_sku[(st_match_sku['BIN_STOCK'] == bin_fisik) & (st_match_sku['QTY_STOCK'] > 0)]
             
             if not exact_stock.empty:
                 idx = exact_stock.index[0]
                 keterangan = 'ITEM TELAH TERJUAL'
-                inv = df_stock.loc[idx, 'INVOICE']
+                invoice = df_stock.loc[idx, 'INVOICE']
                 df_stock.loc[idx, 'QTY_STOCK'] -= 1
             else:
-                # Jika BIN beda tapi SKU ada dan QTY masih ada
+                # BIN Beda tapi SKU ada
                 any_stock = st_match_sku[st_match_sku['QTY_STOCK'] > 0]
                 if not any_stock.empty:
                     idx = any_stock.index[0]
                     keterangan = 'ITEM TELAH TERJUAL (BIN MISSMATCH)'
-                    inv = df_stock.loc[idx, 'INVOICE']
+                    invoice = df_stock.loc[idx, 'INVOICE']
                     df_stock.loc[idx, 'QTY_STOCK'] -= 1
                 else:
-                    # SKU terjual tapi QTY habis di tracking (Double Scan?)
                     keterangan = 'ITEM TELAH TERJUAL (QTY OVERFLOW)'
             
-            qty_val = 1
+            qty_setup_terjual = 1
             found_status = True
 
-        # 2. CEK HISTORY (SET UP) - JIKA BELUM TERJUAL
+        # 2. CEK HISTORY (SET UP)
         if not found_status:
             h_match_sku = df_history[df_history['SKU'] == sku]
             
@@ -2389,7 +2398,7 @@ def process_scan_out(df_scan, df_history, df_stock):
                 if not exact_hist.empty:
                     idx = exact_hist.index[0]
                     keterangan = 'DONE AND MATCH SET UP'
-                    bin_aft = df_history.loc[idx, 'BIN_AFTER']
+                    bin_after = df_history.loc[idx, 'BIN_AFTER']
                     df_history.loc[idx, 'QTY_HIST'] -= 1
                 else:
                     # BIN Beda
@@ -2397,37 +2406,40 @@ def process_scan_out(df_scan, df_history, df_stock):
                     if not any_hist.empty:
                         idx = any_hist.index[0]
                         keterangan = 'DONE SETUP (BIN MISSMATCH)'
-                        bin_aft = df_history.loc[idx, 'BIN_AFTER']
+                        bin_after = df_history.loc[idx, 'BIN_AFTER']
                         df_history.loc[idx, 'QTY_HIST'] -= 1
                     else:
                         keterangan = 'DONE SETUP (QTY OVERFLOW)'
                 
-                qty_val = 1
+                qty_setup_terjual = 1
                 found_status = True
 
-        # 3. DEFAULT (BELUM TERSETUP)
+        # 3. JIKA TIDAK DITEMUKAN
         if not found_status:
             keterangan = 'ITEM BELUM TERSETUP & TIDAK TERJUAL'
-            qty_val = 0
+            qty_setup_terjual = 0
 
         final_results.append({
             'BIN AWAL': bin_fisik,
             'SKU': sku,
             'QTY SCAN': 1,
             'Keterangan': keterangan,
-            'Total Qty Setup/Terjual': qty_val,
-            'Bin After Set Up': bin_aft,
-            'Invoice': inv
+            'Total Qty Setup/Terjual': qty_setup_terjual,
+            'Bin After Set Up': bin_after,
+            'Invoice': invoice
         })
 
-    # Grouping biar rapi
+    # Grouping
     df_res_raw = pd.DataFrame(final_results)
     df_res = df_res_raw.groupby(['BIN AWAL', 'SKU', 'Keterangan', 'Bin After Set Up', 'Invoice'], dropna=False).agg({
         'QTY SCAN': 'sum',
         'Total Qty Setup/Terjual': 'sum'
     }).reset_index()
 
-    # Create Draft
+    # Reorder columns
+    df_res = df_res[['BIN AWAL', 'SKU', 'QTY SCAN', 'Keterangan', 'Total Qty Setup/Terjual', 'Bin After Set Up', 'Invoice']]
+
+    # ========== DRAFT SET UP ==========
     draft_data = []
     for _, row in df_res.iterrows():
         if "MISSMATCH" in row['Keterangan'] or "BELUM" in row['Keterangan']:
