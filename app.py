@@ -2423,7 +2423,7 @@ def process_scan_out(df_scan, df_history, df_stock):
                 'BIN TUJUAN': 'KARANTINA',
                 'SKU': row['SKU'],
                 'QUANTITY': row['QTY SCAN'],
-                'NOTES': row['Keterangan']
+                'NOTES': 'WAITING OFFLINE'
             })
     
     df_draft = pd.DataFrame(draft_data) if draft_data else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
