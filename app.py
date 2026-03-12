@@ -3265,7 +3265,7 @@ if menu == "Compare RTO":
         df_ds = st.session_state.rto_df_ds
         scan_col = df_ds.columns[1]
         
-if st.session_state.rto_df_selisih is not None:
+    if st.session_state.rto_df_selisih is not None:
         st.divider()
         st.subheader("📊 Hasil Compare")
         
