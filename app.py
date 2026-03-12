@@ -3259,42 +3259,8 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-    if st.session_state.rto_df_selisih is not None:
-    st.divider()
-    st.subheader("📊 HASIL COMPARE")
-    
-    # --- PERBAIKAN DI SINI ---
-    # Kita gunakan data yang tersimpan di session_state
-    df_res = st.session_state.rto_df_selisih
-    
-    # Ambil data draft awal dari session state (pastikan nama variabelnya sesuai saat Anda upload)
-    # Jika Anda tidak menyimpan draft awal secara khusus, kita hitung item yang statusnya bukan 'ADD NEW'
-    df_draft_awal = st.session_state.get('df_draft_awal', None) 
-    
-    # Hitung Metrik dengan aman
-    q_new = len(df_res[df_res['STATUS'] == 'ADD NEW'])
-    
-    # QTY DRAFT BEFORE adalah baris yang statusnya BUKAN 'ADD NEW'
-    q_before = len(df_res[df_res['STATUS'] != 'ADD NEW']) 
-    
-    # EDITED ITEM: baris yang mengandung kata 'EDIT' pada kolom STATUS
-    q_edited = len(df_res[df_res['STATUS'].astype(str).str.contains('EDIT', na=False)])
-    
-    # DELETED ITEM: baris yang statusnya 'DELETE ITEM'
-    q_deleted = len(df_res[df_res['STATUS'] == 'DELETE ITEM'])
-    # --------------------------
+        f_draft = st.file_uploader("Upload Draft Jezpro", type=['xlsx','csv'], key="rto_draft_jezpro")
 
-    mc1, mc2, mc3, mc4 = st.columns(4)
-    with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">NEW QTY DRAFT</span><span class="m-val">{q_new}</span></div>', unsafe_allow_html=True)
-    with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">QTY DRAFT BEFORE</span><span class="m-val">{q_before}</span></div>', unsafe_allow_html=True)
-    with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">EDITED ITEM</span><span class="m-val">{q_edited}</span></div>', unsafe_allow_html=True)
-    with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">DELETED ITEM</span><span class="m-val">{q_deleted}</span></div>', unsafe_allow_html=True)
-    
-    st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
-    
-    # Download button
-    csv = st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Sheet Selisih", csv, "SELISIH_RTO.csv", "text/csv", use_container_width=True)
     st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
     f_cek = st.file_uploader("Upload Hasil Cek Real", type=['xlsx','csv'], key="rto_cek")
