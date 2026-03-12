@@ -3261,7 +3261,7 @@ if menu == "Compare RTO":
     
     if st.session_state.rto_df_selisih is not None:
         st.divider()
-        st.subheader("📊 DASHBOARD KUALITAS SCAN (QTY SCAN)")
+        st.subheader("📊 Hasil Compare DS & Appsheet")
         df_ds = st.session_state.rto_df_ds
         scan_col = df_ds.columns[1]
         
