@@ -3265,28 +3265,16 @@ if menu == "Compare RTO":
         df_ds = st.session_state.rto_df_ds
         scan_col = df_ds.columns[1]
         
-        if st.session_state.rto_df_selisih is not None:
-    st.divider()
-    st.subheader("📊 Hasil Compare DS & Appsheet")
-    
-    df_ds = st.session_state.rto_df_ds
-    df_res = st.session_state.rto_df_selisih
-    scan_col = df_ds.columns[1]
-    
-    # Menghitung metrik berdasarkan status di df_res
-    q_new = int(pd.to_numeric(df_res[df_res['STATUS'] == 'ADD NEW']['QTY AMBIL'], errors='coerce').sum())
-    q_before = int(pd.to_numeric(df_ds[scan_col], errors='coerce').sum())
-    q_edited = int(pd.to_numeric(df_res[df_res['STATUS'].astype(str).str.contains('EDIT', na=False)]['QTY AMBIL'], errors='coerce').sum())
-    q_deleted = int(pd.to_numeric(df_res[df_res['STATUS'] == 'DELETE ITEM']['QTY SCAN'], errors='coerce').sum())
-    
-    mc1, mc2, mc3, mc4 = st.columns(4)
-    with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">NEW QTY DRAFT</span><span class="m-val">{q_new}</span></div>', unsafe_allow_html=True)
-    with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">QTY DRAFT BEFORE</span><span class="m-val">{q_before}</span></div>', unsafe_allow_html=True)
-    with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">EDITED ITEM</span><span class="m-val">{q_edited}</span></div>', unsafe_allow_html=True)
-    with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">DELETED ITEM</span><span class="m-val">{q_deleted}</span></div>', unsafe_allow_html=True)
-    
-    st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
-    st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
+        q_total = int(pd.to_numeric(df_ds[scan_col], errors='coerce').sum())
+        q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
+        q_lebih = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').sum())
+        q_kurang = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').sum())
+        
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
+        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
+        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
+        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
         
         st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
         st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
