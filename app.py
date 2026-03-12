@@ -3259,42 +3259,38 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-    if st.session_state.rto_df_selisih is not None:
-        st.divider()
-        st.subheader("📊 DASHBOARD KUALITAS SCAN (QTY SCAN)")
-        df_ds = st.session_state.rto_df_ds
-        scan_col = df_ds.columns[1]
-        
-    if st.session_state.rto_df_selisih is not None:
+if st.session_state.rto_df_selisih is not None:
         st.divider()
         st.subheader("📊 Hasil Compare")
         
         df_ds = st.session_state.rto_df_ds
         df_res = st.session_state.rto_df_selisih
-        scan_col = df_ds.columns[1]
         
-        # Perhitungan metrik berdasarkan status di df_res
-        q_new = int(pd.to_numeric(df_res[df_res['STATUS'] == 'ADD NEW']['QTY AMBIL'], errors='coerce').sum())
-        q_before = int(pd.to_numeric(df_ds[scan_col], errors='coerce').sum())
-        q_edited = int(pd.to_numeric(df_res[df_res['STATUS'].astype(str).str.contains('EDIT', na=False)]['QTY AMBIL'], errors='coerce').sum())
-        q_deleted = int(pd.to_numeric(df_res[df_res['STATUS'] == 'DELETE ITEM']['QTY SCAN'], errors='coerce').sum())
+        # --- PERHITUNGAN METRIK (BERDASARKAN JUMLAH BARIS ITEM) ---
+        # Menghitung berapa banyak item (baris) untuk tiap kategori
+        q_new = len(df_res[df_res['STATUS'] == 'ADD NEW'])
+        q_before = len(df_res[df_res['STATUS'] != 'ADD NEW']) 
+        q_edited = len(df_res[df_res['STATUS'].astype(str).str.contains('EDIT', na=False)])
+        q_deleted = len(df_res[df_res['STATUS'] == 'DELETE ITEM'])
         
+        # --- TAMPILAN DASHBOARD ---
         mc1, mc2, mc3, mc4 = st.columns(4)
-        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">NEW QTY DRAFT</span><span class="m-val">{q_new}</span></div>', unsafe_allow_html=True)
-        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">QTY DRAFT BEFORE</span><span class="m-val">{q_before}</span></div>', unsafe_allow_html=True)
+        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">NEW ITEM DRAFT</span><span class="m-val">{q_new}</span></div>', unsafe_allow_html=True)
+        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">ITEM DRAFT BEFORE</span><span class="m-val">{q_before}</span></div>', unsafe_allow_html=True)
         with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">EDITED ITEM</span><span class="m-val">{q_edited}</span></div>', unsafe_allow_html=True)
         with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">DELETED ITEM</span><span class="m-val">{q_deleted}</span></div>', unsafe_allow_html=True)
         
-        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
+        # --- TAMPILAN DATA & DOWNLOAD (HANYA SATU KALI) ---
+        st.dataframe(df_res, use_container_width=True, hide_index=True)
         
-        csv_data = st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Sheet Selisih", csv_data, "SELISIH_RTO.csv", "text/csv", use_container_width=True)
-    
-        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
-        st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
-        
-        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
-        st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
+        csv_data = df_res.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Sheet Selisih",
+            data=csv_data,
+            file_name="SELISIH_RTO.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
 
     st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
