@@ -3259,38 +3259,42 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-    if st.session_state.rto_df_selisih is not None:
-        st.divider()
-        st.subheader("📊 Hasil Compare")
-        
-        df_ds = st.session_state.rto_df_ds
-        df_res = st.session_state.rto_df_selisih
-        
-        # --- PERHITUNGAN METRIK (BERDASARKAN JUMLAH BARIS ITEM) ---
-        # Menghitung berapa banyak item (baris) untuk tiap kategori
-        q_new = len(df_res[df_res['STATUS'] == 'ADD NEW'])
-        q_before = len(df_res[df_res['STATUS'] != 'ADD NEW']) 
-        q_edited = len(df_res[df_res['STATUS'].astype(str).str.contains('EDIT', na=False)])
-        q_deleted = len(df_res[df_res['STATUS'] == 'DELETE ITEM'])
-        
-        # --- TAMPILAN DASHBOARD ---
-        mc1, mc2, mc3, mc4 = st.columns(4)
-        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">NEW ITEM DRAFT</span><span class="m-val">{q_new}</span></div>', unsafe_allow_html=True)
-        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">ITEM DRAFT BEFORE</span><span class="m-val">{q_before}</span></div>', unsafe_allow_html=True)
-        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">EDITED ITEM</span><span class="m-val">{q_edited}</span></div>', unsafe_allow_html=True)
-        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">DELETED ITEM</span><span class="m-val">{q_deleted}</span></div>', unsafe_allow_html=True)
-        
-        # --- TAMPILAN DATA & DOWNLOAD (HANYA SATU KALI) ---
-        st.dataframe(df_res, use_container_width=True, hide_index=True)
-        
-        csv_data = df_res.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Sheet Selisih",
-            data=csv_data,
-            file_name="SELISIH_RTO.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+   if st.session_state.rto_df_selisih is not None:
+    st.divider()
+    st.subheader("📊 Hasil Compare")
+    
+    df_ds = st.session_state.rto_df_ds
+    df_res = st.session_state.rto_df_selisih
+    
+    # --- PROTEKSI KOLOM & PERHITUNGAN METRIK ---
+    # Kita cek kolom 'STATUS' (untuk draft) atau 'NOTE' (untuk data scan)
+    col_ref = 'STATUS' if 'STATUS' in df_res.columns else 'NOTE'
+    
+    # Menghitung berapa banyak item (baris) untuk tiap kategori
+    # Kita gunakan str.contains agar lebih fleksibel mencari kata kunci
+    q_new = len(df_res[df_res[col_ref].astype(str).str.contains('TAMBAH|ADD', case=False, na=False)])
+    q_before = len(df_res) - q_new
+    q_edited = len(df_res[df_res[col_ref].astype(str).str.contains('EDIT|KURANG|KELEBIHAN', case=False, na=False)])
+    q_deleted = len(df_res[df_res[col_ref].astype(str).str.contains('DELETE|HAPUS', case=False, na=False)])
+    
+    # --- TAMPILAN DASHBOARD ---
+    mc1, mc2, mc3, mc4 = st.columns(4)
+    with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">NEW ITEM</span><span class="m-val">{q_new}</span></div>', unsafe_allow_html=True)
+    with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">ITEM BEFORE</span><span class="m-val">{q_before}</span></div>', unsafe_allow_html=True)
+    with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">EDITED/MISMATCH</span><span class="m-val">{q_edited}</span></div>', unsafe_allow_html=True)
+    with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">DELETED ITEM</span><span class="m-val">{q_deleted}</span></div>', unsafe_allow_html=True)
+    
+    # --- TAMPILAN DATA & DOWNLOAD ---
+    st.dataframe(df_res, use_container_width=True, hide_index=True)
+    
+    csv_data = df_res.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Sheet Selisih",
+        data=csv_data,
+        file_name="SELISIH_RTO.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
 
     st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
