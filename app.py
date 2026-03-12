@@ -3259,44 +3259,26 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-   # Pastikan blok ini sejajar dengan kode di bagian atasnya (biasanya 4 spasi dari kiri)
     if st.session_state.rto_df_selisih is not None:
         st.divider()
-        st.subheader("📊 Hasil Compare")
+        st.subheader("📊 DASHBOARD KUALITAS SCAN (QTY SCAN)")
+        df_ds = st.session_state.rto_df_ds
+        scan_col = df_ds.columns[1]
         
-        df_res = st.session_state.rto_df_selisih
+        q_total = int(pd.to_numeric(df_ds[scan_col], errors='coerce').sum())
+        q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
+        q_lebih = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').sum())
+        q_kurang = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').sum())
         
-        # --- PROTEKSI KOLOM & PERHITUNGAN METRIK ---
-        # Menentukan kolom referensi (STATUS atau NOTE)
-        col_ref = 'STATUS' if 'STATUS' in df_res.columns else 'NOTE' if 'NOTE' in df_res.columns else None
-        
-        if col_ref:
-            # Menghitung item (baris) berdasarkan kategori
-            q_new = len(df_res[df_res[col_ref].astype(str).str.contains('TAMBAH|ADD', case=False, na=False)])
-            q_before = len(df_res) - q_new
-            q_edited = len(df_res[df_res[col_ref].astype(str).str.contains('EDIT|KURANG|KELEBIHAN', case=False, na=False)])
-            q_deleted = len(df_res[df_res[col_ref].astype(str).str.contains('DELETE|HAPUS', case=False, na=False)])
-        else:
-            q_new = q_before = q_edited = q_deleted = 0
-
-        # --- TAMPILAN DASHBOARD ---
         mc1, mc2, mc3, mc4 = st.columns(4)
-        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">NEW ITEM</span><span class="m-val">{q_new}</span></div>', unsafe_allow_html=True)
-        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">ITEM BEFORE</span><span class="m-val">{q_before}</span></div>', unsafe_allow_html=True)
-        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">EDITED/MISMATCH</span><span class="m-val">{q_edited}</span></div>', unsafe_allow_html=True)
-        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">DELETED ITEM</span><span class="m-val">{q_deleted}</span></div>', unsafe_allow_html=True)
+        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
+        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
+        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
+        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
         
-        # --- TAMPILAN DATA & DOWNLOAD ---
-        st.dataframe(df_res, use_container_width=True, hide_index=True)
-        
-        csv_data = df_res.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Sheet Selisih",
-            data=csv_data,
-            file_name="SELISIH_RTO.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
+        st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
+
     st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
     f_cek = st.file_uploader("Upload Hasil Cek Real", type=['xlsx','csv'], key="rto_cek")
