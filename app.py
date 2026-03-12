@@ -3290,8 +3290,8 @@ if menu == "Compare RTO":
         csv_data = st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Sheet Selisih", csv_data, "SELISIH_RTO.csv", "text/csv", use_container_width=True)
     
-    st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
-    st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
+        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
+        st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
         
         st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
         st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
