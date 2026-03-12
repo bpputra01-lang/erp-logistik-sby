@@ -3259,7 +3259,26 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-        f_draft = st.file_uploader("Upload Draft Jezpro", type=['xlsx','csv'], key="rto_draft_jezpro")
+    if st.session_state.rto_df_selisih is not None:
+        st.divider()
+        st.subheader("📊 DASHBOARD KUALITAS SCAN (QTY SCAN)")
+        df_ds = st.session_state.rto_df_ds
+        scan_col = df_ds.columns[1]
+        
+        # Menghitung metrik berdasarkan df_res (hasil engine_compare_draft_jezpro)
+        q_new = len(df_res[df_res['STATUS'] == 'ADD NEW'])
+        q_before = len(df_draft) # Total item di draft awal
+        q_edited = len(df_res[df_res['STATUS'].str.contains('EDIT', na=False)])
+        q_deleted = len(df_res[df_res['STATUS'] == 'DELETE ITEM'])
+        
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">NEW QTY DRAFT</span><span class="m-val">{q_new}</span></div>', unsafe_allow_html=True)
+        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">QTY DRAFT BEFORE</span><span class="m-val">{q_before}</span></div>', unsafe_allow_html=True)
+        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">EDITED ITEM</span><span class="m-val">{q_edited}</span></div>', unsafe_allow_html=True)
+        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">DELETED ITEM</span><span class="m-val">{q_deleted}</span></div>', unsafe_allow_html=True)
+        
+        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
+        st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
 
     st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
