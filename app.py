@@ -1926,36 +1926,105 @@ def engine_compare_draft_jezpro(df_app, df_draft):
     df_res = df_draft.copy()
     df_a = df_app.copy()
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
+    
+    # --- 1. Map Semua Bin & Qty dari Appsheet untuk Cross-Check ---
     bin_map = {}
+    appsheet_items = [] # Untuk melacak apa yang ada di Appsheet
+    
     for _, r in df_a.iterrows():
         s = str(r.get('9', '')).strip().upper() if str(r.get('9','')) not in ["","0","nan"] else str(r.get('15','')).strip().upper()
         if s not in ["", "NAN"]:
             bins = bin_map.get(s, [])
-            if str(r.get('12','')) != "": bins.append((str(r.get('12','')), pd.to_numeric(r.get('13',0), errors='coerce') or 0))
-            if str(r.get('16','')) != "": bins.append((str(r.get('16','')), pd.to_numeric(r.get('17',0), errors='coerce') or 0))
+            # Simpan data Bin 1
+            b1 = str(r.get('12','')).strip().upper()
+            q1 = pd.to_numeric(r.get('13',0), errors='coerce') or 0
+            if b1 not in ["", "0", "NAN"]: 
+                bins.append((b1, q1))
+                appsheet_items.append(f"{s}|{b1}")
+            
+            # Simpan data Bin 2
+            b2 = str(r.get('16','')).strip().upper()
+            q2 = pd.to_numeric(r.get('17',0), errors='coerce') or 0
+            if b2 not in ["", "0", "NAN"]: 
+                bins.append((b2, q2))
+                appsheet_items.append(f"{s}|{b2}")
+            
             bin_map[s] = bins
 
+    # Set untuk melacak item mana dari Appsheet yang SUDAH masuk ke Draft
+    matched_appsheet_keys = set()
+
+    # --- 2. Cek Item yang ada di Draft (Logika Asli Anda) ---
     for idx, row in df_res.iterrows():
         tf_draft = str(row.iloc[0]).strip().upper() if not pd.isna(row.iloc[0]) else ""
         sku_d = str(row.iloc[3]).strip().upper()
         bin_d = str(row.iloc[8]).strip().upper()
         qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
-        match_data = df_a[((df_a['9'].astype(str).str.upper() == sku_d) & (df_a['12'].astype(str).str.upper() == bin_d)) | ((df_a['15'].astype(str).str.upper() == sku_d) & (df_a['16'].astype(str).str.upper() == bin_d))]
+        
+        # Cari di Appsheet
+        match_data = df_a[((df_a['9'].astype(str).str.upper() == sku_d) & (df_a['12'].astype(str).str.upper() == bin_d)) | 
+                          ((df_a['15'].astype(str).str.upper() == sku_d) & (df_a['16'].astype(str).str.upper() == bin_d))]
+        
         qty_j, bin_l, qty_m, note, status = 0, "", 0, "HAPUS ITEM INI DARI DRAFT", "DELETE ITEM"
+        
         if not match_data.empty:
             r_app = match_data.iloc[0]
             tf_app = str(r_app.get('18', '')).strip().upper()
+            
             if tf_draft in ["", "0", "NAN"] or tf_app in ["", "0", "NAN"] or tf_draft == tf_app:
+                # Tandai bahwa item Appsheet ini sudah terproses
+                matched_appsheet_keys.add(f"{sku_d}|{bin_d}")
+                
                 qty_j = pd.to_numeric(r_app.get('13', 0) if str(r_app.get('12','')).upper() == bin_d else r_app.get('17',0), errors='coerce') or 0
-                if qty_j < qty_h: note, status = "QTY AMBIL KURANG DARI DRAFT", "PERLU EDIT QTY DRAFT"
-                elif qty_j == qty_h: note, status = "DRAFT SESUAI", "OK"
+                if qty_j < qty_h: 
+                    note, status = "QTY AMBIL KURANG DARI DRAFT", "PERLU EDIT QTY DRAFT"
+                elif qty_j == qty_h: 
+                    note, status = "DRAFT SESUAI", "OK"
                 else:
                     for b_ext, q_ext in bin_map.get(sku_d, []):
                         if b_ext.upper() != bin_d:
                             bin_l, qty_m, note = b_ext, q_ext, "ADA BIN LAIN"
                             status = "PERLU EDIT BIN & QTY TF" if (qty_j + qty_m) < qty_h else "PERLU EDIT BIN & HAPUS BIN LAMA"
                             break
+                            
         df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [qty_j, note, bin_l, qty_m if qty_m > 0 else "", status]
+
+    # --- 3. Tambahkan Baris Baru untuk Item yang ADA di Appsheet tapi TIDAK ADA di Draft ---
+    new_rows = []
+    for app_key in set(appsheet_items):
+        if app_key not in matched_appsheet_keys:
+            sku_a, bin_a = app_key.split('|')
+            # Cari QTY-nya dari bin_map
+            qty_a = 0
+            for b, q in bin_map.get(sku_a, []):
+                if b == bin_a:
+                    qty_a = q
+                    break
+            
+            # Buat baris baru dengan format kolom yang sama dengan df_res
+            # (Diasumsikan struktur kolom draft: [TF, ..., SKU, ..., QTY, BIN, ...])
+            new_row = [None] * len(df_res.columns)
+            # Isi data minimal agar bisa dibaca di hasil compare
+            # Sesuaikan index kolom (0=TF, 3=SKU, 7=QTY DRAFT, 8=BIN DRAFT)
+            new_row[3] = sku_a  # SKU
+            new_row[7] = 0      # QTY DRAFT (0 karena tidak ada di draft)
+            new_row[8] = bin_a  # BIN
+            
+            # Tambahkan kolom hasil compare (QTY AMBIL, NOTE, dst)
+            # Kolom-kolom ini biasanya ada di akhir setelah kolom draft asli
+            row_dict = dict(zip(df_res.columns, new_row))
+            row_dict['QTY AMBIL'] = qty_a
+            row_dict['NOTE'] = "TAMBAH ITEM KE DRAFT"
+            row_dict['STATUS'] = "ITEM BARU (SCAN)"
+            row_dict['BIN AMBIL LAIN'] = ""
+            row_dict['QTY BIN LAIN'] = ""
+            
+            new_rows.append(row_dict)
+
+    if new_rows:
+        df_new = pd.DataFrame(new_rows)
+        df_res = pd.concat([df_res, df_new], ignore_index=True)
+
     return df_res
 
 def engine_generate_new_draft(df_compared):
