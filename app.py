@@ -2528,14 +2528,42 @@ def process_justification(df_case, df_tracking, df_po):
     res['GAP ADJUSMENT'] = res['ADJ_PLUS'] - res['ADJ_MINUS']
 
     # 7. Justification Logic
+  # --- JUSTIFICATION LOGIC (SESUAI RUMUS EXCEL LU 100%) ---
     def get_just(row):
-        j, k, u, t = row['TRF_IN'], row['TRF_OUT'], row['GAP ADJUSMENT'], row['REAL QTY']
-        if (j > k and u > 0) or (j < k and u < 0): return "KESALAHAN ADJUSMENT"
-        if t < 0: return "PERLU CEK CROSS ORDER"
+        # Mapping variabel sesuai cell di rumus lo
+        # J2 = Trf_In, K2 = Trf_Out, U2 = Gap Adj, T2 = Real Qty, L2 = Current Stock, N2 = Stock In, R2 = Adj Plus, M2 = Sales
+        j = row['Total trf_in']
+        k = row['Total trf_out']
+        u = row['GAP ADJUSMENT']
+        t = row['REAL QTY']
+        l = row['Current Stock']
+        n = row['Total_Stockin']
+        r = row['Total_adj_plus']
+        m = row['Total Sales']
+        
+        # 1. KESALAHAN ADJUSMENT
+        # IF(AND(J2>K2,U2>0),"KESALAHAN ADJUSMENT",IF(AND(J2<K2,U2<0),"KESALAHAN ADJUSMENT",...))
+        if (j > k and u > 0) or (j < k and u < 0):
+            return "KESALAHAN ADJUSMENT"
+        
+        # 2. PERLU CEK CROSS ORDER
+        # IF(OR(SUM(N2+R2)<M2,T2<0),"PERLU CEK CROSS ORDER",...)
+        if (n + r) < m or t < 0:
+            return "PERLU CEK CROSS ORDER"
+        
+        # 3. CEK ULANG HASIL REKON
+        # IF(T2=L2,"CEK ULANG HASIL REKON",...)
+        if t == l and t != 0: # Ditambah t!=0 biar gak semua yang kosong masuk sini
+            return "CEK ULANG HASIL REKON"
+        
+        # 4. INDIKASI BUG SISTEM
+        # IF(OR(AND(T2=0,U2<=0,L2>0),AND(J2>K2,L2>T2)),"INDIKASI BUG SISTEM",...)
+        if (t == 0 and u <= 0 and l > 0) or (j > k and l > t):
+            return "INDIKASI BUG SISTEM"
+            
         return "UNDEFINED"
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
-    return res
 
 with st.sidebar:
        st.markdown("""
