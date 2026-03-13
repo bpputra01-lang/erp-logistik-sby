@@ -2470,89 +2470,88 @@ def process_scan_out(df_scan, df_history, df_stock):
     return df_res, df_draft
     
 
+
 def process_justification(df_case, df_tracking, df_po):
-    df_case = df_case.copy()
+    # 1. Copy data biar gak ngerusak aslinya
+    res = df_case.copy()
     df_tracking = df_tracking.copy()
     df_po = df_po.copy()
 
-    # 1. Pastikan SKU bersih buat merge
-    sku_col_case = df_case.columns[2] # Kolom C
-    df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.split('.').str[0].str.strip().str.upper()
-
-    # 2. Aggregasi Tracking (Ambil data mentah)
-    sku_col_track = df_tracking.columns[1] # Kolom B
+    # 2. Ambil data mentah dari Tracking (Sesuaikan mapping Excel lu)
+    # L=3, M=4, N=5, O=6, P=7, Q=8, R=9, S=10 (Berdasarkan list lu)
+    sku_col_track = df_tracking.columns[1]
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum',  # L: Current Stock
-        df_tracking.columns[4]: 'sum',  # M: Total Sales
-        df_tracking.columns[5]: 'sum',  # N: Total_Stockin
-        df_tracking.columns[6]: 'sum',  # O: Total_adj_minus
-        df_tracking.columns[7]: 'sum',  # P: Total_adj_plus
-        df_tracking.columns[8]: 'sum',  # Q: Total draft_trf
-        df_tracking.columns[9]: 'sum',  # R: Total trf_in
-        df_tracking.columns[10]: 'sum'  # S: Total trf_out
+        df_tracking.columns[3]: 'sum',  # Current Stock
+        df_tracking.columns[4]: 'sum',  # Total Sales
+        df_tracking.columns[5]: 'sum',  # Total_Stockin
+        df_tracking.columns[6]: 'sum',  # Total_adj_minus
+        df_tracking.columns[7]: 'sum',  # Total_adj_plus
+        df_tracking.columns[8]: 'sum',  # Total draft_trf
+        df_tracking.columns[9]: 'sum',  # Total trf_in
+        df_tracking.columns[10]: 'sum'  # Total trf_out
     }).reset_index()
 
-    # Rename kolom tracking biar unik dlu sebelum di-merge
+    # Kasih nama kolom sementara yang UNIK biar gak tabrakan pas merge
     track_agg.columns = ['SKU_KEY', '_L', '_M', '_N', '_O', '_P', '_Q', '_R', '_S']
-    track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
-
-    # 3. Hapus kolom di df_case yang namanya sama dengan target biar gak duplikat pas reindex
-    target_headers = [
-        'QTY SYSTEM', 'QTY SO', 'Current Stock', 'Total Sales', 'Total_Stockin', 
-        'Total_adj_minus', 'Total_adj_plus', 'Total draft_trf', 'Total trf_in', 
-        'Total trf_out', 'REAL QTY', 'GAP ADJUSMENT', 'JUSTIFICATION', 'TOTAL PO IN'
-    ]
-    # Buang kolom lama kalau emang udah ada di file upload-an
-    df_case = df_case.drop(columns=[c for c in target_headers if c in df_case.columns])
-
-    # 4. Merge
-    res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
-
-    # 5. Inisialisasi Nilai J-U
-    res['QTY SYSTEM'] = pd.to_numeric(res[res.columns[0]], errors='coerce').fillna(0)
-    res['QTY SO'] = pd.to_numeric(res[res.columns[1]], errors='coerce').fillna(0)
     
-    # Hitung REAL QTY & GAP ADJ
-    # REAL QTY (T) = (N + R) - (M + S + Q) -> Sesuai mapping tracking tadi
-    res['REAL QTY'] = (res['_N'] + res['_R']) - (res['_M'] + res['_S'] + res['_Q'])
-    # GAP ADJ (U) = P - O (Adj Plus - Adj Minus)
-    res['GAP ADJUSMENT'] = res['_P'] - res['_O']
+    # Clean SKU buat join
+    track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
+    res['SKU_KEY_JOIN'] = res['SKU'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 6. RUMUS LU (SAKLEK)
+    # 3. Merge Data Tracking ke Case
+    res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
+
+    # 4. PINDAHKAN NILAI KE HEADER YANG BENER (BIAR GAK KACAU)
+    res['Current Stock']   = res['_L']
+    res['Total Sales']     = res['_M']
+    res['Total_Stockin']   = res['_N']
+    res['Total_adj_minus'] = res['_O']
+    res['Total_adj_plus']  = res['_P']
+    res['Total draft_trf'] = res['_Q']
+    res['Total trf_in']    = res['_R']
+    res['Total trf_out']   = res['_S']
+
+    # 5. HITUNG REAL QTY (T) & GAP ADJ (U) UNTUK RUMUS
+    # T (REAL QTY) = (STOCKIN + TRFIN) - (SALES + TRFOUT + DRAFT)
+    res['REAL QTY'] = (res['Total_Stockin'] + res['Total trf_in']) - \
+                      (res['Total Sales'] + res['Total trf_out'] + res['Total draft_trf'])
+    
+    # GAP ADJ (U) = ADJ PLUS - ADJ MINUS
+    res['GAP ADJUSMENT'] = res['Total_adj_plus'] - res['Total_adj_minus']
+
+    # 6. JALANKAN RUMUS LU (PLEK KETIPLEK)
     def run_formula(row):
         j2 = row['QTY SYSTEM']
         k2 = row['QTY SO']
         u2 = row['GAP ADJUSMENT']
-        n2 = row['_N']
-        r2 = row['_P'] # Total Adj Plus
-        m2 = row['_M'] # Total Sales
+        n2 = row['Total_Stockin']
+        r2 = row['Total_adj_plus']
+        m2 = row['Total Sales']
         t2 = row['REAL QTY']
-        l2 = row['_L'] # Current Stock
+        l2 = row['Current Stock']
 
+        # Sesuai Rumus Lu:
         if (j2 > k2 and u2 > 0) or (j2 < k2 and u2 < 0):
             return "KESALAHAN ADJUSMENT"
+        
         if (n2 + r2) < m2 or t2 < 0:
             return "PERLU CEK CROSS ORDER"
+        
         if t2 == l2 and t2 != 0:
             return "CEK ULANG HASIL REKON"
+        
         if (t2 == 0 and u2 <= 0 and l2 > 0) or (j2 > k2 and l2 > t2):
             return "INDIKASI BUG SISTEM"
+            
         return "UNDEFINED"
 
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
 
-    # 7. PO IN
+    # 7. HITUNG TOTAL PO IN
     po_counts = df_po[df_po.columns[3]].astype(str).str.split('.').str[0].value_counts().to_dict()
-    res['TOTAL PO IN'] = res['SKU_KEY'].apply(lambda x: po_counts.get(x, 0))
+    res['TOTAL PO IN'] = res['SKU_KEY_JOIN'].apply(lambda x: po_counts.get(x, 0))
 
-    # 8. Rename kolom tracking ke nama final
-    res = res.rename(columns={
-        '_L': 'Current Stock', '_M': 'Total Sales', '_N': 'Total_Stockin',
-        '_O': 'Total_adj_minus', '_P': 'Total_adj_plus', '_Q': 'Total draft_trf',
-        '_R': 'Total trf_in', '_S': 'Total trf_out'
-    })
-
-    # 9. URUTAN SAKLEK (Identify -> TOTAL PO IN)
+    # 8. SUSUN BALIK KOLOM SESUAI URUTAN LU (BIAR GAK GESER)
     ordered_headers = [
         'Identify', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 
         'Harga Beli', 'Harga Jual', 'QTY SYSTEM', 'QTY SO', 'Current Stock', 
@@ -2561,12 +2560,8 @@ def process_justification(df_case, df_tracking, df_po):
         'GAP ADJUSMENT', 'JUSTIFICATION', 'TOTAL PO IN'
     ]
 
-    # Pastikan semua kolom ada sebelum reindex
-    for col in ordered_headers:
-        if col not in res.columns:
-            res[col] = 0
-
-    return res[ordered_headers] # Pake indexing list biar lebih aman dibanding reindex
+    # Hanya ambil kolom yang diminta dalam urutan yang diminta
+    return res[ordered_headers]
 
 with st.sidebar:
        st.markdown("""
