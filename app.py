@@ -3521,11 +3521,11 @@ elif menu == "Justification SO":
     # UI Uploader - Dibagi 3 Kolom
     col1, col2, col3 = st.columns(3)
     with col1: 
-        up_case = st.file_uploader("Upload CASE ITEM / MASTER SKU", type=['xlsx'], key="up_case_so")
+        up_case = st.file_uploader("Upload Adjusment File", type=['xlsx'], key="up_case_so")
     with col2: 
-        up_tracking = st.file_uploader("Upload TRACKING STOCK", type=['xlsx'], key="up_track_so")
+        up_tracking = st.file_uploader("Upload Tracking Stock", type=['xlsx'], key="up_track_so")
     with col3: 
-        up_others = st.file_uploader("Upload TOTAL PO", type=['xlsx'], key="up_po_so")
+        up_others = st.file_uploader("Upload Total PO", type=['xlsx'], key="up_po_so")
 
     # Logika Tombol dan Output
     if up_case and up_tracking and up_others:
@@ -3541,9 +3541,9 @@ elif menu == "Justification SO":
             st.divider()
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("📦 Total SKU", len(result))
-            m2.metric("⚠️ Total Gap", f"{int(result['GAP ADJUSTMENT'].sum())}")
+            m2.metric("⚠️ GAP ADJUSMENT", f"{int(result['GAP ADJUSTMENT'].sum())}")
             m3.metric("🚫 Kesalahan Adj", len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"]))
-            m4.metric("🔍 Perlu Cek", len(result[result['JUSTIFICATION'] == "PERLU CEK CROSS ORDER"]))
+            m4.metric("🔍 Perlu Cek Cross Order", len(result[result['JUSTIFICATION'] == "PERLU CEK CROSS ORDER"]))
             
             # --- TAMPILAN TABEL ---
             st.divider()
