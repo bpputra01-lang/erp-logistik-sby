@@ -3515,38 +3515,53 @@ elif menu == "FDR Update":
                 if opt:
                     st.download_button(f"📥 {opt}", st.session_state.dict_kurir_fdr[opt].to_csv(index=False).encode('utf-8'), f"{opt}.csv", "text/csv")
                     st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
-# --- JUSTIFICATION STOCK OPNAME ---
-st.set_page_config(layout="wide")
-st.title("📊 STOCK COMPARISON MODEL")
+elif menu == "Justification SO":
+    st.markdown('<div class="hero-header"><h1>📊 STOCK COMPARISON MODEL</h1></div>', unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3)
-with col1: up_case = st.file_uploader("Upload CASE ITEM / MASTER SKU", type=['xlsx'])
-with col2: up_tracking = st.file_uploader("Upload TRACKING STOCK", type=['xlsx'])
-with col3: up_others = st.file_uploader("Upload TOTAL PO", type=['xlsx'])
+    # UI Uploader - Dibagi 3 Kolom
+    col1, col2, col3 = st.columns(3)
+    with col1: 
+        up_case = st.file_uploader("Upload CASE ITEM / MASTER SKU", type=['xlsx'], key="up_case_so")
+    with col2: 
+        up_tracking = st.file_uploader("Upload TRACKING STOCK", type=['xlsx'], key="up_track_so")
+    with col3: 
+        up_others = st.file_uploader("Upload TOTAL PO", type=['xlsx'], key="up_po_so")
 
-if up_case and up_tracking and up_others:
-    df_c = pd.read_excel(up_case)
-    df_t = pd.read_excel(up_tracking)
-    df_p = pd.read_excel(up_others)
-    
-    if st.button("RUN COMPARISON"):
-        result = process_comparison(df_c, df_t, df_p, None)
-        
-        # METRIC BOX
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total SKU", len(result))
-        m2.metric("Total Gap", int(result['GAP ADJUSTMENT'].sum()))
-        m3.metric("Kesalahan Adj", len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"]))
-        
-        st.divider()
-        st.subheader("📋 Summary Report")
-        st.dataframe(result, use_container_width=True)
-        
-        # Download
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            result.to_excel(writer, index=False, sheet_name='Summary')
-        st.download_button("📥 Download Hasil Rekon", output.getvalue(), "rekon_stock.xlsx")
+    # Logika Tombol dan Output
+    if up_case and up_tracking and up_others:
+        if st.button("▶️ RUN COMPARISON ANALYSIS", use_container_width=True):
+            df_c = pd.read_excel(up_case)
+            df_t = pd.read_excel(up_tracking)
+            df_p = pd.read_excel(up_others)
+            
+            # Panggil fungsi logic lo
+            result = process_justification(df_c, df_t, df_p)
+            
+            # --- TAMPILAN METRIC BOX ---
+            st.divider()
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("📦 Total SKU", len(result))
+            m2.metric("⚠️ Total Gap", f"{int(result['GAP ADJUSTMENT'].sum())}")
+            m3.metric("🚫 Kesalahan Adj", len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"]))
+            m4.metric("🔍 Perlu Cek", len(result[result['JUSTIFICATION'] == "PERLU CEK CROSS ORDER"]))
+            
+            # --- TAMPILAN TABEL ---
+            st.divider()
+            st.subheader("📋 Summary Report Analysis")
+            st.dataframe(result, use_container_width=True, height=450)
+            
+            # --- DOWNLOAD BUTTON ---
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                result.to_excel(writer, index=False, sheet_name='Summary')
+            
+            st.download_button(
+                label="📥 DOWNLOAD HASIL REKON (.XLSX)",
+                data=output.getvalue(),
+                file_name="rekon_stock_so.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
