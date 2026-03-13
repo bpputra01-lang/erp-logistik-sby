@@ -3560,11 +3560,12 @@ elif menu == "Justification SO":
             
             # --- TAMPILAN METRIC BOX ---
             st.divider()
-            m1, m2, m3, m4 = st.columns(4)
+            m1, m2, m3, m4, m5 = st.columns(4)
             m1.metric("❓ Undefined", len(result[result['JUSTIFICATION'] == "UNDEFINED"]))
             m2.metric("💻 Bug Sistem", len(result[result['JUSTIFICATION'] == "INDIKASI BUG SISTEM"]))
             m3.metric("🚫 Kesalahan Adj", len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"]))
             m4.metric("🔍 Perlu Cek Cross Order", len(result[result['JUSTIFICATION'] == "PERLU CEK CROSS ORDER"]))
+            m5.metric("🔁 Cek Ulang Hasil Rekon", len(result[result['JUSTIFICATION'] == "CEK ULANG HASIL REKON"]))
             
             # --- TAMPILAN TABEL ---
             st.divider()
