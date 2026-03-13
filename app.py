@@ -2519,32 +2519,36 @@ def process_justification(df_case, df_tracking, df_po):
     # GAP ADJ (U) = ADJ PLUS - ADJ MINUS
     res['GAP ADJUSMENT'] = res['Total_adj_plus'] - res['Total_adj_minus']
 
-    # 6. JALANKAN RUMUS LU (PLEK KETIPLEK)
-    def run_formula(row):
-        j2 = row['QTY SYSTEM']
-        k2 = row['QTY SO']
-        u2 = row['GAP ADJUSMENT']
-        n2 = row['Total_Stockin']
-        r2 = row['Total_adj_plus']
-        m2 = row['Total Sales']
-        t2 = row['REAL QTY']
-        l2 = row['Current Stock']
+   def run_formula(row):
+        # MAPPING BERDASARKAN HURUF KOLOM EXCEL LU (INDEX SAKLEK)
+        j2 = round(float(row['QTY SYSTEM']), 2)    # Kolom J
+        k2 = round(float(row['QTY SO']), 2)        # Kolom K
+        l2 = round(float(row['Current Stock']), 2) # Kolom L
+        m2 = round(float(row['Total Sales']), 2)   # Kolom M
+        n2 = round(float(row['Total_Stockin']), 2) # Kolom N
+        r2 = round(float(row['Total trf_in']), 2)  # Kolom R (SESUAI REQUEST LU)
+        t2 = round(float(row['REAL QTY']), 2)      # Kolom T
+        u2 = round(float(row['GAP ADJUSMENT']), 2) # Kolom U
 
-        # Sesuai Rumus Lu:
+        # 1. KESALAHAN ADJUSMENT
         if (j2 > k2 and u2 > 0) or (j2 < k2 and u2 < 0):
             return "KESALAHAN ADJUSMENT"
         
+        # 2. PERLU CEK CROSS ORDER
+        # Di rumus lu: SUM(N2+R2) < M2 
+        # (Artinya: Stock In + Trf In < Sales)
         if (n2 + r2) < m2 or t2 < 0:
             return "PERLU CEK CROSS ORDER"
         
+        # 3. CEK ULANG HASIL REKON
         if t2 == l2 and t2 != 0:
             return "CEK ULANG HASIL REKON"
         
+        # 4. INDIKASI BUG SISTEM
         if (t2 == 0 and u2 <= 0 and l2 > 0) or (j2 > k2 and l2 > t2):
             return "INDIKASI BUG SISTEM"
             
         return "UNDEFINED"
-
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
 
     # 7. HITUNG TOTAL PO IN
