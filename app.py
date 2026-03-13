@@ -2469,87 +2469,77 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     return df_res, df_draft
     
-# --- FUNGSI PROSES DATA ---
 def process_justification(df_case, df_tracking, df_po):
     # 1. Normalisasi
     df_case = df_case.copy()
     df_tracking = df_tracking.copy()
     df_po = df_po.copy()
 
-    for df in [df_case, df_tracking, df_po]:
-        df.columns = [str(col).strip().upper() for col in df.columns]
-
-    # 2. Ambil Kolom (A=0, C=2, D=3)
-    sku_col_case = df_case.columns[2]
-    sku_col_po = df_po.columns[3] 
-    val_col_po = df_po.columns[0]
-
-    # Clean SKU biar sinkron
-    df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
-    df_po['SKU_PO'] = df_po[sku_col_po].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
-
-    # 3. Aggregasi Tracking (Mapping Index Sesuai Kolom Excel Lu)
-    sku_col_track = df_tracking.columns[1] # Kolom B
+    # 2. Ambil Data dari Tracking (Sesuaikan Index dengan Screenshot)
+    # Kolom Tracking: B=SKU, D=Stock, E=Sales, F=Stockin, G=Adj-, H=Adj+, I=Draft, J=TrfIn, K=TrfOut
+    sku_col_track = df_tracking.columns[1] 
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum',  # D -> M (Current Stock)
-        df_tracking.columns[4]: 'sum',  # E -> N (Total Sales)
-        df_tracking.columns[5]: 'sum',  # F -> O (Total Stockin)
-        df_tracking.columns[6]: 'sum',  # G -> Q (Total Adj Minus)
-        df_tracking.columns[7]: 'sum',  # H -> S (Total Adj Plus)
-        df_tracking.columns[8]: 'sum',  # I -> Draft RTO/TRF
-        df_tracking.columns[9]: 'sum',  # J -> J (Total Trf In)
-        df_tracking.columns[10]: 'sum'  # K -> K (Total Trf Out)
+        df_tracking.columns[3]: 'sum',  # M: Current Stock
+        df_tracking.columns[4]: 'sum',  # N: Total Sales
+        df_tracking.columns[5]: 'sum',  # O: Total Stockin
+        df_tracking.columns[6]: 'sum',  # P: Adj Minus
+        df_tracking.columns[7]: 'sum',  # Q: Adj Plus
+        df_tracking.columns[8]: 'sum',  # R: Draft Trf
+        df_tracking.columns[9]: 'sum',  # S: Trf In
+        df_tracking.columns[10]: 'sum'  # T: Trf Out
     }).reset_index()
 
-    track_agg.columns = [
-        'SKU_KEY', 'M_CURR', 'N_SALES', 'O_STOCKIN', 
-        'Q_ADJMINUS', 'S_ADJPLUS', 'DRAFT_I', 'J_TRFIN', 'K_TRFOUT'
-    ]
-    track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
+    track_agg.columns = ['SKU_KEY', 'M_CURR', 'N_SALES', 'O_STOCKIN', 'P_ADJMINUS', 'Q_ADJPLUS', 'R_DRAFT', 'S_TRFIN', 'T_TRFOUT']
+    
+    # Clean SKU
+    track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
+    df_case['SKU_KEY'] = df_case[df_case.columns[2]].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 4. Merge
+    # 3. Merge
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    # 5. Logic TOTAL PO IN (XLOOKUP / COUNTIF)
-    po_counts = df_po['SKU_PO'].value_counts().to_dict()
-    po_lookup = df_po.drop_duplicates('SKU_PO').set_index('SKU_PO')[val_col_po].to_dict()
+    # 4. Hitung REAL QTY (V) & GAP ADJ (W) Sesuai Excel lo
+    # REAL QTY (V) di excel lo: (O + S) - (N + T + R) 
+    # Berdasarkan angka di row 1: (320 + 24) - (282 + 13 + 0) = 49 (COCOK!)
+    res['V_REAL_QTY'] = (res['O_STOCKIN'] + res['S_TRFIN']) - (res['N_SALES'] + res['T_TRFOUT'] + res['R_DRAFT'])
     
-    # Simpan di kolom sementara dulu
-    res['TEMP_PO_IN'] = res['SKU_KEY'].apply(lambda x: po_lookup.get(x, 0) if po_counts.get(x, 0) == 1 else po_counts.get(x, 0))
+    # GAP ADJUSMENT (W): Q - P
+    # Berdasarkan row 1: 135 - 40 = 95 (COCOK!)
+    res['W_GAP_ADJ'] = res['Q_ADJPLUS'] - res['P_ADJMINUS']
 
-    # 6. Kalkulasi Variabel Utama (V dan W) dengan Rounding
-    res['V_REAL_QTY'] = round((res['O_STOCKIN'] + res['J_TRFIN']) - (res['N_SALES'] + res['K_TRFOUT'] + res['DRAFT_I']), 2)
-    res['W_GAP_ADJ'] = round(res['S_ADJPLUS'] - res['Q_ADJMINUS'], 2)
-    res['M_CURR'] = round(res['M_CURR'], 2)
-
-    # 7. JUSTIFICATION LOGIC (SESUAI RUMUS BARU LU)
+    # 5. JUSTIFICATION LOGIC (MENGIKUTI RUMUS LO TAPI VARIABEL DISESUAIKAN EXCEL)
     def get_just(row):
-        j, k, w, v, m, o, s, n = row['J_TRFIN'], row['K_TRFOUT'], row['W_GAP_ADJ'], \
-                                 row['V_REAL_QTY'], row['M_CURR'], row['O_STOCKIN'], \
-                                 row['S_ADJPLUS'], row['N_SALES']
+        # Mapping variabel sesuai huruf di rumus lo tapi merujuk kolom excel yang benar
+        trf_in = row['S_TRFIN']   # Di rumus lo 'J'
+        trf_out = row['T_TRFOUT'] # Di rumus lo 'K'
+        gap_adj = row['W_GAP_ADJ'] # Di rumus lo 'U'
+        real_qty = row['V_REAL_QTY'] # Di rumus lo 'T'
+        curr_stk = row['M_CURR']    # Di rumus lo 'L'
+        stk_in = row['O_STOCKIN']   # Di rumus lo 'N'
+        adj_plus = row['Q_ADJPLUS'] # Di rumus lo 'R'
+        sales = row['N_SALES']      # Di rumus lo 'M'
+
+        # IF(AND(J>K, U>0), "KESALAHAN ADJUSMENT"
+        if (trf_in > trf_out and gap_adj > 0) or (trf_in < trf_out and gap_adj < 0):
+            return "KESALAHAN ADJUSMENT"
         
-        if (j > k and w > 0) or (j < k and w < 0): return "KESALAHAN ADJUSMENT"
-        if (o + s) < n or v < 0: return "PERLU CEK CROSS ORDER"
-        if v == m and v != 0: return "CEK ULANG HASIL REKON"
-        if (v == 0 and w <= 0 and m > 0) or (j > k and m > v): return "INDIKASI BUG SISTEM"
+        # IF(OR(SUM(N+R)<M, T<0), "PERLU CEK CROSS ORDER"
+        if (stk_in + adj_plus) < sales or real_qty < 0:
+            return "PERLU CEK CROSS ORDER"
+        
+        # IF(T=L, "CEK ULANG HASIL REKON"
+        if real_qty == curr_stk and real_qty != 0:
+            return "CEK ULANG HASIL REKON"
+        
+        # IF(OR(AND(T=0, U<=0, L>0), AND(J>K, L>T)), "INDIKASI BUG SISTEM"
+        if (real_qty == 0 and gap_adj <= 0 and curr_stk > 0) or (trf_in > trf_out and curr_stk > real_qty):
+            return "INDIKASI BUG SISTEM"
+            
         return "UNDEFINED"
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
     
-    # 8. RENAME AKHIR (KOLOM TOTAL PO IN JANGAN SAMPE ILANG!)
-    return res.rename(columns={
-        'M_CURR': 'Current Stock', 
-        'N_SALES': 'Total Sales', 
-        'O_STOCKIN': 'Total_Stockin',
-        'Q_ADJMINUS': 'Total_adj_minus', 
-        'S_ADJPLUS': 'Total_adj_plus', 
-        'DRAFT_I': 'Total draft_trf', 
-        'J_TRFIN': 'Total trf_in', 
-        'K_TRFOUT': 'Total trf_out', 
-        'V_REAL_QTY': 'REAL QTY', 
-        'W_GAP_ADJ': 'GAP ADJUSMENT',
-        'TEMP_PO_IN': 'TOTAL PO IN' # INI DIA KOLOMNYA MBUT!
-    })
+    return res
 
 with st.sidebar:
        st.markdown("""
