@@ -2469,7 +2469,7 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     return df_res, df_draft
     
-# --- FUNGSI PROSES DATA SAKLEK ---
+# --- FUNGSI PROSES DATA SAKLEK (ANTI TYPEERROR) ---
 def process_justification(df_case, df_tracking, df_po):
     df_case = df_case.copy()
     df_tracking = df_tracking.copy()
@@ -2478,20 +2478,18 @@ def process_justification(df_case, df_tracking, df_po):
     # 1. SKU di Tracking ada di Kolom B (Index 1)
     sku_col_track = df_tracking.columns[1]
     
-    # 2. Aggregasi Tracking (Sesuaikan mapping index kolom excel)
+    # 2. Aggregasi Tracking (Index 3-10)
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum',  # L2 -> CURRENT STOCK (Index 12)
-        df_tracking.columns[4]: 'sum',  # M2 -> TOTAL SALES (Index 13)
-        df_tracking.columns[5]: 'sum',  # N2 -> TOTAL_STOCKIN (Index 14)
-        df_tracking.columns[6]: 'sum',  # P2 -> TOTAL_ADJ_MINUS (Index 15)
-        df_tracking.columns[7]: 'sum',  # Q2 -> TOTAL_ADJ_PLUS (Index 16)
-        df_tracking.columns[8]: 'sum',  # R2 -> TOTAL DRAFT_TRF (Index 17)
-        df_tracking.columns[9]: 'sum',  # S2 -> TOTAL TRF_IN (Index 18)
-        df_tracking.columns[10]: 'sum'  # T2 -> TOTAL TRF_OUT (Index 19)
+        df_tracking.columns[3]: 'sum',  # L: Current Stock
+        df_tracking.columns[4]: 'sum',  # M: Total Sales
+        df_tracking.columns[5]: 'sum',  # N: Total Stockin
+        df_tracking.columns[6]: 'sum',  # P: Total Adj Minus
+        df_tracking.columns[7]: 'sum',  # Q: Total Adj Plus
+        df_tracking.columns[8]: 'sum',  # R: Total Draft Trf
+        df_tracking.columns[9]: 'sum',  # S: Total Trf In
+        df_tracking.columns[10]: 'sum'  # T: Total Trf Out
     }).reset_index()
 
-    # Kasih nama kolom sesuai HURUF di rumus lo biar gak puyeng
-    # (Hati-hati: Rumus lo sebut J2, K2, dsb itu posisi di sheet gabungan)
     track_agg.columns = ['SKU_KEY', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T']
     
     # Clean SKU
@@ -2501,58 +2499,58 @@ def process_justification(df_case, df_tracking, df_po):
     # 3. Merge
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    # 4. Ambil J (QTY SYSTEM) dan K (QTY SO) dari Case Item (Index 0 & 1)
-    res['J'] = res[res.columns[0]] # QTY SYSTEM
-    res['K'] = res[res.columns[1]] # QTY SO
+    # 4. Ambil J dan K, paksa jadi angka! (Kalau gagal jadi 0)
+    res['J'] = pd.to_numeric(res[res.columns[0]], errors='coerce').fillna(0)
+    res['K'] = pd.to_numeric(res[res.columns[1]], errors='coerce').fillna(0)
 
     # 5. Logic TOTAL PO IN (U)
     po_counts = df_po[df_po.columns[3]].astype(str).str.split('.').str[0].value_counts().to_dict()
-    res['U'] = res['SKU_KEY'].apply(lambda x: po_counts.get(x, 0))
+    res['U_PO'] = res['SKU_KEY'].apply(lambda x: po_counts.get(x, 0))
 
-    # 6. Hitung V (REAL QTY) & W (GAP ADJUSMENT) sesuai screenshot
+    # 6. Hitung V (REAL QTY) & W (GAP ADJUSMENT)
     # V = (N + S) - (M + T + R)
     res['V'] = (res['N'] + res['S']) - (res['M'] + res['T'] + res['R'])
     # W = Q - P
     res['W'] = res['Q'] - res['P']
 
-    # 7. JUSTIFICATION LOGIC (PLEK KETIPLEK RUMUS LU)
-    # Variabel di rumus lu: J=J, K=K, U=W, T=V, L=L, N=N, R=Q, M=M
+    # 7. JUSTIFICATION LOGIC (MENGIKUTI POSISI RUMUS EXCEL LU)
     def get_just(row):
-        j = row['J'] # QTY SYSTEM
-        k = row['K'] # QTY SO
-        u = row['W'] # GAP ADJUSMENT (W di excel, tapi di rumus lo U2)
-        t = row['V'] # REAL QTY (V di excel, tapi di rumus lo T2)
-        l = row['L'] # CURRENT STOCK (M di excel, tapi di rumus lo L2)
-        n = row['N'] # TOTAL SALES (N di excel, tapi di rumus lo N2) -> wait, rumus lo aneh mbut
-        r = row['Q'] # ADJ PLUS (Q di excel, tapi di rumus lo R2)
-        m = row['M'] # STOCK IN ?? (O di excel, tapi di rumus lo M2)
+        # Ambil nilai & paksa float biar aman dibandingin
+        j = float(row['J'])   # Qty System
+        k = float(row['K'])   # Qty SO
+        u_adj = float(row['W']) # Gap Adjustment (W di excel, U di rumus lu)
+        t_real = float(row['V']) # Real Qty (V di excel, T di rumus lu)
+        l_curr = float(row['L']) # Curr Stock (L di excel, L di rumus lu)
+        n_stkin = float(row['N']) # Total Stockin (O di excel, N di rumus lu)
+        r_adjplus = float(row['Q']) # Adj Plus (Q di excel, R di rumus lu)
+        m_sales = float(row['M']) # Total Sales (N di excel, M di rumus lu)
 
-        # Gw pake mapping huruf di RUMUS lo, bukan huruf di HEADER excel:
-        # IF(AND(J2>K2,U2>0) -> J=J, K=K, U=GAP ADJ (W)
-        if (j > k and u > 0) or (j < k and u < 0):
+        # IF(AND(J2>K2,U2>0),"KESALAHAN ADJUSMENT"
+        if (j > k and u_adj > 0) or (j < k and u_adj < 0):
             return "KESALAHAN ADJUSMENT"
         
-        # IF(OR(SUM(N2+R2)<M2,T2<0) -> N=STOCKIN (O), R=ADJPLUS (Q), M=SALES (N), T=REALQTY (V)
-        if (row['N'] + row['Q']) < row['M'] or row['V'] < 0:
+        # IF(OR(SUM(N2+R2)<M2,T2<0),"PERLU CEK CROSS ORDER"
+        if (n_stkin + r_adjplus) < m_sales or t_real < 0:
             return "PERLU CEK CROSS ORDER"
         
-        # IF(T2=L2) -> T=REALQTY (V), L=CURRENT STOCK (L)
-        if row['V'] == row['L'] and row['V'] != 0:
+        # IF(T2=L2,"CEK ULANG HASIL REKON"
+        if t_real == l_curr and t_real != 0:
             return "CEK ULANG HASIL REKON"
         
         # IF(OR(AND(T2=0,U2<=0,L2>0),AND(J2>K2,L2>T2)))
-        if (row['V'] == 0 and row['W'] <= 0 and row['L'] > 0) or (j > k and row['L'] > row['V']):
+        if (t_real == 0 and u_adj <= 0 and l_curr > 0) or (j > k and l_curr > t_real):
             return "INDIKASI BUG SISTEM"
             
         return "UNDEFINED"
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
 
+    # 8. Rename buat display
     return res.rename(columns={
         'L': 'Current Stock', 'M': 'Total Sales', 'N': 'Total_Stockin',
         'P': 'Total_adj_minus', 'Q': 'Total_adj_plus', 'R': 'Total draft_trf',
         'S': 'Total trf_in', 'T': 'Total trf_out', 'V': 'REAL QTY', 'W': 'GAP ADJUSMENT',
-        'U': 'TOTAL PO IN'
+        'U_PO': 'TOTAL PO IN'
     })
 
 with st.sidebar:
