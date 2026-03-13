@@ -2474,66 +2474,64 @@ def process_justification(df_case, df_tracking, df_po):
     df_tracking = df_tracking.copy()
     df_po = df_po.copy()
 
-    # 1. Ambil data dari tracking (Mapping sesuai urutan variabel lu)
+    # 1. Ambil data dari tracking & Map sesuai variabel RUMUS lu
     sku_col_track = df_tracking.columns[1]
     track_agg = df_tracking.groupby(sku_col_track).agg({
         df_tracking.columns[3]: 'sum',  # L: CURRENT STOCK
         df_tracking.columns[4]: 'sum',  # M: TOTAL SALES
-        df_tracking.columns[5]: 'sum',  # N: TOTAL_STOCKIN (Rumus lu pake N)
-        df_tracking.columns[6]: 'sum',  # P: TOTAL_ADJ_MINUS
-        df_tracking.columns[7]: 'sum',  # Q: TOTAL_ADJ_PLUS (Rumus lu pake R)
-        df_tracking.columns[8]: 'sum',  # R: TOTAL DRAFT_TRF
-        df_tracking.columns[9]: 'sum',  # S: TOTAL TRF_IN
-        df_tracking.columns[10]: 'sum'  # T: TOTAL TRF_OUT
+        df_tracking.columns[5]: 'sum',  # N: TOTAL_STOCKIN
+        df_tracking.columns[6]: 'sum',  # P: TOTAL_ADJ_MINUS (buat hitung U)
+        df_tracking.columns[7]: 'sum',  # R: TOTAL_ADJ_PLUS (Rumus lu pake R)
+        df_tracking.columns[8]: 'sum',  # I: TOTAL DRAFT_TRF (buat hitung T)
+        df_tracking.columns[9]: 'sum',  # S: TOTAL TRF_IN (buat hitung T)
+        df_tracking.columns[10]: 'sum'  # T_OUT: TOTAL TRF_OUT (buat hitung T)
     }).reset_index()
 
-    # Rename sesuai variabel lu (M-T)
-    track_agg.columns = ['SKU_KEY', 'L', 'M', 'N', 'P', 'R', 'DRAFT_S', 'S_TRF', 'T_TRF']
+    # Rename kolom agar konsisten dengan variabel rumus
+    track_agg.columns = ['SKU_KEY', 'L', 'M', 'N', 'P', 'R', 'DRAFT_I', 'TRF_S', 'TRF_T_OUT']
     
-    # 2. Merge
+    # Clean SKU
     df_case['SKU_KEY'] = df_case[df_case.columns[2]].astype(str).str.split('.').str[0].str.strip().str.upper()
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
+    
+    # 2. Merge
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    # 3. Ambil J & K dari Case Item (Index 0 & 1)
+    # 3. Ambil J & K dari df_case (QTY SYSTEM & QTY SO)
     res['J'] = pd.to_numeric(res[res.columns[0]], errors='coerce').fillna(0)
     res['K'] = pd.to_numeric(res[res.columns[1]], errors='coerce').fillna(0)
 
-    # 4. Ambil U (PO IN)
-    po_counts = df_po[df_po.columns[3]].astype(str).str.split('.').str[0].value_counts().to_dict()
-    res['U_PO'] = res['SKU_KEY'].apply(lambda x: po_counts.get(x, 0))
+    # 4. Hitung T (REAL QTY) & U (GAP ADJUSMENT) sesuai mapping Excel lu
+    # T = (Stock In + Trf In) - (Sales + Trf Out + Draft)
+    res['T'] = (res['N'] + res['TRF_S']) - (res['M'] + res['TRF_T_OUT'] + res['DRAFT_I'])
+    # U = Adj Plus - Adj Minus
+    res['U'] = res['R'] - res['P']
 
-    # 5. Hitung V (REAL QTY) & W (GAP ADJ)
-    # Rumus REAL QTY (V) lu tadi: STOCK IN + TRF IN - SALES - TRF OUT - DRAFT
-    res['T2_VAL'] = (res['N'] + res['S_TRF']) - (res['M'] + res['T_TRF'] + res['DRAFT_S'])
-    # GAP ADJ (W) = ADJ PLUS - ADJ MINUS (Tapi di rumus lu variabelnya U2)
-    res['U2_VAL'] = res['R'] - res['P']
-
-    # 6. JUSTIFICATION (PLEK KETIPLEK RUMUS LU)
-    # Rumus lu: =IF(AND(J2>K2,U2>0),"KESALAHAN ADJUSMENT",IF(AND(J2<K2,U2<0),"KESALAHAN ADJUSMENT",
-    # IF(OR(SUM(N2+R2)<M2,T2<0),"PERLU CEK CROSS ORDER",IF(T2=L2,"CEK ULANG HASIL REKON",
-    # IF(OR(AND(T2=0,U2<=0,L2>0),AND(J2>K2,L2>T2)),"INDIKASI BUG SISTEM","UNDEFINED"))))))
-    
+    # 5. JUSTIFICATION (PLEK KETIPLEK RUMUS LU)
     def get_just(row):
+        # Definisikan variabel sesuai huruf di rumus lu
         j2 = row['J']
         k2 = row['K']
-        u2 = row['U2_VAL']
+        u2 = row['U']
         n2 = row['N']
         r2 = row['R']
         m2 = row['M']
-        t2 = row['T2_VAL']
+        t2 = row['T']
         l2 = row['L']
 
-        # Jalankan urutan IF lu
+        # Rumus: =IF(AND(J2>K2,U2>0),"KESALAHAN ADJUSMENT",IF(AND(J2<K2,U2<0),"KESALAHAN ADJUSMENT",...
         if (j2 > k2 and u2 > 0) or (j2 < k2 and u2 < 0):
             return "KESALAHAN ADJUSMENT"
         
+        # IF(OR(SUM(N2+R2)<M2,T2<0),"PERLU CEK CROSS ORDER"
         if (n2 + r2) < m2 or t2 < 0:
             return "PERLU CEK CROSS ORDER"
         
+        # IF(T2=L2,"CEK ULANG HASIL REKON"
         if t2 == l2 and t2 != 0:
             return "CEK ULANG HASIL REKON"
         
+        # IF(OR(AND(T2=0,U2<=0,L2>0),AND(J2>K2,L2>T2)),"INDIKASI BUG SISTEM"
         if (t2 == 0 and u2 <= 0 and l2 > 0) or (j2 > k2 and l2 > t2):
             return "INDIKASI BUG SISTEM"
             
@@ -2541,11 +2539,19 @@ def process_justification(df_case, df_tracking, df_po):
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
 
-    # Rename balik biar tampilannya bener
+    # Tambahkan TOTAL PO IN (U_PO) untuk kelengkapan kolom X
+    po_counts = df_po[df_po.columns[3]].astype(str).str.split('.').str[0].value_counts().to_dict()
+    res['TOTAL PO IN'] = res['SKU_KEY'].apply(lambda x: po_counts.get(x, 0))
+
+    # Rename balik buat tampilan final
     return res.rename(columns={
-        'L': 'Current Stock', 'M': 'Total Sales', 'N': 'Total_Stockin',
-        'P': 'Total_adj_minus', 'R': 'Total_adj_plus', 'T2_VAL': 'REAL QTY',
-        'U2_VAL': 'GAP ADJUSMENT', 'U_PO': 'TOTAL PO IN'
+        'L': 'Current Stock', 
+        'M': 'Total Sales', 
+        'N': 'Total_Stockin',
+        'P': 'Total_adj_minus', 
+        'R': 'Total_adj_plus', 
+        'T': 'REAL QTY',
+        'U': 'GAP ADJUSMENT'
     })
 
 with st.sidebar:
