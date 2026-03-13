@@ -2475,52 +2475,54 @@ def process_justification(df_case, df_tracking, df_po):
     df_tracking = df_tracking.copy()
     df_po = df_po.copy()
     
-    # 1. Normalisasi Header
+    # Normalisasi Header (Hapus spasi, Upper case)
     for df in [df_case, df_tracking, df_po]:
         df.columns = [str(col).strip().upper() for col in df.columns]
 
-    # 2. Ambil Kolom Berdasarkan Index
-    sku_col_track = df_tracking.columns[1] # Kolom B
-    sku_col_case = df_case.columns[2]     # Kolom C
-    
-    # 3. Aggregasi Tracking (SUMIF)
+    # --- FIX LOGIC PO (Cari Kolom SKU secara dinamis) ---
+    # Kita cari kolom yang mengandung kata 'SKU' di file PO
+    po_sku_col = next((c for c in df_po.columns if 'SKU' in c), df_po.columns[2])
+    po_data_col = df_po.columns[0] # Ambil kolom pertama (Invoice/Data)
+
+    # Hitung Qty PO per SKU
+    po_counts = df_po.groupby(po_sku_col).size().to_dict()
+    # Ambil Nilai Pertama (XLOOKUP simulator)
+    po_values = df_po.drop_duplicates(po_sku_col).set_index(po_sku_col)[po_data_col].to_dict()
+
+    # --- TRACKING AGGREGATION ---
+    sku_col_track = next((c for c in df_tracking.columns if 'SKU' in c), df_tracking.columns[1])
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum', # D
-        df_tracking.columns[4]: 'sum', # E
-        df_tracking.columns[5]: 'sum', # F
-        df_tracking.columns[6]: 'sum', # G
-        df_tracking.columns[7]: 'sum', # H
-        df_tracking.columns[8]: 'sum', # I
-        df_tracking.columns[9]: 'sum', # J
-        df_tracking.columns[10]: 'sum' # K
+        df_tracking.columns[3]: 'sum', # Current Stock
+        df_tracking.columns[4]: 'sum', # Total Sales
+        df_tracking.columns[5]: 'sum', # Stock In
+        df_tracking.columns[6]: 'sum', # Adj Minus
+        df_tracking.columns[7]: 'sum', # Adj Plus
+        df_tracking.columns[8]: 'sum', # Draft Trf
+        df_tracking.columns[9]: 'sum', # Trf In
+        df_tracking.columns[10]: 'sum' # Trf Out
     }).reset_index()
     
-    track_agg.columns = ['SKU_KEY', 'CURRENT STOCK', 'TOTAL SALES', 'TOTAL_STOCKIN', 
-                         'TOTAL_ADJ_MINUS', 'TOTAL_ADJ_PLUS', 'TOTAL DRAFT_TRF', 
-                         'TOTAL TRF_IN', 'TOTAL TRF_OUT']
+    track_agg.columns = ['SKU_KEY', 'CURR_STOCK', 'SALES', 'STOCKIN', 'ADJ_MINUS', 'ADJ_PLUS', 'DRAFT_TRF', 'TRF_IN', 'TRF_OUT']
 
-    # FIX ERROR DISINI: Tambahin .str sebelum .upper()
+    # --- MERGE DATA ---
+    sku_col_case = next((c for c in df_case.columns if 'SKU' in c), df_case.columns[2])
     df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.strip().str.upper()
-
-    # 4. Merge
+    
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    # 5. PO Logic
-    po_sku_col = df_po.columns[2]
-    po_data_col = df_po.columns[0]
-    po_counts = df_po.groupby(po_sku_col).size().to_dict()
-    po_values = df_po.drop_duplicates(po_sku_col).set_index(po_sku_col)[po_data_col].to_dict()
-    
+    # --- ISI DATA PO KE HASIL AKHIR ---
     res['TOTAL PO IN'] = res['SKU_KEY'].apply(lambda x: po_values.get(x, 0) if po_counts.get(x, 0) == 1 else po_counts.get(x, 0))
 
-    # 6. Rumus Akhir
-    res['REAL QTY'] = (res['TOTAL_STOCKIN'] - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL_ADJ_MINUS']) + res['TOTAL_ADJ_PLUS']
-    res['GAP ADJUSTMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
+    # --- RUMUS REAL QTY & GAP ---
+    res['REAL QTY'] = (res['STOCKIN'] - res['SALES'] - res['TRF_OUT'] - res['ADJ_MINUS']) + res['ADJ_PLUS']
+    res['GAP ADJUSMENT'] = res['ADJ_PLUS'] - res['ADJ_MINUS']
 
+    # --- JUSTIFICATION LOGIC (Sesuai Rumus Excel Lo) ---
     def get_just(row):
-        j, k, u, t = row['TOTAL TRF_IN'], row['TOTAL TRF_OUT'], row['GAP ADJUSTMENT'], row['REAL QTY']
+        j, k, u, t, l = row['TRF_IN'], row['TRF_OUT'], row['GAP ADJUSMENT'], row['REAL QTY'], 0 # L diisi manual atau kolom lain
         if (j > k and u > 0) or (j < k and u < 0): return "KESALAHAN ADJUSMENT"
         if t < 0: return "PERLU CEK CROSS ORDER"
+        if t == 0 and u <= 0: return "INDIKASI BUG SISTEM"
         return "UNDEFINED"
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
@@ -3527,8 +3529,8 @@ elif menu == "Justification SO":
             # --- TAMPILAN METRIC BOX ---
             st.divider()
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("📦 Total SKU", len(result))
-            m2.metric("⚠️ GAP ADJUSMENT", f"{int(result['GAP ADJUSTMENT'].sum())}")
+            m1.metric("❓ Undefined", len(result[result['JUSTIFICATION'] == "UNDEFINED"]))
+            m2.metric("💻 Bug Sistem", len(result[result['JUSTIFICATION'] == "INDIKASI BUG SISTEM"]))
             m3.metric("🚫 Kesalahan Adj", len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"]))
             m4.metric("🔍 Perlu Cek Cross Order", len(result[result['JUSTIFICATION'] == "PERLU CEK CROSS ORDER"]))
             
