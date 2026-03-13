@@ -2479,53 +2479,47 @@ def process_justification(df_case, df_tracking, df_po):
     for df in [df_case, df_tracking, df_po]:
         df.columns = [str(col).strip().upper() for col in df.columns]
 
-    # 2. Ambil Kolom (Akomodasi Rumus: CASE ITEM C2, TOTAL PO C:C, TOTAL PO A:A)
+    # 2. Ambil Kolom (Sesuai Koreksi: TOTAL PO SKU di Kolom D)
     # File Case Item: Kolom C (Index 2)
     sku_col_case = df_case.columns[2]
-    # File Total PO: Kolom C (Index 2) -> Tempat Nyari SKU
-    sku_col_po = df_po.columns[2]
-    # File Total PO: Kolom A (Index 0) -> Nilai yang diambil kalau cuma ada 1 (XLOOKUP)
+    # File Total PO: Kolom D (Index 3) -> TEMPAT SKU
+    sku_col_po = df_po.columns[3] 
+    # File Total PO: Kolom A (Index 0) -> Nilai untuk XLOOKUP
     val_col_po = df_po.columns[0]
 
-    # PENTING: Paksa semua SKU jadi String & hapus ".0" kalo ada (biar nggak 0 lagi)
+    # Clean SKU biar sinkron (Hapus .0 dan spasi)
     df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
     df_po['SKU_PO'] = df_po[sku_col_po].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
-    # 3. Logic SUMIF untuk Tracking (Sesuai mapping D, E, F, G, H, I, J, K)
+    # 3. Logic SUMIF untuk Tracking (Kolom B, D, E, F, G, H, I, J, K)
     sku_col_track = df_tracking.columns[1] # Kolom B
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum', # D: Curr Stock
-        df_tracking.columns[4]: 'sum', # E: Sales
-        df_tracking.columns[5]: 'sum', # F: Stockin
-        df_tracking.columns[6]: 'sum', # G: Adj Minus
-        df_tracking.columns[7]: 'sum', # H: Adj Plus
-        df_tracking.columns[8]: 'sum', # I: Draft Trf
-        df_tracking.columns[9]: 'sum', # J: Trf In
-        df_tracking.columns[10]: 'sum' # K: Trf Out
+        df_tracking.columns[3]: 'sum', # D
+        df_tracking.columns[4]: 'sum', # E
+        df_tracking.columns[5]: 'sum', # F
+        df_tracking.columns[6]: 'sum', # G
+        df_tracking.columns[7]: 'sum', # H
+        df_tracking.columns[8]: 'sum', # I
+        df_tracking.columns[9]: 'sum', # J
+        df_tracking.columns[10]: 'sum' # K
     }).reset_index()
     track_agg.columns = ['SKU_KEY', 'CURR', 'SALES', 'STOCKIN', 'ADJ_MINUS', 'ADJ_PLUS', 'DRAFT', 'TRF_IN', 'TRF_OUT']
-    # Normalisasi SKU di tracking juga biar merge-nya sinkron
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
     # 4. Merge Case & Tracking
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    # 5. Logic TOTAL PO IN (TRANSALASI RUMUS EXCEL LU)
-    # COUNTIF SKU di file PO
+    # 5. Logic TOTAL PO IN (TRANSALASI RUMUS EXCEL)
     po_counts = df_po['SKU_PO'].value_counts().to_dict()
-    # XLOOKUP Kolom A dari file PO
     po_lookup = df_po.drop_duplicates('SKU_PO').set_index('SKU_PO')[val_col_po].to_dict()
 
     def calculate_po(sku):
         count = po_counts.get(sku, 0)
         if count == 1:
-            # Sesuai Rumus: IF COUNTIF = 1, XLOOKUP ambil Kolom A
             return po_lookup.get(sku, 0)
         elif count > 1:
-            # Sesuai Rumus: IF COUNTIF > 1, ambil hasil COUNT-nya
             return count
-        else:
-            return 0
+        return 0
 
     res['TOTAL PO IN'] = res['SKU_KEY'].apply(calculate_po)
 
