@@ -2487,9 +2487,9 @@ def process_justification(df_case, df_tracking, df_po):
     # File Total PO: Kolom A (Index 0) -> Nilai yang diambil kalau cuma ada 1 (XLOOKUP)
     val_col_po = df_po.columns[0]
 
-    # PENTING: Pastikan semua SKU jadi STRING biar bisa dibandingin (Gak jadi 0 lagi)
-    df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.strip().str.upper()
-    df_po['SKU_PO'] = df_po[sku_col_po].astype(str).str.strip().str.upper()
+    # PENTING: Paksa semua SKU jadi String & hapus ".0" kalo ada (biar nggak 0 lagi)
+    df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
+    df_po['SKU_PO'] = df_po[sku_col_po].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
     # 3. Logic SUMIF untuk Tracking (Sesuai mapping D, E, F, G, H, I, J, K)
     sku_col_track = df_tracking.columns[1] # Kolom B
@@ -2504,23 +2504,25 @@ def process_justification(df_case, df_tracking, df_po):
         df_tracking.columns[10]: 'sum' # K: Trf Out
     }).reset_index()
     track_agg.columns = ['SKU_KEY', 'CURR', 'SALES', 'STOCKIN', 'ADJ_MINUS', 'ADJ_PLUS', 'DRAFT', 'TRF_IN', 'TRF_OUT']
+    # Normalisasi SKU di tracking juga biar merge-nya sinkron
+    track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
     # 4. Merge Case & Tracking
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
     # 5. Logic TOTAL PO IN (TRANSALASI RUMUS EXCEL LU)
-    # Itung jumlah kemunculan SKU di file PO
+    # COUNTIF SKU di file PO
     po_counts = df_po['SKU_PO'].value_counts().to_dict()
-    # Ambil data kolom A (Index 0) buat XLOOKUP
+    # XLOOKUP Kolom A dari file PO
     po_lookup = df_po.drop_duplicates('SKU_PO').set_index('SKU_PO')[val_col_po].to_dict()
 
     def calculate_po(sku):
         count = po_counts.get(sku, 0)
         if count == 1:
-            # Jika COUNTIF = 1, jalankan XLOOKUP (ambil kolom A)
+            # Sesuai Rumus: IF COUNTIF = 1, XLOOKUP ambil Kolom A
             return po_lookup.get(sku, 0)
         elif count > 1:
-            # Jika COUNTIF > 1, hasilkan jumlahnya
+            # Sesuai Rumus: IF COUNTIF > 1, ambil hasil COUNT-nya
             return count
         else:
             return 0
