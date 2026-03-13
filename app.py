@@ -2479,19 +2479,16 @@ def process_justification(df_case, df_tracking, df_po):
     for df in [df_case, df_tracking, df_po]:
         df.columns = [str(col).strip().upper() for col in df.columns]
 
-    # 2. Ambil Kolom (Sesuai Koreksi: TOTAL PO SKU di Kolom D)
-    # File Case Item: Kolom C (Index 2)
-    sku_col_case = df_case.columns[2]
-    # File Total PO: Kolom D (Index 3) -> TEMPAT SKU
-    sku_col_po = df_po.columns[3] 
-    # File Total PO: Kolom A (Index 0) -> Nilai untuk XLOOKUP
-    val_col_po = df_po.columns[0]
+    # 2. Ambil Kolom
+    sku_col_case = df_case.columns[2] # Kolom C
+    sku_col_po = df_po.columns[3]   # Kolom D
+    val_col_po = df_po.columns[0]   # Kolom A
 
-    # Clean SKU biar sinkron (Hapus .0 dan spasi)
+    # Clean SKU biar sinkron
     df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
     df_po['SKU_PO'] = df_po[sku_col_po].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
-    # 3. Logic SUMIF untuk Tracking (Kolom B, D, E, F, G, H, I, J, K)
+    # 3. Logic SUMIF untuk Tracking (PENTING: NAMA KOLOM HARUS KONSISTEN)
     sku_col_track = df_tracking.columns[1] # Kolom B
     track_agg = df_tracking.groupby(sku_col_track).agg({
         df_tracking.columns[3]: 'sum', # D
@@ -2503,13 +2500,19 @@ def process_justification(df_case, df_tracking, df_po):
         df_tracking.columns[9]: 'sum', # J
         df_tracking.columns[10]: 'sum' # K
     }).reset_index()
-    track_agg.columns = ['SKU_KEY', 'CURR', 'SALES', 'STOCKIN', 'ADJ_MINUS', 'ADJ_PLUS', 'DRAFT', 'TRF_IN', 'TRF_OUT']
+    
+    # NAMA KOLOM DISINI HARUS SAMA DENGAN DI GET_JUST
+    track_agg.columns = [
+        'SKU_KEY', 'CURRENT STOCK', 'TOTAL SALES', 'TOTAL_STOCKIN', 
+        'TOTAL_ADJ_MINUS', 'TOTAL_ADJ_PLUS', 'TOTAL DRAFT_TRF', 
+        'TOTAL TRF_IN', 'TOTAL TRF_OUT'
+    ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
     # 4. Merge Case & Tracking
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    # 5. Logic TOTAL PO IN (TRANSALASI RUMUS EXCEL)
+    # 5. Logic TOTAL PO IN
     po_counts = df_po['SKU_PO'].value_counts().to_dict()
     po_lookup = df_po.drop_duplicates('SKU_PO').set_index('SKU_PO')[val_col_po].to_dict()
 
@@ -2523,13 +2526,12 @@ def process_justification(df_case, df_tracking, df_po):
 
     res['TOTAL PO IN'] = res['SKU_KEY'].apply(calculate_po)
 
-    # 6. Kalkulasi Akhir
-    res['REAL QTY'] = (res['CURR'] - res['SALES'] - res['DRAFT'] - res['ADJ_MINUS']) + res['ADJ_PLUS']
-    res['GAP ADJUSMENT'] = res['ADJ_PLUS'] - res['ADJ_MINUS']
+    # 6. Kalkulasi Akhir (Pakai Nama Kolom Baru)
+    res['REAL QTY'] = (res['CURRENT STOCK'] - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL_ADJ_MINUS']) + res['TOTAL_ADJ_PLUS']
+    res['GAP ADJUSMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-# --- JUSTIFICATION LOGIC (FIX KEYERROR) ---
+    # 7. JUSTIFICATION LOGIC (SESUAI RUMUS EXCEL)
     def get_just(row):
-        # Kita pake UPPERCASE semua biar sinkron sama normalisasi di atas
         j = row['TOTAL TRF_IN']
         k = row['TOTAL TRF_OUT']
         u = row['GAP ADJUSMENT']
@@ -2539,25 +2541,24 @@ def process_justification(df_case, df_tracking, df_po):
         r = row['TOTAL_ADJ_PLUS']
         m = row['TOTAL SALES']
         
-        # 1. KESALAHAN ADJUSMENT
+        # Urutan IF harus sesuai rumus Excel lo
         if (j > k and u > 0) or (j < k and u < 0):
             return "KESALAHAN ADJUSMENT"
         
-        # 2. PERLU CEK CROSS ORDER
         if (n + r) < m or t < 0:
             return "PERLU CEK CROSS ORDER"
         
-        # 3. CEK ULANG HASIL REKON
         if t == l and t != 0:
             return "CEK ULANG HASIL REKON"
         
-        # 4. INDIKASI BUG SISTEM
         if (t == 0 and u <= 0 and l > 0) or (j > k and l > t):
             return "INDIKASI BUG SISTEM"
             
         return "UNDEFINED"
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
+    
+    return res
 
 with st.sidebar:
        st.markdown("""
