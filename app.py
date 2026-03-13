@@ -2471,58 +2471,71 @@ def process_scan_out(df_scan, df_history, df_stock):
     
 # --- FUNGSI PROSES DATA ---
 def process_justification(df_case, df_tracking, df_po):
+    # 1. Normalisasi
     df_case = df_case.copy()
     df_tracking = df_tracking.copy()
     df_po = df_po.copy()
-    
-    # Normalisasi Header (Hapus spasi, Upper case)
+
     for df in [df_case, df_tracking, df_po]:
         df.columns = [str(col).strip().upper() for col in df.columns]
 
-    # --- FIX LOGIC PO (Cari Kolom SKU secara dinamis) ---
-    # Kita cari kolom yang mengandung kata 'SKU' di file PO
-    po_sku_col = next((c for c in df_po.columns if 'SKU' in c), df_po.columns[2])
-    po_data_col = df_po.columns[0] # Ambil kolom pertama (Invoice/Data)
+    # 2. Ambil Kolom (Akomodasi Rumus: CASE ITEM C2, TOTAL PO C:C, TOTAL PO A:A)
+    # File Case Item: Kolom C (Index 2)
+    sku_col_case = df_case.columns[2]
+    # File Total PO: Kolom C (Index 2) -> Tempat Nyari SKU
+    sku_col_po = df_po.columns[2]
+    # File Total PO: Kolom A (Index 0) -> Nilai yang diambil kalau cuma ada 1 (XLOOKUP)
+    val_col_po = df_po.columns[0]
 
-    # Hitung Qty PO per SKU
-    po_counts = df_po.groupby(po_sku_col).size().to_dict()
-    # Ambil Nilai Pertama (XLOOKUP simulator)
-    po_values = df_po.drop_duplicates(po_sku_col).set_index(po_sku_col)[po_data_col].to_dict()
-
-    # --- TRACKING AGGREGATION ---
-    sku_col_track = next((c for c in df_tracking.columns if 'SKU' in c), df_tracking.columns[1])
-    track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum', # Current Stock
-        df_tracking.columns[4]: 'sum', # Total Sales
-        df_tracking.columns[5]: 'sum', # Stock In
-        df_tracking.columns[6]: 'sum', # Adj Minus
-        df_tracking.columns[7]: 'sum', # Adj Plus
-        df_tracking.columns[8]: 'sum', # Draft Trf
-        df_tracking.columns[9]: 'sum', # Trf In
-        df_tracking.columns[10]: 'sum' # Trf Out
-    }).reset_index()
-    
-    track_agg.columns = ['SKU_KEY', 'CURR_STOCK', 'SALES', 'STOCKIN', 'ADJ_MINUS', 'ADJ_PLUS', 'DRAFT_TRF', 'TRF_IN', 'TRF_OUT']
-
-    # --- MERGE DATA ---
-    sku_col_case = next((c for c in df_case.columns if 'SKU' in c), df_case.columns[2])
+    # PENTING: Pastikan semua SKU jadi STRING biar bisa dibandingin (Gak jadi 0 lagi)
     df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.strip().str.upper()
-    
+    df_po['SKU_PO'] = df_po[sku_col_po].astype(str).str.strip().str.upper()
+
+    # 3. Logic SUMIF untuk Tracking (Sesuai mapping D, E, F, G, H, I, J, K)
+    sku_col_track = df_tracking.columns[1] # Kolom B
+    track_agg = df_tracking.groupby(sku_col_track).agg({
+        df_tracking.columns[3]: 'sum', # D: Curr Stock
+        df_tracking.columns[4]: 'sum', # E: Sales
+        df_tracking.columns[5]: 'sum', # F: Stockin
+        df_tracking.columns[6]: 'sum', # G: Adj Minus
+        df_tracking.columns[7]: 'sum', # H: Adj Plus
+        df_tracking.columns[8]: 'sum', # I: Draft Trf
+        df_tracking.columns[9]: 'sum', # J: Trf In
+        df_tracking.columns[10]: 'sum' # K: Trf Out
+    }).reset_index()
+    track_agg.columns = ['SKU_KEY', 'CURR', 'SALES', 'STOCKIN', 'ADJ_MINUS', 'ADJ_PLUS', 'DRAFT', 'TRF_IN', 'TRF_OUT']
+
+    # 4. Merge Case & Tracking
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    # --- ISI DATA PO KE HASIL AKHIR ---
-    res['TOTAL PO IN'] = res['SKU_KEY'].apply(lambda x: po_values.get(x, 0) if po_counts.get(x, 0) == 1 else po_counts.get(x, 0))
+    # 5. Logic TOTAL PO IN (TRANSALASI RUMUS EXCEL LU)
+    # Itung jumlah kemunculan SKU di file PO
+    po_counts = df_po['SKU_PO'].value_counts().to_dict()
+    # Ambil data kolom A (Index 0) buat XLOOKUP
+    po_lookup = df_po.drop_duplicates('SKU_PO').set_index('SKU_PO')[val_col_po].to_dict()
 
-    # --- RUMUS REAL QTY & GAP ---
-    res['REAL QTY'] = (res['STOCKIN'] - res['SALES'] - res['TRF_OUT'] - res['ADJ_MINUS']) + res['ADJ_PLUS']
+    def calculate_po(sku):
+        count = po_counts.get(sku, 0)
+        if count == 1:
+            # Jika COUNTIF = 1, jalankan XLOOKUP (ambil kolom A)
+            return po_lookup.get(sku, 0)
+        elif count > 1:
+            # Jika COUNTIF > 1, hasilkan jumlahnya
+            return count
+        else:
+            return 0
+
+    res['TOTAL PO IN'] = res['SKU_KEY'].apply(calculate_po)
+
+    # 6. Kalkulasi Akhir
+    res['REAL QTY'] = (res['CURR'] - res['SALES'] - res['DRAFT'] - res['ADJ_MINUS']) + res['ADJ_PLUS']
     res['GAP ADJUSMENT'] = res['ADJ_PLUS'] - res['ADJ_MINUS']
 
-    # --- JUSTIFICATION LOGIC (Sesuai Rumus Excel Lo) ---
+    # 7. Justification Logic
     def get_just(row):
-        j, k, u, t, l = row['TRF_IN'], row['TRF_OUT'], row['GAP ADJUSMENT'], row['REAL QTY'], 0 # L diisi manual atau kolom lain
+        j, k, u, t = row['TRF_IN'], row['TRF_OUT'], row['GAP ADJUSMENT'], row['REAL QTY']
         if (j > k and u > 0) or (j < k and u < 0): return "KESALAHAN ADJUSMENT"
         if t < 0: return "PERLU CEK CROSS ORDER"
-        if t == 0 and u <= 0: return "INDIKASI BUG SISTEM"
         return "UNDEFINED"
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
