@@ -2479,31 +2479,32 @@ def process_justification(df_case, df_tracking, df_po):
     for df in [df_case, df_tracking, df_po]:
         df.columns = [str(col).strip().upper() for col in df.columns]
 
-    # 2. Ambil Kolom
-    sku_col_case = df_case.columns[2] # Kolom C
-    sku_col_po = df_po.columns[3]   # Kolom D
-    val_col_po = df_po.columns[0]   # Kolom A
+    # 2. Ambil Kolom (A=0, C=2, D=3)
+    sku_col_case = df_case.columns[2]
+    sku_col_po = df_po.columns[3] 
+    val_col_po = df_po.columns[0]
 
-    # Clean SKU
+    # Clean SKU biar gak 0
     df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
     df_po['SKU_PO'] = df_po[sku_col_po].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
-    # 3. Aggregasi Tracking (Mapping Index: B=1, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10)
+    # 3. Aggregasi Tracking (B=1, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10)
     sku_col_track = df_tracking.columns[1]
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum', # D: L (Current Stock)
-        df_tracking.columns[4]: 'sum', # E: M (Sales)
-        df_tracking.columns[5]: 'sum', # F: N (Stock In)
+        df_tracking.columns[3]: 'sum', # D: M (Current Stock)
+        df_tracking.columns[4]: 'sum', # E: N (Total Sales)
+        df_tracking.columns[5]: 'sum', # F: O (Total Stockin)
         df_tracking.columns[6]: 'sum', # G: Q (Adj Minus)
-        df_tracking.columns[7]: 'sum', # H: R (Adj Plus)
-        df_tracking.columns[8]: 'sum', # I: DRAFT RTO / TRF
+        df_tracking.columns[7]: 'sum', # H: S (Adj Plus)
+        df_tracking.columns[8]: 'sum', # I: Draft RTO
         df_tracking.columns[9]: 'sum', # J: J (Trf In)
-        df_tracking.columns[10]: 'sum' # K: S (Trf Out)
+        df_tracking.columns[10]: 'sum' # K: K (Trf Out)
     }).reset_index()
 
+    # Mapping sesuai variabel rumus lo
     track_agg.columns = [
-        'SKU_KEY', 'L_CURR', 'M_SALES', 'N_STOCKIN', 
-        'Q_ADJMINUS', 'R_ADJPLUS', 'DRAFT_RTO', 'J_TRFIN', 'K_TRFOUT'
+        'SKU_KEY', 'M_CURR', 'N_SALES', 'O_STOCKIN', 
+        'Q_ADJMINUS', 'S_ADJPLUS', 'DRAFT_RTO', 'J_TRFIN', 'K_TRFOUT'
     ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
@@ -2515,37 +2516,48 @@ def process_justification(df_case, df_tracking, df_po):
     po_lookup = df_po.drop_duplicates('SKU_PO').set_index('SKU_PO')[val_col_po].to_dict()
     res['TOTAL PO IN'] = res['SKU_KEY'].apply(lambda x: po_lookup.get(x, 0) if po_counts.get(x, 0) == 1 else po_counts.get(x, 0))
 
-    # 6. KALKULASI REAL QTY (FIX SESUAI MAU LO: IN + TRF_IN - SALES - TRF_OUT - DRAFT)
-    # T = N + J - M - K - I
-    res['REAL_QTY_T'] = (res['N_STOCKIN'] + res['J_TRFIN']) - (res['M_SALES'] + res['K_TRFOUT'] + res['DRAFT_RTO'])
-    
-    # GAP ADJUSMENT (U) = R - Q
-    res['GAP_ADJ_U'] = res['R_ADJPLUS'] - res['Q_ADJMINUS']
+    # 6. KALKULASI VARIABEL UTAMA (V & W)
+    # V (Real Qty) = Stock In + Trf In - Sales - Trf Out - Draft RTO
+    res['V_REAL_QTY'] = (res['O_STOCKIN'] + res['J_TRFIN']) - (res['N_SALES'] + res['K_TRFOUT'] + res['DRAFT_RTO'])
+    # W (Gap Adj) = Adj Plus - Adj Minus
+    res['W_GAP_ADJ'] = res['S_ADJPLUS'] - res['Q_ADJMINUS']
 
-    # 7. JUSTIFICATION LOGIC (Sesuai Rumus)
+    # 7. JUSTIFICATION LOGIC (SESUAI RUMUS BARU LO)
     def get_just(row):
-        j, k, u, t, l, n, r, m = row['J_TRFIN'], row['K_TRFOUT'], row['GAP_ADJ_U'], \
-                                 row['REAL_QTY_T'], row['L_CURR'], row['N_STOCKIN'], \
-                                 row['R_ADJPLUS'], row['M_SALES']
+        j = row['J_TRFIN']
+        k = row['K_TRFOUT']
+        w = row['W_GAP_ADJ']
+        v = row['V_REAL_QTY']
+        m = row['M_CURR']
+        o = row['O_STOCKIN']
+        s = row['S_ADJPLUS']
+        n = row['N_SALES']
         
-        # Urutan Pengecekan Sesuai Gambar Manual Lo
-        if (j > k and u > 0) or (j < k and u < 0): 
+        # IF(AND(J2>K2,W2>0),"KESALAHAN ADJUSMENT"
+        if (j > k and w > 0) or (j < k and w < 0):
             return "KESALAHAN ADJUSMENT"
-        if (n + r) < m or t < 0: 
+        
+        # IF(OR(SUM(O2+S2)<N2,V2<0),"PERLU CEK CROSS ORDER"
+        if (o + s) < n or v < 0:
             return "PERLU CEK CROSS ORDER"
-        if t == l and t != 0: 
+        
+        # IF(V2=M2,"CEK ULANG HASIL REKON"
+        if v == m and v != 0:
             return "CEK ULANG HASIL REKON"
-        if (t == 0 and u <= 0 and l > 0) or (j > k and l > t): 
+        
+        # IF(OR(AND(V2=0,W2<=0,M2>0),AND(J2>K2,M2>V2)),"INDIKASI BUG SISTEM"
+        if (v == 0 and w <= 0 and m > 0) or (j > k and m > v):
             return "INDIKASI BUG SISTEM"
+            
         return "UNDEFINED"
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
     
     return res.rename(columns={
-        'L_CURR': 'Current Stock', 'M_SALES': 'Total Sales', 'N_STOCKIN': 'Total_Stockin',
-        'Q_ADJMINUS': 'Total_adj_minus', 'R_ADJPLUS': 'Total_adj_plus', 
+        'M_CURR': 'Current Stock', 'N_SALES': 'Total Sales', 'O_STOCKIN': 'Total_Stockin',
+        'Q_ADJMINUS': 'Total_adj_minus', 'S_ADJPLUS': 'Total_adj_plus', 
         'DRAFT_RTO': 'Total draft_trf', 'J_TRFIN': 'Total trf_in', 
-        'K_TRFOUT': 'Total trf_out', 'REAL_QTY_T': 'REAL QTY', 'GAP_ADJ_U': 'GAP ADJUSMENT'
+        'K_TRFOUT': 'Total trf_out', 'V_REAL_QTY': 'REAL QTY', 'W_GAP_ADJ': 'GAP ADJUSMENT'
     })
 
 with st.sidebar:
