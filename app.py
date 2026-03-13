@@ -3576,11 +3576,11 @@ elif menu == "Justification SO":
         c_cross = len(result[result['JUSTIFICATION'] == "PERLU CEK CROSS ORDER"])
         c_rekon = len(result[result['JUSTIFICATION'] == "CEK ULANG HASIL REKON"])
 
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">UNDEFINED</span><span class="m-val">{c_undef}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">BUG SISTEM</span><span class="m-val">{c_bug}</span></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="m-box"><span class="m-lbl">KESALAHAN ADJ</span><span class="m-val">{c_adj}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">CEK CROSS ORDER</span><span class="m-val">{c_cross}</span></div>', unsafe_allow_html=True)
-        m5.markdown(f'<div class="m-box"><span class="m-lbl">CEK ULANG HASIL REKON</span><span class="m-val">{c_rekon}</span></div>', unsafe_allow_html=True)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">❓UNDEFINED</span><span class="m-val">{c_undef}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">💻BUG SISTEM</span><span class="m-val">{c_bug}</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box"><span class="m-lbl">❌KESALAHAN ADJ</span><span class="m-val">{c_adj}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box"><span class="m-lbl">🗳️CEK CROSS ORDER</span><span class="m-val">{c_cross}</span></div>', unsafe_allow_html=True)
+        m5.markdown(f'<div class="m-box"><span class="m-lbl">🔁CEK ULANG HASIL REKON</span><span class="m-val">{c_rekon}</span></div>', unsafe_allow_html=True)
         
         # --- TAMPILAN TABEL ---
         st.divider()
