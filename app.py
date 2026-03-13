@@ -2527,37 +2527,31 @@ def process_justification(df_case, df_tracking, df_po):
     res['REAL QTY'] = (res['CURR'] - res['SALES'] - res['DRAFT'] - res['ADJ_MINUS']) + res['ADJ_PLUS']
     res['GAP ADJUSMENT'] = res['ADJ_PLUS'] - res['ADJ_MINUS']
 
-    # 7. Justification Logic
-  # --- JUSTIFICATION LOGIC (SESUAI RUMUS EXCEL LU 100%) ---
+# --- JUSTIFICATION LOGIC (FIX KEYERROR) ---
     def get_just(row):
-        # Mapping variabel sesuai cell di rumus lo
-        # J2 = Trf_In, K2 = Trf_Out, U2 = Gap Adj, T2 = Real Qty, L2 = Current Stock, N2 = Stock In, R2 = Adj Plus, M2 = Sales
-        j = row['Total trf_in']
-        k = row['Total trf_out']
+        # Kita pake UPPERCASE semua biar sinkron sama normalisasi di atas
+        j = row['TOTAL TRF_IN']
+        k = row['TOTAL TRF_OUT']
         u = row['GAP ADJUSMENT']
         t = row['REAL QTY']
-        l = row['Current Stock']
-        n = row['Total_Stockin']
-        r = row['Total_adj_plus']
-        m = row['Total Sales']
+        l = row['CURRENT STOCK']
+        n = row['TOTAL_STOCKIN']
+        r = row['TOTAL_ADJ_PLUS']
+        m = row['TOTAL SALES']
         
         # 1. KESALAHAN ADJUSMENT
-        # IF(AND(J2>K2,U2>0),"KESALAHAN ADJUSMENT",IF(AND(J2<K2,U2<0),"KESALAHAN ADJUSMENT",...))
         if (j > k and u > 0) or (j < k and u < 0):
             return "KESALAHAN ADJUSMENT"
         
         # 2. PERLU CEK CROSS ORDER
-        # IF(OR(SUM(N2+R2)<M2,T2<0),"PERLU CEK CROSS ORDER",...)
         if (n + r) < m or t < 0:
             return "PERLU CEK CROSS ORDER"
         
         # 3. CEK ULANG HASIL REKON
-        # IF(T2=L2,"CEK ULANG HASIL REKON",...)
-        if t == l and t != 0: # Ditambah t!=0 biar gak semua yang kosong masuk sini
+        if t == l and t != 0:
             return "CEK ULANG HASIL REKON"
         
         # 4. INDIKASI BUG SISTEM
-        # IF(OR(AND(T2=0,U2<=0,L2>0),AND(J2>K2,L2>T2)),"INDIKASI BUG SISTEM",...)
         if (t == 0 and u <= 0 and l > 0) or (j > k and l > t):
             return "INDIKASI BUG SISTEM"
             
