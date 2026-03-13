@@ -3553,7 +3553,7 @@ elif menu == "Justification SO":
     # 2. Logika Tombol Run
     if up_case and up_tracking and up_others:
         if st.button("▶️ RUN COMPARISON ANALYSIS", use_container_width=True):
-            with st.spinner("Lagi ngitung, sabaarr..."):
+            with st.spinner("Processing Data..."):
                 df_c = pd.read_excel(up_case)
                 df_t = pd.read_excel(up_tracking)
                 df_p = pd.read_excel(up_others)
