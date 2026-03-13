@@ -2469,6 +2469,75 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     return df_res, df_draft
     
+import streamlit as st
+import pandas as pd
+import numpy as np
+import io
+
+# --- FUNGSI PROSES DATA ---
+def process_comparison(df_case, df_tracking, df_po, df_adj):
+    # 1. Normalisasi Nama Kolom & Data
+    for df in [df_case, df_tracking, df_po, df_adj]:
+        df.columns = [str(col).strip().upper() for col in df.columns]
+    
+    # Ambil kolom SKU dari Case Item (Asumsi Kolom ke-3 sesuai rumus C2 lo)
+    sku_col_case = df_case.columns[2] 
+    df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.strip().upper()
+
+    # Pre-aggregate Tracking Stock (Biar cepet kayak SUMIF)
+    # B:B = SKU (idx 1), D:D = Curr Stock (idx 3), E:E = Sales (idx 4), dst.
+    tracking_agg = df_tracking.groupby(df_tracking.columns[1]).agg({
+        df_tracking.columns[3]: 'sum', # Current Stock
+        df_tracking.columns[4]: 'sum', # Total Sales
+        df_tracking.columns[5]: 'sum', # Total Stock In
+        df_tracking.columns[6]: 'sum', # Adj Minus
+        df_tracking.columns[7]: 'sum', # Adj Plus
+        df_tracking.columns[8]: 'sum', # Draft Trf
+        df_tracking.columns[9]: 'sum', # Trf In
+        df_tracking.columns[10]: 'sum' # Trf Out
+    }).reset_index()
+    
+    tracking_agg.columns = ['SKU_KEY', 'CURR_STK', 'SALES', 'STK_IN', 'ADJ_MINUS', 'ADJ_PLUS', 'DRAFT_TRF', 'TRF_IN', 'TRF_OUT']
+
+    # 2. Join Case Item dengan Tracking Aggregated
+    res = df_case.merge(tracking_agg, on='SKU_KEY', how='left').fillna(0)
+
+    # 3. Logika PO IN (COUNTIF / XLOOKUP)
+    # C:C = SKU (idx 2), A:A = Data PO (idx 0)
+    po_counts = df_po.groupby(df_po.columns[2]).size().to_dict()
+    po_values = df_po.drop_duplicates(df_po.columns[2]).set_index(df_po.columns[2])[df_po.columns[0]].to_dict()
+
+    def get_po_logic(sku):
+        count = po_counts.get(sku, 0)
+        if count == 1:
+            return po_values.get(sku, 0)
+        return count
+
+    res['TOTAL PO IN'] = res['SKU_KEY'].apply(get_po_logic)
+
+    # 4. Kalkulasi Kolom Tambahan (Rumus Excel Lo)
+    # Rumus 9: Qty after sales (N-M-S-Q+R) -> sesuaikan index kolom lo
+    # Gw pake nama kolom mapping biar jelas
+    res['REAL QTY'] = (res['CURR_STK'] - res['SALES']) # Contoh simpel, sesuaikan urutan cell lo
+
+    # Rumus 10: GAP ADJUSTMENT (P2-O2 -> Adj Plus - Adj Minus)
+    res['GAP ADJUSTMENT'] = res['ADJ_PLUS'] - res['ADJ_MINUS']
+
+    # 5. JUSTIFICATION (Rumus ribet lo)
+    def get_justification(row):
+        # Mapping manual sesuai logika IF lo
+        # J=Trf_In, K=Trf_Out, U=Gap Adj, L=Expected Qty, T=Real Qty, dst
+        j, k, u = row['TRF_IN'], row['TRF_OUT'], row['GAP ADJUSTMENT']
+        
+        if j > k and u > 0: return "KESALAHAN ADJUSMENT"
+        if j < k and u < 0: return "KESALAHAN ADJUSMENT"
+        # Tambahkan sisa logika IF lo di sini sesuai kebutuhan
+        return "CEK ULANG"
+
+    res['JUSTIFICATION'] = res.apply(get_justification, axis=1)
+
+    return res
+
 
 with st.sidebar:
        st.markdown("""
@@ -3446,7 +3515,38 @@ elif menu == "FDR Update":
                 if opt:
                     st.download_button(f"📥 {opt}", st.session_state.dict_kurir_fdr[opt].to_csv(index=False).encode('utf-8'), f"{opt}.csv", "text/csv")
                     st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
+# --- JUSTIFICATION STOCK OPNAME ---
+st.set_page_config(layout="wide")
+st.title("📊 STOCK COMPARISON MODEL")
 
+col1, col2, col3 = st.columns(3)
+with col1: up_case = st.file_uploader("Upload CASE ITEM / MASTER SKU", type=['xlsx'])
+with col2: up_tracking = st.file_uploader("Upload TRACKING STOCK", type=['xlsx'])
+with col3: up_others = st.file_uploader("Upload TOTAL PO", type=['xlsx'])
+
+if up_case and up_tracking and up_others:
+    df_c = pd.read_excel(up_case)
+    df_t = pd.read_excel(up_tracking)
+    df_p = pd.read_excel(up_others)
+    
+    if st.button("RUN COMPARISON"):
+        result = process_comparison(df_c, df_t, df_p, None)
+        
+        # METRIC BOX
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total SKU", len(result))
+        m2.metric("Total Gap", int(result['GAP ADJUSTMENT'].sum()))
+        m3.metric("Kesalahan Adj", len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"]))
+        
+        st.divider()
+        st.subheader("📋 Summary Report")
+        st.dataframe(result, use_container_width=True)
+        
+        # Download
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            result.to_excel(writer, index=False, sheet_name='Summary')
+        st.download_button("📥 Download Hasil Rekon", output.getvalue(), "rekon_stock.xlsx")
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
