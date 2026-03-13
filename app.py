@@ -2469,75 +2469,69 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     return df_res, df_draft
     
-import streamlit as st
-import pandas as pd
-import numpy as np
-import io
-
 # --- FUNGSI PROSES DATA ---
-def process_comparison(df_case, df_tracking, df_po, df_adj):
-    # 1. Normalisasi Nama Kolom & Data
-    for df in [df_case, df_tracking, df_po, df_adj]:
-        df.columns = [str(col).strip().upper() for col in df.columns]
+# --- TARUH DI ATAS (SETELAH IMPORT) ---
+def process_justification(df_case, df_tracking, df_po):
+    # Copy & Normalisasi Kolom
+    df_case = df_case.copy()
+    df_tracking = df_tracking.copy()
+    df_po = df_po.copy()
     
-    # Ambil kolom SKU dari Case Item (Asumsi Kolom ke-3 sesuai rumus C2 lo)
-    sku_col_case = df_case.columns[2] 
-    df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.strip().upper()
+    for df in [df_case, df_tracking, df_po]:
+        df.columns = [str(col).strip().upper() for col in df.columns]
 
-    # Pre-aggregate Tracking Stock (Biar cepet kayak SUMIF)
-    # B:B = SKU (idx 1), D:D = Curr Stock (idx 3), E:E = Sales (idx 4), dst.
-    tracking_agg = df_tracking.groupby(df_tracking.columns[1]).agg({
-        df_tracking.columns[3]: 'sum', # Current Stock
-        df_tracking.columns[4]: 'sum', # Total Sales
-        df_tracking.columns[5]: 'sum', # Total Stock In
-        df_tracking.columns[6]: 'sum', # Adj Minus
-        df_tracking.columns[7]: 'sum', # Adj Plus
-        df_tracking.columns[8]: 'sum', # Draft Trf
-        df_tracking.columns[9]: 'sum', # Trf In
-        df_tracking.columns[10]: 'sum' # Trf Out
+    # Mapping Kolom Berdasarkan Index Excel (Sesuai Rumus Lo)
+    sku_col_track = df_tracking.columns[1] # Kolom B (SKU)
+    sku_col_case = df_case.columns[2]     # Kolom C (SKU)
+
+    # SUMIF Simulator menggunakan GroupBy
+    track_agg = df_tracking.groupby(sku_col_track).agg({
+        df_tracking.columns[3]: 'sum',  # Current Stock (D)
+        df_tracking.columns[4]: 'sum',  # Total Sales (E)
+        df_tracking.columns[5]: 'sum',  # Total Stockin (F)
+        df_tracking.columns[6]: 'sum',  # Total_adj_minus (G)
+        df_tracking.columns[7]: 'sum',  # Total_adj_plus (H)
+        df_tracking.columns[8]: 'sum',  # Total draft_trf (I)
+        df_tracking.columns[9]: 'sum',  # Total trf_in (J)
+        df_tracking.columns[10]: 'sum'  # Total trf_out (K)
     }).reset_index()
     
-    tracking_agg.columns = ['SKU_KEY', 'CURR_STK', 'SALES', 'STK_IN', 'ADJ_MINUS', 'ADJ_PLUS', 'DRAFT_TRF', 'TRF_IN', 'TRF_OUT']
+    track_agg.columns = ['SKU_KEY', 'CURRENT STOCK', 'TOTAL SALES', 'TOTAL_STOCKIN', 
+                         'TOTAL_ADJ_MINUS', 'TOTAL_ADJ_PLUS', 'TOTAL DRAFT_TRF', 
+                         'TOTAL TRF_IN', 'TOTAL TRF_OUT']
 
-    # 2. Join Case Item dengan Tracking Aggregated
-    res = df_case.merge(tracking_agg, on='SKU_KEY', how='left').fillna(0)
+    df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.strip().upper()
 
-    # 3. Logika PO IN (COUNTIF / XLOOKUP)
-    # C:C = SKU (idx 2), A:A = Data PO (idx 0)
-    po_counts = df_po.groupby(df_po.columns[2]).size().to_dict()
-    po_values = df_po.drop_duplicates(df_po.columns[2]).set_index(df_po.columns[2])[df_po.columns[0]].to_dict()
+    # Merge / VLOOKUP
+    res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    def get_po_logic(sku):
-        count = po_counts.get(sku, 0)
-        if count == 1:
-            return po_values.get(sku, 0)
-        return count
+    # Logika TOTAL PO IN (XLOOKUP/COUNTIF)
+    po_sku_col = df_po.columns[2]  # Kolom C (SKU)
+    po_data_col = df_po.columns[0] # Kolom A (Invoice/Data)
+    
+    po_counts = df_po.groupby(po_sku_col).size().to_dict()
+    po_values = df_po.drop_duplicates(po_sku_col).set_index(po_sku_col)[po_data_col].to_dict()
+    
+    res['TOTAL PO IN'] = res['SKU_KEY'].apply(lambda x: po_values.get(x, 0) if po_counts.get(x, 0) == 1 else po_counts.get(x, 0))
 
-    res['TOTAL PO IN'] = res['SKU_KEY'].apply(get_po_logic)
+    # Kalkulasi Rumus Excel Lo
+    # Rumus 9: Qty after sales & RTO (N2-M2-S2-Q2)+R2
+    # N=Stockin, M=Sales, S=TrfOut, Q=AdjMinus, R=AdjPlus
+    res['REAL QTY'] = (res['TOTAL_STOCKIN'] - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL_ADJ_MINUS']) + res['TOTAL_ADJ_PLUS']
+    
+    # Rumus 10: GAP ADJUSTMENT (P2-O2 -> AdjPlus - AdjMinus)
+    res['GAP ADJUSTMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    # 4. Kalkulasi Kolom Tambahan (Rumus Excel Lo)
-    # Rumus 9: Qty after sales (N-M-S-Q+R) -> sesuaikan index kolom lo
-    # Gw pake nama kolom mapping biar jelas
-    res['REAL QTY'] = (res['CURR_STK'] - res['SALES']) # Contoh simpel, sesuaikan urutan cell lo
+    # Rumus 12: JUSTIFICATION
+    def get_just(row):
+        j, k, u, t = row['TOTAL TRF_IN'], row['TOTAL TRF_OUT'], row['GAP ADJUSTMENT'], row['REAL QTY']
+        if (j > k and u > 0) or (j < k and u < 0): return "KESALAHAN ADJUSMENT"
+        if t < 0: return "PERLU CEK CROSS ORDER"
+        return "UNDEFINED"
 
-    # Rumus 10: GAP ADJUSTMENT (P2-O2 -> Adj Plus - Adj Minus)
-    res['GAP ADJUSTMENT'] = res['ADJ_PLUS'] - res['ADJ_MINUS']
-
-    # 5. JUSTIFICATION (Rumus ribet lo)
-    def get_justification(row):
-        # Mapping manual sesuai logika IF lo
-        # J=Trf_In, K=Trf_Out, U=Gap Adj, L=Expected Qty, T=Real Qty, dst
-        j, k, u = row['TRF_IN'], row['TRF_OUT'], row['GAP ADJUSTMENT']
-        
-        if j > k and u > 0: return "KESALAHAN ADJUSMENT"
-        if j < k and u < 0: return "KESALAHAN ADJUSMENT"
-        # Tambahkan sisa logika IF lo di sini sesuai kebutuhan
-        return "CEK ULANG"
-
-    res['JUSTIFICATION'] = res.apply(get_justification, axis=1)
-
+    res['JUSTIFICATION'] = res.apply(get_just, axis=1)
+    
     return res
-
 
 with st.sidebar:
        st.markdown("""
