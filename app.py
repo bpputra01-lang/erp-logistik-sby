@@ -3537,6 +3537,10 @@ elif menu == "FDR Update":
 elif menu == "Justification SO":
     st.markdown('<div class="hero-header"><h1>📊 STOCK COMPARISON MODEL</h1></div>', unsafe_allow_html=True)
 
+    # 1. Inisialisasi Session State biar data nggak hilang pas diklik
+    if 'result_so' not in st.session_state:
+        st.session_state.result_so = None
+
     # UI Uploader - Dibagi 3 Kolom
     col1, col2, col3 = st.columns(3)
     with col1: 
@@ -3546,42 +3550,56 @@ elif menu == "Justification SO":
     with col3: 
         up_others = st.file_uploader("Upload Total PO", type=['xlsx'], key="up_po_so")
 
-    # Logika Tombol dan Output
+    # 2. Logika Tombol Run
     if up_case and up_tracking and up_others:
         if st.button("▶️ RUN COMPARISON ANALYSIS", use_container_width=True):
-            df_c = pd.read_excel(up_case)
-            df_t = pd.read_excel(up_tracking)
-            df_p = pd.read_excel(up_others)
-            
-            # Panggil fungsi logic lo
-            result = process_justification(df_c, df_t, df_p)
-            
-            # --- TAMPILAN METRIC BOX ---
-            st.divider()
-            m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("❓ Undefined", len(result[result['JUSTIFICATION'] == "UNDEFINED"]))
-            m2.metric("💻 Bug Sistem", len(result[result['JUSTIFICATION'] == "INDIKASI BUG SISTEM"]))
-            m3.metric("🚫 Kesalahan Adj", len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"]))
-            m4.metric("🔍 Perlu Cek Cross Order", len(result[result['JUSTIFICATION'] == "PERLU CEK CROSS ORDER"]))
-            m5.metric("🔁 Cek Ulang Hasil Rekon", len(result[result['JUSTIFICATION'] == "CEK ULANG HASIL REKON"]))
-            
-            # --- TAMPILAN TABEL ---
-            st.divider()
-            st.subheader("📋 Summary Report Analysis")
-            st.dataframe(result, use_container_width=True, height=450)
-            
-            # --- DOWNLOAD BUTTON ---
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                result.to_excel(writer, index=False, sheet_name='Summary')
-            
-            st.download_button(
-                label="📥 DOWNLOAD HASIL REKON (.XLSX)",
-                data=output.getvalue(),
-                file_name="rekon_stock_so.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+            with st.spinner("Lagi ngitung, sabaarr..."):
+                df_c = pd.read_excel(up_case)
+                df_t = pd.read_excel(up_tracking)
+                df_p = pd.read_excel(up_others)
+                
+                # Panggil fungsi sakti lo
+                st.session_state.result_so = process_justification(df_c, df_t, df_p)
+
+    # 3. TAMPILAN OUTPUT (Hanya muncul kalau data sudah di-run)
+    if st.session_state.result_so is not None:
+        result = st.session_state.result_so
+        
+        # --- TAMPILAN METRIC BOX (STYLE M-BOX) ---
+        st.divider()
+        m1, m2, m3, m4, m5 = st.columns(5)
+        
+        # Hitung angka buat box
+        c_undef = len(result[result['JUSTIFICATION'] == "UNDEFINED"])
+        c_bug   = len(result[result['JUSTIFICATION'] == "INDIKASI BUG SISTEM"])
+        c_adj   = len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"])
+        c_cross = len(result[result['JUSTIFICATION'] == "PERLU CEK CROSS ORDER"])
+        c_rekon = len(result[result['JUSTIFICATION'] == "CEK ULANG HASIL REKON"])
+
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">UNDEFINED</span><span class="m-val">{c_undef}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">BUG SISTEM</span><span class="m-val">{c_bug}</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box"><span class="m-lbl">KESALAHAN ADJ</span><span class="m-val">{c_adj}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box"><span class="m-lbl">CROSS ORDER</span><span class="m-val">{c_cross}</span></div>', unsafe_allow_html=True)
+        m5.markdown(f'<div class="m-box"><span class="m-lbl">CEK REKON</span><span class="m-val">{c_rekon}</span></div>', unsafe_allow_html=True)
+        
+        # --- TAMPILAN TABEL ---
+        st.divider()
+        st.subheader("📋 Summary Report Analysis")
+        st.dataframe(result, use_container_width=True, height=450)
+        
+        # --- DOWNLOAD BUTTON (DI LUAR BUTTON RUN AGAR STAY) ---
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            result.to_excel(writer, index=False, sheet_name='Summary')
+        
+        st.download_button(
+            label="📥 DOWNLOAD HASIL REKON (.XLSX)",
+            data=output.getvalue(),
+            file_name="rekon_stock_so.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="btn_download_so" # Key unik agar tidak reset
+        )
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
