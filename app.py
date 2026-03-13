@@ -2495,7 +2495,7 @@ def process_justification(df_case, df_tracking, df_po):
         df_tracking.columns[3]: 'sum', # D: Current Stock (L)
         df_tracking.columns[4]: 'sum', # E: Total Sales (M)
         df_tracking.columns[5]: 'sum', # F: Total Stockin (N)
-        df_tracking.columns[6]: 'sum', # G: Adj Minus
+        df_tracking.columns[6]: 'sum', # G: Adj Minus (Q)
         df_tracking.columns[7]: 'sum', # H: Adj Plus (R)
         df_tracking.columns[8]: 'sum', # I: Draft Trf
         df_tracking.columns[9]: 'sum', # J: Trf In (J)
@@ -2504,7 +2504,7 @@ def process_justification(df_case, df_tracking, df_po):
 
     track_agg.columns = [
         'SKU_KEY', 'L_CURR', 'M_SALES', 'N_STOCKIN', 
-        'ADJ_MINUS', 'R_ADJPLUS', 'DRAFT', 'J_TRFIN', 'K_TRFOUT'
+        'Q_ADJMINUS', 'R_ADJPLUS', 'DRAFT', 'J_TRFIN', 'K_TRFOUT'
     ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
@@ -2517,16 +2517,16 @@ def process_justification(df_case, df_tracking, df_po):
     res['TOTAL PO IN'] = res['SKU_KEY'].apply(lambda x: po_lookup.get(x, 0) if po_counts.get(x, 0) == 1 else po_counts.get(x, 0))
 
     # 6. Kalkulasi Field Utama (T dan U)
-    # T (Real Qty) = (N - M - TrfOut - AdjMinus) + AdjPlus
-    res['REAL_QTY_T'] = (res['N_STOCKIN'] - res['M_SALES'] - res['K_TRFOUT'] - res['ADJ_MINUS']) + res['R_ADJPLUS']
-    # U (Gap Adj) = AdjPlus - AdjMinus
-    res['GAP_ADJ_U'] = res['R_ADJPLUS'] - res['ADJ_MINUS']
+    # T (Real Qty) = (N - M - K - Q) + R
+    res['REAL_QTY_T'] = (res['N_STOCKIN'] - res['M_SALES'] - res['K_TRFOUT'] - res['Q_ADJMINUS']) + res['R_ADJPLUS']
+    # U (Gap Adj) = R - Q
+    res['GAP_ADJ_U'] = res['R_ADJPLUS'] - res['Q_ADJMINUS']
 
     # 7. JUSTIFICATION LOGIC (SESUAI RUMUS JEMBUT LU)
     def get_just(row):
         j = row['J_TRFIN']
         k = row['K_TRFOUT']
-        u = row['GAP_AD_U']
+        u = row['GAP_ADJ_U'] # FIX TYPO DISINI
         t = row['REAL_QTY_T']
         l = row['L_CURR']
         n = row['N_STOCKIN']
@@ -2556,7 +2556,7 @@ def process_justification(df_case, df_tracking, df_po):
     # Rename balik buat tampilan biar rapi
     return res.rename(columns={
         'L_CURR': 'Current Stock', 'M_SALES': 'Total Sales', 'N_STOCKIN': 'Total_Stockin',
-        'ADJ_MINUS': 'Total_adj_minus', 'R_ADJPLUS': 'Total_adj_plus', 'DRAFT': 'Total draft_trf',
+        'Q_ADJMINUS': 'Total_adj_minus', 'R_ADJPLUS': 'Total_adj_plus', 'DRAFT': 'Total draft_trf',
         'J_TRFIN': 'Total trf_in', 'K_TRFOUT': 'Total trf_out', 'REAL_QTY_T': 'REAL QTY', 'GAP_AD_U': 'GAP ADJUSMENT'
     })
 
