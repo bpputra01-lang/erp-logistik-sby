@@ -2520,10 +2520,10 @@ def process_justification(df_case, df_tracking, df_po):
         k = float(row['K'])   # Qty SO
         u_adj = float(row['W']) # Gap Adjustment (W di excel, U di rumus lu)
         t_real = float(row['V']) # Real Qty (V di excel, T di rumus lu)
-        l_curr = float(row['L']) # Curr Stock (L di excel, L di rumus lu)
-        n_stkin = float(row['N']) # Total Stockin (O di excel, N di rumus lu)
+        l_curr = float(row['M']) # Curr Stock (L di excel, L di rumus lu)
+        n_stkin = float(row['O']) # Total Stockin (O di excel, N di rumus lu)
         r_adjplus = float(row['Q']) # Adj Plus (Q di excel, R di rumus lu)
-        m_sales = float(row['M']) # Total Sales (N di excel, M di rumus lu)
+        m_sales = float(row['N']) # Total Sales (N di excel, M di rumus lu)
 
         # IF(AND(J2>K2,U2>0),"KESALAHAN ADJUSMENT"
         if (j > k and u_adj > 0) or (j < k and u_adj < 0):
