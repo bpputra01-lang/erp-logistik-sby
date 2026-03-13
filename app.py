@@ -2470,6 +2470,7 @@ def process_scan_out(df_scan, df_history, df_stock):
     return df_res, df_draft
     
 # --- FUNGSI PROSES DATA ---
+# --- FUNGSI PROSES DATA ---
 def process_justification(df_case, df_tracking, df_po):
     # 1. Normalisasi
     df_case = df_case.copy()
@@ -2479,78 +2480,72 @@ def process_justification(df_case, df_tracking, df_po):
     for df in [df_case, df_tracking, df_po]:
         df.columns = [str(col).strip().upper() for col in df.columns]
 
-    # 2. Ambil Kolom
-    sku_col_case = df_case.columns[2] # Kolom C
-    sku_col_po = df_po.columns[3]   # Kolom D
-    val_col_po = df_po.columns[0]   # Kolom A
+    # 2. Ambil Kolom (C=Index 2, D=Index 3, A=Index 0)
+    sku_col_case = df_case.columns[2]
+    sku_col_po = df_po.columns[3] 
+    val_col_po = df_po.columns[0]
 
-    # Clean SKU biar sinkron
+    # Clean SKU biar sinkron (Hapus .0)
     df_case['SKU_KEY'] = df_case[sku_col_case].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
     df_po['SKU_PO'] = df_po[sku_col_po].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
-    # 3. Logic SUMIF untuk Tracking (PENTING: NAMA KOLOM HARUS KONSISTEN)
-    sku_col_track = df_tracking.columns[1] # Kolom B
+    # 3. Aggregasi Tracking (B=1, D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10)
+    sku_col_track = df_tracking.columns[1]
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum', # D
-        df_tracking.columns[4]: 'sum', # E
-        df_tracking.columns[5]: 'sum', # F
-        df_tracking.columns[6]: 'sum', # G
-        df_tracking.columns[7]: 'sum', # H
-        df_tracking.columns[8]: 'sum', # I
-        df_tracking.columns[9]: 'sum', # J
-        df_tracking.columns[10]: 'sum' # K
+        df_tracking.columns[3]: 'sum', # D: Current Stock (L)
+        df_tracking.columns[4]: 'sum', # E: Total Sales (M)
+        df_tracking.columns[5]: 'sum', # F: Total Stockin (N)
+        df_tracking.columns[6]: 'sum', # G: Adj Minus
+        df_tracking.columns[7]: 'sum', # H: Adj Plus (R)
+        df_tracking.columns[8]: 'sum', # I: Draft Trf
+        df_tracking.columns[9]: 'sum', # J: Trf In (J)
+        df_tracking.columns[10]: 'sum' # K: Trf Out (K)
     }).reset_index()
-    
-    # NAMA KOLOM DISINI HARUS SAMA DENGAN DI GET_JUST
+
     track_agg.columns = [
-        'SKU_KEY', 'CURRENT STOCK', 'TOTAL SALES', 'TOTAL_STOCKIN', 
-        'TOTAL_ADJ_MINUS', 'TOTAL_ADJ_PLUS', 'TOTAL DRAFT_TRF', 
-        'TOTAL TRF_IN', 'TOTAL TRF_OUT'
+        'SKU_KEY', 'L_CURR', 'M_SALES', 'N_STOCKIN', 
+        'ADJ_MINUS', 'R_ADJPLUS', 'DRAFT', 'J_TRFIN', 'K_TRFOUT'
     ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
 
-    # 4. Merge Case & Tracking
+    # 4. Merge
     res = df_case.merge(track_agg, on='SKU_KEY', how='left').fillna(0)
 
-    # 5. Logic TOTAL PO IN
+    # 5. Logic TOTAL PO IN (Tetap jalan)
     po_counts = df_po['SKU_PO'].value_counts().to_dict()
     po_lookup = df_po.drop_duplicates('SKU_PO').set_index('SKU_PO')[val_col_po].to_dict()
+    res['TOTAL PO IN'] = res['SKU_KEY'].apply(lambda x: po_lookup.get(x, 0) if po_counts.get(x, 0) == 1 else po_counts.get(x, 0))
 
-    def calculate_po(sku):
-        count = po_counts.get(sku, 0)
-        if count == 1:
-            return po_lookup.get(sku, 0)
-        elif count > 1:
-            return count
-        return 0
+    # 6. Kalkulasi Field Utama (T dan U)
+    # T (Real Qty) = (N - M - TrfOut - AdjMinus) + AdjPlus
+    res['REAL_QTY_T'] = (res['N_STOCKIN'] - res['M_SALES'] - res['K_TRFOUT'] - res['ADJ_MINUS']) + res['R_ADJPLUS']
+    # U (Gap Adj) = AdjPlus - AdjMinus
+    res['GAP_ADJ_U'] = res['R_ADJPLUS'] - res['ADJ_MINUS']
 
-    res['TOTAL PO IN'] = res['SKU_KEY'].apply(calculate_po)
-
-    # 6. Kalkulasi Akhir (Pakai Nama Kolom Baru)
-    res['REAL QTY'] = (res['CURRENT STOCK'] - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL_ADJ_MINUS']) + res['TOTAL_ADJ_PLUS']
-    res['GAP ADJUSMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
-
-    # 7. JUSTIFICATION LOGIC (SESUAI RUMUS EXCEL)
+    # 7. JUSTIFICATION LOGIC (SESUAI RUMUS JEMBUT LU)
     def get_just(row):
-        j = row['TOTAL TRF_IN']
-        k = row['TOTAL TRF_OUT']
-        u = row['GAP ADJUSMENT']
-        t = row['REAL QTY']
-        l = row['CURRENT STOCK']
-        n = row['TOTAL_STOCKIN']
-        r = row['TOTAL_ADJ_PLUS']
-        m = row['TOTAL SALES']
+        j = row['J_TRFIN']
+        k = row['K_TRFOUT']
+        u = row['GAP_AD_U']
+        t = row['REAL_QTY_T']
+        l = row['L_CURR']
+        n = row['N_STOCKIN']
+        r = row['R_ADJPLUS']
+        m = row['M_SALES']
         
-        # Urutan IF harus sesuai rumus Excel lo
+        # IF(AND(J2>K2,U2>0),"KESALAHAN ADJUSMENT"
         if (j > k and u > 0) or (j < k and u < 0):
             return "KESALAHAN ADJUSMENT"
         
+        # IF(OR(SUM(N2+R2)<M2,T2<0),"PERLU CEK CROSS ORDER"
         if (n + r) < m or t < 0:
             return "PERLU CEK CROSS ORDER"
         
+        # IF(T2=L2,"CEK ULANG HASIL REKON"
         if t == l and t != 0:
             return "CEK ULANG HASIL REKON"
         
+        # IF(OR(AND(T2=0,U2<=0,L2>0),AND(J2>K2,L2>T2)),"INDIKASI BUG SISTEM"
         if (t == 0 and u <= 0 and l > 0) or (j > k and l > t):
             return "INDIKASI BUG SISTEM"
             
@@ -2558,7 +2553,12 @@ def process_justification(df_case, df_tracking, df_po):
 
     res['JUSTIFICATION'] = res.apply(get_just, axis=1)
     
-    return res
+    # Rename balik buat tampilan biar rapi
+    return res.rename(columns={
+        'L_CURR': 'Current Stock', 'M_SALES': 'Total Sales', 'N_STOCKIN': 'Total_Stockin',
+        'ADJ_MINUS': 'Total_adj_minus', 'R_ADJPLUS': 'Total_adj_plus', 'DRAFT': 'Total draft_trf',
+        'J_TRFIN': 'Total trf_in', 'K_TRFOUT': 'Total trf_out', 'REAL_QTY_T': 'REAL QTY', 'GAP_AD_U': 'GAP ADJUSMENT'
+    })
 
 with st.sidebar:
        st.markdown("""
