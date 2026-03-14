@@ -3621,7 +3621,7 @@ elif menu == "FDR Update":
                     st.download_button(f"📥 {opt}", st.session_state.dict_kurir_fdr[opt].to_csv(index=False).encode('utf-8'), f"{opt}.csv", "text/csv")
                     st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
 elif menu == "Justification SO":
-    st.markdown('<div class="hero-header"><h1>📊 STOCK COMPARISON MODEL</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>Justification Adjusment</h1></div>', unsafe_allow_html=True)
 
     # 1. Inisialisasi Session State biar data nggak hilang pas diklik
     if 'result_so' not in st.session_state:
@@ -3688,7 +3688,7 @@ elif menu == "Justification SO":
         )
 
 elif menu == "Compare System":
-    st.title("📊 Compare Stock System")
+    st.markdown('<div class="hero-header"><h1>Stock Comparation</h1></div>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     with col1:
