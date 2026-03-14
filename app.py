@@ -2581,6 +2581,58 @@ def process_justification(df_case, df_tracking, df_po):
 
     return res[ordered_headers]
 
+import pandas as pd
+
+def process_stock_comparison(file1, file2):
+    """
+    Fungsi utama untuk memproses dan membandingkan dua file stok.
+    """
+    df1 = load_data(file1)
+    df2 = load_data(file2)
+
+    # Persiapkan data (Ambil kolom B, C, J -> Indeks 1, 2, 9)
+    data1 = prepare_columns(df1)
+    data2 = prepare_columns(df2)
+
+    # Gabungkan data berdasarkan BIN dan SKU
+    # Menggunakan outer join agar item yang hilang di salah satu sistem tetap muncul
+    comparison = pd.merge(
+        data1, 
+        data2, 
+        on=['BIN', 'SKU'], 
+        how='outer', 
+        suffixes=('_Sys1', '_Sys2')
+    ).fillna(0)
+
+    # Hitung Selisih
+    comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
+    
+    # Ambil hanya yang ada perbedaan
+    discrepancies = comparison[comparison['DIFF'] != 0].copy()
+    
+    return comparison, discrepancies
+
+def load_data(file):
+    if file.name.endswith('.csv'):
+        return pd.read_csv(file)
+    return pd.read_excel(file)
+
+def prepare_columns(df):
+    # Validasi jumlah kolom minimal sampai indeks 9 (Kolom J)
+    if df.shape[1] < 10:
+        raise ValueError("File tidak memiliki kolom yang cukup (Minimal sampai kolom J).")
+        
+    # Ambil kolom B(1), C(2), J(9)
+    new_df = df.iloc[:, [1, 2, 9]].copy()
+    new_df.columns = ['BIN', 'SKU', 'QTY']
+    
+    # Sanitasi data
+    new_df['BIN'] = new_df['BIN'].astype(str).str.strip()
+    new_df['SKU'] = new_df['SKU'].astype(str).str.strip()
+    new_df['QTY'] = pd.to_numeric(new_df['QTY'], errors='coerce').fillna(0)
+    
+    return new_df
+
 with st.sidebar:
        st.markdown("""
     <style>
@@ -2830,7 +2882,7 @@ with st.sidebar:
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
     
-    m2_list = ["Stock Opname", "Justification SO", "Putaway System", "Scan Out Validation", "Refill & Overstock","Refill & Withdraw","Stock Minus", "Compare RTO", "FDR Update"]
+    m2_list = ["Stock Opname", "Justification SO", "Putaway System", "Scan Out Validation", "Refill & Overstock","Refill & Withdraw","Stock Minus", "Compare RTO", "FDR Update", "Compare System"]
     
     def change_m2():
         st.session_state.main_menu = st.session_state.m2_key
@@ -3623,6 +3675,37 @@ elif menu == "Justification SO":
             use_container_width=True,
             key="btn_download_so" # Key unik agar tidak reset
         )
+
+elif menu == "Compare Stock":
+    st.title("📊 Compare Stock System")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
+    with col2:
+        file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
+
+    if file_sys1 and file_sys2:
+        if st.button("Proses Perbandingan"):
+            result = process_data(file_sys1, file_sys2)
+            
+            if isinstance(result, str):
+                st.error(result)
+            else:
+                diff_only = result[result['DIFF'] != 0]
+                
+                # Tampilkan Ringkasan
+                st.divider()
+                c1, c2 = st.columns(2)
+                c1.metric("Total Item", len(result))
+                c2.metric("Item Selisih", len(diff_only), delta_color="inverse")
+
+                if not diff_only.empty:
+                    st.warning("Daftar Perbedaan Stok:")
+                    st.dataframe(diff_only.style.highlight_max(axis=0, subset=['DIFF'], color='#ff4b4b22'), use_container_width=True)
+                else:
+                    st.success("Tidak ada perbedaan stok!")
+
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
