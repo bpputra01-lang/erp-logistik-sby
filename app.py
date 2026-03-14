@@ -2888,7 +2888,7 @@ with st.sidebar:
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
     
-    m2_list = ["Stock Opname", "Justification SO", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Stock Minus", "Compare RTO", "FDR Update", "Compare System"]
+    m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "FDR Update"]
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
     
     st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
