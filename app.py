@@ -3687,7 +3687,7 @@ elif menu == "Justification SO":
             key="btn_download_so" # Key unik agar tidak reset
         )
 
-elif menu == "Compare Stock":
+elif menu == "Compare System":
     st.title("📊 Compare Stock System")
     
     col1, col2 = st.columns(2)
