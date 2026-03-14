@@ -2860,61 +2860,48 @@ with st.sidebar:
         st.session_state.logged_in = False
         st.rerun()
     
-    # Inisialisasi session state agar menu tersinkron
-    if 'main_menu' not in st.session_state:
-        st.session_state.main_menu = "Dashboard Overview"
 
-    # --- KELOMPOK 1: DASHBOARD SUMMARY ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
-    
-    m1_list = ["Dashboard Overview", "Database Master"]
-    
-    # Cek apakah pilihan sekarang ada di kelompok 1
-    def change_m1():
-        st.session_state.main_menu = st.session_state.m1_key
+# 1. Inisialisasi session state
+if 'main_menu' not in st.session_state:
+    st.session_state.main_menu = "Dashboard Overview"
 
-    # Jika menu yang terpilih ada di Kelompok 2, maka radio ini kita "kosongkan" secara visual (atau pilih default)
-    idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
-    
-    menu_1 = st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
+# Fungsi Helper untuk navigasi antar kelompok
+def update_menu(key):
+    st.session_state.main_menu = st.session_state[key]
 
-    # --- KELOMPOK 2: OPERATIONAL ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
-    
-    m2_list = ["Stock Opname", "Justification SO", "Putaway System", "Scan Out Validation", "Refill & Overstock","Refill & Withdraw","Stock Minus", "Compare RTO", "FDR Update", "Compare System"]
-    # --- KELOMPOK 3: INVENTORY ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
-    
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System"]
-    def change_m2():
-        st.session_state.main_menu = st.session_state.m2_key
+# --- KELOMPOK 1: DASHBOARD SUMMARY ---
+st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
+st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
 
-    # Jika menu yang terpilih ada di Kelompok 2, arahkan indexnya. Jika tidak, biarkan di posisi default tapi jangan bentrok
-    idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
-    
-    menu_2 = st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
+m1_list = ["Dashboard Overview", "Database Master"]
+# Cari index jika menu ada di list ini, jika tidak ada set ke None/index aman
+idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
 
-    # Final Menu Variable untuk dipakai di konten utama
-    menu = st.session_state.main_menu
+st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=update_menu, args=("m1_key",), label_visibility="collapsed")
 
-    # --- KELOMPOK 2: OPERATIONAL ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
-    
-    m2_list = ["Stock Opname", "Justification SO", "Putaway System", "Scan Out Validation", "Refill & Overstock","Refill & Withdraw","Stock Minus", "Compare RTO", "FDR Update", "Compare System"]
-    
-    def change_m3():
-        st.session_state.main_menu = st.session_state.m3_key
 
-    # Jika menu yang terpilih ada di Kelompok 2, arahkan indexnya. Jika tidak, biarkan di posisi default tapi jangan bentrok
-    idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
-    
-    menu_3 = st.radio("M3", m2_list, index=idx2, key="m3_key", on_change=change_m3, label_visibility="collapsed")
+# --- KELOMPOK 2: OPERATIONAL ---
+st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
 
-    # Final Menu Variable untuk dipakai di konten utama
-    menu = st.session_state.main_menu
+m2_list = ["Stock Opname", "Justification SO", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Stock Minus", "Compare RTO", "FDR Update", "Compare System"]
+idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
 
-    st.divider()
+st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=update_menu, args=("m2_key",), label_visibility="collapsed")
+
+
+# --- KELOMPOK 3: INVENTORY ---
+st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
+
+m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System"]
+# Perbaikan: Pastikan menggunakan m3_list, bukan m2_list
+idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
+
+st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=update_menu, args=("m3_key",), label_visibility="collapsed")
+
+# Output Final
+menu = st.session_state.main_menu
+st.divider()
+st.write(f"Halaman Aktif: **{menu}**")
 
     
 
