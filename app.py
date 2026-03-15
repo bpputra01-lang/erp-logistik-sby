@@ -540,9 +540,13 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     all_recon_keys = set()
     for _, row in df_recon.iterrows():
         try:
-            k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
-            recon_dict[k] = row.iloc[6] # Kolom G
-            all_recon_keys.add(k)
+            # FIX 1: Hanya masukkan ke set jika QTY RECON (Kolom G) > 0
+            # Ini mencegah item dengan QTY 0 masuk ke Single Adjustment
+            qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+            if qty_recon > 0:
+                k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
+                recon_dict[k] = qty_recon
+                all_recon_keys.add(k)
         except: continue
 
     while df_stock.shape[1] < 12:
@@ -554,7 +558,7 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if key_stock in recon_dict:
             used_keys.add(key_stock)
             return recon_dict[key_stock]
-        return ""
+        return 0 # Balikkan 0 supaya bisa dihitung matematis
 
     # Isi QTY SO ke Kolom K (Index 10)
     df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
@@ -562,12 +566,12 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     # Hitung DIFF ke Kolom L (Index 11)
     def do_diff(row):
         try:
-            val_sys = row.iloc[9]
-            val_so = row.iloc[10]
-            if val_so != "" and val_so is not None:
-                return abs(float(val_sys) - float(val_so))
+            val_sys = pd.to_numeric(row.iloc[9], errors='coerce') or 0
+            val_so = pd.to_numeric(row.iloc[10], errors='coerce') or 0
+            # FIX 2: Hanya hitung absolut jika ada perbedaan
+            diff = abs(val_sys - val_so)
+            return diff if diff > 0 else 0
         except: return 0
-        return ""
 
     df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
     
@@ -576,6 +580,7 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     cols[11] = "DIFF"
     df_stock.columns = cols
 
+    # Filter: Hanya kunci yang QTY > 0 di Recon DAN tidak ditemukan di Stock
     missing_keys = all_recon_keys - used_keys
     df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
     
@@ -587,7 +592,8 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
     df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
     df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
     
-    mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
+    # FIX 3: Multiple Adj hanya jika DIFF > 0
+    mask_multiple = df_filtered.iloc[:, 11] > 0
     df_to_pivot = df_filtered[mask_multiple].copy()
     
     pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
@@ -601,10 +607,16 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         if 'SKU_KEY' in df_multiple_final.columns: 
             df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
 
+    # FIX 4: Pastikan Single Final juga hanya yang QTY-nya benar-benar > 0
     if not df_recon_missing.empty:
         df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
-        df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
-        df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
+        df_recon_missing = df_recon_missing[df_recon_missing.iloc[:, 6] > 0] # Filter tambahan
+        
+        if not df_recon_missing.empty:
+            df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
+            df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
+        else:
+            df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
     else:
         df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
         
