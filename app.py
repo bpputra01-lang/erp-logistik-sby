@@ -3701,24 +3701,21 @@ elif menu == "Compare System":
 
     if file_sys1 and file_sys2:
         if st.button("Proses Perbandingan"):
-            # PERBAIKAN: Nama fungsi diganti jadi process_stock_comparison 
-            # sesuai dengan fungsi logic yang lu buat tadi
             try:
-                # Fungsi ini return dua nilai: (all_comparison, discrepancies)
+                # Ambil data dari fungsi logic lu
                 result_all, diff_only = process_stock_comparison(file_sys1, file_sys2)
                 
-                # Tampilkan Ringkasan
                 st.divider()
-                c1, c2 = st.columns(2)
-                c1.metric("Total Item Dicek", len(result_all))
-                c2.metric("Item Selisih", len(diff_only), delta_color="inverse")
+
+                # PAKAI STYLE BOX ELEGAN TAPI CUMA 2 (Sesuai data lu)
+                m1, m2 = st.columns(2)
+                m1.markdown(f'<div class="m-box"><span class="m-lbl">📊 TOTAL ITEM DICEK</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
+                m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ ITEM SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
 
                 if not diff_only.empty:
                     st.warning("Daftar Perbedaan Stok (BIN | SKU | QTY):")
-                    # Menampilkan tabel selisih
                     st.dataframe(diff_only, use_container_width=True)
                     
-                    # Tambahan tombol download biar mantap
                     csv = diff_only.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="📥 Download Hasil Selisih",
@@ -3731,7 +3728,7 @@ elif menu == "Compare System":
             
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
-                
+
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
