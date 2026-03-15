@@ -2581,43 +2581,14 @@ def process_justification(df_case, df_tracking, df_po):
 
     return res[ordered_headers]
 
-import pandas as pd
-
-def process_stock_comparison(file1, file2):
-    """
-    Fungsi utama untuk memproses dan membandingkan dua file stok.
-    """
-    df1 = load_data(file1)
-    df2 = load_data(file2)
-
-    # Persiapkan data (Ambil kolom B, C, J -> Indeks 1, 2, 9)
-    data1 = prepare_columns(df1)
-    data2 = prepare_columns(df2)
-
-    # Gabungkan data berdasarkan BIN dan SKU
-    # Menggunakan outer join agar item yang hilang di salah satu sistem tetap muncul
-    comparison = pd.merge(
-        data1, 
-        data2, 
-        on=['BIN', 'SKU'], 
-        how='outer', 
-        suffixes=('_Sys1', '_Sys2')
-    ).fillna(0)
-
-    # Hitung Selisih
-    comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
-    
-    # Ambil hanya yang ada perbedaan
-    discrepancies = comparison[comparison['DIFF'] != 0].copy()
-    
-    return comparison, discrepancies
-
 def load_data(file):
+    """Membaca file Excel atau CSV."""
     if file.name.endswith('.csv'):
         return pd.read_csv(file)
     return pd.read_excel(file)
 
 def prepare_columns(df):
+    """Mengambil kolom B, C, J dan membersihkan data."""
     # Validasi jumlah kolom minimal sampai indeks 9 (Kolom J)
     if df.shape[1] < 10:
         raise ValueError("File tidak memiliki kolom yang cukup (Minimal sampai kolom J).")
@@ -2626,12 +2597,44 @@ def prepare_columns(df):
     new_df = df.iloc[:, [1, 2, 9]].copy()
     new_df.columns = ['BIN', 'SKU', 'QTY']
     
-    # Sanitasi data
+    # Sanitasi data: Hilangkan spasi dan pastikan tipe data benar
     new_df['BIN'] = new_df['BIN'].astype(str).str.strip()
     new_df['SKU'] = new_df['SKU'].astype(str).str.strip()
     new_df['QTY'] = pd.to_numeric(new_df['QTY'], errors='coerce').fillna(0)
     
+    # PENTING: Grouping supaya jika ada SKU+BIN yang sama di baris berbeda, QTY-nya dijumlahkan dulu
+    new_df = new_df.groupby(['BIN', 'SKU'], as_index=False)['QTY'].sum()
+    
     return new_df
+
+def process_stock_comparison(file1, file2):
+    """Fungsi utama untuk memproses perbandingan."""
+    try:
+        df1 = load_data(file1)
+        df2 = load_data(file2)
+
+        data1 = prepare_columns(df1)
+        data2 = prepare_columns(df2)
+
+        # Gabungkan data berdasarkan BIN dan SKU
+        comparison = pd.merge(
+            data1, 
+            data2, 
+            on=['BIN', 'SKU'], 
+            how='outer', 
+            suffixes=('_Sys1', '_Sys2')
+        ).fillna(0)
+
+        # Hitung Selisih
+        comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
+        
+        # Ambil hanya yang ada perbedaan
+        discrepancies = comparison[comparison['DIFF'] != 0].copy()
+        
+        return comparison, discrepancies
+    except Exception as e:
+        # Lempar error agar bisa ditangkap oleh UI (st.error)
+        raise e
 
 with st.sidebar:
        st.markdown("""
