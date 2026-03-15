@@ -3700,7 +3700,7 @@ elif menu == "Compare System":
         file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
 
     if file_sys1 and file_sys2:
-        if st.button("▶️Proses Perbandingan"):
+        if st.button("▶️RUN COMPARE"):
             try:
                 # Ambil data dari fungsi logic lu
                 result_all, diff_only = process_stock_comparison(file_sys1, file_sys2)
