@@ -540,12 +540,9 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     all_recon_keys = set()
     for _, row in df_recon.iterrows():
         try:
-            # Hanya masukkan kunci jika Qty Recon (Kolom G) > 0 untuk menghindari bocor
-            qty_val = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-            if qty_val > 0:
-                k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
-                recon_dict[k] = qty_val
-                all_recon_keys.add(k)
+            k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
+            recon_dict[k] = row.iloc[6] # Kolom G
+            all_recon_keys.add(k)
         except: continue
 
     while df_stock.shape[1] < 12:
@@ -557,7 +554,7 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if key_stock in recon_dict:
             used_keys.add(key_stock)
             return recon_dict[key_stock]
-        return 0 # Default ke 0 jika tidak ketemu agar DIFF bisa dihitung numerik
+        return ""
 
     # Isi QTY SO ke Kolom K (Index 10)
     df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
@@ -565,11 +562,12 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     # Hitung DIFF ke Kolom L (Index 11)
     def do_diff(row):
         try:
-            val_sys = pd.to_numeric(row.iloc[9], errors='coerce') or 0
-            val_so = pd.to_numeric(row.iloc[10], errors='coerce') or 0
-            diff = abs(val_sys - val_so)
-            return diff if diff > 0 else 0
+            val_sys = row.iloc[9]
+            val_so = row.iloc[10]
+            if val_so != "" and val_so is not None:
+                return abs(float(val_sys) - float(val_so))
         except: return 0
+        return ""
 
     df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
     
@@ -578,7 +576,6 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     cols[11] = "DIFF"
     df_stock.columns = cols
 
-    # Filter Missing Keys: Item di Recon yang TIDAK ADA di Stock Report
     missing_keys = all_recon_keys - used_keys
     df_need_single = df_recon[df_recon.apply(lambda r: f"{clean_val(r.iloc[0])}|{clean_val(r.iloc[1])}" in missing_keys, axis=1)].copy()
     
@@ -590,9 +587,7 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
     df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
     df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
     
-    # LOGIC PERBAIKAN: Multiple Adjustment hanya jika DIFF > 0
-    # Menggunakan DIFF (index 11) sebagai acuan utama
-    mask_multiple = df_filtered.iloc[:, 11] > 0
+    mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
     df_to_pivot = df_filtered[mask_multiple].copy()
     
     pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
@@ -606,17 +601,10 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         if 'SKU_KEY' in df_multiple_final.columns: 
             df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
 
-    # LOGIC PERBAIKAN: Single Adjustment hanya jika QTY > 0
     if not df_recon_missing.empty:
         df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
-        # Filter ulang untuk memastikan tidak ada Qty 0 yang lolos
-        df_recon_missing = df_recon_missing[df_recon_missing.iloc[:, 6] > 0].copy()
-        
-        if not df_recon_missing.empty:
-            df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
-            df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
-        else:
-            df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+        df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
+        df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
     else:
         df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
         
@@ -1024,7 +1012,7 @@ def menu_Stock_Opname():
         list_sub_kat = ["GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", "NUTRITION", "BAG", "EXTRAS SHOES"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
     with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP","MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
         selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
