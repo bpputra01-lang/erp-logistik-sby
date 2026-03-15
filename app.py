@@ -3701,25 +3701,37 @@ elif menu == "Compare System":
 
     if file_sys1 and file_sys2:
         if st.button("Proses Perbandingan"):
-            result = process_data(file_sys1, file_sys2)
-            
-            if isinstance(result, str):
-                st.error(result)
-            else:
-                diff_only = result[result['DIFF'] != 0]
+            # PERBAIKAN: Nama fungsi diganti jadi process_stock_comparison 
+            # sesuai dengan fungsi logic yang lu buat tadi
+            try:
+                # Fungsi ini return dua nilai: (all_comparison, discrepancies)
+                result_all, diff_only = process_stock_comparison(file_sys1, file_sys2)
                 
                 # Tampilkan Ringkasan
                 st.divider()
                 c1, c2 = st.columns(2)
-                c1.metric("Total Item", len(result))
+                c1.metric("Total Item Dicek", len(result_all))
                 c2.metric("Item Selisih", len(diff_only), delta_color="inverse")
 
                 if not diff_only.empty:
-                    st.warning("Daftar Perbedaan Stok:")
-                    st.dataframe(diff_only.style.highlight_max(axis=0, subset=['DIFF'], color='#ff4b4b22'), use_container_width=True)
+                    st.warning("Daftar Perbedaan Stok (BIN | SKU | QTY):")
+                    # Menampilkan tabel selisih
+                    st.dataframe(diff_only, use_container_width=True)
+                    
+                    # Tambahan tombol download biar mantap
+                    csv = diff_only.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download Hasil Selisih",
+                        data=csv,
+                        file_name='selisih_stok.csv',
+                        mime='text/csv',
+                    )
                 else:
-                    st.success("Tidak ada perbedaan stok!")
-
+                    st.success("✅ Tidak ada perbedaan stok! Semua BIN, SKU, dan QTY match.")
+            
+            except Exception as e:
+                st.error(f"Terjadi Kesalahan: {e}")
+                
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
