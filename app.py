@@ -3700,7 +3700,7 @@ elif menu == "Compare System":
         file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
 
     if file_sys1 and file_sys2:
-        if st.button("Proses Perbandingan"):
+        if st.button("▶️Proses Perbandingan"):
             try:
                 # Ambil data dari fungsi logic lu
                 result_all, diff_only = process_stock_comparison(file_sys1, file_sys2)
@@ -3709,7 +3709,7 @@ elif menu == "Compare System":
 
                 # PAKAI STYLE BOX ELEGAN TAPI CUMA 2 (Sesuai data lu)
                 m1, m2 = st.columns(2)
-                m1.markdown(f'<div class="m-box"><span class="m-lbl">📊 TOTAL ITEM DICEK</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
+                m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
                 m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ ITEM SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
 
                 if not diff_only.empty:
