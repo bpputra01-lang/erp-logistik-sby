@@ -3523,7 +3523,7 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-    if st.session_state.rto_df_selisih is not None:
+if st.session_state.rto_df_selisih is not None:
         st.divider()
         st.subheader("📊 Hasil Analisis RTO")
         
