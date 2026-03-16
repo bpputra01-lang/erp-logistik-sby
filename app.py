@@ -3469,7 +3469,11 @@ if menu == "Compare RTO":
         (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce') - 
         pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce')
         ).sum())
-        q_kurang = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').sum())
+        q_kurang = int(
+        (
+        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL']['QTY AMBIL'], errors='coerce') - 
+        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce')
+        ).sum())
         
         mc1, mc2, mc3, mc4 = st.columns(4)
         with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
