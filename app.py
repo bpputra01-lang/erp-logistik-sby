@@ -1364,22 +1364,29 @@ def menu_Stock_Opname():
     up_plus = st.file_uploader("📥 Upload STOCK ADJ +", type=['xlsx','csv'], key="up_plus_final_v3")
 
     if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
-        df_p = st.session_state.get('df_mult_final')
-    
-        if df_p is not None:
-        # LOGIC HYBRID: Baca upload jika ada, kalau gak ada baru pake data current aplikasi
-            df_p_in = pd.read_excel(up_plus) if up_plus else df_p
-        
-            df_m_in = None
-            if up_minus:
-                df_m_in = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
-        
-        # Panggil fungsi logic dengan data yang sudah difilter
+        # 1. LOGIC HYBRID CERDAS
+        if up_plus:
+            # Prioritas: Pakai file yang baru di-upload
+            df_p_in = pd.read_excel(up_plus) if up_plus.name.endswith('.xlsx') else pd.read_csv(up_plus)
+        else:
+            # Fallback: Pakai data dari session state (hasil running sebelumnya)
+            df_p_in = st.session_state.get('df_mult_final')
+
+        # 2. Ambil data Minus jika ada upload
+        df_m_in = None
+        if up_minus:
+            df_m_in = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
+
+        # 3. Jalankan Logic jika data tersedia
+        if df_p_in is not None:
+            # Jalankan fungsi logic asli
             df_res, df_summary = logic_sum_adjustment_final(df_p_in, df_m_in)
-        
+            
             st.session_state.report_adj = {"data": df_res, "sum": df_summary}
             st.success("✅ Summary Adjustment Berhasil Dibuat!")
             st.rerun()
+        else:
+            st.error("⚠️ Data tidak ditemukan! Upload file 'STOCK ADJ +' atau jalankan proses master data sebelumnya.")
 
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
