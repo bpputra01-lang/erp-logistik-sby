@@ -1834,39 +1834,45 @@ import streamlit as st
 # ⚙️ 1. DEFINISI SEMUA ENGINE (LOGIKA TETAP SAMA)
 # =========================================================
 
-import pandas as pd
-
 def engine_ds_rto_vba_total(df_ds, df_app):
     if df_ds is None or df_app is None:
         return pd.DataFrame(), pd.DataFrame()
 
-    # 1. Helper Function untuk membersihkan SKU (Hilangkan .0 dan spasi)
+    # 1. Helper Function untuk membersihkan SKU secara total
     def clean_sku(val):
         if pd.isna(val): return ""
-        s = str(val).strip().upper()
-        if s.endswith('.0'): s = s[:-2]  # Hilangkan desimal .0 jika ada
+        # Hilangkan .0 jika SKU terbaca sebagai float
+        if isinstance(val, float) and val.is_integer():
+            s = str(int(val)).strip().upper()
+        else:
+            s = str(val).strip().upper()
+        
+        if s.endswith('.0'): s = s[:-2]
         if s in ["NAN", "0", "NONE", ""]: return ""
         return s
 
     df_a = df_app.copy()
-    # Mengubah nama kolom menjadi string '1', '2', dst.
+    # Mengubah nama kolom menjadi string untuk memudahkan akses
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
     # Filter Status: DONE atau KURANG AMBIL
     mask_status = df_a['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
     df_filtered = df_a[mask_status].copy()
 
-    # 2. Hitung Total QTY dari AppSheet (Kolom 13 + 17)
+    # 2. Logic Perbaikan: Cek SKU 9+13 DAN 15+17 secara independen
     dict_qty_total = {}
     for _, row in df_filtered.iterrows():
-        sku = clean_sku(row.get('9', ''))
-        if not sku: 
-            sku = clean_sku(row.get('15', ''))
-        
-        if sku:
-            q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
-            q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
-            dict_qty_total[sku] = dict_qty_total.get(sku, 0) + (q13 + q17)
+        # Pasangan 1 (Kolom 9 & 13)
+        sku1 = clean_sku(row.get('9', ''))
+        qty1 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
+        if sku1:
+            dict_qty_total[sku1] = dict_qty_total.get(sku1, 0) + qty1
+            
+        # Pasangan 2 (Kolom 15 & 17)
+        sku2 = clean_sku(row.get('15', ''))
+        qty2 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
+        if sku2:
+            dict_qty_total[sku2] = dict_qty_total.get(sku2, 0) + qty2
 
     # 3. Proses DataFrame DS
     res_ds = df_ds.copy()
@@ -1874,8 +1880,8 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     sku_col = cols[0]
     scan_col = cols[1]
     
-    # Bersihkan SKU di DS agar matching dengan dict
     res_ds['SKU_UPPER'] = res_ds[sku_col].apply(clean_sku)
+    # Map ke dict_qty_total yang sudah mencakup kolom 9 dan 15
     res_ds['QTY AMBIL'] = res_ds['SKU_UPPER'].map(dict_qty_total).fillna(0).astype(int)
     
     def check_note(row):
@@ -1887,10 +1893,11 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     res_ds['NOTE'] = res_ds.apply(check_note, axis=1)
 
-    # 4. Perhitungan q_del, q_lebih, q_kurang (Perbaikan Logika Selisih)
-    # Gunakan df_a (AppSheet) untuk mencari DELETE ITEM karena biasanya tidak masuk DS
-    q_del = int(pd.to_numeric(df_a[df_a['2'].astype(str).str.upper().str.strip() == 'DELETE ITEM']['13'], errors='coerce').sum()) + \
-            int(pd.to_numeric(df_a[df_a['2'].astype(str).str.upper().str.strip() == 'DELETE ITEM']['17'], errors='coerce').sum())
+    # 4. Perhitungan q_del (Status DELETE ITEM)
+    # Menjumlahkan QTY dari kolom 13 dan 17 untuk status DELETE
+    mask_del = df_a['2'].astype(str).str.upper().str.strip() == 'DELETE ITEM'
+    q_del = int(pd.to_numeric(df_a[mask_del]['13'], errors='coerce').sum() + 
+                pd.to_numeric(df_a[mask_del]['17'], errors='coerce').sum())
 
     # 5. Bangun Hasil Selisih untuk Report
     results_selisih = []
@@ -1898,22 +1905,21 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     for _, row in mismatch_ds.iterrows():
         sku = row['SKU_UPPER']
-        # Cari baris yang relevan di AppSheet
+        # Cari baris yang relevan di AppSheet baik di kolom 9 atau 15
         mask_app = (df_a['9'].apply(clean_sku) == sku) | (df_a['15'].apply(clean_sku) == sku)
         found_rows = df_a[mask_app]
         
         if not found_rows.empty:
             for _, r_app in found_rows.iterrows():
-                # Jika ada data di BIN 1 (Kolom 12 & 13)
-                if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
-                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('12'), r_app.get('13', 0), 0])
-                # Jika ada data di BIN 2 (Kolom 16 & 17)
-                if str(r_app.get('16', '')).strip() not in ["", "nan", "0"]:
-                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('16'), r_app.get('17', 0), 0])
+                # Cek apakah SKU tersebut ada di pasangannya masing-masing
+                if clean_sku(r_app.get('9')) == sku:
+                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('12', '-'), r_app.get('13', 0), 0])
+                if clean_sku(r_app.get('15')) == sku:
+                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('16', '-'), r_app.get('17', 0), 0])
         else:
             results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], "-", 0, 0])
 
-    # 6. SKU yang ada di AppSheet tapi GAIB di DS
+    # 6. SKU di AppSheet tapi tidak ada di DS
     skus_in_ds = set(res_ds['SKU_UPPER'].unique())
     for sku_app, total_qty in dict_qty_total.items():
         if sku_app and sku_app not in skus_in_ds:
@@ -1921,14 +1927,14 @@ def engine_ds_rto_vba_total(df_ds, df_app):
             found_rows = df_a[mask_app]
             for _, r_app in found_rows.iterrows():
                 note_khusus = "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
-                if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
-                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('12'), r_app.get('13', 0), 0])
-                if str(r_app.get('16', '')).strip() not in ["", "nan", "0"]:
-                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('16'), r_app.get('17', 0), 0])
+                if clean_sku(r_app.get('9')) == sku_app:
+                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('12', '-'), r_app.get('13', 0), 0])
+                if clean_sku(r_app.get('15')) == sku_app:
+                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('16', '-'), r_app.get('17', 0), 0])
 
     res_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
     
-    # Bersihkan kolom SKU di hasil akhir agar tidak ada .0
+    # Final clean-up
     res_selisih['SKU'] = res_selisih['SKU'].apply(clean_sku)
     res_ds.drop(columns=['SKU_UPPER'], inplace=True)
     
