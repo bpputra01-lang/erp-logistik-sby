@@ -1988,11 +1988,11 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             qty_j = app_summary[key_d]
             matched_keys.add(key_d)
             if qty_j < qty_h: 
-                note, status = "QTY AMBIL KURANG DARI DRAFT", "PERLU EDIT QTY DRAFT"
+                note, status = "KURANG AMBIL", "PERLU EDIT QTY DRAFT"
             elif qty_j == qty_h: 
                 note, status = "DRAFT SESUAI", "OK"
             else: 
-                note, status = "KELEBIHAN AMBIL DARI DRAFT", "PERLU CEK"
+                note, status = "KELEBIHAN AMBIL", "PERLU CEK"
             
         df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [qty_j, note, "", "", status]
 
