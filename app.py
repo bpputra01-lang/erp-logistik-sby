@@ -3523,15 +3523,15 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-   if st.session_state.rto_df_selisih is not None:
+    if st.session_state.rto_df_selisih is not None:
         st.divider()
         st.subheader("📊 Hasil Analisis RTO")
         
-        # 1. Definisi Data (Ambil data lengkap dari session state)
+        # Ambil data lengkap
         df_full = st.session_state.rto_df_ds
         scan_col = df_full.columns[1]
         
-        # 2. Perhitungan Metrik (Tetap bulat tanpa .0)
+        # --- PERHITUNGAN METRIK ---
         q_total = int(pd.to_numeric(df_full.iloc[:, 1], errors='coerce').fillna(0).sum())
         q_sesuai = int(pd.to_numeric(df_full[df_full['NOTE'] == 'SESUAI'].iloc[:, 1], errors='coerce').fillna(0).sum())
         
@@ -3547,30 +3547,30 @@ if menu == "Compare RTO":
             ).sum()
         )
 
-        # 3. Pembuatan TAB (Didefinisikan SEBELUM dipanggil di 'with')
+        # Buat Tab
         tab1, tab2 = st.tabs(["📝 Summary Compare", "⚠️ Item Selisih"])
 
         with tab1:
-            # Tampilkan Matrix Box
+            # Matrix Box
             mc1, mc2, mc3, mc4 = st.columns(4)
             with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
             with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
             with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
             with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
             
-            st.write("### 📋 All Data Comparison (Semua Item)")
-            # Menampilkan SEMUA data dari df_full
+            st.write("### 📋 All Data Comparison")
+            # Menampilkan SEMUA data tanpa filter
             st.dataframe(df_full, use_container_width=True, hide_index=True)
-            st.download_button("📥 Download All Data", df_full.to_csv(index=False).encode('utf-8'), "ALL_DATA_RTO.csv", "text/csv", use_container_width=True)
+            st.download_button("📥 Download All Data", df_full.to_csv(index=False).encode('utf-8'), "ALL_DATA_RTO.csv", "text/csv", key="dl_all", use_container_width=True)
 
         with tab2:
-            st.write("### 🚨 Daftar Item Selisih (Hanya Kurang/Lebih)")
-            # Filter hanya yang bermasalah saja
+            st.write("### 🚨 Daftar Item Selisih")
+            # Hanya tampilkan yang bermasalah
             df_selisih_saja = df_full[df_full['NOTE'].isin(['KURANG AMBIL', 'KELEBIHAN AMBIL'])]
             
             if not df_selisih_saja.empty:
                 st.dataframe(df_selisih_saja, use_container_width=True, hide_index=True)
-                st.download_button("📥 Download Item Selisih Saja", df_selisih_saja.to_csv(index=False).encode('utf-8'), "HANYA_SELISIH_RTO.csv", "text/csv", use_container_width=True)
+                st.download_button("📥 Download Item Selisih", df_selisih_saja.to_csv(index=False).encode('utf-8'), "HANYA_SELISIH_RTO.csv", "text/csv", key="dl_selisih", use_container_width=True)
             else:
                 st.success("✨ Aman! Tidak ada item yang selisih.")
     st.divider()
