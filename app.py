@@ -3523,30 +3523,42 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-    if st.session_state.rto_df_selisih is not None:
-        st.divider()
-        st.subheader("📊 Hasil Compare DS & Appsheet")
-        df_ds = st.session_state.rto_df_ds
-        scan_col = df_ds.columns[1]
-        
-        q_total = int(pd.to_numeric(df_ds[scan_col], errors='coerce').sum())
-        q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
-        # Versi dengan pengurangan (Scan - Qty Ambil)
-        q_lebih = int(
-        (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce') - 
-        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce')
-        ).sum())
-        q_kurang = int(
-        (
-        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL']['QTY AMBIL'], errors='coerce') - 
-        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce')
-        ).sum())
-        
-        mc1, mc2, mc3, mc4 = st.columns(4)
-        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
-        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
-        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
-        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
+if st.session_state.rto_draft_compared is not None:
+    st.divider()
+    st.subheader("📊 Hasil Compare Draft & Appsheet")
+    
+    # Gunakan hasil dataframe yang sudah dikomparasi
+    df_res = st.session_state.rto_draft_compared
+    
+    # 1. Total Qty Scan: Semua QTY yang diinput user di Appsheet (Kolom QTY AMBIL hasil rekap)
+    q_total = int(df_res['QTY AMBIL'].sum())
+    
+    # 2. Qty Sesuai: Total QTY AMBIL yang statusnya 'OK'
+    q_sesuai = int(df_res[df_res['STATUS'] == 'OK']['QTY AMBIL'].sum())
+    
+    # 3. Qty Kelebihan: Selisih ketika Qty Ambil > Qty Draft
+    # Menggunakan kolom index 7 sebagai QTY Draft (sesuai fungsi engine)
+    col_qty_draft = df_res.columns[7]
+    mask_lebih = df_res['NOTE'] == 'BEDA QTY' # Atau logika kelebihan sesuai engine
+    
+    # Kita hitung selisihnya: (Qty Ambil - Qty Draft) jika Ambil lebih besar
+    q_lebih = int(df_res[df_res['QTY AMBIL'] > df_res[col_qty_draft]]['QTY AMBIL'].sum() - 
+                  df_res[df_res['QTY AMBIL'] > df_res[col_qty_draft]][col_qty_draft].sum())
+
+    # 4. Qty Kurang: Selisih ketika Qty Ambil < Qty Draft
+    q_kurang = int(df_res[df_res['QTY AMBIL'] < df_res[col_qty_draft]][col_qty_draft].sum() - 
+                   df_res[df_res['QTY AMBIL'] < df_res[col_qty_draft]]['QTY AMBIL'].sum())
+    
+    # Tampilkan Box Ringkasan
+    mc1, mc2, mc3, mc4 = st.columns(4)
+    with mc1: 
+        st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
+    with mc2: 
+        st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
+    with mc3: 
+        st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{max(0, q_lebih)}</span></div>', unsafe_allow_html=True)
+    with mc4: 
+        st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{max(0, q_kurang)}</span></div>', unsafe_allow_html=True)
         
         st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
         st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
