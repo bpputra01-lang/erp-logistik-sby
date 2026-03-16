@@ -3464,7 +3464,11 @@ if menu == "Compare RTO":
         
         q_total = int(pd.to_numeric(df_ds[scan_col], errors='coerce').sum())
         q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
-        q_lebih = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').sum())
+        # Versi dengan pengurangan (Scan - Qty Ambil)
+        q_lebih = int(
+        (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce') - 
+        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce')
+        ).sum())
         q_kurang = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').sum())
         
         mc1, mc2, mc3, mc4 = st.columns(4)
