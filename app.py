@@ -3529,13 +3529,11 @@ if menu == "Compare RTO":
         df_ds = st.session_state.rto_df_ds
         scan_col = df_ds.columns[1]
         
-        # Ganti scan_col menjadi 'QTY AMBIL' karena ini adalah hasil gabungan (I+M) dan (O+Q)
+        # Ambil total QTY AMBIL dari semua baris tanpa terkecuali (Match maupun ADD NEW)
         q_total = int(pd.to_numeric(df_ds['QTY AMBIL'], errors='coerce').fillna(0).sum())
         
-        # Qty sesuai juga harus mengambil dari kolom gabungan 'QTY AMBIL' 
-        # dan mengecek Note yang sesuai (misal: 'DRAFT SESUAI' atau 'SESUAI')
-        mask_sesuai = df_ds['NOTE'].str.contains('SESUAI', na=False)
-        q_sesuai = int(pd.to_numeric(df_ds[mask_sesuai]['QTY AMBIL'], errors='coerce').fillna(0).sum())
+        # Qty Sesuai tetap menggunakan filter Note 'SESUAI' (pakai contains agar lebih aman)
+        q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'].str.contains('SESUAI', na=False)]['QTY AMBIL'], errors='coerce').fillna(0).sum())
         # Versi dengan pengurangan (Scan - Qty Ambil)
         q_lebih = int(
         (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce') - 
