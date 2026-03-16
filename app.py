@@ -3528,29 +3528,25 @@ if menu == "Compare RTO":
         st.subheader("📊 Hasil Compare DS & Appsheet")
         df_ds = st.session_state.rto_df_ds
         scan_col = df_ds.columns[1]
-    
-        # --- Perhitungan Qty Scan (Menghilangkan .0) ---
+        
+        # Ganti scan_col menjadi 'QTY AMBIL' karena ini adalah hasil gabungan (I+M) dan (O+Q)
         q_total = int(pd.to_numeric(df_ds['QTY AMBIL'], errors='coerce').fillna(0).sum())
-    
-        # Mengambil Qty Sesuai berdasarkan Note yang mengandung kata 'SESUAI'
-        q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'].str.contains('SESUAI', na=False)]['QTY AMBIL'], errors='coerce').fillna(0).sum())
-    
-        # Hitung Kelebihan: (Scan - Draft) jika Scan > Draft
-        col_draft = df_ds.columns[7]
+        
+        # Qty sesuai juga harus mengambil dari kolom gabungan 'QTY AMBIL' 
+        # dan mengecek Note yang sesuai (misal: 'DRAFT SESUAI' atau 'SESUAI')
+        mask_sesuai = df_ds['NOTE'].str.contains('SESUAI', na=False)
+        q_sesuai = int(pd.to_numeric(df_ds[mask_sesuai]['QTY AMBIL'], errors='coerce').fillna(0).sum())
+        # Versi dengan pengurangan (Scan - Qty Ambil)
         q_lebih = int(
-            (pd.to_numeric(df_ds[df_ds['QTY AMBIL'] > df_ds[col_draft]]['QTY AMBIL'], errors='coerce') - 
-            pd.to_numeric(df_ds[df_ds['QTY AMBIL'] > df_ds[col_draft]][col_draft], errors='coerce')
-            ).sum()
-        )
-    
-    # Hitung Kurang: (Draft - Scan) jika Scan < Draft
+        (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce') - 
+        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce')
+        ).sum())
         q_kurang = int(
-            (pd.to_numeric(df_ds[df_ds['QTY AMBIL'] < df_ds[col_draft]][col_draft], errors='coerce') - 
-            pd.to_numeric(df_ds[df_ds['QTY AMBIL'] < df_ds[col_draft]]['QTY AMBIL'], errors='coerce')
-            ).sum()
-        )
-    
-        # Tampilan Box Dashboard
+        (
+        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL']['QTY AMBIL'], errors='coerce') - 
+        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce')
+        ).sum())
+        
         mc1, mc2, mc3, mc4 = st.columns(4)
         with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
         with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
