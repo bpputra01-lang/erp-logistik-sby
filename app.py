@@ -3525,35 +3525,54 @@ if menu == "Compare RTO":
     
     if st.session_state.rto_df_selisih is not None:
         st.divider()
-        st.subheader("📊 Hasil Compare DS & Appsheet")
+        st.subheader("📊 Hasil Analisis RTO")
+        
+        # Membuat 2 Tab
+        tab1, tab2 = st.tabs(["📝 Summary Compare", "⚠️ Item Selisih"])
+        
         df_ds = st.session_state.rto_df_ds
         scan_col = df_ds.columns[1]
         
-        # Menjumlahkan total kolom B (index 1) dari file asli Data Scan
+        # --- PERHITUNGAN METRIK (Tetap sama agar akurat) ---
         q_total = int(pd.to_numeric(df_ds.iloc[:, 1], errors='coerce').fillna(0).sum())
-        
-        # Qty Sesuai tetap menggunakan filter Note 'SESUAI'
         q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'SESUAI'].iloc[:, 1], errors='coerce').fillna(0).sum())
-        # Versi dengan pengurangan (Scan - Qty Ambil)
+        
         q_lebih = int(
-        (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce') - 
-        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce')
-        ).sum())
+            (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').fillna(0) - 
+             pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce').fillna(0)
+            ).sum()
+        )
+        
         q_kurang = int(
-        (
-        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL']['QTY AMBIL'], errors='coerce') - 
-        pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce')
-        ).sum())
-        
-        mc1, mc2, mc3, mc4 = st.columns(4)
-        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
-        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
-        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
-        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
-        
-        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
-        st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
+            (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL']['QTY AMBIL'], errors='coerce').fillna(0) - 
+             pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').fillna(0)
+            ).sum()
+        )
 
+        with tab1:
+            # Tampilkan Matrix Box
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
+            with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
+            with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
+            with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
+            
+            st.write("### All Data Comparison")
+            st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
+            st.download_button("📥 Download All Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "ALL_SELISIH_RTO.csv", "text/csv", use_container_width=True)
+
+        with tab2:
+            st.write("### 🚨 Daftar Item Selisih")
+            # Filter hanya item yang KURANG atau LEBIH saja
+            df_hanya_selisih = st.session_state.rto_df_selisih[
+                st.session_state.rto_df_selisih['NOTE'].isin(['KURANG AMBIL', 'KELEBIHAN AMBIL'])
+            ]
+            
+            if not df_hanya_selisih.empty:
+                st.dataframe(df_hanya_selisih, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Item Selisih Saja", df_hanya_selisih.to_csv(index=False).encode('utf-8'), "HANYA_SELISIH_RTO.csv", "text/csv", use_container_width=True)
+            else:
+                st.success("✨ Luar biasa! Tidak ada item selisih (Semua Sesuai).")
     st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
     f_cek = st.file_uploader("Upload Hasil Cek Real", type=['xlsx','csv'], key="rto_cek")
