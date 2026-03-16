@@ -2042,7 +2042,7 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             note = "PINDAH BIN"
             # Ambil detail BIN dan QTY dari AppSheet untuk diinfokan di kolom 'LAIN'
             details = sku_to_bins[sku_d]
-            bin_lain = ", ".join([d[0] for d in details])
+            bin_lain = ", ".join([str(d[0]) for d in details])
             qty_lain = sum([d[1] for d in details])
             qty_j = 0 # Di BIN draft aslinya tidak ada pengambilan
             
@@ -2059,7 +2059,6 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             [qty_j, note, bin_lain, qty_lain, status]
 
     # --- 3. TAMBAHKAN ITEM BARU (ADD NEW) ---
-    # ADD NEW hanya jika SKU benar-benar tidak ada di Draft manapun
     new_rows = []
     for (sku_a, bin_a), qty_a in app_summary.items():
         if (sku_a, bin_a) not in matched_app_keys and sku_a not in sku_in_draft:
@@ -2075,6 +2074,13 @@ def engine_compare_draft_jezpro(df_app, df_draft):
 
     if new_rows:
         df_res = pd.concat([df_res, pd.DataFrame(new_rows)], ignore_index=True)
+
+    # --- BAGIAN TAMBAHAN: MENGHILANGKAN ANGKA .0 ---
+    cols_qty = ['QTY AMBIL', 'QTY BIN LAIN', df_res.columns[7]]
+    for col in cols_qty:
+        if col in df_res.columns:
+            # Mengubah NaN atau string kosong ke 0, lalu paksa jadi integer
+            df_res[col] = pd.to_numeric(df_res[col], errors='coerce').fillna(0).astype(int)
 
     return df_res
 
