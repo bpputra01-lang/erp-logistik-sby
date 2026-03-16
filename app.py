@@ -3523,56 +3523,34 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-    if st.session_state.rto_df_selisih is not None:
-        st.divider()
-        st.subheader("📊 Hasil Analisis RTO")
-        
-        # Membuat 2 Tab
-        tab1, tab2 = st.tabs(["📝 Summary Compare", "⚠️ Item Selisih"])
-        
-        df_ds = st.session_state.rto_df_ds
-        scan_col = df_ds.columns[1]
-        
-        # --- PERHITUNGAN METRIK (Tetap sama agar akurat) ---
-        q_total = int(pd.to_numeric(df_ds.iloc[:, 1], errors='coerce').fillna(0).sum())
-        q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'SESUAI'].iloc[:, 1], errors='coerce').fillna(0).sum())
-        
-        q_lebih = int(
-            (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').fillna(0) - 
-             pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce').fillna(0)
-            ).sum()
-        )
-        
-        q_kurang = int(
-            (pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL']['QTY AMBIL'], errors='coerce').fillna(0) - 
-             pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').fillna(0)
-            ).sum()
-        )
-
-        with tab1:
-            # Tampilkan Matrix Box
+    with tab1:
+            # Tampilkan Matrix Box di Tab 1
             mc1, mc2, mc3, mc4 = st.columns(4)
             with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
             with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
             with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
             with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
             
-            st.write("### All Data Comparison")
-            st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
-            st.download_button("📥 Download All Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "ALL_SELISIH_RTO.csv", "text/csv", use_container_width=True)
+            st.write("### 📋 All Data Comparison (Semua Item)")
+            
+            # --- PASTIKAN PAKAI df_ds ATAU rto_df_ds UNTUK DATA LENGKAP ---
+            st.dataframe(st.session_state.rto_df_ds, use_container_width=True, hide_index=True)
+            
+            csv_all = st.session_state.rto_df_ds.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Download All Data", csv_all, "ALL_DATA_RTO.csv", "text/csv", use_container_width=True)
 
         with tab2:
             st.write("### 🚨 Daftar Item Selisih")
-            # Filter hanya item yang KURANG atau LEBIH saja
-            df_hanya_selisih = st.session_state.rto_df_selisih[
-                st.session_state.rto_df_selisih['NOTE'].isin(['KURANG AMBIL', 'KELEBIHAN AMBIL'])
-            ]
+            # Di sini baru kita filter cuma yang Kurang atau Lebih
+            data_lengkap = st.session_state.rto_df_ds
+            df_hanya_selisih = data_lengkap[data_lengkap['NOTE'].isin(['KURANG AMBIL', 'KELEBIHAN AMBIL'])]
             
             if not df_hanya_selisih.empty:
                 st.dataframe(df_hanya_selisih, use_container_width=True, hide_index=True)
-                st.download_button("📥 Download Item Selisih Saja", df_hanya_selisih.to_csv(index=False).encode('utf-8'), "HANYA_SELISIH_RTO.csv", "text/csv", use_container_width=True)
+                csv_selisih = df_hanya_selisih.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Download Item Selisih", csv_selisih, "HANYA_SELISIH_RTO.csv", "text/csv", use_container_width=True)
             else:
-                st.success("✨ Luar biasa! Tidak ada item selisih (Semua Sesuai).")
+                st.success("✨ Aman! Tidak ada item yang selisih.")
     st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
     f_cek = st.file_uploader("Upload Hasil Cek Real", type=['xlsx','csv'], key="rto_cek")
