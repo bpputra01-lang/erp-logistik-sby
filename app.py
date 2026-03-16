@@ -1976,6 +1976,8 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
         df_app_res.drop(columns=['TMP_SKU', 'TMP_QTY'], inplace=True)
     return df_ds_res, df_app_res
 
+import pandas as pd
+
 def engine_compare_draft_jezpro(df_app, df_draft):
     df_res = df_draft.copy()
     df_a = df_app.copy()
@@ -1983,7 +1985,11 @@ def engine_compare_draft_jezpro(df_app, df_draft):
     
     def clean_sku(val):
         if pd.isna(val): return ""
-        s = str(val).strip().upper()
+        # Menangani SKU angka agar tidak ada .0
+        if isinstance(val, (float, int)):
+            s = str(int(val)).strip().upper()
+        else:
+            s = str(val).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s if s not in ["NAN", "0", "NONE"] else ""
 
@@ -1994,8 +2000,8 @@ def engine_compare_draft_jezpro(df_app, df_draft):
     for _, r in df_a.iterrows():
         s1 = clean_sku(r.get('9'))
         b1 = str(r.get('12', '')).strip().upper()
-        # Gunakan int() di sini
-        q1 = int(pd.to_numeric(r.get('13', 0), errors='coerce') or 0)
+        # Paksa jadi int saat pembacaan
+        q1 = int(float(pd.to_numeric(r.get('13', 0), errors='coerce') or 0))
         
         if s1 and b1 not in ["", "0", "NAN"]:
             app_summary[(s1, b1)] = app_summary.get((s1, b1), 0) + q1
@@ -2005,8 +2011,8 @@ def engine_compare_draft_jezpro(df_app, df_draft):
         s2_raw = clean_sku(r.get('15'))
         s2 = s2_raw if s2_raw else s1
         b2 = str(r.get('16', '')).strip().upper()
-        # Gunakan int() di sini
-        q2 = int(pd.to_numeric(r.get('17', 0), errors='coerce') or 0)
+        # Paksa jadi int saat pembacaan
+        q2 = int(float(pd.to_numeric(r.get('17', 0), errors='coerce') or 0))
         
         if s2 and b2 not in ["", "0", "NAN"]:
             app_summary[(s2, b2)] = app_summary.get((s2, b2), 0) + q2
@@ -2020,16 +2026,15 @@ def engine_compare_draft_jezpro(df_app, df_draft):
     for idx, row in df_res.iterrows():
         sku_d = clean_sku(row.iloc[3])
         bin_d = str(row.iloc[8]).strip().upper()
-        # Pastikan qty draft pembanding juga bulat
-        qty_h = int(pd.to_numeric(row.iloc[7], errors='coerce') or 0)
+        qty_h = int(float(pd.to_numeric(row.iloc[7], errors='coerce') or 0))
         sku_in_draft.add(sku_d)
         
         key_d = (sku_d, bin_d)
-        qty_j, bin_lain, qty_lain = 0, "", ""
+        qty_j, bin_lain, qty_lain = 0, "", 0
         note, status = "", ""
         
         if key_d in app_summary:
-            qty_j = int(app_summary[key_d]) # Paksa Integer
+            qty_j = int(app_summary[key_d])
             matched_app_keys.add(key_d)
             if qty_j == qty_h:
                 note, status = "DRAFT SESUAI", "OK"
@@ -2041,17 +2046,14 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             note = "PINDAH BIN"
             details = sku_to_bins[sku_d]
             bin_lain = ", ".join([str(d[0]) for d in details])
-            qty_lain = int(sum([d[1] for d in details])) # Paksa Integer
+            qty_lain = int(sum([d[1] for d in details]))
             qty_j = 0
-            
             for b_a, q_a in details:
                 matched_app_keys.add((sku_d, b_a))
-            
         else:
             qty_j = 0
             note, status = "HAPUS ITEM INI", "DELETE ITEM"
 
-        # Simpan dengan memastikan tipe data bukan float
         df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
             [qty_j, note, bin_lain, qty_lain, status]
 
@@ -2064,7 +2066,7 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             new_entry[df_res.columns[3]] = sku_a 
             new_entry[df_res.columns[7]] = 0     
             new_entry[df_res.columns[8]] = bin_a 
-            new_entry['QTY AMBIL'] = int(qty_a) # Paksa Integer
+            new_entry['QTY AMBIL'] = int(qty_a)
             new_entry['NOTE'] = "TAMBAH ITEM BARU"
             new_entry['STATUS'] = "ADD NEW"
             new_rows.append(new_entry)
@@ -2072,15 +2074,12 @@ def engine_compare_draft_jezpro(df_app, df_draft):
     if new_rows:
         df_res = pd.concat([df_res, pd.DataFrame(new_rows)], ignore_index=True)
 
-    # Langkah terakhir: Pastikan kolom QTY di seluruh dataframe benar-benar integer
-    df_res['QTY AMBIL'] = pd.to_numeric(df_res['QTY AMBIL'], errors='coerce').fillna(0).astype(int)
-    
-    # Perbaikan tambahan jika kolom index 7 adalah QTY Draft
-    col_qty_draft = df_res.columns[7]
-    df_res[col_qty_draft] = pd.to_numeric(df_res[col_qty_draft], errors='coerce').fillna(0).astype(int)
+    # --- FIX FINAL: Paksa semua kolom angka menjadi integer ---
+    cols_to_fix = ['QTY AMBIL', 'QTY BIN LAIN', df_res.columns[7]]
+    for col in cols_to_fix:
+        df_res[col] = pd.to_numeric(df_res[col], errors='coerce').fillna(0).astype(int)
 
     return df_res
-
 def engine_generate_new_draft(df_compared):
     if df_compared is None or df_compared.empty: return pd.DataFrame(columns=['BIN', 'SKU', 'QUANTITY'])
     dict_final = {}
