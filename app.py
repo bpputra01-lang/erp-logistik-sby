@@ -3539,7 +3539,7 @@ if menu == "Compare RTO":
             csv_all = st.session_state.rto_df_ds.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Download All Data", csv_all, "ALL_DATA_RTO.csv", "text/csv", use_container_width=True)
 
-        with tab2:
+    with tab2:
             st.write("### 🚨 Daftar Item Selisih")
             # Di sini baru kita filter cuma yang Kurang atau Lebih
             data_lengkap = st.session_state.rto_df_ds
