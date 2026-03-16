@@ -3523,8 +3523,35 @@ if menu == "Compare RTO":
             st.session_state.rto_df_ds, st.session_state.rto_df_selisih = res_ds, res_selisih
             st.success("✅ Selesai!")
     
-    with tab1:
-            # Tampilkan Matrix Box di Tab 1
+   if st.session_state.rto_df_selisih is not None:
+        st.divider()
+        st.subheader("📊 Hasil Analisis RTO")
+        
+        # 1. Definisi Data (Ambil data lengkap dari session state)
+        df_full = st.session_state.rto_df_ds
+        scan_col = df_full.columns[1]
+        
+        # 2. Perhitungan Metrik (Tetap bulat tanpa .0)
+        q_total = int(pd.to_numeric(df_full.iloc[:, 1], errors='coerce').fillna(0).sum())
+        q_sesuai = int(pd.to_numeric(df_full[df_full['NOTE'] == 'SESUAI'].iloc[:, 1], errors='coerce').fillna(0).sum())
+        
+        q_lebih = int(
+            (pd.to_numeric(df_full[df_full['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').fillna(0) - 
+             pd.to_numeric(df_full[df_full['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce').fillna(0)
+            ).sum()
+        )
+        
+        q_kurang = int(
+            (pd.to_numeric(df_full[df_full['NOTE'] == 'KURANG AMBIL']['QTY AMBIL'], errors='coerce').fillna(0) - 
+             pd.to_numeric(df_full[df_full['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').fillna(0)
+            ).sum()
+        )
+
+        # 3. Pembuatan TAB (Didefinisikan SEBELUM dipanggil di 'with')
+        tab1, tab2 = st.tabs(["📝 Summary Compare", "⚠️ Item Selisih"])
+
+        with tab1:
+            # Tampilkan Matrix Box
             mc1, mc2, mc3, mc4 = st.columns(4)
             with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
             with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
@@ -3532,23 +3559,18 @@ if menu == "Compare RTO":
             with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
             
             st.write("### 📋 All Data Comparison (Semua Item)")
-            
-            # --- PASTIKAN PAKAI df_ds ATAU rto_df_ds UNTUK DATA LENGKAP ---
-            st.dataframe(st.session_state.rto_df_ds, use_container_width=True, hide_index=True)
-            
-            csv_all = st.session_state.rto_df_ds.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download All Data", csv_all, "ALL_DATA_RTO.csv", "text/csv", use_container_width=True)
+            # Menampilkan SEMUA data dari df_full
+            st.dataframe(df_full, use_container_width=True, hide_index=True)
+            st.download_button("📥 Download All Data", df_full.to_csv(index=False).encode('utf-8'), "ALL_DATA_RTO.csv", "text/csv", use_container_width=True)
 
-    with tab2:
-            st.write("### 🚨 Daftar Item Selisih")
-            # Di sini baru kita filter cuma yang Kurang atau Lebih
-            data_lengkap = st.session_state.rto_df_ds
-            df_hanya_selisih = data_lengkap[data_lengkap['NOTE'].isin(['KURANG AMBIL', 'KELEBIHAN AMBIL'])]
+        with tab2:
+            st.write("### 🚨 Daftar Item Selisih (Hanya Kurang/Lebih)")
+            # Filter hanya yang bermasalah saja
+            df_selisih_saja = df_full[df_full['NOTE'].isin(['KURANG AMBIL', 'KELEBIHAN AMBIL'])]
             
-            if not df_hanya_selisih.empty:
-                st.dataframe(df_hanya_selisih, use_container_width=True, hide_index=True)
-                csv_selisih = df_hanya_selisih.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Download Item Selisih", csv_selisih, "HANYA_SELISIH_RTO.csv", "text/csv", use_container_width=True)
+            if not df_selisih_saja.empty:
+                st.dataframe(df_selisih_saja, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Item Selisih Saja", df_selisih_saja.to_csv(index=False).encode('utf-8'), "HANYA_SELISIH_RTO.csv", "text/csv", use_container_width=True)
             else:
                 st.success("✨ Aman! Tidak ada item yang selisih.")
     st.divider()
