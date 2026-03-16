@@ -1979,75 +1979,90 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
 def engine_compare_draft_jezpro(df_app, df_draft):
     df_res = df_draft.copy()
     df_a = df_app.copy()
-    # Mengubah nama kolom menjadi string angka agar mudah diakses seperti index (1-based)
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
+    def clean_sku(val):
+        if pd.isna(val): return ""
+        s = str(val).strip().upper()
+        if s.endswith('.0'): s = s[:-2]
+        return s if s not in ["NAN", "0", "NONE"] else ""
+
     # --- 1. REKAP SEMUA DATA DARI APPSHEET ---
     app_summary = {}
-    
+    app_skus_only = {} # Untuk melacak SKU yang ada di AppSheet tanpa peduli BIN
+
     for _, r in df_a.iterrows():
-        # Ambil SKU: Cek kolom 9 (I), jika kosong cek kolom 15 (O)
-        sku_1 = str(r.get('9', '')).strip().upper()
-        sku_2 = str(r.get('15', '')).strip().upper()
+        # Ambil Pasangan 1 (I & M)
+        s1 = clean_sku(r.get('9'))
+        b1 = str(r.get('12', '')).strip().upper()
+        q1 = pd.to_numeric(r.get('13', 0), errors='coerce') or 0
         
-        # Proses Pasangan BIN 1 & QTY 1 (Kolom 12 & 13 / L & M)
-        bin_1 = str(r.get('12', '')).strip().upper()
-        if sku_1 not in ["", "NAN", "0"] and bin_1 not in ["", "0", "NAN"]:
-            qty_1 = pd.to_numeric(r.get('13', 0), errors='coerce') or 0
-            key = (sku_1, bin_1)
-            app_summary[key] = app_summary.get(key, 0) + qty_1
-            
-        # Proses Pasangan BIN 2 & QTY 2 (Kolom 16 & 17 / P & Q)
-        # Note: Kita gunakan SKU_2 (kolom O/15) jika ada, jika tidak pakai SKU_1
-        bin_2 = str(r.get('16', '')).strip().upper()
-        final_sku_2 = sku_2 if sku_2 not in ["", "NAN", "0"] else sku_1
+        if s1 and b1 not in ["", "0", "NAN"]:
+            app_summary[(s1, b1)] = app_summary.get((s1, b1), 0) + q1
+            app_skus_only[s1] = app_skus_only.get(s1, 0) + q1
+
+        # Ambil Pasangan 2 (O & Q) - Gunakan SKU O jika ada, jika tidak pakai SKU I
+        s2_raw = clean_sku(r.get('15'))
+        s2 = s2_raw if s2_raw else s1
+        b2 = str(r.get('16', '')).strip().upper()
+        q2 = pd.to_numeric(r.get('17', 0), errors='coerce') or 0
         
-        if final_sku_2 not in ["", "NAN", "0"] and bin_2 not in ["", "0", "NAN"]:
-            qty_2 = pd.to_numeric(r.get('17', 0), errors='coerce') or 0
-            key = (final_sku_2, bin_2)
-            app_summary[key] = app_summary.get(key, 0) + qty_2
+        if s2 and b2 not in ["", "0", "NAN"]:
+            app_summary[(s2, b2)] = app_summary.get((s2, b2), 0) + q2
+            app_skus_only[s2] = app_skus_only.get(s2, 0) + q2
 
     # --- 2. UPDATE ITEM YANG SUDAH ADA DI DRAFT ---
     matched_keys = set()
     for idx, row in df_res.iterrows():
-        sku_d = str(row.iloc[3]).strip().upper()  # Kolom SKU di Draft
-        bin_d = str(row.iloc[8]).strip().upper()  # Kolom BIN di Draft
-        qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0 # QTY Draft
+        sku_d = clean_sku(row.iloc[3])
+        bin_d = str(row.iloc[8]).strip().upper()
+        qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
         
         key_d = (sku_d, bin_d)
-        qty_j = 0
-        note, status = "HAPUS ITEM INI DARI DRAFT", "DELETE ITEM"
         
+        # LOGIKA BARU:
+        # A. Jika SKU dan BIN Match Sempurna
         if key_d in app_summary:
             qty_j = app_summary[key_d]
             matched_keys.add(key_d)
-            if qty_j < qty_h: 
-                note, status = "KURANG AMBIL", "PERLU EDIT QTY DRAFT"
-            elif qty_j == qty_h: 
+            if qty_j == qty_h:
                 note, status = "DRAFT SESUAI", "OK"
-            else: 
-                note, status = "KELEBIHAN AMBIL", "PERLU EDIT QTY DRAFT"
+            else:
+                note, status = f"QTY BEDA (App:{qty_j})", "PERLU EDIT QTY DRAFT"
+            df_res.loc[idx, 'QTY AMBIL'] = qty_j
             
-        df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [qty_j, note, "", "", status]
+        # B. Jika SKU ada di AppSheet tapi BIN BEDA
+        elif sku_d in app_skus_only:
+            # Ambil QTY total dari AppSheet untuk SKU ini sebagai info
+            qty_j = app_skus_only[sku_d]
+            note, status = "PINDAH BIN", "PERLU EDIT BIN DRAFT"
+            df_res.loc[idx, 'QTY AMBIL'] = 0 # 0 karena di BIN ini tidak ada ambil
+            
+        # C. Jika SKU memang tidak ada sama sekali di AppSheet
+        else:
+            note, status = "HAPUS ITEM INI", "DELETE ITEM"
+            df_res.loc[idx, 'QTY AMBIL'] = 0
+            
+        df_res.loc[idx, ['NOTE', 'STATUS']] = [note, status]
 
-    # --- 3. TAMBAHKAN ITEM YANG ADA DI APPSHEET TAPI BELUM ADA DI DRAFT ---
+    # --- 3. TAMBAHKAN ITEM BARU (ADD NEW) ---
     new_rows = []
     for (sku_a, bin_a), qty_a in app_summary.items():
+        # Cek apakah kombinasi SKU & BIN ini sudah tercover di Draft
         if (sku_a, bin_a) not in matched_keys:
-            # Gunakan "-" atau data default untuk kolom draft yang tidak ada
+            # Kita hanya ADD NEW jika SKU+BIN tersebut memang tidak ada di baris manapun di Draft
             new_entry = {col: "" for col in df_res.columns}
-            new_entry[df_res.columns[0]] = "-"           # No TF
-            new_entry[df_res.columns[3]] = sku_a         # SKU
-            new_entry[df_res.columns[7]] = 0             # Qty Draft (0)
-            new_entry[df_res.columns[8]] = bin_a         # Bin
+            new_entry[df_res.columns[0]] = "-" 
+            new_entry[df_res.columns[3]] = sku_a
+            new_entry[df_res.columns[7]] = 0 
+            new_entry[df_res.columns[8]] = bin_a
             new_entry['QTY AMBIL'] = qty_a
             new_entry['NOTE'] = "TAMBAH ITEM DRAFT"
             new_entry['STATUS'] = "ADD NEW"
             new_rows.append(new_entry)
 
     if new_rows:
-        df_added = pd.DataFrame(new_rows)
-        df_res = pd.concat([df_res, df_added], ignore_index=True)
+        df_res = pd.concat([df_res, pd.DataFrame(new_rows)], ignore_index=True)
 
     return df_res
 
