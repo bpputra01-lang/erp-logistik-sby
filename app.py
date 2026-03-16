@@ -1988,25 +1988,25 @@ def engine_compare_draft_jezpro(df_app, df_draft):
         return s if s not in ["NAN", "0", "NONE"] else ""
 
     # --- 1. REKAP DATA APPSHEET ---
-    app_summary = {} # Kunci: (SKU, BIN) -> Value: QTY
-    sku_to_bins = {} # Kunci: SKU -> Value: List of (BIN, QTY) untuk lacak pindah BIN
+    app_summary = {}
+    sku_to_bins = {}
 
     for _, r in df_a.iterrows():
-        # Ambil Pasangan 1 (I & M)
         s1 = clean_sku(r.get('9'))
         b1 = str(r.get('12', '')).strip().upper()
-        q1 = pd.to_numeric(r.get('13', 0), errors='coerce') or 0
+        # Gunakan int() di sini
+        q1 = int(pd.to_numeric(r.get('13', 0), errors='coerce') or 0)
         
         if s1 and b1 not in ["", "0", "NAN"]:
             app_summary[(s1, b1)] = app_summary.get((s1, b1), 0) + q1
             if s1 not in sku_to_bins: sku_to_bins[s1] = []
             sku_to_bins[s1].append((b1, q1))
 
-        # Ambil Pasangan 2 (O & Q)
         s2_raw = clean_sku(r.get('15'))
-        s2 = s2_raw if s2_raw else s1 # Jika O kosong pakai SKU I
+        s2 = s2_raw if s2_raw else s1
         b2 = str(r.get('16', '')).strip().upper()
-        q2 = pd.to_numeric(r.get('17', 0), errors='coerce') or 0
+        # Gunakan int() di sini
+        q2 = int(pd.to_numeric(r.get('17', 0), errors='coerce') or 0)
         
         if s2 and b2 not in ["", "0", "NAN"]:
             app_summary[(s2, b2)] = app_summary.get((s2, b2), 0) + q2
@@ -2015,51 +2015,47 @@ def engine_compare_draft_jezpro(df_app, df_draft):
 
     # --- 2. UPDATE ITEM DI DRAFT ---
     matched_app_keys = set()
-    sku_in_draft = set() # Catat SKU apa saja yang sudah ada di Draft
+    sku_in_draft = set()
 
     for idx, row in df_res.iterrows():
         sku_d = clean_sku(row.iloc[3])
         bin_d = str(row.iloc[8]).strip().upper()
-        qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
+        # Pastikan qty draft pembanding juga bulat
+        qty_h = int(pd.to_numeric(row.iloc[7], errors='coerce') or 0)
         sku_in_draft.add(sku_d)
         
         key_d = (sku_d, bin_d)
         qty_j, bin_lain, qty_lain = 0, "", ""
         note, status = "", ""
         
-        # A. MATCH SEMPURNA (SKU & BIN sama)
         if key_d in app_summary:
-            qty_j = app_summary[key_d]
+            qty_j = int(app_summary[key_d]) # Paksa Integer
             matched_app_keys.add(key_d)
             if qty_j == qty_h:
                 note, status = "DRAFT SESUAI", "OK"
             else:
                 note, status = "BEDA QTY", "PERLU EDIT QTY DRAFT"
         
-        # B. SKU ADA TAPI BIN BEDA (Ambil data dari BIN lain di AppSheet)
         elif sku_d in sku_to_bins:
             status = "PERLU EDIT BIN DRAFT"
             note = "PINDAH BIN"
-            # Ambil detail BIN dan QTY dari AppSheet untuk diinfokan di kolom 'LAIN'
             details = sku_to_bins[sku_d]
-            bin_lain = ", ".join([d[0] for d in details])
-            qty_lain = sum([d[1] for d in details])
-            qty_j = 0 # Di BIN draft aslinya tidak ada pengambilan
+            bin_lain = ", ".join([str(d[0]) for d in details])
+            qty_lain = int(sum([d[1] for d in details])) # Paksa Integer
+            qty_j = 0
             
-            # Tandai agar tidak masuk ADD NEW
             for b_a, q_a in details:
                 matched_app_keys.add((sku_d, b_a))
             
-        # C. TIDAK ADA DI APPSHEET SAMA SEKALI
         else:
             qty_j = 0
             note, status = "HAPUS ITEM INI", "DELETE ITEM"
 
+        # Simpan dengan memastikan tipe data bukan float
         df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
             [qty_j, note, bin_lain, qty_lain, status]
 
-    # --- 3. TAMBAHKAN ITEM BARU (ADD NEW) ---
-    # ADD NEW hanya jika SKU benar-benar tidak ada di Draft manapun
+    # --- 3. TAMBAHKAN ITEM BARU ---
     new_rows = []
     for (sku_a, bin_a), qty_a in app_summary.items():
         if (sku_a, bin_a) not in matched_app_keys and sku_a not in sku_in_draft:
@@ -2068,13 +2064,20 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             new_entry[df_res.columns[3]] = sku_a 
             new_entry[df_res.columns[7]] = 0     
             new_entry[df_res.columns[8]] = bin_a 
-            new_entry['QTY AMBIL'] = qty_a
+            new_entry['QTY AMBIL'] = int(qty_a) # Paksa Integer
             new_entry['NOTE'] = "TAMBAH ITEM BARU"
             new_entry['STATUS'] = "ADD NEW"
             new_rows.append(new_entry)
 
     if new_rows:
         df_res = pd.concat([df_res, pd.DataFrame(new_rows)], ignore_index=True)
+
+    # Langkah terakhir: Pastikan kolom QTY di seluruh dataframe benar-benar integer
+    df_res['QTY AMBIL'] = pd.to_numeric(df_res['QTY AMBIL'], errors='coerce').fillna(0).astype(int)
+    
+    # Perbaikan tambahan jika kolom index 7 adalah QTY Draft
+    col_qty_draft = df_res.columns[7]
+    df_res[col_qty_draft] = pd.to_numeric(df_res[col_qty_draft], errors='coerce').fillna(0).astype(int)
 
     return df_res
 
