@@ -3790,11 +3790,11 @@ elif menu == "Justification SO":
     # UI Uploader - Dibagi 3 Kolom
     col1, col2, col3 = st.columns(3)
     with col1: 
-        up_case = st.file_uploader("Upload Adjusment File", type=['xlsx'], key="up_case_so")
+        up_case = st.file_uploader("Upload FILE ADJUSMENT", type=['xlsx'], key="up_case_so")
     with col2: 
-        up_tracking = st.file_uploader("Upload Tracking Stock", type=['xlsx'], key="up_track_so")
+        up_tracking = st.file_uploader("Upload SUMMARY STOCK", type=['xlsx'], key="up_track_so")
     with col3: 
-        up_others = st.file_uploader("Upload Total PO", type=['xlsx'], key="up_po_so")
+        up_others = st.file_uploader("Upload PURCHASE ORDER", type=['xlsx'], key="up_po_so")
 
     # 2. Logika Tombol Run
     if up_case and up_tracking and up_others:
