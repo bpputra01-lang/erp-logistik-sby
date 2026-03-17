@@ -3031,6 +3031,13 @@ elif menu == "Putaway System":
         .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
         </style>
     """, unsafe_allow_html=True)
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **DATA SCAN**: Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN
+        - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro (PASTIKAN AMBIL GL3-DC-PUTAWAY, STAGGING LT.3 DAN STAGGING INBOUND)
+        - **NOTE**: JANGAN LUPA UNTUK REPORT DAN CEK KETIKA ADA SELISIH PUTAWAY
+        """)
     
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
