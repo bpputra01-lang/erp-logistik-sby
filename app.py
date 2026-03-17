@@ -3776,7 +3776,13 @@ elif menu == "FDR Update":
                     st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
 elif menu == "Justification SO":
     st.markdown('<div class="hero-header"><h1>JUTIFICATION ADJUSMENT</h1></div>', unsafe_allow_html=True)
-
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **ADJUSMENT FILE**: Gabungkan antara Adjusment **(Plus)** dan **(Minus)** dalam 1 File dan **QTY SO** yang telah terisi dengan qty yang akan diadjusment
+        - **SUMMARY STOCK**: Download **SUMMARY STOCK** yang ada di **POWER BI** dan pilih Store **JEZ SURABAYA**
+        - **PURCHASE ORDER**: Download **PURCHASE ORDER** yang di **POWER BI**, pilih Period Invoice **ALL TIME**, pilih Period RceiveIN **ALL TIME**, pilih Store **JEZ SURABAYA** 
+        """)
     # 1. Inisialisasi Session State biar data nggak hilang pas diklik
     if 'result_so' not in st.session_state:
         st.session_state.result_so = None
