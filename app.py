@@ -1025,9 +1025,8 @@ def menu_Stock_Opname():
             - **STOCK SYSTEM**
                 - Download All stock dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
         - **BIN COVERAGE**
-            - **FILE BIN COVERAGE**
-                -Download Bin Coverage  dari **Multiple Adjusment**
-                -Pilih stocknya **Hanya ada di stock**
+            - Download Bin Coverage  dari **Multiple Adjusment**
+            - Pilih stocknya **Hanya ada di stock**
         - **FINAL ADJUSMENT + PROCESS**
             - **REAL + RECON**
                 - Upload file Recon Real + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
