@@ -1023,8 +1023,9 @@ def menu_Stock_Opname():
                 - **Kolom B** = SKU
                 - **Kolom C** = QTY SCAN
             - **STOCK SYSTEM**
-                -Download All stock dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
+                - Download All stock dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
         - **BIN COVERAGE**
+            - **FILE BIN COVERAGE**
                 -Download Bin Coverage  dari **Multiple Adjusment**
                 -Pilih stocknya **Hanya ada di stock**
         - **FINAL ADJUSMENT + PROCESS**
