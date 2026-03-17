@@ -3034,7 +3034,7 @@ elif menu == "Putaway System":
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **DATA SCAN**: Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN
+        - **DATA SCAN PUTAWAY**: Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN
         - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro (PASTIKAN AMBIL GL3-DC-PUTAWAY, STAGGING LT.3 DAN STAGGING INBOUND)
         - **NOTE**: JANGAN LUPA UNTUK REPORT DAN CEK KETIKA ADA SELISIH PUTAWAY
         """)
@@ -3315,7 +3315,12 @@ elif menu == "Refill & Overstock":
     .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
-
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **HANYA ADA DI STOCK**
+        - **DATA PUTAWAY**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu untuk rentang waktu pilih **7 HARI SEBELUMNYA**
+        """)
     c1, c2 = st.columns(2)
     with c1: up_all = st.file_uploader("📥Upload ALL DATA STOCK", type=['xlsx'])
     with c2: up_track = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
