@@ -3034,7 +3034,7 @@ elif menu == "Putaway System":
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **DATA SCAN PUTAWAY**: Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN
+        - **DATA SCAN PUTAWAY**: Kolom A = **BIN**, Kolom B = **SKU**, Kolom C = **QTY SCAN**
         - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro (PASTIKAN AMBIL GL3-DC-PUTAWAY, STAGGING LT.3 DAN STAGGING INBOUND)
         - **NOTE**: JANGAN LUPA UNTUK REPORT DAN CEK KETIKA ADA SELISIH PUTAWAY
         """)
@@ -3123,7 +3123,7 @@ elif menu == "Scan Out Validation":
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **DATA SCAN**: Kolom A = BIN, Kolom B = SKU (QTY akan dihitung otomatis)
+        - **DATA SCAN**: Kolom A = **BIN**, Kolom B = **SKU** (QTY akan dihitung otomatis)
         - **HISTORY SET UP**: Sesuai yang ada pada template Mutasi Set Up Jezpro
         - **STOCK TRACKING**: Sesuai yang ada pada template Stock Tracking Jezpro
         """)
@@ -3428,8 +3428,12 @@ elif menu == "Stock Minus":
         .m-val { color: #f39c12; font-size: 32px; font-weight: bold; }
         </style>
     """, unsafe_allow_html=True)
-
-    uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **TERMASUK YANG SUDAH HABIS**
+        """)
+    uploaded_file = st.file_uploader("Upload File ALL DATA STOCK", type=["xlsx", "xlsm"])
     
     if uploaded_file:
         try:
