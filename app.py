@@ -1017,9 +1017,25 @@ def menu_Stock_Opname():
                 - Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa
             - **BIN COVERAGE**
                 - Untuk BIN COVERAGE sementara non aktifkan dulu dan jangan dipilih
-        - **DATA SCAN**: Kolom A = **BIN**, Kolom B = **SKU**, Kolom C = **QTY SCAN**
-        - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro (PASTIKAN AMBIL GL3-DC-PUTAWAY, STAGGING LT.3 DAN STAGGING INBOUND)
-        - **NOTE**: JANGAN LUPA UNTUK REPORT DAN CEK KETIKA ADA SELISIH PUTAWAY
+        - **COMPARE DS VS STOCK SYSTEM**
+            - **DATA SCAN**: Upload data scan SO yang sudah diberi header :
+                - **Kolom A** = BIN
+                - **Kolom B** = SKU
+                - **Kolom C** = QTY SCAN
+            - **STOCK SYSTEM**
+                -Download All stock dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
+        - **BIN COVERAGE**
+            -Download Bin Coverage  dari *Multiple Adjusment**
+            -Pilih stocknya **Hanya ada di stock**
+        - **FINAL ADJUSMENT + PROCESS**
+            - **REAL + RECON**
+                - Upload file Recon + yang sudah diupload dari step sebelumnya pastikan *KOLOM A* bukan berisi *NUMBER* ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
+            - **CEK STOCK ADJ +**
+                - Download Stock System yang terbaru dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
+            - **STOCK ADJ + (MASTER)**
+                - Download Stock System dan pilih hanya *BIN STAGGING INBOUND* dan pilih **Termasuk yang sudah habis**
+        - **SET UP KARANTINA GENERATOR**
+            - **SYTEM + RECON**
         """)
     # --- INITIALIZE ALL SESSION STATES ---
     if 'compare_result' not in st.session_state: st.session_state.compare_result = None
@@ -1263,9 +1279,9 @@ def menu_Stock_Opname():
     # Tambahkan dua uploader agar logic compare BIN|SKU bisa jalan
     col_k1, col_k2 = st.columns(2)
     with col_k1:
-        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
+        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
     with col_k2:
-        up_adj6 = st.file_uploader("📥 2. Upload HASIL CEK ADJUSTMENT (RECON)", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
+        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
 
     if up_k6 and up_adj6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
