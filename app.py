@@ -1010,12 +1010,13 @@ def menu_Stock_Opname():
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
+        **FILTER**
         - **SUB KATEGORI**
             - Untuk Sub Kategori pilih sesuai dengan kategori yang sedang dianalisa
         - **BIN SYSTEM**
-            -  Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa
+            - Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa
         - **BIN COVERAGE**
-            -Untuk BIN C 
+            - Untuk BIN COVERAGE sementara non aktifkan dulu dan jangan dipilih
         - **DATA SCAN**: Kolom A = **BIN**, Kolom B = **SKU**, Kolom C = **QTY SCAN**
         - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro (PASTIKAN AMBIL GL3-DC-PUTAWAY, STAGGING LT.3 DAN STAGGING INBOUND)
         - **NOTE**: JANGAN LUPA UNTUK REPORT DAN CEK KETIKA ADA SELISIH PUTAWAY
