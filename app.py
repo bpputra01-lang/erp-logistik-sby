@@ -3673,7 +3673,11 @@ elif menu == "FDR Update":
         .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
         </style>
     """, unsafe_allow_html=True)
-    
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **FILE MANIFEST**: Download Manifest dari jezpro pada menu **TRANSAKSI ONLINE V2**, pilih Cabang **ONLINE SURABAYA**, pilih Status Jezpro **DONE ONLINE**, dan rentang waktunya pilih **30 HARI TERAKHIR**
+        """)
     # --- INIT STATE ---
     if "ws_manifest_fdr" not in st.session_state: st.session_state.ws_manifest_fdr = None
     if "ws_fu_it_fdr" not in st.session_state: st.session_state.ws_fu_it_fdr = None
