@@ -1029,13 +1029,25 @@ def menu_Stock_Opname():
             -Pilih stocknya **Hanya ada di stock**
         - **FINAL ADJUSMENT + PROCESS**
             - **REAL + RECON**
-                - Upload file Recon + yang sudah diupload dari step sebelumnya pastikan *KOLOM A* bukan berisi *NUMBER* ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
+                - Upload file Recon Real + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
             - **CEK STOCK ADJ +**
                 - Download Stock System yang terbaru dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
             - **STOCK ADJ + (MASTER)**
                 - Download Stock System dan pilih hanya *BIN STAGGING INBOUND* dan pilih **Termasuk yang sudah habis**
         - **SET UP KARANTINA GENERATOR**
             - **SYTEM + RECON**
+                - Upload file Recon System + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
+            - **CEK STOCK ADJ -**
+                - Download Stock System yang terbaru dari *Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
+        - **SUMMARY ADJUSMENT REPORT**
+            - **OPSI 1**
+                - Jika ingin mengetahui value adjusment saat proses running bisa langsung klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
+            - **OPSI 2**
+                - Jika ingin mengetahui value adjusment total + dari all bin maka **Gabungkan All Adjusment +** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
+            - **OPSI 3**
+                - Jika ingin mengetahui value adjusment total - dari all bin maka **Gabungkan All Adjusment -** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
+            - **OPSI 4**
+                - Jika ingin mengetahui value adjusment total dari + dan - secara keseluruhan maka **Gabungkan All Adjusment + & - ** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
         """)
     # --- INITIALIZE ALL SESSION STATES ---
     if 'compare_result' not in st.session_state: st.session_state.compare_result = None
