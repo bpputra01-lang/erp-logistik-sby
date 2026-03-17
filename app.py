@@ -1010,7 +1010,7 @@ def menu_Stock_Opname():
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        **FILTER**
+        - **FILTER**
         - **SUB KATEGORI**
             - Untuk Sub Kategori pilih sesuai dengan kategori yang sedang dianalisa
         - **BIN SYSTEM**
