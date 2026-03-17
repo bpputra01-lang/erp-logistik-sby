@@ -3531,6 +3531,7 @@ if menu == "Compare RTO":
         **Format yang diharapkan:**
         - **DS RTO**: Diisi dengan Kolom A = **SKU** , Kolom B = **QTY SCAN**
         - **APPSHEET RTO**: Download Spreadsheets Rekap Appsheet sesuai dengan sheet dari RTO yang akan dituju
+        - **UPLOAD HASIL CEK REAL**: Upload hasil rekonsiliasi RTO yang sudah di download dan diisi sesuai real yang ditemukan
         - **DRAFT RTO**: Download Draft RTO yang sudah di buatkan purchasing di awal
         """)
     if 'rto_df_ds' not in st.session_state: st.session_state.rto_df_ds = None
