@@ -1671,8 +1671,13 @@ def menu_refill_withdraw():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><h1>🔄 REFILL & WITHDRAW SYSTEM</h1></div>', unsafe_allow_html=True)
-
+    st.markdown('<div class="hero-header"><h1>REFILL & WITHDRAW SYSTEM</h1></div>', unsafe_allow_html=True)
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **HANYA ADA DI STOCK**
+        - **STOCK TRACKING**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu untuk rentang waktu pilih **7 HARI SEBELUMNYA**
+        """)
     # --- 0. INIT STATE ---
     for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
         if key not in st.session_state: 
@@ -1681,7 +1686,7 @@ def menu_refill_withdraw():
     # --- 1. UPLOAD SECTION ---
     col1, col2 = st.columns(2)
     with col1:
-        u_stock = st.file_uploader("📤 Upload All Stock SBY", type=["xlsx"])
+        u_stock = st.file_uploader("📤 Upload ALL STOCK SURABAYA", type=["xlsx"])
         if u_stock:
             try:
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
@@ -1691,7 +1696,7 @@ def menu_refill_withdraw():
                 st.warning("Pakai Sheet Pertama")
 
     with col2:
-        u_trx = st.file_uploader("📤 Upload Data Transaksi", type=["xlsx"])
+        u_trx = st.file_uploader("📤 Upload STOCK TRACKING", type=["xlsx"])
         if u_trx:
             try:
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name="Data Transaksi")
@@ -3319,7 +3324,7 @@ elif menu == "Refill & Overstock":
         st.info("""
         **Format yang diharapkan:**
         - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **HANYA ADA DI STOCK**
-        - **DATA PUTAWAY**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu untuk rentang waktu pilih **7 HARI SEBELUMNYA**
+        - **STOCK TRACKING**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu untuk rentang waktu pilih **7 HARI SEBELUMNYA**
         """)
     c1, c2 = st.columns(2)
     with c1: up_all = st.file_uploader("📥Upload ALL DATA STOCK", type=['xlsx'])
