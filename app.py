@@ -3526,7 +3526,13 @@ elif menu == "Stock Minus":
 if menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
     st.markdown("""<style>.m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }.m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }.m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }</style>""", unsafe_allow_html=True)
-    
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **DS RTO**: Diisi dengan Kolom A = **SKU** , Kolom B = **QTY SCAN**
+        - **APPSHEET RTO**: Download Spreadsheets Rekap Appsheet sesuai dengan sheet dari RTO yang akan dituju
+        - **DRAFT RTO**: Download Draft RTO yang sudah di buatkan purchasing di awal
+        """)
     if 'rto_df_ds' not in st.session_state: st.session_state.rto_df_ds = None
     if 'rto_df_selisih' not in st.session_state: st.session_state.rto_df_selisih = None
     if 'rto_df_app' not in st.session_state: st.session_state.rto_df_app = None
