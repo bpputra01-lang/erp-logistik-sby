@@ -1007,7 +1007,19 @@ def menu_Stock_Opname():
         </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header"><h1> STOCK OPNAME ANALYZER</h1></div>', unsafe_allow_html=True)
-
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **SUB KATEGORI**
+            - Untuk Sub Kategori pilih sesuai dengan kategori yang sedang dianalisa
+        - **BIN SYSTEM**
+            -  Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa
+        - **BIN COVERAGE**
+            -Untuk BIN C 
+        - **DATA SCAN**: Kolom A = **BIN**, Kolom B = **SKU**, Kolom C = **QTY SCAN**
+        - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro (PASTIKAN AMBIL GL3-DC-PUTAWAY, STAGGING LT.3 DAN STAGGING INBOUND)
+        - **NOTE**: JANGAN LUPA UNTUK REPORT DAN CEK KETIKA ADA SELISIH PUTAWAY
+        """)
     # --- INITIALIZE ALL SESSION STATES ---
     if 'compare_result' not in st.session_state: st.session_state.compare_result = None
     if 'allocation_result' not in st.session_state: st.session_state.allocation_result = None
