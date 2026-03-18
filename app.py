@@ -3840,6 +3840,9 @@ elif menu == "Justification SO":
         - **ADJUSMENT FILE**: Gabungkan antara Adjusment **(Plus)** dan **(Minus)** dalam 1 File dan **QTY SO** yang telah terisi dengan qty yang akan diadjusment
         - **SUMMARY STOCK**: Download **SUMMARY STOCK** yang ada di **POWER BI** dan pilih Store **JEZ SURABAYA**
         - **PURCHASE ORDER**: Download **PURCHASE ORDER** yang di **POWER BI**, pilih Period Invoice **ALL TIME**, pilih Period RceiveIN **ALL TIME**, pilih Store **JEZ SURABAYA** 
+        """)
+    with st.expander("💡Logic Information"):
+        st.info("""
         **Logic Justifikasi**
         - **Kesalahan Adjusment**
             - Jika **QTY System > QTY SO (ADJ -)**, dan **Gap Adjusment bernilai (+)**
