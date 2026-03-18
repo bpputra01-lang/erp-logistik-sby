@@ -3340,7 +3340,6 @@ elif menu == "Scan Out Validation":
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
     
-    # --- TAMBAHKAN CSS AGAR KOTAK METRICS MUNCUL ---
     st.markdown("""
     <style>
     .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
@@ -3348,54 +3347,73 @@ elif menu == "Refill & Overstock":
     .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
+
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **HANYA ADA DI STOCK**
-        - **STOCK TRACKING**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu untuk rentang waktu pilih **7 HARI SEBELUMNYA**
+        - **ALL DATA STOCK**: Pilih **HANYA ADA DI STOCK**
+        - **STOCK TRACKING (Opsional)**: Pilih **JEZ SURABAYA**, rentang 7 hari. 
         """)
+
     c1, c2 = st.columns(2)
-    with c1: up_all = st.file_uploader("📥Upload ALL DATA STOCK", type=['xlsx'])
-    with c2: up_track = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
+    with c1: up_all = st.file_uploader("📥 Upload ALL DATA STOCK", type=['xlsx'])
+    with c2: up_track = st.file_uploader("📥 Upload STOCK TRACKING (Opsional)", type=['xlsx'])
     
-    if up_all and up_track:
+    # PERBAIKAN: Hanya ALL DATA yang wajib untuk memunculkan tombol
+    if up_all:
         if st.button("▶️ PROSES REFILL & OVERSTOCK"):
             try:
                 with st.spinner("Processing..."):
-                    # --- PERBAIKAN: Ganti engine ke openpyxl ---
+                    # Load file wajib
                     df_all = pd.read_excel(up_all, engine='openpyxl')
-                    df_track = pd.read_excel(up_track, engine='openpyxl')
                     
-                    # --- PERBAIKAN: PANGGIL FUNGSI ---
-                    # Pastikan lo punya fungsi process_refill_overstock di file lo!
+                    # PERBAIKAN: Load file opsional (jika ada)
+                    df_track = None
+                    if up_track:
+                        df_track = pd.read_excel(up_track, engine='openpyxl')
+                    else:
+                        st.warning("⚠️ Berjalan tanpa Stock Tracking. Kalkulasi Overstock mungkin tidak maksimal.")
+                    
+                    # Panggil fungsi yang sudah kita perbaiki tadi
                     res_gl3, res_gl4, res_refill, res_over = process_refill_overstock(df_all, df_track)
                     
                     st.success("Data Berhasil di Filter!")
                     
                     # Tampilan Metrics
                     m1, m2, m3 = st.columns(3)
-                    m1.markdown(f'<div class="m-box"><span class="m-lbl">REFILL ITEMS</span><span class="m-val">{len(res_refill)}</span></div>', unsafe_allow_html=True)
-                    m2.markdown(f'<div class="m-box"><span class="m-lbl">OVERSTOCK ITEMS</span><span class="m-val">{len(res_over)}</span></div>', unsafe_allow_html=True)
-                    m3.markdown(f'<div class="m-box"><span class="m-lbl">GL3/GL4 ROWS</span><span class="m-val">{len(res_gl3)+len(res_gl4)}</span></div>', unsafe_allow_html=True)
+                    # Gunakan len() dengan proteksi jika dataframe kosong
+                    count_refill = len(res_refill) if not res_refill.empty else 0
+                    count_over = len(res_over) if not res_over.empty else 0
+                    count_total = (len(res_gl3) if not res_gl3.empty else 0) + (len(res_gl4) if not res_gl4.empty else 0)
+
+                    m1.markdown(f'<div class="m-box"><span class="m-lbl">REFILL ITEMS</span><span class="m-val">{count_refill}</span></div>', unsafe_allow_html=True)
+                    m2.markdown(f'<div class="m-box"><span class="m-lbl">OVERSTOCK ITEMS</span><span class="m-val">{count_over}</span></div>', unsafe_allow_html=True)
+                    m3.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL GL3/GL4</span><span class="m-val">{count_total}</span></div>', unsafe_allow_html=True)
                     
-                    # Tabs dan Data
+                    # Tabs
                     t1, t2, t3, t4 = st.tabs(["📦 REFILL", "⚠️ OVERSTOCK", "📑 GL3 DATA", "📑 GL4 DATA"])
                     with t1: st.dataframe(res_refill, use_container_width=True)
                     with t2: st.dataframe(res_over, use_container_width=True)
                     with t3: st.dataframe(res_gl3, use_container_width=True)
                     with t4: st.dataframe(res_gl4, use_container_width=True)
                     
-                    # Download
+                    # Download Report
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                         res_refill.to_excel(writer, sheet_name='REFILL', index=False)
                         res_over.to_excel(writer, sheet_name='OVERSTOCK', index=False)
                         res_gl3.to_excel(writer, sheet_name='GL3', index=False)
                         res_gl4.to_excel(writer, sheet_name='GL4', index=False)
-                    st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REFILL_OVERSTOCK_REPORT.xlsx")
+                    
+                    st.download_button(
+                        label="📥 DOWNLOAD REPORT",
+                        data=output.getvalue(),
+                        file_name=f"REFILL_REPORT_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
                     
             except Exception as e: 
-                st.error(f"Error: {e}")
+                st.error(f"Terjadi kesalahan saat memproses data: {e}")
 elif menu == "Database Master":
     # Link Google Sheets lo yang sudah dikunci
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
