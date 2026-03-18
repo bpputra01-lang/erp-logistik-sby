@@ -2169,6 +2169,9 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
             return df_gl3, df_gl4, df_refill_final, df_overstock_final
 
         srcArr = df_all_data.values
+        # AMBIL NAMA KOLOM ASLI
+        header_names = df_all_data.columns.tolist()
+        
         outGL3 = []
         outGL4 = []
 
@@ -2182,8 +2185,9 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
             if "GL4" in binCode and not any(x in binCode for x in ["DEFECT", "REJECT", "ONLINE", "RAK"]):
                 outGL4.append(srcArr[i][:11])
 
-        df_gl3 = pd.DataFrame(outGL3)
-        df_gl4 = pd.DataFrame(outGL4)
+        # PERBAIKAN: Masukkan header_names agar kolom tidak jadi angka
+        df_gl3 = pd.DataFrame(outGL3, columns=header_names[:11])
+        df_gl4 = pd.DataFrame(outGL4, columns=header_names[:11])
 
         # --- SUB 2: FILTER STOCK TRACKING (Proteksi jika None/Kosong) ---
         dictTrans = {}
