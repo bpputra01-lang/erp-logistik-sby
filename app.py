@@ -3833,28 +3833,30 @@ elif menu == "FDR Update":
                     st.download_button(f"📥 {opt}", st.session_state.dict_kurir_fdr[opt].to_csv(index=False).encode('utf-8'), f"{opt}.csv", "text/csv")
                     st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
 elif menu == "Justification SO":
-    st.markdown('<div class="hero-header"><h1>JUTIFICATION ADJUSMENT</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>JUSTIFICATION ADJUSTMENT</h1></div>', unsafe_allow_html=True)
+    
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **ADJUSMENT FILE**: Gabungkan antara Adjusment **(Plus)** dan **(Minus)** dalam 1 File dan **QTY SO** yang telah terisi dengan qty yang akan diadjusment
-        - **SUMMARY STOCK**: Download **SUMMARY STOCK** yang ada di **POWER BI** dan pilih Store **JEZ SURABAYA**
-        - **PURCHASE ORDER**: Download **PURCHASE ORDER** yang di **POWER BI**, pilih Period Invoice **ALL TIME**, pilih Period RceiveIN **ALL TIME**, pilih Store **JEZ SURABAYA** 
+        - **ADJUSTMENT FILE**: Gabungkan antara Adjustment **(Plus)** dan **(Minus)** dalam 1 File dan **QTY SO** yang telah terisi dengan qty yang akan diadjustment.
+        - **SUMMARY STOCK**: Download **SUMMARY STOCK** dari **POWER BI** (Store: **JEZ SURABAYA**).
+        - **PURCHASE ORDER**: Download **PURCHASE ORDER** dari **POWER BI**, Period Invoice & Receive IN: **ALL TIME** (Store: **JEZ SURABAYA**).
         """)
-    with st.expander("💡Logic Information"):
+
+    with st.expander("💡 Logic Information"):
         st.info("""
-        **Logic Justifikasi**
-        - **Kesalahan Adjusment**
-            - Jika **QTY System > QTY SO (ADJ -)**, dan **Gap Adjusment bernilai (+)**
-            - Jika **QTY System < QTY SO (ADJ +)**, dan **Gap Adjusment bernilai (-)**
+        **Logic Justifikasi:**
+        - **Kesalahan Adjustment**
+            - Jika **QTY System > QTY SO (ADJ -)**, namun **Gap Adjustment bernilai (+)**.
+            - Jika **QTY System < QTY SO (ADJ +)**, namun **Gap Adjustment bernilai (-)**.
         - **Perlu Cek Cross Order**
-            - Jika Total Sales > dari total PO in + total TF in
+            - Jika Total Sales > (Total PO IN + Total TF IN).
         - **Cek Ulang Hasil Rekon**
-            - Jika Perhitungan **Real QTY** (PO IN + TF IN) - (SALES + TF OUT + DRAFT TF) Hasilnya sama dengan (=) **Current Stock**
-        - **Indikasi Bug Sistem**
-            - Jika **Real Qty = 0** dan **Gap Adjusment = 0** Namun **Current Stock tidak sama dengan 0**
-            - Jika **Qty System > QTY SO (ADJ -)** dan **Current Stock > Real QTY**
-            - Jika **Qty System < QTY SO (ADJ +)** dan **Current Stock < Real QTY**
+            - Jika **Real QTY** [(PO IN + TF IN) - (SALES + TF OUT + DRAFT TF)] hasilnya sama dengan (=) **Current Stock**.
+        - **Indikasi Bug Sistem (Update)**
+            - **Kondisi 1:** Jika (Real QTY = 0 AND Gap Adjustment = 0) tapi **Current Stock ≠ 0**.
+            - **Kondisi 2:** Jika QTY System > QTY SO AND Current Stock > Real QTY.
+            - **Kondisi 3:** Jika QTY System < QTY SO AND Current Stock < Real QTY (L2 & T2 ≠ 0).
         """)
     # 1. Inisialisasi Session State biar data nggak hilang pas diklik
     if 'result_so' not in st.session_state:
