@@ -3847,16 +3847,18 @@ elif menu == "Justification SO":
         st.info("""
         **Logic Justifikasi:**
         - **Kesalahan Adjustment**
-            - Jika **QTY System > QTY SO (ADJ -)**, namun **Gap Adjustment bernilai (+)**.
-            - Jika **QTY System < QTY SO (ADJ +)**, namun **Gap Adjustment bernilai (-)**.
+            - **Kondisi 1:** Jika **QTY System > QTY SO (ADJ -)**, namun **Gap Adjustment bernilai (+)**.
+            - **Kondisi 2:** Jika **QTY System < QTY SO (ADJ +)**, namun **Gap Adjustment bernilai (-)**.
         - **Perlu Cek Cross Order**
             - Jika Total Sales > (Total PO IN + Total TF IN).
         - **Cek Ulang Hasil Rekon**
             - Jika **Real QTY** [(PO IN + TF IN) - (SALES + TF OUT + DRAFT TF)] hasilnya sama dengan (=) **Current Stock**.
-        - **Indikasi Bug Sistem (Update)**
+        - **Indikasi Bug Sistem**
             - **Kondisi 1:** Jika (Real QTY = 0 AND Gap Adjustment = 0) tapi **Current Stock ≠ 0**.
             - **Kondisi 2:** Jika QTY System > QTY SO AND Current Stock > Real QTY.
             - **Kondisi 3:** Jika QTY System < QTY SO AND Current Stock < Real QTY (L2 & T2 ≠ 0).
+        - **UNDEFINED**
+            - **Kondisi dimana ke-4 Logic diatas tidak ada yang sesuai sehingga memerlukan analisa detail secara manual untuk cek justifikasinya.
         """)
     # 1. Inisialisasi Session State biar data nggak hilang pas diklik
     if 'result_so' not in st.session_state:
