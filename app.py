@@ -2689,7 +2689,10 @@ def process_justification(df_case, df_tracking, df_po):
         if t2 == l2 and t2 != 0:
             return "CEK ULANG HASIL REKON"
         
-        if (t2 == 0 and u2 <= 0 and l2 > 0) or (j2 > k2 and l2 > t2):
+        # Versi Python / Logic Script
+        if ((t2 == 0 and u2 == 0 and l2 != 0) or 
+            (j2 > k2 and l2 > t2) or 
+            (j2 < k2 and l2 != 0 and t2 != 0)):
             return "INDIKASI BUG SISTEM"
             
         return "UNDEFINED"
@@ -3837,6 +3840,18 @@ elif menu == "Justification SO":
         - **ADJUSMENT FILE**: Gabungkan antara Adjusment **(Plus)** dan **(Minus)** dalam 1 File dan **QTY SO** yang telah terisi dengan qty yang akan diadjusment
         - **SUMMARY STOCK**: Download **SUMMARY STOCK** yang ada di **POWER BI** dan pilih Store **JEZ SURABAYA**
         - **PURCHASE ORDER**: Download **PURCHASE ORDER** yang di **POWER BI**, pilih Period Invoice **ALL TIME**, pilih Period RceiveIN **ALL TIME**, pilih Store **JEZ SURABAYA** 
+        **Logic Justifikasi**
+        - **Kesalahan Adjusment**
+            - Jika **QTY System > QTY SO (ADJ -)**, dan **Gap Adjusment bernilai (+)**
+            - Jika **QTY System < QTY SO (ADJ +)**, dan **Gap Adjusment bernilai (-)**
+        - **Perlu Cek Cross Order**
+            - Jika Total Sales > dari total PO in + total TF in
+        - **Cek Ulang Hasil Rekon**
+            - Jika Perhitungan **Real QTY** (PO IN + TF IN) - (SALES + TF OUT + DRAFT TF) Hasilnya sama dengan (=) **Current Stock**
+        - **Indikasi Bug Sistem**
+            - Jika **Real Qty = 0** dan **Gap Adjusment = 0** Namun **Current Stock tidak sama dengan 0**
+            - Jika **Qty System > QTY SO (ADJ -)** dan **Current Stock > Real QTY**
+            - Jika **Qty System < QTY SO (ADJ +)** dan **Current Stock < Real QTY**
         """)
     # 1. Inisialisasi Session State biar data nggak hilang pas diklik
     if 'result_so' not in st.session_state:
