@@ -3926,7 +3926,12 @@ elif menu == "Justification SO":
 
 elif menu == "Compare System":
     st.markdown('<div class="hero-header"><h1>STOCK COMPARATION</h1></div>', unsafe_allow_html=True)
-    
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **STOCK SYSTEM 1**: Download ALL DATA STOCK Setelah jam operasional **Shift 2 (22:00)**
+        - **STOCK SYSTEM 2**: Download ALL DATA STOCK Sebelum jam operasional **Shift 0 (07:30)**
+        """)
     col1, col2 = st.columns(2)
     with col1:
         file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
