@@ -3651,7 +3651,7 @@ if menu == "Compare RTO":
             st.dataframe(df_full, use_container_width=True, hide_index=True)
             st.download_button("📥 Download All Data", df_full.to_csv(index=False).encode('utf-8'), "ALL_DATA_RTO.csv", "text/csv", key="dl_all", use_container_width=True)
 
-       with tab2:
+        with tab2:
             st.write("### 🚨 Daftar Item Selisih")
             
             # --- PERBAIKAN DI SINI ---
