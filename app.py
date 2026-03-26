@@ -3622,33 +3622,30 @@ if menu == "Compare RTO":
         df_full = st.session_state.rto_df_ds
         scan_col = df_full.columns[1]
         
-# --- # --- PERHITUNGAN METRIK (VERSI SUPER CLEAN & SUM TOTAL) ---
-        # 1. Bersihkan Kolom Note dari spasi liar & ubah ke Upper Case
-        df_full['NOTE'] = df_full['NOTE'].astype(str).str.strip().str.upper()
-        
-        # 2. Pastikan Numerik
-        scan_val = pd.to_numeric(df_full[scan_col], errors='coerce').fillna(0)
-        ambil_val = pd.to_numeric(df_full['QTY AMBIL'], errors='coerce').fillna(0)
+# --- PERHITUNGAN METRIK (TOTAL KUMULATIF SEMUA BARIS) ---
+        # 1. Pastikan numerik buat perhitungan
+        val_scan = pd.to_numeric(df_full[scan_col], errors='coerce').fillna(0)
+        val_ambil = pd.to_numeric(df_full['QTY AMBIL'], errors='coerce').fillna(0)
+        notes = df_full['NOTE'].astype(str).str.strip().str.upper()
 
-        # 3. Hitung Total & Sesuai
-        q_total = int(scan_val.sum())
-        q_sesuai = int(scan_val[df_full['NOTE'] == 'SESUAI'].sum())
+        # 2. Total Scan (Semua baris dihitung)
+        q_total = int(val_scan.sum())
         
-        # 4. LOGIKA SUM SELISIH (BUKAN COUNT BARIS)
-        # Cari baris yang KELEBIHAN AMBIL (Scan > Ambil)
-        mask_lebih = df_full['NOTE'] == 'KELEBIHAN AMBIL'
-        # Selisih = Total Scan - Total Ambil khusus untuk baris yang LEBIH
-        q_lebih = int((scan_val[mask_lebih] - ambil_val[mask_lebih]).sum())
+        # 3. Qty Sesuai (Hanya baris yang NOTE-nya SESUAI)
+        q_sesuai = int(val_scan[notes == 'SESUAI'].sum())
         
-        # 5. Cari baris yang KURANG AMBIL (Ambil > Scan)
-        mask_kurang = df_full['NOTE'] == 'KURANG AMBIL'
-        mask_missing = df_full['NOTE'] == 'DI APPSHEET DIAMBIL DI DS TIDAK ADA'
+        # 4. QTY KELEBIHAN (Total akumulasi selisih Scan - Ambil dari SEMUA baris kelebihan)
+        mask_l = notes == 'KELEBIHAN AMBIL'
+        q_lebih = int((val_scan[mask_l] - val_ambil[mask_l]).sum())
         
-        # Gabungkan selisih dari baris KURANG AMBIL dan baris yang tidak ada di DS
-        selisih_kurang = (ambil_val[mask_kurang] - scan_val[mask_kurang]).sum()
-        total_missing = ambil_val[mask_missing].sum()
+        # 5. QTY KURANG (Total akumulasi selisih Ambil - Scan dari SEMUA baris kurang/missing)
+        mask_k = notes == 'KURANG AMBIL'
+        mask_m = notes == 'DI APPSHEET DIAMBIL DI DS TIDAK ADA'
         
-        q_kurang = int(selisih_kurang + total_missing)
+        selisih_k = (val_ambil[mask_k] - val_scan[mask_k]).sum()
+        total_m = val_ambil[mask_m].sum()
+        
+        q_kurang = int(selisih_k + total_m)
 
         # Buat Tab
         tab1, tab2 = st.tabs(["📝 Summary Compare", "⚠️ Item Selisih"])
