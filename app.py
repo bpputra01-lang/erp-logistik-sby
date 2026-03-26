@@ -3622,28 +3622,33 @@ if menu == "Compare RTO":
         df_full = st.session_state.rto_df_ds
         scan_col = df_full.columns[1]
         
-# --- PERHITUNGAN METRIK (VERSI FIX SUM SELISIH) ---
-        # 1. Pastikan kolom numerik
-        df_full[scan_col] = pd.to_numeric(df_full[scan_col], errors='coerce').fillna(0)
-        df_full['QTY AMBIL'] = pd.to_numeric(df_full['QTY AMBIL'], errors='coerce').fillna(0)
-
-        # 2. Total & Sesuai (Berdasarkan Qty Scan)
-        q_total = int(df_full[scan_col].sum())
-        q_sesuai = int(df_full[df_full['NOTE'] == 'SESUAI'][scan_col].sum())
+# --- # --- PERHITUNGAN METRIK (VERSI SUPER CLEAN & SUM TOTAL) ---
+        # 1. Bersihkan Kolom Note dari spasi liar & ubah ke Upper Case
+        df_full['NOTE'] = df_full['NOTE'].astype(str).str.strip().str.upper()
         
-        # 3. QTY KELEBIHAN (Total selisih unit saat Scan > Ambil)
+        # 2. Pastikan Numerik
+        scan_val = pd.to_numeric(df_full[scan_col], errors='coerce').fillna(0)
+        ambil_val = pd.to_numeric(df_full['QTY AMBIL'], errors='coerce').fillna(0)
+
+        # 3. Hitung Total & Sesuai
+        q_total = int(scan_val.sum())
+        q_sesuai = int(scan_val[df_full['NOTE'] == 'SESUAI'].sum())
+        
+        # 4. LOGIKA SUM SELISIH (BUKAN COUNT BARIS)
+        # Cari baris yang KELEBIHAN AMBIL (Scan > Ambil)
         mask_lebih = df_full['NOTE'] == 'KELEBIHAN AMBIL'
-        # Rumus: Scan - Ambil
-        q_lebih = int((df_full.loc[mask_lebih, scan_col] - df_full.loc[mask_lebih, 'QTY AMBIL']).sum())
+        # Selisih = Total Scan - Total Ambil khusus untuk baris yang LEBIH
+        q_lebih = int((scan_val[mask_lebih] - ambil_val[mask_lebih]).sum())
         
-        # 4. QTY KURANG (Total selisih unit saat Ambil > Scan)
+        # 5. Cari baris yang KURANG AMBIL (Ambil > Scan)
         mask_kurang = df_full['NOTE'] == 'KURANG AMBIL'
-        # Rumus: Ambil - Scan
-        q_kurang = int((df_full.loc[mask_kurang, 'QTY AMBIL'] - df_full.loc[mask_kurang, scan_col]).sum())
-
-        # 5. Tambahan: Jika ada SKU yang di DS tidak ada tapi di Appsheet ada (Masuk Kurang)
         mask_missing = df_full['NOTE'] == 'DI APPSHEET DIAMBIL DI DS TIDAK ADA'
-        q_kurang += int(df_full.loc[mask_missing, 'QTY AMBIL'].sum())
+        
+        # Gabungkan selisih dari baris KURANG AMBIL dan baris yang tidak ada di DS
+        selisih_kurang = (ambil_val[mask_kurang] - scan_val[mask_kurang]).sum()
+        total_missing = ambil_val[mask_missing].sum()
+        
+        q_kurang = int(selisih_kurang + total_missing)
 
         # Buat Tab
         tab1, tab2 = st.tabs(["📝 Summary Compare", "⚠️ Item Selisih"])
