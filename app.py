@@ -2043,97 +2043,84 @@ def engine_compare_draft_jezpro(df_app, df_draft):
         if s.endswith('.0'): s = s[:-2]
         return s if s not in ["NAN", "0", "NONE"] else ""
 
-    # --- 1. REKAP DATA APPSHEET (Gunakan Dictionary sebagai "Gudang Penampung") ---
-    app_summary = {} # (SKU, BIN) -> QTY
+    # --- 1. REKAP DATA APPSHEET ---
+    app_summary = {} 
     for _, r in df_a.iterrows():
-        # Pasangan 1 (Kolom 9 & 12)
-        s1, b1 = clean_sku(r.get('9')), str(r.get('12', '')).strip().upper()
-        q1 = pd.to_numeric(r.get('13', 0), errors='coerce') or 0
-        if s1 and b1 not in ["", "0", "NAN"]:
-            app_summary[(s1, b1)] = app_summary.get((s1, b1), 0) + q1
+        # Ambil semua pasangan SKU & BIN dari AppSheet (Kolom 9&12, 15&16)
+        pairs = [(clean_sku(r.get('9')), str(r.get('12','')).strip().upper(), pd.to_numeric(r.get('13',0), errors='coerce') or 0),
+                 (clean_sku(r.get('15')) or clean_sku(r.get('9')), str(r.get('16','')).strip().upper(), pd.to_numeric(r.get('17',0), errors='coerce') or 0)]
+        
+        for s, b, q in pairs:
+            if s and b not in ["", "0", "NAN"]:
+                app_summary[(s, b)] = app_summary.get((s, b), 0) + q
 
-        # Pasangan 2 (Kolom 15 & 16)
-        s2_raw = clean_sku(r.get('15'))
-        s2 = s2_raw if s2_raw else s1 
-        b2 = str(r.get('16', '')).strip().upper()
-        q2 = pd.to_numeric(r.get('17', 0), errors='coerce') or 0
-        if s2 and b2 not in ["", "0", "NAN"]:
-            app_summary[(s2, b2)] = app_summary.get((s2, b2), 0) + q2
-
-    # --- 2. UPDATE ITEM DI DRAFT (Sistem Pengurangan Kuota) ---
-    # Kita buat salinan app_summary untuk dilacak pengurangannya
+    # Kita pakai copy untuk tracking sisa stok yang belum terpakai
     rem_app = app_summary.copy()
+
+    # --- 2. TAHAP 1: PRIORITAS MATCH SEMPURNA (ANTI BARIS DOUBLE) ---
+    # Kita tandai dulu baris mana yang sudah OK biar nggak kena tabrak logic PINDAH BIN
+    processed_indices = set()
 
     for idx, row in df_res.iterrows():
         sku_d = clean_sku(row.iloc[3])
         bin_d = str(row.iloc[8]).strip().upper()
         qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
-        
         key_d = (sku_d, bin_d)
-        qty_j, bin_lain, qty_lain, note, status = 0, "", "", "", ""
 
-        # PRIORITAS 1: MATCH SEMPURNA (SKU & BIN SAMA)
         if rem_app.get(key_d, 0) > 0:
             qty_j = rem_app[key_d]
-            if qty_j == qty_h:
-                note, status = "DRAFT SESUAI", "OK"
-            else:
-                note, status = "BEDA QTY", "PERLU EDIT QTY DRAFT"
-            # Kosongkan sisa kuota untuk kunci ini agar tidak dipakai baris lain
-            rem_app[key_d] = 0 
-        
-        # PRIORITAS 2: SKU ADA TAPI BIN BEDA (PINDAH BIN)
-        else:
-            # Cari di rem_app apakah ada SKU ini di BIN manapun yang masih punya QTY
-            possible_bins = [k for k, v in rem_app.items() if k[0] == sku_d and v > 0]
+            rem_app[key_d] = 0 # Habiskan kuota karena sudah match sempurna
             
-            if possible_bins:
-                status = "PERLU EDIT BIN DRAFT"
-                note = "PINDAH BIN"
-                # Ambil semua info BIN yang tersedia di AppSheet untuk SKU ini
-                bins_info = [f"{b} ({q})" for (s, b), q in rem_app.items() if s == sku_d and q > 0]
-                bin_lain = ", ".join([b[1] for b in possible_bins])
-                qty_lain = sum([rem_app[b] for b in possible_bins])
-                qty_j = 0
-                
-                # JANGAN kurangi rem_app di sini karena PINDAH BIN biasanya 
-                # berarti item tersebut akan muncul sebagai "ADD NEW" atau 
-                # dicocokkan ke baris draft lain nantinya.
-            else:
-                # PRIORITAS 3: TIDAK ADA SAMA SEKALI
-                qty_j = 0
-                note, status = "HAPUS ITEM INI", "DELETE ITEM"
+            note = "DRAFT SESUAI" if qty_j == qty_h else "BEDA QTY"
+            status = "OK" if qty_j == qty_h else "PERLU EDIT QTY DRAFT"
+            
+            df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
+                [qty_j, note, "", 0, status]
+            processed_indices.add(idx)
 
-        df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
-            [qty_j, note, bin_lain, qty_lain, status]
+    # --- 3. TAHAP 2: SISANYA BARU CEK PINDAH BIN / DELETE ---
+    for idx, row in df_res.iterrows():
+        if idx in processed_indices: continue # Lewati yang sudah OK di Tahap 1
 
-    # --- 3. TAMBAHKAN ITEM BARU (Hanya sisa yang belum ter-match di rem_app) ---
-    new_rows = []
-    # Kumpulkan SKU yang sudah ada di Draft untuk filter ADD NEW
+        sku_d = clean_sku(row.iloc[3])
+        bin_d = str(row.iloc[8]).strip().upper()
+        
+        # Cari apakah SKU ini ada di BIN lain yang MASIH punya sisa stok di rem_app
+        possible_bins = [k for k, v in rem_app.items() if k[0] == sku_d and v > 0]
+        
+        if possible_bins:
+            # Info BIN lain diambil dari sisa stok yang belum ter-match
+            bin_lain = ", ".join([b[1] for b in possible_bins])
+            qty_lain = sum([rem_app[b] for b in possible_bins])
+            
+            df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
+                [0, "PINDAH BIN", bin_lain, qty_lain, "PERLU EDIT BIN DRAFT"]
+        else:
+            df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
+                [0, "HAPUS ITEM INI", "", 0, "DELETE ITEM"]
+
+    # --- 4. TAHAP 3: ADD NEW (Hanya jika SKU bener-bener gak ada di Draft) ---
     sku_in_draft = set(df_draft.iloc[:, 3].apply(clean_sku).unique())
+    new_rows = []
 
     for (sku_a, bin_a), qty_a in rem_app.items():
-        if qty_a > 0: # Hanya yang belum diproses di tahap 2
-            # Jika SKU sudah ada di Draft tapi di BIN berbeda, 
-            # dia sudah masuk status "PINDAH BIN" di atas, tidak perlu ADD NEW lagi.
-            if sku_a not in sku_in_draft:
-                new_entry = {col: "" for col in df_res.columns}
-                new_entry[df_res.columns[0]] = "-" 
-                new_entry[df_res.columns[3]] = sku_a 
-                new_entry[df_res.columns[7]] = 0 
-                new_entry[df_res.columns[8]] = bin_a 
-                new_entry['QTY AMBIL'] = qty_a
-                new_entry['NOTE'] = "TAMBAH ITEM BARU"
-                new_entry['STATUS'] = "ADD NEW"
-                new_rows.append(new_entry)
+        if qty_a > 0 and sku_a not in sku_in_draft:
+            new_entry = {col: "" for col in df_res.columns}
+            new_entry[df_res.columns[0]] = "-" 
+            new_entry[df_res.columns[3]] = sku_a 
+            new_entry[df_res.columns[7]] = 0 
+            new_entry[df_res.columns[8]] = bin_a 
+            new_entry['QTY AMBIL'] = qty_a
+            new_entry['NOTE'] = "TAMBAH ITEM BARU"
+            new_entry['STATUS'] = "ADD NEW"
+            new_rows.append(new_entry)
+            rem_app[(sku_a, bin_a)] = 0 # Tandai sudah masuk ADD NEW
 
     if new_rows:
         df_res = pd.concat([df_res, pd.DataFrame(new_rows)], ignore_index=True)
 
-    # Final Cleaning (Integer format)
-    cols_qty = ['QTY AMBIL', 'QTY BIN LAIN']
-    col_idx_7 = df_res.columns[7]
-    for col in cols_qty + [col_idx_7]:
+    # Convert angka .0 jadi integer biar bersih
+    for col in ['QTY AMBIL', 'QTY BIN LAIN', df_res.columns[7]]:
         if col in df_res.columns:
             df_res[col] = pd.to_numeric(df_res[col], errors='coerce').fillna(0).astype(int)
 
