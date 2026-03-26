@@ -3648,7 +3648,7 @@ if menu == "Compare RTO":
     
     if st.session_state.rto_df_selisih is not None:
         st.divider()
-        st.subheader("📊 Hasil Analisis RTO")
+        st.subheader("📊 COMPARE DATA SCAN VS APPSHEET")
         
         # Ambil data lengkap
         df_full = st.session_state.rto_df_ds
@@ -3744,7 +3744,7 @@ if menu == "Compare RTO":
 
     if st.session_state.rto_draft_compared is not None:
         st.divider()
-        st.subheader("📊 DASHBOARD DRAFT (QTY AMBIL)")
+        st.subheader("📊 FINAL COMPARE RTO")
         df_comp = st.session_state.rto_draft_compared
         # Pastikan kolom sudah numerik dulu biar gak error saat dijumlah
         qty_ambil = pd.to_numeric(df_comp['QTY AMBIL'], errors='coerce').fillna(0)
