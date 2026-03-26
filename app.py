@@ -3746,9 +3746,20 @@ if menu == "Compare RTO":
         st.divider()
         st.subheader("📊 DASHBOARD DRAFT (QTY AMBIL)")
         df_comp = st.session_state.rto_draft_compared
-        q_draft_total = int(pd.to_numeric(df_comp['QTY AMBIL'], errors='coerce').sum())
-        q_ok = int(pd.to_numeric(df_comp[df_comp['STATUS'] == 'OK']['QTY AMBIL'], errors='coerce').sum())
-        q_edit = int(pd.to_numeric(df_comp[df_comp['STATUS'].str.contains('EDIT', na=False)]['QTY AMBIL'], errors='coerce').sum())
+        # Pastikan kolom sudah numerik dulu biar gak error saat dijumlah
+        qty_ambil = pd.to_numeric(df_comp['QTY AMBIL'], errors='coerce').fillna(0)
+        qty_lain = pd.to_numeric(df_comp['QTY BIN LAIN'], errors='coerce').fillna(0)
+
+        # 1. QTY DRAFT TOTAL (Menjumlahkan semua qty ambil dan qty bin lain)
+        q_draft_total = int((qty_ambil + qty_lain).sum())
+
+        # 2. QTY OK (Hanya yang statusnya 'OK', menjumlahkan qty ambil + qty bin lain)
+        mask_ok = (df_comp['STATUS'] == 'OK')
+        q_ok = int((qty_ambil[mask_ok] + qty_lain[mask_ok]).sum())
+
+        # 3. QTY PERLU EDIT (Yang statusnya mengandung kata 'EDIT', menjumlahkan qty ambil + qty bin lain)
+        mask_edit = df_comp['STATUS'].str.contains('EDIT', na=False)
+        q_edit = int((qty_ambil[mask_edit] + qty_lain[mask_edit]).sum())
         q_del = int(pd.to_numeric(df_comp[df_comp['STATUS'] == 'DELETE ITEM']['Qty Transfer'], errors='coerce').sum())
         
         dc1, dc2, dc3, dc4 = st.columns(4)
