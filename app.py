@@ -3651,17 +3651,28 @@ if menu == "Compare RTO":
             st.dataframe(df_full, use_container_width=True, hide_index=True)
             st.download_button("📥 Download All Data", df_full.to_csv(index=False).encode('utf-8'), "ALL_DATA_RTO.csv", "text/csv", key="dl_all", use_container_width=True)
 
-        with tab2:
+       with tab2:
             st.write("### 🚨 Daftar Item Selisih")
-            # Hanya tampilkan yang bermasalah
-            df_selisih_saja = df_full[df_full['NOTE'].isin(['KURANG AMBIL', 'KELEBIHAN AMBIL'])]
             
-            if not df_selisih_saja.empty:
-                st.dataframe(df_selisih_saja, use_container_width=True, hide_index=True)
-                st.download_button("📥 Download Item Selisih", df_selisih_saja.to_csv(index=False).encode('utf-8'), "HANYA_SELISIH_RTO.csv", "text/csv", key="dl_selisih", use_container_width=True)
+            # --- PERBAIKAN DI SINI ---
+            # Kita gunakan rto_df_selisih karena variabel ini yang menyimpan detail BIN
+            df_selisih_detail = st.session_state.rto_df_selisih
+            
+            if not df_selisih_detail.empty:
+                # Menampilkan dataframe dengan kolom detail BIN sesuai request
+                st.dataframe(df_selisih_detail, use_container_width=True, hide_index=True)
+                
+                # Tombol download juga menggunakan data detail
+                st.download_button(
+                    "📥 Download Item Selisih (Detail BIN)", 
+                    df_selisih_detail.to_csv(index=False).encode('utf-8'), 
+                    "DETAIL_SELISIH_RTO.csv", 
+                    "text/csv", 
+                    key="dl_selisih_detail", 
+                    use_container_width=True
+                )
             else:
                 st.success("✨ Aman! Tidak ada item yang selisih.")
-    st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
     f_cek = st.file_uploader("Upload Hasil Cek Real", type=['xlsx','csv'], key="rto_cek")
     if f_cek and st.session_state.rto_df_app is not None:
@@ -3875,7 +3886,7 @@ elif menu == "Justification SO":
 
     # 2. Logika Tombol Run
     if up_case and up_tracking and up_others:
-        if st.button("▶️ RUN COMPARISON ANALYSIS", use_container_width=True):
+        if st.button("▶️ RUN COMPARE", use_container_width=True):
             with st.spinner("Processing Data..."):
                 df_c = pd.read_excel(up_case)
                 df_t = pd.read_excel(up_tracking)
