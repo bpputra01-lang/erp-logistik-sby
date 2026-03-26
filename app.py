@@ -3622,28 +3622,35 @@ if menu == "Compare RTO":
         df_full = st.session_state.rto_df_ds
         scan_col = df_full.columns[1]
         
-# --- PERHITUNGAN METRIK (TOTAL KUMULATIF SEMUA BARIS) ---
-        # 1. Pastikan numerik buat perhitungan
-        val_scan = pd.to_numeric(df_full[scan_col], errors='coerce').fillna(0)
-        val_ambil = pd.to_numeric(df_full['QTY AMBIL'], errors='coerce').fillna(0)
-        notes = df_full['NOTE'].astype(str).str.strip().str.upper()
+# --- PERHITUNGAN METRIK (WAJIB PAKAI DATA DETAIL BIN AGAR KUMULATIF) ---
+        
+        # 1. Gunakan data selisih yang sudah dipecah per BIN oleh engine
+        df_detail = st.session_state.rto_df_selisih 
+        
+        # 2. Pastikan numerik agar bisa dijumlahkan
+        v_scan = pd.to_numeric(df_detail['QTY SCAN'], errors='coerce').fillna(0)
+        v_ambil = pd.to_numeric(df_detail['QTY AMBIL BIN'], errors='coerce').fillna(0) # Pakai QTY AMBIL BIN
+        v_notes = df_detail['NOTE'].astype(str).str.strip().str.upper()
 
-        # 2. Total Scan (Semua baris dihitung)
-        q_total = int(val_scan.sum())
+        # 3. Metrik Utama (Tetap pakai df_full untuk total scan gudang)
+        q_total = int(pd.to_numeric(df_full[scan_col], errors='coerce').sum())
+        q_sesuai = int(pd.to_numeric(df_full[df_full['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
         
-        # 3. Qty Sesuai (Hanya baris yang NOTE-nya SESUAI)
-        q_sesuai = int(val_scan[notes == 'SESUAI'].sum())
+        # 4. QTY KELEBIHAN (Hajar semua baris yang muncul di Tabel Selisih)
+        # Jika satu SKU pecah jadi 3 BIN dan masing-masing selisih, bakal dijumlah semua di sini
+        mask_l = v_notes == 'KELEBIHAN AMBIL'
+        # Logika: Di baris detail, kita hitung selisih per barisnya
+        # Jika QTY SCAN (Total) vs QTY AMBIL BIN (Eceran), 
+        # kita hitung akumulasi selisih yang muncul di tampilan
+        q_lebih = int((v_scan[mask_l] - df_detail.loc[mask_l, 'QTY AMBIL']).sum()) 
         
-        # 4. QTY KELEBIHAN (Total akumulasi selisih Scan - Ambil dari SEMUA baris kelebihan)
-        mask_l = notes == 'KELEBIHAN AMBIL'
-        q_lebih = int((val_scan[mask_l] - val_ambil[mask_l]).sum())
+        # 5. QTY KURANG (Kumulatif semua baris selisih di tabel)
+        mask_k = v_notes == 'KURANG AMBIL'
+        mask_m = v_notes == 'DI APPSHEET DIAMBIL DI DS TIDAK ADA'
         
-        # 5. QTY KURANG (Total akumulasi selisih Ambil - Scan dari SEMUA baris kurang/missing)
-        mask_k = notes == 'KURANG AMBIL'
-        mask_m = notes == 'DI APPSHEET DIAMBIL DI DS TIDAK ADA'
-        
-        selisih_k = (val_ambil[mask_k] - val_scan[mask_k]).sum()
-        total_m = val_ambil[mask_m].sum()
+        # Hitung selisih dari semua baris yang muncul di tab 2
+        selisih_k = (df_detail.loc[mask_k, 'QTY AMBIL'] - v_scan[mask_k]).sum()
+        total_m = v_ambil[mask_m].sum()
         
         q_kurang = int(selisih_k + total_m)
 
