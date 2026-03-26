@@ -3474,7 +3474,6 @@ elif menu == "Database Master":
 elif menu == "Stock Minus":
     st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     
-    # CSS UNTUK BOX CUSTOM (Tampilan sesuai gambar Anda)
     st.markdown("""
         <style>
         .m-box {
@@ -3489,11 +3488,10 @@ elif menu == "Stock Minus":
         .m-val { color: #f39c12; font-size: 32px; font-weight: bold; }
         </style>
     """, unsafe_allow_html=True)
+
     with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **TERMASUK YANG SUDAH HABIS**
-        """)
+        st.info("**Format yang diharapkan:**\n- **ALL DATA STOCK**: Download di Jezpro dan pilih **TERMASUK YANG SUDAH HABIS**")
+
     uploaded_file = st.file_uploader("Upload File ALL DATA STOCK", type=["xlsx", "xlsm"])
     
     if uploaded_file:
@@ -3501,7 +3499,6 @@ elif menu == "Stock Minus":
             df = pd.read_excel(uploaded_file, engine="openpyxl")
             df.columns = [str(c).strip().upper() for c in df.columns]
             
-            # Identifikasi Kolom Utama
             col_sku = 'SKU'
             col_bin = 'BIN'
             col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
@@ -3516,151 +3513,109 @@ elif menu == "Stock Minus":
                         df[col_sku] = df[col_sku].astype(str).str.strip().str.upper()
                         df[col_bin] = df[col_bin].astype(str).str.strip().str.upper()
 
-                        # Data Minus Awal (untuk tab 1)
                         df_minus_awal = df[df[col_qty] < 0].copy()
-
-                        # 2. Bangun Dictionary SKU -> BIN -> QTY POSITIF (Mirip dict di VBA)
-                        # Hanya ambil yang QTY > 0 untuk jadi sumber penutup minus
                         df_positif = df[df[col_qty] > 0]
+                        
                         inventory = {}
                         for _, row in df_positif.iterrows():
-                            sku = row[col_sku]
-                            bin_name = row[col_bin]
-                            qty = row[col_qty]
-                            if sku not in inventory:
-                                inventory[sku] = {}
-                            inventory[sku][bin_name] = inventory[sku].get(bin_name, 0) + qty
+                            sku, bn, qt = row[col_sku], row[col_bin], row[col_qty]
+                            if sku not in inventory: inventory[sku] = {}
+                            inventory[sku][bn] = inventory[sku].get(bn, 0) + qt
 
-                        # 3. Setting Prioritas BIN (Sesuai Array priorBins di VBA)
-                        prior_bins = [
-                            "RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC",
-                            "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3",
-                            "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO",
-                            "STAGGING LT.2", "LT.4"
-                        ]
+                        prior_bins = ["RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC",
+                                      "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3",
+                                      "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"]
 
                         set_up_results = []
                         df_need_adj_list = []
 
-                        # 4. Proses Setiap Baris yang Minus
+                        # 2. Proses Alokasi (Logika Inti)
                         for _, row in df_minus_awal.iterrows():
                             sku = row[col_sku]
                             bin_asal = row[col_bin]
-                            sisa_minus = abs(row[col_qty]) # Jadi positif untuk dihitung
+                            sisa_minus = abs(row[col_qty])
                             
                             if sku not in inventory or not any(v > 0 for v in inventory[sku].values()):
-                                # TIDAK ADA STOK SAMA SEKALI
                                 row_adj = row.to_dict()
-                                row_adj.update({"BIN PENYELESAIAN": "TIDAK ADA", "QTY BIN": 0, "STATUS": "NEED ADJUSTMENT"})
+                                row_adj.update({"STATUS": "NEED ADJUSTMENT"})
                                 df_need_adj_list.append(row_adj)
                                 continue
 
                             sku_stock = inventory[sku]
-                            
-                            # PROSES SPLIT QTY (Do While sisa > 0)
                             while sisa_minus > 0:
                                 bin_solusi = ""
-                                
-                                # A. Cross-check TOKO vs LT.2
                                 if bin_asal == "TOKO":
                                     if sku_stock.get("STAGGING LT.2", 0) > 0: bin_solusi = "STAGGING LT.2"
                                     elif sku_stock.get("LT.2", 0) > 0: bin_solusi = "LT.2"
-                                
-                                elif bin_asal in ["STAGGING LT.2", "LT.2"]:
-                                    if sku_stock.get("TOKO", 0) > 0: bin_solusi = "TOKO"
+                                elif bin_asal in ["STAGGING LT.2", "LT.2"] and sku_stock.get("TOKO", 0) > 0:
+                                    bin_solusi = "TOKO"
 
-                                # B. Jalankan Prioritas BIN
                                 if not bin_solusi:
                                     for b in prior_bins:
                                         if sku_stock.get(b, 0) > 0:
                                             bin_solusi = b
                                             break
                                 
-                                # C. Cari BIN Lain (Kecuali REJECT)
                                 if not bin_solusi:
                                     for b, q in sku_stock.items():
                                         if b != "REJECT DEFECT" and q > 0:
                                             bin_solusi = b
                                             break
 
-                                # D. Eksekusi Alokasi
                                 if not bin_solusi:
                                     row_adj = row.to_dict()
-                                    row_adj.update({"BIN PENYELESAIAN": "TIDAK ADA", "QTY BIN": 0, "STATUS": "NEED ADJUSTMENT"})
+                                    row_adj.update({"STATUS": "NEED ADJUSTMENT"})
                                     df_need_adj_list.append(row_adj)
-                                    break # Keluar loop while karena stok habis
+                                    break
                                 else:
                                     qty_tersedia = sku_stock[bin_solusi]
                                     ambil = min(sisa_minus, qty_tersedia)
-                                    
-                                    # Simpan Hasil Mutasi (SET UP)
-                                    res_row = row.to_dict()
-                                    res_row.update({
-                                        "BIN PENYELESAIAN": bin_solusi,
-                                        "QTY BIN": ambil,
-                                        "STATUS": "DONE SET UP"
+                                    set_up_results.append({
+                                        "BIN AWAL": bin_solusi,    # Sesuai Macro VBA
+                                        "BIN TUJUAN": bin_asal,    # Sesuai Macro VBA
+                                        "SKU": sku,
+                                        "QUANTITY": ambil,
+                                        "NOTES": "STOCK MINUS"
                                     })
-                                    set_up_results.append(res_row)
-                                    
-                                    # Update sisa dan inventory
                                     sku_stock[bin_solusi] -= ambil
                                     sisa_minus -= ambil
 
-                        # 5. Finalisasi Data
-                        df_set_up = pd.DataFrame(set_up_results)
+                        # 3. Finalisasi DataFrame
+                        df_set_up_final = pd.DataFrame(set_up_results)
                         df_need_adj = pd.DataFrame(df_need_adj_list)
+                        
+                        # Fix QTY SO di Justifikasi (Kolom K / Indeks 10) menjadi 0
+                        if not df_need_adj.empty and len(df_need_adj.columns) >= 11:
+                            col_justif_qty = df_need_adj.columns[10]
+                            df_need_adj[col_justif_qty] = 0
 
-                        # Update Matrix Box
+                        # 4. Tampilan Dashboard
                         val_total_minus = len(df_minus_awal)
-                        val_mutasi = int(df_set_up['QTY BIN'].sum()) if not df_set_up.empty else 0
+                        val_mutasi = int(df_set_up_final['QUANTITY'].sum()) if not df_set_up_final.empty else 0
                         val_need_adj = len(df_need_adj)
 
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.markdown(f'<div class="m-box"><span class="m-lbl">Total Stock Minus</span><span class="m-val">{val_total_minus}</span></div>', unsafe_allow_html=True)
-                        with col2:
-                            st.markdown(f'<div class="m-box"><span class="m-lbl">Mutasi Stock Minus</span><span class="m-val">{val_mutasi}</span></div>', unsafe_allow_html=True)
-                        with col3:
-                            st.markdown(f'<div class="m-box"><span class="m-lbl">Need Justification</span><span class="m-val">{val_need_adj}</span></div>', unsafe_allow_html=True)
+                        c1, c2, c3 = st.columns(3)
+                        c1.markdown(f'<div class="m-box"><span class="m-lbl">Total Stock Minus</span><span class="m-val">{val_total_minus}</span></div>', unsafe_allow_html=True)
+                        c2.markdown(f'<div class="m-box"><span class="m-lbl">Mutasi Stock Minus</span><span class="m-val">{val_mutasi}</span></div>', unsafe_allow_html=True)
+                        c3.markdown(f'<div class="m-box"><span class="m-lbl">Need Justification</span><span class="m-val">{val_need_adj}</span></div>', unsafe_allow_html=True)
 
-                        # --- TAMPILAN TAB DENGAN KETERANGAN KOSONG ---
-                        tab1, tab2, tab3 = st.tabs(["📄 MINUS AWAL", "🔄 DETAIL MUTASI", "⚠️ JUSTIFIKASI"])
-                        
-                        with tab1:
-                            if not df_minus_awal.empty:
-                                st.dataframe(df_minus_awal, use_container_width=True)
-                            else:
-                                st.info("ℹ️ Tidak ada data stock minus dalam file ini.")
-                                
-                        with tab2:
-                            if set_up_results:
-                                st.dataframe(pd.DataFrame(set_up_results), use_container_width=True)
-                            else:
-                                st.warning("⚠️ Tidak ditemukan stock pendukung. Tidak ada mutasi yang dilakukan.")
-                                
-                        with tab3:
-                            if not df_need_adj.empty:
-                                st.dataframe(df_need_adj, use_container_width=True)
-                            else:
-                                st.success("✅ Semua stock minus berhasil ditutup! Tidak ada item butuh justifikasi.")
+                        t1, t2, t3 = st.tabs(["📄 MINUS AWAL", "🔄 TEMPLATE SET UP", "⚠️ JUSTIFIKASI"])
+                        with t1: st.dataframe(df_minus_awal, use_container_width=True)
+                        with t2: st.dataframe(df_set_up_final, use_container_width=True)
+                        with t3: st.dataframe(df_need_adj, use_container_width=True)
 
-                        # --- DOWNLOAD DENGAN SHEET KETERANGAN ---
+                        # 5. Export Excel
                         output = io.BytesIO()
                         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                            if not df_minus_awal.empty:
-                                df_minus_awal.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
-                            if set_up_results:
-                                pd.DataFrame(set_up_results).to_excel(writer, sheet_name='SET_UP', index=False)
+                            df_minus_awal.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
+                            df_set_up_final.to_excel(writer, sheet_name='SET_UP', index=False)
                             if not df_need_adj.empty:
                                 df_need_adj.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
-                            else:
-                                pd.DataFrame({"INFO": ["DATA BERSIH - TIDAK ADA MINUS"]}).to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
                         
-                        st.download_button("📥 DOWNLOAD HASIL", output.getvalue(), "HASIL_STOCK_MINUS.xlsx")
+                        st.download_button("📥 DOWNLOAD HASIL (Template Siap Upload)", output.getvalue(), "HASIL_STOCK_MINUS.xlsx")
 
         except Exception as e:
             st.error(f"Gagal memproses file: {e}")
-
 
 if menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
