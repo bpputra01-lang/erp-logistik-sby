@@ -3510,31 +3510,109 @@ elif menu == "Stock Minus":
                 st.error("❌ Kolom 'QTY SYSTEM' tidak ditemukan!")
             else:
                 if st.button("🔃 PROSES DATA"):
-                    with st.spinner('Memproses...'):
-                        # 1. DATA MINUS AWAL
+                    with st.spinner('Memproses sesuai logika Cross-Check...'):
+                        # 1. Persiapan Data
                         df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
+                        df[col_sku] = df[col_sku].astype(str).str.strip().str.upper()
+                        df[col_bin] = df[col_bin].astype(str).str.strip().str.upper()
+
+                        # Data Minus Awal (untuk tab 1)
                         df_minus_awal = df[df[col_qty] < 0].copy()
-                        
-                        # [LOGIKA PROSES MUTASI DIMULAI]
-                        qty_arr = df[col_qty].values.copy()
-                        sku_arr = df[col_sku].astype(str).values
-                        bin_arr = df[col_bin].astype(str).values
-                        
-                        # (Logika mapping dan prior_bins tetap di sini)
-                        # ... proses pencarian stock ...
-                        
-                        # [LOGIKA PROSES MUTASI SELESAI]
-                        set_up_results = [] # Anggap ini list hasil proses mutasi Anda
-                        df_final = df.copy()
-                        df_final[col_qty] = qty_arr
-                        df_need_adj = df_final[df_final[col_qty] < 0].copy()
-                        
-                        # --- TAMPILAN BOX CUSTOM ---
-                        st.divider()
-                        st.subheader("📊 RINGKASAN HASIL PROSES")
-                        
+
+                        # 2. Bangun Dictionary SKU -> BIN -> QTY POSITIF (Mirip dict di VBA)
+                        # Hanya ambil yang QTY > 0 untuk jadi sumber penutup minus
+                        df_positif = df[df[col_qty] > 0]
+                        inventory = {}
+                        for _, row in df_positif.iterrows():
+                            sku = row[col_sku]
+                            bin_name = row[col_bin]
+                            qty = row[col_qty]
+                            if sku not in inventory:
+                                inventory[sku] = {}
+                            inventory[sku][bin_name] = inventory[sku].get(bin_name, 0) + qty
+
+                        # 3. Setting Prioritas BIN (Sesuai Array priorBins di VBA)
+                        prior_bins = [
+                            "RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC",
+                            "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3",
+                            "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO",
+                            "STAGGING LT.2", "LT.4"
+                        ]
+
+                        set_up_results = []
+                        df_need_adj_list = []
+
+                        # 4. Proses Setiap Baris yang Minus
+                        for _, row in df_minus_awal.iterrows():
+                            sku = row[col_sku]
+                            bin_asal = row[col_bin]
+                            sisa_minus = abs(row[col_qty]) # Jadi positif untuk dihitung
+                            
+                            if sku not in inventory or not any(v > 0 for v in inventory[sku].values()):
+                                # TIDAK ADA STOK SAMA SEKALI
+                                row_adj = row.to_dict()
+                                row_adj.update({"BIN PENYELESAIAN": "TIDAK ADA", "QTY BIN": 0, "STATUS": "NEED ADJUSTMENT"})
+                                df_need_adj_list.append(row_adj)
+                                continue
+
+                            sku_stock = inventory[sku]
+                            
+                            # PROSES SPLIT QTY (Do While sisa > 0)
+                            while sisa_minus > 0:
+                                bin_solusi = ""
+                                
+                                # A. Cross-check TOKO vs LT.2
+                                if bin_asal == "TOKO":
+                                    if sku_stock.get("STAGGING LT.2", 0) > 0: bin_solusi = "STAGGING LT.2"
+                                    elif sku_stock.get("LT.2", 0) > 0: bin_solusi = "LT.2"
+                                
+                                elif bin_asal in ["STAGGING LT.2", "LT.2"]:
+                                    if sku_stock.get("TOKO", 0) > 0: bin_solusi = "TOKO"
+
+                                # B. Jalankan Prioritas BIN
+                                if not bin_solusi:
+                                    for b in prior_bins:
+                                        if sku_stock.get(b, 0) > 0:
+                                            bin_solusi = b
+                                            break
+                                
+                                # C. Cari BIN Lain (Kecuali REJECT)
+                                if not bin_solusi:
+                                    for b, q in sku_stock.items():
+                                        if b != "REJECT DEFECT" and q > 0:
+                                            bin_solusi = b
+                                            break
+
+                                # D. Eksekusi Alokasi
+                                if not bin_solusi:
+                                    row_adj = row.to_dict()
+                                    row_adj.update({"BIN PENYELESAIAN": "TIDAK ADA", "QTY BIN": 0, "STATUS": "NEED ADJUSTMENT"})
+                                    df_need_adj_list.append(row_adj)
+                                    break # Keluar loop while karena stok habis
+                                else:
+                                    qty_tersedia = sku_stock[bin_solusi]
+                                    ambil = min(sisa_minus, qty_tersedia)
+                                    
+                                    # Simpan Hasil Mutasi (SET UP)
+                                    res_row = row.to_dict()
+                                    res_row.update({
+                                        "BIN PENYELESAIAN": bin_solusi,
+                                        "QTY BIN": ambil,
+                                        "STATUS": "DONE SET UP"
+                                    })
+                                    set_up_results.append(res_row)
+                                    
+                                    # Update sisa dan inventory
+                                    sku_stock[bin_solusi] -= ambil
+                                    sisa_minus -= ambil
+
+                        # 5. Finalisasi Data
+                        df_set_up = pd.DataFrame(set_up_results)
+                        df_need_adj = pd.DataFrame(df_need_adj_list)
+
+                        # Update Matrix Box
                         val_total_minus = len(df_minus_awal)
-                        val_mutasi = int(sum([x['QUANTITY'] for x in set_up_results])) if set_up_results else 0
+                        val_mutasi = int(df_set_up['QTY BIN'].sum()) if not df_set_up.empty else 0
                         val_need_adj = len(df_need_adj)
 
                         col1, col2, col3 = st.columns(3)
