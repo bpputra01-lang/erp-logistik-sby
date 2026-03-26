@@ -3622,21 +3622,27 @@ if menu == "Compare RTO":
         df_full = st.session_state.rto_df_ds
         scan_col = df_full.columns[1]
         
-        # --- PERHITUNGAN METRIK ---
-        q_total = int(pd.to_numeric(df_full.iloc[:, 1], errors='coerce').fillna(0).sum())
-        q_sesuai = int(pd.to_numeric(df_full[df_full['NOTE'] == 'SESUAI'].iloc[:, 1], errors='coerce').fillna(0).sum())
+     # --- PERHITUNGAN METRIK ---
+        # 1. Pastikan kolom utama menjadi numerik agar tidak error saat pengurangan
+        df_full[scan_col] = pd.to_numeric(df_full[scan_col], errors='coerce').fillna(0)
+        df_full['QTY AMBIL'] = pd.to_numeric(df_full['QTY AMBIL'], errors='coerce').fillna(0)
+
+        # 2. Hitung Total & Sesuai
+        q_total = int(df_full[scan_col].sum())
+        q_sesuai = int(df_full[df_full['NOTE'] == 'SESUAI'][scan_col].sum())
         
-        q_lebih = int(
-            (pd.to_numeric(df_full[df_full['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').fillna(0) - 
-             pd.to_numeric(df_full[df_full['NOTE'] == 'KELEBIHAN AMBIL']['QTY AMBIL'], errors='coerce').fillna(0)
-            ).sum()
-        )
+        # 3. Hitung Selisih Kelebihan (Scan > Ambil)
+        df_lebih = df_full[df_full['NOTE'] == 'KELEBIHAN AMBIL']
+        q_lebih = int((df_lebih[scan_col] - df_lebih['QTY AMBIL']).sum())
         
-        q_kurang = int(
-            (pd.to_numeric(df_full[df_full['NOTE'] == 'KURANG AMBIL']['QTY AMBIL'], errors='coerce').fillna(0) - 
-             pd.to_numeric(df_full[df_full['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').fillna(0)
-            ).sum()
-        )
+        # 4. Hitung Selisih Kurang (Ambil > Scan)
+        df_kurang = df_full[df_full['NOTE'] == 'KURANG AMBIL']
+        q_kurang = int((df_kurang['QTY AMBIL'] - df_kurang[scan_col]).sum())
+
+        # 5. Tambahan: Jika ada status khusus "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
+        # Ini juga termasuk dalam kategori "KURANG AMBIL" secara logika sistem
+        mask_tidak_ada = df_full['NOTE'] == 'DI APPSHEET DIAMBIL DI DS TIDAK ADA'
+        q_kurang += int(df_full[mask_tidak_ada]['QTY AMBIL'].sum())
 
         # Buat Tab
         tab1, tab2 = st.tabs(["📝 Summary Compare", "⚠️ Item Selisih"])
