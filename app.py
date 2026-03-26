@@ -1987,6 +1987,9 @@ def engine_ds_rto_vba_total(df_ds, df_app):
 
     res_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
     
+    # --- PERBAIKAN: Hapus duplikat baris yang sama persis ---
+    res_selisih = res_selisih.drop_duplicates(subset=['SKU', 'BIN', 'QTY AMBIL BIN', 'NOTE'], keep='first')
+    
     # Final clean-up
     res_selisih['SKU'] = res_selisih['SKU'].apply(clean_sku)
     res_ds.drop(columns=['SKU_UPPER'], inplace=True)
