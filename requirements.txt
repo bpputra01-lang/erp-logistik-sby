@@ -7,3 +7,7 @@ xlsxwriter
 openpyxl
 altair<5
 plotly
+beautifulsoup4
+requests
+pandas
+lxml
