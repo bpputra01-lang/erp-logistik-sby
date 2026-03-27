@@ -2758,46 +2758,7 @@ def process_stock_comparison(file1, file2):
     except Exception as e:
         # Lempar error agar bisa ditangkap oleh UI (st.error)
         raise e
-import streamlit as st
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 
-st.set_page_config(page_title="JEZ Stock Monitor", layout="wide")
-
-st.title("📊 Monitoring Stok Real-time")
-url = "https://jezpro.id/data_stok"
-
-# Fungsi untuk mengambil data
-@st.cache_data(ttl=600) # Simpan di cache selama 10 menit agar tidak overload
-def fetch_data(url):
-    try:
-        # 1. Ambil konten web
-        response = requests.get(url, timeout=10)
-        
-        # 2. Jika web menggunakan tabel HTML standar
-        # Pandas bisa langsung membacanya
-        tables = pd.read_html(response.text)
-        return tables[0] # Ambil tabel pertama
-    except Exception as e:
-        return None
-
-# Tampilkan di UI
-data = fetch_data(url)
-
-if data is not None:
-    st.success(f"Data berhasil diambil dari {url}")
-    
-    # Fitur Search/Filter
-    search = st.text_input("Cari SKU atau Nama Barang:")
-    if search:
-        # Asumsi kolom nama barang ada di data (sesuaikan nama kolomnya)
-        data = data[data.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
-    
-    st.dataframe(data, use_container_width=True)
-else:
-    st.error("Gagal mengambil data. Pastikan link dapat diakses atau periksa struktur HTML-nya.")
-    
 with st.sidebar:
        st.markdown("""
     <style>
