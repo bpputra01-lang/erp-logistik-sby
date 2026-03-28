@@ -2788,65 +2788,66 @@ def save_data(df):
 
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # CSS UNTUK MENYELARASKAN WARNA SEMUA INPUT & TOMBOL
+    # CSS CLEAN & ELEGANT - NO DOUBLE BOX - BLUE THEME
     st.markdown("""
         <style>
         /* 1. Hero Header Biru */
         .hero-header {
             background-color: #007BFF;
             color: white;
-            padding: 15px;
-            border-radius: 10px;
+            padding: 12px;
+            border-radius: 8px;
             text-align: center;
             margin-bottom: 25px;
             font-weight: bold;
-            font-size: 22px;
+            font-size: 20px;
         }
 
-        /* 2. Form & Input - Kita paksa warna navy/dark blue agar selaras dengan selectbox */
+        /* 2. Menghilangkan Double Border & Background Hitam */
         [data-testid="stForm"] {
             border: none !important;
             padding: 0 !important;
         }
 
-        /* Menyelaraskan SKU, Nama Barang, Size, dan Textarea ke warna BIN Lokasi */
-        input, textarea, [data-baseweb="base-input"] {
-            background-color: #1a1c27 !important; /* Warna gelap navy seragam */
-            border: 1px solid #3d4156 !important; /* Border tipis halus */
-            border-radius: 8px !important;
-            color: #FFFFFF !important;
-            height: 45px !important;
+        /* Styling Input agar Sama dengan Dropdown BIN */
+        .stTextInput input, .stTextArea textarea {
+            background-color: #262730 !important; /* Warna Grey-Navy Streamlit */
+            color: white !important;
+            border: 1px solid #4a4d5e !important;
+            border-radius: 5px !important;
+            padding: 10px !important;
         }
         
-        /* Khusus untuk Textarea (Detail) agar tingginya tetap fleksibel tapi warna sama */
-        textarea {
-            height: auto !important;
-            min-height: 100px !important;
+        /* Hilangkan focus outline yang mengganggu */
+        .stTextInput input:focus, .stTextArea textarea:focus {
+            border-color: #007BFF !important;
+            box-shadow: 0 0 0 1px #007BFF !important;
         }
 
-        /* 3. Tombol Masukkan Daftar Reject (Warna Biru Elegant) */
+        /* 3. Tombol Simpan - Biru Elegant & Solid */
         div.stButton > button {
-            background-color: #007BFF !important; /* Biru terang agar eyecatching tapi serasi */
+            background-color: #007BFF !important;
             color: white !important;
+            border-radius: 6px !important;
             border: none !important;
-            border-radius: 8px !important;
-            width: 100% !important;
             font-weight: bold !important;
-            height: 50px !important;
-            margin-top: 10px;
-            transition: 0.3s;
+            width: 100% !important;
+            height: 48px !important;
+            margin-top: 15px !important;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         
         div.stButton > button:hover {
             background-color: #0056b3 !important;
-            box-shadow: 0px 4px 15px rgba(0, 123, 255, 0.3);
+            box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.4);
         }
 
-        /* Styling Label */
+        /* Warna Label */
         label {
             color: #E0E0E0 !important;
+            font-size: 13px !important;
             font-weight: 600 !important;
-            font-size: 14px !important;
             margin-bottom: 5px !important;
         }
         </style>
