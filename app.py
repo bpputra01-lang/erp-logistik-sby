@@ -2823,10 +2823,9 @@ def delete_single_row(sku, tanggal):
         
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # CSS ULTIMATE - CLEAN & PROFESSIONAL LOOK
+    # --- 1. CSS & HEADER ---
     st.markdown("""
         <style>
-        /* 1. Hero Header Biru */
         .hero-header {
             background-color: #007BFF;
             color: white;
@@ -2837,72 +2836,32 @@ def menu_reject_defect():
             font-weight: bold;
             font-size: 20px;
         }
-
-        /* 2. Menghilangkan Double Border (Box-in-Box) */
-        [data-testid="stForm"] {
-            border: none !important;
-            padding: 0 !important;
-        }
-
-        /* Styling Input Text & Textarea agar menyatu sempurna */
+        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div {
-            background-color: #1a1c27 !important; /* Warna Navy Gelap */
+            background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             border-radius: 6px !important;
             color: white !important;
         }
-
-        /* Menghilangkan garis input internal bawaan streamlit */
-        input, textarea {
-            background-color: transparent !important;
-            border: none !important;
-            color: white !important;
-        }
-
-        /* 3. Tombol Simpan - Biru Solid & Elegant */
+        input, textarea { background-color: transparent !important; border: none !important; color: white !important; }
         div.stButton > button {
             background-color: #007BFF !important;
             color: white !important;
-            border: none !important;
             border-radius: 8px !important;
-            width: 250px !important; /* Ukuran pas, tidak kepanjangan */
+            width: 100% !important;
             height: 48px !important;
             font-weight: bold !important;
-            margin-top: 20px !important;
-            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
         }
-        
-        div.stButton > button:hover {
-            background-color: #0056b3 !important;
-            transform: translateY(-1px);
-        }
-
-        /* Warna Label agar kontras */
-        label {
-            color: #E0E0E0 !important;
-            font-weight: 600 !important;
-            font-size: 14px !important;
-        }
-        /* Styling khusus untuk tombol hapus agar berwarna merah */
-        div[data-testid="stVerticalBlock"] > div:last-child button {
-            background-color: #FF4B4B !important;
-            color: white !important;
-            border: none !important;
-        }
-
-        div[data-testid="stVerticalBlock"] > div:last-child button:hover {
-            background-color: #D32F2F !important;
-        }
+        label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # Menampilkan Hero Header Biru
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
     
     init_db()
 
-    # Form Input Manual
+    # --- 2. FORM INPUT MANUAL ---
     with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -2914,14 +2873,14 @@ def menu_reject_defect():
             kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
             keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
-        # Tombol sudah otomatis berubah jadi biru elegant lewat CSS di atas
         btn_submit = st.form_submit_button("MASUKKAN KE DAFTAR REJECT")
 
     if btn_submit:
         if sku:
             new_data = pd.DataFrame([{
                 'BIN': bin_val, 'SKU': sku, 'ARTICLE_NAME': article,
-                'SIZE': size, 'KATEGORI': kategori, 'KETERANGAN': keterangan
+                'SIZE': size, 'KATEGORI': kategori, 'KETERANGAN': keterangan,
+                'TANGGAL_INPUT': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }])
             save_data(new_data)
             st.success(f"Data {sku} berhasil disimpan!")
@@ -2929,84 +2888,66 @@ def menu_reject_defect():
         else:
             st.error("SKU wajib diisi!")
 
-    # ... Sisa kode upload file & table tetap sama ...
-
-    # --- BAGIAN 2: UPLOAD FILE & DOWNLOAD TEMPLATE ---
+    # --- 3. UPLOAD FILE & TEMPLATE ---
     st.divider()
     st.subheader("📁 Upload Massal via Excel")
     col_dl, col_up = st.columns([1, 2])
 
     with col_dl:
-        # Buat Template Excel
         template_cols = ['BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
         df_template = pd.DataFrame(columns=template_cols)
-        
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_template.to_excel(writer, index=False)
-        
-        st.download_button(
-            label="⬇️ Download Template Excel",
-            data=output.getvalue(),
-            file_name="template_reject_list.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        st.download_button("⬇️ Template Excel", output.getvalue(), "template_reject.xlsx")
 
     with col_up:
         uploaded_file = st.file_uploader("Upload File Excel", type=['xlsx'])
-        if uploaded_file is not None:
+        if uploaded_file:
             try:
                 df_upload = pd.read_excel(uploaded_file)
-                # Validasi Header
                 if set(template_cols).issubset(df_upload.columns):
                     if st.button("Proses & Simpan Data Upload"):
-                        save_data(df_upload[template_cols])
-                        st.success(f"Berhasil mengimport {len(df_upload)} baris data!")
+                        df_upload['TANGGAL_INPUT'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        save_data(df_upload)
+                        st.success("Import Berhasil!")
                         st.rerun()
                 else:
-                    st.error("Format kolom tidak sesuai template!")
+                    st.error("Format kolom tidak sesuai!")
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    # --- BAGIAN 3: TAMPILAN DATA & ACTION ---
-st.divider()
-st.subheader("📊 Database Reject List")
-
-# Ambil Data
-conn = sqlite3.connect('inventory_logistik.db')
-df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
-conn.close()
-
-if not df_db.empty:
-    # 1. Bagian Tombol Hapus Semua (Multiple)
-    # Gunakan popover agar tidak sengaja terhapus semua
-    with st.popover("🗑️ OPSI HAPUS SEMUA DATA", use_container_width=True):
-        st.warning("Tindakan ini akan menghapus seluruh isi database!")
-        if st.button("YA, KOSONGKAN DATABASE", type="primary"):
-            clear_all_data()
-            st.rerun()
-
-    # 2. Fitur Hapus Per Baris (Single) - Pakai Expander agar UI tetap bersih
-    with st.expander("❌ Hapus Baris Spesifik"):
-        col_sku, col_date = st.columns(2)
-        with col_sku:
-            selected_sku = st.selectbox("Pilih SKU", df_db['SKU'].unique(), key="del_sku")
-        with col_date:
-            # Filter tanggal untuk SKU tersebut
-            df_filtered = df_db[df_db['SKU'] == selected_sku]
-            selected_date = st.selectbox("Pilih Tanggal Input", df_filtered['TANGGAL_INPUT'], key="del_date")
-        
-        if st.button(f"Hapus SKU {selected_sku} pada tanggal ini", use_container_width=True):
-            delete_single_row(selected_sku, selected_date)
-            st.rerun()
-
-    # 3. Tampilkan Tabel Utama
+    # --- 4. TAMPILAN DATA & ACTION ---
     st.divider()
-    st.dataframe(df_db, use_container_width=True)
+    st.subheader("📊 Database Reject List")
 
-else:
-    # Baris else ini harus sejajar secara vertikal dengan 'if not df_db.empty:'
-    st.info("Database kosong.")
+    conn = sqlite3.connect('inventory_logistik.db')
+    df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
+    conn.close()
+
+    if not df_db.empty:
+        # Hapus Semua
+        with st.popover("🗑️ OPSI HAPUS SEMUA DATA", use_container_width=True):
+            st.warning("Hapus permanen seluruh isi database?")
+            if st.button("YA, KOSONGKAN DATABASE", type="primary"):
+                clear_all_data()
+                st.rerun()
+
+        # Hapus Single Row
+        with st.expander("❌ Hapus Baris Spesifik"):
+            c1, c2 = st.columns(2)
+            with c1:
+                sel_sku = st.selectbox("Pilih SKU", df_db['SKU'].unique(), key="del_sku")
+            with c2:
+                sel_date = st.selectbox("Pilih Tanggal", df_db[df_db['SKU']==sel_sku]['TANGGAL_INPUT'], key="del_date")
+            
+            if st.button(f"Hapus {sel_sku} Terpilih", use_container_width=True):
+                delete_single_row(sel_sku, sel_date)
+                st.rerun()
+
+        st.dataframe(df_db, use_container_width=True)
+    else:
+        st.info("Database kosong.")
 
 # 3. Integrasi ke Main Menu
 def main():
