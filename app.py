@@ -3033,22 +3033,33 @@ def menu_reject_defect():
                 st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} SKU")
                 
             with m2:
-                major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
-                p_major = (major_cnt / total_val * 100) if total_val > 0 else 0
+            major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
+            p_major = (major_cnt / total_val * 100) if total_val > 0 else 0
             
-                # LOGIKA PANAH MANUAL
-                # Jika 0, kita pakai panah bawah (↓). Jika ada isinya, pakai panah atas (↑)
-                icon_major = "↑" if major_cnt > 0 else "↓"
+            # LOGIKA: Kalau 0 atau turun, kita kasih nilai negatif ke delta
+            # Tapi di tampilan (f-string) kita buat dia tetap rapi
+            delta_val = p_major if major_cnt > 0 else -0.0001 
             
-                st.metric(label="🔴 MAJOR CONDITION", value=f"{major_cnt} ITEMS", delta=f"{icon_major} {p_major:.1f}% Items", delta_color="normal" if major_cnt > 0 else "inverse")
+            st.metric(
+                label="🔴 MAJOR CONDITION", 
+                value=f"{major_cnt} ITEMS", 
+                delta=f"{p_major:.1f}% Items",
+                delta_color="normal" # Biar Streamlit yang atur panahnya sendiri
+            )
             
             with m3:
-                minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
-                p_minor = (minor_cnt / total_val * 100) if total_val > 0 else 0
+            minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
+            p_minor = (minor_cnt / total_val * 100) if total_val > 0 else 0
             
-                icon_minor = "↑" if minor_cnt > 0 else "↓"
+            # Kasih nilai negatif sangat kecil supaya panah otomatis nunduk ke bawah
+            delta_val_min = p_minor if minor_cnt > 0 else -0.0001
             
-                st.metric(label="🟡 MINOR CONDITION", value=f"{minor_cnt} ITEMS", delta=f"{icon_minor} {p_minor:.1f}% Items",delta_color="normal" if minor_cnt > 0 else "inverse")
+            st.metric(
+                label="🟡 MINOR CONDITION", 
+                value=f"{minor_cnt} ITEMS", 
+                delta=f"{p_minor:.1f}% Items" if minor_cnt > 0 else f"-{p_minor:.1f}% Items",
+                delta_color="normal"
+            )
 
         # Baris 2: Grafik
         col_pie, col_bar = st.columns(2)
