@@ -2786,11 +2786,15 @@ def save_data(df):
     df.to_sql('reject_list', conn, if_exists='append', index=False)
     conn.close()
 def clear_all_data():
-    conn = sqlite3.connect('inventory_logistik.db')
-    c = conn.cursor()
-    c.execute('DELETE FROM reject_list')
-    conn.commit()
-    conn.close()
+    conn = sqlite3.connect('inventory_logistik.db', timeout=10) # Tambahkan timeout
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM reject_list")
+        conn.commit()
+    except Exception as e:
+        st.error(f"Gagal menghapus data: {e}")
+    finally:
+        conn.close()
 
 def delete_single_row(sku, tanggal):
     conn = sqlite3.connect('inventory_logistik.db')
