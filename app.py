@@ -2762,71 +2762,86 @@ import sqlite3
 import streamlit as st
 import pandas as pd
 
-# Fungsi untuk inisialisasi database
+# 1. Database Logic
 def init_db():
-    conn = sqlite3.connect('inventory_jez.db')
+    conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
+    # Menambahkan kolom TIMESTAMP untuk tracking kapan data reject diinput
     c.execute('''
-        CREATE TABLE IF NOT EXISTS master_stok (
+        CREATE TABLE IF NOT EXISTS reject_list (
             BIN TEXT,
             SKU TEXT,
             ARTICLE_NAME TEXT,
             SIZE TEXT,
             KATEGORI TEXT,
-            KETERANGAN TEXT
+            KETERANGAN TEXT,
+            TANGGAL_INPUT DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     conn.commit()
-    return conn
+    conn.close()
 
-# Fungsi untuk input data ke database
-def add_data(bin_val, sku, name, size, kat, ket):
-    conn = sqlite3.connect('inventory_jez.db')
+def save_reject_data(bin_val, sku, name, size, kat, ket):
+    conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
     c.execute('''
-        INSERT INTO master_stok (BIN, SKU, ARTICLE_NAME, SIZE, KATEGORI, KETERANGAN)
+        INSERT INTO reject_list (BIN, SKU, ARTICLE_NAME, SIZE, KATEGORI, KETERANGAN)
         VALUES (?, ?, ?, ?, ?, ?)
     ''', (bin_val, sku, name, size, kat, ket))
     conn.commit()
     conn.close()
-def main():
-    st.set_page_config(page_title="Input Database SQlite", layout="wide")
+
+# 2. UI Menu Reject/Defect List
+def menu_reject_defect():
+    st.header("⚠️ Reject / Defect List Entry")
+    st.info("Gunakan form ini untuk mendata barang defect yang ditemukan di BIN.")
+    
+    # Inisialisasi DB di dalam menu
     init_db()
 
-    st.title("📦 System Input Master Data")
-    
-    # Membuat Form Input
-    with st.form("input_form", clear_on_submit=True):
-        col1, col2, col3 = st.columns(3)
+    # Form Input
+    with st.form("form_reject", clear_on_submit=True):
+        col1, col2 = st.columns(2)
         
         with col1:
-            bin_val = st.text_input("BIN (Lokasi)")
-            sku = st.text_input("SKU")
+            bin_val = st.text_input("BIN LOKASI")
+            sku = st.text_input("SKU / ARTIKEL")
+            article = st.text_input("NAMA BARANG")
             
         with col2:
-            article = st.text_input("ARTICLE NAME")
             size = st.text_input("SIZE")
-            
-        with col3:
-            kategori = st.selectbox("KATEGORI", ["FOOTWEAR", "APPAREL", "ACCESSORIES", "OTHER"])
-            keterangan = st.text_area("KETERANGAN")
+            kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
+            keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
-        submit = st.form_submit_button("SIMPAN KE DATABASE")
+        btn_submit = st.form_submit_button("MASUKKAN KE DAFTAR REJECT")
 
-    if submit:
-        if bin_val and sku: # Validasi sederhana
-            add_data(bin_val, sku, article, size, kategori, keterangan)
-            st.success(f"Data SKU {sku} berhasil tersimpan ke SQLite!")
+    if btn_submit:
+        if sku and bin_val:
+            save_reject_data(bin_val, sku, article, size, kategori, keterangan)
+            st.success(f"Berhasil! Data {sku} telah masuk ke daftar defect.")
         else:
-            st.error("Gagal! BIN dan SKU wajib diisi.")
+            st.warning("Mohon isi minimal BIN dan SKU.")
 
-    # Menampilkan data yang tersimpan
+    # Tampilan Tabel Data Reject
     st.divider()
-    st.subheader("📊 Data Terdaftar")
-    conn = sqlite3.connect('inventory_jez.db')
-    df = pd.read_sql_query("SELECT * FROM master_stok", conn)
-    st.dataframe(df, use_container_width=True)
+    st.subheader("📋 Log Daftar Defect Terkini")
+    conn = sqlite3.connect('inventory_logistik.db')
+    df_show = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
+    st.dataframe(df_show, use_container_width=True)
     conn.close()
+
+# 3. Integrasi ke Main Menu (Sidebar Navigasi)
+def main():
+    st.sidebar.title("LOGISTIC SYSTEM")
+    # Tambahkan menu-menu lain di sini sesuai kebutuhan project Anda
+    menu_pilihan = st.sidebar.radio("Navigation", ["Dashboard", "Input Stock", "Reject/Defect List"])
+
+    if menu_pilihan == "Reject/Defect List":
+        menu_reject_defect()
+    elif menu_pilihan == "Dashboard":
+        st.write("### Halaman Utama Dashboard")
+    elif menu_pilihan == "Input Stock":
+        st.write("### Halaman Input Stock")
 
 if __name__ == "__main__":
     main()
