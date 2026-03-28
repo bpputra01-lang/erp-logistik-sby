@@ -2972,31 +2972,30 @@ def menu_reject_defect():
     st.divider()
     st.subheader("📊 Database Reject List")
     
-    # Tampilkan Data
-conn = sqlite3.connect('inventory_logistik.db')
-df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
-conn.close()
+    conn = sqlite3.connect('inventory_logistik.db')
+    df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
+    conn.close()
 
-if not df_db.empty:
+    if not df_db.empty:
     # 1. Tombol Clear All (Multiple)
     if st.button("🗑️ HAPUS SEMUA DATA"):
         clear_all_data()
 
-    # 2. Fitur Hapus Per Baris (Single)
-    # Kita buat kolom select untuk memilih data mana yang mau dihapus
-    st.subheader("Pilih Data untuk Dihapus")
-    selected_sku = st.selectbox("Pilih SKU yang akan dihapus", df_db['SKU'].unique())
+        # 2. Fitur Hapus Per Baris (Single)
+        # Kita buat kolom select untuk memilih data mana yang mau dihapus
+        st.subheader("Pilih Data untuk Dihapus")
+        selected_sku = st.selectbox("Pilih SKU yang akan dihapus", df_db['SKU'].unique())
     
-    # Filter tanggal untuk SKU tersebut (antisipasi SKU sama di tanggal beda)
-    df_filtered = df_db[df_db['SKU'] == selected_sku]
-    selected_date = st.selectbox("Pilih Tanggal Input", df_filtered['TANGGAL_INPUT'])
+        # Filter tanggal untuk SKU tersebut (antisipasi SKU sama di tanggal beda)
+        df_filtered = df_db[df_db['SKU'] == selected_sku]
+        selected_date = st.selectbox("Pilih Tanggal Input", df_filtered['TANGGAL_INPUT'])
 
-    if st.button(f"❌ Hapus SKU {selected_sku} Terpilih"):
-        delete_single_row(selected_sku, selected_date)
+        if st.button(f"❌ Hapus SKU {selected_sku} Terpilih"):
+            delete_single_row(selected_sku, selected_date)
 
-    # Tampilkan Tabel Utama
-    st.divider()
-    st.dataframe(df_db, use_container_width=True)
+        # Tampilkan Tabel Utama
+        st.divider()
+        st.dataframe(df_db, use_container_width=True)
     else:
         st.info("Database kosong.")
 
