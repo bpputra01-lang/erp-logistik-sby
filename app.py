@@ -2781,28 +2781,46 @@ def init_db():
     conn.commit()
     conn.close()
 
+import sqlite3
+import streamlit as st
+
+# 1. Fungsi Simpan (Append)
 def save_data(df):
-    conn = sqlite3.connect('inventory_logistik.db')
-    df.to_sql('reject_list', conn, if_exists='append', index=False)
-    conn.close()
-def clear_all_data():
-    conn = sqlite3.connect('inventory_logistik.db', timeout=10) # Tambahkan timeout
-    cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM reject_list")
-        conn.commit()
+        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
+            df.to_sql('reject_list', conn, if_exists='append', index=False)
+            conn.commit()
+        st.cache_data.clear() # Bersihkan cache agar data baru muncul
     except Exception as e:
-        st.error(f"Gagal menghapus data: {e}")
-    finally:
-        conn.close()
+        st.error(f"Gagal menyimpan data: {e}")
 
+# 2. Fungsi Hapus Semua (Multiple/Clear All)
+def clear_all_data():
+    try:
+        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM reject_list")
+            conn.commit()
+        st.cache_data.clear() # Paksa Streamlit lupakan data lama
+        st.success("Database berhasil dikosongkan!")
+        st.rerun() # Refresh halaman agar tabel langsung kosong
+    except Exception as e:
+        st.error(f"Gagal mengosongkan database: {e}")
+
+# 3. Fungsi Hapus Per Baris (Single Row)
 def delete_single_row(sku, tanggal):
-    conn = sqlite3.connect('inventory_logistik.db')
-    c = conn.cursor()
-    c.execute('DELETE FROM reject_list WHERE SKU = ? AND TANGGAL_INPUT = ?', (sku, tanggal))
-    conn.commit()
-    conn.close()
-
+    try:
+        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
+            cursor = conn.cursor()
+            # Gunakan filter SKU dan TANGGAL agar akurat
+            cursor.execute('DELETE FROM reject_list WHERE SKU = ? AND TANGGAL_INPUT = ?', (sku, tanggal))
+            conn.commit()
+        st.cache_data.clear()
+        st.success(f"SKU {sku} berhasil dihapus!")
+        st.rerun() # Refresh halaman agar baris tersebut hilang dari tabel
+    except Exception as e:
+        st.error(f"Gagal menghapus baris: {e}")
+        
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
     # CSS ULTIMATE - CLEAN & PROFESSIONAL LOOK
@@ -2954,32 +2972,31 @@ def menu_reject_defect():
     st.divider()
     st.subheader("📊 Database Reject List")
     
-    conn = sqlite3.connect('inventory_logistik.db')
-    df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
-    conn.close()
+    # Tampilkan Data
+conn = sqlite3.connect('inventory_logistik.db')
+df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
+conn.close()
 
-    if not df_db.empty:
-        # Layout untuk tombol Export dan Clear All
-        col_exp, col_clr = st.columns([3, 1])
-        
-        with col_exp:
-            # Tombol Export (Existing)
-            output_export = BytesIO()
-            with pd.ExcelWriter(output_export, engine='xlsxwriter') as writer:
-                df_db.to_excel(writer, index=False)
-            st.download_button("📥 Export ke Excel", output_export.getvalue(), "Laporan_Reject.xlsx")
+if not df_db.empty:
+    # 1. Tombol Clear All (Multiple)
+    if st.button("🗑️ HAPUS SEMUA DATA"):
+        clear_all_data()
 
-        with col_clr:
-            # Tombol Kosongkan Database (Hati-hati!)
-            if st.button("🗑️ KOSONGKAN SEMUA", use_container_width=True):
-                st.warning("Apakah Anda yakin ingin menghapus SEMUA data?")
-                if st.button("YA, HAPUS PERMANEN"):
-                    clear_all_data()
-                    st.success("Database telah dikosongkan!")
-                    st.rerun()
+    # 2. Fitur Hapus Per Baris (Single)
+    # Kita buat kolom select untuk memilih data mana yang mau dihapus
+    st.subheader("Pilih Data untuk Dihapus")
+    selected_sku = st.selectbox("Pilih SKU yang akan dihapus", df_db['SKU'].unique())
+    
+    # Filter tanggal untuk SKU tersebut (antisipasi SKU sama di tanggal beda)
+    df_filtered = df_db[df_db['SKU'] == selected_sku]
+    selected_date = st.selectbox("Pilih Tanggal Input", df_filtered['TANGGAL_INPUT'])
 
-        # Menampilkan tabel
-        st.dataframe(df_db, use_container_width=True)
+    if st.button(f"❌ Hapus SKU {selected_sku} Terpilih"):
+        delete_single_row(selected_sku, selected_date)
+
+    # Tampilkan Tabel Utama
+    st.divider()
+    st.dataframe(df_db, use_container_width=True)
     else:
         st.info("Database kosong.")
 
