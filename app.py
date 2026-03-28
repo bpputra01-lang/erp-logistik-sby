@@ -2914,8 +2914,6 @@ def menu_reject_defect():
     """, unsafe_allow_html=True)
 
     col_dl, col_up = st.columns([1, 2])
-    st.subheader("📁 Upload Massal via Excel")
-    col_dl, col_up = st.columns([1, 2])
 
     with col_dl:
         template_cols = ['BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
