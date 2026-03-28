@@ -3879,7 +3879,11 @@ if menu == "Compare RTO":
     
     if st.session_state.rto_df_selisih is not None:
         st.divider()
-        st.subheader("📊 COMPARE DATA SCAN VS APPSHEET")
+        st.markdown("""
+                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL DATA SCAN VS APPSHEET</h3>
+                </div>
+                """, unsafe_allow_html=True)
         
         # Ambil data lengkap
         df_full = st.session_state.rto_df_ds
@@ -3965,7 +3969,12 @@ if menu == "Compare RTO":
             st.success("✅ Refreshed!")
 
     st.divider()
-    st.subheader("📝 COMPARE DRAFT JEZPRO")
+    st.markdown("""
+                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL APPSHEET VS DRAFT</h3>
+                </div>
+                """, unsafe_allow_html=True)
+    
     f_draft = st.file_uploader("Upload Draft Jezpro", type=['xlsx','csv'], key="rto_draft_jezpro")
     if f_draft and st.session_state.rto_df_app is not None:
         if st.button("🔍 COMPARE DRAFT JEZPRO", use_container_width=True):
@@ -3975,7 +3984,11 @@ if menu == "Compare RTO":
 
     if st.session_state.rto_draft_compared is not None:
         st.divider()
-        st.subheader("📊 FINAL COMPARE RTO")
+        st.markdown("""
+                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋FINAL RESULT</h3>
+                </div>
+                """, unsafe_allow_html=True)
         df_comp = st.session_state.rto_draft_compared
         # Pastikan kolom sudah numerik dulu biar gak error saat dijumlah
         qty_ambil = pd.to_numeric(df_comp['QTY AMBIL'], errors='coerce').fillna(0)
@@ -4211,7 +4224,11 @@ elif menu == "Justification SO":
         
         # --- TAMPILAN TABEL ---
         st.divider()
-        st.subheader("📋 Summary Report Analysis")
+        st.markdown("""
+                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
+                </div>
+                """, unsafe_allow_html=True)
         st.dataframe(result, use_container_width=True, height=450)
         
         # --- DOWNLOAD BUTTON (DI LUAR BUTTON RUN AGAR STAY) ---
