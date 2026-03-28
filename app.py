@@ -2788,46 +2788,99 @@ def save_data(df):
 
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # CSS Fix Teks Agar Terlihat Jelas
+    # CUSTOM CSS UNTUK TAMPILAN ELEGANT & DARK THEME CONSISTENCY
     st.markdown("""
         <style>
-        input, textarea, [data-baseweb="select"] { color: #1E1E1E !important; }
+        /* 1. Header Biru (Hero Header) */
+        .hero-header {
+            background-color: #007BFF;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 24px;
+        }
+
+        /* 2. Menghilangkan Box Putih di Tengah (Form Transparent) */
+        [data-testid="stForm"] {
+            border: none !important;
+            padding: 0 !important;
+            background-color: transparent !important;
+        }
+
+        /* 3. Styling Input & Border Detail Kerusakan */
+        input, textarea, [data-baseweb="select"] {
+            color: #FFFFFF !important; /* Teks Putih agar kontras dengan box gelap */
+            background-color: #1E1E1E !important;
+            border: 1px solid #444 !important; /* Border tipis di garis batas */
+            border-radius: 5px !important;
+        }
+        
+        /* Border khusus merah/orange saat focus di Detail Kerusakan agar terlihat */
+        textarea:focus {
+            border: 1px solid #007BFF !important;
+            box-shadow: 0 0 5px rgba(0,123,255,0.5);
+        }
+
+        /* 4. Tombol Simpan Elegant (Warna Biru Seragam) */
+        div.stButton > button:first-child {
+            background-color: #007BFF !important;
+            color: white !important;
+            border-radius: 8px !important;
+            border: none !important;
+            width: 100% !important;
+            height: 45px !important;
+            font-weight: bold !important;
+            transition: 0.3s;
+        }
+        
+        div.stButton > button:first-child:hover {
+            background-color: #0056b3 !important;
+            box-shadow: 0px 4px 15px rgba(0, 123, 255, 0.4);
+        }
+
+        /* Label Teks Warna Putih/Terang */
         .stTextInput label, .stTextArea label, .stSelectbox label {
-            color: #31333F !important;
-            font-weight: 600;
+            color: #E0E0E0 !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    st.header("⚠️ Reject / Defect List Entry")
+    # Menampilkan Hero Header Biru
+    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
+    
     init_db()
 
-    # --- BAGIAN 1: INPUT MANUAL ---
-    with st.expander("📝 Input Manual Baru", expanded=True):
-        with st.form("form_reject", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                # Dropdown sesuai permintaan
-                bin_val = st.selectbox("BIN LOKASI", ["REJECT DC", "DEFECT DC", "DEFECT STORE"])
-                sku = st.text_input("SKU / ARTIKEL")
-                article = st.text_input("NAMA BARANG")
-            with col2:
-                size = st.text_input("SIZE")
-                kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
-                keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
+    # Form Input Manual
+    with st.form("form_reject", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            bin_val = st.selectbox("BIN LOKASI", ["REJECT DC", "DEFECT DC", "DEFECT STORE"])
+            sku = st.text_input("SKU / ARTIKEL")
+            article = st.text_input("NAMA BARANG")
+        with col2:
+            size = st.text_input("SIZE")
+            kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
+            keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
-            btn_submit = st.form_submit_button("MASUKKAN KE DAFTAR REJECT")
+        # Tombol sudah otomatis berubah jadi biru elegant lewat CSS di atas
+        btn_submit = st.form_submit_button("MASUKKAN KE DAFTAR REJECT")
 
-        if btn_submit:
-            if sku:
-                new_data = pd.DataFrame([{
-                    'BIN': bin_val, 'SKU': sku, 'ARTICLE_NAME': article,
-                    'SIZE': size, 'KATEGORI': kategori, 'KETERANGAN': keterangan
-                }])
-                save_data(new_data)
-                st.success(f"Data {sku} berhasil disimpan!")
-            else:
-                st.error("SKU wajib diisi!")
+    if btn_submit:
+        if sku:
+            new_data = pd.DataFrame([{
+                'BIN': bin_val, 'SKU': sku, 'ARTICLE_NAME': article,
+                'SIZE': size, 'KATEGORI': kategori, 'KETERANGAN': keterangan
+            }])
+            save_data(new_data)
+            st.success(f"Data {sku} berhasil disimpan!")
+            st.rerun()
+        else:
+            st.error("SKU wajib diisi!")
+
+    # ... Sisa kode upload file & table tetap sama ...
 
     # --- BAGIAN 2: UPLOAD FILE & DOWNLOAD TEMPLATE ---
     st.divider()
