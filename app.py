@@ -2967,7 +2967,11 @@ def menu_reject_defect():
 
     # --- 4. TAMPILAN DATA & ACTION ---
     st.divider()
-    st.subheader("📋 DATABASE REJECT/DEFECT LIST")
+    st.markdown("""
+        <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+            <h3 style="color: #007BFF; margin: 0; font-size: 20px;">📋 DATABASE REJECT/DEFECT LIST</h3>
+        </div>
+    """, unsafe_allow_html=True)
 
     conn = sqlite3.connect('inventory_logistik.db')
     df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
