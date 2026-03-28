@@ -2857,15 +2857,20 @@ def menu_reject_defect():
         }
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
 
-        /* Styling khusus untuk tombol hapus agar berwarna merah */
+        /* Styling khusus untuk tombol hapus - SEKARANG WARNA GOLD */
         div[data-testid="stVerticalBlock"] > div:last-child button {
-            background-color: #FF4B4B !important;
+            background-color: #D4AF37 !important; /* Metallic Gold */
             color: white !important;
             border: none !important;
+            border-radius: 8px !important;
+            font-weight: bold !important;
+            box-shadow: 0px 4px 10px rgba(212, 175, 55, 0.3); /* Shadow Gold halus */
         }
 
         div[data-testid="stVerticalBlock"] > div:last-child button:hover {
-            background-color: #D32F2F !important;
+            background-color: #B8860B !important; /* Dark Goldenrod saat hover */
+            transform: translateY(-1px);
+            box-shadow: 0px 6px 15px rgba(212, 175, 55, 0.4);
         }
         </style>
     """, unsafe_allow_html=True)
@@ -2929,7 +2934,7 @@ def menu_reject_defect():
             try:
                 df_upload = pd.read_excel(uploaded_file)
                 if set(template_cols).issubset(df_upload.columns):
-                    if st.button("Proses & Simpan Data Upload"):
+                    if st.button("⤴️EXPORT DATA TO DATABE"):
                         df_upload['TANGGAL_INPUT'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         save_data(df_upload)
                         st.success("Import Berhasil!")
