@@ -2762,6 +2762,7 @@ import sqlite3
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+from datetime import datetime
 
 # 1. Database Logic
 def init_db():
@@ -2854,6 +2855,17 @@ def menu_reject_defect():
             font-weight: bold !important;
         }
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
+
+        /* Styling khusus untuk tombol hapus agar berwarna merah */
+        div[data-testid="stVerticalBlock"] > div:last-child button {
+            background-color: #FF4B4B !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        div[data-testid="stVerticalBlock"] > div:last-child button:hover {
+            background-color: #D32F2F !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
