@@ -2967,6 +2967,56 @@ def menu_reject_defect():
             except Exception as e:
                 st.error(f"Error: {e}")
 
+# ==========================================
+    # --- DASHBOARD VISUALISASI (NYELIP DISINI) ---
+    # ==========================================
+    st.divider()
+    
+    # Ambil Data
+    conn = sqlite3.connect('inventory_logistik.db')
+    df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
+    conn.close()
+
+    if not df_chart.empty:
+        # Header Dashboard dengan gaya JEZ
+        st.markdown("""
+            <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="color: #007BFF; margin: 0; font-size: 20px; font-weight: 900;">📊 REAL-TIME REJECT ANALYTICS</h3>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Baris 1: Metrik Angka
+        m1, m2, m3 = st.columns(3)
+        with m1:
+            st.metric("TOTAL REJECT", f"{len(df_chart)} SKU")
+        with m2:
+            major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
+            st.metric("MAJOR", f"{major_cnt}", f"{major_cnt/len(df_chart)*100:.1f}%", delta_color="inverse")
+        with m3:
+            minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
+            st.metric("MINOR", f"{minor_cnt}", f"{minor_cnt/len(df_chart)*100:.1f}%")
+
+        # Baris 2: Grafik
+        col_pie, col_bar = st.columns(2)
+        
+        with col_pie:
+            # Pie Chart Kategori
+            df_p = df_chart['KATEGORI'].value_counts().reset_index()
+            df_p.columns = ['KATEGORI', 'TOTAL']
+            fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4,
+                           title="Porsi Defect", color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_p.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
+            st.plotly_chart(fig_p, use_container_width=True)
+
+        with col_bar:
+            # Bar Chart per Lokasi BIN
+            df_b = df_chart['BIN'].value_counts().reset_index()
+            df_b.columns = ['BIN', 'TOTAL']
+            fig_b = px.bar(df_b, x='BIN', y='TOTAL', title="Defect per Lokasi",
+                           color_discrete_sequence=['#D4AF37'])
+            fig_b.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
+            st.plotly_chart(fig_b, use_container_width=True)
+        
     # --- 4. TAMPILAN DATA & ACTION ---
     st.divider()
     st.markdown("""
