@@ -2912,33 +2912,26 @@ def menu_reject_defect():
             font-weight: bold !important;
             font-size: 14px !important;
         }
-        /* Styling Metric Card agar Mewah */
+        /* Kunci Tinggi Metric Box agar RATA SEMUA */
         [data-testid="stMetric"] {
-            background-color: #1a1c27 !important; /* Navy Gelap */
+            background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
-            padding: 15px !important;
+            padding: 20px !important;
             border-radius: 12px !important;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
-            transition: transform 0.3s ease;
+            
+            /* INI KUNCINYA */
+            min-height: 160px !important; 
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
         }
 
-        [data-testid="stMetric"]:hover {
-            transform: translateY(-5px);
-            border-color: #007BFF !important; /* Highlight Biru saat Hover */
-        }
-
-        /* Warna Label Metric (Total Reject, Major, Minor) */
-        [data-testid="stMetricLabel"] > div {
-            color: #D4AF37 !important; /* Warna Gold */
-            font-weight: 900 !important;
-            font-size: 16px !important;
-            text-transform: uppercase;
-        }
-
-        /* Warna Angka Utama */
+        /* Styling tulisan angka agar makin Bold & Besar */
         [data-testid="stMetricValue"] > div {
-            color: #ffffff !important;
+            font-size: 32px !important;
             font-weight: 900 !important;
+            color: #ffffff !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -3042,12 +3035,12 @@ def menu_reject_defect():
             with m2:
                 major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
                 porsi_major = (major_cnt/total_val*100) if total_val > 0 else 0
-                st.metric(label="🔴 MAJOR CONDITION", value=f"{major_cnt}", delta=f"{porsi_major:.1f}% items")
+                st.metric(label="🔴 MAJOR CONDITION", value=f"{major_cnt}", delta=f"{porsi_major:.1f}% Items")
                 
             with m3:
                 minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
                 porsi_minor = (minor_cnt/total_val*100) if total_val > 0 else 0
-                st.metric(label="🟡 MINOR CONDITION", value=f"{minor_cnt}", delta=f"{porsi_minor:.1f}% items")
+                st.metric(label="🟡 MINOR CONDITION", value=f"{minor_cnt}", delta=f"{porsi_minor:.1f}% Items")
 
         # Baris 2: Grafik
         col_pie, col_bar = st.columns(2)
