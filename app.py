@@ -2975,7 +2975,7 @@ def menu_reject_defect():
     # Header berwarna Biru dengan Icon
     st.markdown("""
         <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-            <h3 style="color: #007BFF; margin: 0; font-size: 20px;">📁 MULTIPLE UPLOAD LIST REJECT/DEFECT</h3>
+            <h3 style="color: #007BFF; margin: 0; font-size: 20px; font-weight: 900;">📁 MULTIPLE UPLOAD LIST REJECT/DEFECT</h3>
         </div>
     """, unsafe_allow_html=True)
 
@@ -2987,24 +2987,32 @@ def menu_reject_defect():
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_template.to_excel(writer, index=False)
-        st.download_button("📥 Download Template Input", output.getvalue(), "template_reject/defect.xlsx")
+        st.download_button("📥 Download Template Input", output.getvalue(), "template_reject_defect.xlsx")
 
     with col_up:
         uploaded_file = st.file_uploader("Upload File Excel", type=['xlsx'])
         if uploaded_file:
             try:
                 df_upload = pd.read_excel(uploaded_file)
+                # Pastikan kolom sesuai template
                 if set(template_cols).issubset(df_upload.columns):
-                    if st.button("⤴️EXPORT MULTIPLE DATA TO DATABASE"):
-                        df_upload['TANGGAL_INPUT'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    if st.button("⤴️ EXPORT MULTIPLE DATA TO DATABASE"):
+                        # --- FIX JAM KACAU: Kunci waktu di satu variabel string ---
+                        import datetime
+                        jam_fix = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
+                        # Terapkan jam yang sama persis ke semua baris di DataFrame
+                        df_upload['TANGGAL_INPUT'] = jam_fix
+                        
+                        # Simpan ke database
                         save_data(df_upload)
-                        st.success("Import Berhasil!")
+                        
+                        st.success(f"✅ Import Berhasil! (Waktu: {jam_fix})")
                         st.rerun()
                 else:
-                    st.error("Format kolom tidak sesuai!")
+                    st.error("❌ Format kolom tidak sesuai! Pastikan kolom: BIN, SKU, ARTICLE_NAME, SIZE, KATEGORI, KETERANGAN")
             except Exception as e:
-                st.error(f"Error: {e}")
-
+                st.error(f"⚠️ Terjadi Kesalahan: {e}")
 # ==========================================
     # --- DASHBOARD VISUALISASI (NYELIP DISINI) ---
     # ==========================================
