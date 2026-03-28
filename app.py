@@ -2793,27 +2793,35 @@ def save_reject_data(bin_val, sku, name, size, kat, ket):
 
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
+    # CSS Fix untuk teks putih
+    st.markdown("""
+        <style>
+        input { color: #1E1E1E !important; }
+        textarea { color: #1E1E1E !important; }
+        .stTextInput label, .stTextArea label, .stSelectbox label {
+            color: #31333F !important;
+            font-weight: 600;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.header("⚠️ Reject / Defect List Entry")
-    st.info("Gunakan form ini untuk mendata barang defect yang ditemukan di BIN.")
-    
-    # Inisialisasi DB di dalam menu
     init_db()
 
-    # Form Input
     with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
-        
         with col1:
             bin_val = st.text_input("BIN LOKASI")
             sku = st.text_input("SKU / ARTIKEL")
             article = st.text_input("NAMA BARANG")
-            
         with col2:
             size = st.text_input("SIZE")
             kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
             keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
         btn_submit = st.form_submit_button("MASUKKAN KE DAFTAR REJECT")
+    
+    # ... sisa kode simpan data ...
 
     if btn_submit:
         if sku and bin_val:
