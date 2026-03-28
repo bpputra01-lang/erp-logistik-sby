@@ -3007,109 +3007,61 @@ def main():
     st.sidebar.title("LOGISTIC SYSTEM")
     menu_pilihan = st.sidebar.radio("Navigasi", ["Dashboard", "Reject/Defect List"])
 # ==========================================
-    # --- BAGIAN 4: DASHBOARD VISUALISASI (BARU) ---
+    # --- BAGIAN 4: DASHBOARD VISUALISASI ---
     # ==========================================
     st.divider()
     
-    # Header Subheader BERWARNA BIRU JGA
     st.markdown("""
-        <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-            <h3 style="color: #007BFF; margin: 0; font-size: 20px;">📊 DASHBOARD RINGKASAN REJECT (WIB)</h3>
+        <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #D4AF37; border-radius: 5px; margin-bottom: 20px;">
+            <h3 style="color: #D4AF37; margin: 0; font-size: 20px; font-weight: 900;">📊 ANALISA DATA REJECT (WIB)</h3>
         </div>
     """, unsafe_allow_html=True)
 
-    # Ambil Data Terbaru dari Database
+    # Ambil Data
     conn = sqlite3.connect('inventory_logistik.db')
     df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
     conn.close()
 
     if not df_chart.empty:
-        # --- PRE-PROCESSING DATA ---
-        # Pastikan kolom Tanggal menjadi object datetime agar tren-nya akurat
+        # Konversi Tanggal agar terbaca Plotly
         df_chart['TANGGAL_INPUT'] = pd.to_datetime(df_chart['TANGGAL_INPUT'])
-        # Buat kolom baru hanya berisi Tanggal (tanpa jam) untuk grouping harian
-        df_chart['TANGGAL_HARI'] = df_chart['TANGGAL_INPUT'].dt.date
-
-        # --- ROW 1: METRICS & PIE CHART ---
-        col_metric, col_pie = st.columns([1, 2])
         
-        with col_metric:
-            # Metric Ringkasan (Kiri)
-            total_reject = len(df_chart)
-            major_defect = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
-            minor_defect = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
-            
-            st.metric(label="Total Barang Reject", value=f"{total_reject} SKU", help="Jumlah total semua defect yang tercatat.")
-            st.metric(label="Kategori MAJOR", value=f"{major_defect} SKU", delta=f"Porsi: {major_defect/total_reject*100:.1f}%", delta_color="normal")
-            st.metric(label="Kategori MINOR", value=f"{minor_defect} SKU", delta=f"Porsi: {minor_defect/total_reject*100:.1f}%", delta_color="normal")
+        # Kolom Metrik Ringkasan
+        m1, m2, m3 = st.columns(3)
+        with m1:
+            st.metric("TOTAL REJECT", f"{len(df_chart)} SKU")
+        with m2:
+            major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
+            st.metric("MAJOR DEFECT", f"{major_cnt}", delta=f"{(major_cnt/len(df_chart)*100):.1f}%", delta_color="inverse")
+        with m3:
+            minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
+            st.metric("MINOR DEFECT", f"{minor_cnt}", delta=f"{(minor_cnt/len(df_chart)*100):.1f}%")
 
-        with col_pie:
-            # Pie Chart: Porsi Defect per Kategori
-            df_kategori = df_chart['KATEGORI'].value_counts().reset_index()
-            df_kategori.columns = ['KATEGORI', 'JUMLAH']
-            
-            # Ganti warna Pie Chart agar matching Gold/Biru
-            color_map = {
-                'MAJOR': '#FF4B4B',   # Merah
-                'MINOR': '#FFD700',   # Gold
-                'PACKAGING': '#28a745', # Hijau
-                'LAINNYA': '#007BFF'    # Biru
-            }
-            
-            fig_pie = px.pie(
-                df_kategori, values='JUMLAH', names='KATEGORI', 
-                title='Porsi Reject per Kategori',
-                color='KATEGORI', color_discrete_map=color_map,
-                hole=0.4, # Donut style agar lebih sleek
-                template="plotly_dark" # Pakai tema gelap agar tulisannya nyala
-            )
-            # Hilangkan legenda dan taruh label langsung di pie
-            fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-            fig_pie.update_layout(showlegend=False, margin=dict(t=30, b=0, l=0, r=0))
+        st.write("") # Spasi
+
+        # BIKIN DUA CHART SEJAJAR
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            # 1. PIE CHART KATEGORI
+            df_pie = df_chart['KATEGORI'].value_counts().reset_index()
+            df_pie.columns = ['KATEGORI', 'JUMLAH']
+            fig_pie = px.pie(df_pie, values='JUMLAH', names='KATEGORI', 
+                             title="Porsi Defect", hole=0.4,
+                             color_discrete_sequence=['#FF4B4B', '#D4AF37', '#007BFF', '#28a745'])
+            fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
             st.plotly_chart(fig_pie, use_container_width=True)
 
-        st.divider()
-
-        # --- ROW 2: LINE CHART (TREN HARIAN) & DONUT CHART (BIN) ---
-        col_line, col_donut = st.columns([2, 1])
-        
-        with col_line:
-            # Line Chart: Tren Defect Harian
-            df_tren = df_chart.groupby('TANGGAL_HARI').size().reset_index(name='JUMLAH_HARI')
-            # Pastikan tanggalnya urut
-            df_tren = df_tren.sort_values('TANGGAL_HARI')
-            
-            fig_line = px.line(
-                df_tren, x='TANGGAL_HARI', y='JUMLAH_HARI', 
-                title='Tren Reject Harian (Log Book)',
-                markers=True, # Tambahkan titik koordinat
-                template="plotly_dark", # Tema Gelap
-                color_discrete_sequence=['#FFD700'] # Warna Garis Gold
-            )
-            # Kustomisasi Sumbu
-            fig_line.update_layout(xaxis_title="Tanggal Input", yaxis_title="Jumlah SKU")
-            st.plotly_chart(fig_line, use_container_width=True)
-
-        with col_donut:
-            # Donut Chart: Porsi Defect per LOKASI BIN
-            df_bin = df_chart['BIN'].value_counts().reset_index()
-            df_bin.columns = ['BIN_LOKASI', 'JUMLAH']
-            
-            fig_donut = px.pie(
-                df_bin, values='JUMLAH', names='BIN_LOKASI', 
-                title='Reject per BIN',
-                hole=0.6, # Donut style ekstra
-                template="plotly_dark", # Tema Gelap
-                color_discrete_sequence=px.colors.qualitative.Plotly # Warna random tapi matching
-            )
-            # Kustomisasi label
-            fig_donut.update_traces(textposition='inside', textinfo='percent')
-            fig_donut.update_layout(margin=dict(t=30, b=0, l=0, r=0))
-            st.plotly_chart(fig_donut, use_container_width=True)
-            
+        with col_right:
+            # 2. BAR CHART PER BIN
+            df_bar = df_chart['BIN'].value_counts().reset_index()
+            df_bar.columns = ['BIN', 'JUMLAH']
+            fig_bar = px.bar(df_bar, x='BIN', y='JUMLAH', title="Reject per Lokasi",
+                             color_discrete_sequence=['#D4AF37'])
+            fig_bar.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
+            st.plotly_chart(fig_bar, use_container_width=True)
     else:
-        # Tampilkan Pesan Kalau Database Kosong
-        st.info("Visualisasi belum tersedia karena database masih kosong.")
+        st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
 
 with st.sidebar:
        st.markdown("""
