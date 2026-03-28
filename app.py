@@ -2857,20 +2857,41 @@ def menu_reject_defect():
         }
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
 
-        /* Styling khusus untuk tombol hapus - SEKARANG WARNA GOLD */
+        /* Styling khusus untuk tombol hapus - GOLD MENYALA ULTIMATE */
         div[data-testid="stVerticalBlock"] > div:last-child button {
-            background-color: #D4AF37 !important; /* Metallic Gold */
+            background-color: #D4AF37 !important; /* Metallic Gold Base */
             color: white !important;
             border: none !important;
             border-radius: 8px !important;
             font-weight: bold !important;
-            box-shadow: 0px 4px 10px rgba(212, 175, 55, 0.3); /* Shadow Gold halus */
+            
+            /* 1. Neon Glow Efek Berlapis (Ambient Glow) */
+            box-shadow: 
+                0 0 5px rgba(255, 215, 0, 0.4),  /* Lapisan dekat */
+                0 0 10px rgba(255, 215, 0, 0.3), /* Lapisan tengah */
+                0 0 15px rgba(255, 215, 0, 0.2); /* Lapisan jauh */
+            
+            /* 2. Text Glow Efek agar teks ikut menyala */
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+            
+            transition: all 0.3s ease-in-out; /* Animasi halus */
         }
 
+        /* --- MENYALA LEBIH TERANG SAAT DI-HOVER --- */
         div[data-testid="stVerticalBlock"] > div:last-child button:hover {
-            background-color: #B8860B !important; /* Dark Goldenrod saat hover */
-            transform: translateY(-1px);
-            box-shadow: 0px 6px 15px rgba(212, 175, 55, 0.4);
+            background-color: #FFD700 !important; /* Gold Lebih Terang */
+            color: #1a1c27 !important; /* Ganti teks jadi gelap saat terang */
+            transform: translateY(-2px) scale(1.02); /* Sedikit membesar & naik */
+            
+            /* 3. Intense Neon Shine saat hover */
+            box-shadow: 
+                0 0 10px rgba(255, 215, 0, 0.8), /* Lapisan dalam pekat */
+                0 0 20px rgba(255, 215, 0, 0.6), /* Lapisan tengah menyebar */
+                0 0 30px rgba(255, 215, 0, 0.4), /* Lapisan luar halus */
+                0 0 40px rgba(255, 215, 0, 0.2); /* Lapisan jauh pudar */
+            
+            /* Matikan text glow karena teks jadi gelap */
+            text-shadow: none;
         }
         </style>
     """, unsafe_allow_html=True)
