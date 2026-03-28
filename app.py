@@ -2997,17 +2997,19 @@ def menu_reject_defect():
                 # Pastikan kolom sesuai template
                 if set(template_cols).issubset(df_upload.columns):
                     if st.button("⤴️ EXPORT MULTIPLE DATA TO DATABASE"):
-                        # --- FIX JAM KACAU: Kunci waktu di satu variabel string ---
-                        import datetime
-                        jam_fix = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        
-                        # Terapkan jam yang sama persis ke semua baris di DataFrame
-                        df_upload['TANGGAL_INPUT'] = jam_fix
-                        
+                        # --- FIX JAM SERVER (WIB UTC+7) ---
+                        from datetime import datetime, timedelta
+        
+                        # Ambil waktu server lalu tambah 7 jam untuk WIB
+                        jam_wib = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+        
+                        # Terapkan jam fix ini ke semua baris
+                        df_upload['TANGGAL_INPUT'] = jam_wib
+        
                         # Simpan ke database
                         save_data(df_upload)
-                        
-                        st.success(f"✅ Import Berhasil! (Waktu: {jam_fix})")
+        
+                        st.success(f"✅ Import Berhasil! (Waktu WIB: {jam_wib})")
                         st.rerun()
                 else:
                     st.error("❌ Format kolom tidak sesuai! Pastikan kolom: BIN, SKU, ARTICLE_NAME, SIZE, KATEGORI, KETERANGAN")
