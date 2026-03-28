@@ -2969,35 +2969,44 @@ def menu_reject_defect():
                 st.error(f"Error: {e}")
 
     # --- BAGIAN 3: TAMPILAN DATA & ACTION ---
-    st.divider()
-    st.subheader("📊 Database Reject List")
-    
-    conn = sqlite3.connect('inventory_logistik.db')
-    df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
-    conn.close()
+st.divider()
+st.subheader("📊 Database Reject List")
 
-    if not df_db.empty:
-    # 1. Tombol Clear All (Multiple)
-    if st.button("🗑️ HAPUS SEMUA DATA"):
-        clear_all_data()
+# Ambil Data
+conn = sqlite3.connect('inventory_logistik.db')
+df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
+conn.close()
 
-        # 2. Fitur Hapus Per Baris (Single)
-        # Kita buat kolom select untuk memilih data mana yang mau dihapus
-        st.subheader("Pilih Data untuk Dihapus")
-        selected_sku = st.selectbox("Pilih SKU yang akan dihapus", df_db['SKU'].unique())
-    
-        # Filter tanggal untuk SKU tersebut (antisipasi SKU sama di tanggal beda)
-        df_filtered = df_db[df_db['SKU'] == selected_sku]
-        selected_date = st.selectbox("Pilih Tanggal Input", df_filtered['TANGGAL_INPUT'])
+if not df_db.empty:
+    # 1. Bagian Tombol Hapus Semua (Multiple)
+    # Gunakan popover agar tidak sengaja terhapus semua
+    with st.popover("🗑️ OPSI HAPUS SEMUA DATA", use_container_width=True):
+        st.warning("Tindakan ini akan menghapus seluruh isi database!")
+        if st.button("YA, KOSONGKAN DATABASE", type="primary"):
+            clear_all_data()
+            st.rerun()
 
-        if st.button(f"❌ Hapus SKU {selected_sku} Terpilih"):
+    # 2. Fitur Hapus Per Baris (Single) - Pakai Expander agar UI tetap bersih
+    with st.expander("❌ Hapus Baris Spesifik"):
+        col_sku, col_date = st.columns(2)
+        with col_sku:
+            selected_sku = st.selectbox("Pilih SKU", df_db['SKU'].unique(), key="del_sku")
+        with col_date:
+            # Filter tanggal untuk SKU tersebut
+            df_filtered = df_db[df_db['SKU'] == selected_sku]
+            selected_date = st.selectbox("Pilih Tanggal Input", df_filtered['TANGGAL_INPUT'], key="del_date")
+        
+        if st.button(f"Hapus SKU {selected_sku} pada tanggal ini", use_container_width=True):
             delete_single_row(selected_sku, selected_date)
+            st.rerun()
 
-        # Tampilkan Tabel Utama
-        st.divider()
-        st.dataframe(df_db, use_container_width=True)
-    else:
-        st.info("Database kosong.")
+    # 3. Tampilkan Tabel Utama
+    st.divider()
+    st.dataframe(df_db, use_container_width=True)
+
+else:
+    # Baris else ini harus sejajar secara vertikal dengan 'if not df_db.empty:'
+    st.info("Database kosong.")
 
 # 3. Integrasi ke Main Menu
 def main():
