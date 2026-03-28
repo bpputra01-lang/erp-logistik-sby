@@ -2836,15 +2836,6 @@ def main():
     # Tambahkan menu-menu lain di sini sesuai kebutuhan project Anda
     menu_pilihan = st.sidebar.radio("Navigation", ["Dashboard", "Input Stock", "Reject/Defect List"])
 
-    if menu_pilihan == "Reject/Defect List":
-        menu_reject_defect()
-    elif menu_pilihan == "Dashboard":
-        st.write("### Halaman Utama Dashboard")
-    elif menu_pilihan == "Input Stock":
-        st.write("### Halaman Input Stock")
-
-if __name__ == "__main__":
-    main()
 with st.sidebar:
        st.markdown("""
     <style>
@@ -3108,7 +3099,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System"]
+    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System","Reject/Defect List"]
     
     # PERBAIKAN DI SINI: Gunakan m3_list dan idx3, jangan pakai m2_list lagi
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
@@ -4109,3 +4100,7 @@ elif menu == "Refill & Withdraw":
 # --- Navigasi ---
 elif menu == "Stock Opname":
     menu_Stock_Opname()
+
+# --- Navigasi ---
+elif menu == "Reject/Defect List":
+    menu_reject_defect()
