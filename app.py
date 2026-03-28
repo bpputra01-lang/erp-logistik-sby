@@ -2788,8 +2788,7 @@ def save_data(df):
 
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # CUSTOM CSS UNTUK TAMPILAN ELEGANT & DARK THEME CONSISTENCY
-    # CSS CLEAN & ELEGANT (Tanpa Background Hitam Paksa)
+    # CSS UNTUK MENYELARASKAN WARNA SEMUA INPUT & TOMBOL
     st.markdown("""
         <style>
         /* 1. Hero Header Biru */
@@ -2804,45 +2803,51 @@ def menu_reject_defect():
             font-size: 22px;
         }
 
-        /* 2. Form & Input - Kita buat transparan & ikut tema */
+        /* 2. Form & Input - Kita paksa warna navy/dark blue agar selaras dengan selectbox */
         [data-testid="stForm"] {
             border: none !important;
             padding: 0 !important;
         }
 
-        /* Hilangkan warna hitam paksa, biarkan mengikuti tema asli */
-        input, textarea, [data-baseweb="select"] {
-            background-color: transparent !important; 
-            border: 1.5px solid #555 !important; /* Garis batas tipis */
+        /* Menyelaraskan SKU, Nama Barang, Size, dan Textarea ke warna BIN Lokasi */
+        input, textarea, [data-baseweb="base-input"] {
+            background-color: #1a1c27 !important; /* Warna gelap navy seragam */
+            border: 1px solid #3d4156 !important; /* Border tipis halus */
             border-radius: 8px !important;
-            color: inherit !important;
+            color: #FFFFFF !important;
+            height: 45px !important;
         }
-
-        /* 3. Detail Kerusakan (Textarea) Border */
+        
+        /* Khusus untuk Textarea (Detail) agar tingginya tetap fleksibel tapi warna sama */
         textarea {
-            border: 1.5px solid #555 !important;
+            height: auto !important;
+            min-height: 100px !important;
         }
 
-        /* 4. Tombol Biru Seragam */
+        /* 3. Tombol Masukkan Daftar Reject (Warna Biru Elegant) */
         div.stButton > button {
-            background-color: #007BFF !important;
+            background-color: #007BFF !important; /* Biru terang agar eyecatching tapi serasi */
             color: white !important;
             border: none !important;
             border-radius: 8px !important;
             width: 100% !important;
             font-weight: bold !important;
-            height: 45px;
+            height: 50px !important;
+            margin-top: 10px;
+            transition: 0.3s;
         }
         
         div.stButton > button:hover {
             background-color: #0056b3 !important;
-            border: none !important;
+            box-shadow: 0px 4px 15px rgba(0, 123, 255, 0.3);
         }
 
-        /* Label Teks */
+        /* Styling Label */
         label {
-            color: inherit !important;
-            font-weight: 500;
+            color: #E0E0E0 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            margin-bottom: 5px !important;
         }
         </style>
     """, unsafe_allow_html=True)
