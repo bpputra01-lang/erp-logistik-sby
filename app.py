@@ -2955,7 +2955,7 @@ def menu_reject_defect():
             try:
                 df_upload = pd.read_excel(uploaded_file)
                 if set(template_cols).issubset(df_upload.columns):
-                    if st.button("⤴️EXPORT DATA TO DATABASE"):
+                    if st.button("⤴️EXPORT MULTIPLE DATA TO DATABASE"):
                         df_upload['TANGGAL_INPUT'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         save_data(df_upload)
                         st.success("Import Berhasil!")
