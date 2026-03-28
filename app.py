@@ -3445,7 +3445,11 @@ elif menu == "Scan Out Validation":
                 
                 # ========== STATISTIK DENGAN KOTAK CUSTOM ==========
                 st.divider()
-                st.subheader("📊 Ringkasan Hasil")
+                st.markdown("""
+                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 total_items = len(df_res)
                 terjual_count = df_res['Keterangan'].str.contains('TERJUAL', case=False, na=False).sum()
