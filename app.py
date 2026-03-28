@@ -3019,7 +3019,7 @@ def menu_reject_defect():
         # Header Dashboard dengan gaya JEZ
         st.markdown("""
             <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #007BFF; margin: 0; font-size: 20px; font-weight: 900;">📊 REAL-TIME REJECT ANALYTICS</h3>
+                <h3 style="color: #007BFF; margin: 0; font-size: 20px; font-weight: 900;">📊 CHART DEFECT / REJECT</h3>
             </div>
         """, unsafe_allow_html=True)
 
