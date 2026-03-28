@@ -2886,7 +2886,7 @@ def menu_reject_defect():
             kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
             keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
-        btn_submit = st.form_submit_button("MASUKKAN KE DAFTAR REJECT")
+        btn_submit = st.form_submit_button("📤UPLOAD SINGLE LIST")
 
     if btn_submit:
         if sku:
@@ -2909,7 +2909,7 @@ def menu_reject_defect():
     # Header berwarna Biru dengan Icon
     st.markdown("""
         <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-            <h3 style="color: #007BFF; margin: 0; font-size: 20px;">📁 UPLOAD MASSAL VIA EXCEL</h3>
+            <h3 style="color: #007BFF; margin: 0; font-size: 20px;">📁 MULTIPLE UPLOAD LIST REJECT/DEFECT</h3>
         </div>
     """, unsafe_allow_html=True)
 
@@ -2921,7 +2921,7 @@ def menu_reject_defect():
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_template.to_excel(writer, index=False)
-        st.download_button("⬇️ Template Excel", output.getvalue(), "template_reject.xlsx")
+        st.download_button("📥 Download Template Input", output.getvalue(), "template_reject/defect.xlsx")
 
     with col_up:
         uploaded_file = st.file_uploader("Upload File Excel", type=['xlsx'])
@@ -2941,7 +2941,7 @@ def menu_reject_defect():
 
     # --- 4. TAMPILAN DATA & ACTION ---
     st.divider()
-    st.subheader("📊 Database Reject List")
+    st.subheader("📋 DATABASE REJECT/DEFECT LIST")
 
     conn = sqlite3.connect('inventory_logistik.db')
     df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
@@ -2949,14 +2949,14 @@ def menu_reject_defect():
 
     if not df_db.empty:
         # Hapus Semua
-        with st.popover("🗑️ OPSI HAPUS SEMUA DATA", use_container_width=True):
+        with st.popover("🗑️ CLEAR ALL DATA", use_container_width=True):
             st.warning("Hapus permanen seluruh isi database?")
             if st.button("YA, KOSONGKAN DATABASE", type="primary"):
                 clear_all_data()
                 st.rerun()
 
         # Hapus Single Row
-        with st.expander("❌ Hapus Baris Spesifik"):
+        with st.expander("❌ HAPUS SINGLE DATA"):
             c1, c2 = st.columns(2)
             with c1:
                 sel_sku = st.selectbox("Pilih SKU", df_db['SKU'].unique(), key="del_sku")
