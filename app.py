@@ -2758,7 +2758,78 @@ def process_stock_comparison(file1, file2):
     except Exception as e:
         # Lempar error agar bisa ditangkap oleh UI (st.error)
         raise e
+import sqlite3
+import streamlit as st
+import pandas as pd
 
+# Fungsi untuk inisialisasi database
+def init_db():
+    conn = sqlite3.connect('inventory_jez.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS master_stok (
+            BIN TEXT,
+            SKU TEXT,
+            ARTICLE_NAME TEXT,
+            SIZE TEXT,
+            KATEGORI TEXT,
+            KETERANGAN TEXT
+        )
+    ''')
+    conn.commit()
+    return conn
+
+# Fungsi untuk input data ke database
+def add_data(bin_val, sku, name, size, kat, ket):
+    conn = sqlite3.connect('inventory_jez.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO master_stok (BIN, SKU, ARTICLE_NAME, SIZE, KATEGORI, KETERANGAN)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (bin_val, sku, name, size, kat, ket))
+    conn.commit()
+    conn.close()
+def main():
+    st.set_page_config(page_title="Input Database SQlite", layout="wide")
+    init_db()
+
+    st.title("📦 System Input Master Data")
+    
+    # Membuat Form Input
+    with st.form("input_form", clear_on_submit=True):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            bin_val = st.text_input("BIN (Lokasi)")
+            sku = st.text_input("SKU")
+            
+        with col2:
+            article = st.text_input("ARTICLE NAME")
+            size = st.text_input("SIZE")
+            
+        with col3:
+            kategori = st.selectbox("KATEGORI", ["FOOTWEAR", "APPAREL", "ACCESSORIES", "OTHER"])
+            keterangan = st.text_area("KETERANGAN")
+
+        submit = st.form_submit_button("SIMPAN KE DATABASE")
+
+    if submit:
+        if bin_val and sku: # Validasi sederhana
+            add_data(bin_val, sku, article, size, kategori, keterangan)
+            st.success(f"Data SKU {sku} berhasil tersimpan ke SQLite!")
+        else:
+            st.error("Gagal! BIN dan SKU wajib diisi.")
+
+    # Menampilkan data yang tersimpan
+    st.divider()
+    st.subheader("📊 Data Terdaftar")
+    conn = sqlite3.connect('inventory_jez.db')
+    df = pd.read_sql_query("SELECT * FROM master_stok", conn)
+    st.dataframe(df, use_container_width=True)
+    conn.close()
+
+if __name__ == "__main__":
+    main()
 with st.sidebar:
        st.markdown("""
     <style>
