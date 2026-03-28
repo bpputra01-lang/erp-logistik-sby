@@ -2785,6 +2785,19 @@ def save_data(df):
     conn = sqlite3.connect('inventory_logistik.db')
     df.to_sql('reject_list', conn, if_exists='append', index=False)
     conn.close()
+def clear_all_data():
+    conn = sqlite3.connect('inventory_logistik.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM reject_list')
+    conn.commit()
+    conn.close()
+
+def delete_single_row(sku, tanggal):
+    conn = sqlite3.connect('inventory_logistik.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM reject_list WHERE SKU = ? AND TANGGAL_INPUT = ?', (sku, tanggal))
+    conn.commit()
+    conn.close()
 
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
@@ -2848,6 +2861,16 @@ def menu_reject_defect():
             color: #E0E0E0 !important;
             font-weight: 600 !important;
             font-size: 14px !important;
+        }
+        /* Styling khusus untuk tombol hapus agar berwarna merah */
+        div[data-testid="stVerticalBlock"] > div:last-child button {
+            background-color: #FF4B4B !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        div[data-testid="stVerticalBlock"] > div:last-child button:hover {
+            background-color: #D32F2F !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -2923,7 +2946,7 @@ def menu_reject_defect():
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    # --- BAGIAN 3: TAMPILAN DATA & EXPORT ---
+    # --- BAGIAN 3: TAMPILAN DATA & ACTION ---
     st.divider()
     st.subheader("📊 Database Reject List")
     
@@ -2932,21 +2955,29 @@ def menu_reject_defect():
     conn.close()
 
     if not df_db.empty:
-        # Tombol Export ke Excel
-        output_export = BytesIO()
-        with pd.ExcelWriter(output_export, engine='xlsxwriter') as writer:
-            df_db.to_excel(writer, index=False, sheet_name='RejectData')
+        # Layout untuk tombol Export dan Clear All
+        col_exp, col_clr = st.columns([3, 1])
         
-        st.download_button(
-            label="📥 Export Seluruh Data ke Excel",
-            data=output_export.getvalue(),
-            file_name="Laporan_Reject_Full.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        
+        with col_exp:
+            # Tombol Export (Existing)
+            output_export = BytesIO()
+            with pd.ExcelWriter(output_export, engine='xlsxwriter') as writer:
+                df_db.to_excel(writer, index=False)
+            st.download_button("📥 Export ke Excel", output_export.getvalue(), "Laporan_Reject.xlsx")
+
+        with col_clr:
+            # Tombol Kosongkan Database (Hati-hati!)
+            if st.button("🗑️ KOSONGKAN SEMUA", use_container_width=True):
+                st.warning("Apakah Anda yakin ingin menghapus SEMUA data?")
+                if st.button("YA, HAPUS PERMANEN"):
+                    clear_all_data()
+                    st.success("Database telah dikosongkan!")
+                    st.rerun()
+
+        # Menampilkan tabel
         st.dataframe(df_db, use_container_width=True)
     else:
-        st.info("Belum ada data tersimpan.")
+        st.info("Database kosong.")
 
 # 3. Integrasi ke Main Menu
 def main():
