@@ -3037,17 +3037,17 @@ def menu_reject_defect():
             
             with m1:
                 total_val = len(df_chart)
-                st.metric(label="📊 TOTAL REJECT", value=f"{total_val} SKU")
+                st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} SKU")
                 
             with m2:
                 major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
                 porsi_major = (major_cnt/total_val*100) if total_val > 0 else 0
-                st.metric(label="🔴 MAJOR DEFECT", value=f"{major_cnt}", delta=f"{porsi_major:.1f}% Porsi")
+                st.metric(label="🔴 MAJOR CONDITION", value=f"{major_cnt}", delta=f"{porsi_major:.1f}% Porsi")
                 
             with m3:
                 minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
                 porsi_minor = (minor_cnt/total_val*100) if total_val > 0 else 0
-                st.metric(label="🟡 MINOR DEFECT", value=f"{minor_cnt}", delta=f"{porsi_minor:.1f}% Porsi")
+                st.metric(label="🟡 MINOR CONDITION", value=f"{minor_cnt}", delta=f"{porsi_minor:.1f}% Porsi")
 
         # Baris 2: Grafik
         col_pie, col_bar = st.columns(2)
