@@ -2761,12 +2761,12 @@ def process_stock_comparison(file1, file2):
 import sqlite3
 import streamlit as st
 import pandas as pd
+from io import BytesIO
 
 # 1. Database Logic
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
-    # Menambahkan kolom TIMESTAMP untuk tracking kapan data reject diinput
     c.execute('''
         CREATE TABLE IF NOT EXISTS reject_list (
             BIN TEXT,
@@ -2781,23 +2781,17 @@ def init_db():
     conn.commit()
     conn.close()
 
-def save_reject_data(bin_val, sku, name, size, kat, ket):
+def save_data(df):
     conn = sqlite3.connect('inventory_logistik.db')
-    c = conn.cursor()
-    c.execute('''
-        INSERT INTO reject_list (BIN, SKU, ARTICLE_NAME, SIZE, KATEGORI, KETERANGAN)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (bin_val, sku, name, size, kat, ket))
-    conn.commit()
+    df.to_sql('reject_list', conn, if_exists='append', index=False)
     conn.close()
 
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # CSS Fix untuk teks putih
+    # CSS Fix Teks Agar Terlihat Jelas
     st.markdown("""
         <style>
-        input { color: #1E1E1E !important; }
-        textarea { color: #1E1E1E !important; }
+        input, textarea, [data-baseweb="select"] { color: #1E1E1E !important; }
         .stTextInput label, .stTextArea label, .stSelectbox label {
             color: #31333F !important;
             font-weight: 600;
@@ -2808,41 +2802,99 @@ def menu_reject_defect():
     st.header("⚠️ Reject / Defect List Entry")
     init_db()
 
-    with st.form("form_reject", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            bin_val = st.text_input("BIN LOKASI")
-            sku = st.text_input("SKU / ARTIKEL")
-            article = st.text_input("NAMA BARANG")
-        with col2:
-            size = st.text_input("SIZE")
-            kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
-            keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
+    # --- BAGIAN 1: INPUT MANUAL ---
+    with st.expander("📝 Input Manual Baru", expanded=True):
+        with st.form("form_reject", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                # Dropdown sesuai permintaan
+                bin_val = st.selectbox("BIN LOKASI", ["REJECT DC", "DEFECT DC", "DEFECT STORE"])
+                sku = st.text_input("SKU / ARTIKEL")
+                article = st.text_input("NAMA BARANG")
+            with col2:
+                size = st.text_input("SIZE")
+                kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
+                keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
-        btn_submit = st.form_submit_button("MASUKKAN KE DAFTAR REJECT")
-    
-    # ... sisa kode simpan data ...
+            btn_submit = st.form_submit_button("MASUKKAN KE DAFTAR REJECT")
 
-    if btn_submit:
-        if sku and bin_val:
-            save_reject_data(bin_val, sku, article, size, kategori, keterangan)
-            st.success(f"Berhasil! Data {sku} telah masuk ke daftar defect.")
-        else:
-            st.warning("Mohon isi minimal BIN dan SKU.")
+        if btn_submit:
+            if sku:
+                new_data = pd.DataFrame([{
+                    'BIN': bin_val, 'SKU': sku, 'ARTICLE_NAME': article,
+                    'SIZE': size, 'KATEGORI': kategori, 'KETERANGAN': keterangan
+                }])
+                save_data(new_data)
+                st.success(f"Data {sku} berhasil disimpan!")
+            else:
+                st.error("SKU wajib diisi!")
 
-    # Tampilan Tabel Data Reject
+    # --- BAGIAN 2: UPLOAD FILE & DOWNLOAD TEMPLATE ---
     st.divider()
-    st.subheader("📋 Log Daftar Defect Terkini")
+    st.subheader("📁 Upload Massal via Excel")
+    col_dl, col_up = st.columns([1, 2])
+
+    with col_dl:
+        # Buat Template Excel
+        template_cols = ['BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
+        df_template = pd.DataFrame(columns=template_cols)
+        
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_template.to_excel(writer, index=False)
+        
+        st.download_button(
+            label="⬇️ Download Template Excel",
+            data=output.getvalue(),
+            file_name="template_reject_list.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    with col_up:
+        uploaded_file = st.file_uploader("Upload File Excel", type=['xlsx'])
+        if uploaded_file is not None:
+            try:
+                df_upload = pd.read_excel(uploaded_file)
+                # Validasi Header
+                if set(template_cols).issubset(df_upload.columns):
+                    if st.button("Proses & Simpan Data Upload"):
+                        save_data(df_upload[template_cols])
+                        st.success(f"Berhasil mengimport {len(df_upload)} baris data!")
+                        st.rerun()
+                else:
+                    st.error("Format kolom tidak sesuai template!")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    # --- BAGIAN 3: TAMPILAN DATA & EXPORT ---
+    st.divider()
+    st.subheader("📊 Database Reject List")
+    
     conn = sqlite3.connect('inventory_logistik.db')
-    df_show = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
-    st.dataframe(df_show, use_container_width=True)
+    df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
     conn.close()
 
-# 3. Integrasi ke Main Menu (Sidebar Navigasi)
+    if not df_db.empty:
+        # Tombol Export ke Excel
+        output_export = BytesIO()
+        with pd.ExcelWriter(output_export, engine='xlsxwriter') as writer:
+            df_db.to_excel(writer, index=False, sheet_name='RejectData')
+        
+        st.download_button(
+            label="📥 Export Seluruh Data ke Excel",
+            data=output_export.getvalue(),
+            file_name="Laporan_Reject_Full.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
+        st.dataframe(df_db, use_container_width=True)
+    else:
+        st.info("Belum ada data tersimpan.")
+
+# 3. Integrasi ke Main Menu
 def main():
     st.sidebar.title("LOGISTIC SYSTEM")
-    # Tambahkan menu-menu lain di sini sesuai kebutuhan project Anda
-    menu_pilihan = st.sidebar.radio("Navigation", ["Dashboard", "Input Stock", "Reject/Defect List"])
+    menu_pilihan = st.sidebar.radio("Navigasi", ["Dashboard", "Reject/Defect List"])
 
 with st.sidebar:
        st.markdown("""
