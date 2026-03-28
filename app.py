@@ -2788,7 +2788,7 @@ def save_data(df):
 
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # CSS CLEAN & ELEGANT - NO DOUBLE BOX - BLUE THEME
+    # CSS ULTIMATE - CLEAN & PROFESSIONAL LOOK
     st.markdown("""
         <style>
         /* 1. Hero Header Biru */
@@ -2803,52 +2803,51 @@ def menu_reject_defect():
             font-size: 20px;
         }
 
-        /* 2. Menghilangkan Double Border & Background Hitam */
+        /* 2. Menghilangkan Double Border (Box-in-Box) */
         [data-testid="stForm"] {
             border: none !important;
             padding: 0 !important;
         }
 
-        /* Styling Input agar Sama dengan Dropdown BIN */
-        .stTextInput input, .stTextArea textarea {
-            background-color: #262730 !important; /* Warna Grey-Navy Streamlit */
+        /* Styling Input Text & Textarea agar menyatu sempurna */
+        div[data-testid="stTextInput"] > div > div, 
+        div[data-testid="stTextArea"] > div > div {
+            background-color: #1a1c27 !important; /* Warna Navy Gelap */
+            border: 1px solid #3d4156 !important;
+            border-radius: 6px !important;
             color: white !important;
-            border: 1px solid #4a4d5e !important;
-            border-radius: 5px !important;
-            padding: 10px !important;
-        }
-        
-        /* Hilangkan focus outline yang mengganggu */
-        .stTextInput input:focus, .stTextArea textarea:focus {
-            border-color: #007BFF !important;
-            box-shadow: 0 0 0 1px #007BFF !important;
         }
 
-        /* 3. Tombol Simpan - Biru Elegant & Solid */
+        /* Menghilangkan garis input internal bawaan streamlit */
+        input, textarea {
+            background-color: transparent !important;
+            border: none !important;
+            color: white !important;
+        }
+
+        /* 3. Tombol Simpan - Biru Solid & Elegant */
         div.stButton > button {
             background-color: #007BFF !important;
             color: white !important;
-            border-radius: 6px !important;
             border: none !important;
-            font-weight: bold !important;
-            width: 100% !important;
+            border-radius: 8px !important;
+            width: 250px !important; /* Ukuran pas, tidak kepanjangan */
             height: 48px !important;
-            margin-top: 15px !important;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            font-weight: bold !important;
+            margin-top: 20px !important;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
         }
         
         div.stButton > button:hover {
             background-color: #0056b3 !important;
-            box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.4);
+            transform: translateY(-1px);
         }
 
-        /* Warna Label */
+        /* Warna Label agar kontras */
         label {
             color: #E0E0E0 !important;
-            font-size: 13px !important;
             font-weight: 600 !important;
-            margin-bottom: 5px !important;
+            font-size: 14px !important;
         }
         </style>
     """, unsafe_allow_html=True)
