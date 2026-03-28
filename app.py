@@ -2906,6 +2906,14 @@ def menu_reject_defect():
 
     # --- 3. UPLOAD FILE & TEMPLATE ---
     st.divider()
+    # Header berwarna Biru dengan Icon
+    st.markdown("""
+        <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+            <h3 style="color: #007BFF; margin: 0; font-size: 20px;">📁 UPLOAD MASSAL VIA EXCEL</h3>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_dl, col_up = st.columns([1, 2])
     st.subheader("📁 Upload Massal via Excel")
     col_dl, col_up = st.columns([1, 2])
 
