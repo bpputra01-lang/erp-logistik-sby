@@ -3034,13 +3034,17 @@ def menu_reject_defect():
                 
             with m2:
                 major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
-                porsi_major = (major_cnt/total_val*100) if total_val > 0 else 0
-                st.metric(label="🔴 MAJOR CONDITION", value=f"{major_cnt} ITEMS", delta=f"{porsi_major:.1f}% Items")
-                
+                p_major = (major_cnt/total_val*100) if total_val > 0 else 0
+    
+            # LOGIKA PANAH: Jika porsi > 0 maka normal, jika 0 atau turun maka 'inverse' atau 'off'
+            # Atau lebih simpel, biarkan Streamlit hitung angka murni dulu:
+                st.metric(label="🔴 MAJOR CONDITION", value=f"{major_cnt} ITEMS", delta=f"{p_major:.1f}% Items",delta_color="normal" if p_major > 0 else "inverse") # Merah kalau 0/turun)
+    
             with m3:
                 minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
-                porsi_minor = (minor_cnt/total_val*100) if total_val > 0 else 0
-                st.metric(label="🟡 MINOR CONDITION", value=f"{minor_cnt} ITEMS", delta=f"{porsi_minor:.1f}% Items")
+                p_minor = (minor_cnt/total_val*100) if total_val > 0 else 0
+    
+                st.metric(label="🟡 MINOR CONDITION", value=f"{minor_cnt} ITEMS", delta=f"{p_minor:.1f}% Items",delta_color="normal" if p_minor > 0 else "inverse")
 
         # Baris 2: Grafik
         col_pie, col_bar = st.columns(2)
