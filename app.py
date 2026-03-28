@@ -2789,61 +2789,60 @@ def save_data(df):
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
     # CUSTOM CSS UNTUK TAMPILAN ELEGANT & DARK THEME CONSISTENCY
+    # CSS CLEAN & ELEGANT (Tanpa Background Hitam Paksa)
     st.markdown("""
         <style>
-        /* 1. Header Biru (Hero Header) */
+        /* 1. Hero Header Biru */
         .hero-header {
             background-color: #007BFF;
             color: white;
-            padding: 20px;
+            padding: 15px;
             border-radius: 10px;
             text-align: center;
             margin-bottom: 25px;
             font-weight: bold;
-            font-size: 24px;
+            font-size: 22px;
         }
 
-        /* 2. Menghilangkan Box Putih di Tengah (Form Transparent) */
+        /* 2. Form & Input - Kita buat transparan & ikut tema */
         [data-testid="stForm"] {
             border: none !important;
             padding: 0 !important;
-            background-color: transparent !important;
         }
 
-        /* 3. Styling Input & Border Detail Kerusakan */
+        /* Hilangkan warna hitam paksa, biarkan mengikuti tema asli */
         input, textarea, [data-baseweb="select"] {
-            color: #FFFFFF !important; /* Teks Putih agar kontras dengan box gelap */
-            background-color: #1E1E1E !important;
-            border: 1px solid #444 !important; /* Border tipis di garis batas */
-            border-radius: 5px !important;
-        }
-        
-        /* Border khusus merah/orange saat focus di Detail Kerusakan agar terlihat */
-        textarea:focus {
-            border: 1px solid #007BFF !important;
-            box-shadow: 0 0 5px rgba(0,123,255,0.5);
+            background-color: transparent !important; 
+            border: 1.5px solid #555 !important; /* Garis batas tipis */
+            border-radius: 8px !important;
+            color: inherit !important;
         }
 
-        /* 4. Tombol Simpan Elegant (Warna Biru Seragam) */
-        div.stButton > button:first-child {
+        /* 3. Detail Kerusakan (Textarea) Border */
+        textarea {
+            border: 1.5px solid #555 !important;
+        }
+
+        /* 4. Tombol Biru Seragam */
+        div.stButton > button {
             background-color: #007BFF !important;
             color: white !important;
-            border-radius: 8px !important;
             border: none !important;
+            border-radius: 8px !important;
             width: 100% !important;
-            height: 45px !important;
             font-weight: bold !important;
-            transition: 0.3s;
+            height: 45px;
         }
         
-        div.stButton > button:first-child:hover {
+        div.stButton > button:hover {
             background-color: #0056b3 !important;
-            box-shadow: 0px 4px 15px rgba(0, 123, 255, 0.4);
+            border: none !important;
         }
 
-        /* Label Teks Warna Putih/Terang */
-        .stTextInput label, .stTextArea label, .stSelectbox label {
-            color: #E0E0E0 !important;
+        /* Label Teks */
+        label {
+            color: inherit !important;
+            font-weight: 500;
         }
         </style>
     """, unsafe_allow_html=True)
