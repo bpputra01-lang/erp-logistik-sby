@@ -3050,7 +3050,7 @@ def menu_reject_defect():
             df_p = df_chart['KATEGORI'].value_counts().reset_index()
             df_p.columns = ['KATEGORI', 'TOTAL']
             fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4,
-                           title="Porsi Defect", color_discrete_sequence=px.colors.qualitative.Pastel)
+                           title="PRECENTAGE DEFECT/REJECT BY CAUSE", color_discrete_sequence=px.colors.qualitative.Pastel)
             fig_p.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
             st.plotly_chart(fig_p, use_container_width=True)
 
@@ -3058,7 +3058,7 @@ def menu_reject_defect():
             # Bar Chart per Lokasi BIN
             df_b = df_chart['BIN'].value_counts().reset_index()
             df_b.columns = ['BIN', 'TOTAL']
-            fig_b = px.bar(df_b, x='BIN', y='TOTAL', title="Defect per Lokasi",
+            fig_b = px.bar(df_b, x='BIN', y='TOTAL', title="TOTAL SKU DEFECT/REJECT BY LOCATION",
                            color_discrete_sequence=['#D4AF37'])
             fig_b.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
             st.plotly_chart(fig_b, use_container_width=True)
