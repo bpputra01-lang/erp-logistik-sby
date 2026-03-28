@@ -2761,10 +2761,11 @@ def process_stock_comparison(file1, file2):
 import sqlite3
 import streamlit as st
 import pandas as pd
+import plotly.express as px  # <--- INI WAJIB ADA
 from io import BytesIO
 from datetime import datetime
 from datetime import datetime, timedelta
-import plotly.express as px  # <--- INI WAJIB ADA
+
 
 # 1. Database Logic
 def init_db():
