@@ -3335,7 +3335,7 @@ elif menu == "Putaway System":
                 st.divider()
                 st.markdown("""
                 <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #007BFF; margin: 0; font-size: 40px;">📋RINGKASAN HASIL</h3>
+                <h3 style="color: #007BFF; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
                 </div>
                 """, unsafe_allow_html=True)
                 
