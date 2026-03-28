@@ -3016,31 +3016,23 @@ def menu_reject_defect():
         # Baris 2: Grafik
         col_pie, col_bar = st.columns(2)
         
-        # GANTI PIE CHART DENGAN BAR CHART EFEK 3D (CONTOH)
         with col_pie:
-            # Bar Chart Kategori Defect
-            df_bar_k = df_chart['KATEGORI'].value_counts().reset_index()
-            df_bar_k.columns = ['KATEGORI', 'TOTAL']
-            
-            # Gunakan color_discrete_map agar warna Bar Chart matching dengan warna Pie Chart sebelumnya
-            color_map = {'MINOR': '#ffd700', 'MAJOR': '#ff4b4b', 'PACKAGING': '#28a745'}
-            
-            # Buat grafik batang dengan efek 3D
-            fig_bar_k = px.bar(df_bar_k, x='KATEGORI', y='TOTAL', 
-                              title="Jumlah Defect per Kategori",
-                              color='KATEGORI', color_discrete_map=color_map,
-                              template="plotly_dark") # Gunakan tema gelap
-            
-            # Kustomisasi label agar tidak polosan dan taruh di atas batang
-            fig_bar_k.update_traces(textposition='outside', text=df_bar_k['TOTAL'],
-                                  textfont=dict(color="black", size=14, weight="bold"))
-            
-            # Hilangkan legenda, taruh label langsung di batang, dan tambahkan sedikit efek glow/shadow
-            fig_bar_k.update_layout(showlegend=False, 
-                                   margin=dict(t=30, b=0, l=0, r=0), 
-                                   paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-            
-            st.plotly_chart(fig_bar_k, use_container_width=True)
+            # Pie Chart Kategori
+            df_p = df_chart['KATEGORI'].value_counts().reset_index()
+            df_p.columns = ['KATEGORI', 'TOTAL']
+            fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4,
+                           title="Porsi Defect", color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_p.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
+            st.plotly_chart(fig_p, use_container_width=True)
+
+        with col_bar:
+            # Bar Chart per Lokasi BIN
+            df_b = df_chart['BIN'].value_counts().reset_index()
+            df_b.columns = ['BIN', 'TOTAL']
+            fig_b = px.bar(df_b, x='BIN', y='TOTAL', title="Defect per Lokasi",
+                           color_discrete_sequence=['#D4AF37'])
+            fig_b.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
+            st.plotly_chart(fig_b, use_container_width=True)
         
     # --- 4. TAMPILAN DATA & ACTION ---
     st.divider()
