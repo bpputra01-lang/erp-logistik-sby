@@ -2889,13 +2889,16 @@ def menu_reject_defect():
 
     if btn_submit:
         if sku:
+            # Tambahkan timedelta(hours=7) agar sesuai waktu WIB
+            waktu_sekarang = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+            
             new_data = pd.DataFrame([{
                 'BIN': bin_val, 'SKU': sku, 'ARTICLE_NAME': article,
                 'SIZE': size, 'KATEGORI': kategori, 'KETERANGAN': keterangan,
-                'TANGGAL_INPUT': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                'TANGGAL_INPUT': waktu_sekarang
             }])
             save_data(new_data)
-            st.success(f"Data {sku} berhasil disimpan!")
+            st.success(f"Data {sku} berhasil disimpan jam {waktu_sekarang}!")
             st.rerun()
         else:
             st.error("SKU wajib diisi!")
