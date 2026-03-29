@@ -2997,19 +2997,21 @@ def menu_reject_defect():
                 # Pastikan kolom sesuai template
                 if set(template_cols).issubset(df_upload.columns):
                     if st.button("⤴️ EXPORT MULTIPLE DATA TO DATABASE"):
-                        # --- FIX JAM SERVER (WIB UTC+7) ---
-                        from datetime import datetime, timedelta
-        
-                        # Ambil waktu server lalu tambah 7 jam untuk WIB
-                        jam_wib = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
-        
-                        # Terapkan jam fix ini ke semua baris
-                        df_upload['TANGGAL_INPUT'] = jam_wib
-        
-                        # Simpan ke database
+                        import datetime
+                        jam_fix = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        df_upload['TANGGAL_INPUT'] = jam_fix
+                        
+                        # --- TAMBAHKAN LOGIKA INI ---
+                        conn = sqlite3.connect('inventory_logistik.db')
+                        cursor = conn.cursor()
+                        # Hapus semua data lama sebelum memasukkan yang baru
+                        cursor.execute("DELETE FROM reject_list") 
+                        conn.commit()
+                        conn.close()
+                        # ----------------------------
+
                         save_data(df_upload)
-        
-                        st.success(f"✅ Import Berhasil! (Waktu WIB: {jam_wib})")
+                        st.success("Database telah di-reset dan data baru berhasil di-import!")
                         st.rerun()
                 else:
                     st.error("❌ Format kolom tidak sesuai! Pastikan kolom: BIN, SKU, ARTICLE_NAME, SIZE, KATEGORI, KETERANGAN")
