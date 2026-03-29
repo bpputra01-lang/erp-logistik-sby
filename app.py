@@ -3355,11 +3355,10 @@ def process_allocation(df_scan, df_tf):
 
 # --- 4. NAVIGATION / MENU CONTROL ---
 def main():
-    # Contoh Sidebar jika Anda ingin memisahkan menu
-    menu = st.sidebar.selectbox("Pilih Menu", ["Compare RTO", "Dashboard", "Settings"])
+    # Pastikan variabel menu didefinisikan (mengambil dari sidebar)
+    menu = st.sidebar.selectbox("Pilih Menu", ["Compare Penerimaan RTO", "Lainnya"])
 
-    if menu == "Compare RTO":
-        # Terapkan UI Khusus hanya di menu ini
+    if menu == "Compare Penerimaan RTO":
         apply_custom_ui()
         st.markdown('<div class="hero-header">📦 Menu Compare Penerimaan RTO</div>', unsafe_allow_html=True)
 
@@ -3369,19 +3368,24 @@ def main():
         with col2:
             up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'], key="tf_up")
 
+        # Cek apakah kedua file sudah di-upload
         if up_scan and up_tf:
             if st.button("PROSES KOMPARASI DATA"):
-                df_scan_raw = pd.read_excel(up_scan)
-                df_tf_raw = pd.read_excel(up_tf)
+                # 1. Baca data (Pastikan nama variabel sesuai dengan yang dikirim ke fungsi)
+                df_scan = pd.read_excel(up_scan)
+                df_tf = pd.read_excel(up_tf)
 
-                res1, res2, res3, res4 = process_allocation(df_scan_raw, df_tf_raw)
+                # 2. Panggil fungsi (Gunakan nama variabel yang baru dibuat di atas)
+                res1, res2, res3, res4 = process_allocation(df_scan, df_tf)
 
+                # 3. Tampilkan hasil
                 t1, t2, t3, t4 = st.tabs(["🎯 HASIL ALOKASI", "📈 SCAN LEBIH", "📉 QTY TF LEBIH", "⚠️ SKU TIDAK MATCH"])
                 with t1: st.dataframe(res1, use_container_width=True)
                 with t2: st.dataframe(res2, use_container_width=True)
                 with t3: st.dataframe(res3, use_container_width=True)
                 with t4: st.dataframe(res4, use_container_width=True)
 
+                # Logic ExcelWriter & Download Button tetap di sini...
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
@@ -3389,8 +3393,10 @@ def main():
                     res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
                     res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
                 
-                st.download_button("📥 DOWNLOAD HASIL EXCEL", data=output.getvalue(), 
-                                   file_name="Hasil_Compare_RTO.xlsx", use_container_width=True)
+                st.download_button("📥 DOWNLOAD HASIL EXCEL", 
+                                   data=output.getvalue(), 
+                                   file_name="Hasil_Compare_RTO.xlsx", 
+                                   use_container_width=True)
 
 
 
@@ -4725,6 +4731,3 @@ elif menu == "Stock Opname":
 # --- Navigasi ---
 elif menu == "Reject/Defect List":
     menu_reject_defect()
-
-elif menu == "Compare Penerimaan RTO":
-    process_allocation(df_scan, df_tf)
