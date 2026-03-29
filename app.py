@@ -3324,7 +3324,7 @@ def process_allocation(df_scan, df_tf):
                 row_t_copy = row_t.copy()
                 # Kita temukan nama kolom ke-10 (Kolom J)
                 col_j_name = df_tf.columns[9] 
-                row_t_copy[col_j_name] = needed # Masukin sisa ke Kolom J
+                row_t_copy["Sisa TF Lebih"] = needed # Masukin sisa ke Kolom J
                 tf_lebih.append(row_t_copy)
 
         while idx_s < len(list_s):
