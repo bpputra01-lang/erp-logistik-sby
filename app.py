@@ -4304,7 +4304,7 @@ elif menu == "FDR Update":
 
                     # 3. Split Kurir Logic (Kolom F Index 5 ada, Kolom M Index 12 kosong)
                     if len(df_clean.columns) > 12:
-                        f_val = df_clean.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
+                        f_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
                         m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
                         mask_out = (f_val != "") & (m_val == "")
                         filtered_out = df_clean[mask_out].copy()
