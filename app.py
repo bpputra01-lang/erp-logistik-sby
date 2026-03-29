@@ -3047,43 +3047,51 @@ def menu_reject_defect():
             m1, m2, m3 = st.columns(3)
             total_val = len(df_chart)
             
-        with m2:
-            defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
-            p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
+            with m1:
+                # Delta Total SKU tetep ada, pake kata "OVERALL" sesuai kode awal lo
+                st.metric(
+                    label="📊 TOTAL REJECT/DEFECT", 
+                    value=f"{total_val} ITEMS", 
+                    delta="OVERALL"
+                )
+                
+            with m2:
+                defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
+                p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
             
-            # TRIK: Paksa warna Merah & Panah Bawah kalau angka kecil/nol
-            # Kalau nambah (misal > 10) jadi Hijau Naik, kalau dikit jadi Merah Turun
-            if defect_cnt > 0:
-                d_label = f"↑ {p_defect:.1f}% Items"
-                d_color = "normal" # Hijau
-            else:
-                d_label = f"↓ {p_defect:.1f}% Items"
-                d_color = "inverse" # Merah
+                # TRIK: Paksa warna Merah & Panah Bawah kalau angka kecil/nol
+                # Kalau nambah (misal > 10) jadi Hijau Naik, kalau dikit jadi Merah Turun
+                if defect_cnt > 0:
+                    d_label = f"↑ {p_defect:.1f}% Items"
+                    d_color = "normal" # Hijau
+                else:
+                    d_label = f"↓ {p_defect:.1f}% Items"
+                    d_color = "inverse" # Merah
 
-            st.metric(
-                label="📦 TOTAL DEFECT (D)", 
-                value=f"{defect_cnt} ITEMS", 
-                delta=d_label,
-                delta_color=d_color
-            )
+                st.metric(
+                    label="📦 TOTAL DEFECT (D)", 
+                    value=f"{defect_cnt} ITEMS", 
+                    delta=d_label,
+                    delta_color=d_color
+                )
             
-        with m3:
-            reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
-            p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
+            with m3:
+                reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
+                p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
             
-            if reject_cnt > 0:
-                r_label = f"↑ {p_reject:.1f}% Items"
-                r_color = "normal" # Hijau
-            else:
-                r_label = f"↓ {p_reject:.1f}% Items"
-                r_color = "inverse" # Merah
+                if reject_cnt > 0:
+                    r_label = f"↑ {p_reject:.1f}% Items"
+                    r_color = "normal" # Hijau
+                else:
+                    r_label = f"↓ {p_reject:.1f}% Items"
+                    r_color = "inverse" # Merah
 
-            st.metric(
-                label="❌ TOTAL REJECT (R)", 
-                value=f"{reject_cnt} ITEMS", 
-                delta=r_label,
-                delta_color=r_color
-            )
+                st.metric(
+                    label="❌ TOTAL REJECT (R)", 
+                    value=f"{reject_cnt} ITEMS", 
+                    delta=r_label,
+                    delta_color=r_color
+                )
 
         # --- ROW 2: GRAFIK (PIE & BAR) ---
         col_pie, col_bar = st.columns(2)
