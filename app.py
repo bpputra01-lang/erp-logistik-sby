@@ -3232,7 +3232,7 @@ st.set_page_config(page_title="RTO Compare System", layout="wide")
 
 # --- CUSTOM CSS UNTUK BACKGROUND BIRU ---
 # --- 1. CSS & HEADER ---
-    st.markdown("""
+st.markdown("""
         <style>
         .hero-header {
             background-color: #007BFF;
