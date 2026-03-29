@@ -4302,36 +4302,39 @@ elif menu == "FDR Update":
                     else:
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
 
-                   # --- START LOGIC 3 & 4 ---
-                try:
-                    # 3. Split Warehouse Logic (L=Index 11 ada, M=Index 12 kosong)
-                    if len(df_clean.columns) > 12:
-                        l_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
-                        m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
-                        
-                        mask_out = (l_val != "") & (m_val == "")
-                        filtered_out = df_clean[mask_out].copy()
-                        
-                        if not filtered_out.empty:
-                            # Grouping berdasarkan Kolom L (Warehouse)
-                            st.session_state.dict_kurir_fdr = {
-                                str(n): g.iloc[:, 0:13] 
-                                for n, g in filtered_out.groupby(filtered_out.iloc[:, 11])
-                            }
-                        else:
-                            st.session_state.dict_kurir_fdr = {}
-                    
-                    # 4. Metrics
-                    st.session_state.metrics_data = {
-                        'total': len(st.session_state.ws_manifest_fdr),
-                        'fu': len(st.session_state.ws_fu_it_fdr) if st.session_state.ws_fu_it_fdr is not None else 0,
-                        'kurir': len(st.session_state.dict_kurir_fdr)
+                   # --- PASTIKAN STRUKTUR TRY-EXCEPT INI SEJAJAR ---
+        try:
+            # 3. Split Warehouse Logic (L=Index 11 ada, M=Index 12 kosong)
+            if len(df_clean.columns) > 12:
+                l_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
+                m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+                
+                mask_out = (l_val != "") & (m_val == "")
+                filtered_out = df_clean[mask_out].copy()
+                
+                if not filtered_out.empty:
+                    # Grouping berdasarkan Kolom L (Warehouse)
+                    st.session_state.dict_kurir_fdr = {
+                        str(n): g.iloc[:, 0:13] 
+                        for n, g in filtered_out.groupby(filtered_out.iloc[:, 11])
                     }
-                    
-                    st.rerun()
+                else:
+                    st.session_state.dict_kurir_fdr = {}
+            
+            # 4. Metrics
+            # Di sini kita pastikan ws_manifest_fdr aman dicek
+            if st.session_state.ws_manifest_fdr is not None:
+                st.session_state.metrics_data = {
+                    'total': len(st.session_state.ws_manifest_fdr),
+                    'fu': len(st.session_state.ws_fu_it_fdr) if st.session_state.ws_fu_it_fdr is not None else 0,
+                    'kurir': len(st.session_state.dict_kurir_fdr)
+                }
+            
+            st.rerun()
 
-                except Exception as e:
-                    st.error(f"❌ Error saat proses split warehouse: {e}")
+        except Exception as e:
+            # PENUTUP TRY WAJIB ADA DI SINI
+            st.error(f"❌ Error pada baris proses: {e}")
                 # --- END LOGIC ---
 
     # --- TAMPILKAN HASIL & METRICS ---
