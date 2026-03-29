@@ -3228,35 +3228,31 @@ import streamlit as st
 from io import BytesIO
 
 def process_allocation(df_scan, df_tf):
-    # Penamaan Kolom sesuai instruksi
-    # df_scan: SKU (Kolom B), Qty (Kolom B? - diasumsikan kolom C/Qty karena B adalah SKU)
-    # df_tf: No Transfer (Kolom A), SKU (Kolom D), Qty (Kolom H)
+    # Penyesuaian Kolom berdasarkan instruksi:
+    # Scan: A (Index 0) = SKU, B (Index 1) = Qty
+    # TF:   A (Index 0) = No TF, D (Index 3) = SKU, H (Index 7) = Qty
     
-    # Pre-processing: Pastikan tipe data benar
-    df_scan.columns = ['Row_Scan'] + list(df_scan.columns[1:]) # Safety index
-    df_tf.columns = ['No_Transfer', 'Col_B', 'Col_C', 'SKU', 'Col_E', 'Col_F', 'Col_G', 'Qty_TF'] + list(df_tf.columns[8:])
+    # Mapping kolom untuk keamanan
+    scan_sku_idx, scan_qty_idx = 0, 1
+    tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
 
-    sku_scan_col = df_scan.columns[1] # Kolom B
-    qty_scan_col = df_scan.columns[2] # Kolom C (Asumsi Qty Scan)
-    
-    sku_tf_col = 'SKU'        # Kolom D
-    qty_tf_col = 'Qty_TF'     # Kolom H
-    no_tf_col = 'No_Transfer' # Kolom A
-
-    # List untuk menampung hasil
+    # List kontainer hasil
     hasil_alokasi = []
     scan_lebih = []
     tf_lebih = []
     missing_sku = []
 
-    # Ambil Unique SKU dari kedua file
-    all_skus = set(df_scan[sku_scan_col].unique()) | set(df_tf[sku_tf_col].unique())
+    # Get All Unique SKUs
+    skus_in_scan = set(df_scan.iloc[:, scan_sku_idx].dropna().unique())
+    skus_in_tf = set(df_tf.iloc[:, tf_sku_idx].dropna().unique())
+    all_skus = skus_in_scan | skus_in_tf
 
     for sku in all_skus:
-        data_s = df_scan[df_scan[sku_scan_col] == sku].copy()
-        data_t = df_tf[df_tf[sku_tf_col] == sku].copy()
+        # Filter data per SKU
+        data_s = df_scan[df_scan.iloc[:, scan_sku_idx] == sku].copy()
+        data_t = df_tf[df_tf.iloc[:, tf_sku_idx] == sku].copy()
 
-        # Tab 4: Cek jika SKU tidak ada di salah satu file
+        # TAB 4: Cek jika SKU hanya ada di salah satu file
         if data_s.empty:
             data_t['Keterangan'] = "Hanya ada di Transfer Stock"
             missing_sku.append(data_t)
@@ -3266,40 +3262,47 @@ def process_allocation(df_scan, df_tf):
             missing_sku.append(data_s)
             continue
 
-        # Logika Alokasi
-        idx_s = 0
+        # Persiapkan data untuk looping alokasi
+        # Konversi ke list of dict agar proses "Ultra Fast"
         list_s = data_s.to_dict('records')
         list_t = data_t.to_dict('records')
 
+        idx_s = 0
         for row_t in list_t:
-            needed = row_t[qty_tf_col]
+            needed = row_t.get(df_tf.columns[tf_qty_idx], 0)
+            no_tf = row_t.get(df_tf.columns[tf_no_idx], "N/A")
             
             while needed > 0 and idx_s < len(list_s):
-                available = list_s[idx_s][qty_scan_col]
+                available = list_s[idx_s].get(df_scan.columns[scan_qty_idx], 0)
+                
+                if available <= 0:
+                    idx_s += 1
+                    continue
                 
                 allocated = min(needed, available)
                 
-                # Catat Tab 1
+                # TAB 1: Simpan record alokasi
                 hasil_alokasi.append({
-                    'No Transfer': row_t[no_tf_col],
+                    'No Transfer': no_tf,
                     'SKU': sku,
-                    'Qty Allocated': allocated
+                    'Qty Alokasi': allocated
                 })
                 
                 needed -= allocated
-                list_s[idx_s][qty_scan_col] -= allocated
+                list_s[idx_s][df_scan.columns[scan_qty_idx]] -= allocated
                 
-                if list_s[idx_s][qty_scan_col] == 0:
+                if list_s[idx_s][df_scan.columns[scan_qty_idx]] == 0:
                     idx_s += 1
             
-            # Tab 3: Jika transfer stock belum terpenuhi
+            # TAB 3: Jika Qty TF belum terpenuhi sepenuhnya
             if needed > 0:
-                row_t[qty_tf_col] = needed
+                row_t[df_tf.columns[tf_qty_idx]] = needed
                 tf_lebih.append(row_t)
 
-        # Tab 2: Jika data scan masih sisa
+        # TAB 2: Jika Data Scan masih ada sisa (Lebih)
         while idx_s < len(list_s):
-            if list_s[idx_s][qty_scan_col] > 0:
+            rem_qty = list_s[idx_s].get(df_scan.columns[scan_qty_idx], 0)
+            if rem_qty > 0:
                 scan_lebih.append(list_s[idx_s])
             idx_s += 1
 
@@ -3311,39 +3314,40 @@ def process_allocation(df_scan, df_tf):
     )
 
 # --- STREAMLIT UI ---
-st.set_page_config(page_title="Compare RTO - God Mode", layout="wide")
-st.header("📦 Compare Penerimaan RTO")
+st.set_page_config(page_title="RTO Compare System", layout="wide")
+st.title("📦 Menu Compare Penerimaan RTO")
 
-col1, col2 = st.columns(2)
-with col1:
-    file_scan = st.file_uploader("Upload Data Scan (Kolom B: SKU, Kolom C: Qty)", type=['xlsx', 'csv'])
-with col2:
-    file_tf = st.file_uploader("Upload Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx', 'csv'])
+up_scan = st.file_uploader("Upload Data Scan (A: SKU, B: Qty)", type=['xlsx'])
+up_tf = st.file_uploader("Upload Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx'])
 
-if file_scan and file_tf:
-    if st.button("PROSES KOMPARASI SEKARANG"):
-        df_scan = pd.read_excel(file_scan)
-        df_tf = pd.read_excel(file_tf)
+if up_scan and up_tf:
+    if st.button("PROSES DATA", use_container_width=True):
+        df_scan_raw = pd.read_excel(up_scan)
+        df_tf_raw = pd.read_excel(up_tf)
 
-        tab1_df, tab2_df, tab3_df, tab4_df = process_allocation(df_scan, df_tf)
+        res1, res2, res3, res4 = process_allocation(df_scan_raw, df_tf_raw)
 
-        t1, t2, t3, t4 = st.tabs([
-            "🎯 HASIL ALOKASI", 
-            "📈 DATA SCAN LEBIH", 
-            "📉 QTY TF LEBIH", 
-            "⚠️ SKU TIDAK MATCH"
-        ])
+        t1, t2, t3, t4 = st.tabs(["🎯 Hasil Alokasi", "📈 Scan Lebih", "📉 TF Lebih (Kurang Scan)", "⚠️ SKU Tidak Match"])
 
-        with t1:
-            st.dataframe(tab1_df, use_container_width=True)
-        with t2:
-            st.dataframe(tab2_df, use_container_width=True)
-        with t3:
-            st.dataframe(tab3_df, use_container_width=True)
-        with t4:
-            st.dataframe(tab4_df, use_container_width=True)
-            
-        # Download Button logic could be added here using BytesIO
+        with t1: st.dataframe(res1, use_container_width=True)
+        with t2: st.dataframe(res2, use_container_width=True)
+        with t3: st.dataframe(res3, use_container_width=True)
+        with t4: st.dataframe(res4, use_container_width=True)
+
+        # Download Logic
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
+            res2.to_excel(writer, sheet_name='DATA SCAN LEBIH', index=False)
+            res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
+            res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
+        
+        st.download_button(
+            label="📥 DOWNLOAD HASIL KOMPARASI (EXCEL)",
+            data=output.getvalue(),
+            file_name="Hasil_Compare_RTO.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 with st.sidebar:
        st.markdown("""
     <style>
