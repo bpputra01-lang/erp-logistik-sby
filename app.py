@@ -3041,31 +3041,37 @@ def menu_reject_defect():
             </div>
         """, unsafe_allow_html=True)
 
-       # --- ROW 1: METRICS (CLEAN MODE - NO FAKE ARROWS) ---
+       # --- ROW 1: METRICS (LOGIKA FLUKTUATIF FIX) ---
         st.markdown("<br>", unsafe_allow_html=True) 
         with st.container():
             m1, m2, m3 = st.columns(3)
             total_val = len(df_chart)
             
             with m1:
-                # Value murni, tanpa delta yang bikin bingung
                 st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} ITEMS")
                 
             with m2:
                 defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
                 p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
-                # Persentase ditaruh di label aja biar tetep informatif tanpa panah
+                
+                # LOGIKA: Streamlit anggap NEGATIF = MERAH/TURUN (normal)
+                # Kita pakai 'inverse' agar: POSITIF (nambah barang rusak) = MERAH
                 st.metric(
-                    label=f"📦 TOTAL DEFECT (D) - {p_defect:.1f}%", 
-                    value=f"{defect_cnt} ITEMS"
+                    label="📦 TOTAL DEFECT (D)", 
+                    value=f"{defect_cnt} ITEMS", 
+                    delta=f"{p_defect:.1f}% Items",
+                    delta_color="inverse" # <--- INI KUNCINYA: Nambah = Merah, Kurang = Hijau
                 )
                 
             with m3:
                 reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
                 p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
+                
                 st.metric(
-                    label=f"❌ TOTAL REJECT (R) - {p_reject:.1f}%", 
-                    value=f"{reject_cnt} ITEMS"
+                    label="❌ TOTAL REJECT (R)", 
+                    value=f"{reject_cnt} ITEMS", 
+                    delta=f"{p_reject:.1f}% Items",
+                    delta_color="inverse" # <--- Sama, biar sinkron logikanya
                 )
 
         # --- ROW 2: GRAFIK (PIE & BAR) ---
