@@ -3230,46 +3230,77 @@ from io import BytesIO
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="RTO Compare System", layout="wide")
 
-# --- 2. CSS & HEADER ---
+# --- 2. CSS & HEADER (FIXED BLUE THEME) ---
 st.markdown("""
 <style>
-    .stApp { background-color: #f0f7ff !important; }
+    /* Background aplikasi biru muda */
+    .stApp {
+        background-color: #f0f7ff !important;
+    }
+
+    /* Hero Header Biru */
     .hero-header {
-        background-color: #007BFF; color: white; padding: 15px;
-        border-radius: 10px; text-align: center; margin-bottom: 25px;
-        font-weight: bold; font-size: 24px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+        background-color: #007BFF;
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 25px;
+        font-weight: bold;
+        font-size: 24px;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
     }
-    /* Styling khusus uploader agar bersih */
-    [data-testid="stFileUploader"] { 
-        background-color: #ffffff; 
-        border: 1px solid #007BFF; 
-        border-radius: 10px; 
-        padding: 10px;
+
+    /* Styling Uploader */
+    [data-testid="stFileUploader"] {
+        background-color: #ffffff;
+        border: 1px solid #007BFF;
+        border-radius: 10px;
+        padding: 15px;
     }
+
+    /* Styling Button */
     div.stButton > button {
-        background-color: #007BFF !important; color: white !important;
-        border-radius: 8px !important; width: 100% !important;
-        height: 48px !important; font-weight: bold !important; border: none !important;
+        background-color: #007BFF !important;
+        color: white !important;
+        border-radius: 8px !important;
+        width: 100% !important;
+        height: 48px !important;
+        font-weight: bold !important;
+        border: none !important;
+    }
+
+    /* Warna Label */
+    label { 
+        color: #333333 !important; 
+        font-weight: 600 !important; 
+    }
+    
+    /* Styling Tab */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #ffffff;
+        border-radius: 5px 5px 0px 0px;
+        padding: 10px 20px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="hero-header">📦 Menu Compare Penerimaan RTO</div>', unsafe_allow_html=True)
 
-# --- 3. RESET LOGIC ---
-if 'results' not in st.session_state:
-    st.session_state.results = None
-
-def reset_data():
-    st.session_state.results = None
-
-# --- 4. LOGIKA ALOKASI FIFO ---
+# --- 4. LOGIKA ALOKASI ---
 def process_allocation(df_scan, df_tf):
+    # Mapping Kolom Berdasarkan Instruksi
+    # Scan: A=SKU (0), B=Qty (1) 
+    # TF: A=No TF (0), D=SKU (3), H=Qty (7)
     scan_sku_idx, scan_qty_idx = 0, 1
     tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
 
     hasil_alokasi, scan_lebih, tf_lebih, missing_sku = [], [], [], []
 
+    # Bersihkan Data SKU
     df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].dropna().astype(str).str.strip()
     df_tf.iloc[:, tf_sku_idx] = df_tf.iloc[:, tf_sku_idx].dropna().astype(str).str.strip()
 
@@ -3279,6 +3310,7 @@ def process_allocation(df_scan, df_tf):
         data_s = df_scan[df_scan.iloc[:, scan_sku_idx] == sku].copy()
         data_t = df_tf[df_tf.iloc[:, tf_sku_idx] == sku].copy()
 
+        # Tab 4: SKU Tidak Match
         if data_s.empty:
             data_t['Keterangan'] = "Hanya di Transfer Stock"
             missing_sku.append(data_t)
@@ -3288,83 +3320,99 @@ def process_allocation(df_scan, df_tf):
             missing_sku.append(data_s)
             continue
 
+        # Konversi ke list dict untuk kecepatan (Ultra Fast)
         list_s = data_s.to_dict('records')
         list_t = data_t.to_dict('records')
-        col_scan_qty, col_tf_qty, col_tf_no = df_scan.columns[scan_qty_idx], df_tf.columns[tf_qty_idx], df_tf.columns[tf_no_idx]
+        
+        col_scan_qty = df_scan.columns[scan_qty_idx]
+        col_tf_qty = df_tf.columns[tf_qty_idx]
+        col_tf_no = df_tf.columns[tf_no_idx]
         
         idx_s = 0
         for row_t in list_t:
             needed = row_t.get(col_tf_qty, 0)
+            
             while needed > 0 and idx_s < len(list_s):
                 available = list_s[idx_s].get(col_scan_qty, 0)
+                
                 if available <= 0:
                     idx_s += 1
                     continue
+                
                 allocated = min(needed, available)
-                hasil_alokasi.append({'Tf Code': row_t.get(col_tf_no), 'SKU': sku, 'Qty Alokasi': allocated})
+                hasil_alokasi.append({
+                    'No Transfer': row_t.get(col_tf_no),
+                    'SKU': sku,
+                    'Qty Alokasi': allocated
+                })
+                
                 needed -= allocated
                 list_s[idx_s][col_scan_qty] -= allocated
-                if list_s[idx_s][col_scan_qty] <= 0: idx_s += 1
+                
+                if list_s[idx_s][col_scan_qty] <= 0:
+                    idx_s += 1
             
+            # Tab 3: Qty TF Lebih (Sisa masuk ke Kolom J)
             if needed > 0:
+                # Pastikan row_t memiliki minimal 10 kolom agar bisa mengisi Kolom J (index 9)
                 row_list = list(row_t.values())
-                while len(row_list) < 10: row_list.append(None)
-                row_list[9] = needed # KOLOM J
+                while len(row_list) < 10:
+                    row_list.append(None)
+                row_list[9] = needed # Sisa diletakkan di Kolom J
                 tf_lebih.append(row_list)
 
+        # Tab 2: Scan Lebih
         while idx_s < len(list_s):
-            if list_s[idx_s].get(col_scan_qty, 0) > 0: scan_lebih.append(list_s[idx_s])
+            if list_s[idx_s].get(col_scan_qty, 0) > 0:
+                scan_lebih.append(list_s[idx_s])
             idx_s += 1
 
+    # Format Header Tab 3
     tf_headers = list(df_tf.columns)
     while len(tf_headers) < 9: tf_headers.append(f"Col_{len(tf_headers)}")
     tf_headers.append("Sisa Lebih (Kolom J)")
 
-    return (pd.DataFrame(hasil_alokasi), pd.DataFrame(scan_lebih), 
+    return (pd.DataFrame(hasil_alokasi), 
+            pd.DataFrame(scan_lebih), 
             pd.DataFrame(tf_lebih, columns=tf_headers) if tf_lebih else pd.DataFrame(columns=tf_headers), 
             pd.concat(missing_sku) if missing_sku else pd.DataFrame())
 
-# --- 5. UI UPLOADER (DI DALAM EXPANDER BIAR GAK NANGKRING) ---
-with st.expander("📂 UPLOAD FILE DISINI", expanded=(st.session_state.results is None)):
-    col1, col2 = st.columns(2)
-    with col1:
-        up_scan = st.file_uploader("Data Scan (A: SKU, B: Qty)", type=['xlsx'], on_change=reset_data)
-    with col2:
-        up_tf = st.file_uploader("Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx'], on_change=reset_data)
-    
-    btn_proses = st.button("PROSES SEKARANG")
+# --- 5. MAIN UI ---
+col1, col2 = st.columns(2)
+with col1:
+    up_scan = st.file_uploader("Upload Data Scan", type=['xlsx','csv'])
+with col2:
+    up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'])
 
-if up_scan and up_tf and btn_proses:
-    df_scan_raw = pd.read_excel(up_scan)
-    df_tf_raw = pd.read_excel(up_tf)
-    st.session_state.results = process_allocation(df_scan_raw, df_tf_raw)
-    st.rerun() # Paksa rerun biar expander otomatis nutup
+if up_scan and up_tf:
+    if st.button("PROSES KOMPARASI DATA"):
+        df_scan_raw = pd.read_excel(up_scan)
+        df_tf_raw = pd.read_excel(up_tf)
 
-# --- 6. TAMPILAN HASIL ---
-if st.session_state.results:
-    res1, res2, res3, res4 = st.session_state.results
+        res1, res2, res3, res4 = process_allocation(df_scan_raw, df_tf_raw)
 
-    # Tombol Reset Manual
-    if st.button("🗑️ BERSIHKAN HASIL / UPLOAD ULANG"):
-        reset_data()
-        st.rerun()
+        t1, t2, t3, t4 = st.tabs(["🎯 HASIL ALOKASI", "📈 SCAN LEBIH", "📉 QTY TF LEBIH", "⚠️ SKU TIDAK MATCH"])
+        with t1: st.dataframe(res1, use_container_width=True)
+        with t2: st.dataframe(res2, use_container_width=True)
+        with t3: st.dataframe(res3, use_container_width=True)
+        with t4: st.dataframe(res4, use_container_width=True)
 
-    t1, t2, t3, t4 = st.tabs(["🎯 HASIL ALOKASI", "📈 SCAN LEBIH", "📉 QTY TF LEBIH", "⚠️ SKU TIDAK MATCH"])
-    with t1: st.dataframe(res1, use_container_width=True)
-    with t2: st.dataframe(res2, use_container_width=True)
-    with t3: st.dataframe(res3, use_container_width=True)
-    with t4: st.dataframe(res4, use_container_width=True)
+        # Download Logic (Menggunakan ExcelWriter agar data tetap aman)
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
+            res2.to_excel(writer, sheet_name='DATA SCAN LEBIH', index=False)
+            res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
+            res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
+        
+        st.download_button(
+            label="📥 DOWNLOAD HASIL EXCEL", 
+            data=output.getvalue(), 
+            file_name="Hasil_Compare_RTO_Final.xlsx", 
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
 
-    # Excel Download
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
-        res2.to_excel(writer, sheet_name='DATA SCAN LEBIH', index=False)
-        res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
-        res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
-    
-    st.download_button("📥 DOWNLOAD HASIL EXCEL", data=output.getvalue(), 
-                       file_name="Hasil_Compare_RTO.xlsx", use_container_width=True)
 
                            
 with st.sidebar:
