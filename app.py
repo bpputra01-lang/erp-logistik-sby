@@ -3341,7 +3341,7 @@ def main():
 
     if menu == "Compare Penerimaan RTO":
         apply_custom_ui()
-        st.markdown('<div class="hero-header">Compare Penerimaan RTO</div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-header">COMPARE PENERIMAAN RTO</div>', unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
         with col1:
