@@ -3033,49 +3033,49 @@ def menu_reject_defect():
             </div>
         """, unsafe_allow_html=True)
 
-        # --- ROW 1: METRICS DENGAN CARD MODERN ---
-        st.markdown("<br>", unsafe_allow_html=True) # Jeda spasi
-            with st.container():
-                m1, m2, m3 = st.columns(3)
-                total_val = len(df_chart)
-        
-        with m1:
-            st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} ITEMS", delta="OVERALL")
+       # --- ROW 1: METRICS ---
+        st.markdown("<br>", unsafe_allow_html=True) 
+        with st.container():
+            m1, m2, m3 = st.columns(3)
+            total_val = len(df_chart)
             
-        with m2:
-            # Hitung semua yang depannya 'D' (Defect: D1, D2, D3, D4)
-            defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
-            p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
-            st.metric(
-                label="📦 TOTAL DEFECT (D)", 
-                value=f"{defect_cnt} ITEMS", 
-                delta=f"{p_defect:.1f}% Items",
-                delta_color="normal" if defect_cnt > 0 else "inverse"
-            )
-            
-        with m3:
-            # Hitung semua yang depannya 'R' (Reject: R1, R2, R3, R4)
-            reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
-            p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
-            st.metric(
-                label="❌ TOTAL REJECT (R)", 
-                value=f"{reject_cnt} ITEMS", 
-                delta=f"{p_reject:.1f}% Items",
-                delta_color="normal" if reject_cnt > 0 else "inverse"
-            )
+            with m1:
+                st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} ITEMS", delta="OVERALL")
+                
+            with m2:
+                defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
+                p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
+                st.metric(label="📦 TOTAL DEFECT (D)", value=f"{defect_cnt} ITEMS", 
+                          delta=f"{p_defect:.1f}% Items", delta_color="normal" if defect_cnt > 0 else "inverse")
+                
+            with m3:
+                reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
+                p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
+                st.metric(label="❌ TOTAL REJECT (R)", value=f"{reject_cnt} ITEMS", 
+                          delta=f"{p_reject:.1f}% Items", delta_color="normal" if reject_cnt > 0 else "inverse")
 
-        # Baris 2: Grafik
+        # --- ROW 2: GRAFIK (PIE & BAR) ---
         col_pie, col_bar = st.columns(2)
         
         with col_pie:
-            # Ini otomatis bakal nampilin porsi D1, D2, R1, dst selama ada datanya di kolom KATEGORI
             df_p = df_chart['KATEGORI'].value_counts().reset_index()
             df_p.columns = ['KATEGORI', 'TOTAL']
             fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4,
-                           title="PRECENTAGE BY CAUSE (D1-R4)", 
-                           color_discrete_sequence=px.colors.qualitative.Bold) # Pakai warna Bold biar beda tiap kode
-            fig_p.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=350)
+                           title="PERCENTAGE BY CAUSE (D1-R4)", 
+                           color_discrete_sequence=px.colors.qualitative.Bold)
+            fig_p.update_layout(margin=dict(t=50, b=0, l=0, r=0), height=350)
             st.plotly_chart(fig_p, use_container_width=True)
+
+        # --- INI BAGIAN YANG TADI HILANG (BAR CHART) ---
+        with col_bar:
+            # Hitung jumlah defect/reject per BIN (Lokasi)
+            df_b = df_chart['BIN'].value_counts().reset_index()
+            df_b.columns = ['BIN', 'TOTAL']
+            fig_b = px.bar(df_b, x='BIN', y='TOTAL', 
+                           title="TOTAL BY LOCATION (BIN)",
+                           color='TOTAL', color_continuous_scale='Blues')
+            fig_b.update_layout(margin=dict(t=50, b=0, l=0, r=0), height=350)
+            st.plotly_chart(fig_b, use_container_width=True)
         
     # --- 4. TAMPILAN DATA & ACTION ---
     st.divider()
