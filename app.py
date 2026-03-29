@@ -4363,11 +4363,28 @@ elif menu == "FDR Update":
                 opt = st.selectbox("Pilih Kurir", list(st.session_state.dict_kurir_fdr.keys()))
                 
                 # Download All Excel
+                # --- DOWNLOAD ALL EXCEL (FIX DUPLICATE SHEET NAMES) ---
                 import io
                 buff = io.BytesIO()
                 with pd.ExcelWriter(buff, engine='xlsxwriter') as w:
-                    for n, d in st.session_state.dict_kurir_fdr.items(): d.to_excel(w, sheet_name=str(n)[:31], index=False)
-                st.download_button("📊 Download All Excel", buff.getvalue(), "All.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    used_names = set() # Buat nyatet nama sheet yang udah dipake
+                    for n, d in st.session_state.dict_kurir_fdr.items():
+                        # 1. Bersihin nama: max 31 karakter & hapus karakter terlarang [ ] : * ? / \
+                        sheet_name = str(n)[:31].strip()
+                        for char in "[]:*?/\ ": sheet_name = sheet_name.replace(char, "_")
+                        
+                        # 2. Logic Anti-Duplikat
+                        original_name = sheet_name
+                        counter = 1
+                        while sheet_name.lower() in used_names:
+                            suffix = f"_{counter}"
+                            sheet_name = f"{original_name[:31-len(suffix)]}{suffix}"
+                            counter += 1
+                        
+                        used_names.add(sheet_name.lower())
+                        d.to_excel(w, sheet_name=sheet_name, index=False)
+                
+                st.download_button("📊 Download All Excel", buff.getvalue(), "All_Warehouse.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 
                 # Download Selected
                 if opt:
