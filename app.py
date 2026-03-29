@@ -3041,57 +3041,53 @@ def menu_reject_defect():
             </div>
         """, unsafe_allow_html=True)
 
-       # --- ROW 1: METRICS (LOGIKA FLUKTUATIF FIX: NAIK=HIJAU, TURUN=MERAH) ---
+       # --- LOGIKA MEMORY (SESSION STATE) ---
+        # Kita bikin tempat penyimpanan nilai lama di memori browser
+        if 'old_total' not in st.session_state: st.session_state.old_total = 0
+        if 'old_defect' not in st.session_state: st.session_state.old_defect = 0
+        if 'old_reject' not in st.session_state: st.session_state.old_reject = 0
+
         st.markdown("<br>", unsafe_allow_html=True) 
         with st.container():
             m1, m2, m3 = st.columns(3)
             total_val = len(df_chart)
             
-        with m1:
-            st.metric(
-                label="📊 TOTAL REJECT/DEFECT", 
-                value=f"{total_val} ITEMS", 
-                delta="OVERALL"
-            )
-            
-        with m2:
-            defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
-            p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
-            
-            # --- LOGIKA FIX ---
-            if defect_cnt > 0:
-                # Angka positif = Panah Atas otomatis (Hijau)
-                d_label = f"{p_defect:.1f}% Items"
-                d_color = "normal"
-            else:
-                # Kasih tanda minus '-' di depan angka = Panah Bawah otomatis (Merah)
-                d_label = f"-{p_defect:.1f}% Items"
-                d_color = "normal"
-
-            st.metric(
-                label="📦 TOTAL DEFECT (D)", 
-                value=f"{defect_cnt} ITEMS", 
-                delta=d_label,
-                delta_color=d_color
-            )
-            
-        with m3:
-            reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
-            p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
-            
-            if reject_cnt > 0:
-                r_label = f"{p_reject:.1f}% Items"
-                r_color = "normal"
-            else:
-                r_label = f"-{p_reject:.1f}% Items"
-                r_color = "normal"
-
-            st.metric(
-                label="❌ TOTAL REJECT (R)", 
-                value=f"{reject_cnt} ITEMS", 
-                delta=r_label,
-                delta_color=r_color
-            )
+            with m1:
+                # 1. Hitung selisih total
+                diff_total = total_val - st.session_state.old_total
+                st.metric(
+                    label="📊 TOTAL REJECT/DEFECT", 
+                    value=f"{total_val} ITEMS", 
+                    delta=f"{diff_total} Items" if diff_total != 0 else "OVERALL"
+                )
+                # Simpan nilai sekarang jadi nilai lama buat update berikutnya
+                st.session_state.old_total = total_val
+                
+            with m2:
+                defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
+                p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
+                
+                # 2. Hitung selisih Defect
+                diff_d = defect_cnt - st.session_state.old_defect
+                st.metric(
+                    label="📦 TOTAL DEFECT (D)", 
+                    value=f"{defect_cnt} ITEMS", 
+                    delta=f"{diff_d} Items ({p_defect:.1f}%)"
+                )
+                st.session_state.old_defect = defect_cnt
+                
+            with m3:
+                reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
+                p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
+                
+                # 3. Hitung selisih Reject
+                diff_r = reject_cnt - st.session_state.old_reject
+                st.metric(
+                    label="❌ TOTAL REJECT (R)", 
+                    value=f"{reject_cnt} ITEMS", 
+                    delta=f"{diff_r} Items ({p_reject:.1f}%)"
+                )
+                st.session_state.old_reject = reject_cnt
 
         # --- ROW 2: GRAFIK (PIE & BAR) ---
         col_pie, col_bar = st.columns(2)
