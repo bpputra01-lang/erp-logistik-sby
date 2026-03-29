@@ -3355,10 +3355,8 @@ def process_allocation(df_scan, df_tf):
 
 # --- 4. NAVIGATION / MENU CONTROL ---
 def main():
-    # Contoh Sidebar jika Anda ingin memisahkan menu
-    menu = st.sidebar.selectbox("Pilih Menu", ["Compare RTO", "Dashboard", "Settings"])
 
-    if menu == "Compare RTO":
+    if menu == "Compare Penerimaan RTO":
         # Terapkan UI Khusus hanya di menu ini
         apply_custom_ui()
         st.markdown('<div class="hero-header">📦 Menu Compare Penerimaan RTO</div>', unsafe_allow_html=True)
