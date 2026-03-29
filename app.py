@@ -3223,7 +3223,127 @@ def main():
             st.plotly_chart(fig_bar, use_container_width=True)
     else:
         st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
+import pandas as pd
+import streamlit as st
+from io import BytesIO
 
+def process_allocation(df_scan, df_tf):
+    # Penamaan Kolom sesuai instruksi
+    # df_scan: SKU (Kolom B), Qty (Kolom B? - diasumsikan kolom C/Qty karena B adalah SKU)
+    # df_tf: No Transfer (Kolom A), SKU (Kolom D), Qty (Kolom H)
+    
+    # Pre-processing: Pastikan tipe data benar
+    df_scan.columns = ['Row_Scan'] + list(df_scan.columns[1:]) # Safety index
+    df_tf.columns = ['No_Transfer', 'Col_B', 'Col_C', 'SKU', 'Col_E', 'Col_F', 'Col_G', 'Qty_TF'] + list(df_tf.columns[8:])
+
+    sku_scan_col = df_scan.columns[1] # Kolom B
+    qty_scan_col = df_scan.columns[2] # Kolom C (Asumsi Qty Scan)
+    
+    sku_tf_col = 'SKU'        # Kolom D
+    qty_tf_col = 'Qty_TF'     # Kolom H
+    no_tf_col = 'No_Transfer' # Kolom A
+
+    # List untuk menampung hasil
+    hasil_alokasi = []
+    scan_lebih = []
+    tf_lebih = []
+    missing_sku = []
+
+    # Ambil Unique SKU dari kedua file
+    all_skus = set(df_scan[sku_scan_col].unique()) | set(df_tf[sku_tf_col].unique())
+
+    for sku in all_skus:
+        data_s = df_scan[df_scan[sku_scan_col] == sku].copy()
+        data_t = df_tf[df_tf[sku_tf_col] == sku].copy()
+
+        # Tab 4: Cek jika SKU tidak ada di salah satu file
+        if data_s.empty:
+            data_t['Keterangan'] = "Hanya ada di Transfer Stock"
+            missing_sku.append(data_t)
+            continue
+        if data_t.empty:
+            data_s['Keterangan'] = "Hanya ada di Data Scan"
+            missing_sku.append(data_s)
+            continue
+
+        # Logika Alokasi
+        idx_s = 0
+        list_s = data_s.to_dict('records')
+        list_t = data_t.to_dict('records')
+
+        for row_t in list_t:
+            needed = row_t[qty_tf_col]
+            
+            while needed > 0 and idx_s < len(list_s):
+                available = list_s[idx_s][qty_scan_col]
+                
+                allocated = min(needed, available)
+                
+                # Catat Tab 1
+                hasil_alokasi.append({
+                    'No Transfer': row_t[no_tf_col],
+                    'SKU': sku,
+                    'Qty Allocated': allocated
+                })
+                
+                needed -= allocated
+                list_s[idx_s][qty_scan_col] -= allocated
+                
+                if list_s[idx_s][qty_scan_col] == 0:
+                    idx_s += 1
+            
+            # Tab 3: Jika transfer stock belum terpenuhi
+            if needed > 0:
+                row_t[qty_tf_col] = needed
+                tf_lebih.append(row_t)
+
+        # Tab 2: Jika data scan masih sisa
+        while idx_s < len(list_s):
+            if list_s[idx_s][qty_scan_col] > 0:
+                scan_lebih.append(list_s[idx_s])
+            idx_s += 1
+
+    return (
+        pd.DataFrame(hasil_alokasi),
+        pd.DataFrame(scan_lebih),
+        pd.DataFrame(tf_lebih),
+        pd.concat(missing_sku) if missing_sku else pd.DataFrame()
+    )
+
+# --- STREAMLIT UI ---
+st.set_page_config(page_title="Compare RTO - God Mode", layout="wide")
+st.header("📦 Compare Penerimaan RTO")
+
+col1, col2 = st.columns(2)
+with col1:
+    file_scan = st.file_uploader("Upload Data Scan (Kolom B: SKU, Kolom C: Qty)", type=['xlsx', 'csv'])
+with col2:
+    file_tf = st.file_uploader("Upload Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx', 'csv'])
+
+if file_scan and file_tf:
+    if st.button("PROSES KOMPARASI SEKARANG"):
+        df_scan = pd.read_excel(file_scan)
+        df_tf = pd.read_excel(file_tf)
+
+        tab1_df, tab2_df, tab3_df, tab4_df = process_allocation(df_scan, df_tf)
+
+        t1, t2, t3, t4 = st.tabs([
+            "🎯 HASIL ALOKASI", 
+            "📈 DATA SCAN LEBIH", 
+            "📉 QTY TF LEBIH", 
+            "⚠️ SKU TIDAK MATCH"
+        ])
+
+        with t1:
+            st.dataframe(tab1_df, use_container_width=True)
+        with t2:
+            st.dataframe(tab2_df, use_container_width=True)
+        with t3:
+            st.dataframe(tab3_df, use_container_width=True)
+        with t4:
+            st.dataframe(tab4_df, use_container_width=True)
+            
+        # Download Button logic could be added here using BytesIO
 with st.sidebar:
        st.markdown("""
     <style>
