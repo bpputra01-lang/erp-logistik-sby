@@ -3380,9 +3380,9 @@ def process_allocation(df_scan, df_tf):
 # --- 5. MAIN UI ---
 col1, col2 = st.columns(2)
 with col1:
-    up_scan = st.file_uploader("Upload Data Scan (A: SKU, B: Qty)", type=['xlsx','csv'])
+    up_scan = st.file_uploader("Upload Data Scan", type=['xlsx','csv'])
 with col2:
-    up_tf = st.file_uploader("Upload Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx'])
+    up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'])
 
 if up_scan and up_tf:
     if st.button("PROSES KOMPARASI DATA"):
