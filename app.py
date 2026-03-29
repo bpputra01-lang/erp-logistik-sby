@@ -3345,7 +3345,7 @@ def main():
 
         col1, col2 = st.columns(2)
         with col1:
-            up_scan = st.file_uploader("Upload Data Scan", type=['xlsx'], key="scan_up")
+            up_scan = st.file_uploader("Upload Data Scan", type=['xlsx','csv'], key="scan_up")
         with col2:
             up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'], key="tf_up")
 
