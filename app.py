@@ -4302,16 +4302,21 @@ elif menu == "FDR Update":
                     else:
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
 
-                    # 3. Split Warehouse Logic (L=Index 11 ada, M=Index 12 kosong)
+                    # 3. Split Warehouse Logic (Normalisasi UPPERCASE agar Surabaya & surabaya Gabung)
                     if len(df_clean.columns) > 12:
+                        # Ambil data Kolom L (Warehouse) dan M
                         l_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
                         m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
                         
+                        # Filter: L tidak kosong, M kosong
                         mask_out = (l_val != "") & (m_val == "")
                         filtered_out = df_clean[mask_out].copy()
                         
                         if not filtered_out.empty:
-                            # Grouping berdasarkan Kolom L (WAREHOUSE)
+                            # --- INI KUNCINYA: Paksa kolom L jadi Huruf Besar Semua ---
+                            filtered_out.iloc[:, 11] = filtered_out.iloc[:, 11].astype(str).str.upper().str.strip()
+                            
+                            # Grouping berdasarkan Kolom L yang sudah "Bersih"
                             st.session_state.dict_kurir_fdr = {
                                 str(n): g.iloc[:, 0:13] 
                                 for n, g in filtered_out.groupby(filtered_out.iloc[:, 11])
