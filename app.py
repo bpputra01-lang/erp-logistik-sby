@@ -4302,13 +4302,15 @@ elif menu == "FDR Update":
                     else:
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
 
-                   # --- PASTIKAN STRUKTUR TRY-EXCEPT INI SEJAJAR ---
-            try:
+                   # --- MULAI DARI SINI (PASTIKAN TIDAK ADA 'TRY' GANDA DI ATASNYA) ---
+        try:
             # 3. Split Warehouse Logic (L=Index 11 ada, M=Index 12 kosong)
             if len(df_clean.columns) > 12:
+                # Ambil data Kolom L (Warehouse) dan M
                 l_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
                 m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
                 
+                # Filter: L tidak kosong, M kosong
                 mask_out = (l_val != "") & (m_val == "")
                 filtered_out = df_clean[mask_out].copy()
                 
@@ -4322,7 +4324,6 @@ elif menu == "FDR Update":
                     st.session_state.dict_kurir_fdr = {}
             
             # 4. Metrics
-            # Di sini kita pastikan ws_manifest_fdr aman dicek
             if st.session_state.ws_manifest_fdr is not None:
                 st.session_state.metrics_data = {
                     'total': len(st.session_state.ws_manifest_fdr),
@@ -4333,9 +4334,8 @@ elif menu == "FDR Update":
             st.rerun()
 
         except Exception as e:
-            # PENUTUP TRY WAJIB ADA DI SINI
-            st.error(f"❌ Error pada baris proses: {e}")
-                # --- END LOGIC ---
+            # INI PENUTUP WAJIB
+            st.error(f"❌ Error pada proses Warehouse: {e}")
 
     # --- TAMPILKAN HASIL & METRICS ---
     if st.session_state.ws_manifest_fdr is not None:
