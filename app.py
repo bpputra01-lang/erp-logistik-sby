@@ -3036,8 +3036,8 @@ def menu_reject_defect():
         # --- ROW 1: METRICS DENGAN CARD MODERN ---
         st.markdown("<br>", unsafe_allow_html=True) # Jeda spasi
         with st.container():
-        m1, m2, m3 = st.columns(3)
-        total_val = len(df_chart)
+            m1, m2, m3 = st.columns(3)
+            total_val = len(df_chart)
         
         with m1:
             st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} ITEMS", delta="OVERALL")
