@@ -4349,7 +4349,7 @@ elif menu == "FDR Update":
         <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
             <div class="m-box" style="flex:1"><span class="m-lbl">TOTAL MANIFEST</span><span class="m-val">{total_val}</span></div>
             <div class="m-box" style="flex:1"><span class="m-lbl">FU IT</span><span class="m-val" style="color:#FFA500">{fu_val}</span></div>
-            <div class="m-box" style="flex:1"><span class="m-lbl">READY TO SPLIT</span><span class="m-val" style="color:#FF4B4B">{sisa_data}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">NEED CHECK BRANCH</span><span class="m-val" style="color:#FF4B4B">{sisa_data}</span></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -4358,7 +4358,7 @@ elif menu == "FDR Update":
             st.session_state.dict_kurir_fdr = {}
             st.rerun()
 
-        t1, t2, t3 = st.tabs(["📥 MANIFEST", "📋 FU IT", "🛵 KURIR"])
+        t1, t2, t3 = st.tabs(["📥 MANIFEST", "📋 FU IT", "🏭 BRANCH"])
 
         with t1:
             st.dataframe(st.session_state.ws_manifest_fdr, use_container_width=True, hide_index=True)
