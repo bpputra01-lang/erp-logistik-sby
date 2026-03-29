@@ -4282,13 +4282,13 @@ elif menu == "FDR Update":
     u_file = st.file_uploader("📂 Upload File Manifest", type=["xlsx"], key="fdr_upload_fix")
 
     # --- TOMBOL RUN UTAMA ---
-    # Hanya aktif jika ada file dan tombol ditekan
     if u_file:
         if st.button("▶️PROCESS DATA", type="primary", use_container_width=True):
             try:
                 with st.spinner("🔄 Processing..."):
                     # 1. Load & Clear Columns
                     df_raw = pd.read_excel(u_file)
+                    # Kolom yang mau dibuang (Index 6, 7, 8, dst)
                     cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
                     existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
                     df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
@@ -4302,40 +4302,34 @@ elif menu == "FDR Update":
                     else:
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
 
-                   # --- MULAI DARI SINI (PASTIKAN TIDAK ADA 'TRY' GANDA DI ATASNYA) ---
-        try:
-            # 3. Split Warehouse Logic (L=Index 11 ada, M=Index 12 kosong)
-            if len(df_clean.columns) > 12:
-                # Ambil data Kolom L (Warehouse) dan M
-                l_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
-                m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
-                
-                # Filter: L tidak kosong, M kosong
-                mask_out = (l_val != "") & (m_val == "")
-                filtered_out = df_clean[mask_out].copy()
-                
-                if not filtered_out.empty:
-                    # Grouping berdasarkan Kolom L (Warehouse)
-                    st.session_state.dict_kurir_fdr = {
-                        str(n): g.iloc[:, 0:13] 
-                        for n, g in filtered_out.groupby(filtered_out.iloc[:, 11])
+                    # 3. Split Warehouse Logic (L=Index 11 ada, M=Index 12 kosong)
+                    if len(df_clean.columns) > 12:
+                        l_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
+                        m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+                        
+                        mask_out = (l_val != "") & (m_val == "")
+                        filtered_out = df_clean[mask_out].copy()
+                        
+                        if not filtered_out.empty:
+                            # Grouping berdasarkan Kolom L (WAREHOUSE)
+                            st.session_state.dict_kurir_fdr = {
+                                str(n): g.iloc[:, 0:13] 
+                                for n, g in filtered_out.groupby(filtered_out.iloc[:, 11])
+                            }
+                        else:
+                            st.session_state.dict_kurir_fdr = {}
+                    
+                    # 4. Metrics Update
+                    st.session_state.metrics_data = {
+                        'total': len(st.session_state.ws_manifest_fdr),
+                        'fu': len(st.session_state.ws_fu_it_fdr) if st.session_state.ws_fu_it_fdr is not None else 0,
+                        'kurir': len(st.session_state.dict_kurir_fdr)
                     }
-                else:
-                    st.session_state.dict_kurir_fdr = {}
-            
-            # 4. Metrics
-            if st.session_state.ws_manifest_fdr is not None:
-                st.session_state.metrics_data = {
-                    'total': len(st.session_state.ws_manifest_fdr),
-                    'fu': len(st.session_state.ws_fu_it_fdr) if st.session_state.ws_fu_it_fdr is not None else 0,
-                    'kurir': len(st.session_state.dict_kurir_fdr)
-                }
-            
-            st.rerun()
+                    
+                    st.rerun()
 
-        except Exception as e:
-            # INI PENUTUP WAJIB
-            st.error(f"❌ Error pada proses Warehouse: {e}")
+            except Exception as e:
+                st.error(f"❌ Error saat proses: {e}")
 
     # --- TAMPILKAN HASIL & METRICS ---
     if st.session_state.ws_manifest_fdr is not None:
