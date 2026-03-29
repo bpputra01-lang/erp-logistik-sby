@@ -4749,3 +4749,6 @@ elif menu == "Stock Opname":
 # --- Navigasi ---
 elif menu == "Reject/Defect List":
     menu_reject_defect()
+
+elif menu == "Compare Penerimaan RTO":
+    main()
