@@ -3255,7 +3255,7 @@ def apply_custom_ui():
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGIKA ALOKASI (FIXED TOTAL) ---
+# --- 3. LOGIKA ALOKASI (FIXED WITH HEADER SISA QTY TF) ---
 def process_allocation(df_scan, df_tf):
     # Mapping index (Scan: 0=SKU, 1=Qty | TF: 0=No TF, 3=SKU, 7=Qty)
     scan_sku_idx, scan_qty_idx = 0, 1
