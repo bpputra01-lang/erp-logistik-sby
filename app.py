@@ -3355,6 +3355,9 @@ def process_allocation(df_scan, df_tf):
 
 # --- 4. NAVIGATION / MENU CONTROL ---
 def main():
+    # 1. DEFINISIKAN VARIABEL MENU (Ini yang sering terlewat)
+    # Anda bisa menggunakan sidebar agar area kerja tetap luas
+    menu = st.sidebar.selectbox("Pilih Navigasi", ["Compare Penerimaan RTO", "Lainnya"])
 
     # 2. CEK KONDISI MENU
     if menu == "Compare Penerimaan RTO":
@@ -3395,6 +3398,10 @@ def main():
                                    data=output.getvalue(), 
                                    file_name="Hasil_Compare_RTO.xlsx", 
                                    use_container_width=True)
+
+# 3. PASTIKAN FUNGSI MAIN DIPANGGIL DI AKHIR SCRIPT
+if __name__ == "__main__":
+    main()
 
 
                            
