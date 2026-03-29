@@ -3047,7 +3047,7 @@ def menu_reject_defect():
             m1, m2, m3 = st.columns(3)
             total_val = len(df_chart)
             
-            with m1:
+        with m1:
             st.metric(
                 label="📊 TOTAL REJECT/DEFECT", 
                 value=f"{total_val} ITEMS", 
