@@ -3354,9 +3354,9 @@ def process_allocation(df_scan, df_tf):
 # --- 5. MAIN UI ---
 col1, col2 = st.columns(2)
 with col1:
-    up_scan = st.file_uploader("Upload Data Scan (A: SKU, B: Qty)", type=['xlsx'])
+    up_scan = st.file_uploader("Upload Data Scan", type=['xlsx','csv'])
 with col2:
-    up_tf = st.file_uploader("Upload Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx'])
+    up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'])
 
 if up_scan and up_tf:
     if st.button("PROSES KOMPARASI DATA"):
@@ -3790,9 +3790,9 @@ elif menu == "Scan Out Validation":
         """)
     
     col1, col2, col3 = st.columns(3)
-    with col1: up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'])
-    with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'])
-    with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
+    with col1: up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'], help="File dengan Kolom A=BIN, B=SKU")
+    with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'], help="File dengan Kolom D=SKU")
+    with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'], help="File dengan Kolom B=SKU, A=Invoice")
     
     if up_scan and up_hist and up_stock:
         if st.button("▶️ COMPARE DATA SCAN OUT"):
