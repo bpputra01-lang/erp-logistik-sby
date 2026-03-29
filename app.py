@@ -3230,7 +3230,7 @@ from io import BytesIO
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="RTO Compare System", layout="wide")
 
-# --- 2. CSS & HEADER (FIXED BLUE THEME) ---
+# --- 2. CSS & HEADER ---
 st.markdown("""
 <style>
     .stApp { background-color: #f0f7ff !important; }
@@ -3250,7 +3250,12 @@ st.markdown("""
 
 st.markdown('<div class="hero-header">📦 Menu Compare Penerimaan RTO</div>', unsafe_allow_html=True)
 
-# --- 3. LOGIKA ALOKASI ---
+# --- 3. FUNGSI RESET (BIAR GA NANGKRING) ---
+def clear_results():
+    if 'results' in st.session_state:
+        del st.session_state.results
+
+# --- 4. LOGIKA ALOKASI FIFO ---
 def process_allocation(df_scan, df_tf):
     scan_sku_idx, scan_qty_idx = 0, 1
     tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
@@ -3290,7 +3295,7 @@ def process_allocation(df_scan, df_tf):
                     idx_s += 1
                     continue
                 allocated = min(needed, available)
-                hasil_alokasi.append({'No Transfer': row_t.get(col_tf_no), 'SKU': sku, 'Qty Alokasi': allocated})
+                hasil_alokasi.append({'Tf Code': row_t.get(col_tf_no), 'SKU': sku, 'Qty Alokasi': allocated})
                 needed -= allocated
                 list_s[idx_s][col_scan_qty] -= allocated
                 if list_s[idx_s][col_scan_qty] <= 0: idx_s += 1
@@ -3298,7 +3303,7 @@ def process_allocation(df_scan, df_tf):
             if needed > 0:
                 row_list = list(row_t.values())
                 while len(row_list) < 10: row_list.append(None)
-                row_list[9] = needed # Kolom J
+                row_list[9] = needed # KOLOM J (SISA LEBIH TF)
                 tf_lebih.append(row_list)
 
         while idx_s < len(list_s):
@@ -3313,35 +3318,30 @@ def process_allocation(df_scan, df_tf):
             pd.DataFrame(tf_lebih, columns=tf_headers) if tf_lebih else pd.DataFrame(columns=tf_headers), 
             pd.concat(missing_sku) if missing_sku else pd.DataFrame())
 
-# --- 4. MAIN UI DENGAN SESSION STATE ---
+# --- 5. MAIN UI ---
 col1, col2 = st.columns(2)
 with col1:
-    up_scan = st.file_uploader("Upload Data Scan", type=['xlsx'])
+    # Clear results if file changed
+    up_scan = st.file_uploader("Upload Data Scan", type=['xlsx'], on_change=clear_results)
 with col2:
-    up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'])
-
-# Inisialisasi session state agar data tidak hilang saat rerun
-if 'results' not in st.session_state:
-    st.session_state.results = None
+    up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'], on_change=clear_results)
 
 if up_scan and up_tf:
     if st.button("PROSES KOMPARASI DATA"):
         df_scan_raw = pd.read_excel(up_scan)
         df_tf_raw = pd.read_excel(up_tf)
-        # Simpan hasil ke session state
         st.session_state.results = process_allocation(df_scan_raw, df_tf_raw)
 
-# Cek apakah hasil ada di memori session_state
-if st.session_state.results:
+# Tampilkan hasil cuma kalau variabel results ada di session state
+if 'results' in st.session_state and st.session_state.results is not None:
     res1, res2, res3, res4 = st.session_state.results
 
-    t1, t2, t3, t4 = st.tabs(["🎯 HASIL ALOKASI", "📈 SCAN LEBIH", "📉 QTY TF LEBIH", "⚠️ SKU TIDAK MATCH"])
+    t1, t2, t3, t4 = st.tabs(["🎯 HASIL ALOKASI", "📈 DATA SCAN LEBIH", "📉 QTY TF LEBIH", "⚠️ SKU TIDAK MATCH"])
     with t1: st.dataframe(res1, use_container_width=True)
     with t2: st.dataframe(res2, use_container_width=True)
     with t3: st.dataframe(res3, use_container_width=True)
     with t4: st.dataframe(res4, use_container_width=True)
 
-    # Buat file Excel di memori
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
