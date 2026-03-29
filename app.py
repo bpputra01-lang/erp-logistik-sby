@@ -3047,7 +3047,7 @@ def menu_reject_defect():
             m1, m2, m3 = st.columns(3)
             total_val = len(df_chart)
             
-            with m2:
+        with m2:
             defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
             p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
             
