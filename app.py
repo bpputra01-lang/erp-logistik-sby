@@ -3068,13 +3068,28 @@ def menu_reject_defect():
 
         # --- INI BAGIAN YANG TADI HILANG (BAR CHART) ---
         with col_bar:
-            # Hitung jumlah defect/reject per BIN (Lokasi)
+            # Hitung data per BIN
             df_b = df_chart['BIN'].value_counts().reset_index()
             df_b.columns = ['BIN', 'TOTAL']
+            
+            # --- FIX WARNA TERLALU SOFT ---
+            # Kita ganti gradasi (color='TOTAL') jadi SATU warna solid yang garang
             fig_b = px.bar(df_b, x='BIN', y='TOTAL', 
                            title="TOTAL BY LOCATION (BIN)",
-                           color='TOTAL', color_continuous_scale='Blues')
-            fig_b.update_layout(margin=dict(t=50, b=0, l=0, r=0), height=350)
+                           color_discrete_sequence=['#D4AF37']) # <--- WARNA GOLD SOLID
+            
+            # Tambahin text di atas batang biar makin jelas angkanya
+            fig_b.update_traces(textposition='outside', text=df_b['TOTAL'])
+            
+            # Rapihin layout
+            fig_b.update_layout(
+                margin=dict(t=50, b=0, l=0, r=0), 
+                height=350,
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)',
+                font_color="white", # <--- Font putih biar kontras
+                coloraxis_showscale=False # Sembunyikan color scale legend
+            )
             st.plotly_chart(fig_b, use_container_width=True)
         
     # --- 4. TAMPILAN DATA & ACTION ---
