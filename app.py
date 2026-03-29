@@ -4303,7 +4303,7 @@ elif menu == "FDR Update":
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
 
                    # --- PASTIKAN STRUKTUR TRY-EXCEPT INI SEJAJAR ---
-        try:
+            try:
             # 3. Split Warehouse Logic (L=Index 11 ada, M=Index 12 kosong)
             if len(df_clean.columns) > 12:
                 l_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
