@@ -3058,22 +3058,29 @@ def menu_reject_defect():
             with m2:
                 defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
                 p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
-                # Pakai delta angka biar panahnya otomatis (Positif=Hijau/Naik, Negatif=Merah/Turun)
+            
+                # LOGIKA: Kalau 0 atau mau dianggap turun, paksa kasih tanda MINUS (-) di teksnya
+                display_delta = f"{p_defect:.1f}% Items" if defect_cnt > 0 else f"-{p_defect:.1f}% Items"
+            
                 st.metric(
                     label="📦 TOTAL DEFECT (D)", 
                     value=f"{defect_cnt} ITEMS", 
-                    delta=f"{p_defect:.1f}% Items",
-                    delta_color="normal" # Naik Hijau, Turun Merah
+                    delta=display_delta,
+                    delta_color="normal" # Normal = Ada minus jadi Merah, Nggak ada jadi Hijau
                 )
-                
+            
             with m3:
                 reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
                 p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
+            
+                # Sama, paksa tanda minus kalau data 0
+                display_delta_r = f"{p_reject:.1f}% Items" if reject_cnt > 0 else f"-{p_reject:.1f}% Items"
+            
                 st.metric(
                     label="❌ TOTAL REJECT (R)", 
                     value=f"{reject_cnt} ITEMS", 
-                    delta=f"{p_reject:.1f}% Items",
-                    delta_color="normal" # Naik Hijau, Turun Merah
+                    delta=display_delta_r,
+                    delta_color="normal"
                 )
 
         # --- ROW 2: GRAFIK (PIE & BAR) ---
