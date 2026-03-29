@@ -3041,37 +3041,39 @@ def menu_reject_defect():
             </div>
         """, unsafe_allow_html=True)
 
-       # --- ROW 1: METRICS (LOGIKA FLUKTUATIF FIX) ---
+       # --- ROW 1: METRICS (LOGIKA FLUKTUATIF FIX: NAIK=HIJAU, TURUN=MERAH) ---
         st.markdown("<br>", unsafe_allow_html=True) 
         with st.container():
             m1, m2, m3 = st.columns(3)
             total_val = len(df_chart)
             
             with m1:
-                st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} ITEMS")
+                # Delta Total SKU tetep ada, pake kata "OVERALL" sesuai kode awal lo
+                st.metric(
+                    label="📊 TOTAL REJECT/DEFECT", 
+                    value=f"{total_val} ITEMS", 
+                    delta="OVERALL"
+                )
                 
             with m2:
                 defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
                 p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
-                
-                # LOGIKA: Streamlit anggap NEGATIF = MERAH/TURUN (normal)
-                # Kita pakai 'inverse' agar: POSITIF (nambah barang rusak) = MERAH
+                # Pakai delta angka biar panahnya otomatis (Positif=Hijau/Naik, Negatif=Merah/Turun)
                 st.metric(
                     label="📦 TOTAL DEFECT (D)", 
                     value=f"{defect_cnt} ITEMS", 
                     delta=f"{p_defect:.1f}% Items",
-                    delta_color="inverse" # <--- INI KUNCINYA: Nambah = Merah, Kurang = Hijau
+                    delta_color="normal" # Naik Hijau, Turun Merah
                 )
                 
             with m3:
                 reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
                 p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
-                
                 st.metric(
                     label="❌ TOTAL REJECT (R)", 
                     value=f"{reject_cnt} ITEMS", 
                     delta=f"{p_reject:.1f}% Items",
-                    delta_color="inverse" # <--- Sama, biar sinkron logikanya
+                    delta_color="normal" # Naik Hijau, Turun Merah
                 )
 
         # --- ROW 2: GRAFIK (PIE & BAR) ---
