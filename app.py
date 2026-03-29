@@ -3355,16 +3355,12 @@ def process_allocation(df_scan, df_tf):
 
 # --- 4. NAVIGATION / MENU CONTROL ---
 def main():
-    # 1. DEFINISIKAN VARIABEL MENU (Ini yang sering terlewat)
-    # Anda bisa menggunakan sidebar agar area kerja tetap luas
-    menu = st.sidebar.selectbox("Pilih Navigasi", ["Compare Penerimaan RTO", "Lainnya"])
+    # Contoh Sidebar jika Anda ingin memisahkan menu
+    menu = st.sidebar.selectbox("Pilih Menu", ["Compare RTO", "Dashboard", "Settings"])
 
-    # 2. CEK KONDISI MENU
-    if menu == "Compare Penerimaan RTO":
-        # Panggil fungsi CSS agar styling diterapkan
+    if menu == "Compare RTO":
+        # Terapkan UI Khusus hanya di menu ini
         apply_custom_ui()
-        
-        # Header Biru
         st.markdown('<div class="hero-header">📦 Menu Compare Penerimaan RTO</div>', unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
@@ -3374,7 +3370,6 @@ def main():
             up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'], key="tf_up")
 
         if up_scan and up_tf:
-            # Gunakan st.container() agar tombol tidak 'nangkring' aneh di layout
             if st.button("PROSES KOMPARASI DATA"):
                 df_scan_raw = pd.read_excel(up_scan)
                 df_tf_raw = pd.read_excel(up_tf)
@@ -3394,14 +3389,9 @@ def main():
                     res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
                     res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
                 
-                st.download_button("📥 DOWNLOAD HASIL EXCEL", 
-                                   data=output.getvalue(), 
-                                   file_name="Hasil_Compare_RTO.xlsx", 
-                                   use_container_width=True)
+                st.download_button("📥 DOWNLOAD HASIL EXCEL", data=output.getvalue(), 
+                                   file_name="Hasil_Compare_RTO.xlsx", use_container_width=True)
 
-# 3. PASTIKAN FUNGSI MAIN DIPANGGIL DI AKHIR SCRIPT
-if __name__ == "__main__":
-    main()
 
 
                            
