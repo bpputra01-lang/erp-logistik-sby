@@ -4337,18 +4337,19 @@ elif menu == "FDR Update":
                 st.error(f"❌ Error saat proses: {e}")
 
     # --- TAMPILKAN HASIL & METRICS ---
-    # --- TAMPILKAN HASIL & METRICS ---
     if st.session_state.ws_manifest_fdr is not None:
         m = st.session_state.metrics_data
         
-        # Ambil total manifest untuk ditampilkan di box ketiga
-        total_manifest = m.get('total', 0)
+        # --- LOGIKA SISA DATA (MANIFEST - FU IT) ---
+        total_val = m.get('total', 0)
+        fu_val = m.get('fu', 0)
+        sisa_data = total_val - fu_val # Ini yang lo mau, Bos
         
         st.markdown(f"""
         <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
-            <div class="m-box" style="flex:1"><span class="m-lbl">TOTAL MANIFEST</span><span class="m-val">{total_manifest}</span></div>
-            <div class="m-box" style="flex:1"><span class="m-lbl">FU IT</span><span class="m-val" style="color:#FFA500">{m.get('fu', 0)}</span></div>
-            <div class="m-box" style="flex:1"><span class="m-lbl">DATA MANIFEST</span><span class="m-val" style="color:#FF4B4B">{total_manifest}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">TOTAL MANIFEST</span><span class="m-val">{total_val}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">FU IT</span><span class="m-val" style="color:#FFA500">{fu_val}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">READY TO SPLIT</span><span class="m-val" style="color:#FF4B4B">{sisa_data}</span></div>
         </div>
         """, unsafe_allow_html=True)
 
