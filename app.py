@@ -3239,7 +3239,13 @@ st.markdown("""
         border-radius: 10px; text-align: center; margin-bottom: 25px;
         font-weight: bold; font-size: 24px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
     }
-    [data-testid="stFileUploader"] { background-color: #ffffff; border: 1px solid #007BFF; border-radius: 10px; padding: 15px; }
+    /* Styling khusus uploader agar bersih */
+    [data-testid="stFileUploader"] { 
+        background-color: #ffffff; 
+        border: 1px solid #007BFF; 
+        border-radius: 10px; 
+        padding: 10px;
+    }
     div.stButton > button {
         background-color: #007BFF !important; color: white !important;
         border-radius: 8px !important; width: 100% !important;
@@ -3250,10 +3256,12 @@ st.markdown("""
 
 st.markdown('<div class="hero-header">📦 Menu Compare Penerimaan RTO</div>', unsafe_allow_html=True)
 
-# --- 3. FUNGSI RESET (BIAR GA NANGKRING) ---
-def clear_results():
-    if 'results' in st.session_state:
-        del st.session_state.results
+# --- 3. RESET LOGIC ---
+if 'results' not in st.session_state:
+    st.session_state.results = None
+
+def reset_data():
+    st.session_state.results = None
 
 # --- 4. LOGIKA ALOKASI FIFO ---
 def process_allocation(df_scan, df_tf):
@@ -3282,9 +3290,7 @@ def process_allocation(df_scan, df_tf):
 
         list_s = data_s.to_dict('records')
         list_t = data_t.to_dict('records')
-        col_scan_qty = df_scan.columns[scan_qty_idx]
-        col_tf_qty = df_tf.columns[tf_qty_idx]
-        col_tf_no = df_tf.columns[tf_no_idx]
+        col_scan_qty, col_tf_qty, col_tf_no = df_scan.columns[scan_qty_idx], df_tf.columns[tf_qty_idx], df_tf.columns[tf_no_idx]
         
         idx_s = 0
         for row_t in list_t:
@@ -3303,7 +3309,7 @@ def process_allocation(df_scan, df_tf):
             if needed > 0:
                 row_list = list(row_t.values())
                 while len(row_list) < 10: row_list.append(None)
-                row_list[9] = needed # KOLOM J (SISA LEBIH TF)
+                row_list[9] = needed # KOLOM J
                 tf_lebih.append(row_list)
 
         while idx_s < len(list_s):
@@ -3318,30 +3324,38 @@ def process_allocation(df_scan, df_tf):
             pd.DataFrame(tf_lebih, columns=tf_headers) if tf_lebih else pd.DataFrame(columns=tf_headers), 
             pd.concat(missing_sku) if missing_sku else pd.DataFrame())
 
-# --- 5. MAIN UI ---
-col1, col2 = st.columns(2)
-with col1:
-    # Clear results if file changed
-    up_scan = st.file_uploader("Upload Data Scan", type=['xlsx'], on_change=clear_results)
-with col2:
-    up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'], on_change=clear_results)
+# --- 5. UI UPLOADER (DI DALAM EXPANDER BIAR GAK NANGKRING) ---
+with st.expander("📂 UPLOAD FILE DISINI", expanded=(st.session_state.results is None)):
+    col1, col2 = st.columns(2)
+    with col1:
+        up_scan = st.file_uploader("Data Scan (A: SKU, B: Qty)", type=['xlsx'], on_change=reset_data)
+    with col2:
+        up_tf = st.file_uploader("Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx'], on_change=reset_data)
+    
+    btn_proses = st.button("PROSES SEKARANG")
 
-if up_scan and up_tf:
-    if st.button("PROSES KOMPARASI DATA"):
-        df_scan_raw = pd.read_excel(up_scan)
-        df_tf_raw = pd.read_excel(up_tf)
-        st.session_state.results = process_allocation(df_scan_raw, df_tf_raw)
+if up_scan and up_tf and btn_proses:
+    df_scan_raw = pd.read_excel(up_scan)
+    df_tf_raw = pd.read_excel(up_tf)
+    st.session_state.results = process_allocation(df_scan_raw, df_tf_raw)
+    st.rerun() # Paksa rerun biar expander otomatis nutup
 
-# Tampilkan hasil cuma kalau variabel results ada di session state
-if 'results' in st.session_state and st.session_state.results is not None:
+# --- 6. TAMPILAN HASIL ---
+if st.session_state.results:
     res1, res2, res3, res4 = st.session_state.results
 
-    t1, t2, t3, t4 = st.tabs(["🎯 HASIL ALOKASI", "📈 DATA SCAN LEBIH", "📉 QTY TF LEBIH", "⚠️ SKU TIDAK MATCH"])
+    # Tombol Reset Manual
+    if st.button("🗑️ BERSIHKAN HASIL / UPLOAD ULANG"):
+        reset_data()
+        st.rerun()
+
+    t1, t2, t3, t4 = st.tabs(["🎯 HASIL ALOKASI", "📈 SCAN LEBIH", "📉 QTY TF LEBIH", "⚠️ SKU TIDAK MATCH"])
     with t1: st.dataframe(res1, use_container_width=True)
     with t2: st.dataframe(res2, use_container_width=True)
     with t3: st.dataframe(res3, use_container_width=True)
     with t4: st.dataframe(res4, use_container_width=True)
 
+    # Excel Download
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
@@ -3349,14 +3363,8 @@ if 'results' in st.session_state and st.session_state.results is not None:
         res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
         res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
     
-    st.download_button(
-        label="📥 DOWNLOAD HASIL EXCEL", 
-        data=output.getvalue(), 
-        file_name="Hasil_Compare_RTO.xlsx", 
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
-
+    st.download_button("📥 DOWNLOAD HASIL EXCEL", data=output.getvalue(), 
+                       file_name="Hasil_Compare_RTO.xlsx", use_container_width=True)
 
                            
 with st.sidebar:
