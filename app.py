@@ -3256,6 +3256,7 @@ def apply_custom_ui():
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIKA ALOKASI (FIXED TOTAL) ---
+# --- 3. LOGIKA ALOKASI (FIXED WITH COLUMN J) ---
 def process_allocation(df_scan, df_tf):
     # Mapping index (Scan: 0=SKU, 1=Qty | TF: 0=No TF, 3=SKU, 7=Qty)
     scan_sku_idx, scan_qty_idx = 0, 1
@@ -3271,6 +3272,11 @@ def process_allocation(df_scan, df_tf):
     df_tf = df_tf.copy()
     df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip()
     df_tf.iloc[:, tf_sku_idx] = df_tf.iloc[:, tf_sku_idx].astype(str).str.strip()
+
+    # Pastikan df_tf punya kolom sampai J (minimal 10 kolom)
+    # Jika kolom J belum ada, kita buatkan kolom kosong
+    while df_tf.shape[1] < 10:
+        df_tf[f"Empty_{df_tf.shape[1]}"] = ""
 
     skus_scan = set(df_scan.iloc[:, scan_sku_idx].unique())
     skus_tf = set(df_tf.iloc[:, tf_sku_idx].unique())
@@ -3293,7 +3299,6 @@ def process_allocation(df_scan, df_tf):
         list_t = data_t.to_dict('records')
         idx_s = 0
 
-        # Looping Data Transfer (TF) untuk dialokasikan dari Scan
         for row_t in list_t:
             needed = float(row_t.get(df_tf.columns[tf_qty_idx], 0))
             no_tf = row_t.get(df_tf.columns[tf_no_idx], "N/A")
@@ -3314,13 +3319,14 @@ def process_allocation(df_scan, df_tf):
                 if list_s[idx_s][df_scan.columns[scan_qty_idx]] <= 0:
                     idx_s += 1
             
-            # INI LOGIKA YANG TADI ILANG: Jika masih butuh tapi scan abis
+            # --- INPUT KE KOLOM J (INDEX 9) DI TAB QTY TF LEBIH ---
             if needed > 0:
                 row_t_copy = row_t.copy()
-                row_t_copy[df_tf.columns[tf_qty_idx]] = needed
+                # Kita temukan nama kolom ke-10 (Kolom J)
+                col_j_name = df_tf.columns[9] 
+                row_t_copy[col_j_name] = needed # Masukin sisa ke Kolom J
                 tf_lebih.append(row_t_copy)
 
-        # Sisa scan yang nggak kepake sama sekali
         while idx_s < len(list_s):
             rem_qty = float(list_s[idx_s].get(df_scan.columns[scan_qty_idx], 0))
             if rem_qty > 0:
