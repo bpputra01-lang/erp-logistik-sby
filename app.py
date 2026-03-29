@@ -3227,12 +3227,42 @@ import pandas as pd
 import streamlit as st
 from io import BytesIO
 
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="RTO Compare System", layout="wide")
+
+# --- CUSTOM CSS UNTUK BACKGROUND BIRU ---
+st.markdown("""
+<style>
+    /* Mengubah warna background halaman utama */
+    [data-testid="stAppViewContainer"] {
+        background-color: #f0f7ff; /* Warna biru muda lembut untuk background */
+    }
+    
+    /* Opsional: Mengubah warna sidebar jika ada */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff; /* Putih untuk kontras */
+    }
+    
+    /* Mengubah warna text agar tetap terbaca */
+    .stMarkdown, .stSubheader, .stTitle {
+        color: #333333;
+    }
+    
+    /* Memberikan efek border pada uploaders */
+    div.stFileUploader {
+        border: 2px dashed #007bff; /* Garis putus-putus biru */
+        border-radius: 8px;
+        padding: 10px;
+        background-color: #ffffff;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 def process_allocation(df_scan, df_tf):
     # Penyesuaian Kolom berdasarkan instruksi:
     # Scan: A (Index 0) = SKU, B (Index 1) = Qty
     # TF:   A (Index 0) = No TF, D (Index 3) = SKU, H (Index 7) = Qty
     
-    # Mapping kolom untuk keamanan
     scan_sku_idx, scan_qty_idx = 0, 1
     tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
 
@@ -3242,7 +3272,7 @@ def process_allocation(df_scan, df_tf):
     tf_lebih = []
     missing_sku = []
 
-    # Get All Unique SKUs
+    # Ambil All Unique SKUs
     skus_in_scan = set(df_scan.iloc[:, scan_sku_idx].dropna().unique())
     skus_in_tf = set(df_tf.iloc[:, tf_sku_idx].dropna().unique())
     all_skus = skus_in_scan | skus_in_tf
@@ -3262,8 +3292,7 @@ def process_allocation(df_scan, df_tf):
             missing_sku.append(data_s)
             continue
 
-        # Persiapkan data untuk looping alokasi
-        # Konversi ke list of dict agar proses "Ultra Fast"
+        # Persiapkan data untuk looping alokasi (Konversi ke list of dict)
         list_s = data_s.to_dict('records')
         list_t = data_t.to_dict('records')
 
@@ -3314,40 +3343,57 @@ def process_allocation(df_scan, df_tf):
     )
 
 # --- STREAMLIT UI ---
-st.set_page_config(page_title="RTO Compare System", layout="wide")
+# Menampilkan Header sesuai gambar dengan background biru muda
 st.title("📦 Menu Compare Penerimaan RTO")
+st.markdown("---") # Garis pemisah
 
-up_scan = st.file_uploader("Upload Data Scan (A: SKU, B: Qty)", type=['xlsx'])
-up_tf = st.file_uploader("Upload Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx'])
+col1, col2 = st.columns(2)
+with col1:
+    up_scan = st.file_uploader("1. Upload Data Scan (Kolom A: SKU, Kolom B: Qty)", type=['xlsx'])
+with col2:
+    up_tf = st.file_uploader("2. Upload Transfer Stock (A: No TF, D: SKU, H: Qty)", type=['xlsx'])
 
 if up_scan and up_tf:
-    if st.button("PROSES DATA", use_container_width=True):
-        df_scan_raw = pd.read_excel(up_scan)
-        df_tf_raw = pd.read_excel(up_tf)
+    if st.button("PROSES DATA SEKARANG", use_container_width=True, type="primary"):
+        # Loading state
+        with st.spinner('Sedang memproses alokasi FIFO...'):
+            df_scan_raw = pd.read_excel(up_scan)
+            df_tf_raw = pd.read_excel(up_tf)
 
-        res1, res2, res3, res4 = process_allocation(df_scan_raw, df_tf_raw)
+            res1, res2, res3, res4 = process_allocation(df_scan_raw, df_tf_raw)
 
-        t1, t2, t3, t4 = st.tabs(["🎯 Hasil Alokasi", "📈 Scan Lebih", "📉 TF Lebih (Kurang Scan)", "⚠️ SKU Tidak Match"])
+            st.success('Pemrosesan selesai!')
 
-        with t1: st.dataframe(res1, use_container_width=True)
-        with t2: st.dataframe(res2, use_container_width=True)
-        with t3: st.dataframe(res3, use_container_width=True)
-        with t4: st.dataframe(res4, use_container_width=True)
+            # Menampilkan hasil dalam tab
+            t1, t2, t3, t4 = st.tabs([
+                "🎯 HASIL ALOKASI", 
+                "📈 DATA SCAN LEBIH", 
+                "📉 QTY TF LEBIH", 
+                "⚠️ SKU TIDAK MATCH"
+            ])
 
-        # Download Logic
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
-            res2.to_excel(writer, sheet_name='DATA SCAN LEBIH', index=False)
-            res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
-            res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
-        
-        st.download_button(
-            label="📥 DOWNLOAD HASIL KOMPARASI (EXCEL)",
-            data=output.getvalue(),
-            file_name="Hasil_Compare_RTO.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+            with t1: st.dataframe(res1, use_container_width=True)
+            with t2: st.dataframe(res2, use_container_width=True)
+            with t3: st.dataframe(res3, use_container_width=True)
+            with t4: st.dataframe(res4, use_container_width=True)
+
+            # Download Logic
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
+                res2.to_excel(writer, sheet_name='DATA SCAN LEBIH', index=False)
+                res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
+                res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
+            
+            st.download_button(
+                label="📥 DOWNLOAD HASIL KOMPARASI (EXCEL 4 SHEET)",
+                data=output.getvalue(),
+                file_name="Hasil_Compare_RTO_Biru.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+else:
+    st.info("💡 Silakan unggah kedua file Excel di atas untuk memulai komparasi.")
 with st.sidebar:
        st.markdown("""
     <style>
