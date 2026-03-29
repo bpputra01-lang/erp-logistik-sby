@@ -3790,9 +3790,9 @@ elif menu == "Scan Out Validation":
         """)
     
     col1, col2, col3 = st.columns(3)
-    with col1: up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'], help="File dengan Kolom A=BIN, B=SKU")
-    with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'], help="File dengan Kolom D=SKU")
-    with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'], help="File dengan Kolom B=SKU, A=Invoice")
+    with col1: up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'])
+    with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'])
+    with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
     
     if up_scan and up_hist and up_stock:
         if st.button("▶️ COMPARE DATA SCAN OUT"):
