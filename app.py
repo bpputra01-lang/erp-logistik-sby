@@ -3465,6 +3465,8 @@ def change_m2():
     st.session_state.main_menu = st.session_state.m2_key
 def change_m3():
     st.session_state.main_menu = st.session_state.m3_key
+def change_m4():
+    st.session_state.main_menu = st.session_state.m4_key
 
 with st.sidebar:
     # --- KELOMPOK 1: DASHBOARD SUMMARY ---
@@ -3473,7 +3475,6 @@ with st.sidebar:
     
     m1_list = ["Dashboard Overview", "Database Master"]
     idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
-    
     st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
 
     # --- KELOMPOK 2: OPERATIONAL ---
@@ -3481,18 +3482,21 @@ with st.sidebar:
     
     m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "FDR Update"]
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
-    
     st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
 
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     
     m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System","Reject/Defect List"]
-    
-    # PERBAIKAN DI SINI: Gunakan m3_list dan idx3, jangan pakai m2_list lagi
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
-    
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
+
+    # --- KELOMPOK 4: EXTRAS ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
+    
+    m4_list = ["Logistic Schedule"]
+    idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else 0
+    st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=change_m4, label_visibility="collapsed")
 
     st.divider()
 
