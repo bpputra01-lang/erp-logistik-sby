@@ -2949,7 +2949,7 @@ def menu_reject_defect():
             article = st.text_input("NAMA BARANG")
         with col2:
             size = st.text_input("SIZE")
-            kategori = st.selectbox("KATEGORI DEFECT", ["MAJOR", "MINOR", "PACKAGING", "LAINNYA"])
+            kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4"])
             keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
         btn_submit = st.form_submit_button("📤UPLOAD SINGLE LIST")
@@ -3042,55 +3042,47 @@ def menu_reject_defect():
                 total_val = len(df_chart)
                 st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} SKU")
                 
-            with m2:
-                major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
-                p_major = (major_cnt / total_val * 100) if total_val > 0 else 0
+            # --- ROW 1: METRIC CARDS (OTOMATIS) ---
+        m1, m2, m3 = st.columns(3)
+        total_val = len(df_chart)
+        
+        with m1:
+            st.metric(label="📊 TOTAL REJECT/DEFECT", value=f"{total_val} ITEMS", delta="OVERALL")
             
-            # LOGIKA: Kalau 0 atau turun, kita kasih nilai negatif ke delta
-            # Tapi di tampilan (f-string) kita buat dia tetap rapi
-                delta_val = p_major if major_cnt > 0 else -0.0001 
+        with m2:
+            # Hitung semua yang depannya 'D' (Defect: D1, D2, D3, D4)
+            defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
+            p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
+            st.metric(
+                label="📦 TOTAL DEFECT (D)", 
+                value=f"{defect_cnt} ITEMS", 
+                delta=f"{p_defect:.1f}% Items",
+                delta_color="normal" if defect_cnt > 0 else "inverse"
+            )
             
-                st.metric(
-                    label="🔴 MAJOR CONDITION", 
-                    value=f"{major_cnt} ITEMS", 
-                    delta=f"{p_major:.1f}% Items",
-                    delta_color="normal" # Biar Streamlit yang atur panahnya sendiri
-                )
-            
-            with m3:
-                minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
-                p_minor = (minor_cnt / total_val * 100) if total_val > 0 else 0
-            
-            # Kasih nilai negatif sangat kecil supaya panah otomatis nunduk ke bawah
-                delta_val_min = p_minor if minor_cnt > 0 else -0.0001
-            
-                st.metric(
-                    label="🟡 MINOR CONDITION", 
-                    value=f"{minor_cnt} ITEMS", 
-                    delta=f"{p_minor:.1f}% Items" if minor_cnt > 0 else f"-{p_minor:.1f}% Items",
-                    delta_color="normal"
-                )
+        with m3:
+            # Hitung semua yang depannya 'R' (Reject: R1, R2, R3, R4)
+            reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
+            p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
+            st.metric(
+                label="❌ TOTAL REJECT (R)", 
+                value=f"{reject_cnt} ITEMS", 
+                delta=f"{p_reject:.1f}% Items",
+                delta_color="normal" if reject_cnt > 0 else "inverse"
+            )
 
         # Baris 2: Grafik
         col_pie, col_bar = st.columns(2)
         
         with col_pie:
-            # Pie Chart Kategori
+            # Ini otomatis bakal nampilin porsi D1, D2, R1, dst selama ada datanya di kolom KATEGORI
             df_p = df_chart['KATEGORI'].value_counts().reset_index()
             df_p.columns = ['KATEGORI', 'TOTAL']
             fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4,
-                           title="PRECENTAGE DEFECT/REJECT BY CAUSE", color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig_p.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
+                           title="PRECENTAGE BY CAUSE (D1-R4)", 
+                           color_discrete_sequence=px.colors.qualitative.Bold) # Pakai warna Bold biar beda tiap kode
+            fig_p.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=350)
             st.plotly_chart(fig_p, use_container_width=True)
-
-        with col_bar:
-            # Bar Chart per Lokasi BIN
-            df_b = df_chart['BIN'].value_counts().reset_index()
-            df_b.columns = ['BIN', 'TOTAL']
-            fig_b = px.bar(df_b, x='BIN', y='TOTAL', title="TOTAL SKU DEFECT/REJECT BY LOCATION",
-                           color_discrete_sequence=['#D4AF37'])
-            fig_b.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=300)
-            st.plotly_chart(fig_b, use_container_width=True)
         
     # --- 4. TAMPILAN DATA & ACTION ---
     st.divider()
