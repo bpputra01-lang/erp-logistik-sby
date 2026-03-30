@@ -3380,9 +3380,15 @@ import pandas as pd
 import sqlite3
 import io
 
-# Session State untuk menyimpan data agar tidak hilang saat pindah menu
+st.set_page_config(page_title="Stock Analysis SBY", layout="wide")
+
+# 1. Pastikan Session State ada
 if 'main_df' not in st.session_state:
     st.session_state.main_df = None
+
+# 2. DEFINISIKAN variabel 'menu' di sini (Ini yang tadi kurang)
+st.sidebar.title("Navigation")
+menu = st.sidebar.radio("Pilih Menu:", ["Upload Data", "Balancing Stock"])
 
 # --- MENU 1: UPLOAD DATA ---
 if menu == "Upload Data":
@@ -3390,32 +3396,34 @@ if menu == "Upload Data":
     uploaded_file = st.file_uploader("Upload File Excel/CSV All Stock", type=['xlsx', 'csv'])
     
     if uploaded_file:
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        else:
-            df = pd.read_excel(uploaded_file)
-        
-        # Bersihkan nama kolom
-        df.columns = [c.strip() for c in df.columns]
-        st.session_state.main_df = df
-        st.success(f"Data berhasil di-upload! Total: {len(df)} baris.")
-        st.dataframe(df.head(10), use_container_width=True)
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
+            
+            # Bersihkan nama kolom
+            df.columns = [c.strip() for c in df.columns]
+            st.session_state.main_df = df
+            st.success(f"Data berhasil di-upload! Total: {len(df)} baris.")
+            st.dataframe(df.head(10), use_container_width=True)
+        except Exception as e:
+            st.error(f"Gagal membaca file: {e}")
 
-# --- MENU 2: BALANCING STOCK (Logika Utama Kamu) ---
+# --- MENU 2: BALANCING STOCK ---
 elif menu == "Balancing Stock":
     st.title("⚖️ Balancing Stock Analysis")
     
     if st.session_state.main_df is not None:
         df = st.session_state.main_df
         
-        # Koneksi SQLite (In-Memory) - God Speed!
+        # Koneksi SQLite (In-Memory)
         conn = sqlite3.connect(':memory:')
         df.to_sql('stock_data', conn, index=False, if_exists='replace')
 
         st.info("Menganalisis ketimpangan stok antar lokasi (BIN)...")
 
         # --- QUERY LOGIC ---
-        # Query 1: SKU di DC (B) tapi TIDAK ADA di Gudang lt.2, Store, atau Toko
         query1 = """
         SELECT DISTINCT "SKU" FROM stock_data 
         WHERE "BIN" LIKE '%DC%'
@@ -3426,7 +3434,6 @@ elif menu == "Balancing Stock":
            OR "BIN" LIKE '%Toko%'
         """
         
-        # Query 2: SKU di GL4 (Tanpa RAK) tapi TIDAK ADA di GL3
         query2 = """
         SELECT DISTINCT "SKU" FROM stock_data
         WHERE "BIN" LIKE '%GL4%' AND "BIN" NOT LIKE '%RAK%'
@@ -3442,26 +3449,23 @@ elif menu == "Balancing Stock":
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("⚠️ SKU Hanya Mengendap di DC")
+            st.subheader("⚠️ SKU Hanya di DC")
             st.warning(f"Total: {len(res1)} SKU")
-            st.caption("SKU ini ada di DC tapi kosong di Store/Toko/Gudang lt.2")
             st.dataframe(res1, use_container_width=True)
             if not res1.empty:
                 st.download_button("Download List DC", res1.to_csv(index=False), "need_balancing_dc.csv")
 
         with col2:
-            st.subheader("⚠️ SKU di GL4 tapi Kosong di GL3")
+            st.subheader("⚠️ SKU di GL4 vs GL3")
             st.warning(f"Total: {len(res2)} SKU")
-            st.caption("SKU di GL4 (Non-RAK) yang belum tersedia di GL3")
             st.dataframe(res2, use_container_width=True)
             if not res2.empty:
                 st.download_button("Download List GL4", res2.to_csv(index=False), "need_balancing_gl4.csv")
 
-        # --- VISUALISASI ---
+        # --- GRAFIK ---
         st.divider()
-        st.subheader("Grafik Ketimpangan Distribusi")
         chart_data = pd.DataFrame({
-            'Kategori': ['Butuh Distribusi (DC)', 'Butuh Distribusi (GL4)'],
+            'Kategori': ['DC Only', 'GL4 Only'],
             'Jumlah SKU': [len(res1), len(res2)]
         })
         st.bar_chart(data=chart_data, x='Kategori', y='Jumlah SKU')
@@ -3469,7 +3473,6 @@ elif menu == "Balancing Stock":
         conn.close()
     else:
         st.error("⚠️ Data belum ada. Silakan ke menu 'Upload Data' terlebih dahulu.")
-
                            
 with st.sidebar:
        st.markdown("""
