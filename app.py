@@ -3381,40 +3381,33 @@ import sqlite3
 
 def tampilan_balancing_stock():
     st.title("⚖️ Stock Distribution & Balancing System")
-    st.write("Analisis pemerataan stok antar Warehouse, Store, dan Rak.")
+    st.write("Analisis pemerataan stok dan estimasi perpindahan unit ke Box.")
+
+    # Input Konvrensi Box Default jika di Excel tidak ada isi per box
+    with st.sidebar:
+        st.subheader("Konfigurasi Box")
+        default_qty_per_box = st.number_input("Standar Isi per Box (Pcs)", min_value=1, value=24)
 
     uploaded_file = st.file_uploader("Upload All Stock (Excel/CSV)", type=['xlsx', 'csv'], key="balancer_upload")
 
     if uploaded_file:
-        # 1. Load Data
         df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-        
-        # Bersihkan nama kolom dan data string agar tidak ada spasi hantu
         df.columns = [str(c).strip() for c in df.columns]
-        
-        # Menampilkan preview kolom untuk memastikan (Bisa dihapus jika sudah lancar)
-        with st.expander("Klik untuk cek struktur kolom file"):
-            st.write("Kolom yang terbaca:", list(df.columns))
-            st.dataframe(df.head(3))
 
-        # 2. Identifikasi Kolom secara Otomatis (Cari nama yang mengandung 'BIN', 'SKU', 'QTY')
-        # Jika tidak ketemu, baru pakai index (B=1, C=2, D=3)
+        # Identifikasi Kolom Otomatis
         col_bin = next((c for c in df.columns if 'BIN' in c.upper()), df.columns[1])
         col_sku = next((c for c in df.columns if 'SKU' in c.upper() or 'KODE' in c.upper()), df.columns[2])
         col_qty = next((c for c in df.columns if 'QTY' in c.upper() or 'STOK' in c.upper() or 'JUMLAH' in c.upper()), df.columns[3])
 
-        # 3. Masukkan ke SQLite
         conn = sqlite3.connect(':memory:')
         df.to_sql('stock_data', conn, index=False, if_exists='replace')
 
-        # --- LOGIKA QUERY (DIPERBAIKI: Menggunakan UPPER agar Case-Insensitive) ---
+        # --- QUERY LOGIC ---
         query_dc = f"""
         SELECT 
             "{col_sku}" as SKU,
             SUM(CASE WHEN UPPER("{col_bin}") LIKE '%DC%' THEN "{col_qty}" ELSE 0 END) as Qty_DC,
-            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%GUDANG LT.2%' 
-                       OR UPPER("{col_bin}") LIKE '%STORE%' 
-                       OR UPPER("{col_bin}") LIKE '%TOKO%' THEN "{col_qty}" ELSE 0 END) as Qty_Retail
+            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%GUDANG LT.2%' OR UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%' THEN "{col_qty}" ELSE 0 END) as Qty_Retail
         FROM stock_data
         GROUP BY "{col_sku}"
         HAVING Qty_DC > 0 AND Qty_Retail = 0
@@ -3433,39 +3426,51 @@ def tampilan_balancing_stock():
         res_dc = pd.read_sql(query_dc, conn)
         res_gl = pd.read_sql(query_gl, conn)
 
+        # Hitung Estimasi Box (Qty / Default per Box)
+        res_dc['Estimasi_Box'] = (res_dc['Qty_DC'] / default_qty_per_box).apply(lambda x: round(x, 1))
+        res_gl['Estimasi_Box'] = (res_gl['Qty_GL4_NonRak'] / default_qty_per_box).apply(lambda x: round(x, 1))
+
+        # --- METRIKS UTAMA ---
+        st.divider()
+        m1, m2, m3, m4 = st.columns(4)
+        
+        with m1:
+            st.metric("SKU Tertahan di DC", f"{len(res_dc)} SKU")
+        with m2:
+            st.metric("Total Box DC ➡️ Retail", f"{res_dc['Estimasi_Box'].sum():,.0f} Box")
+        with m3:
+            st.metric("SKU Tertahan di GL4", f"{len(res_gl)} SKU")
+        with m4:
+            st.metric("Total Box GL4 ➡️ GL3", f"{res_gl['Estimasi_Box'].sum():,.0f} Box")
+
         # --- TAMPILAN TABEL ---
-        t1, t2 = st.tabs(["📌 DC ➡️ Retail", "📌 GL4 ➡️ GL3"])
+        st.divider()
+        t1, t2 = st.tabs(["📌 List Pindah DC (Retail Kosong)", "📌 List Pindah GL4 (Lantai ➡️ Rak)"])
 
         with t1:
             if not res_dc.empty:
-                st.error(f"⚠️ {len(res_dc)} SKU mengendap di DC (Retail Kosong)")
-                st.dataframe(res_dc, use_container_width=True)
-                st.download_button("Download CSV (DC)", res_dc.to_csv(index=False), "pindah_dc.csv")
+                st.dataframe(res_dc.sort_values('Qty_DC', ascending=False), use_container_width=True)
+                st.download_button("Download CSV DC", res_dc.to_csv(index=False), "pindah_dc.csv")
             else:
-                st.success("✅ Stok DC & Retail sudah merata (Tidak ada SKU yang 'macet' di DC).")
+                st.success("✅ Distribusi DC Aman.")
 
         with t2:
             if not res_gl.empty:
-                st.warning(f"⚠️ {len(res_gl)} SKU di GL4 Lantai (GL3 Kosong)")
-                st.dataframe(res_gl, use_container_width=True)
-                st.download_button("Download CSV (GL4)", res_gl.to_csv(index=False), "pindah_gl4.csv")
+                st.dataframe(res_gl.sort_values('Qty_GL4_NonRak', ascending=False), use_container_width=True)
+                st.download_button("Download CSV GL4", res_gl.to_csv(index=False), "pindah_gl4.csv")
             else:
-                st.success("✅ Stok GL4 & GL3 sudah merata.")
+                st.success("✅ Distribusi GL4 Aman.")
 
         # --- VISUALISASI ---
-        if not res_dc.empty or not res_gl.empty:
+        if not res_dc.empty:
             st.divider()
-            st.subheader("Visualisasi Ketimpangan")
-            
-            # Bar chart sederhana
-            top_dc = res_dc.sort_values('Qty_DC', ascending=False).head(10)
-            if not top_dc.empty:
-                st.bar_chart(data=top_dc, x='SKU', y='Qty_DC')
-                st.caption("Top 10 SKU terbanyak yang perlu ditarik dari DC ke Retail.")
+            st.subheader("Top 10 SKU Butuh Pindah (Berdasarkan Box)")
+            top_box = res_dc.sort_values('Estimasi_Box', ascending=False).head(10)
+            st.bar_chart(data=top_box, x='SKU', y='Estimasi_Box')
 
         conn.close()
     else:
-        st.info("Silakan upload data 'All Stock' untuk memulai analisis pemerataan.")
+        st.info("Silakan upload data 'All Stock' untuk melihat metrik perpindahan barang.")
                            
 with st.sidebar:
        st.markdown("""
