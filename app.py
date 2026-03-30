@@ -3380,8 +3380,13 @@ import pandas as pd
 import sqlite3
 import plotly.express as px
 
+def init_db():
+    # Menggunakan file database fisik agar data awet walau logout
+    conn = sqlite3.connect('database_sby.db', check_same_thread=False)
+    return conn
+
 def tampilan_balancing_stock():
-    # --- CSS CUSTOM UNTUK CARD (Biar Mirip Dashboard Reject) ---
+    # --- 1. CSS CUSTOM (STYLE DASHBOARD PREMIUM) ---
     st.markdown("""
         <style>
         .metric-card {
@@ -3391,74 +3396,108 @@ def tampilan_balancing_stock():
             box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
             text-align: center;
             color: white;
-            border-left: 5px solid #7B61FF;
+            margin-bottom: 10px;
         }
         .metric-value {
-            font-size: 32px;
+            font-size: 30px;
             font-weight: bold;
             margin: 0;
+            color: #FFFFFF;
         }
         .metric-label {
-            font-size: 14px;
+            font-size: 13px;
             color: #A0A0A0;
             text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.title("⚖️ Stock Merchandising Analysis")
     
-    # ... (Bagian koneksi SQLite & Logic sama dengan sebelumnya) ...
+    # --- 2. KONEKSI & UPLOAD ---
+    conn = init_db()
+    uploaded_file = st.file_uploader("Upload All Stock (Excel/CSV)", type=['xlsx', 'csv'], key="balancer_upload")
 
-    # --- TAMPILAN METRIKS DENGAN STYLE BARU ---
-    c1, c2, c3 = st.columns(3)
-    
-    with c1:
-        st.markdown(f"""
-            <div class="metric-card" style="border-left: 5px solid #7B61FF;">
-                <p class="metric-label">📦 Total SKU</p>
-                <p class="metric-value">{total_sku:,}</p>
-                <p style="color: #00FF00; font-size: 12px;">↑ OVERALL</p>
-            </div>
-        """, unsafe_allow_html=True)
+    if uploaded_file:
+        df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
+        df.columns = [str(c).strip() for c in df.columns]
+        # Simpan permanen ke SQLite
+        df.to_sql('stock_raw', conn, index=False, if_exists='replace')
+        st.success("Data Berhasil Diperbarui!")
+
+    # --- 3. LOGIKA ANALISIS (HITUNG VARIABEL) ---
+    try:
+        # Cek apakah tabel sudah ada
+        df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_raw'", conn)
+        if df_check.empty:
+            st.info("Silakan upload data 'All Stock' untuk melihat analisis.")
+            return
+
+        # Ambil sampel kolom secara dinamis
+        cols = pd.read_sql("SELECT * FROM stock_raw LIMIT 1", conn).columns
+        col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
+        col_sku = next((c for c in cols if 'SKU' in c.upper() or 'KODE' in c.upper()), cols[2])
+
+        # Hitung Total SKU Unik
+        total_sku = pd.read_sql(f'SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw', conn).iloc[0,0]
+
+        # Case 1: DC vs Retail
+        query_c1 = f"""
+        SELECT 
+            (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%' OR UPPER("{col_bin}") LIKE '%GUDANG LT.2%')) as Ada_Di_Retail,
+            (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%' OR UPPER("{col_bin}") LIKE '%GUDANG LT.2%')) as Tidak_Ada_Di_Retail
+        """
+        res1 = pd.read_sql(query_c1, conn).iloc[0]
         
-    with c2:
-        st.markdown(f"""
-            <div class="metric-card" style="border-left: 5px solid #00C853;">
-                <p class="metric-label">🏪 DC to Retail</p>
-                <p class="metric-value">{res1['Ada_Di_Retail']:,}</p>
-                <p style="color: #00FF00; font-size: 12px;">↑ {perc_retail:.1f}% Tersedia</p>
-            </div>
-        """, unsafe_allow_html=True)
+        # Case 2: GL4 vs GL3
+        query_c2 = f"""
+        SELECT 
+            (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as Ada_Di_GL3,
+            (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as Tidak_Ada_Di_GL3
+        """
+        res2 = pd.read_sql(query_c2, conn).iloc[0]
 
-    with c3:
-        st.markdown(f"""
-            <div class="metric-card" style="border-left: 5px solid #FFAB00;">
-                <p class="metric-label">🏗️ GL4 to GL3</p>
-                <p class="metric-value">{res2['Ada_Di_GL3']:,}</p>
-                <p style="color: #FF5252; font-size: 12px;">↓ {100-perc_gl:.1f}% Perlu Re-Stock</p>
-            </div>
-        """, unsafe_allow_html=True)
+        # Hitung Persentase
+        sum_c1 = res1['Ada_Di_Retail'] + res1['Tidak_Ada_Di_Retail']
+        perc_retail = (res1['Ada_Di_Retail'] / sum_c1 * 100) if sum_c1 > 0 else 0
+        
+        sum_c2 = res2['Ada_Di_GL3'] + res2['Tidak_Ada_Di_GL3']
+        perc_gl = (res2['Ada_Di_GL3'] / sum_c2 * 100) if sum_c2 > 0 else 0
 
-    st.write(" ") # Spacer
-    st.divider()
+        # --- 4. TAMPILAN METRIKS ---
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 Total SKU</p><p class="metric-value">{total_sku:,}</p><p style="color: #00FF00; font-size: 12px;">↑ OVERALL</p></div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Retail</p><p class="metric-value">{res1["Ada_Di_Retail"]:,}</p><p style="color: #00FF00; font-size: 12px;">↑ {perc_retail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+        with c3:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{res2["Ada_Di_GL3"]:,}</p><p style="color: #FF5252; font-size: 12px;">↓ {perc_gl:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
 
-    # --- GRAFIK UPGRADE ---
-    g1, g2 = st.columns(2)
+        st.divider()
 
-    with g1:
-        st.subheader("Distribution Balance")
-        fig1 = px.pie(donut_data, values='Jumlah', names='Status', hole=0.6, 
-                     color_discrete_sequence=['#43A047', '#E53935']) # Warna lebih soft
-        fig1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
-        st.plotly_chart(fig1, use_container_width=True)
+        # --- 5. GRAFIK ---
+        g1, g2 = st.columns(2)
+        with g1:
+            st.subheader("Distribution Balance")
+            donut_data = pd.DataFrame({"Status": ["Ada di Retail", "Hanya di DC"], "Jumlah": [res1['Ada_Di_Retail'], res1['Tidak_Ada_Di_Retail']]})
+            fig1 = px.pie(donut_data, values='Jumlah', names='Status', hole=0.6, color_discrete_sequence=['#2E7D32', '#C62828'])
+            fig1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white", height=350)
+            st.plotly_chart(fig1, use_container_width=True)
 
-    with g2:
-        st.subheader("Stock Availability (GL)")
-        fig2 = px.bar(bar_data, x='Kategori', y='Total', color='Kategori',
-                     color_discrete_sequence=['#FFD600', '#FF6D00']) # Gradasi Kuning ke Orange
-        fig2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white", showlegend=False)
-        st.plotly_chart(fig2, use_container_width=True)
+        with g2:
+            st.subheader("Stock Availability (GL)")
+            bar_data = pd.DataFrame({"Kategori": ["Ada di GL3", "Tidak di GL3"], "Total": [res2['Ada_Di_GL3'], res2['Tidak_Ada_Di_GL3']]})
+            fig2 = px.bar(bar_data, x='Kategori', y='Total', color='Kategori', color_discrete_sequence=['#F9A825', '#EF6C00'])
+            fig2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white", showlegend=False, height=350)
+            st.plotly_chart(fig2, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Terjadi kesalahan data: {e}")
+    finally:
+        conn.close()
+
                            
 with st.sidebar:
        st.markdown("""
