@@ -4777,7 +4777,8 @@ elif menu == "Compare System":
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
 
-if menu == "Balancing Stock":
+elif menu == "Balancing Stock":
+    tampilan_balancing_stock()
 
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
