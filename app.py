@@ -3378,99 +3378,97 @@ def main():
 import streamlit as st
 import pandas as pd
 import sqlite3
+import plotly.express as px # Untuk grafik donut yang keren
+
+def init_db():
+    # Menggunakan file fisik agar data tersimpan permanen
+    conn = sqlite3.connect('database_sby.db')
+    return conn
 
 def tampilan_balancing_stock():
-    st.title("⚖️ Stock Distribution & Balancing System")
-    st.write("Analisis pemerataan stok dan estimasi perpindahan unit ke Box.")
-
-    # Input Konvrensi Box Default jika di Excel tidak ada isi per box
-    with st.sidebar:
-        st.subheader("Konfigurasi Box")
-        default_qty_per_box = st.number_input("Standar Isi per Box (Pcs)", min_value=1, value=24)
-
-    uploaded_file = st.file_uploader("Upload All Stock (Excel/CSV)", type=['xlsx', 'csv'], key="balancer_upload")
+    st.title("⚖️ Stock Merchandising Analysis")
+    
+    # 1. Uploader
+    uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
+    conn = init_db()
 
     if uploaded_file:
         df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
         df.columns = [str(c).strip() for c in df.columns]
-
-        # Identifikasi Kolom Otomatis
-        col_bin = next((c for c in df.columns if 'BIN' in c.upper()), df.columns[1])
-        col_sku = next((c for c in df.columns if 'SKU' in c.upper() or 'KODE' in c.upper()), df.columns[2])
-        col_qty = next((c for c in df.columns if 'QTY' in c.upper() or 'STOK' in c.upper() or 'JUMLAH' in c.upper()), df.columns[3])
-
-        conn = sqlite3.connect(':memory:')
-        df.to_sql('stock_data', conn, index=False, if_exists='replace')
-
-        # --- QUERY LOGIC ---
-        query_dc = f"""
-        SELECT 
-            "{col_sku}" as SKU,
-            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%DC%' THEN "{col_qty}" ELSE 0 END) as Qty_DC,
-            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%GUDANG LT.2%' OR UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%' THEN "{col_qty}" ELSE 0 END) as Qty_Retail
-        FROM stock_data
-        GROUP BY "{col_sku}"
-        HAVING Qty_DC > 0 AND Qty_Retail = 0
-        """
-
-        query_gl = f"""
-        SELECT 
-            "{col_sku}" as SKU,
-            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%GL4%' AND UPPER("{col_bin}") NOT LIKE '%RAK%' THEN "{col_qty}" ELSE 0 END) as Qty_GL4_NonRak,
-            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%GL3%' THEN "{col_qty}" ELSE 0 END) as Qty_GL3
-        FROM stock_data
-        GROUP BY "{col_sku}"
-        HAVING Qty_GL4_NonRak > 0 AND Qty_GL3 = 0
-        """
-
-        res_dc = pd.read_sql(query_dc, conn)
-        res_gl = pd.read_sql(query_gl, conn)
-
-        # Hitung Estimasi Box (Qty / Default per Box)
-        res_dc['Estimasi_Box'] = (res_dc['Qty_DC'] / default_qty_per_box).apply(lambda x: round(x, 1))
-        res_gl['Estimasi_Box'] = (res_gl['Qty_GL4_NonRak'] / default_qty_per_box).apply(lambda x: round(x, 1))
-
-        # --- METRIKS UTAMA ---
-        st.divider()
-        m1, m2, m3, m4 = st.columns(4)
         
-        with m1:
-            st.metric("SKU Tertahan di DC", f"{len(res_dc)} SKU")
-        with m2:
-            st.metric("Total Box DC ➡️ Retail", f"{res_dc['Estimasi_Box'].sum():,.0f} Box")
-        with m3:
-            st.metric("SKU Tertahan di GL4", f"{len(res_gl)} SKU")
-        with m4:
-            st.metric("Total Box GL4 ➡️ GL3", f"{res_gl['Estimasi_Box'].sum():,.0f} Box")
+        # Simpan ke SQLite fisik
+        df.to_sql('stock_raw', conn, index=False, if_exists='replace')
+        st.success("Data terbaru telah disimpan ke database!")
 
-        # --- TAMPILAN TABEL ---
-        st.divider()
-        t1, t2 = st.tabs(["📌 List Pindah DC (Retail Kosong)", "📌 List Pindah GL4 (Lantai ➡️ Rak)"])
+    # Cek apakah data ada di database (agar tetap tampil walau tidak upload ulang)
+    try:
+        df_db = pd.read_sql("SELECT * FROM stock_raw", conn)
+        # Deteksi Kolom
+        col_bin = next((c for c in df_db.columns if 'BIN' in c.upper()), df_db.columns[1])
+        col_sku = next((c for c in df_db.columns if 'SKU' in c.upper() or 'KODE' in c.upper()), df_db.columns[2])
+    except:
+        st.info("Belum ada data tersimpan. Silakan upload file terlebih dahulu.")
+        return
 
-        with t1:
-            if not res_dc.empty:
-                st.dataframe(res_dc.sort_values('Qty_DC', ascending=False), use_container_width=True)
-                st.download_button("Download CSV DC", res_dc.to_csv(index=False), "pindah_dc.csv")
-            else:
-                st.success("✅ Distribusi DC Aman.")
+    # --- LOGIKA ANALISIS ---
+    # Total SKU Unik
+    total_sku = pd.read_sql(f'SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw', conn).iloc[0,0]
 
-        with t2:
-            if not res_gl.empty:
-                st.dataframe(res_gl.sort_values('Qty_GL4_NonRak', ascending=False), use_container_width=True)
-                st.download_button("Download CSV GL4", res_gl.to_csv(index=False), "pindah_gl4.csv")
-            else:
-                st.success("✅ Distribusi GL4 Aman.")
+    # Case 1: DC vs Retail (Store, Toko, Gudang lt.2)
+    query_c1 = f"""
+    SELECT 
+        (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%' OR UPPER("{col_bin}") LIKE '%GUDANG LT.2%')) as Ada_Di_Retail,
+        (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%' OR UPPER("{col_bin}") LIKE '%GUDANG LT.2%')) as Tidak_Ada_Di_Retail
+    """
+    res1 = pd.read_sql(query_c1, conn).iloc[0]
+    
+    # Case 2: GL4 vs GL3
+    query_c2 = f"""
+    SELECT 
+        (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as Ada_Di_GL3,
+        (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as Tidak_Ada_Di_GL3
+    """
+    res2 = pd.read_sql(query_c2, conn).iloc[0]
 
-        # --- VISUALISASI ---
-        if not res_dc.empty:
-            st.divider()
-            st.subheader("Top 10 SKU Butuh Pindah (Berdasarkan Box)")
-            top_box = res_dc.sort_values('Estimasi_Box', ascending=False).head(10)
-            st.bar_chart(data=top_box, x='SKU', y='Estimasi_Box')
+    # --- TAMPILAN METRIKS (Mirip Gambar) ---
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("📦 TOTAL SKU", f"{total_sku} ITEMS", "OVERALL")
+    with m2:
+        perc_retail = (res1['Ada_Di_Retail'] / (res1['Ada_Di_Retail'] + res1['Tidak_Ada_Di_Retail']) * 100) if total_sku > 0 else 0
+        st.metric("🏪 DC TO RETAIL", f"{res1['Ada_Di_Retail']} SKU", f"{perc_retail:.1f}% Tersedia")
+    with m3:
+        perc_gl = (res2['Ada_Di_GL3'] / (res2['Ada_Di_GL3'] + res2['Tidak_Ada_Di_GL3']) * 100) if total_sku > 0 else 0
+        st.metric("🏗️ GL4 TO GL3", f"{res2['Ada_Di_GL3']} SKU", f"{perc_gl:.1f}% Tersedia")
 
-        conn.close()
-    else:
-        st.info("Silakan upload data 'All Stock' untuk melihat metrik perpindahan barang.")
+    st.divider()
+
+    # --- GRAFIK (Mirip Gambar) ---
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.subheader("Percentage DC to Retail")
+        donut_data = pd.DataFrame({
+            "Status": ["Ada di Retail", "Hanya di DC"],
+            "Jumlah": [res1['Ada_Di_Retail'], res1['Tidak_Ada_Di_Retail']]
+        })
+        fig1 = px.pie(donut_data, values='Jumlah', names='Status', hole=0.5, 
+                     color_discrete_sequence=['#2E7D32', '#C62828'])
+        fig1.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=300)
+        st.plotly_chart(fig1, use_container_width=True)
+
+    with c2:
+        st.subheader("Distribution Case 2 (GL)")
+        bar_data = pd.DataFrame({
+            "Kategori": ["Ada di GL3", "Tidak Ada di GL3"],
+            "Total": [res2['Ada_Di_GL3'], res2['Tidak_Ada_Di_GL3']]
+        })
+        fig2 = px.bar(bar_data, x='Kategori', y='Total', color='Kategori',
+                     color_discrete_sequence=['#F9A825', '#EF6C00'])
+        fig2.update_layout(showlegend=False, height=300)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    conn.close()
                            
 with st.sidebar:
        st.markdown("""
