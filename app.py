@@ -3375,7 +3375,86 @@ def main():
             
             st.download_button("📥 DOWNLOAD EXCEL", data=output.getvalue(), 
                                file_name="Hasil_Compare_RTO.xlsx", use_container_width=True)
+import streamlit as st
+import pandas as pd
+import sqlite3
+import io
 
+st.set_page_config(page_title="Stock Analysis SBY", layout="wide")
+
+st.title("📦 All Stock Analysis System")
+st.write("Upload data stock untuk pengecekan distribusi SKU antar BIN.")
+
+# 1. File Uploader
+uploaded_file = st.file_uploader("Upload File Excel/CSV All Stock", type=['xlsx', 'csv'])
+
+if uploaded_file:
+    # Membaca data
+    if uploaded_file.name.endswith('.csv'):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+
+    # Bersihkan nama kolom (menghapus spasi di awal/akhir)
+    df.columns = [c.strip() for c in df.columns]
+    
+    # Koneksi SQLite (In-Memory agar 'god-speed')
+    conn = sqlite3.connect(':memory:')
+    df.to_sql('stock_data', conn, index=False, if_exists='replace')
+
+    # --- LOGIKA PENGECEKAN ---
+    
+    # Query 1: SKU di DC (B) tapi TIDAK ADA di Gudang lt.2, Store, atau Toko
+    # Kolom C = SKU, Kolom B = BIN
+    query1 = """
+    SELECT DISTINCT "SKU" FROM stock_data 
+    WHERE "BIN" LIKE '%DC%'
+    EXCEPT
+    SELECT DISTINCT "SKU" FROM stock_data 
+    WHERE "BIN" LIKE '%Gudang lt.2%' 
+       OR "BIN" LIKE '%Store%' 
+       OR "BIN" LIKE '%Toko%'
+    """
+    
+    # Query 2: SKU di GL4 (Tanpa RAK) tapi TIDAK ADA di GL3
+    query2 = """
+    SELECT DISTINCT "SKU" FROM stock_data
+    WHERE "BIN" LIKE '%GL4%' AND "BIN" NOT LIKE '%RAK%'
+    EXCEPT
+    SELECT DISTINCT "SKU" FROM stock_data
+    WHERE "BIN" LIKE '%GL3%'
+    """
+
+    res1 = pd.read_sql(query1, conn)
+    res2 = pd.read_sql(query2, conn)
+
+    # --- DISPLAY HASIL ---
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("⚠️ SKU Hanya di DC")
+        st.info(f"Ditemukan: {len(res1)} SKU")
+        if not res1.empty:
+            st.dataframe(res1, use_container_width=True)
+
+    with col2:
+        st.subheader("⚠️ SKU di GL4 (Non-RAK) vs GL3")
+        st.info(f"Ditemukan: {len(res2)} SKU")
+        if not res2.empty:
+            st.dataframe(res2, use_container_width=True)
+
+    # --- VISUALISASI SEDERHANA ---
+    st.divider()
+    st.subheader("Ringkasan Data")
+    chart_data = pd.DataFrame({
+        'Kategori': ['SKU di DC saja', 'SKU di GL4 (Non-RAK) saja'],
+        'Jumlah': [len(res1), len(res2)]
+    })
+    st.bar_chart(data=chart_data, x='Kategori', y='Jumlah')
+
+    conn.close()
+else:
+    st.info("Silakan upload file All Stock terlebih dahulu untuk memulai analisis.")
 
                            
 with st.sidebar:
