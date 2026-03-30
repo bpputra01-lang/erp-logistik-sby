@@ -3433,14 +3433,24 @@ def tampilan_balancing_stock():
     conn = init_db()
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
 
+    # --- FAST UPLOAD LOGIC ---
     if uploaded_file:
         try:
-            df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-            df.columns = [str(c).strip() for c in df.columns]
-            df.to_sql('stock_raw', conn, index=False, if_exists='replace')
-            st.success("Data Berhasil Diperbarui!")
+            with st.spinner('🚀 Menulis data ke database Surabaya (God-Speed Mode)...'):
+                if uploaded_file.name.endswith('.xlsx'):
+                    df = pd.read_excel(uploaded_file)
+                else:
+                    df = pd.read_csv(uploaded_file)
+                
+                df.columns = [str(c).strip() for c in df.columns]
+                
+                # Optimasi: method='multi' dan chunksize buat SQLite biar ga lemot
+                df.to_sql('stock_raw', conn, index=False, if_exists='replace', 
+                          method='multi', chunksize=1000)
+                
+                st.success(f"✅ Data {len(df):,} baris berhasil diperbarui!")
         except Exception as e:
-            st.error(f"Gagal upload: {e}")
+            st.error(f"❌ Gagal upload: {e}")
 
     # --- 2. LOGIKA ANALISIS ---
     try:
@@ -3449,185 +3459,97 @@ def tampilan_balancing_stock():
             st.info("Upload data dulu buat narik metriks dan grafik.")
             return
 
-        # Ambil nama kolom secara dinamis
+        # Deteksi Kolom
         cols = pd.read_sql("SELECT * FROM stock_raw LIMIT 1", conn).columns
         col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
         col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
         col_desc = next((c for c in cols if 'DESC' in c.upper() or 'NAMA' in c.upper()), col_sku)
-        # Deteksi kolom QTY (Kolom J biasanya index ke-9)
         col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
 
-        # --- GLOBAL FILTER ---
+        # Global Filter (Exclusion)
         base_excl = f"""
-            UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND 
-            UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
-            UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND 
-            UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
-            UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND
-            UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
-            UPPER("{col_bin}") NOT LIKE '%STAGING%' AND
-            UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
-            UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND
-            UPPER("{col_bin}") NOT LIKE '%OUT%' AND
-            UPPER("{col_bin}") NOT LIKE '%INB%'
+            UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
+            UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
+            UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
+            UPPER("{col_bin}") NOT LIKE '%STAGING%' AND UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND
+            UPPER("{col_bin}") NOT LIKE '%OUT%' AND UPPER("{col_bin}") NOT LIKE '%INB%'
         """
-        
         gl_excl = f"{base_excl} AND UPPER(\"{col_bin}\") NOT LIKE '%RAK%'"
         filter_retail = f"(UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
 
-        # --- QUERY METRIKS (Filter QTY > 0) ---
+        # --- QUERY METRIKS (SINKRON DENGAN TABEL) ---
         q_data = pd.read_sql(f"""
             SELECT  
-                -- Total SKU Clean dengan Stok > 0
-                (SELECT COUNT(*) FROM (
-                    SELECT "{col_sku}" FROM stock_raw 
-                    WHERE {base_excl} 
-                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-                )) as Total_SKU_Clean,
-
-                -- DC Analysis
-                (SELECT COUNT(*) FROM (
-                    SELECT "{col_sku}" FROM stock_raw 
-                    WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} 
-                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-                )) as DC_Clean_Total,
+                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as Total_SKU_Clean,
                 
-                (SELECT COUNT(*) FROM (
-                    SELECT "{col_sku}" FROM stock_raw 
-                    WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} 
-                    AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail})
-                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-                )) as DC_In_Retail_Clean,
+                -- DC Metrics
+                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as DC_Clean_Total,
+                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0) GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as DC_In_Retail_Clean,
                 
-                -- GL Analysis
-                (SELECT COUNT(*) FROM (
-                    SELECT "{col_sku}" FROM stock_raw 
-                    WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} 
-                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-                )) as GL4_Clean_Total,
-                
-                (SELECT COUNT(*) FROM (
-                    SELECT "{col_sku}" FROM stock_raw 
-                    WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} 
-                    AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')
-                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-                )) as GL4_In_GL3_Clean
+                -- GL Metrics
+                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as GL4_Clean_Total,
+                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%' GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0) GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as GL4_In_GL3_Clean
         """, conn).iloc[0]
 
-        # Kalkulasi Variabel
-        total_sku_display = q_data['Total_SKU_Clean']
-        dc_total = q_data['DC_Clean_Total']
-        dc_tersedia = q_data['DC_In_Retail_Clean']
-        dc_missing = dc_total - dc_tersedia
-        perc_dc_avail = (dc_tersedia / dc_total * 100) if dc_total > 0 else 0
-        perc_dc_missing = (dc_missing / dc_total * 100) if dc_total > 0 else 0
+        # Perhitungan Persentase
+        dc_missing = q_data['DC_Clean_Total'] - q_data['DC_In_Retail_Clean']
+        gl4_missing = q_data['GL4_Clean_Total'] - q_data['GL4_In_GL3_Clean']
+        
+        perc_dc_avail = (q_data['DC_In_Retail_Clean'] / q_data['DC_Clean_Total'] * 100) if q_data['DC_Clean_Total'] > 0 else 0
+        perc_gl_avail = (q_data['GL4_In_GL3_Clean'] / q_data['GL4_Clean_Total'] * 100) if q_data['GL4_Clean_Total'] > 0 else 0
 
-        gl4_total = q_data['GL4_Clean_Total']
-        gl4_tersedia = q_data['GL4_In_GL3_Clean']
-        gl4_missing = gl4_total - gl4_tersedia
-        perc_gl_avail = (gl4_tersedia / gl4_total * 100) if gl4_total > 0 else 0
-        perc_gl_missing = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
-
-        # --- 3. TAMPILAN HEADER & METRIKS ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK (QTY > 0)</h4></div>', unsafe_allow_html=True)
-
+        # --- 3. TAMPILAN METRIKS ---
+        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 BALANCING SUMMARY (STOK > 0)</h4></div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #7B61FF;">
-                <p class="metric-label">📦 Total SKU Aktif</p>
-                <p class="metric-value">{total_sku_display:,}</p>
-                <p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p>
-            </div>''', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 Total SKU Aktif</p><p class="metric-value">{q_data["Total_SKU_Clean"]:,}</p></div>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #00C853;">
-                <p class="metric-label">🏪 DC to Retail</p>
-                <p class="metric-value">{dc_tersedia:,}</p>
-                <p class="metric-arrow" style="color: #00FF00;">↑ {perc_dc_avail:.1f}% Tersedia</p>
-            </div>''', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC ➔ Retail</p><p class="metric-value">{q_data["DC_In_Retail_Clean"]:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_dc_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FFAB00;">
-                <p class="metric-label">🏗️ GL4 to GL3</p>
-                <p class="metric-value">{gl4_tersedia:,}</p>
-                <p class="metric-arrow" style="color: #00FF00;">↑ {perc_gl_avail:.1f}% Tersedia</p>
-            </div>''', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 ➔ GL3</p><p class="metric-value">{q_data["GL4_In_GL3_Clean"]:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_gl_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
 
         cc1, cc2 = st.columns(2)
         with cc1:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #E91E63;">
-                <p class="metric-label">⚠️ DC Missing in Retail</p>
-                <p class="metric-value">{dc_missing:,} SKU</p>
-                <p class="metric-arrow" style="color: #FF5252;">{perc_dc_missing:.1f}% Belum Terdistribusi</p>
-            </div>''', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ DC Missing</p><p class="metric-value">{dc_missing:,} SKU</p></div>', unsafe_allow_html=True)
         with cc2:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FF9800;">
-                <p class="metric-label">⚠️ GL4 Missing in GL3</p>
-                <p class="metric-value">{gl4_missing:,} SKU</p>
-                <p class="metric-arrow" style="color: #FF5252;">{perc_gl_missing:.1f}% Belum Turun</p>
-            </div>''', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ GL4 Missing</p><p class="metric-value">{gl4_missing:,} SKU</p></div>', unsafe_allow_html=True)
 
         st.divider()
 
-        # --- 4. GRAFIK ---
-        g1, g2 = st.columns(2)
-        with g1:
-            st.subheader("Percentage DC to Retail")
-            df_pie = pd.DataFrame({"Status": ["Ada di Retail", "Hanya di DC"], "Jumlah": [dc_tersedia, dc_missing]})
-            fig1 = px.pie(df_pie, values='Jumlah', names='Status', hole=0.6, color_discrete_sequence=['#2E7D32', '#C62828'])
-            fig1.update_layout(height=350, margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig1, use_container_width=True)
-        with g2:
-            st.subheader("Distribution Case 2 (GL)")
-            df_bar = pd.DataFrame({"Kategori": ["Ada di GL3", "Tidak Ada di GL3"], "Total": [gl4_tersedia, gl4_missing]})
-            fig2 = px.bar(df_bar, x='Kategori', y='Total', color='Kategori', color_discrete_sequence=['#F9A825', '#EF6C00'])
-            fig2.update_layout(showlegend=False, height=350)
-            st.plotly_chart(fig2, use_container_width=True)
-
-        # --- 5. LIST TABEL (FILTER QTY > 0) ---
-        st.markdown("### 📋 Detail List SKU Belum Ada di Lokasi Tujuan")
+        # --- 4. LIST TABEL (SINKRON DENGAN KARTU) ---
+        st.markdown("### 📋 Detail Missing List")
         t1, t2 = st.tabs(["List DC ➔ Retail", "List GL4 ➔ GL3"])
         
         with t1:
-            query_list_dc = f"""
-                SELECT DISTINCT a."{col_sku}" as SKU, a."{col_desc}" as Deskripsi, a."{col_bin}" as BIN
-                FROM stock_raw a
-                WHERE UPPER(a."{col_bin}") LIKE '%DC%' AND {base_excl}
-                AND a."{col_sku}" IN (
-                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
-                    EXCEPT
-                    SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail}
-                )
-                AND (SELECT SUM("{col_qty}") FROM stock_raw b WHERE b."{col_sku}" = a."{col_sku}") > 0
+            q_list_dc = f"""
+                SELECT "{col_sku}" as SKU, MAX("{col_desc}") as Deskripsi, GROUP_CONCAT(DISTINCT "{col_bin}") as Lokasi_DC, SUM("{col_qty}") as Qty_Total
+                FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
+                AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)
+                GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
             """
-            df_list_dc = pd.read_sql(query_list_dc, conn)
-            if not df_list_dc.empty:
-                st.dataframe(df_list_dc, use_container_width=True)
-                csv = df_list_dc.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download List DC Missing ({len(df_list_dc)} SKU)", csv, "dc_missing.csv", "text/csv")
-            else:
-                st.info("✅ Semua SKU DC dengan stok aktif sudah terdistribusi.")
+            df_dc = pd.read_sql(q_list_dc, conn)
+            st.dataframe(df_dc, use_container_width=True)
+            if not df_dc.empty:
+                st.download_button(f"📥 Download {len(df_dc)} SKU DC", df_dc.to_csv(index=False).encode('utf-8'), "dc_missing.csv")
 
         with t2:
-            query_list_gl = f"""
-                SELECT DISTINCT a."{col_sku}" as SKU, a."{col_desc}" as Deskripsi, a."{col_bin}" as BIN
-                FROM stock_raw a
-                WHERE UPPER(a."{col_bin}") LIKE '%GL4%' AND {gl_excl}
-                AND a."{col_sku}" IN (
-                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
-                    EXCEPT
-                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%'
-                )
-                AND (SELECT SUM("{col_qty}") FROM stock_raw b WHERE b."{col_sku}" = a."{col_sku}") > 0
+            q_list_gl = f"""
+                SELECT "{col_sku}" as SKU, MAX("{col_desc}") as Deskripsi, GROUP_CONCAT(DISTINCT "{col_bin}") as Lokasi_GL4, SUM("{col_qty}") as Qty_Total
+                FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
+                AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%' GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)
+                GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
             """
-            df_list_gl = pd.read_sql(query_list_gl, conn)
-            if not df_list_gl.empty:
-                st.dataframe(df_list_gl, use_container_width=True)
-                csv_gl = df_list_gl.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download List GL Missing ({len(df_list_gl)} SKU)", csv_gl, "gl_missing.csv", "text/csv")
+            df_gl = pd.read_sql(q_list_gl, conn)
+            st.dataframe(df_gl, use_container_width=True)
+            if not df_gl.empty:
+                st.download_button(f"📥 Download {len(df_gl)} SKU GL", df_gl.to_csv(index=False).encode('utf-8'), "gl_missing.csv")
 
     except Exception as e:
-        st.error(f"Error Database: {e}")
+        st.error(f"Error: {e}")
     finally:
         conn.close()
+
+tampilan_balancing_stock()
 
                            
 with st.sidebar:
