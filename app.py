@@ -3380,6 +3380,10 @@ import pandas as pd
 import sqlite3
 import io
 
+# --- SIDEBAR NAVIGATION ---
+st.sidebar.title("Main Menu")
+menu = st.sidebar.radio("Pilih Menu:", ["Upload Data", "Balancing Stock", "Dashboard"])
+
 # Session State untuk menyimpan data agar tidak hilang saat pindah menu
 if 'main_df' not in st.session_state:
     st.session_state.main_df = None
