@@ -3380,81 +3380,102 @@ import pandas as pd
 import sqlite3
 import io
 
-st.set_page_config(page_title="Stock Analysis SBY", layout="wide")
+# Konfigurasi Halaman
+st.set_page_config(page_title="ERP Logistik SBY", layout="wide")
 
-st.title("All Stock Analysis System")
-st.write("Upload data stock untuk pengecekan distribusi SKU antar BIN.")
+# --- SIDEBAR NAVIGATION ---
+st.sidebar.title("Main Menu")
+menu = st.sidebar.radio("Pilih Menu:", ["Upload Data", "Balancing Stock", "Dashboard"])
 
-# 1. File Uploader
-uploaded_file = st.file_uploader("Upload File Excel/CSV All Stock", type=['xlsx', 'csv'])
+# Session State untuk menyimpan data agar tidak hilang saat pindah menu
+if 'main_df' not in st.session_state:
+    st.session_state.main_df = None
 
-if uploaded_file:
-    # Membaca data
-    if uploaded_file.name.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file)
-
-    # Bersihkan nama kolom (menghapus spasi di awal/akhir)
-    df.columns = [c.strip() for c in df.columns]
+# --- MENU 1: UPLOAD DATA ---
+if menu == "Upload Data":
+    st.title("📂 Upload All Stock")
+    uploaded_file = st.file_uploader("Upload File Excel/CSV All Stock", type=['xlsx', 'csv'])
     
-    # Koneksi SQLite (In-Memory agar 'god-speed')
-    conn = sqlite3.connect(':memory:')
-    df.to_sql('stock_data', conn, index=False, if_exists='replace')
+    if uploaded_file:
+        if uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
+        
+        # Bersihkan nama kolom
+        df.columns = [c.strip() for c in df.columns]
+        st.session_state.main_df = df
+        st.success(f"Data berhasil di-upload! Total: {len(df)} baris.")
+        st.dataframe(df.head(10), use_container_width=True)
 
-    # --- LOGIKA PENGECEKAN ---
+# --- MENU 2: BALANCING STOCK (Logika Utama Kamu) ---
+elif menu == "Balancing Stock":
+    st.title("⚖️ Balancing Stock Analysis")
     
-    # Query 1: SKU di DC (B) tapi TIDAK ADA di Gudang lt.2, Store, atau Toko
-    # Kolom C = SKU, Kolom B = BIN
-    query1 = """
-    SELECT DISTINCT "SKU" FROM stock_data 
-    WHERE "BIN" LIKE '%DC%'
-    EXCEPT
-    SELECT DISTINCT "SKU" FROM stock_data 
-    WHERE "BIN" LIKE '%Gudang lt.2%' 
-       OR "BIN" LIKE '%Store%' 
-       OR "BIN" LIKE '%Toko%'
-    """
-    
-    # Query 2: SKU di GL4 (Tanpa RAK) tapi TIDAK ADA di GL3
-    query2 = """
-    SELECT DISTINCT "SKU" FROM stock_data
-    WHERE "BIN" LIKE '%GL4%' AND "BIN" NOT LIKE '%RAK%'
-    EXCEPT
-    SELECT DISTINCT "SKU" FROM stock_data
-    WHERE "BIN" LIKE '%GL3%'
-    """
+    if st.session_state.main_df is not None:
+        df = st.session_state.main_df
+        
+        # Koneksi SQLite (In-Memory) - God Speed!
+        conn = sqlite3.connect(':memory:')
+        df.to_sql('stock_data', conn, index=False, if_exists='replace')
 
-    res1 = pd.read_sql(query1, conn)
-    res2 = pd.read_sql(query2, conn)
+        st.info("Menganalisis ketimpangan stok antar lokasi (BIN)...")
 
-    # --- DISPLAY HASIL ---
-    col1, col2 = st.columns(2)
+        # --- QUERY LOGIC ---
+        # Query 1: SKU di DC (B) tapi TIDAK ADA di Gudang lt.2, Store, atau Toko
+        query1 = """
+        SELECT DISTINCT "SKU" FROM stock_data 
+        WHERE "BIN" LIKE '%DC%'
+        EXCEPT
+        SELECT DISTINCT "SKU" FROM stock_data 
+        WHERE "BIN" LIKE '%Gudang lt.2%' 
+           OR "BIN" LIKE '%Store%' 
+           OR "BIN" LIKE '%Toko%'
+        """
+        
+        # Query 2: SKU di GL4 (Tanpa RAK) tapi TIDAK ADA di GL3
+        query2 = """
+        SELECT DISTINCT "SKU" FROM stock_data
+        WHERE "BIN" LIKE '%GL4%' AND "BIN" NOT LIKE '%RAK%'
+        EXCEPT
+        SELECT DISTINCT "SKU" FROM stock_data
+        WHERE "BIN" LIKE '%GL3%'
+        """
 
-    with col1:
-        st.subheader("⚠️ SKU Hanya di DC")
-        st.info(f"Ditemukan: {len(res1)} SKU")
-        if not res1.empty:
+        res1 = pd.read_sql(query1, conn)
+        res2 = pd.read_sql(query2, conn)
+
+        # --- DISPLAY HASIL ---
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("⚠️ SKU Hanya Mengendap di DC")
+            st.warning(f"Total: {len(res1)} SKU")
+            st.caption("SKU ini ada di DC tapi kosong di Store/Toko/Gudang lt.2")
             st.dataframe(res1, use_container_width=True)
+            if not res1.empty:
+                st.download_button("Download List DC", res1.to_csv(index=False), "need_balancing_dc.csv")
 
-    with col2:
-        st.subheader("⚠️ SKU di GL4 (Non-RAK) vs GL3")
-        st.info(f"Ditemukan: {len(res2)} SKU")
-        if not res2.empty:
+        with col2:
+            st.subheader("⚠️ SKU di GL4 tapi Kosong di GL3")
+            st.warning(f"Total: {len(res2)} SKU")
+            st.caption("SKU di GL4 (Non-RAK) yang belum tersedia di GL3")
             st.dataframe(res2, use_container_width=True)
+            if not res2.empty:
+                st.download_button("Download List GL4", res2.to_csv(index=False), "need_balancing_gl4.csv")
 
-    # --- VISUALISASI SEDERHANA ---
-    st.divider()
-    st.subheader("Ringkasan Data")
-    chart_data = pd.DataFrame({
-        'Kategori': ['SKU di DC saja', 'SKU di GL4 (Non-RAK) saja'],
-        'Jumlah': [len(res1), len(res2)]
-    })
-    st.bar_chart(data=chart_data, x='Kategori', y='Jumlah')
-
-    conn.close()
-else:
-    st.info("Silakan upload file All Stock terlebih dahulu untuk memulai analisis.")
+        # --- VISUALISASI ---
+        st.divider()
+        st.subheader("Grafik Ketimpangan Distribusi")
+        chart_data = pd.DataFrame({
+            'Kategori': ['Butuh Distribusi (DC)', 'Butuh Distribusi (GL4)'],
+            'Jumlah SKU': [len(res1), len(res2)]
+        })
+        st.bar_chart(data=chart_data, x='Kategori', y='Jumlah SKU')
+        
+        conn.close()
+    else:
+        st.error("⚠️ Data belum ada. Silakan ke menu 'Upload Data' terlebih dahulu.")
 
                            
 with st.sidebar:
