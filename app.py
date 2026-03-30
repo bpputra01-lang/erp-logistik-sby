@@ -3425,10 +3425,26 @@ def tampilan_balancing_stock():
             margin-top: 8px;
             font-weight: bold;
         }
+        .hero-header {
+                background-color: #007BFF; /* Biru Hero */
+                padding: 15px 25px;
+                border-radius: 10px;
+                margin-bottom: 25px;
+                box-shadow: 0px 4px 12px rgba(0, 123, 255, 0.3);
+                text-align: left;
+            }
+            .hero-text {
+                color: white !important;
+                margin: 0 !important;
+                font-size: 24px !important;
+                font-weight: 800 !important;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-    st.title("PRECENTAGE DISTRIBUTION STOCK CONTROL")
+    st.markdown('<div class="hero-header"><p class="hero-text">PERCENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
     
     conn = init_db()
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
