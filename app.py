@@ -3567,11 +3567,8 @@ def tampilan_balancing_stock():
             fig2.update_layout(showlegend=False, height=350)
             st.plotly_chart(fig2, use_container_width=True)
 
-        # --- 5. LIST TABEL (SINKRON DENGAN METRIKS) ---
-        st.markdown("### 📋 Detail List SKU Belum Ada di Lokasi Tujuan")
-        t1, t2 = st.tabs(["List DC ➔ Retail", "List GL4 ➔ GL3"])
-        
-        # Logic Dasar Selisih (Kunci biar Match)
+        # --- QUERY METRIKS (KUNCI AGAR MATCH) ---
+        # Kita definisikan query dasarnya dulu biar sama persis antara kartu & tabel
         q_logic_dc_missing = f"""
             SELECT "{col_sku}" FROM stock_raw 
             WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
@@ -3588,7 +3585,24 @@ def tampilan_balancing_stock():
             SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%'
         """
 
+        q_data = pd.read_sql(f"""
+            SELECT  
+                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as Total_SKU_Clean,
+                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as DC_Clean_Total,
+                (SELECT COUNT(*) FROM ({q_logic_dc_missing})) as DC_Missing_Count,
+                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as GL4_Clean_Total,
+                (SELECT COUNT(*) FROM ({q_logic_gl_missing})) as GL_Missing_Count
+        """, conn).iloc[0]
+
+        # Update variable metrik
+        dc_missing = int(q_data['DC_Missing_Count'])
+        gl4_missing = int(q_data['GL_Missing_Count'])
+        dc_tersedia = int(q_data['DC_Clean_Total']) - dc_missing
+        gl4_tersedia = int(q_data['GL4_Clean_Total']) - gl4_missing
+
+        # --- TABEL DETAIL (WAJIB MATCH DENGAN METRIK) ---
         with t1:
+            # SINKRON: Pake logic yang sama dengan kartu metrik
             query_list_dc = f"""
                 SELECT DISTINCT a."{col_sku}" as SKU, a."{col_desc}" as Deskripsi, a."{col_bin}" as BIN
                 FROM stock_raw a
@@ -3596,15 +3610,11 @@ def tampilan_balancing_stock():
                 AND UPPER(a."{col_bin}") LIKE '%DC%' AND {base_excl}
             """
             df_list_dc = pd.read_sql(query_list_dc, conn)
-            
-            if not df_list_dc.empty:
-                st.dataframe(df_list_dc, use_container_width=True)
-                csv = df_list_dc.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download List DC Missing ({len(df_list_dc.SKU.unique())} SKU)", csv, "dc_missing.csv", "text/csv")
-            else:
-                st.info("✅ Semua SKU DC dengan stok aktif sudah terdistribusi.")
+            st.dataframe(df_list_dc, use_container_width=True)
+            st.download_button(f"📥 Download List DC Missing ({len(df_list_dc.SKU.unique())} SKU)", ...)
 
         with t2:
+            # SINKRON: Pake logic yang sama dengan kartu metrik
             query_list_gl = f"""
                 SELECT "{col_sku}" as SKU, MAX("{col_desc}") as Deskripsi, 
                        GROUP_CONCAT(DISTINCT "{col_bin}") as BIN_Lokasi, SUM("{col_qty}") as Total_Qty
@@ -3614,11 +3624,8 @@ def tampilan_balancing_stock():
                 GROUP BY "{col_sku}"
             """
             df_list_gl = pd.read_sql(query_list_gl, conn)
-            
-            if not df_list_gl.empty:
-                st.dataframe(df_list_gl, use_container_width=True)
-                csv_gl = df_list_gl.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download List GL Missing ({len(df_list_gl)} SKU)", csv_gl, "gl_missing.csv", "text/csv")
+            st.dataframe(df_list_gl, use_container_width=True)
+            st.download_button(f"📥 Download List GL Missing ({len(df_list_gl)} SKU)", ...)
             else:
                 st.info("✅ Tidak ada selisih SKU antara GL4 dan GL3.")
 
