@@ -3626,8 +3626,7 @@ def tampilan_balancing_stock():
             df_list_gl = pd.read_sql(query_list_gl, conn)
             st.dataframe(df_list_gl, use_container_width=True)
             st.download_button(f"📥 Download List GL Missing ({len(df_list_gl)} SKU)", ...)
-            else:
-                st.info("✅ Tidak ada selisih SKU antara GL4 dan GL3.")
+             
 
     except Exception as e:
         st.error(f"Error Database: {e}")
