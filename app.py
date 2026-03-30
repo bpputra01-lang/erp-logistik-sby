@@ -3411,8 +3411,8 @@ def tampilan_balancing_stock():
         # --- 2. IMPLEMENTASI HERO HEADER ---
         st.markdown('<div class="hero-header"><p class="hero-text">PERCENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
     
-    conn = init_db()
-    uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
+        conn = init_db()
+        uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
 
     if uploaded_file:
         try:
