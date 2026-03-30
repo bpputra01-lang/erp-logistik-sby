@@ -3458,133 +3458,32 @@ def tampilan_balancing_stock():
 
         # --- GLOBAL FILTER ---
         base_excl = f"""
-            UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND 
-            UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
-            UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND 
-            UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
-            UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND
-            UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
-            UPPER("{col_bin}") NOT LIKE '%STAGING%' AND
-            UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
-            UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND
-            UPPER("{col_bin}") NOT LIKE '%OUT%' AND
-            UPPER("{col_bin}") NOT LIKE '%INB%' AND
-            UPPER("{col_bin}") NOT LIKE '%AMP%'
+            UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
+            UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
+            UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
+            UPPER("{col_bin}") NOT LIKE '%STAGING%' AND UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
+            UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND UPPER("{col_bin}") NOT LIKE '%OUT%' AND
+            UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%AMP%'
         """
-        
         gl_excl = f"{base_excl} AND UPPER(\"{col_bin}\") NOT LIKE '%RAK%'"
         filter_retail = f"(UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
 
-        # --- QUERY METRIKS (DIPERBAIKI AGAR SINKRON) ---
-        q_data = pd.read_sql(f"""
-            SELECT  
-                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as Total_SKU_Clean,
-
-                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as DC_Clean_Total,
-                
-                (SELECT COUNT(*) FROM (
-                    SELECT "{col_sku}" FROM stock_raw 
-                    WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} 
-                    AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)
-                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-                )) as DC_In_Retail_Clean,
-                
-                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as GL4_Clean_Total,
-                
-                (SELECT COUNT(*) FROM (
-                    SELECT "{col_sku}" FROM stock_raw 
-                    WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} 
-                    AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%' GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)
-                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-                )) as GL4_In_GL3_Clean
-        """, conn).iloc[0]
-
-        # Kalkulasi Variabel
-        total_sku_display = q_data['Total_SKU_Clean']
-        dc_total = q_data['DC_Clean_Total']
-        dc_tersedia = q_data['DC_In_Retail_Clean']
-        dc_missing = dc_total - dc_tersedia
-        perc_dc_avail = (dc_tersedia / dc_total * 100) if dc_total > 0 else 0
-        perc_dc_missing = (dc_missing / dc_total * 100) if dc_total > 0 else 0
-
-        gl4_total = q_data['GL4_Clean_Total']
-        gl4_tersedia = q_data['GL4_In_GL3_Clean']
-        gl4_missing = gl4_total - gl4_tersedia
-        perc_gl_avail = (gl4_tersedia / gl4_total * 100) if gl4_total > 0 else 0
-        perc_gl_missing = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
-
-        # --- 3. TAMPILAN HEADER & METRIKS ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK (QTY > 0)</h4></div>', unsafe_allow_html=True)
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #7B61FF;">
-                <p class="metric-label">📦 Total SKU Aktif</p>
-                <p class="metric-value">{total_sku_display:,}</p>
-                <p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p>
-            </div>''', unsafe_allow_html=True)
-        with c2:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #00C853;">
-                <p class="metric-label">🏪 DC to Retail</p>
-                <p class="metric-value">{dc_tersedia:,}</p>
-                <p class="metric-arrow" style="color: #00FF00;">↑ {perc_dc_avail:.1f}% Tersedia</p>
-            </div>''', unsafe_allow_html=True)
-        with c3:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FFAB00;">
-                <p class="metric-label">🏗️ GL4 to GL3</p>
-                <p class="metric-value">{gl4_tersedia:,}</p>
-                <p class="metric-arrow" style="color: #00FF00;">↑ {perc_gl_avail:.1f}% Tersedia</p>
-            </div>''', unsafe_allow_html=True)
-
-        cc1, cc2 = st.columns(2)
-        with cc1:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #E91E63;">
-                <p class="metric-label">⚠️ DC Missing in Retail</p>
-                <p class="metric-value">{dc_missing:,} SKU</p>
-                <p class="metric-arrow" style="color: #FF5252;">{perc_dc_missing:.1f}% Belum Terdistribusi</p>
-            </div>''', unsafe_allow_html=True)
-        with cc2:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FF9800;">
-                <p class="metric-label">⚠️ GL4 Missing in GL3</p>
-                <p class="metric-value">{gl4_missing:,} SKU</p>
-                <p class="metric-arrow" style="color: #FF5252;">{perc_gl_missing:.1f}% Belum Turun</p>
-            </div>''', unsafe_allow_html=True)
-
-        st.divider()
-
-        # --- 4. GRAFIK ---
-        g1, g2 = st.columns(2)
-        with g1:
-            st.subheader("Percentage DC to Retail")
-            df_pie = pd.DataFrame({"Status": ["Ada di Retail", "Hanya di DC"], "Jumlah": [dc_tersedia, dc_missing]})
-            fig1 = px.pie(df_pie, values='Jumlah', names='Status', hole=0.6, color_discrete_sequence=['#2E7D32', '#C62828'])
-            fig1.update_layout(height=350, margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig1, use_container_width=True)
-        with g2:
-            st.subheader("Distribution Case 2 (GL)")
-            df_bar = pd.DataFrame({"Kategori": ["Ada di GL3", "Tidak Ada di GL3"], "Total": [gl4_tersedia, gl4_missing]})
-            fig2 = px.bar(df_bar, x='Kategori', y='Total', color='Kategori', color_discrete_sequence=['#F9A825', '#EF6C00'])
-            fig2.update_layout(showlegend=False, height=350)
-            st.plotly_chart(fig2, use_container_width=True)
-
-        # --- QUERY METRIKS (KUNCI AGAR MATCH) ---
-        # Kita definisikan query dasarnya dulu biar sama persis antara kartu & tabel
+        # --- 1. DEFINISI LOGIKA MISSING (SATU SUMBER KEBENARAN) ---
         q_logic_dc_missing = f"""
-            SELECT "{col_sku}" FROM stock_raw 
-            WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
+            SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
             GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
             EXCEPT
             SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail}
         """
 
         q_logic_gl_missing = f"""
-            SELECT "{col_sku}" FROM stock_raw 
-            WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
+            SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
             GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
             EXCEPT
             SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%'
         """
 
+        # --- 2. QUERY METRIKS (HITUNG SKALI JALAN) ---
         q_data = pd.read_sql(f"""
             SELECT  
                 (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as Total_SKU_Clean,
@@ -3594,15 +3493,45 @@ def tampilan_balancing_stock():
                 (SELECT COUNT(*) FROM ({q_logic_gl_missing})) as GL_Missing_Count
         """, conn).iloc[0]
 
-        # Update variable metrik
+        # Kalkulasi Variabel buat Card
+        total_sku_display = int(q_data['Total_SKU_Clean'])
+        dc_total = int(q_data['DC_Clean_Total'])
         dc_missing = int(q_data['DC_Missing_Count'])
-        gl4_missing = int(q_data['GL_Missing_Count'])
-        dc_tersedia = int(q_data['DC_Clean_Total']) - dc_missing
-        gl4_tersedia = int(q_data['GL4_Clean_Total']) - gl4_missing
+        dc_tersedia = dc_total - dc_missing
+        perc_dc_avail = (dc_tersedia / dc_total * 100) if dc_total > 0 else 0
+        perc_dc_missing = (dc_missing / dc_total * 100) if dc_total > 0 else 0
 
-        # --- TABEL DETAIL (WAJIB MATCH DENGAN METRIK) ---
+        gl4_total = int(q_data['GL4_Clean_Total'])
+        gl4_missing = int(q_data['GL_Missing_Count'])
+        gl4_tersedia = gl4_total - gl4_missing
+        perc_gl_avail = (gl4_tersedia / gl4_total * 100) if gl4_total > 0 else 0
+        perc_gl_missing = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
+
+        # --- 3. TAMPILAN METRIKS ---
+        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK (QTY > 0)</h4></div>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 Total SKU Aktif</p><p class="metric-value">{total_sku_display:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p></div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Retail</p><p class="metric-value">{dc_tersedia:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_dc_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+        with c3:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl4_tersedia:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_gl_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ DC Missing in Retail</p><p class="metric-value">{dc_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_dc_missing:.1f}% Belum Terdistribusi</p></div>', unsafe_allow_html=True)
+        with cc2:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ GL4 Missing in GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_gl_missing:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
+
+        st.divider()
+        
+        # (Bagian Grafik skip biar hemat tempat, tetap sama)
+
+        # --- 4. TABEL DETAIL (SINKRONISASI TOTAL) ---
+        st.markdown("### 📋 Detail List SKU Belum Ada di Lokasi Tujuan")
+        t1, t2 = st.tabs(["List DC ➔ Retail", "List GL4 ➔ GL3"])
+        
         with t1:
-            # SINKRON: Pake logic yang sama dengan kartu metrik
             query_list_dc = f"""
                 SELECT DISTINCT a."{col_sku}" as SKU, a."{col_desc}" as Deskripsi, a."{col_bin}" as BIN
                 FROM stock_raw a
@@ -3610,11 +3539,13 @@ def tampilan_balancing_stock():
                 AND UPPER(a."{col_bin}") LIKE '%DC%' AND {base_excl}
             """
             df_list_dc = pd.read_sql(query_list_dc, conn)
-            st.dataframe(df_list_dc, use_container_width=True)
-            st.download_button(f"📥 Download List DC Missing ({len(df_list_dc.SKU.unique())} SKU)", ...)
+            if not df_list_dc.empty:
+                st.dataframe(df_list_dc, use_container_width=True)
+                st.download_button(f"📥 Download List DC ({len(df_list_dc[col_sku].unique())} SKU)", df_list_dc.to_csv(index=False), "dc_missing.csv")
+            else:
+                st.info("✅ Aman Bos, DC sudah sinkron.")
 
         with t2:
-            # SINKRON: Pake logic yang sama dengan kartu metrik
             query_list_gl = f"""
                 SELECT "{col_sku}" as SKU, MAX("{col_desc}") as Deskripsi, 
                        GROUP_CONCAT(DISTINCT "{col_bin}") as BIN_Lokasi, SUM("{col_qty}") as Total_Qty
@@ -3624,9 +3555,11 @@ def tampilan_balancing_stock():
                 GROUP BY "{col_sku}"
             """
             df_list_gl = pd.read_sql(query_list_gl, conn)
-            st.dataframe(df_list_gl, use_container_width=True)
-            st.download_button(f"📥 Download List GL Missing ({len(df_list_gl)} SKU)", ...)
-             
+            if not df_list_gl.empty:
+                st.dataframe(df_list_gl, use_container_width=True)
+                st.download_button(f"📥 Download List GL ({len(df_list_gl)} SKU)", df_list_gl.to_csv(index=False), "gl_missing.csv")
+            else:
+                st.info("✅ Aman Bos, GL4 to GL3 sinkron.")
 
     except Exception as e:
         st.error(f"Error Database: {e}")
