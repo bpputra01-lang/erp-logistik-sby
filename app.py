@@ -3381,24 +3381,22 @@ import sqlite3
 import plotly.express as px
 
 def init_db():
-    # Menggunakan database fisik agar data tetap aman walau logout
+    # Database fisik biar data aman di Surabaya branch
     conn = sqlite3.connect('database_sby.db', check_same_thread=False)
     return conn
 
 def tampilan_balancing_stock():
-    # --- 1. CSS CUSTOM (STYLE DASHBOARD PREMIUM) ---
+    # --- 1. CSS CUSTOM ---
     st.markdown("""
         <style>
-        /* Header Biru di Atas Metriks */
         .metric-label-header {
             background-color: #f8f9fa;
             padding: 10px 15px;
             border-left: 5px solid #007BFF;
             border-radius: 4px;
             margin-bottom: 15px;
-            margin-top: 10px;
+            margin-top: 20px;
         }
-        /* Kotak Metrik Gelap */
         .metric-card {
             background-color: #1E1E2E;
             padding: 20px;
@@ -3406,7 +3404,7 @@ def tampilan_balancing_stock():
             box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
             text-align: center;
             color: white;
-            min-height: 120px;
+            min-height: 140px;
         }
         .metric-value {
             font-size: 28px;
@@ -3414,12 +3412,17 @@ def tampilan_balancing_stock():
             margin: 0;
             color: #FFFFFF;
         }
-        .metric-title {
+        .metric-label {
             font-size: 12px;
             color: #A0A0A0;
             text-transform: uppercase;
             margin-bottom: 8px;
             letter-spacing: 1px;
+        }
+        .metric-arrow {
+            font-size: 12px;
+            margin-top: 8px;
+            font-weight: bold;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -3427,95 +3430,69 @@ def tampilan_balancing_stock():
     st.title("⚖️ Stock Merchandising Analysis")
     
     conn = init_db()
-    
-    # --- 2. UPLOAD DATA ---
-    uploaded_file = st.file_uploader("Upload All Stock (Excel/CSV)", type=['xlsx', 'csv'], key="balancer_upload")
+    uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
 
     if uploaded_file:
         try:
             df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df.columns = [str(c).strip() for c in df.columns]
             df.to_sql('stock_raw', conn, index=False, if_exists='replace')
-            st.success("Data Berhasil Diperbarui!")
+            st.success("Data Berhasil Di-upload!")
         except Exception as e:
-            st.error(f"Gagal memproses file: {e}")
+            st.error(f"Gagal upload: {e}")
 
-    # --- 3. LOGIKA ANALISIS ---
     try:
-        # Cek apakah data ada
         df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_raw'", conn)
         if df_check.empty:
-            st.info("Silakan upload data 'All Stock' untuk memulai.")
+            st.info("Upload data untuk melihat metriks.")
             return
 
-        # Deteksi Kolom Otomatis
         cols = pd.read_sql("SELECT * FROM stock_raw LIMIT 1", conn).columns
         col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
-        col_sku = next((c for c in cols if 'SKU' in c.upper() or 'KODE' in c.upper()), cols[2])
+        col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
 
-        # Hitung Angka Metriks
         total_sku = pd.read_sql(f'SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw', conn).iloc[0,0]
         
-        # Case 1: DC vs Retail
-        q1 = f"""
-        SELECT 
-            (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%' OR UPPER("{col_bin}") LIKE '%GUDANG LT.2%')) as Ada,
-            (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%' OR UPPER("{col_bin}") LIKE '%GUDANG LT.2%')) as Tidak
-        """
-        res1 = pd.read_sql(q1, conn).iloc[0]
-        
-        # Case 2: GL4 vs GL3
-        q2 = f"""
-        SELECT 
-            (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as Ada,
-            (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as Tidak
-        """
-        res2 = pd.read_sql(q2, conn).iloc[0]
+        # Logika Case DC & GL
+        query_res = pd.read_sql(f"""
+            SELECT 
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%')) as DC_Retail,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%') as Total_DC,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as GL4_GL3,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%') as Total_GL4
+        """, conn).iloc[0]
 
-        # --- 4. TAMPILAN HEADER BIRU & METRIKS (SESUAI GAMBAR) ---
-        st.markdown("""
-            <div class="metric-label-header">
-                <h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK</h4>
-            </div>
-        """, unsafe_allow_html=True)
+        perc_retail = (query_res['DC_Retail'] / query_res['Total_DC'] * 100) if query_res['Total_DC'] > 0 else 0
+        perc_gl = (query_res['GL4_GL3'] / query_res['Total_GL4'] * 100) if query_res['Total_GL4'] > 0 else 0
+
+        # --- HEADER & METRIKS ---
+        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK</h4></div>', unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-title">📦 Total SKU</p><p class="metric-value">{total_sku:,}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #7B61FF;">
+                <p class="metric-label">📦 Total SKU</p>
+                <p class="metric-value">{total_sku:,}</p>
+                <p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p>
+            </div>''', unsafe_allow_html=True)
         with c2:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-title">🏪 DC to Retail</p><p class="metric-value">{res1["Ada"]:,}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #00C853;">
+                <p class="metric-label">🏪 DC to Retail</p>
+                <p class="metric-value">{query_res['DC_Retail']:,}</p>
+                <p class="metric-arrow" style="color: #00FF00;">↑ {perc_retail:.1f}% Tersedia</p>
+            </div>''', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-title">🏗️ GL4 to GL3</p><p class="metric-value">{res2["Ada"]:,}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FFAB00;">
+                <p class="metric-label">🏗️ GL4 to GL3</p>
+                <p class="metric-value">{query_res['GL4_GL3']:,}</p>
+                <p class="metric-arrow" style="color: #FF5252;">↓ {perc_gl:.1f}% Tersedia</p>
+            </div>''', unsafe_allow_html=True)
 
         st.divider()
-
-        # --- 5. GRAFIK VISUALISASI ---
-        g1, g2 = st.columns(2)
-        
-        with g1:
-            st.subheader("Percentage DC to Retail")
-            donut_data = pd.DataFrame({
-                "Status": ["Ada di Retail", "Hanya di DC"],
-                "Jumlah": [res1['Ada'], res1['Tidak']]
-            })
-            fig1 = px.pie(donut_data, values='Jumlah', names='Status', hole=0.6, 
-                         color_discrete_sequence=['#2E7D32', '#C62828'])
-            fig1.update_layout(showlegend=True, height=350, margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig1, use_container_width=True)
-
-        with g2:
-            st.subheader("Distribution Case 2 (GL)")
-            bar_data = pd.DataFrame({
-                "Kategori": ["Ada di GL3", "Tidak Ada di GL3"],
-                "Total": [res2['Ada'], res2['Tidak']]
-            })
-            fig2 = px.bar(bar_data, x='Kategori', y='Total', color='Kategori',
-                         color_discrete_sequence=['#F9A825', '#EF6C00'])
-            fig2.update_layout(showlegend=False, height=350)
-            st.plotly_chart(fig2, use_container_width=True)
+        # --- (Grafik dilanjutkan di sini) ---
 
     except Exception as e:
-        st.error(f"Error Database: {e}")
+        st.error(f"Error: {e}")
     finally:
         conn.close()
 
