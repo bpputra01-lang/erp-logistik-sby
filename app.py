@@ -3382,7 +3382,7 @@ import io
 
 st.set_page_config(page_title="Stock Analysis SBY", layout="wide")
 
-st.title("📦 All Stock Analysis System")
+st.title("All Stock Analysis System")
 st.write("Upload data stock untuk pengecekan distribusi SKU antar BIN.")
 
 # 1. File Uploader
