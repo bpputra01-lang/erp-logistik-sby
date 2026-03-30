@@ -3383,31 +3383,38 @@ def tampilan_balancing_stock():
     st.title("⚖️ Stock Distribution & Balancing System")
     st.write("Analisis pemerataan stok antar Warehouse, Store, dan Rak.")
 
-    # Gunakan data yang sudah di-upload sebelumnya jika ada di session_state
-    # atau sediakan uploader lokal di sini
     uploaded_file = st.file_uploader("Upload All Stock (Excel/CSV)", type=['xlsx', 'csv'], key="balancer_upload")
 
     if uploaded_file:
-        # Membaca data
+        # 1. Load Data
         df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-        df.columns = [c.strip() for c in df.columns]
+        
+        # Bersihkan nama kolom dan data string agar tidak ada spasi hantu
+        df.columns = [str(c).strip() for c in df.columns]
+        
+        # Menampilkan preview kolom untuk memastikan (Bisa dihapus jika sudah lancar)
+        with st.expander("Klik untuk cek struktur kolom file"):
+            st.write("Kolom yang terbaca:", list(df.columns))
+            st.dataframe(df.head(3))
 
-        # In-Memory SQLite untuk performa 'Ultra Fast'
+        # 2. Identifikasi Kolom secara Otomatis (Cari nama yang mengandung 'BIN', 'SKU', 'QTY')
+        # Jika tidak ketemu, baru pakai index (B=1, C=2, D=3)
+        col_bin = next((c for c in df.columns if 'BIN' in c.upper()), df.columns[1])
+        col_sku = next((c for c in df.columns if 'SKU' in c.upper() or 'KODE' in c.upper()), df.columns[2])
+        col_qty = next((c for c in df.columns if 'QTY' in c.upper() or 'STOK' in c.upper() or 'JUMLAH' in c.upper()), df.columns[3])
+
+        # 3. Masukkan ke SQLite
         conn = sqlite3.connect(':memory:')
         df.to_sql('stock_data', conn, index=False, if_exists='replace')
 
-        # Ambil nama kolom secara dinamis (B=Bin, C=SKU, D=Qty)
-        # Sesuai struktur data operasional SBY
-        col_bin = df.columns[1] 
-        col_sku = df.columns[2] 
-        col_qty = df.columns[3] 
-
-        # --- LOGIKA QUERY ---
+        # --- LOGIKA QUERY (DIPERBAIKI: Menggunakan UPPER agar Case-Insensitive) ---
         query_dc = f"""
         SELECT 
             "{col_sku}" as SKU,
-            SUM(CASE WHEN "{col_bin}" LIKE '%DC%' THEN "{col_qty}" ELSE 0 END) as Qty_DC,
-            SUM(CASE WHEN "{col_bin}" LIKE '%Gudang lt.2%' OR "{col_bin}" LIKE '%Store%' OR "{col_bin}" LIKE '%Toko%' THEN "{col_qty}" ELSE 0 END) as Qty_Retail
+            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%DC%' THEN "{col_qty}" ELSE 0 END) as Qty_DC,
+            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%GUDANG LT.2%' 
+                       OR UPPER("{col_bin}") LIKE '%STORE%' 
+                       OR UPPER("{col_bin}") LIKE '%TOKO%' THEN "{col_qty}" ELSE 0 END) as Qty_Retail
         FROM stock_data
         GROUP BY "{col_sku}"
         HAVING Qty_DC > 0 AND Qty_Retail = 0
@@ -3416,8 +3423,8 @@ def tampilan_balancing_stock():
         query_gl = f"""
         SELECT 
             "{col_sku}" as SKU,
-            SUM(CASE WHEN "{col_bin}" LIKE '%GL4%' AND "{col_bin}" NOT LIKE '%RAK%' THEN "{col_qty}" ELSE 0 END) as Qty_GL4_NonRak,
-            SUM(CASE WHEN "{col_bin}" LIKE '%GL3%' THEN "{col_qty}" ELSE 0 END) as Qty_GL3
+            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%GL4%' AND UPPER("{col_bin}") NOT LIKE '%RAK%' THEN "{col_qty}" ELSE 0 END) as Qty_GL4_NonRak,
+            SUM(CASE WHEN UPPER("{col_bin}") LIKE '%GL3%' THEN "{col_qty}" ELSE 0 END) as Qty_GL3
         FROM stock_data
         GROUP BY "{col_sku}"
         HAVING Qty_GL4_NonRak > 0 AND Qty_GL3 = 0
@@ -3430,32 +3437,35 @@ def tampilan_balancing_stock():
         t1, t2 = st.tabs(["📌 DC ➡️ Retail", "📌 GL4 ➡️ GL3"])
 
         with t1:
-            st.error(f"⚠️ {len(res_dc)} SKU mengendap di DC (Retail Kosong)")
-            st.dataframe(res_dc, use_container_width=True)
             if not res_dc.empty:
+                st.error(f"⚠️ {len(res_dc)} SKU mengendap di DC (Retail Kosong)")
+                st.dataframe(res_dc, use_container_width=True)
                 st.download_button("Download CSV (DC)", res_dc.to_csv(index=False), "pindah_dc.csv")
+            else:
+                st.success("✅ Stok DC & Retail sudah merata (Tidak ada SKU yang 'macet' di DC).")
 
         with t2:
-            st.warning(f"⚠️ {len(res_gl)} SKU di GL4 Lantai (GL3 Kosong)")
-            st.dataframe(res_gl, use_container_width=True)
             if not res_gl.empty:
+                st.warning(f"⚠️ {len(res_gl)} SKU di GL4 Lantai (GL3 Kosong)")
+                st.dataframe(res_gl, use_container_width=True)
                 st.download_button("Download CSV (GL4)", res_gl.to_csv(index=False), "pindah_gl4.csv")
+            else:
+                st.success("✅ Stok GL4 & GL3 sudah merata.")
 
         # --- VISUALISASI ---
-        st.divider()
-        st.subheader("Visualisasi Ketimpangan")
-        top_dc = res_dc.sort_values('Qty_DC', ascending=False).head(10)
-        if not top_dc.empty:
-            st.bar_chart(data=top_dc, x='SKU', y='Qty_DC')
-            st.caption("Top 10 SKU terbanyak yang 'macet' di DC.")
+        if not res_dc.empty or not res_gl.empty:
+            st.divider()
+            st.subheader("Visualisasi Ketimpangan")
+            
+            # Bar chart sederhana
+            top_dc = res_dc.sort_values('Qty_DC', ascending=False).head(10)
+            if not top_dc.empty:
+                st.bar_chart(data=top_dc, x='SKU', y='Qty_DC')
+                st.caption("Top 10 SKU terbanyak yang perlu ditarik dari DC ke Retail.")
 
         conn.close()
     else:
         st.info("Silakan upload data 'All Stock' untuk memulai analisis pemerataan.")
-
-
-
-
                            
 with st.sidebar:
        st.markdown("""
