@@ -3428,7 +3428,7 @@ def tampilan_balancing_stock():
         </style>
     """, unsafe_allow_html=True)
 
-    st.title("⚖️ Stock Merchandising Analysis")
+    st.title("PRECENTAGE DISTRIBUTION STOCK CONTROL")
     
     conn = init_db()
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
@@ -3508,28 +3508,28 @@ def tampilan_balancing_stock():
         perc_gl_missing = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
 
         # --- 3. TAMPILAN METRIKS ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK (QTY > 0)</h4></div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK</h4></div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 Total SKU Aktif</p><p class="metric-value">{total_sku_display:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p></div>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Retail</p><p class="metric-value">{dc_tersedia:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_dc_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Store</p><p class="metric-value">{dc_tersedia:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_dc_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
         with c3:
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl4_tersedia:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_gl_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
 
         cc1, cc2 = st.columns(2)
         with cc1:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ DC Missing in Retail</p><p class="metric-value">{dc_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_dc_missing:.1f}% Belum Terdistribusi</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ Not Yet Distributed DC to Store</p><p class="metric-value">{dc_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_dc_missing:.1f}% Belum Terdistribusi</p></div>', unsafe_allow_html=True)
         with cc2:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ GL4 Missing in GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_gl_missing:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ Not Yet Refill GL4 to GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_gl_missing:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
 
         st.divider()
         
         # (Bagian Grafik skip biar hemat tempat, tetap sama)
 
         # --- TABEL DETAIL (UNIQUE SKU & DESKRIPSI DARI KOLOM E) ---
-        st.markdown("### 📋 Detail List SKU Belum Ada di Lokasi Tujuan")
-        t1, t2 = st.tabs(["List DC ➔ Retail", "List GL4 ➔ GL3"])
+        st.markdown("### 📋 Detail List SKU Need Distributed")
+        t1, t2 = st.tabs(["DC ➔ Store", "GL4 ➔ GL3"])
         
         # Ambil nama kolom E secara dinamis (indeks ke-4)
         col_desc_e = cols[4] 
