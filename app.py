@@ -3727,7 +3727,7 @@ with st.sidebar:
     # --- KELOMPOK 4: EXTRAS ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
     
-    m4_list = ["Logistic Schedule"]
+    m4_list = ["Logistic Schedule", "Balancing Stock"]
     idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else 0
     st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=change_m4, label_visibility="collapsed")
 
