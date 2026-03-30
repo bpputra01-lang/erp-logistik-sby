@@ -3381,6 +3381,7 @@ import sqlite3
 import plotly.express as px
 
 def init_db():
+    # Database fisik biar data aman di Surabaya branch
     conn = sqlite3.connect('database_sby.db', check_same_thread=False)
     return conn
 
@@ -3407,13 +3408,13 @@ def tampilan_balancing_stock():
             margin-bottom: 10px;
         }
         .metric-value {
-            font-size: 26px;
+            font-size: 28px;
             font-weight: bold;
             margin: 0;
             color: #FFFFFF;
         }
         .metric-label {
-            font-size: 11px;
+            font-size: 12px;
             color: #A0A0A0;
             text-transform: uppercase;
             margin-bottom: 8px;
@@ -3450,78 +3451,134 @@ def tampilan_balancing_stock():
 
         cols = pd.read_sql("SELECT * FROM stock_raw LIMIT 1", conn).columns
         col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
-        col_sku = next((c for c in cols if 'SKU' in c.upper() or 'KODE' in c.upper()), cols[2])
+        col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
         col_desc = next((c for c in cols if 'DESC' in c.upper() or 'NAMA' in c.upper()), col_sku)
 
-        # Variabel Filter
-        filter_retail = f"UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\""+col_bin+"\") LIKE '%GUDANG LT.2%'"
-        filter_no_rak = f"UPPER(\"{col_bin}\") NOT LIKE '%RAK%'"
+        total_sku = pd.read_sql(f'SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw', conn).iloc[0,0]
+        
+        # --- TAMBAHAN LOGIKA FILTER KHUSUS (EXCL. RAK, ONLINE, DLL) ---
+        filter_excl = f"""
+            UPPER("{col_bin}") NOT LIKE '%RAK%' AND 
+            UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND 
+            UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND 
+            UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
+            UPPER("{col_bin}") NOT LIKE '%LIVE%'
+        """
+        filter_retail = f"(UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
 
-        # Query Utama
+        # Query Analisis Stok (DC & GL)
         q_data = pd.read_sql(f"""
-            SELECT 
-                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw) as Total_SKU,
-                -- Case 1: DC tapi TIDAK ADA di Retail
-                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {filter_no_rak}) as Total_DC_Clean,
-                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {filter_no_rak} AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail})) as DC_No_Retail,
-                -- Case 2: GL4 tapi TIDAK ADA di GL3
-                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {filter_no_rak}) as Total_GL4_Clean,
-                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {filter_no_rak} AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as GL4_No_GL3
+            SELECT  
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%TOKO%')) as DC_Retail,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%') as Total_DC,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND "{col_sku}" IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as GL4_GL3,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%') as Total_GL4,
+                
+                -- METRICS TAMBAHAN SESUAI REQUEST
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {filter_excl}) as DC_Clean_Total,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {filter_excl} AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail})) as DC_Not_In_Retail,
+                
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {filter_excl}) as GL4_Clean_Total,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {filter_excl} AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')) as GL4_Not_In_GL3
         """, conn).iloc[0]
 
-        # Hitung Persentase "Nyangkut"
-        perc_dc_missing = (q_data['DC_No_Retail'] / q_data['Total_DC_Clean'] * 100) if q_data['Total_DC_Clean'] > 0 else 0
-        perc_gl4_missing = (q_data['GL4_No_GL3'] / q_data['Total_GL4_Clean'] * 100) if q_data['Total_GL4_Clean'] > 0 else 0
+        # Hitung Selisih untuk Grafik
+        tidak_retail = q_data['Total_DC'] - q_data['DC_Retail']
+        tidak_gl3 = q_data['Total_GL4'] - q_data['GL4_GL3']
+        
+        perc_retail = (q_data['DC_Retail'] / q_data['Total_DC'] * 100) if q_data['Total_DC'] > 0 else 0
+        perc_gl = (q_data['GL4_GL3'] / q_data['Total_GL4'] * 100) if q_data['Total_GL4'] > 0 else 0
+
+        # Hitung Persen Tambahan
+        perc_dc_missing = (q_data['DC_Not_In_Retail'] / q_data['DC_Clean_Total'] * 100) if q_data['DC_Clean_Total'] > 0 else 0
+        perc_gl4_missing = (q_data['GL4_Not_In_GL3'] / q_data['GL4_Clean_Total'] * 100) if q_data['GL4_Clean_Total'] > 0 else 0
 
         # --- 3. TAMPILAN HEADER & METRIKS ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 BALANCING ANALYSIS (EXCL. RAK)</h4></div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK</h4></div>', unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #7B61FF;">
                 <p class="metric-label">📦 Total SKU</p>
-                <p class="metric-value">{q_data['Total_SKU']:,}</p>
-                <p class="metric-arrow" style="color: #00FF00;">↑ SYSTEM</p>
+                <p class="metric-value">{total_sku:,}</p>
+                <p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p>
             </div>''', unsafe_allow_html=True)
         with c2:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FF5252;">
-                <p class="metric-label">⚠️ DC Not in Retail</p>
-                <p class="metric-value">{q_data['DC_No_Retail']:,} SKU</p>
-                <p class="metric-arrow" style="color: #FF5252;">↓ {perc_dc_missing:.1f}% Nyangkut</p>
+            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #00C853;">
+                <p class="metric-label">🏪 DC to Retail</p>
+                <p class="metric-value">{q_data['DC_Retail']:,}</p>
+                <p class="metric-arrow" style="color: #00FF00;">↑ {perc_retail:.1f}% Tersedia</p>
             </div>''', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FFA000;">
-                <p class="metric-label">⚠️ GL4 Not in GL3</p>
-                <p class="metric-value">{q_data['GL4_No_GL3']:,} SKU</p>
-                <p class="metric-arrow" style="color: #FFA000;">↓ {perc_gl4_missing:.1f}% Nyangkut</p>
+            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FFAB00;">
+                <p class="metric-label">🏗️ GL4 to GL3</p>
+                <p class="metric-value">{q_data['GL4_GL3']:,}</p>
+                <p class="metric-arrow" style="color: #FF5252;">↓ {perc_gl:.1f}% Tersedia</p>
+            </div>''', unsafe_allow_html=True)
+
+        # --- BARIS METRIC BARU (REQUEST) ---
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #E91E63;">
+                <p class="metric-label">⚠️ DC Missing in Retail (Excl. Filter)</p>
+                <p class="metric-value">{q_data['DC_Not_In_Retail']:,} SKU</p>
+                <p class="metric-arrow" style="color: #FF5252;">{perc_dc_missing:.1f}% Belum Terdistribusi</p>
+            </div>''', unsafe_allow_html=True)
+        with cc2:
+            st.markdown(f'''<div class="metric-card" style="border-left: 5px solid #FF9800;">
+                <p class="metric-label">⚠️ GL4 Missing in GL3 (Excl. Filter)</p>
+                <p class="metric-value">{q_data['GL4_Not_In_GL3']:,} SKU</p>
+                <p class="metric-arrow" style="color: #FF5252;">{perc_gl4_missing:.1f}% Belum Turun ke GL3</p>
             </div>''', unsafe_allow_html=True)
 
         st.divider()
 
-        # --- 4. LIST SKU DETAIL ---
-        st.subheader("📋 Detail List SKU Belum Terdistribusi")
+        # --- 4. GRAFIK (DONUT & BAR) ---
+        g1, g2 = st.columns(2)
         
-        tab1, tab2 = st.tabs(["DC Missing in Retail", "GL4 Missing in GL3"])
+        with g1:
+            st.subheader("Percentage DC to Retail")
+            df_pie = pd.DataFrame({
+                "Status": ["Ada di Retail", "Hanya di DC"],
+                "Jumlah": [q_data['DC_Retail'], tidak_retail]
+            })
+            fig1 = px.pie(df_pie, values='Jumlah', names='Status', hole=0.6, 
+                         color_discrete_sequence=['#2E7D32', '#C62828'])
+            fig1.update_layout(height=350, margin=dict(t=0, b=0, l=0, r=0))
+            st.plotly_chart(fig1, use_container_width=True)
+
+        with g2:
+            st.subheader("Distribution Case 2 (GL)")
+            df_bar = pd.DataFrame({
+                "Kategori": ["Ada di GL3", "Tidak Ada di GL3"],
+                "Total": [q_data['GL4_GL3'], tidak_gl3]
+            })
+            fig2 = px.bar(df_bar, x='Kategori', y='Total', color='Kategori',
+                         color_discrete_sequence=['#F9A825', '#EF6C00'])
+            fig2.update_layout(showlegend=False, height=350)
+            st.plotly_chart(fig2, use_container_width=True)
+
+        # --- 5. LIST TABEL (REQUEST) ---
+        st.markdown("### 📋 Detail List SKU Belum Ada di Lokasi Tujuan")
+        t1, t2 = st.tabs(["List DC ➔ Retail", "List GL4 ➔ GL3"])
         
-        with tab1:
-            df_dc = pd.read_sql(f"""
+        with t1:
+            df_list_dc = pd.read_sql(f"""
                 SELECT "{col_sku}" as SKU, "{col_desc}" as Deskripsi, "{col_bin}" as BIN
                 FROM stock_raw 
-                WHERE UPPER("{col_bin}") LIKE '%DC%' AND {filter_no_rak}
+                WHERE UPPER("{col_bin}") LIKE '%DC%' AND {filter_excl}
                 AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail})
             """, conn)
-            st.dataframe(df_dc, use_container_width=True)
-            st.caption(f"Menampilkan {len(df_dc)} SKU yang ada di DC tapi tidak ada di Store/Toko/Gudang Lt.2 (Excl. RAK)")
+            st.dataframe(df_list_dc, use_container_width=True)
 
-        with tab2:
-            df_gl = pd.read_sql(f"""
+        with t2:
+            df_list_gl = pd.read_sql(f"""
                 SELECT "{col_sku}" as SKU, "{col_desc}" as Deskripsi, "{col_bin}" as BIN
                 FROM stock_raw 
-                WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {filter_no_rak}
+                WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {filter_excl}
                 AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')
             """, conn)
-            st.dataframe(df_gl, use_container_width=True)
-            st.caption(f"Menampilkan {len(df_gl)} SKU yang ada di GL4 tapi tidak ada di GL3 (Excl. RAK)")
+            st.dataframe(df_list_gl, use_container_width=True)
 
     except Exception as e:
         st.error(f"Error Database: {e}")
