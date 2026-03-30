@@ -3567,38 +3567,45 @@ def tampilan_balancing_stock():
             fig2.update_layout(showlegend=False, height=350)
             st.plotly_chart(fig2, use_container_width=True)
 
-        # --- 5. LIST TABEL (SINKRON DENGAN METRIKS) ---
+        # --- 5. LIST TABEL (FILTER QTY > 0) ---
         st.markdown("### 📋 Detail List SKU Belum Ada di Lokasi Tujuan")
         t1, t2 = st.tabs(["List DC ➔ Retail", "List GL4 ➔ GL3"])
         
         with t1:
-            # Gunakan GROUP BY agar SKU tidak duplikat baris
+            # --- BALIK KE LOGIKA ASLI LU (TETAP BARIS PER BIN) ---
             query_list_dc = f"""
-                SELECT "{col_sku}" as SKU, MAX("{col_desc}") as Deskripsi, GROUP_CONCAT(DISTINCT "{col_bin}") as BIN
-                FROM stock_raw 
-                WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
-                AND "{col_sku}" NOT IN (
-                    SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
+                SELECT DISTINCT a."{col_sku}" as SKU, a."{col_desc}" as Deskripsi, a."{col_bin}" as BIN
+                FROM stock_raw a
+                WHERE UPPER(a."{col_bin}") LIKE '%DC%' AND {base_excl}
+                AND a."{col_sku}" IN (
+                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
+                    EXCEPT
+                    SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail}
                 )
-                GROUP BY "{col_sku}"
-                HAVING SUM("{col_qty}") > 0
+                AND (SELECT SUM("{col_qty}") FROM stock_raw b WHERE b."{col_sku}" = a."{col_sku}") > 0
             """
             df_list_dc = pd.read_sql(query_list_dc, conn)
             if not df_list_dc.empty:
                 st.dataframe(df_list_dc, use_container_width=True)
                 csv = df_list_dc.to_csv(index=False).encode('utf-8')
-                st.download_button(f"📥 Download List DC Missing ({len(df_list_dc)} SKU)", csv, "dc_missing.csv", "text/csv")
+                st.download_button(f"📥 Download List DC Missing ({len(df_list_dc)} Baris)", csv, "dc_missing.csv", "text/csv")
             else:
                 st.info("✅ Semua SKU DC dengan stok aktif sudah terdistribusi.")
 
         with t2:
-            # SINKRON: GROUP BY SKU agar jumlah baris = jumlah di kartu metrik
+            # --- INI YANG GUE PERBAIKI (GL4 ➔ GL3 SINKRON 1 SKU 1 BARIS) ---
             query_list_gl = f"""
-                SELECT "{col_sku}" as SKU, MAX("{col_desc}") as Deskripsi, GROUP_CONCAT(DISTINCT "{col_bin}") as BIN
+                SELECT 
+                    "{col_sku}" as SKU, 
+                    MAX("{col_desc}") as Deskripsi, 
+                    GROUP_CONCAT(DISTINCT "{col_bin}") as BIN_Lokasi,
+                    SUM("{col_qty}") as Total_Qty
                 FROM stock_raw 
                 WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
-                AND "{col_sku}" NOT IN (
-                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%' GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
+                AND "{col_sku}" IN (
+                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
+                    EXCEPT
+                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%'
                 )
                 GROUP BY "{col_sku}"
                 HAVING SUM("{col_qty}") > 0
@@ -3609,7 +3616,7 @@ def tampilan_balancing_stock():
                 csv_gl = df_list_gl.to_csv(index=False).encode('utf-8')
                 st.download_button(f"📥 Download List GL Missing ({len(df_list_gl)} SKU)", csv_gl, "gl_missing.csv", "text/csv")
             else:
-                st.info("✅ Semua SKU GL4 dengan stok aktif sudah ada di GL3.")
+                st.info("✅ Tidak ada selisih SKU antara GL4 dan GL3.")
 
     except Exception as e:
         st.error(f"Error Database: {e}")
