@@ -3459,7 +3459,13 @@ def tampilan_balancing_stock():
             UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND 
             UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
             UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND 
-            UPPER("{col_bin}") NOT LIKE '%LIVE%'
+            UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
+            UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND
+            UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
+            UPPER("{col_bin}") NOT LIKE '%STAGING%' AND
+            UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
+            UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND
+            UPPER("{col_bin}") NOT LIKE '%OUT%'
         """
         
         # --- GL FILTER (Base + RAK) ---
