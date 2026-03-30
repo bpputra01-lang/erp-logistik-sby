@@ -3375,7 +3375,7 @@ def main():
             
             st.download_button("📥 DOWNLOAD EXCEL", data=output.getvalue(), 
                                file_name="Hasil_Compare_RTO.xlsx", use_container_width=True)
-import streamlit as st
+iimport streamlit as st
 import pandas as pd
 import sqlite3
 import plotly.express as px
@@ -3387,32 +3387,32 @@ def init_db():
 
 def tampilan_balancing_stock():
     # --- 1. CSS CUSTOM (HERO HEADER STYLE) ---
-        st.markdown("""
-            <style>
-            .hero-header {
-                background-color: #007BFF; /* Biru Hero */
-                padding: 15px 25px;
-                border-radius: 10px;
-                margin-bottom: 25px;
-                box-shadow: 0px 4px 12px rgba(0, 123, 255, 0.3);
-                text-align: left;
-            }
-            .hero-text {
-                color: white !important;
-                margin: 0 !important;
-                font-size: 24px !important;
-                font-weight: 800 !important;
-                letter-spacing: 1.5px;
-                text-transform: uppercase;
-            }
-            </style>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+        .hero-header {
+            background-color: #007BFF; /* Biru Hero */
+            padding: 15px 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0px 4px 12px rgba(0, 123, 255, 0.3);
+            text-align: left;
+        }
+        .hero-text {
+            color: white !important;
+            margin: 0 !important;
+            font-size: 24px !important;
+            font-weight: 800 !important;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-        # --- 2. IMPLEMENTASI HERO HEADER ---
-        st.markdown('<div class="hero-header"><p class="hero-text">PERCENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
+    # --- 2. IMPLEMENTASI HERO HEADER ---
+    st.markdown('<div class="hero-header"><p class="hero-text">PERCENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
     
-        conn = init_db()
-        uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
+    conn = init_db()
+    uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
 
     if uploaded_file:
         try:
@@ -3505,8 +3505,6 @@ def tampilan_balancing_stock():
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ Not Yet Refill GL4 to GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_gl_missing:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
 
         st.divider()
-        
-        # (Bagian Grafik skip biar hemat tempat, tetap sama)
 
         # --- TABEL DETAIL (UNIQUE SKU & DESKRIPSI DARI KOLOM E) ---
         st.markdown("### 📋 Detail List SKU Need Distributed")
@@ -3516,7 +3514,6 @@ def tampilan_balancing_stock():
         col_desc_e = cols[4] 
 
         with t1:
-            # Query DC: Hanya SKU dan Deskripsi, di-Group agar Unique
             query_list_dc = f"""
                 SELECT 
                     "{col_sku}" as SKU, 
@@ -3534,7 +3531,6 @@ def tampilan_balancing_stock():
                 st.info("✅ DC sudah sinkron.")
 
         with t2:
-            # Query GL: Hanya SKU dan Deskripsi, di-Group agar Unique
             query_list_gl = f"""
                 SELECT 
                     "{col_sku}" as SKU, 
