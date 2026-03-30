@@ -3380,6 +3380,20 @@ import pandas as pd
 import sqlite3
 import plotly.express as px
 
+# ==========================================
+    # --- HEADER DASHBOARD GAYA JEZ ---
+    # ==========================================
+    st.markdown("""
+        <div style="background-color: #f0f2f6; padding: 15px; border-left: 5px solid #28A745; border-radius: 8px; margin-bottom: 25px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
+            <h3 style="color: #155724; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 1px;">
+                📊 PERCENTAGE & BALANCING STOCK ANALYSIS
+            </h3>
+            <p style="margin: 5px 0 0 0; color: #666; font-size: 13px; font-weight: 500;">
+                Warehouse Distribution Monitoring System - Surabaya Branch
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
 def init_db():
     # Menggunakan file database fisik agar data awet walau logout
     conn = sqlite3.connect('database_sby.db', check_same_thread=False)
