@@ -3414,7 +3414,7 @@ def tampilan_balancing_stock():
         conn = init_db()
         uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
 
-    if uploaded_file:
+        if uploaded_file:
         try:
             df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df.columns = [str(c).strip() for c in df.columns]
