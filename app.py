@@ -3527,28 +3527,37 @@ def tampilan_balancing_stock():
         
         # (Bagian Grafik skip biar hemat tempat, tetap sama)
 
-        # --- 4. TABEL DETAIL (SINKRONISASI TOTAL) ---
+        # --- TABEL DETAIL (UNIQUE SKU & DESKRIPSI DARI KOLOM E) ---
         st.markdown("### 📋 Detail List SKU Belum Ada di Lokasi Tujuan")
         t1, t2 = st.tabs(["List DC ➔ Retail", "List GL4 ➔ GL3"])
         
+        # Ambil nama kolom E secara dinamis (indeks ke-4)
+        col_desc_e = cols[4] 
+
         with t1:
+            # Query DC: Hanya SKU dan Deskripsi, di-Group agar Unique
             query_list_dc = f"""
-                SELECT DISTINCT a."{col_sku}" as SKU, a."{col_desc}" as Deskripsi, a."{col_bin}" as BIN
-                FROM stock_raw a
-                WHERE a."{col_sku}" IN ({q_logic_dc_missing})
-                AND UPPER(a."{col_bin}") LIKE '%DC%' AND {base_excl}
+                SELECT 
+                    "{col_sku}" as SKU, 
+                    MAX("{col_desc_e}") as Deskripsi
+                FROM stock_raw 
+                WHERE "{col_sku}" IN ({q_logic_dc_missing})
+                AND UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
+                GROUP BY "{col_sku}"
             """
             df_list_dc = pd.read_sql(query_list_dc, conn)
             if not df_list_dc.empty:
                 st.dataframe(df_list_dc, use_container_width=True)
-                st.download_button(f"📥 Download List DC ({len(df_list_dc[col_sku].unique())} SKU)", df_list_dc.to_csv(index=False), "dc_missing.csv")
+                st.download_button(f"📥 Download List DC ({len(df_list_dc)} SKU)", df_list_dc.to_csv(index=False), "dc_missing.csv")
             else:
-                st.info("✅ Aman Bos, DC sudah sinkron.")
+                st.info("✅ DC sudah sinkron.")
 
         with t2:
+            # Query GL: Hanya SKU dan Deskripsi, di-Group agar Unique
             query_list_gl = f"""
-                SELECT "{col_sku}" as SKU, MAX("{col_desc}") as Deskripsi, 
-                       GROUP_CONCAT(DISTINCT "{col_bin}") as BIN_Lokasi, SUM("{col_qty}") as Total_Qty
+                SELECT 
+                    "{col_sku}" as SKU, 
+                    MAX("{col_desc_e}") as Deskripsi
                 FROM stock_raw 
                 WHERE "{col_sku}" IN ({q_logic_gl_missing})
                 AND UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
@@ -3559,7 +3568,7 @@ def tampilan_balancing_stock():
                 st.dataframe(df_list_gl, use_container_width=True)
                 st.download_button(f"📥 Download List GL ({len(df_list_gl)} SKU)", df_list_gl.to_csv(index=False), "gl_missing.csv")
             else:
-                st.info("✅ Aman Bos, GL4 to GL3 sinkron.")
+                st.info("✅ GL4 to GL3 sinkron.")
 
     except Exception as e:
         st.error(f"Error Database: {e}")
