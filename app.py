@@ -3415,7 +3415,7 @@ def tampilan_balancing_stock():
         uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
 
         if uploaded_file:
-        try:
+            try:
             df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df.columns = [str(c).strip() for c in df.columns]
             df.to_sql('stock_raw', conn, index=False, if_exists='replace')
