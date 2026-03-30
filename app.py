@@ -3565,26 +3565,45 @@ def tampilan_balancing_stock():
             fig2.update_layout(showlegend=False, height=350)
             st.plotly_chart(fig2, use_container_width=True)
 
-        # --- 5. LIST TABEL ---
+        # --- 5. LIST TABEL (FIXED BY EXCEPT LOGIC) ---
         st.markdown("### 📋 Detail List SKU Belum Ada di Lokasi Tujuan")
         t1, t2 = st.tabs(["List DC ➔ Retail", "List GL4 ➔ GL3"])
         
         with t1:
-            df_list_dc = pd.read_sql(f"""
-                SELECT "{col_sku}" as SKU, "{col_desc}" as Deskripsi, "{col_bin}" as BIN
+            # Gunakan EXCEPT untuk memastikan 375 SKU yang hilang itu muncul di list
+            query_list_dc = f"""
+                SELECT DISTINCT "{col_sku}" as SKU, "{col_desc}" as Deskripsi, "{col_bin}" as BIN
                 FROM stock_raw 
                 WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
-                AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail})
-            """, conn)
-            st.dataframe(df_list_dc, use_container_width=True)
+                AND "{col_sku}" IN (
+                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
+                    EXCEPT
+                    SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail}
+                )
+            """
+            df_list_dc = pd.read_sql(query_list_dc, conn)
+            
+            if not df_list_dc.empty:
+                st.dataframe(df_list_dc, use_container_width=True)
+                # Kasih tombol download biar tim admin Surabaya bisa langsung eksekusi
+                csv = df_list_dc.to_csv(index=False).encode('utf-8')
+                st.download_button(f"📥 Download List DC Missing ({len(df_list_dc)} SKU)", csv, "dc_missing.csv", "text/csv")
+            else:
+                st.warning("⚠️ List masih kosong. Cek apakah kolom SKU di data 'DC' dan 'Retail' sudah konsisten formatnya.")
 
         with t2:
-            df_list_gl = pd.read_sql(f"""
-                SELECT "{col_sku}" as SKU, "{col_desc}" as Deskripsi, "{col_bin}" as BIN
+            # Sama untuk GL, pakai EXCEPT supaya hasil list sinkron dengan angka metrics
+            query_list_gl = f"""
+                SELECT DISTINCT "{col_sku}" as SKU, "{col_desc}" as Deskripsi, "{col_bin}" as BIN
                 FROM stock_raw 
                 WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
-                AND "{col_sku}" NOT IN (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%')
-            """, conn)
+                AND "{col_sku}" IN (
+                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
+                    EXCEPT
+                    SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%'
+                )
+            """
+            df_list_gl = pd.read_sql(query_list_gl, conn)
             st.dataframe(df_list_gl, use_container_width=True)
 
     except Exception as e:
