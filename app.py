@@ -3380,13 +3380,6 @@ import pandas as pd
 import sqlite3
 import io
 
-# Konfigurasi Halaman
-st.set_page_config(page_title="ERP Logistik SBY", layout="wide")
-
-# --- SIDEBAR NAVIGATION ---
-st.sidebar.title("Main Menu")
-menu = st.sidebar.radio("Pilih Menu:", ["Upload Data", "Balancing Stock", "Dashboard"])
-
 # Session State untuk menyimpan data agar tidak hilang saat pindah menu
 if 'main_df' not in st.session_state:
     st.session_state.main_df = None
