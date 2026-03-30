@@ -3386,49 +3386,30 @@ def init_db():
     return conn
 
 def tampilan_balancing_stock():
-    # --- 1. CSS CUSTOM (STYLE DASHBOARD PREMIUM) ---
-    st.markdown("""
-        <style>
-        .metric-label-header {
-            background-color: #f8f9fa;
-            padding: 10px 15px;
-            border-left: 5px solid #007BFF;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            margin-top: 20px;
-        }
-        .metric-card {
-            background-color: #1E1E2E;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
-            text-align: center;
-            color: white;
-            min-height: 140px;
-            margin-bottom: 10px;
-        }
-        .metric-value {
-            font-size: 28px;
-            font-weight: bold;
-            margin: 0;
-            color: #FFFFFF;
-        }
-        .metric-label {
-            font-size: 12px;
-            color: #A0A0A0;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            letter-spacing: 1px;
-        }
-        .metric-arrow {
-            font-size: 12px;
-            margin-top: 8px;
-            font-weight: bold;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    # --- 1. CSS CUSTOM (HERO HEADER STYLE) ---
+        st.markdown("""
+            <style>
+            .hero-header {
+                background-color: #007BFF; /* Biru Hero */
+                padding: 15px 25px;
+                border-radius: 10px;
+                margin-bottom: 25px;
+                box-shadow: 0px 4px 12px rgba(0, 123, 255, 0.3);
+                text-align: left;
+            }
+            .hero-text {
+                color: white !important;
+                margin: 0 !important;
+                font-size: 24px !important;
+                font-weight: 800 !important;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
-    st.title("PRECENTAGE DISTRIBUTION STOCK CONTROL")
+        # --- 2. IMPLEMENTASI HERO HEADER ---
+        st.markdown('<div class="hero-header"><p class="hero-text">PERCENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
     
     conn = init_db()
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
