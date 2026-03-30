@@ -3378,33 +3378,82 @@ def main():
 import streamlit as st
 import pandas as pd
 import sqlite3
-import io
 
-st.set_page_config(page_title="Stock Analysis SBY", layout="wide")
+def tampilan_balancing_stock():
+    st.title("⚖️ Stock Distribution & Balancing System")
+    st.write("Analisis pemerataan stok antar Warehouse, Store, dan Rak.")
 
-# 1. Pastikan Session State ada
-if 'main_df' not in st.session_state:
-    st.session_state.main_df = None
+    # Gunakan data yang sudah di-upload sebelumnya jika ada di session_state
+    # atau sediakan uploader lokal di sini
+    uploaded_file = st.file_uploader("Upload All Stock (Excel/CSV)", type=['xlsx', 'csv'], key="balancer_upload")
 
-# --- MENU 1: UPLOAD DATA ---
-if menu == "Upload Data":
-    st.title("📂 Upload All Stock")
-    uploaded_file = st.file_uploader("Upload File Excel/CSV All Stock", type=['xlsx', 'csv'])
-    
     if uploaded_file:
-        try:
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
-            
-            # Bersihkan nama kolom
-            df.columns = [c.strip() for c in df.columns]
-            st.session_state.main_df = df
-            st.success(f"Data berhasil di-upload! Total: {len(df)} baris.")
-            st.dataframe(df.head(10), use_container_width=True)
-        except Exception as e:
-            st.error(f"Gagal membaca file: {e}")
+        # Membaca data
+        df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
+        df.columns = [c.strip() for c in df.columns]
+
+        # In-Memory SQLite untuk performa 'Ultra Fast'
+        conn = sqlite3.connect(':memory:')
+        df.to_sql('stock_data', conn, index=False, if_exists='replace')
+
+        # Ambil nama kolom secara dinamis (B=Bin, C=SKU, D=Qty)
+        # Sesuai struktur data operasional SBY
+        col_bin = df.columns[1] 
+        col_sku = df.columns[2] 
+        col_qty = df.columns[3] 
+
+        # --- LOGIKA QUERY ---
+        query_dc = f"""
+        SELECT 
+            "{col_sku}" as SKU,
+            SUM(CASE WHEN "{col_bin}" LIKE '%DC%' THEN "{col_qty}" ELSE 0 END) as Qty_DC,
+            SUM(CASE WHEN "{col_bin}" LIKE '%Gudang lt.2%' OR "{col_bin}" LIKE '%Store%' OR "{col_bin}" LIKE '%Toko%' THEN "{col_qty}" ELSE 0 END) as Qty_Retail
+        FROM stock_data
+        GROUP BY "{col_sku}"
+        HAVING Qty_DC > 0 AND Qty_Retail = 0
+        """
+
+        query_gl = f"""
+        SELECT 
+            "{col_sku}" as SKU,
+            SUM(CASE WHEN "{col_bin}" LIKE '%GL4%' AND "{col_bin}" NOT LIKE '%RAK%' THEN "{col_qty}" ELSE 0 END) as Qty_GL4_NonRak,
+            SUM(CASE WHEN "{col_bin}" LIKE '%GL3%' THEN "{col_qty}" ELSE 0 END) as Qty_GL3
+        FROM stock_data
+        GROUP BY "{col_sku}"
+        HAVING Qty_GL4_NonRak > 0 AND Qty_GL3 = 0
+        """
+
+        res_dc = pd.read_sql(query_dc, conn)
+        res_gl = pd.read_sql(query_gl, conn)
+
+        # --- TAMPILAN TABEL ---
+        t1, t2 = st.tabs(["📌 DC ➡️ Retail", "📌 GL4 ➡️ GL3"])
+
+        with t1:
+            st.error(f"⚠️ {len(res_dc)} SKU mengendap di DC (Retail Kosong)")
+            st.dataframe(res_dc, use_container_width=True)
+            if not res_dc.empty:
+                st.download_button("Download CSV (DC)", res_dc.to_csv(index=False), "pindah_dc.csv")
+
+        with t2:
+            st.warning(f"⚠️ {len(res_gl)} SKU di GL4 Lantai (GL3 Kosong)")
+            st.dataframe(res_gl, use_container_width=True)
+            if not res_gl.empty:
+                st.download_button("Download CSV (GL4)", res_gl.to_csv(index=False), "pindah_gl4.csv")
+
+        # --- VISUALISASI ---
+        st.divider()
+        st.subheader("Visualisasi Ketimpangan")
+        top_dc = res_dc.sort_values('Qty_DC', ascending=False).head(10)
+        if not top_dc.empty:
+            st.bar_chart(data=top_dc, x='SKU', y='Qty_DC')
+            st.caption("Top 10 SKU terbanyak yang 'macet' di DC.")
+
+        conn.close()
+    else:
+        st.info("Silakan upload data 'All Stock' untuk memulai analisis pemerataan.")
+
+
 
 
                            
@@ -4727,69 +4776,8 @@ elif menu == "Compare System":
             
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
-# --- MENU 2: BALANCING STOCK ---
-elif menu == "Balancing Stock":
-    st.title("⚖️ Balancing Stock Analysis")
-    
-    if st.session_state.main_df is not None:
-        df = st.session_state.main_df
-        
-        # Koneksi SQLite (In-Memory)
-        conn = sqlite3.connect(':memory:')
-        df.to_sql('stock_data', conn, index=False, if_exists='replace')
 
-        st.info("Menganalisis ketimpangan stok antar lokasi (BIN)...")
-
-        # --- QUERY LOGIC ---
-        query1 = """
-        SELECT DISTINCT "SKU" FROM stock_data 
-        WHERE "BIN" LIKE '%DC%'
-        EXCEPT
-        SELECT DISTINCT "SKU" FROM stock_data 
-        WHERE "BIN" LIKE '%Gudang lt.2%' 
-           OR "BIN" LIKE '%Store%' 
-           OR "BIN" LIKE '%Toko%'
-        """
-        
-        query2 = """
-        SELECT DISTINCT "SKU" FROM stock_data
-        WHERE "BIN" LIKE '%GL4%' AND "BIN" NOT LIKE '%RAK%'
-        EXCEPT
-        SELECT DISTINCT "SKU" FROM stock_data
-        WHERE "BIN" LIKE '%GL3%'
-        """
-
-        res1 = pd.read_sql(query1, conn)
-        res2 = pd.read_sql(query2, conn)
-
-        # --- DISPLAY HASIL ---
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader("⚠️ SKU Hanya di DC")
-            st.warning(f"Total: {len(res1)} SKU")
-            st.dataframe(res1, use_container_width=True)
-            if not res1.empty:
-                st.download_button("Download List DC", res1.to_csv(index=False), "need_balancing_dc.csv")
-
-        with col2:
-            st.subheader("⚠️ SKU di GL4 vs GL3")
-            st.warning(f"Total: {len(res2)} SKU")
-            st.dataframe(res2, use_container_width=True)
-            if not res2.empty:
-                st.download_button("Download List GL4", res2.to_csv(index=False), "need_balancing_gl4.csv")
-
-        # --- GRAFIK ---
-        st.divider()
-        chart_data = pd.DataFrame({
-            'Kategori': ['DC Only', 'GL4 Only'],
-            'Jumlah SKU': [len(res1), len(res2)]
-        })
-        st.bar_chart(data=chart_data, x='Kategori', y='Jumlah SKU')
-        
-        conn.close()
-    else:
-        st.error("⚠️ Data belum ada. Silakan ke menu 'Upload Data' terlebih dahulu.")
+if menu == "Balancing Stock":
 
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
