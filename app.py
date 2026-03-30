@@ -3630,7 +3630,7 @@ def tampilan_balancing_stock():
                            
 with st.sidebar:
        st.markdown("""
-    <style>
+        <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         
