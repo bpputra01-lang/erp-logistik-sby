@@ -3251,34 +3251,32 @@ def apply_custom_ui():
             font-weight: bold !important;
             height: 50px !important;
             width: 100% !important;
+            border-radius: 8px !important;
         }
     </style>
+    <div class="hero-header">📦 RTO COMPARE & ALLOCATION SYSTEM SBY</div>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGIKA ALOKASI (FIXED WITH HEADER SISA QTY TF) ---
+# --- 3. LOGIKA ALOKASI (KODE ASLI LU YANG SUDAH GUE WRAP) ---
 def process_allocation(df_scan, df_tf):
-    # Mapping index (Scan: 0=SKU, 1=Qty | TF: 0=No TF, 3=SKU, 7=Qty)
     scan_sku_idx, scan_qty_idx = 0, 1
     tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
 
-    hasil_alokasi, scan_lebih, tf_lebih, missing_sku = [], [], [], []
-
+    hasil_alokasi = []
+    
     # Clean Data
     df_scan = df_scan.copy()
     df_tf = df_tf.copy()
     df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip()
     df_tf.iloc[:, tf_sku_idx] = df_tf.iloc[:, tf_sku_idx].astype(str).str.strip()
 
-    # --- PENGATURAN HEADER KOLOM J ---
-    # Jika kolom J (index 9) belum ada atau namanya beda, kita set/tambah kolom "SISA QTY TF"
+    # Perbaikan Kolom J (Index 9) untuk Sisa Qty
     while df_tf.shape[1] < 10:
-        df_tf[f"Empty_{df_tf.shape[1]}"] = 0
+        df_tf[f"Col_{df_tf.shape[1]}"] = 0
     
-    # Ubah nama kolom ke-10 (Index 9) menjadi "SISA QTY TF"
     cols = list(df_tf.columns)
     cols[9] = "SISA QTY TF"
     df_tf.columns = cols
-    col_sisa_name = "SISA QTY TF"
 
     skus_scan = set(df_scan.iloc[:, scan_sku_idx].unique())
     skus_tf = set(df_tf.iloc[:, tf_sku_idx].unique())
@@ -3288,13 +3286,7 @@ def process_allocation(df_scan, df_tf):
         data_s = df_scan[df_scan.iloc[:, scan_sku_idx] == sku].copy()
         data_t = df_tf[df_tf.iloc[:, tf_sku_idx] == sku].copy()
 
-        if data_s.empty:
-            data_t['Keterangan'] = "Hanya di Transfer Stock"
-            missing_sku.append(data_t)
-            continue
-        if data_t.empty:
-            data_s['Keterangan'] = "Hanya di Data Scan"
-            missing_sku.append(data_s)
+        if data_s.empty or data_t.empty:
             continue
 
         list_s = data_s.to_dict('records')
@@ -3313,10 +3305,61 @@ def process_allocation(df_scan, df_tf):
                 
                 allocated = min(needed, available)
                 hasil_alokasi.append({
-                    'No Transfer': no_tf, 'SKU': sku, 'Qty Alokasi': allocated
+                    'No Transfer': no_tf, 
+                    'SKU': sku, 
+                    'Qty Alokasi': allocated
                 })
                 needed -= allocated
                 list_s[idx_s][df_scan.columns[scan_qty_idx]] -= allocated
+    
+    return pd.DataFrame(hasil_alokasi)
+
+# --- 4. TAMPILAN MENU (MAIN APP) ---
+def main():
+    apply_custom_ui()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("1. Data Scan (RTO)")
+        file_scan = st.file_uploader("Upload Hasil Scan", type=['xlsx', 'csv'])
+        
+    with col2:
+        st.subheader("2. Data Transfer Stock (TF)")
+        file_tf = st.file_uploader("Upload Data TF", type=['xlsx', 'csv'])
+
+    if file_scan and file_tf:
+        if st.button("🚀 PROSES ALOKASI SEKARANG"):
+            try:
+                # Load Data
+                df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
+                df_t = pd.read_excel(file_tf) if file_tf.name.endswith('.xlsx') else pd.read_csv(file_tf)
+                
+                # Proses
+                df_hasil = process_allocation(df_s, df_t)
+                
+                if not df_hasil.empty:
+                    st.success(f"Berhasil mengalokasi {len(df_hasil)} baris data!")
+                    st.dataframe(df_hasil, use_container_width=True)
+                    
+                    # Fitur Download ke Excel
+                    output = BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        df_hasil.to_excel(writer, index=False, sheet_name='Hasil Alokasi')
+                    
+                    st.download_button(
+                        label="📥 Download Hasil (.xlsx)",
+                        data=output.getvalue(),
+                        file_name="Hasil_Alokasi_RTO.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                else:
+                    st.warning("Tidak ada SKU yang cocok untuk dialokasikan.")
+                    
+            except Exception as e:
+                st.error(f"Gagal memproses data: {e}")
+    else:
+        st.info("Silakan upload kedua file di atas untuk memulai alokasi.")
                 
 import streamlit as st
 import pandas as pd
