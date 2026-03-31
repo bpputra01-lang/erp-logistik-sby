@@ -3581,78 +3581,150 @@ def tampilan_balancing_stock():
 import streamlit as st
 import sqlite3
 import pandas as pd
-import random
 from datetime import datetime, timedelta
 
-# --- CONFIG & DATABASE ---
-st.set_page_config(page_title="JEZ SBY Schedule System", layout="wide")
-
+# --- SETUP DATABASE ---
 def init_db():
-    conn = sqlite3.connect('logistic_sby.db')
+    conn = sqlite3.connect('logistic_sby_v2.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS karyawan 
-                 (nama TEXT, posisi TEXT, tipe TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS libur_request 
-                 (nama TEXT, tanggal TEXT, jenis TEXT)''')
+    c.execute('CREATE TABLE IF NOT EXISTS karyawan (nama TEXT, posisi TEXT, tipe TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS libur_request (nama TEXT, tanggal TEXT, jenis TEXT)')
     conn.commit()
     return conn
 
 conn = init_db()
 
-# --- LOGIC PENJADWALAN (THE ENGINE) ---
-def generate_logic(start_date):
-    days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-    day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
-    
-    # Ambil data dari DB
-    df_k = pd.read_sql_query("SELECT * FROM karyawan", conn)
-    df_l = pd.read_sql_query("SELECT * FROM libur_request", conn)
-    
-    schedule_data = []
+st.set_page_config(page_title="JEZ SBY - All-in-One Schedule", layout="wide")
+st.title("🚛 LOGISTIC & WAREHOUSE SCHEDULE - SURABAYA BRANCH")
 
-    for pos in ["Picker", "Admin", "Loader", "Backliner"]:
-        # Filter karyawan per posisi
-        staff_pos = df_k[df_k['posisi'] == pos].to_dict('records')
-        random.shuffle(staff_pos) # Acak urutan biar adil
+# --- SECTION 1: INPUT DATA (Kiri: Karyawan, Kanan: Libur) ---
+col_input1, col_input2 = st.columns(2)
+
+with col_input1:
+    with st.expander("➕ INPUT KARYAWAN BARU", expanded=False):
+        with st.form("form_k"):
+            n = st.text_input("Nama Karyawan")
+            p = st.selectbox("Posisi", ["PICKER", "ADMIN", "LOADER", "BACKLINER"])
+            t = st.selectbox("Tipe", ["Full-Time", "Part-Full", "Part-Time"])
+            if st.form_submit_button("SIMPAN KARYAWAN"):
+                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (n.upper(), p, t))
+                conn.commit()
+                st.success("Data Tersimpan!")
+
+with col_input2:
+    with st.expander("📅 INPUT LIBUR / CUTI / LPH", expanded=False):
+        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+        with st.form("form_l"):
+            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else st.write("Isi karyawan dulu!")
+            tgl = st.date_input("Tanggal Off")
+            ket = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
+            if st.form_submit_button("SUBMIT OFF"):
+                conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl), ket))
+                conn.commit()
+                st.warning(f"{target} OFF pada {tgl}")
+
+st.divider()
+
+# --- SECTION 2: LOGISTIC SCHEDULE GENERATOR ---
+st.header("🗓️ LOGISTIC SCHEDULE GENERATOR")
+
+col_gen1, col_gen2 = st.columns([1, 3])
+
+with col_gen1:
+    start_date = st.date_input("Mulai Hari Senin", datetime.now())
+    btn_generate = st.button("🚀 GENERATE JADWAL SEKARANG", use_container_width=True)
+    
+    if st.button("🗑️ RESET SEMUA DATA", type="secondary"):
+        conn.execute("DELETE FROM karyawan")
+        conn.execute("DELETE FROM libur_request")
+        conn.commit()
+        st.rerun()
+
+# --- ENGINE LOGIC ---
+if btn_generate:
+    days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+    
+    df_karyawan = pd.read_sql_query("SELECT * FROM karyawan", conn)
+    df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
+    
+    final_rows = []
+    
+    # List Posisi & Shift sesuai permintaan
+    posisi_config = {
+        "PICKER": ["SHIFT 0", "SHIFT 1", "SHIFT 2", "SHIFT 2 LONG"],
+        "ADMIN": ["SHIFT 1", "SHIFT 2"],
+        "LOADER": ["SHIFT 1", "SHIFT 2"],
+        "BACKLINER": ["SHIFT 1", "SHIFT 2"]
+    }
+
+    for pos, shifts in posisi_config.items():
+        staff_pool = df_karyawan[df_karyawan['posisi'] == pos].to_dict('records')
         
-        assigned_count = 0
-        
-        for staff in staff_pos:
-            name = staff['nama']
-            tipe = staff['tipe']
+        for shf in shifts:
+            # Khusus Shift Long Sabtu/Minggu: Filter Part-Time & Part-Full saja
+            if "LONG" in shf:
+                current_staff = [s for s in staff_pool if s['tipe'] in ["Part-Time", "Part-Full"]]
+            else:
+                current_staff = staff_pool
             
-            # Tentukan shift berdasarkan posisi
-            shifts = ["Shift 0", "Shift 1", "Shift 2"] if pos == "Picker" else ["Shift 1", "Shift 2"]
+            if not current_staff: continue
             
-            for shf in shifts:
-                row = {"Posisi": pos, "Shift": shf, "Tipe": tipe}
+            # Ambil satu staff untuk baris ini (Bisa dikembangkan untuk looping nama)
+            for idx, person in enumerate(current_staff):
+                row = {"ROLE": f"{pos}-{shf}", "TIPE": person['tipe']}
                 
                 for i, d_str in enumerate(days):
-                    # Cek apakah sedang libur/cuti di DB
-                    is_off = not df_l[(df_l['nama'] == name) & (df_l['tanggal'] == d_str)].empty
+                    name = person['nama']
+                    tipe = person['tipe']
+                    hari = day_names[i]
                     
-                    # Logika Pembagian Kerja
-                    work_this_day = False
-                    if not is_off:
-                        if tipe in ["Full-Time", "Part-Time"]:
-                            work_this_day = True # 1 nama 6-7 hari (minus libur)
-                        elif tipe == "Part-Full":
-                            # Part-Full: Orang A (Senin-Rabu), Orang B (Kamis-Sabtu)
-                            if (assigned_count % 2 == 0 and i < 3) or (assigned_count % 2 != 0 and i >= 3):
-                                work_this_day = True
+                    # Cek Libur Manual di DB
+                    is_off_db = not df_libur[(df_libur['nama'] == name) & (df_libur['tanggal'] == d_str)].empty
                     
-                    # Khusus SHIFT LONG (Sabtu-Minggu)
-                    if day_names[i] in ["Sabtu", "Minggu"] and "Long" in shf:
-                        if tipe not in ["Part-Time", "Part-Full"]:
-                            work_this_day = False
+                    status = name
+                    
+                    # Aturan 1: Libur Manual
+                    if is_off_db:
+                        status = "LIBUR/CUTI"
+                    
+                    # Aturan 2: Part-Full (Bagi 3 hari)
+                    # Jika ada 2 orang Part-Full, idx genap senin-rabu, idx ganjil kamis-sabtu
+                    elif tipe == "Part-Full":
+                        if (idx % 2 == 0 and i >= 3) or (idx % 2 != 0 and i < 3):
+                            status = "OFF (GANTIAN)"
+                    
+                    # Aturan 3: Shift Long hanya Sabtu-Minggu
+                    if "LONG" in shf and hari not in ["SABTU", "MINGGU"]:
+                        status = "-"
 
-                    row[day_names[i]] = name if work_this_day else "OFF / LIBUR"
+                    row[hari] = status
                 
-                schedule_data.append(row)
-                assigned_count += 1
-                if assigned_count >= len(staff_pos): break
+                final_rows.append(row)
 
-    return pd.DataFrame(schedule_data)
+    # TAMPILKAN TABEL
+    df_hasil = pd.DataFrame(final_rows)
+    
+    def color_grid(val):
+        if val in ["LIBUR/CUTI", "OFF (GANTIAN)"]: return 'background-color: #ff4b4b; color: white'
+        if val == "-": return 'color: #777'
+        return 'background-color: #262730; color: #00ff00'
+
+    st.subheader(f"JADWAL WEEKLY: {start_date}")
+    st.dataframe(df_hasil.style.applymap(color_grid), use_container_width=True, height=500)
+    
+    # Tombol Download
+    st.download_button("📥 DOWNLOAD CSV", df_hasil.to_csv(index=False), "jadwal.csv", "text/csv")
+
+# --- SECTION 3: PREVIEW DATA ---
+st.divider()
+col_view1, col_view2 = st.columns(2)
+with col_view1:
+    st.write("📋 **DATABASE KARYAWAN**")
+    st.dataframe(pd.read_sql_query("SELECT * FROM karyawan", conn), height=200, use_container_width=True)
+with col_view2:
+    st.write("🚫 **DAFTAR LIBUR TERINPUT**")
+    st.dataframe(pd.read_sql_query("SELECT * FROM libur_request", conn), height=200, use_container_width=True)
 
 
 
@@ -4977,70 +5049,7 @@ elif menu == "Compare System":
             
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
-# --- MENU: LOGISTIC SCHEDULE (CORE) ---
-elif menu == "Logistic Schedule":
-    st.header("📅 Generate Weekly Logistic Schedule")
-    
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        start_date = st.date_input("Pilih Tanggal Mulai (Senin)", datetime.now())
-        process = st.button("🚀 Generate Ultra-Fast Schedule")
-    
-    if process:
-        df_hasil = generate_logic(start_date)
-        
-        st.subheader(f"Jadwal Minggu: {start_date} s/d {start_date + timedelta(days=6)}")
-        
-        # Styling agar mirip gambar (Warna-warni tipis)
-        def highlight_off(s):
-            return ['background-color: #ffcccc' if v == 'OFF / LIBUR' else '' for v in s]
-        
-        st.dataframe(df_hasil.style.apply(highlight_off, axis=1), height=600, use_container_width=True)
-        
-        # Fitur Download Excel
-        csv = df_hasil.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Excel (CSV)", csv, f"Schedule_{start_date}.csv", "text/csv")
-# --- UI NAVIGATION ---
-st.sidebar.title("🚛 JEZ Logistics SBY")
-menu = st.sidebar.radio("Navigasi", ["Dashboard", "Master Data Karyawan", "Input Libur/Cuti", "Logistic Schedule"])
 
-# --- MENU: DASHBOARD ---
-if menu == "Dashboard":
-    st.header("Dashboard Overview")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total Crew", len(pd.read_sql_query("SELECT * FROM karyawan", conn)))
-    c2.metric("Request Libur", len(pd.read_sql_query("SELECT * FROM libur_request", conn)))
-    st.info("Gunakan menu 'Logistic Schedule' untuk generate jadwal mingguan otomatis.")
-
-# --- MENU: MASTER DATA ---
-elif menu == "Master Data Karyawan":
-    st.header("👤 Management Staff")
-    with st.expander("Tambah Karyawan Baru"):
-        with st.form("add_staff"):
-            n = st.text_input("Nama Lengkap")
-            p = st.selectbox("Posisi", ["Picker", "Admin", "Loader", "Backliner"])
-            t = st.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
-            if st.form_submit_button("Simpan"):
-                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (n, p, t))
-                conn.commit()
-                st.success("Data Tersimpan!")
-    
-    st.subheader("List Karyawan Terdaftar")
-    st.dataframe(pd.read_sql_query("SELECT * FROM karyawan", conn), use_container_width=True)
-
-# --- MENU: INPUT LIBUR ---
-elif menu == "Input Libur/Cuti":
-    st.header("🔴 Request Off / Cuti / LPH")
-    df_names = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-    
-    with st.form("off_form"):
-        target = st.selectbox("Pilih Nama", df_names['nama'])
-        tgl = st.date_input("Tanggal Libur")
-        ket = st.selectbox("Jenis", ["Libur Rutin", "Cuti", "LPH"])
-        if st.form_submit_button("Submit Request"):
-            conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl), ket))
-            conn.commit()
-            st.success(f"Berhasil mencatat libur untuk {target}")
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
