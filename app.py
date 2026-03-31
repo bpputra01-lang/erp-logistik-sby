@@ -5026,7 +5026,7 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (REVISI TAMPILAN - LOGIC TETAP) ---
+   # --- D. GENERATOR JADWAL (VERSI BALIK KE AWAL - LOGIC BRUTAL) ---
     if st.button("RUN GENERATOR JADWAL (TARGET ONLY)", use_container_width=True):
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5039,19 +5039,15 @@ if menu == "Logistic Schedule":
         weekly_total = {nama: 0 for nama in df_staff['nama']}
         hasil_mentah = {d: {j: [] for j in list_shift_jam} for d in day_names}
 
-        # 1. HITUNG TARGET FIX PER ORANG
+        # 1. HITUNG TARGET FIX
         karyawan_list = df_staff.to_dict('records')
         for k in karyawan_list:
             hari_off = len(df_libur[(df_libur['nama'] == k['nama']) & (df_libur['tanggal'].isin(days))])
-            if k['tipe'] == "Part-Full":
-                k['target'] = 9 - (hari_off * 2)
-            else:
-                k['target'] = 6 - hari_off
+            k['target'] = (9 - (hari_off * 2)) if k['tipe'] == "Part-Full" else (6 - hari_off)
 
-        # --- INI YANG TADI KETINGGALAN (SORTIR KARYAWAN) ---
         karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target'], reverse=True)
 
-        # 2. SEBAR NAMA (LOGIC BRUTAL PUNYA LU)
+        # 2. SEBAR NAMA
         for k in karyawan_sorted:
             nama = k['nama']
             target = k['target']
@@ -5064,43 +5060,41 @@ if menu == "Logistic Schedule":
                 
                 max_harian = 2 if k['tipe'] == "Part-Full" else 1
                 count_harian = 0
-                
                 for jam in list_shift_jam:
                     if weekly_total[nama] >= target: break
                     if count_harian >= max_harian: break
                     
-                    hasil_mentah[day_name][jam].append(f"{posisi} | {nama}")
+                    hasil_mentah[day_name][jam].append(nama) # Isi cuma nama biar bersih
                     weekly_total[nama] += 1
                     count_harian += 1
 
-        # 3. TAMPILAN RAPI PER GRUP SHIFT
+        # 3. PENYUSUNAN TABEL MODEL AWAL (Per Grup Shift)
         final_table_rows = []
         for jam in list_shift_jam:
-            # Hitung baris terbanyak di jam ini
-            max_rows_jam = max([len(hasil_mentah[d][jam]) for d in day_names]) if hasil_mentah else 0
-            
-            for r in range(max_rows_jam):
-                row_data = {"SHIFT": jam}
+            max_r = max([len(hasil_mentah[d][jam]) for d in day_names]) if hasil_mentah else 0
+            for r in range(max_r):
+                row_data = {"ROLE": jam}
                 for d in day_names:
                     row_data[d] = hasil_mentah[d][jam][r] if r < len(hasil_mentah[d][jam]) else ""
                 final_table_rows.append(row_data)
-            
-            # Garis pemisah antar shift
-            if max_rows_jam > 0:
-                final_table_rows.append({d: "---" for d in (["SHIFT"] + day_names)})
 
         st.session_state.res_df = pd.DataFrame(final_table_rows)
         st.session_state.summary_shift = weekly_total
 
-    # --- TAMPILAN AKHIR ---
+    # --- 4. TAMPILAN MODEL AWAL (TABEL KIRI, SUMMARY KANAN) ---
     if 'res_df' in st.session_state:
         st.divider()
-        st.dataframe(st.session_state.res_df, use_container_width=True, height=600)
+        col_v1, col_v2 = st.columns([5, 1.5]) # KANAN KIRI BALIK LAGI
         
-        st.write("### 📈 Summary Realisasi")
-        sum_list = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
-        st.table(pd.DataFrame(sum_list).sort_values(by="TOTAL", ascending=False))
-
+        with col_v1:
+            st.write("**📊 Jadwal Mingguan**")
+            st.dataframe(st.session_state.res_df, use_container_width=True, height=650)
+        
+        with col_v2:
+            st.write("**📈 Summary**")
+            sum_list = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
+            df_sum = pd.DataFrame(sum_list).sort_values(by="TOTAL", ascending=False)
+            st.table(df_sum)
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
