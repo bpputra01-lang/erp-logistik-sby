@@ -3612,9 +3612,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. SIDEBAR NAVIGATION ---
-st.sidebar.title("🚛 JEZ LOGISTICS SBY")
-menu = st.sidebar.radio("Pilih Menu:", ["Logistic Schedule", "Data Master Tim"])
 
 # ==========================================
 # MENU: DATA MASTER TIM (INPUT AWAL)
