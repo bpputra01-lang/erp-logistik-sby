@@ -4916,4 +4916,4 @@ elif menu == "Reject/Defect List":
     menu_reject_defect()
 
 elif menu == "Compare Penerimaan RTO":
-    apply_custom_ui()
+    main()
