@@ -5010,19 +5010,17 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
-    # --- C. GENERATOR JADWAL (TARGET ORIENTED) ---
-    st.subheader("🚀 3. Generate Jadwal (Target 9-6-6)")
-    start_date = st.date_input("Mulai Hari Senin", datetime.now())
+   # --- D. GENERATOR JADWAL (LOGIC: TARGET WAJIB & ANTI-BENTROK JAM) ---
+    st.subheader("🚀 3. Generate Jadwal (Strict Target 9-6-6)")
     
     if st.button("RUN GENERATOR", use_container_width=True):
-        # Definisikan timedelta di sini juga aman, tapi pastikan sudah di-import di atas
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        roles = [
+        roles_template = [
             ("SHIFT 3", "LOG-SO"), ("SHIFT 3", "LOG-SO"),
             ("SHIFT 0", "LOG-SO"), ("SHIFT 0", "WF-SO"), ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-PICKER"),
             ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
@@ -5031,49 +5029,53 @@ if menu == "Logistic Schedule":
         ]
 
         weekly_total = {nama: 0 for nama in df_staff['nama']}
-        weekly_data = []
+        schedule_data = {day: ["" for _ in range(len(roles_template))] for day in day_names}
 
-        for d_str in days:
-            used_today = {} 
-            day_col = []
-            
-            for shf_name, pos in roles:
-                kandidat = df_staff[df_staff['posisi'] == pos].copy()
-                kandidat = kandidat[~kandidat['nama'].isin(df_libur[df_libur['tanggal'] == d_str]['nama'])]
+        for idx_day, d_str in enumerate(days):
+            day_name = day_names[idx_day]
+            # used_in_shift buat nyatet: Di jam ini siapa aja yang udah masuk
+            used_in_shift = {"SHIFT 3": [], "SHIFT 0": [], "SHIFT 1": [], "SHIFT 2": []}
+            # used_today buat pembatas max 2 shift per hari buat Part-Full
+            used_today_count = {nama: 0 for nama in df_staff['nama']}
+
+            # Ambil semua tim yang nggak libur hari ini
+            kandidat_hari_ini = df_staff[~df_staff['nama'].isin(df_libur[df_libur['tanggal'] == d_str]['nama'])].to_dict('records')
+
+            for i, (shf_jam, shf_role) in enumerate(roles_template):
+                # Sort kandidat: Utamakan yang sisa hutang shift-nya paling banyak
+                def hitung_hutang(k):
+                    nama = k['nama']
+                    hari_off = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
+                    target = 9 - (hari_off * 2) if k['tipe'] == "Part-Full" else 6 - hari_off
+                    return target - weekly_total[nama]
+
+                kandidat_sorted = sorted(kandidat_hari_ini, key=hitung_hutang, reverse=True)
+
+                assigned = ""
+                for k in kandidat_sorted:
+                    nama = k['nama']
+                    # LOGIC UTAMA:
+                    # 1. Role harus cocok
+                    # 2. Belum ada di jam (SHIFT) yang sama hari ini (ANTI-TABRAK)
+                    # 3. Masih ada hutang shift
+                    # 4. Part-Full max 2x sehari, lainnya max 1x sehari
+                    
+                    if k['posisi'] == shf_role:
+                        if nama not in used_in_shift[shf_jam]:
+                            if hitung_hutang(k) > 0:
+                                max_harian = 2 if k['tipe'] == "Part-Full" else 1
+                                if used_today_count[nama] < max_harian:
+                                    assigned = nama
+                                    break
                 
-                if not kandidat.empty:
-                    # LOGIKA HITUNG SISA JATAH (BIAR GAK KURANG)
-                    def cek_sisa(row):
-                        nama = row['nama']
-                        tipe = row['tipe']
-                        hari_off = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
-                        if tipe == "Part-Full": target = 9 - (hari_off * 2)
-                        else: target = 6 - hari_off
-                        return target - weekly_total.get(nama, 0)
+                if assigned:
+                    schedule_data[day_name][i] = assigned
+                    weekly_total[assigned] += 1
+                    used_in_shift[shf_jam].append(assigned)
+                    used_today_count[assigned] += 1
 
-                    kandidat['hutang'] = kandidat.apply(cek_sisa, axis=1)
-                    kandidat = kandidat.sort_values(by='hutang', ascending=False)
-                    kandidat_list = kandidat.to_dict('records')
-
-                    assigned = ""
-                    for k in kandidat_list:
-                        nama = k['nama']
-                        shift_skrg = used_today.get(nama, 0)
-                        if k['hutang'] > 0:
-                            if k['tipe'] == "Part-Full":
-                                if shift_skrg < 2: assigned = nama
-                            else:
-                                if shift_skrg < 1: assigned = nama
-                        if assigned:
-                            weekly_total[nama] += 1
-                            used_today[nama] = shift_skrg + 1
-                            break
-                    day_col.append(assigned)
-                else: day_col.append("")
-            weekly_data.append(day_col)
-
-        df_final = pd.DataFrame(weekly_data, index=day_names).T
-        df_final.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles])
+        df_final = pd.DataFrame(schedule_data)
+        df_final.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles_template])
         st.session_state.res_df = df_final
         st.session_state.summary_shift = weekly_total
 
