@@ -5006,37 +5006,35 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
-    # --- C. DAFTAR KARYAWAN AKTIF (DENGAN FITUR HAPUS) ---
+    # --- C. DAFTAR KARYAWAN AKTIF ---
     with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
-        # Ambil data terbaru
         df_cek = pd.read_sql_query("SELECT nama AS 'NAMA', posisi AS 'ROLE', tipe AS 'TIPE' FROM karyawan", conn)
         
         if not df_cek.empty:
-            st.write("💡 *Klik baris lalu tekan **Backspace/Delete** pada keyboard untuk hapus, atau edit langsung di tabel.*")
-            
-            # Gunakan data_editor agar baris bisa dipilih/dihapus
-            edited_df = st.data_editor(
-                df_cek, 
-                use_container_width=True, 
-                num_rows="dynamic", # Ini yang memunculkan tombol hapus di samping
-                key="editor_karyawan"
-            )
+            # Buat header kolom
+            h_col1, h_col2, h_col3, h_col4 = st.columns([3, 2, 2, 1])
+            h_col1.write("**NAMA**")
+            h_col2.write("**ROLE**")
+            h_col3.write("**TIPE**")
+            h_col4.write("**AKSI**")
+            st.markdown("---")
 
-            # Logika sinkronisasi: Jika jumlah baris di editor berkurang dibanding database
-            if len(edited_df) < len(df_cek):
-                # Cari nama yang hilang (yang dihapus user di UI)
-                nama_sebelumnya = set(df_cek['NAMA'])
-                nama_sekarang = set(edited_df['NAMA'])
-                nama_dihapus = nama_sebelumnya - nama_sekarang
+            # Loop isi data
+            for i, row in df_cek.iterrows():
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+                c1.write(row['NAMA'])
+                c2.write(row['ROLE'])
+                c3.write(row['TIPE'])
                 
-                for nama in nama_dihapus:
-                    conn.execute("DELETE FROM karyawan WHERE nama = ?", (nama,))
-                
-                conn.commit()
-                st.success(f"🗑️ Data berhasil diperbarui!")
-                st.rerun()
+                # Tombol hapus spesifik per nama
+                if c4.button("🗑️", key=f"del_{row['NAMA']}_{i}"):
+                    conn.execute("DELETE FROM karyawan WHERE nama = ? AND posisi = ? AND tipe = ?", 
+                                 (row['NAMA'], row['ROLE'], row['TIPE']))
+                    conn.commit()
+                    st.success(f"Dihapus: {row['NAMA']}")
+                    st.rerun()
         else:
-            st.info("Belum ada data karyawan.")
+            st.info("Belum ada data tim.")
 
     # --- D. GENERATOR JADWAL ---
     st.subheader("🚀 3. Generate Jadwal")
