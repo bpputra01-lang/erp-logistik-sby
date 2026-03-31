@@ -3599,12 +3599,6 @@ conn = init_db()
 st.markdown("""
     <style>
     
-    /* Styling Kotak Input: Rounded & Background HITAM PEKAT */
-    div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
-        background-color: #000000 !important; /* Hitam biar kontras sama Putih */
-        border-radius: 12px !important;
-        border: 2px solid #3e4451 !important;
-    }
     
     /* FIX WARNA TEKS: Paksa jadi PUTIH BERSIH */
     input { 
