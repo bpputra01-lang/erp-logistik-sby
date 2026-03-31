@@ -3470,7 +3470,18 @@ def tampilan_balancing_stock():
         col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
         col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
         col_desc_e = cols[4] # Kolom E untuk Deskripsi
+# --- TAMBAHKAN INI DI DALAM TRY ---
+        base_excl = f"""
+            UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
+            UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
+            UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
+            UPPER("{col_bin}") NOT LIKE '%STAGING%' AND UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
+            UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND UPPER("{col_bin}") NOT LIKE '%OUT%' AND
+            UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%AMP%'
+        """
 
+        # --- SEKARANG FILTER INI GAK BAKAL ERROR ---
+        f_source_dc = f"UPPER(\"{col_bin}\") LIKE '%DC%' AND {base_excl}"
         # --- DEFINISI FILTER SESUAI INSTRUKSI ---
         # Target GL3: Kecualikan PUTAWAY & RAK
         f_target_gl3 = f"UPPER(\"{col_bin}\") LIKE '%GL3%' AND UPPER(\"{col_bin}\") NOT LIKE '%PUTAWAY%' AND UPPER(\"{col_bin}\") NOT LIKE '%RAK%'"
