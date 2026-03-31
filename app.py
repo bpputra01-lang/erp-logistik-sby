@@ -3598,10 +3598,31 @@ conn = init_db()
 # SEKARANG SUDAH RATA KIRI (TIDAK ADA SPASI DI DEPAN st.markdown)
 st.markdown("""
     <style>
+    /* Hilangkan sidebar */
+    [data-testid="stSidebar"] { display: none; }
+    
+    /* Styling Kotak Input: Rounded & Background Gelap */
     div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
         background-color: #1e2129 !important;
         border-radius: 12px !important;
-        border: 1px solid #3e4451 !important;
+        border: 2px solid #3e4451 !important;
+    }
+    
+    /* FIX WARNA TEKS: Paksa jadi Putih Terang agar kontras di BG Gelap */
+    /* Atau kalau lo mau BG terang, ganti warnanya di sini */
+    input { 
+        color: #00FF00 !important; /* Hijau Neon biar Gahar */
+        -webkit-text-fill-color: #00FF00 !important;
+    }
+    
+    /* Warna Placeholder (Tulisan tipis sebelum diisi) */
+    input::placeholder {
+        color: #888888 !important;
+    }
+
+    /* Warna teks di Selectbox */
+    div[data-testid="stSelectbox"] p {
+        color: #FFFFFF !important;
     }
     </style>
 """, unsafe_allow_html=True)
