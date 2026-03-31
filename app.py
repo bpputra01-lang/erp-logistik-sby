@@ -5028,7 +5028,7 @@ if menu == "Logistic Schedule":
 
 import random
 
-# --- D. GENERATOR JADWAL (VERSI: EQUAL SPREAD PRIORITY) ---
+# --- D. GENERATOR JADWAL (VERSI: FULL SPREAD - NO EMPTY SLOT) ---
 if st.button("RUN GENERATOR JADWAL", use_container_width=True):
     dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5062,7 +5062,6 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
             weekly_counter[p['nama']] += 1
 
     # --- STEP 1: FILLING BERDASARKAN POSISI ASLI (LOGIC RATAKAN: MINIMAL 1 ORANG) ---
-    # MODIFIKASI: Kita isi 1 orang dulu per slot di semua hari biar rata
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
         shuffled_roles = base_roles.copy()
@@ -5077,12 +5076,12 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                 nama = p['nama']
                 if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                 if not any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
-                    if len(storage[day_name][slot_key]) < 1: # Isi 1 dulu bos biar adil
+                    if len(storage[day_name][slot_key]) < 1: 
                         storage[day_name][slot_key].append(nama)
                         weekly_counter[nama] += 1
                         break
 
-    # --- STEP 1.5: PENUHI JATAH JADI 2 ORANG (JIKA MASIH ADA SISA JATAH) ---
+    # --- STEP 1.5: PENUHI JATAH JADI 2 ORANG ---
     for k in sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True):
         nama = k['nama']
         shuffled_days = day_names.copy()
@@ -5105,29 +5104,28 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                                 storage[day_name][slot_key].append(nama)
                                 weekly_counter[nama] += 1
 
-    # --- STEP 2: HIERARCHICAL BACKUP (PICKER <-> LOADER -> ADMIN) ---
+    # --- STEP 2: HIERARCHICAL BACKUP & SAFETY NET (MENCEGAH KOSONG) ---
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
         for shf_jam, shf_role in base_roles:
             slot_key = f"{shf_jam} - {shf_role}"
-            if "ADMIN" in shf_role or shf_jam == "SHIFT 3" or shf_role == "SPV": continue
-            target_min = 2 if not ("STORE" in shf_role and shf_jam != "SHIFT 2") else 1
-            if len(storage[day_name][slot_key]) < target_min:
+            if shf_jam == "SHIFT 3": continue
+            
+            # Target 1 orang dulu agar tidak ada yang kosong sama sekali
+            if len(storage[day_name][slot_key]) < 1:
                 available = [kb for kb in karyawan_list if weekly_counter[kb['nama']] < kb['target_fix']]
                 random.shuffle(available)
-                backups = [b for b in available if "LOADER" in b['posisi'] or "PICKER" in b['posisi']]
-                if len(backups) + len(storage[day_name][slot_key]) < target_min:
-                    backups += [b for b in available if "ADMIN" in b['posisi']]
-                for kb in backups:
+                
+                for kb in available:
                     nama_bk = kb['nama']
                     if not df_libur[(df_libur['nama'] == nama_bk) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                    if any(nama_bk in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)): continue
-                    if len(storage[day_name][slot_key]) < target_min:
+                    # Pastikan orangnya tidak sedang di shift yang sama
+                    if not any(nama_bk in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
                         storage[day_name][slot_key].append(nama_bk + " (BACKUP)")
                         weekly_counter[kb['nama']] += 1
-                        if len(storage[day_name][slot_key]) >= target_min: break
+                        break
 
-    # --- STEP 3: FINAL SWEEP ---
+    # --- STEP 3: FINAL SWEEP (SISA JATAH) ---
     for kb in [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix']]:
         nama_sisa = kb['nama']
         for day_name in day_names:
