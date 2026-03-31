@@ -5054,7 +5054,7 @@ if menu == "Logistic Schedule":
 
 import random
 
-# --- D. GENERATOR JADWAL (VERSI: SPV ISOLATION - NO BACKUP) ---
+# --- D. GENERATOR JADWAL (VERSI: STORE IMMUNITY & CROSS-BACKUP) ---
 if st.button("RUN GENERATOR JADWAL", use_container_width=True):
     dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5084,7 +5084,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                 count += 1
         return count
 
-    # --- STEP 1: PRIORITAS ANTI-BOLONG (SPV KUNCI 1 ORANG) ---
+    # --- STEP 1: PRIORITAS ANTI-BOLONG (ISI SEMUA SLOT 1 ORANG) ---
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
         shuffled_roles = base_roles.copy()
@@ -5094,6 +5094,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
             if shf_jam == "SHIFT 3": continue
             slot_key = f"{shf_jam} - {shf_role}"
             
+            # Cari yang posisinya cocok dulu
             potential = [k for k in karyawan_list if k['posisi'] == shf_role and weekly_counter[k['nama']] < k['target_fix']]
             random.shuffle(potential)
             
@@ -5107,19 +5108,22 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                     weekly_counter[nama] += 1
                     break
 
-    # --- STEP 2: FILLING DOUBLE SHIFT (SPV DILARANG DOUBLE/BACKUP) ---
+    # --- STEP 2: BACKUP & DOUBLE SHIFT (STORE TIDAK BOLEH JADI BACKUP) ---
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
         shuffled_roles = base_roles.copy()
         random.shuffle(shuffled_roles)
         
         for shf_jam, shf_role in shuffled_roles:
-            if shf_jam == "SHIFT 3" or shf_role == "SPV": continue # KUNCI: SPV GAK BOLEH DITAMBAH
+            if shf_jam == "SHIFT 3" or shf_role == "SPV": continue
             slot_key = f"{shf_jam} - {shf_role}"
             
             limit = 2 if not ("STORE" in shf_role and shf_jam != "SHIFT 2") else 1
             if len(storage[day_name][slot_key]) < limit:
-                potential = [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix'] and k['posisi'] != "SPV"]
+                # KUNCI: Store dilarang jadi backup di role lain
+                # Admin dan SPV juga dilarang backup
+                potential = [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix'] 
+                             and k['posisi'] not in ["LOG-STORE", "SPV", "LOG-ADMIN", "WF-ADMIN"]]
                 random.shuffle(potential)
                 
                 for p in potential:
@@ -5128,20 +5132,20 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                     current_daily = get_daily_count(nama, day_name)
                     
                     if p['tipe'] == "Part-Full":
-                        if current_daily >= 2: continue
-                        if current_daily == 1 and double_day_count[nama] >= 3: continue
+                        if current_daily >= 2 or (current_daily == 1 and double_day_count[nama] >= 3): continue
                     else:
                         if current_daily >= 1: continue
                     
                     if not any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
-                        storage[day_name][slot_key].append(nama)
+                        storage[day_name][slot_key].append(nama + " (BACKUP)")
                         weekly_counter[nama] += 1
                         if get_daily_count(nama, day_name) == 2:
                             double_day_count[nama] += 1
                         if len(storage[day_name][slot_key]) >= limit: break
 
-    # --- STEP 3: FINAL SWEEP (SPV ISOLASI TOTAL) ---
-    for kb in [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix'] and k['posisi'] != "SPV"]:
+    # --- STEP 3: FINAL SWEEP (PENGHABISAN JATAH) ---
+    for kb in [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix'] 
+               and k['posisi'] not in ["LOG-STORE", "SPV", "LOG-ADMIN", "WF-ADMIN"]]:
         nama_sisa = kb['nama']
         for day_name in day_names:
             if weekly_counter[nama_sisa] >= kb['target_fix']: break
@@ -5155,7 +5159,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                 if current_daily >= 1: continue
 
             for shf_jam, shf_role in base_roles:
-                if shf_jam == "SHIFT 3" or shf_role == "SPV": continue # KUNCI: JANGAN SWEEP KE SPV
+                if shf_jam == "SHIFT 3" or shf_role == "SPV": continue
                 slot_key = f"{shf_jam} - {shf_role}"
                 if len(storage[day_name][slot_key]) < 2:
                     if not any(nama_sisa in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
