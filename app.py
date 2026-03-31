@@ -5061,7 +5061,7 @@ if menu == "Logistic Schedule":
         else:
             st.info("Belum ada data tim.")
 
- # ==========================================
+# ==========================================
 # SEMUA FITUR MASUK KE MENU INI
 # ==========================================
 if menu == "Logistic Schedule":
@@ -5069,8 +5069,7 @@ if menu == "Logistic Schedule":
 
     # --- A. SUB-SECTION: INPUT DATA TIM ---
     st.subheader("👤 1. Input Database Tim")
-    # Nama key form diganti agar tidak error duplicate
-    with st.form("form_tim_new", clear_on_submit=True): 
+    with st.form("form_tim_final", clear_on_submit=True): 
         c1, c2, c3 = st.columns(3)
         nama_input = c1.text_input("Nama Lengkap (Contoh: GALIH)")
         posisi_input = c2.selectbox("Posisi/Role", 
@@ -5092,8 +5091,7 @@ if menu == "Logistic Schedule":
     
     with col_l1:
         df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        # Nama key form diganti agar tidak error duplicate
-        with st.form("form_libur_new", clear_on_submit=True):
+        with st.form("form_libur_final", clear_on_submit=True):
             target = st.selectbox("Pilih Nama Tim", df_k['nama']) if not df_k.empty else st.warning("Isi Data Tim Dulu!")
             tgl_off = st.date_input("Tanggal")
             jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH", "TGL MERAH"], horizontal=True)
@@ -5105,26 +5103,19 @@ if menu == "Logistic Schedule":
     with col_l2:
         st.write("**Monitoring Libur Terkini**")
         df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
-        
         if not df_off_view.empty:
             h1, h2, h3, h4 = st.columns([3, 3, 2, 1])
-            h1.caption("NAMA")
-            h2.caption("TANGGAL")
-            h3.caption("JENIS")
-            h4.caption("AKSI")
+            h1.caption("NAMA") ; h2.caption("TANGGAL") ; h3.caption("JENIS") ; h4.caption("AKSI")
             st.markdown("---")
-
             for i, row in df_off_view.iterrows():
                 m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
                 m1.write(f"**{row['nama']}**")
                 m2.write(row['tanggal'])
                 m3.write(row['jenis'])
-                
                 if m4.button("🗑️", key=f"del_libur_{row['nama']}_{i}"):
                     conn.execute("DELETE FROM libur_request WHERE nama = ? AND tanggal = ? AND jenis = ?", 
                                  (row['nama'], row['tanggal'], row['jenis']))
-                    conn.commit()
-                    st.rerun()
+                    conn.commit() ; st.rerun()
         else:
             st.info("Belum ada data libur.")
 
@@ -5133,28 +5124,17 @@ if menu == "Logistic Schedule":
     # --- C. DAFTAR KARYAWAN AKTIF ---
     with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
         df_cek = pd.read_sql_query("SELECT nama AS 'NAMA', posisi AS 'ROLE', tipe AS 'TIPE' FROM karyawan", conn)
-        
         if not df_cek.empty:
             h_col1, h_col2, h_col3, h_col4 = st.columns([3, 2, 2, 1])
-            h_col1.write("**NAMA**")
-            h_col2.write("**ROLE**")
-            h_col3.write("**TIPE**")
-            h_col4.write("**AKSI**")
+            h_col1.write("**NAMA**") ; h_col2.write("**ROLE**") ; h_col3.write("**TIPE**") ; h_col4.write("**AKSI**")
             st.markdown("---")
-
             for i, row in df_cek.iterrows():
                 c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
-                c1.write(row['NAMA'])
-                c2.write(row['ROLE'])
-                c3.write(row['TIPE'])
-                
+                c1.write(row['NAMA']) ; c2.write(row['ROLE']) ; c3.write(row['TIPE'])
                 if c4.button("🗑️", key=f"del_tim_{row['NAMA']}_{i}"):
                     conn.execute("DELETE FROM karyawan WHERE nama = ? AND posisi = ? AND tipe = ?", 
                                  (row['NAMA'], row['ROLE'], row['TIPE']))
-                    conn.commit()
-                    st.rerun()
-        else:
-            st.info("Belum ada data tim.")
+                    conn.commit() ; st.rerun()
 
     st.divider()
 
@@ -5164,7 +5144,6 @@ if menu == "Logistic Schedule":
     
     with c_g1:
         start_date = st.date_input("Mulai Hari Senin", datetime.now())
-        
         if st.button("RUN GENERATOR", use_container_width=True):
             days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
             day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5172,7 +5151,6 @@ if menu == "Logistic Schedule":
             df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
             df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-            # List Roles: SPV ditambahkan di Shift 2
             roles = [
                 ("SHIFT 3", "LOG-SO"), ("SHIFT 3", "LOG-SO"),
                 ("SHIFT 0", "LOG-SO"), ("SHIFT 0", "WF-SO"), ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-PICKER"),
@@ -5182,7 +5160,6 @@ if menu == "Logistic Schedule":
             ]
 
             weekly_total_masuk = {nama: 0 for nama in df_staff['nama']}
-            weekly_double_count = {nama: 0 for nama in df_staff['nama']}
 
             weekly_data = []
             for d_str in days:
@@ -5191,27 +5168,37 @@ if menu == "Logistic Schedule":
                 
                 for shf_name, pos in roles:
                     kandidat = df_staff[df_staff['posisi'] == pos].to_dict('records')
+                    # Filter Libur
                     kandidat = [k for k in kandidat if df_libur[(df_libur['nama'] == k['nama']) & (df_libur['tanggal'] == d_str)].empty]
                     random.shuffle(kandidat)
 
                     assigned = ""
                     for k in kandidat:
                         nama = k['nama']
-                        shift_hari_ini = used_today.get(nama, 0)
                         total_minggu = weekly_total_masuk.get(nama, 0)
-                        sudah_double_minggu = weekly_double_count.get(nama, 0)
-
+                        shift_hari_ini = used_today.get(nama, 0)
+                        
+                        # Cek berapa hari dia libur minggu ini untuk potong kuota
+                        hari_libur = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
+                        
+                        # Tentukan Limit Berdasarkan Tipe (Potong jatah kalau dia ada OFF)
                         if k['tipe'] == "Part-Full":
-                            if shift_hari_ini == 0:
-                                assigned = nama
-                            elif shift_hari_ini == 1 and sudah_double_minggu < 3:
-                                assigned = nama
-                                weekly_double_count[nama] += 1
-                            else: continue
-                        else: # Full-Time / SPV (Anti-Bentrok Hari yang Sama)
-                            if shift_hari_ini == 0:
-                                assigned = nama
-                            else: continue
+                            limit_minggu = 9 - (hari_libur * 2) # Asumsi libur potong jatah double shift
+                        elif k['tipe'] == "Full-Time":
+                            limit_minggu = 6 - hari_libur
+                        elif k['tipe'] == "Part-Time":
+                            limit_minggu = 6 - hari_libur
+                        else:
+                            limit_minggu = 6 - hari_libur
+
+                        # Logika Pengisian
+                        if total_minggu < limit_minggu:
+                            if k['tipe'] == "Part-Full":
+                                if shift_hari_ini < 2: # Boleh double shift
+                                    assigned = nama
+                            else:
+                                if shift_hari_ini < 1: # Role lain haram double shift
+                                    assigned = nama
 
                         if assigned:
                             weekly_total_masuk[nama] += 1
