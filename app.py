@@ -5026,7 +5026,7 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (VERSI: NO SHIFT 3 + FULL WEEK) ---
+   # --- D. GENERATOR JADWAL (VERSI: SHIFT 3 KOSONG + SHIFT 0 KHUSUS PICKER) ---
     if st.button("RUN GENERATOR JADWAL", use_container_width=True):
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5034,14 +5034,15 @@ if menu == "Logistic Schedule":
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        # TEMPLATE TANPA SHIFT 3 (Sesuai request lu bos)
+        # TEMPLATE LENGKAP (Termasuk Shift 3 yang bakal dikosongin)
         base_template = [
-            ("SHIFT 0", "LOG-ADMIN"), ("SHIFT 0", "LOG-LOADER"), ("SHIFT 0", "LOG-STORE"), ("SHIFT 0", "WF-PICKER"),
+            ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
+            ("SHIFT 0", "LOG-PICKER"), # KHUSUS PICKER DI SINI
             ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
             ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
         ]
 
-        # 1. TARGET & SORTING (Part-Full 9, Reguler 6)
+        # 1. TARGET & SORTING (9/6)
         karyawan_list = df_staff.to_dict('records')
         for k in karyawan_list:
             k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
@@ -5050,12 +5051,15 @@ if menu == "Logistic Schedule":
         weekly_total = {nama: 0 for nama in df_staff['nama']}
         storage = {d: {f"{s} - {r}": [] for s, r in base_template} for d in day_names}
 
-        # 2. SEBAR JATAH KE 7 HARI (SENIN - MINGGU)
+        # 2. FILLING LOGIC (7 HARI FULL)
         for d_idx, (day_name, d_str) in enumerate(zip(day_names, days)):
-            # Tiap hari, prioritaskan orang yang total shift-nya masih paling dikit
             daily_sorted = sorted(karyawan_sorted, key=lambda x: (weekly_total[x['nama']], x['target_fix']), reverse=False)
             
             for shf_jam, shf_role in base_template:
+                # SKIP SHIFT 3 (Biar tetep ada di tabel tapi kosong)
+                if shf_jam == "SHIFT 3":
+                    continue
+                
                 slot_key = f"{shf_jam} - {shf_role}"
                 
                 for k in daily_sorted:
@@ -5066,18 +5070,20 @@ if menu == "Logistic Schedule":
                     if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == d_str)].empty:
                         continue
                     
-                    # Satu orang satu shift per hari biar nyebar ke Minggu
+                    # Cek Double Shift & Role Match
                     already_work_today = any(nama in storage[day_name][sk] for sk in storage[day_name])
                     
+                    # LOGIC: Harus sesuai posisi DAN kalau SHIFT 0 cuma buat LOG-PICKER
                     if k['posisi'] == shf_role and not already_work_today:
                         storage[day_name][slot_key].append(nama)
                         weekly_total[nama] += 1
                         break 
 
-        # 3. BUILD TABEL DYNAMIC ROWS (Satu kotak satu nama)
+        # 3. BUILD TABEL DYNAMIC ROWS
         final_table = []
         for shf_jam, shf_role in base_template:
             slot_key = f"{shf_jam} - {shf_role}"
+            # Cari baris terbanyak
             max_r = max([len(storage[d][slot_key]) for d in day_names])
             
             for r in range(max(1, max_r)):
