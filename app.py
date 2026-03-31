@@ -5054,7 +5054,7 @@ if menu == "Logistic Schedule":
 
 import random
 
-# --- D. GENERATOR JADWAL (VERSI: STORE SHIFT 2 PRIORITY & ABSOLUTE IMMUNITY) ---
+# --- D. GENERATOR JADWAL (VERSI: STORE SAFETY FIRST - NO EMPTY SHIFT) ---
 if st.button("RUN GENERATOR JADWAL", use_container_width=True):
     dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5084,25 +5084,21 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                 count += 1
         return count
 
-    # --- STEP 1: PRIORITAS UTAMA (STORE SHIFT 2 & ANTI-BOLONG) ---
+    # --- STEP 1: PRIORITAS ANTI-KOSONG (ISI 1 ORANG DI SEMUA SLOT DULU) ---
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
         
-        # Urutan pengisian: SHIFT 2 STORE didahulukan agar orangnya tidak terpakai di shift lain
-        priority_order = [("SHIFT 2", "LOG-STORE")] + [r for r in base_roles if r != ("SHIFT 2", "LOG-STORE")]
+        # 1. Pastikan Shift 1 & 2 LOG-STORE dapet minimal 1 orang duluan
+        store_slots = [("SHIFT 1", "LOG-STORE"), ("SHIFT 2", "LOG-STORE")]
+        other_slots = [r for r in base_roles if r not in store_slots and r[0] != "SHIFT 3"]
         
-        for shf_jam, shf_role in priority_order:
-            if shf_jam == "SHIFT 3": continue
+        for shf_jam, shf_role in (store_slots + other_slots):
             slot_key = f"{shf_jam} - {shf_role}"
-            
-            # KUNCI: Khusus Shift 2 Store minta 2 orang
-            limit_step1 = 2 if (shf_jam == "SHIFT 2" and shf_role == "LOG-STORE") else 1
             
             potential = [k for k in karyawan_list if k['posisi'] == shf_role and weekly_counter[k['nama']] < k['target_fix']]
             random.shuffle(potential)
             
             for p in potential:
-                if len(storage[day_name][slot_key]) >= limit_step1: break
                 nama = p['nama']
                 if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                 if get_daily_count(nama, day_name) >= 1: continue 
@@ -5110,24 +5106,33 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                 if not any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
                     storage[day_name][slot_key].append(nama)
                     weekly_counter[nama] += 1
+                    break
 
-    # --- STEP 2: FILLING BACKUP (STORE DILARANG BACKUP KELUAR) ---
+    # --- STEP 2: PENAMBAHAN ORANG KEDUA (SHIFT 2 STORE JADI PRIORITAS KEDUA) ---
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
-        for shf_jam, shf_role in base_roles:
-            if shf_jam == "SHIFT 3" or shf_role == "SPV": continue
+        
+        # Urutan: Coba penuhin orang ke-2 di SHIFT 2 STORE dulu, baru role lain
+        fill_order = [("SHIFT 2", "LOG-STORE")] + [r for r in base_roles if r != ("SHIFT 2", "LOG-STORE") and r[0] != "SHIFT 3"]
+        
+        for shf_jam, shf_role in fill_order:
+            if shf_role == "SPV": continue
             slot_key = f"{shf_jam} - {shf_role}"
             
-            # Tentukan limit backup
-            limit = 2 
-            if "STORE" in shf_role and shf_jam != "SHIFT 2": limit = 1
+            # Limit: Shift 2 Store mau 2 orang, Shift 1 Store cukup 1 orang saja
+            limit = 2 if not (shf_role == "LOG-STORE" and shf_jam == "SHIFT 1") else 1
             
             if len(storage[day_name][slot_key]) < limit:
-                # KUNCI MATI: LOG-STORE, ADMIN, SPV TIDAK BOLEH JADI BACKUP
+                # LOG-STORE DILARANG BACKUP KELUAR
                 potential = [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix'] 
                              and k['posisi'] not in ["LOG-STORE", "LOG-ADMIN", "WF-ADMIN", "SPV"]]
-                random.shuffle(potential)
                 
+                # Khusus untuk slot Store, orang Store sendiri boleh masuk sebagai orang ke-2
+                if shf_role == "LOG-STORE":
+                    store_only = [k for k in karyawan_list if k['posisi'] == "LOG-STORE" and weekly_counter[k['nama']] < k['target_fix']]
+                    potential = store_only + potential # Utamakan orang store sendiri buat ngisi slot store ke-2
+                
+                random.shuffle(potential)
                 for p in potential:
                     nama = p['nama']
                     if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
@@ -5162,7 +5167,6 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                 if current_daily >= 1: continue
 
             for shf_jam, shf_role in base_roles:
-                # Store dilarang ditarik paksa ke role lain
                 if k['posisi'] == "LOG-STORE" and shf_role != "LOG-STORE": continue
                 if shf_jam == "SHIFT 3" or shf_role == "SPV": continue
                 
