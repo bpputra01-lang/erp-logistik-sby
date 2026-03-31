@@ -5138,104 +5138,87 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
-    # --- D. GENERATOR JADWAL (VERSI AGRESIF TARGET) ---
-    st.subheader("🚀 3. Generate Jadwal (Target 9-6-6)")
-    c_g1, c_g2 = st.columns([1, 4])
+    # --- D. GENERATOR JADWAL (VERSI ANTI-KURANG SHIFT) ---
+    st.subheader("🚀 3. Generate Jadwal (Strict Target 9-6-6)")
     
-    with c_g1:
-        start_date = st.date_input("Mulai Hari Senin", datetime.now())
-        if st.button("RUN GENERATOR", use_container_width=True):
-            days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-            day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+    if st.button("RUN GENERATOR", use_container_width=True):
+        days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+        day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+        
+        df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
+        df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
+
+        # Definisi Roles (Shift 2 SPV sudah masuk)
+        roles = [
+            ("SHIFT 3", "LOG-SO"), ("SHIFT 3", "LOG-SO"),
+            ("SHIFT 0", "LOG-SO"), ("SHIFT 0", "WF-SO"), ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-PICKER"),
+            ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
+            ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"),
+            ("SHIFT 2", "SPV"), ("SHIFT 2", "SPV")
+        ]
+
+        weekly_total = {nama: 0 for nama in df_staff['nama']}
+        weekly_data = []
+
+        for d_str in days:
+            used_today = {} 
+            day_col = []
             
-            df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
-            df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
-
-            roles = [
-                ("SHIFT 3", "LOG-SO"), ("SHIFT 3", "LOG-SO"),
-                ("SHIFT 0", "LOG-SO"), ("SHIFT 0", "WF-SO"), ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-PICKER"),
-                ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
-                ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"),
-                ("SHIFT 2", "SPV"), ("SHIFT 2", "SPV")
-            ]
-
-            weekly_total_masuk = {nama: 0 for nama in df_staff['nama']}
-            weekly_data = []
-
-            for d_str in days:
-                used_today = {} 
-                day_col = []
+            for shf_name, pos in roles:
+                # 1. Ambil kandidat sesuai role-nya
+                kandidat = df_staff[df_staff['posisi'] == pos].copy()
                 
-                # Biar adil tapi tetep ngejar target, kita kocok urutan role tiap hari
-                for shf_name, pos in roles:
-                    kandidat = df_staff[df_staff['posisi'] == pos].copy()
-                    
-                    # 1. Filter yang sedang Libur/Cuti/LPH
-                    kandidat = kandidat[~kandidat['nama'].isin(df_libur[df_libur['tanggal'] == d_str]['nama'])]
-                    
-                    if not kandidat.empty:
-                        # 2. HITUNG TARGET SISA (Sangat Penting!)
-                        def hitung_sisa(row):
-                            nama = row['nama']
-                            tipe = row['tipe']
-                            # Hitung berapa hari dia libur minggu ini
-                            hari_off = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
-                            
-                            # Target awal
-                            if tipe == "Part-Full": target = 9 - (hari_off * 2)
-                            else: target = 6 - hari_off
-                            
-                            # Sisa hutang shift
-                            return target - weekly_total_masuk.get(nama, 0)
-
-                        kandidat['sisa_hutang'] = kandidat.apply(hitung_sisa, axis=1)
+                # 2. Kick yang lagi LIBUR/LPH/CUTI
+                kandidat = kandidat[~kandidat['nama'].isin(df_libur[df_libur['tanggal'] == d_str]['nama'])]
+                
+                if not kandidat.empty:
+                    # 3. HITUNG HUTANG SHIFT (Target - Realita)
+                    def cek_hutang(row):
+                        nama = row['nama']
+                        tipe = row['tipe']
+                        hari_off = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
                         
-                        # 3. SORTING AGRESIF: Prioritaskan yang hutang shift-nya paling banyak
-                        kandidat = kandidat.sort_values(by='sisa_hutang', ascending=False)
-                        kandidat_list = kandidat.to_dict('records')
+                        # Set Target sesuai permintaan lu
+                        if tipe == "Part-Full": target = 9 - (hari_off * 2)
+                        else: target = 6 - hari_off
+                        return target - weekly_total.get(nama, 0)
 
-                        assigned = ""
-                        for k in kandidat_list:
-                            nama = k['nama']
-                            shift_hari_ini = used_today.get(nama, 0)
-                            
-                            # Syarat pilih:
-                            # - Masih ada hutang shift (>0)
-                            # - Kalau Part-Full boleh 2x sehari (double shift)
-                            # - Selain itu cuma boleh 1x sehari
-                            if k['sisa_hutang'] > 0:
-                                if k['tipe'] == "Part-Full":
-                                    if shift_hari_ini < 2:
-                                        assigned = nama
-                                else:
-                                    if shift_hari_ini < 1:
-                                        assigned = nama
+                    kandidat['hutang'] = kandidat.apply(cek_hutang, axis=1)
+                    
+                    # 4. SORTING: Prioritas yang hutangnya paling gede
+                    kandidat = kandidat.sort_values(by='hutang', ascending=False)
+                    kandidat_list = kandidat.to_dict('records')
 
-                            if assigned:
-                                weekly_total_masuk[nama] += 1
-                                used_today[nama] = shift_hari_ini + 1
-                                break
-                        day_col.append(assigned)
-                    else:
-                        day_col.append("")
+                    assigned = ""
+                    for k in kandidat_list:
+                        nama = k['nama']
+                        shift_hari_ini = used_today.get(nama, 0)
                         
-                weekly_data.append(day_col)
+                        # Aturan Main: 
+                        # - Part-Full wajib ngejar sampai 2 shift/hari kalau hutang masih banyak
+                        # - Full-Time/Lainnya 1 shift/hari aja
+                        if k['hutang'] > 0:
+                            if k['tipe'] == "Part-Full":
+                                if shift_hari_ini < 2:
+                                    assigned = nama
+                            else:
+                                if shift_hari_ini < 1:
+                                    assigned = nama
 
-            df_final = pd.DataFrame(weekly_data, index=day_names).T
-            df_final.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles])
-            st.session_state.res_df = df_final
-            st.session_state.summary_shift = weekly_total_masuk
+                        if assigned:
+                            weekly_total[nama] += 1
+                            used_today[nama] = shift_hari_ini + 1
+                            break
+                    day_col.append(assigned)
+                else:
+                    day_col.append("")
+            weekly_data.append(day_col)
 
-    # --- E. TAMPILAN (SAMA SEPERTI SEBELUMNYA) ---
-    if 'res_df' in st.session_state:
-        st.subheader(f"📊 HASIL JADWAL - {start_date}")
-        col_res1, col_res2 = st.columns([5, 1.5])
-        with col_res1:
-            st.dataframe(st.session_state.res_df, use_container_width=True, height=650)
-        with col_res2:
-            st.write("**Total Shift / Nama**")
-            sum_data = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
-            st.table(pd.DataFrame(sum_data).sort_values(by="TOTAL", ascending=False))
+        # Output Tabel
+        df_final = pd.DataFrame(weekly_data, index=day_names).T
+        df_final.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles])
+        st.session_state.res_df = df_final
+        st.session_state.summary_shift = weekly_total
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
