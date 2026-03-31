@@ -3611,10 +3611,6 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
-    /* Warna Placeholder */
-    input::placeholder {
-        color: #666666 !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
