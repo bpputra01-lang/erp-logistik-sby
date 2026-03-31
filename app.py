@@ -5001,7 +5001,7 @@ if menu == "Logistic Schedule":
     with col_l2:
         st.write("**Monitoring Libur Terkini**")
         # Ambil data libur terbaru
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 10", conn)
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
         
         if not df_off_view.empty:
             # Header Tabel Monitoring
