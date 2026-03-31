@@ -3602,7 +3602,7 @@ st.markdown("""
     
     /* FIX WARNA TEKS: Paksa jadi PUTIH BERSIH */
     input { 
-        color: #000000 !important; 
+        color: #FFFFFF !important; 
         -webkit-text-fill-color: #000000 !important;
     }
     
