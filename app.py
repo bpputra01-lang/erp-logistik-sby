@@ -3654,47 +3654,7 @@ def generate_logic(start_date):
 
     return pd.DataFrame(schedule_data)
 
-# --- UI NAVIGATION ---
-st.sidebar.title("🚛 JEZ Logistics SBY")
-menu = st.sidebar.radio("Navigasi", ["Dashboard", "Master Data Karyawan", "Input Libur/Cuti", "Logistic Schedule"])
 
-# --- MENU: DASHBOARD ---
-if menu == "Dashboard":
-    st.header("Dashboard Overview")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total Crew", len(pd.read_sql_query("SELECT * FROM karyawan", conn)))
-    c2.metric("Request Libur", len(pd.read_sql_query("SELECT * FROM libur_request", conn)))
-    st.info("Gunakan menu 'Logistic Schedule' untuk generate jadwal mingguan otomatis.")
-
-# --- MENU: MASTER DATA ---
-elif menu == "Master Data Karyawan":
-    st.header("👤 Management Staff")
-    with st.expander("Tambah Karyawan Baru"):
-        with st.form("add_staff"):
-            n = st.text_input("Nama Lengkap")
-            p = st.selectbox("Posisi", ["Picker", "Admin", "Loader", "Backliner"])
-            t = st.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
-            if st.form_submit_button("Simpan"):
-                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (n, p, t))
-                conn.commit()
-                st.success("Data Tersimpan!")
-    
-    st.subheader("List Karyawan Terdaftar")
-    st.dataframe(pd.read_sql_query("SELECT * FROM karyawan", conn), use_container_width=True)
-
-# --- MENU: INPUT LIBUR ---
-elif menu == "Input Libur/Cuti":
-    st.header("🔴 Request Off / Cuti / LPH")
-    df_names = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-    
-    with st.form("off_form"):
-        target = st.selectbox("Pilih Nama", df_names['nama'])
-        tgl = st.date_input("Tanggal Libur")
-        ket = st.selectbox("Jenis", ["Libur Rutin", "Cuti", "LPH"])
-        if st.form_submit_button("Submit Request"):
-            conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl), ket))
-            conn.commit()
-            st.success(f"Berhasil mencatat libur untuk {target}")
 
 
 
@@ -5040,7 +5000,47 @@ elif menu == "Logistic Schedule":
         # Fitur Download Excel
         csv = df_hasil.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Excel (CSV)", csv, f"Schedule_{start_date}.csv", "text/csv")
+# --- UI NAVIGATION ---
+st.sidebar.title("🚛 JEZ Logistics SBY")
+menu = st.sidebar.radio("Navigasi", ["Dashboard", "Master Data Karyawan", "Input Libur/Cuti", "Logistic Schedule"])
 
+# --- MENU: DASHBOARD ---
+if menu == "Dashboard":
+    st.header("Dashboard Overview")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Crew", len(pd.read_sql_query("SELECT * FROM karyawan", conn)))
+    c2.metric("Request Libur", len(pd.read_sql_query("SELECT * FROM libur_request", conn)))
+    st.info("Gunakan menu 'Logistic Schedule' untuk generate jadwal mingguan otomatis.")
+
+# --- MENU: MASTER DATA ---
+elif menu == "Master Data Karyawan":
+    st.header("👤 Management Staff")
+    with st.expander("Tambah Karyawan Baru"):
+        with st.form("add_staff"):
+            n = st.text_input("Nama Lengkap")
+            p = st.selectbox("Posisi", ["Picker", "Admin", "Loader", "Backliner"])
+            t = st.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
+            if st.form_submit_button("Simpan"):
+                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (n, p, t))
+                conn.commit()
+                st.success("Data Tersimpan!")
+    
+    st.subheader("List Karyawan Terdaftar")
+    st.dataframe(pd.read_sql_query("SELECT * FROM karyawan", conn), use_container_width=True)
+
+# --- MENU: INPUT LIBUR ---
+elif menu == "Input Libur/Cuti":
+    st.header("🔴 Request Off / Cuti / LPH")
+    df_names = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+    
+    with st.form("off_form"):
+        target = st.selectbox("Pilih Nama", df_names['nama'])
+        tgl = st.date_input("Tanggal Libur")
+        ket = st.selectbox("Jenis", ["Libur Rutin", "Cuti", "LPH"])
+        if st.form_submit_button("Submit Request"):
+            conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl), ket))
+            conn.commit()
+            st.success(f"Berhasil mencatat libur untuk {target}")
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
