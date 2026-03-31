@@ -3598,8 +3598,6 @@ conn = init_db()
 # --- CSS FIX: TEKS PUTIH & BG HITAM PEKAT (RATA KIRI) ---
 st.markdown("""
     <style>
-    /* Hilangkan sidebar */
-    [data-testid="stSidebar"] { display: none; }
     
     /* Styling Kotak Input: Rounded & Background HITAM PEKAT */
     div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
