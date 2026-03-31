@@ -3585,7 +3585,7 @@ from datetime import datetime, timedelta
 
 # --- SETUP DATABASE ---
 def init_db():
-    conn = sqlite3.connect('logistic_sby_v2.db')
+    conn = sqlite3.connect('logistic_sby_v3.db')
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS karyawan (nama TEXT, posisi TEXT, tipe TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS libur_request (nama TEXT, tanggal TEXT, jenis TEXT)')
@@ -3594,8 +3594,7 @@ def init_db():
 
 conn = init_db()
 
-st.set_page_config(page_title="JEZ SBY System", layout="wide")
-# --- INJECT CSS BIAR TULISAN PAS NGETIK KELIHATAN ---
+st.set_page_config(page_title="JEZ SBY - Logistic System", layout="wide")
 st.markdown("""
     <style>
     /* Paksa warna teks di dalam semua input box */
@@ -3617,8 +3616,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-
 
 
 
@@ -4941,129 +4938,124 @@ elif menu == "Compare System":
             
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
-# ==========================================
-# MENU 2: LOGISTIC SCHEDULE
-# ==========================================
-elif menu == "Logistic Schedule":
-    st.title("🗓️ LOGISTIC & WAREHOUSE SCHEDULE")
-    st.markdown("---")
-
-    # --- SECTION 1: INPUT DATA (Styling Modern) ---
-    col_input1, col_input2 = st.columns(2)
-
-    with col_input1:
-        st.markdown("### 👤 Karyawan Baru")
-        with st.expander("Buka Form Input", expanded=False):
-            with st.form("form_k"):
-                n = st.text_input("Nama Karyawan", placeholder="Masukkan Nama...")
-                p = st.selectbox("Posisi", ["PICKER", "ADMIN", "LOADER", "BACKLINER","SPV"])
-                t = st.selectbox("Tipe", ["Full-Time", "Part-Full", "Part-Time"])
-                if st.form_submit_button("💾 SIMPAN DATA"):
-                    if n:
-                        conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (n.upper(), p, t))
-                        conn.commit()
-                        st.success(f"✅ {n.upper()} Berhasil Disimpan!")
-                        st.rerun()
-                    else:
-                        st.error("Nama tidak boleh kosong!")
-
-    with col_input2:
-        st.markdown("### 📅 Cuti & Libur")
-        with st.expander("Buka Form Libur", expanded=False):
-            df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-            with st.form("form_l"):
-                target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else st.write("Data karyawan masih kosong.")
-                tgl = st.date_input("Tanggal Off")
-                ket = st.radio("Keterangan", ["LIBUR", "CUTI", "LPH"], horizontal=True)
-                if st.form_submit_button("📤 SUBMIT OFF"):
-                    conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl), ket))
-                    conn.commit()
-                    st.warning(f"⚠️ {target} OFF pada {tgl}")
-                    st.rerun()
-
-    st.markdown("---")
-
-    # --- SECTION 2: GENERATOR ---
-    col_gen1, col_gen2 = st.columns([1, 4])
-
-    with col_gen1:
-        st.markdown("### ⚙️ Control")
-        start_date = st.date_input("Senin Mulai", datetime.now())
-        btn_generate = st.button("🚀 GENERATE", use_container_width=True)
-        
-        if st.button("🗑️ RESET DATA", type="secondary", use_container_width=True):
-            conn.execute("DELETE FROM karyawan")
-            conn.execute("DELETE FROM libur_request")
+if menu == "Data Master":
+    st.header("👤 Database Karyawan")
+    with st.form("add_k"):
+        c1, c2, c3 = st.columns(3)
+        n = c1.text_input("Nama Lengkap")
+        p = c2.selectbox("Posisi", ["PICKER", "ADMIN", "LOADER", "BACKLINER", "SPV"])
+        t = c3.selectbox("Tipe", ["Full-Time", "Part-Full", "Part-Time"])
+        if st.form_submit_button("SIMPAN"):
+            conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (n.upper(), p, t))
             conn.commit()
+            st.success("Staff Berhasil Ditambahkan!")
             st.rerun()
+    st.dataframe(pd.read_sql_query("SELECT * FROM karyawan", conn), use_container_width=True)
 
-    # --- ENGINE LOGIC & TABLE DISPLAY ---
-    if btn_generate:
+elif menu == "Logistic Schedule":
+    st.title("📅 LOGISTIC SCHEDULE GENERATOR")
+
+    # --- SECTION MONITORING LIBUR ---
+    col_lib1, col_lib2 = st.columns([1, 2])
+    with col_lib1:
+        st.subheader("🚫 Input Libur")
+        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+        with st.form("form_l", clear_on_submit=True):
+            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else st.write("Data Kosong")
+            tgl = st.date_input("Tanggal Off")
+            ket = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
+            if st.form_submit_button("SUBMIT OFF"):
+                conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl), ket))
+                conn.commit()
+                st.rerun()
+
+    with col_lib2:
+        st.subheader("📋 Monitoring Off")
+        df_mon = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
+        st.table(df_mon)
+
+    st.divider()
+
+    # --- SECTION GENERATOR ---
+    c_gen1, c_gen2 = st.columns([1, 4])
+    with c_gen1:
+        st.markdown("### ⚙️ Setting")
+        start_date = st.date_input("Senin Mulai", datetime.now())
+        # Opsi khusus buat Shift 3 (Stock Opname)
+        enable_so = st.checkbox("Aktifkan Shift 3 (Stock Opname)", value=False)
+        btn_gen = st.button("🚀 GENERATE JADWAL", use_container_width=True)
+
+    if btn_gen:
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         
-        df_karyawan = pd.read_sql_query("SELECT * FROM karyawan", conn)
-        df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
+        df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
+        df_off = pd.read_sql_query("SELECT * FROM libur_request", conn)
         
-        final_rows = []
-        posisi_config = {
-            "PICKER": ["SHIFT 0", "SHIFT 1", "SHIFT 2", "SHIFT 2 LONG"],
-            "ADMIN": ["SHIFT 1", "SHIFT 2"],
-            "LOADER": ["SHIFT 1", "SHIFT 2"],
-            "BACKLINER": ["SHIFT 1", "SHIFT 2"]
-        }
+        final_schedule = []
+        
+        # Konfigurasi Kebutuhan Minimal per Shift
+        kebutuhan_base = [
+            ["SPV", "SHIFT 2", 1], 
+            ["PICKER", "SHIFT 0", 2], ["PICKER", "SHIFT 1", 2], ["PICKER", "SHIFT 2", 2],
+            ["ADMIN", "SHIFT 1", 1], ["ADMIN", "SHIFT 2", 1],
+            ["LOADER", "SHIFT 1", 2], ["LOADER", "SHIFT 2", 2],
+            ["BACKLINER", "SHIFT 1", 1], ["BACKLINER", "SHIFT 2", 1]
+        ]
 
-        for pos, shifts in posisi_config.items():
-            staff_pool = df_karyawan[df_karyawan['posisi'] == pos].to_dict('records')
-            for shf in shifts:
-                current_staff = [s for s in staff_pool if s['tipe'] in ["Part-Time", "Part-Full"]] if "LONG" in shf else staff_pool
-                if not current_staff: continue
-                
-                for idx, person in enumerate(current_staff):
-                    row = {"ROLE": f"{pos}-{shf}", "TIPE": person['tipe']}
-                    for i, d_str in enumerate(days):
-                        name, tipe, hari = person['nama'], person['tipe'], day_names[i]
-                        is_off_db = not df_libur[(df_libur['nama'] == name) & (df_libur['tanggal'] == d_str)].empty
-                        
-                        status = name
-                        if is_off_db: status = "LIBUR/CUTI"
-                        elif tipe == "Part-Full":
-                            if (idx % 2 == 0 and i >= 3) or (idx % 2 != 0 and i < 3): status = "GANTIAN"
-                        
-                        if "LONG" in shf and hari not in ["SABTU", "MINGGU"]: status = "-"
-                        row[hari] = status
-                    final_rows.append(row)
-
-        df_hasil = pd.DataFrame(final_rows)
-
-        # --- STYLING TABEL MENARIK (DARK THEME OPTIMIZED) ---
-        def color_grid(val):
-            # Merah Gelap untuk Libur
-            if val in ["LIBUR/CUTI", "GANTIAN"]:
-                return 'background-color: #721c24; color: #f8d7da; border: 0.5px solid #f5c6cb'
-            # Abu-abu untuk slot kosong
-            if val == "-":
-                return 'color: #444; border: none'
-            # Hijau Emerald untuk Masuk Kerja
-            return 'background-color: #064e3b; color: #ecfdf5; font-weight: bold; border: 0.5px solid #059669'
-
-        with col_gen2:
-            st.subheader(f"📊 JADWAL MINGGUAN: {start_date}")
-            st.dataframe(
-                df_hasil.style.applymap(color_grid), 
-                use_container_width=True, 
-                height=550
-            )
+        for i, d_str in enumerate(days):
+            hari = day_names[i]
+            used_today = {} # {nama: jumlah_shift_hari_ini}
             
-            # Tombol Download dengan style yang lebih oke
-            csv = df_hasil.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 DOWNLOAD JADWAL (CSV)",
-                data=csv,
-                file_name=f'jadwal_{start_date}.csv',
-                mime='text/csv',
-                use_container_width=True
-            )
+            kebutuhan_hari_ini = kebutuhan_base.copy()
+            if enable_so:
+                kebutuhan_hari_ini.append(["PICKER", "SHIFT 3 (SO)", 2])
+                kebutuhan_hari_ini.append(["ADMIN", "SHIFT 3 (SO)", 1])
+            
+            if hari in ["SABTU", "MINGGU"]:
+                kebutuhan_hari_ini.append(["PICKER", "SHIFT 2 LONG", 2])
+
+            day_results = []
+            for pos, shf, min_orang in kebutuhan_hari_ini:
+                # Filter staff berdasarkan posisi dan status libur
+                kandidat = df_staff[df_staff['posisi'] == pos].to_dict('records')
+                kandidat = [k for k in kandidat if df_off[(df_off['nama'] == k['nama']) & (df_off['tanggal'] == d_str)].empty]
+                random.shuffle(kandidat)
+
+                count_filled = 0
+                for k in kandidat:
+                    if count_filled < min_orang:
+                        nama = k['nama']
+                        tipe = k['tipe']
+                        
+                        # LOGIC ANTI-DOUBLE / PART-FULL
+                        shifts_taken = used_today.get(nama, 0)
+                        
+                        can_work = False
+                        if tipe in ["Full-Time", "Part-Time"]:
+                            if shifts_taken < 1: can_work = True # Maks 1 shift per hari
+                        elif tipe == "Part-Full":
+                            if shifts_taken < 2: can_work = True # BOLEH 2 SHIFT (Double) untuk kejar jatah 3 hari
+                        
+                        if can_work:
+                            day_results.append({"ROLE": f"{pos}-{shf}", "NAMA": nama})
+                            used_today[nama] = shifts_taken + 1
+                            count_filled += 1
+            
+            # Format baris untuk DataFrame
+            row = {res["ROLE"]: res["NAMA"] for res in day_results}
+            row["DAY"] = hari
+            final_schedule.append(row)
+
+        st.session_state.df_final = pd.DataFrame(final_schedule).set_index("DAY").T
+
+    # --- DISPLAY HASIL ---
+    if 'df_final' in st.session_state:
+        st.subheader(f"📊 JADWAL FINAL: {start_date}")
+        def color_rule(val):
+            return 'background-color: #064e3b; color: #00ff00; font-weight: bold; border: 1px solid #059669'
+
+        st.dataframe(st.session_state.df_final.style.applymap(color_rule), use_container_width=True, height=650)
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
