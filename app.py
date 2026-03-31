@@ -5026,7 +5026,7 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (LOGIC BRUTAL - TARGET HARGA MATI) ---
+   # --- D. GENERATOR JADWAL (LOGIC LU + TAMPILAN GW) ---
     if st.button("RUN GENERATOR JADWAL", use_container_width=True):
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5034,7 +5034,7 @@ if menu == "Logistic Schedule":
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        # TEMPLATE BARIS TETAP (Sesuai Gambar Lu)
+        # TEMPLATE BARIS HARGA MATI (GAK BOLEH BERUBAH)
         roles_template = [
             ("SHIFT 3", "LOG-SO"), ("SHIFT 3", "LOG-SO"),
             ("SHIFT 0", "LOG-SO"), ("SHIFT 0", "WF-SO"), 
@@ -5047,58 +5047,59 @@ if menu == "Logistic Schedule":
         weekly_total = {nama: 0 for nama in df_staff['nama']}
         schedule_data = {day: ["" for _ in range(len(roles_template))] for day in day_names}
 
-        # 1. TARGET FIX (GAK BOLEH BERUBAH MESKI LIBUR)
+        # 1. HITUNG TARGET FIX PER ORANG (LOGIC PUNYA LU)
         karyawan_list = df_staff.to_dict('records')
         for k in karyawan_list:
-            k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6 # Target Harga Mati
+            hari_off = len(df_libur[(df_libur['nama'] == k['nama']) & (df_libur['tanggal'].isin(days))])
+            if k['tipe'] == "Part-Full":
+                k['target'] = 9 - (hari_off * 2)
+            else:
+                k['target'] = 6 - hari_off
 
-        # Sortir: Target 9 dapet slot prioritas
-        karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True)
+        # Sortir biar target gede dapet slot duluan
+        karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target'], reverse=True)
 
-        # 2. PROSES PENGISIAN (HAJAR SISA HARI)
+        # 2. SEBAR NAMA KE TEMPLATE (LOGIC BRUTAL)
         for k in karyawan_sorted:
             nama = k['nama']
-            target = k['target_fix']
+            target = k['target']
+            posisi = k['posisi']
             
-            # Putar loop 3 kali buat mastiin jatah double shift masuk di sisa hari kerja
-            for _ in range(3):
+            for day_name, d_str in zip(day_names, days):
                 if weekly_total[nama] >= target: break
                 
-                for day_name, d_str in zip(day_names, days):
+                # Cek Plot Libur
+                if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == d_str)].empty:
+                    continue
+                
+                max_harian = 2 if k['tipe'] == "Part-Full" else 1
+                used_shifts = []
+                
+                for i, (shf_jam, shf_role) in enumerate(roles_template):
                     if weekly_total[nama] >= target: break
+                    if len(used_shifts) >= max_harian: break
                     
-                    # Cek Plot Libur
-                    if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == d_str)].empty:
-                        continue
+                    # SYARAT: Posisi Cocok, Slot Kosong, Jam Belum Diambil
+                    if shf_role == posisi and schedule_data[day_name][i] == "" and shf_jam not in used_shifts:
+                        schedule_data[day_name][i] = nama
+                        weekly_total[nama] += 1
+                        used_shifts.append(shf_jam)
 
-                    used_shifts_today = []
-                    # Part-Full boleh sampe 3 shift sehari kalo emang harinya mepet
-                    max_harian = 3 if k['tipe'] == "Part-Full" else 2
-
-                    for i, (shf_jam, shf_role) in enumerate(roles_template):
-                        if weekly_total[nama] >= target: break
-                        if len(used_shifts_today) >= max_harian: break
-                        
-                        # Isi jika Posisi pas, Slot kosong, dan Jam beda (Anti-Tabrak)
-                        if shf_role == k['posisi'] and schedule_data[day_name][i] == "" and shf_jam not in used_shifts_today:
-                            schedule_data[day_name][i] = nama
-                            weekly_total[nama] += 1
-                            used_shifts_today.append(shf_jam)
-
+        # Bungkus ke DataFrame
         df_res = pd.DataFrame(schedule_data)
         df_res.insert(0, "SHIFT - ROLE", [f"{s} - {r}" for s, r in roles_template])
         st.session_state.res_df = df_res
         st.session_state.summary_shift = weekly_total
 
-    # --- 4. TAMPILAN (DARK MODE & SUMMARY KANAN) ---
+    # --- TAMPILAN AKHIR (DARK MODE + SUMMARY KANAN) ---
     if 'res_df' in st.session_state:
         st.divider()
-        col_v1, col_v2 = st.columns([5, 1.5])
+        col_v1, col_v2 = st.columns([5, 1.8])
         
         with col_v1:
-            st.write("**📊 JADWAL KERJA**")
+            st.write("**📊 JADWAL KERJA (DARK MODE)**")
             def style_dark_green(val):
-                if val == "": return 'background-color: #1E1E1E;'
+                if not val: return 'background-color: #1E1E1E;'
                 return 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 1px solid #000;'
             
             st.dataframe(st.session_state.res_df.style.applymap(style_dark_green), use_container_width=True, height=700)
@@ -5106,7 +5107,6 @@ if menu == "Logistic Schedule":
         with col_v2:
             st.write("**📈 REALISASI**")
             sum_list = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
-            # Pastikan tabel summary isinya angka 9 dan 6
             st.table(pd.DataFrame(sum_list).sort_values(by="TOTAL", ascending=False))
 
 elif menu == "Balancing Stock":
