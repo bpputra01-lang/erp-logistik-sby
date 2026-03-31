@@ -3600,8 +3600,6 @@ st.set_page_config(page_title="JEZ SBY - Logistic System", layout="wide")
 # CSS: Custom Input Box sesuai request (Rounded & Clean)
 st.markdown("""
     <style>
-    /* Hilangkan sidebar */
-    [data-testid="stSidebar"] { display: none; }
     
     /* Styling Kotak Input (Text, Select, Date) biar mirip gambar lo */
     div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
