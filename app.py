@@ -5026,7 +5026,7 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (VERSI: MINGGU FULL & JATAH MINIMAL 9/6) ---
+   # --- D. GENERATOR JADWAL (VERSI: 9/6 HARGA MATI - MINGGU WAJIB ISI) ---
     if st.button("RUN GENERATOR JADWAL", use_container_width=True):
         dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5042,44 +5042,53 @@ if menu == "Logistic Schedule":
         ]
 
         karyawan_list = df_staff.to_dict('records')
+        for k in karyawan_list:
+            k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
+        
         storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
+        weekly_counter = {k['nama']: 0 for k in karyawan_list}
 
-        # --- LOGIC PLOTTING: GASPOL 7 HARI TANPA STOP ---
+        # --- STRATEGI: DISTRIBUSI RATA 7 HARI ---
+        # Kita loop per HARI dulu, tapi tiap hari kita ambil orang yang jatahnya masih jauh dari target
         for d_idx, day_name in enumerate(day_names):
             tgl_ini = dates_real[d_idx]
             
             for shf_jam, shf_role in base_roles:
-                if shf_jam == "SHIFT 3": continue # Tetap dikosongin sesuai request
+                if shf_jam == "SHIFT 3": continue # Tetap kosongin
                 
                 slot_key = f"{shf_jam} - {shf_role}"
                 
-                # Sortir karyawan: Prioritaskan yang shiftnya masih sedikit biar target minimal 9/6 tercapai duluan
-                # Tapi kalau semua sudah dapet jatah, tetep lanjut ngisi slot kosong
+                # Cari orang: Utamakan yang targetnya belum tercapai (9 atau 6)
                 karyawan_sorted = sorted(karyawan_list, key=lambda x: (
-                    # Dahulukan Part-Full (9)
+                    # 1. Pastikan yang belum nyampe target dapet prioritas
+                    0 if weekly_counter[x['nama']] < x['target_fix'] else 1,
+                    # 2. Part-Full (9) dapet slot duluan biar gak kurang
                     0 if x['tipe'] == "Part-Full" else 1,
-                    # Dahulukan yang jumlah shift-nya paling dikit saat ini
-                    sum([len([n for n in storage[d][sk] if n == x['nama']]) for d in day_names for sk in storage[d]])
+                    # 3. Ambil yang jumlah shiftnya paling dikit biar rata sampe Minggu
+                    weekly_counter[x['nama']]
                 ))
 
                 for k in karyawan_sorted:
                     nama = k['nama']
                     
-                    # 1. Cek Libur (Harga Mati)
+                    # CEK BATAS MATI: Gak boleh lebih dari target
+                    if weekly_counter[nama] >= k['target_fix']: continue
+                    
+                    # Cek Libur
                     if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty:
                         continue
                     
-                    # 2. Cek Kesesuaian Posisi
-                    if k['posisi'] != shf_role:
-                        continue
-                    
-                    # 3. Cek apakah sudah ada di shift jam yang sama (anti-double di slot yang sama)
-                    if nama in storage[day_name][slot_key]:
-                        continue
-
-                    # 4. MASUKKAN! (Gak pake 'if target >= target_fix', biar hari Minggu tetep keisi)
-                    storage[day_name][slot_key].append(nama)
-                    break # Slot ini sudah ada isinya, lanjut ke slot role berikutnya
+                    # Cek Role & Double Shift di slot yang sama
+                    if k['posisi'] == shf_role and nama not in storage[day_name][slot_key]:
+                        # Cek Double Shift di jam berbeda (Part-Full boleh 2x sehari biar tembus 9)
+                        sudah_kerja_jam_lain = any(nama in storage[day_name][sk] for sk in storage[day_name])
+                        
+                        # Aturan: Reguler (6) cuma boleh 1x sehari, Part-Full (9) boleh 2x biar tembus target
+                        if k['target_fix'] == 6 and sudah_kerja_jam_lain: continue
+                        
+                        storage[day_name][slot_key].append(nama)
+                        weekly_counter[nama] += 1
+                        break
 
         # --- GENERATE TABEL FINAL ---
         final_table = []
