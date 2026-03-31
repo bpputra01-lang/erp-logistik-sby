@@ -5000,9 +5000,34 @@ if menu == "Logistic Schedule":
 
     with col_l2:
         st.write("**Monitoring Libur Terkini**")
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
+        # Ambil data libur terbaru
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 10", conn)
+        
         if not df_off_view.empty:
-            st.table(df_off_view)
+            # Header Tabel Monitoring
+            h1, h2, h3, h4 = st.columns([3, 3, 2, 1])
+            h1.caption("NAMA")
+            h2.caption("TANGGAL")
+            h3.caption("JENIS")
+            h4.caption("AKSI")
+            st.markdown("---")
+
+            # Isi Data Monitoring dengan tombol hapus
+            for i, row in df_off_view.iterrows():
+                m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
+                m1.write(f"**{row['nama']}**")
+                m2.write(row['tanggal'])
+                m3.write(row['jenis'])
+                
+                # Tombol hapus spesifik baris libur
+                if m4.button("🗑️", key=f"del_libur_{row['nama']}_{row['tanggal']}_{i}"):
+                    conn.execute("DELETE FROM libur_request WHERE nama = ? AND tanggal = ? AND jenis = ?", 
+                                 (row['nama'], row['tanggal'], row['jenis']))
+                    conn.commit()
+                    st.success("Record Libur Dihapus!")
+                    st.rerun()
+        else:
+            st.info("Belum ada data libur.")
 
     st.divider()
 
