@@ -4956,7 +4956,7 @@ elif menu == "Logistic Schedule":
         with st.expander("Buka Form Input", expanded=False):
             with st.form("form_k"):
                 n = st.text_input("Nama Karyawan", placeholder="Masukkan Nama...")
-                p = st.selectbox("Posisi", ["PICKER", "ADMIN", "LOADER", "BACKLINER"])
+                p = st.selectbox("Posisi", ["PICKER", "ADMIN", "LOADER", "BACKLINER","SPV"])
                 t = st.selectbox("Tipe", ["Full-Time", "Part-Full", "Part-Time"])
                 if st.form_submit_button("💾 SIMPAN DATA"):
                     if n:
