@@ -5044,29 +5044,47 @@ if menu == "Logistic Schedule":
         weekly_total = {nama: 0 for nama in df_staff['nama']}
         schedule_data = {day: ["" for _ in range(len(roles_template))] for day in day_names}
 
+        # --- REVISI LOGIC: DISTRIBUSI ADIL & TARGET STRICT (9-6-6) ---
         for idx_day, d_str in enumerate(days):
             day_name = day_names[idx_day]
-            used_in_shift = {"SHIFT 3":[], "SHIFT 0":[], "SHIFT 1":[], "SHIFT 2":[]}
+            used_in_shift = {"SHIFT 3": [], "SHIFT 0": [], "SHIFT 1": [], "SHIFT 2": []}
             used_today_count = {nama: 0 for nama in df_staff['nama']}
 
+            # List tim yang nggak libur hari ini
             kandidat_hari_ini = df_staff[~df_staff['nama'].isin(df_libur[df_libur['tanggal'] == d_str]['nama'])].to_dict('records')
 
             for i, (shf_jam, shf_role) in enumerate(roles_template):
-                def hitung_hutang(k):
+                
+                # RE-CALCULATE HUTANG DI SETIAP BARIS SLOT (Agar dinamis)
+                def get_priority_score(k):
                     nama = k['nama']
+                    tipe = k['tipe']
                     hari_off = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
-                    target = 9 - (hari_off * 2) if k['tipe'] == "Part-Full" else 6 - hari_off
-                    return target - weekly_total.get(nama, 0)
+                    
+                    # Set target murni
+                    if tipe == "Part-Full": target = 9 - (hari_off * 2)
+                    elif tipe == "Full-Time": target = 6 - hari_off
+                    else: target = 6 - hari_off # Part-time
+                    
+                    sisa_hutang = target - weekly_total.get(nama, 0)
+                    return sisa_hutang
 
-                kandidat_sorted = sorted(kandidat_hari_ini, key=hitung_hutang, reverse=True)
+                # Sortir: Yang hutangnya paling banyak (paling butuh kerja) di atas
+                kandidat_sorted = sorted(kandidat_hari_ini, key=get_priority_score, reverse=True)
 
                 assigned = ""
                 for k in kandidat_sorted:
                     nama = k['nama']
-                    # LOGIC: Role Cocok & Anti-Bentrok Jam (Shift Sama) & Masih Hutang Shift
+                    hutang_skrg = get_priority_score(k)
+                    
+                    # Validasi:
+                    # 1. Role harus pas
+                    # 2. Anti-tabrak jam (nggak boleh ada di SHIFT yang sama)
+                    # 3. Masih ada hutang shift (> 0)
+                    # 4. Limit harian (Part-Full max 2, lainnya 1)
                     if k['posisi'] == shf_role:
                         if nama not in used_in_shift[shf_jam]:
-                            if hitung_hutang(k) > 0:
+                            if hutang_skrg > 0:
                                 max_h = 2 if k['tipe'] == "Part-Full" else 1
                                 if used_today_count[nama] < max_h:
                                     assigned = nama
