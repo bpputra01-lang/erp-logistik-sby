@@ -3321,12 +3321,10 @@ def main():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("1. Data Scan (RTO)")
-        file_scan = st.file_uploader("Upload Hasil Scan", type=['xlsx', 'csv'])
+        file_scan = st.file_uploader("Upload Hasil Scan rto", type=['xlsx', 'csv'])
         
     with col2:
-        st.subheader("2. Data Transfer Stock (TF)")
-        file_tf = st.file_uploader("Upload Data TF", type=['xlsx', 'csv'])
+        file_tf = st.file_uploader("Upload Transfer Stock Jezpro", type=['xlsx', 'csv'])
 
     if file_scan and file_tf:
         if st.button("▶️RUN DATA"):
