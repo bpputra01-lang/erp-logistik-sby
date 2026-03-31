@@ -5026,86 +5026,80 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (VERSI FINAL: TEMPLATE FIX & DARK MODE) ---
-    if st.button("RUN GENERATOR JADWAL", use_container_width=True):
+   # --- D. GENERATOR JADWAL (REVISI TAMPILAN - LOGIC TETAP) ---
+    if st.button("RUN GENERATOR JADWAL (TARGET ONLY)", use_container_width=True):
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        # TEMPLATE BARIS HARGA MATI (SESUAI GAMBAR LU)
-        roles_template = [
-            ("SHIFT 3", "LOG-SO"), ("SHIFT 3", "LOG-SO"),
-            ("SHIFT 0", "LOG-SO"), ("SHIFT 0", "WF-SO"), 
-            ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-PICKER"),
-            ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), 
-            ("SHIFT 1", "WF-ADMIN"), # Ini baris yang bakal keliatan kosong/item di gambar lu
-            ("SHIFT 1", "WF-PICKER"),
-            ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), 
-            ("SHIFT 2", "WF-ADMIN"), # Ini juga kosong
-            ("SHIFT 2", "WF-PICKER"),
-            ("SHIFT 2", "SPV"), ("SHIFT 2", "SPV")
-        ]
-
+        list_shift_jam = ["SHIFT 3", "SHIFT 0", "SHIFT 1", "SHIFT 2"]
+        
         weekly_total = {nama: 0 for nama in df_staff['nama']}
-        schedule_data = {day: ["" for _ in range(len(roles_template))] for day in day_names}
+        hasil_mentah = {d: {j: [] for j in list_shift_jam} for d in day_names}
 
-        # 1. TARGET HARGA MATI (9-6-6)
+        # 1. HITUNG TARGET FIX PER ORANG
         karyawan_list = df_staff.to_dict('records')
         for k in karyawan_list:
-            k['target'] = 9 if k['tipe'] == "Part-Full" else 6
+            hari_off = len(df_libur[(df_libur['nama'] == k['nama']) & (df_libur['tanggal'].isin(days))])
+            if k['tipe'] == "Part-Full":
+                k['target'] = 9 - (hari_off * 2)
+            else:
+                k['target'] = 6 - hari_off
+
+        # --- INI YANG TADI KETINGGALAN (SORTIR KARYAWAN) ---
         karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target'], reverse=True)
 
-        # 2. ISI SLOT (LOGIC HAJAR TARGET KE DALAM TEMPLATE)
+        # 2. SEBAR NAMA (LOGIC BRUTAL PUNYA LU)
         for k in karyawan_sorted:
             nama = k['nama']
             target = k['target']
+            posisi = k['posisi']
+            
             for day_name, d_str in zip(day_names, days):
                 if weekly_total[nama] >= target: break
                 if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == d_str)].empty:
                     continue
-
-                used_today = []
+                
                 max_harian = 2 if k['tipe'] == "Part-Full" else 1
-
-                for i, (shf_jam, shf_role) in enumerate(roles_template):
+                count_harian = 0
+                
+                for jam in list_shift_jam:
                     if weekly_total[nama] >= target: break
-                    if len(used_today) >= max_harian: break
+                    if count_harian >= max_harian: break
                     
-                    # Isi hanya jika Posisi COCOK dan Slot KOSONG
-                    if shf_role == k['posisi'] and schedule_data[day_name][i] == "" and shf_jam not in used_today:
-                        schedule_data[day_name][i] = nama
-                        weekly_total[nama] += 1
-                        used_today.append(shf_jam)
+                    hasil_mentah[day_name][jam].append(f"{posisi} | {nama}")
+                    weekly_total[nama] += 1
+                    count_harian += 1
 
-        df_res = pd.DataFrame(schedule_data)
-        # Nama Kolom Paling Kiri
-        df_res.insert(0, "SHIFT - ROLE", [f"{s} - {r}" for s, r in roles_template])
-        st.session_state.res_df = df_res
+        # 3. TAMPILAN RAPI PER GRUP SHIFT
+        final_table_rows = []
+        for jam in list_shift_jam:
+            # Hitung baris terbanyak di jam ini
+            max_rows_jam = max([len(hasil_mentah[d][jam]) for d in day_names]) if hasil_mentah else 0
+            
+            for r in range(max_rows_jam):
+                row_data = {"SHIFT": jam}
+                for d in day_names:
+                    row_data[d] = hasil_mentah[d][jam][r] if r < len(hasil_mentah[d][jam]) else ""
+                final_table_rows.append(row_data)
+            
+            # Garis pemisah antar shift
+            if max_rows_jam > 0:
+                final_table_rows.append({d: "---" for d in (["SHIFT"] + day_names)})
+
+        st.session_state.res_df = pd.DataFrame(final_table_rows)
         st.session_state.summary_shift = weekly_total
 
-    # --- TAMPILAN DARK MODE (ITEM - IJO) ---
+    # --- TAMPILAN AKHIR ---
     if 'res_df' in st.session_state:
         st.divider()
-        col_v1, col_v2 = st.columns([5, 1.5])
+        st.dataframe(st.session_state.res_df, use_container_width=True, height=600)
         
-        with col_v1:
-            st.write("**📊 JADWAL KERJA (TEMPLATE FIX)**")
-            
-            # STYLING DARK MODE: BACKGROUND ITEM, TULISAN IJO NEON
-            def style_dark_green(val):
-                if val == "": # Baris kosong tetep item
-                    return 'background-color: #1E1E1E;'
-                return 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 1px solid #000;'
-            
-            styled_df = st.session_state.res_df.style.applymap(style_dark_green)
-            st.dataframe(styled_df, use_container_width=True, height=700)
-        
-        with col_v2:
-            st.write("**📈 SUMMARY**")
-            sum_list = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
-            st.table(pd.DataFrame(sum_list).sort_values(by="TOTAL", ascending=False))
+        st.write("### 📈 Summary Realisasi")
+        sum_list = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
+        st.table(pd.DataFrame(sum_list).sort_values(by="TOTAL", ascending=False))
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
