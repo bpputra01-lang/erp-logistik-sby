@@ -3444,7 +3444,8 @@ def tampilan_balancing_stock():
         f_source_dc = f"UPPER(\"{col_bin}\") LIKE '%DC%' AND {base_excl}"
 
         # --- 1. LOGIKA MISSING (STOK SOURCE > 0 DAN STOK TARGET <= 0) ---
-        # SESUAI GAMBAR EXCEL: Nangkep SKU yang di GL3 isinya 0 tapi di GL4 ada isinya
+        
+        # GL4 to GL3 Tetap (Sesuai Excel 52 SKU)
         q_logic_gl_missing = f"""
             SELECT "{col_sku}" FROM stock_raw 
             WHERE {base_excl}
@@ -3453,11 +3454,12 @@ def tampilan_balancing_stock():
                AND SUM(CASE WHEN {f_target_gl3} THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
+        # DC to Store (TAMBAHAN FILTER: STOK DC WAJIB > 1)
         q_logic_dc_missing = f"""
             SELECT "{col_sku}" FROM stock_raw 
             WHERE {base_excl}
             GROUP BY "{col_sku}"
-            HAVING SUM(CASE WHEN {f_source_dc} THEN "{col_qty}" ELSE 0 END) > 0
+            HAVING SUM(CASE WHEN {f_source_dc} THEN "{col_qty}" ELSE 0 END) > 1
                AND SUM(CASE WHEN {f_target_store} THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
