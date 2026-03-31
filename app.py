@@ -3401,7 +3401,7 @@ def tampilan_balancing_stock():
         except Exception as e:
             st.error(f"Gagal upload: {e}")
 
-    # --- 2. LOGIKA ANALISIS (REVISED: UNIQUE SKU COMPARISON) ---
+    # --- 2. LOGIKA ANALISIS (REVISED: STOK VS STOK COMPARISON) ---
     try:
         df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_raw'", conn)
         if df_check.empty:
@@ -3425,11 +3425,11 @@ def tampilan_balancing_stock():
             UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%AMP%'
         """
 
-        # --- DEFINISI FILTER AREA ---
+        # --- DEFINISI AREA FILTER ---
         # Target GL3: Kecualikan PUTAWAY & RAK
         f_target_gl3 = f"UPPER(\"{col_bin}\") LIKE '%GL3%' AND UPPER(\"{col_bin}\") NOT LIKE '%PUTAWAY%' AND UPPER(\"{col_bin}\") NOT LIKE '%RAK%'"
         
-        # Source GL4: Kecualikan REJECT, DEFECT, LIVE, ONLINE, RAK
+        # Source GL4: Area asal stok
         f_source_gl4 = f"""
             UPPER("{col_bin}") LIKE '%GL4%' 
             AND UPPER("{col_bin}") NOT LIKE '%REJECT%' AND UPPER("{col_bin}") NOT LIKE '%DEFECT%' 
@@ -3440,21 +3440,25 @@ def tampilan_balancing_stock():
         # Target Store: TOKO, STORE, GUDANG LT.2
         f_target_store = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
         
-        # Source DC: Gunakan base_excl standar
+        # Source DC: Area pusat
         f_source_dc = f"UPPER(\"{col_bin}\") LIKE '%DC%' AND {base_excl}"
 
-        # --- 1. LOGIKA MISSING (SUMIF ANALOGY) ---
-        # Mencari SKU yang ada di Source (Qty > 0) tapi TIDAK ADA recordnya di Target
+        # --- 1. LOGIKA MISSING (STOK SOURCE > 0 DAN STOK TARGET <= 0) ---
+        # SESUAI GAMBAR EXCEL: Nangkep SKU yang di GL3 isinya 0 tapi di GL4 ada isinya
         q_logic_gl_missing = f"""
-            SELECT "{col_sku}" FROM stock_raw WHERE {f_source_gl4}
-            GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-            AND "{col_sku}" NOT IN (SELECT DISTINCT "{col_sku}" FROM stock_raw WHERE {f_target_gl3})
+            SELECT "{col_sku}" FROM stock_raw 
+            WHERE {base_excl}
+            GROUP BY "{col_sku}"
+            HAVING SUM(CASE WHEN {f_source_gl4} THEN "{col_qty}" ELSE 0 END) > 0
+               AND SUM(CASE WHEN {f_target_gl3} THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
         q_logic_dc_missing = f"""
-            SELECT "{col_sku}" FROM stock_raw WHERE {f_source_dc}
-            GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-            AND "{col_sku}" NOT IN (SELECT DISTINCT "{col_sku}" FROM stock_raw WHERE {f_target_store})
+            SELECT "{col_sku}" FROM stock_raw 
+            WHERE {base_excl}
+            GROUP BY "{col_sku}"
+            HAVING SUM(CASE WHEN {f_source_dc} THEN "{col_qty}" ELSE 0 END) > 0
+               AND SUM(CASE WHEN {f_target_store} THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
         # --- 2. QUERY METRIKS ---
@@ -3480,11 +3484,13 @@ def tampilan_balancing_stock():
         with c1:
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 Total SKU Aktif</p><p class="metric-value">{int(q_data["Total_SKU_Clean"]):,}</p><p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p></div>', unsafe_allow_html=True)
         with c2:
-            perc = ((dc_total - dc_missing) / dc_total * 100) if dc_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Store</p><p class="metric-value">{dc_total - dc_missing:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+            dc_avail = dc_total - dc_missing
+            perc = (dc_avail / dc_total * 100) if dc_total > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Store</p><p class="metric-value">{dc_avail:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
         with c3:
-            perc = ((gl4_total - gl4_missing) / gl4_total * 100) if gl4_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl4_total - gl4_missing:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+            gl_avail = gl4_total - gl4_missing
+            perc = (gl_avail / gl4_total * 100) if gl4_total > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl_avail:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
 
         cc1, cc2 = st.columns(2)
         with cc1:
@@ -3499,6 +3505,7 @@ def tampilan_balancing_stock():
         t1, t2 = st.tabs(["DC ➔ Store", "GL4 ➔ GL3"])
         
         with t1:
+            # Mengambil deskripsi terbaru untuk SKU yang missing
             df_dc = pd.read_sql(f"""
                 SELECT "{col_sku}" as SKU, MAX("{col_desc_e}") as Deskripsi 
                 FROM stock_raw 
@@ -3511,6 +3518,7 @@ def tampilan_balancing_stock():
                 st.info("✅ DC sinkron.")
 
         with t2:
+            # Mengambil deskripsi terbaru untuk SKU yang missing
             df_gl = pd.read_sql(f"""
                 SELECT "{col_sku}" as SKU, MAX("{col_desc_e}") as Deskripsi 
                 FROM stock_raw 
@@ -3523,7 +3531,7 @@ def tampilan_balancing_stock():
                 st.info("✅ GL4 to GL3 sinkron.")
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error pada sistem analisis: {e}")
     finally:
         conn.close()
 
