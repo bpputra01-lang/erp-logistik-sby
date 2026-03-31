@@ -3596,22 +3596,6 @@ conn = init_db()
 
 st.set_page_config(page_title="JEZ SBY System", layout="wide")
 
-# --- SIDEBAR MENU ---
-st.sidebar.title("🚛 JEZ LOGISTICS")
-menu = st.sidebar.radio("Pilih Menu:", ["Dashboard", "Logistic Schedule"])
-
-# ==========================================
-# MENU 1: DASHBOARD (Opsional untuk cek data)
-# ==========================================
-if menu == "Dashboard":
-    st.title("📊 Dashboard Overview")
-    col_view1, col_view2 = st.columns(2)
-    with col_view1:
-        st.write("📋 **DATABASE KARYAWAN**")
-        st.dataframe(pd.read_sql_query("SELECT * FROM karyawan", conn), use_container_width=True)
-    with col_view2:
-        st.write("🚫 **DAFTAR LIBUR TERINPUT**")
-        st.dataframe(pd.read_sql_query("SELECT * FROM libur_request", conn), use_container_width=True)
 
 
 
