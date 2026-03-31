@@ -5054,7 +5054,7 @@ if menu == "Logistic Schedule":
 
 import random
 
-# --- D. GENERATOR JADWAL (VERSI: SPREAD FIRST - NO EMPTY SLOTS) ---
+# --- D. GENERATOR JADWAL (VERSI: WATER-TIGHT SPREAD) ---
 if st.button("RUN GENERATOR JADWAL", use_container_width=True):
     dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5084,7 +5084,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                 count += 1
         return count
 
-    # --- STEP 1: PRIORITAS - ISI 1 ORANG DI SETIAP SLOT DULU (ANTI KOSONG) ---
+    # --- STEP 1: PRIORITAS ANTI-BOLONG (MINIMAL 1 ORANG PER SLOT) ---
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
         shuffled_roles = base_roles.copy()
@@ -5094,69 +5094,84 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
             if shf_jam == "SHIFT 3": continue
             slot_key = f"{shf_jam} - {shf_role}"
             
-            # Cari orang yang posisinya cocok dan belum kerja hari ini
+            # Cari staff yang sesuai posisi dan masih punya jatah
             potential = [k for k in karyawan_list if k['posisi'] == shf_role and weekly_counter[k['nama']] < k['target_fix']]
             random.shuffle(potential)
             
             for p in potential:
                 nama = p['nama']
                 if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                if get_daily_count(nama, day_name) >= 1: continue # Di tahap ini, 1 orang 1 hari dulu
+                # KUNCI: Di Step 1, satu orang HARAM masuk 2 kali sebelum semua slot terisi
+                if get_daily_count(nama, day_name) >= 1: continue 
                 
                 if not any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
                     storage[day_name][slot_key].append(nama)
                     weekly_counter[nama] += 1
-                    break # Slot ini sudah isi 1, lanjut ke slot role berikutnya
+                    break
 
-    # --- STEP 2: PENUHI JATAH (MAKSIMAL 2 ORANG PER SLOT & DOUBLE SHIFT PART-FULL) ---
-    for k in sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True):
-        nama = k['nama']
-        shuffled_days = day_names.copy()
-        random.shuffle(shuffled_days)
+    # --- STEP 2: FILLING DOUBLE SHIFT (KHUSUS PART-FULL MAX 3 HARI) ---
+    for day_name in day_names:
+        tgl_ini = dates_real[day_names.index(day_name)]
+        shuffled_roles = base_roles.copy()
+        random.shuffle(shuffled_roles)
         
-        for day_name in shuffled_days:
-            if weekly_counter[nama] >= k['target_fix']: break
-            tgl_ini = dates_real[day_names.index(day_name)]
-            if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+        for shf_jam, shf_role in shuffled_roles:
+            if shf_jam == "SHIFT 3": continue
+            slot_key = f"{shf_jam} - {shf_role}"
+            limit = 2 if not ("STORE" in shf_role and shf_jam != "SHIFT 2") else 1
             
-            # Cek limit harian sesuai tipe
-            current_daily = get_daily_count(nama, day_name)
-            if k['tipe'] == "Part-Full":
+            # Jika slot masih butuh orang untuk jadi 2
+            if len(storage[day_name][slot_key]) < limit:
+                potential = [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix']]
+                random.shuffle(potential)
+                
+                for p in potential:
+                    nama = p['nama']
+                    if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+                    
+                    current_daily = get_daily_count(nama, day_name)
+                    # VALIDASI DOUBLE SHIFT
+                    if p['tipe'] == "Part-Full":
+                        if current_daily >= 2: continue
+                        if current_daily == 1 and double_day_count[nama] >= 3: continue
+                    else:
+                        if current_daily >= 1: continue # Full-timer mutlak 1 shift
+                    
+                    # Cek bentrok jam
+                    if not any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
+                        if nama not in storage[day_name][slot_key]:
+                            storage[day_name][slot_key].append(nama)
+                            weekly_counter[nama] += 1
+                            if get_daily_count(nama, day_name) == 2:
+                                double_day_count[nama] += 1
+                            if len(storage[day_name][slot_key]) >= limit: break
+
+    # --- STEP 3: FINAL SWEEP (PENGHABISAN JATAH) ---
+    for kb in [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix']]:
+        nama_sisa = kb['nama']
+        for day_name in day_names:
+            if weekly_counter[nama_sisa] >= kb['target_fix']: break
+            tgl_ini = dates_real[day_names.index(day_name)]
+            if not df_libur[(df_libur['nama'] == nama_sisa) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+            
+            # Tetap patuhi aturan double shift
+            current_daily = get_daily_count(nama_sisa, day_name)
+            if kb['tipe'] == "Part-Full":
                 if current_daily >= 2: continue
-                if current_daily == 1 and double_day_count[nama] >= 3: continue
+                if current_daily == 1 and double_day_count[nama_sisa] >= 3: continue
             else:
                 if current_daily >= 1: continue
 
-            shuffled_roles = base_roles.copy()
-            random.shuffle(shuffled_roles)
-            for shf_jam, shf_role in shuffled_roles:
-                if weekly_counter[nama] >= k['target_fix']: break
-                if shf_jam == "SHIFT 3": continue 
-                
-                if k['posisi'] == shf_role:
-                    slot_key = f"{shf_jam} - {shf_role}"
-                    # Baru di sini boleh nambahin jadi 2 orang
-                    limit = 2 if not ("STORE" in shf_role and shf_jam != "SHIFT 2") else 1
-                    if len(storage[day_name][slot_key]) < limit:
-                        if not any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
-                            if nama not in storage[day_name][slot_key]:
-                                storage[day_name][slot_key].append(nama)
-                                weekly_counter[nama] += 1
-                                if get_daily_count(nama, day_name) == 2:
-                                    double_day_count[nama] += 1
-                                break
-
-    # --- STEP 3: BACKUP & SWEEP (TETAP DENGAN DOUBLE LIMIT) ---
-    # (Gunakan logic Backup dan Sweep dari kode lu sebelumnya, tapi pastikan get_daily_count tetap dicek)
-    for day_name in day_names:
-        tgl_ini = dates_real[day_names.index(day_name)]
-        for shf_jam, shf_role in base_roles:
-            slot_key = f"{shf_jam} - {shf_role}"
-            if "ADMIN" in shf_role or shf_jam == "SHIFT 3" or shf_role == "SPV": continue
-            target_min = 1 # Pastikan minimal 1 dulu
-            if len(storage[day_name][slot_key]) < target_min:
-                # ... (isi backup seperti kode sebelumnya)
-                pass
+            for shf_jam, shf_role in base_roles:
+                if weekly_counter[nama_sisa] >= kb['target_fix']: break
+                if shf_jam == "SHIFT 3": continue
+                slot_key = f"{shf_jam} - {shf_role}"
+                if len(storage[day_name][slot_key]) < 2:
+                    if not any(nama_sisa in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
+                        storage[day_name][slot_key].append(nama_sisa + " (SWEEP)")
+                        weekly_counter[nama_sisa] += 1
+                        if get_daily_count(nama_sisa, day_name) == 2:
+                            double_day_count[nama_sisa] += 1
 
     # --- STEP 4: GENERATE TABEL ---
     final_table = []
