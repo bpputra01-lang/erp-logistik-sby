@@ -4960,14 +4960,22 @@ elif menu == "Compare System":
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
 
+import pandas as pd
+import random
+import sqlite3
+from datetime import datetime, timedelta
+import streamlit as st
+
+# Pastikan koneksi DB lu didefinisikan (contoh: conn = sqlite3.connect('data.db'))
+
 if menu == "Logistic Schedule":
     st.markdown("---")
 
-    # --- A. INPUT DATABASE TIM ---
-    st.subheader("👤 1. Input Database Tim")
-    with st.form("form_tim_fix", clear_on_submit=True): 
+    # --- 1. DATABASE TIM (FULL) ---
+    st.subheader("👤 1. Database & Input Tim")
+    with st.form("form_tim_komplit", clear_on_submit=True): 
         c1, c2, c3 = st.columns(3)
-        nama_input = c1.text_input("Nama Lengkap (Contoh: GALIH)")
+        nama_input = c1.text_input("Nama Lengkap")
         posisi_input = c2.selectbox("Posisi/Role", 
             ["WF-PICKER", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
         tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
@@ -4976,20 +4984,24 @@ if menu == "Logistic Schedule":
             if nama_input:
                 conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper(), posisi_input, tipe_input))
                 conn.commit()
-                st.success(f"✅ {nama_input.upper()} Berhasil Terdaftar!")
+                st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
+
+    with st.expander("🔍 Lihat Daftar Tim"):
+        df_tim = pd.read_sql_query("SELECT * FROM karyawan", conn)
+        st.dataframe(df_tim, use_container_width=True)
 
     st.divider()
 
-    # --- B. MONITORING LIBUR ---
+    # --- 2. PLOT LIBUR (FULL) ---
     st.subheader("🚫 2. Plot Libur & Monitoring")
     col_l1, col_l2 = st.columns([1, 2])
     
     with col_l1:
         df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        with st.form("form_libur_fix", clear_on_submit=True):
-            target = st.selectbox("Pilih Nama Tim", df_k['nama']) if not df_k.empty else st.warning("Isi Data Tim Dulu!")
-            tgl_off = st.date_input("Tanggal")
+        with st.form("form_libur_komplit", clear_on_submit=True):
+            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else st.warning("Isi Data Tim!")
+            tgl_off = st.date_input("Tanggal Off")
             jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH", "TGL MERAH"], horizontal=True)
             if st.form_submit_button("SUBMIT OFF"):
                 conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
@@ -4997,23 +5009,24 @@ if menu == "Logistic Schedule":
                 st.rerun()
 
     with col_l2:
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 10", conn)
         if not df_off_view.empty:
             for i, row in df_off_view.iterrows():
                 m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
                 m1.write(f"**{row['nama']}**")
                 m2.write(row['tanggal'])
                 m3.write(row['jenis'])
-                if m4.button("🗑️", key=f"del_libur_{i}"):
-                    conn.execute("DELETE FROM libur_request WHERE nama = ? AND tanggal = ?", (row['nama'], row['tanggal']))
-                    conn.commit() ; st.rerun()
+                if m4.button("🗑️", key=f"del_{i}"):
+                    conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
+                    conn.commit(); st.rerun()
 
     st.divider()
 
-   # --- D. GENERATOR JADWAL (LOGIC: TARGET WAJIB & ANTI-BENTROK JAM) ---
-    st.subheader("🚀 3. Generate Jadwal (Strict Target 9-6-6)")
+    # --- 3. GENERATOR ANTI-TABRAK (LOGIC STRICT 9-6-6) ---
+    st.subheader("🚀 3. Generator Jadwal Otomatis")
+    start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-    if st.button("RUN GENERATOR", use_container_width=True):
+    if st.button("RUN GENERATOR JADWAL", use_container_width=True):
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         
@@ -5033,38 +5046,29 @@ if menu == "Logistic Schedule":
 
         for idx_day, d_str in enumerate(days):
             day_name = day_names[idx_day]
-            # used_in_shift buat nyatet: Di jam ini siapa aja yang udah masuk
-            used_in_shift = {"SHIFT 3": [], "SHIFT 0": [], "SHIFT 1": [], "SHIFT 2": []}
-            # used_today buat pembatas max 2 shift per hari buat Part-Full
+            used_in_shift = {"SHIFT 3":[], "SHIFT 0":[], "SHIFT 1":[], "SHIFT 2":[]}
             used_today_count = {nama: 0 for nama in df_staff['nama']}
 
-            # Ambil semua tim yang nggak libur hari ini
             kandidat_hari_ini = df_staff[~df_staff['nama'].isin(df_libur[df_libur['tanggal'] == d_str]['nama'])].to_dict('records')
 
             for i, (shf_jam, shf_role) in enumerate(roles_template):
-                # Sort kandidat: Utamakan yang sisa hutang shift-nya paling banyak
                 def hitung_hutang(k):
                     nama = k['nama']
                     hari_off = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
                     target = 9 - (hari_off * 2) if k['tipe'] == "Part-Full" else 6 - hari_off
-                    return target - weekly_total[nama]
+                    return target - weekly_total.get(nama, 0)
 
                 kandidat_sorted = sorted(kandidat_hari_ini, key=hitung_hutang, reverse=True)
 
                 assigned = ""
                 for k in kandidat_sorted:
                     nama = k['nama']
-                    # LOGIC UTAMA:
-                    # 1. Role harus cocok
-                    # 2. Belum ada di jam (SHIFT) yang sama hari ini (ANTI-TABRAK)
-                    # 3. Masih ada hutang shift
-                    # 4. Part-Full max 2x sehari, lainnya max 1x sehari
-                    
+                    # LOGIC: Role Cocok & Anti-Bentrok Jam (Shift Sama) & Masih Hutang Shift
                     if k['posisi'] == shf_role:
                         if nama not in used_in_shift[shf_jam]:
                             if hitung_hutang(k) > 0:
-                                max_harian = 2 if k['tipe'] == "Part-Full" else 1
-                                if used_today_count[nama] < max_harian:
+                                max_h = 2 if k['tipe'] == "Part-Full" else 1
+                                if used_today_count[nama] < max_h:
                                     assigned = nama
                                     break
                 
@@ -5074,20 +5078,22 @@ if menu == "Logistic Schedule":
                     used_in_shift[shf_jam].append(assigned)
                     used_today_count[assigned] += 1
 
-        df_final = pd.DataFrame(schedule_data)
-        df_final.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles_template])
-        st.session_state.res_df = df_final
+        df_res = pd.DataFrame(schedule_data)
+        df_res.insert(0, "ROLE", [f"{s} - {r}" for s, r in roles_template])
+        st.session_state.res_df = df_res
         st.session_state.summary_shift = weekly_total
 
-    # --- D. TAMPILAN HASIL ---
+    # --- 4. TAMPILAN HASIL (FULL) ---
     if 'res_df' in st.session_state:
-        c_res1, c_res2 = st.columns([5, 1.5])
-        with c_res1:
-            st.dataframe(st.session_state.res_df, use_container_width=True, height=600)
-        with c_res2:
-            st.write("**Total Shift / Nama**")
-            sum_data = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
-            st.table(pd.DataFrame(sum_data).sort_values(by="TOTAL", ascending=False))
+        st.divider()
+        col_view1, col_view2 = st.columns([5, 1.5])
+        with col_view1:
+            st.write("### 📊 Jadwal Mingguan")
+            st.dataframe(st.session_state.res_df, use_container_width=True, height=650)
+        with col_view2:
+            st.write("### 📈 Summary")
+            sum_list = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
+            st.table(pd.DataFrame(sum_list).sort_values(by="TOTAL", ascending=False))
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
