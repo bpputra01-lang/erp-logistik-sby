@@ -3624,16 +3624,6 @@ st.markdown("""
             color: white !important; 
             -webkit-text-fill-color: white !important; /* Biar teks beneran putih di Chrome */
         }
-
-        div.stButton > button {
-            background-color: #007BFF !important;
-            color: white !important;
-            border-radius: 8px !important;
-            width: 100% !important;
-            height: 48px !important;
-            font-weight: bold !important;
-        }
-        label { color: #E0E0E0 !important; font-weight: 600 !important; }
     </style>
 """, unsafe_allow_html=True)
 st.markdown('<div class="hero-header">📅LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
