@@ -3555,8 +3555,16 @@ def tampilan_balancing_stock():
         st.markdown("### 📋 Detail List SKU Need Distributed")
         t1, t2 = st.tabs(["DC ➔ Store", "GL4 ➔ GL3"])
         
+        # Ganti bagian query di dalam tab dengan ini agar lebih cepat:
         with t1:
-            df_dc = pd.read_sql(f"SELECT \"{col_sku}\" as SKU, MAX(\"{col_desc_e}\") as Deskripsi FROM stock_raw WHERE \"{col_sku}\" IN ({q_logic_dc_missing}) GROUP BY \"{col_sku}\"", conn)
+            # Langsung tarik data dari hasil q_logic_dc_missing yang sudah didefinisikan
+            df_dc = pd.read_sql(f"""
+            SELECT "{col_sku}" as SKU, MAX("{col_desc_e}") as Deskripsi 
+            FROM stock_raw 
+            WHERE "{col_sku}" IN ({q_logic_dc_missing}) 
+            GROUP BY "{col_sku}"
+            """, conn)
+    # ... sisanya sama
             st.dataframe(df_dc, use_container_width=True) if not df_dc.empty else st.info("✅ DC sinkron.")
 
         with t2:
