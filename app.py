@@ -4959,6 +4959,9 @@ elif menu == "Compare System":
             
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
+from datetime import datetime, timedelta
+import pandas as pd
+import random
 # ==========================================
 # SEMUA FITUR MASUK KE MENU INI
 # ==========================================
