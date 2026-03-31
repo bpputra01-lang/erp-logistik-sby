@@ -3594,10 +3594,6 @@ def init_db():
     return conn
 
 conn = init_db()
-# Pastikan jarak spasi dari pinggir kiri itu sama semua (konsisten)
-if menu == "Logistic Schedule":
-    st.title("📅 LOGISTIC SCHEDULE SYSTEM")
-    st.markdown("---") # <--- Error lo di sini tadi, pastiin sejajar sama st.title
 
     # Bagian CSS Custom Rounded Input yang lo minta
     st.markdown("""
