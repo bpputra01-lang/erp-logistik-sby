@@ -3318,63 +3318,6 @@ def process_allocation(df_scan, df_tf):
                 needed -= allocated
                 list_s[idx_s][df_scan.columns[scan_qty_idx]] -= allocated
                 
-                if list_s[idx_s][df_scan.columns[scan_qty_idx]] <= 0:
-                    idx_s += 1
-            
-            # INPUT SISA KE KOLOM J DENGAN HEADER "SISA QTY TF"
-            if needed > 0:
-                row_t_copy = row_t.copy()
-                row_t_copy[col_sisa_name] = needed 
-                tf_lebih.append(row_t_copy)
-
-        while idx_s < len(list_s):
-            rem_qty = float(list_s[idx_s].get(df_scan.columns[scan_qty_idx], 0))
-            if rem_qty > 0:
-                scan_lebih.append(list_s[idx_s])
-            idx_s += 1
-
-    return (pd.DataFrame(hasil_alokasi), pd.DataFrame(scan_lebih), 
-            pd.DataFrame(tf_lebih), pd.concat(missing_sku) if missing_sku else pd.DataFrame())
-
-# --- 4. NAVIGATION / MENU CONTROL ---
-def main():
-
-    if menu == "Compare Penerimaan RTO":
-        apply_custom_ui()
-        st.markdown('<div class="hero-header">COMPARE PENERIMAAN RTO</div>', unsafe_allow_html=True)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            up_scan = st.file_uploader("Upload Data Scan", type=['xlsx','csv'], key="scan_up")
-        with col2:
-            up_tf = st.file_uploader("Upload Transfer Stock", type=['xlsx'], key="tf_up")
-
-        if up_scan and up_tf:
-            if st.button("🚀 PROSES KOMPARASI DATA"):
-                df_s = pd.read_excel(up_scan)
-                df_t = pd.read_excel(up_tf)
-                st.session_state['rto_result'] = process_allocation(df_s, df_t)
-                st.success("Selesai!")
-
-        if 'rto_result' in st.session_state:
-            res1, res2, res3, res4 = st.session_state['rto_result']
-
-            t1, t2, t3, t4 = st.tabs(["🎯 HASIL ALOKASI", "📈 SCAN LEBIH", "📉 QTY TF LEBIH", "⚠️ SKU TIDAK MATCH"])
-            
-            with t1: st.dataframe(res1, use_container_width=True, hide_index=True)
-            with t2: st.dataframe(res2, use_container_width=True, hide_index=True)
-            with t3: st.dataframe(res3, use_container_width=True, hide_index=True) # Tab Qty TF Lebih
-            with t4: st.dataframe(res4, use_container_width=True, hide_index=True)
-
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                res1.to_excel(writer, sheet_name='HASIL ALOKASI', index=False)
-                res2.to_excel(writer, sheet_name='DATA SCAN LEBIH', index=False)
-                res3.to_excel(writer, sheet_name='QTY TF LEBIH', index=False)
-                res4.to_excel(writer, sheet_name='SKU TIDAK MATCH', index=False)
-            
-            st.download_button("📥 DOWNLOAD EXCEL", data=output.getvalue(), 
-                               file_name="Hasil_Compare_RTO.xlsx", use_container_width=True)
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -3465,14 +3408,14 @@ def tampilan_balancing_stock():
             st.info("Upload data dulu buat narik metriks.")
             return
 
-        # Ambil nama kolom secara dinamis
+        # Ambil kolom secara dinamis
         cols = pd.read_sql("SELECT * FROM stock_raw LIMIT 1", conn).columns
         col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
         col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
         col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
         col_desc_e = cols[4] # Kolom E untuk Deskripsi
 
-        # --- GLOBAL EXCLUSION FILTER ---
+        # --- GLOBAL EXCLUSION FILTER SURABAYA BRANCH ---
         base_excl = f"""
             UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
             UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
@@ -3482,11 +3425,11 @@ def tampilan_balancing_stock():
             UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%AMP%'
         """
 
-        # --- DEFINISI FILTER SOURCE & TARGET ---
-        # 1. Target GL3: Kecualikan PUTAWAY & RAK
+        # --- DEFINISI FILTER AREA ---
+        # Target GL3: Kecualikan PUTAWAY & RAK
         f_target_gl3 = f"UPPER(\"{col_bin}\") LIKE '%GL3%' AND UPPER(\"{col_bin}\") NOT LIKE '%PUTAWAY%' AND UPPER(\"{col_bin}\") NOT LIKE '%RAK%'"
         
-        # 2. Source GL4: Kecualikan REJECT, DEFECT, LIVE, ONLINE, RAK
+        # Source GL4: Kecualikan REJECT, DEFECT, LIVE, ONLINE, RAK
         f_source_gl4 = f"""
             UPPER("{col_bin}") LIKE '%GL4%' 
             AND UPPER("{col_bin}") NOT LIKE '%REJECT%' AND UPPER("{col_bin}") NOT LIKE '%DEFECT%' 
@@ -3494,14 +3437,14 @@ def tampilan_balancing_stock():
             AND UPPER("{col_bin}") NOT LIKE '%RAK%'
         """
 
-        # 3. Target Store: TOKO, STORE, GUDANG LT.2
+        # Target Store: TOKO, STORE, GUDANG LT.2
         f_target_store = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
         
-        # 4. Source DC: Gunakan base_excl standar Surabaya branch
+        # Source DC: Gunakan base_excl standar
         f_source_dc = f"UPPER(\"{col_bin}\") LIKE '%DC%' AND {base_excl}"
 
-        # --- 1. LOGIKA MISSING (UNIQUE SKU COMPARISON) ---
-        # Logika: SKU ada di Source (Qty > 0) tapi tidak terdaftar sama sekali di Target
+        # --- 1. LOGIKA MISSING (SUMIF ANALOGY) ---
+        # Mencari SKU yang ada di Source (Qty > 0) tapi TIDAK ADA recordnya di Target
         q_logic_gl_missing = f"""
             SELECT "{col_sku}" FROM stock_raw WHERE {f_source_gl4}
             GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
@@ -3527,71 +3470,60 @@ def tampilan_balancing_stock():
         # Kalkulasi Variabel Card
         dc_total = int(q_data['DC_Clean_Total'])
         dc_missing = int(q_data['DC_Missing_Count'])
-        dc_tersedia = dc_total - dc_missing
-        perc_dc_avail = (dc_tersedia / dc_total * 100) if dc_total > 0 else 0
-        perc_dc_missing = (dc_missing / dc_total * 100) if dc_total > 0 else 0
-
         gl4_total = int(q_data['GL4_Clean_Total'])
         gl4_missing = int(q_data['GL_Missing_Count'])
-        gl4_tersedia = gl4_total - gl4_missing
-        perc_gl_avail = (gl4_tersedia / gl4_total * 100) if gl4_total > 0 else 0
-        perc_gl_missing = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
 
-        # --- 3. TAMPILAN METRIKS ---
+        # --- 3. TAMPILAN DASHBOARD ---
         st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK</h4></div>', unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 Total SKU Aktif</p><p class="metric-value">{int(q_data["Total_SKU_Clean"]):,}</p><p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p></div>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Store</p><p class="metric-value">{dc_tersedia:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_dc_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+            perc = ((dc_total - dc_missing) / dc_total * 100) if dc_total > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Store</p><p class="metric-value">{dc_total - dc_missing:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl4_tersedia:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_gl_avail:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+            perc = ((gl4_total - gl4_missing) / gl4_total * 100) if gl4_total > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl4_total - gl4_missing:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
 
         cc1, cc2 = st.columns(2)
         with cc1:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ Not Yet Distributed DC to Store</p><p class="metric-value">{dc_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_dc_missing:.1f}% Belum Terdistribusi</p></div>', unsafe_allow_html=True)
+            perc = (dc_missing / dc_total * 100) if dc_total > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ Not Yet Distributed DC to Store</p><p class="metric-value">{dc_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc:.1f}% Belum Terdistribusi</p></div>', unsafe_allow_html=True)
         with cc2:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ Not Yet Refill GL4 to GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_gl_missing:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
+            perc = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ Not Yet Refill GL4 to GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 📋 Detail List SKU Need Distributed")
         t1, t2 = st.tabs(["DC ➔ Store", "GL4 ➔ GL3"])
         
         with t1:
-            query_dc_detail = f"""
-                SELECT 
-                    "{col_sku}" as SKU, 
-                    MAX("{col_desc_e}") as Deskripsi 
+            df_dc = pd.read_sql(f"""
+                SELECT "{col_sku}" as SKU, MAX("{col_desc_e}") as Deskripsi 
                 FROM stock_raw 
                 WHERE "{col_sku}" IN ({q_logic_dc_missing}) 
                 GROUP BY "{col_sku}"
-            """
-            df_dc = pd.read_sql(query_dc_detail, conn)
+            """, conn)
             if not df_dc.empty:
                 st.dataframe(df_dc, use_container_width=True)
-                st.download_button(f"📥 Download List DC ({len(df_dc)} SKU)", df_dc.to_csv(index=False), "dc_missing.csv")
             else:
                 st.info("✅ DC sinkron.")
 
         with t2:
-            query_gl_detail = f"""
-                SELECT 
-                    "{col_sku}" as SKU, 
-                    MAX("{col_desc_e}") as Deskripsi 
+            df_gl = pd.read_sql(f"""
+                SELECT "{col_sku}" as SKU, MAX("{col_desc_e}") as Deskripsi 
                 FROM stock_raw 
                 WHERE "{col_sku}" IN ({q_logic_gl_missing}) 
                 GROUP BY "{col_sku}"
-            """
-            df_gl = pd.read_sql(query_gl_detail, conn)
+            """, conn)
             if not df_gl.empty:
                 st.dataframe(df_gl, use_container_width=True)
-                st.download_button(f"📥 Download List GL ({len(df_gl)} SKU)", df_gl.to_csv(index=False), "gl_missing.csv")
             else:
                 st.info("✅ GL4 to GL3 sinkron.")
 
     except Exception as e:
-        st.error(f"Error Database: {e}")
+        st.error(f"Error: {e}")
     finally:
         conn.close()
 
