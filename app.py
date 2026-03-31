@@ -4960,19 +4960,12 @@ elif menu == "Compare System":
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
 
-from datetime import datetime, timedelta
-import pandas as pd
-import random
-
-# ==========================================
-# SEMUA FITUR MASUK KE MENU INI
-# ==========================================
 if menu == "Logistic Schedule":
     st.markdown("---")
 
-    # --- A. SUB-SECTION: INPUT DATA TIM ---
+    # --- A. INPUT DATABASE TIM ---
     st.subheader("👤 1. Input Database Tim")
-    with st.form("form_tim_final_v2", clear_on_submit=True): 
+    with st.form("form_tim_fix", clear_on_submit=True): 
         c1, c2, c3 = st.columns(3)
         nama_input = c1.text_input("Nama Lengkap (Contoh: GALIH)")
         posisi_input = c2.selectbox("Posisi/Role", 
@@ -4988,13 +4981,13 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
-    # --- B. SUB-SECTION: PLOT LIBUR & MONITORING ---
+    # --- B. MONITORING LIBUR ---
     st.subheader("🚫 2. Plot Libur & Monitoring")
     col_l1, col_l2 = st.columns([1, 2])
     
     with col_l1:
         df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        with st.form("form_libur_final_v2", clear_on_submit=True):
+        with st.form("form_libur_fix", clear_on_submit=True):
             target = st.selectbox("Pilih Nama Tim", df_k['nama']) if not df_k.empty else st.warning("Isi Data Tim Dulu!")
             tgl_off = st.date_input("Tanggal")
             jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH", "TGL MERAH"], horizontal=True)
@@ -5004,54 +4997,31 @@ if menu == "Logistic Schedule":
                 st.rerun()
 
     with col_l2:
-        st.write("**Monitoring Libur Terkini**")
         df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
         if not df_off_view.empty:
-            h1, h2, h3, h4 = st.columns([3, 3, 2, 1])
-            h1.caption("NAMA") ; h2.caption("TANGGAL") ; h3.caption("JENIS") ; h4.caption("AKSI")
-            st.markdown("---")
             for i, row in df_off_view.iterrows():
                 m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
                 m1.write(f"**{row['nama']}**")
                 m2.write(row['tanggal'])
                 m3.write(row['jenis'])
-                if m4.button("🗑️", key=f"del_libur_{row['nama']}_{i}"):
-                    conn.execute("DELETE FROM libur_request WHERE nama = ? AND tanggal = ? AND jenis = ?", 
-                                 (row['nama'], row['tanggal'], row['jenis']))
-                    conn.commit() ; st.rerun()
-        else:
-            st.info("Belum ada data libur.")
-
-    st.divider()
-
-    # --- C. DAFTAR KARYAWAN AKTIF ---
-    with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
-        df_cek = pd.read_sql_query("SELECT nama AS 'NAMA', posisi AS 'ROLE', tipe AS 'TIPE' FROM karyawan", conn)
-        if not df_cek.empty:
-            h_col1, h_col2, h_col3, h_col4 = st.columns([3, 2, 2, 1])
-            h_col1.write("**NAMA**") ; h_col2.write("**ROLE**") ; h_col3.write("**TIPE**") ; h_col4.write("**AKSI**")
-            st.markdown("---")
-            for i, row in df_cek.iterrows():
-                c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
-                c1.write(row['NAMA']) ; c2.write(row['ROLE']) ; c3.write(row['TIPE'])
-                if c4.button("🗑️", key=f"del_tim_{row['NAMA']}_{i}"):
-                    conn.execute("DELETE FROM karyawan WHERE nama = ? AND posisi = ? AND tipe = ?", 
-                                 (row['NAMA'], row['ROLE'], row['TIPE']))
+                if m4.button("🗑️", key=f"del_libur_{i}"):
+                    conn.execute("DELETE FROM libur_request WHERE nama = ? AND tanggal = ?", (row['nama'], row['tanggal']))
                     conn.commit() ; st.rerun()
 
     st.divider()
 
-    # --- D. GENERATOR JADWAL (VERSI ANTI-KURANG SHIFT) ---
-    st.subheader("🚀 3. Generate Jadwal (Strict Target 9-6-6)")
+    # --- C. GENERATOR JADWAL (TARGET ORIENTED) ---
+    st.subheader("🚀 3. Generate Jadwal (Target 9-6-6)")
+    start_date = st.date_input("Mulai Hari Senin", datetime.now())
     
     if st.button("RUN GENERATOR", use_container_width=True):
+        # Definisikan timedelta di sini juga aman, tapi pastikan sudah di-import di atas
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        # Definisi Roles (Shift 2 SPV sudah masuk)
         roles = [
             ("SHIFT 3", "LOG-SO"), ("SHIFT 3", "LOG-SO"),
             ("SHIFT 0", "LOG-SO"), ("SHIFT 0", "WF-SO"), ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-PICKER"),
@@ -5068,68 +5038,51 @@ if menu == "Logistic Schedule":
             day_col = []
             
             for shf_name, pos in roles:
-                # 1. Ambil kandidat sesuai role-nya
                 kandidat = df_staff[df_staff['posisi'] == pos].copy()
-                
-                # 2. Kick yang lagi LIBUR/LPH/CUTI
                 kandidat = kandidat[~kandidat['nama'].isin(df_libur[df_libur['tanggal'] == d_str]['nama'])]
                 
                 if not kandidat.empty:
-                    # 3. HITUNG HUTANG SHIFT (Target - Realita)
-                    def cek_hutang(row):
+                    # LOGIKA HITUNG SISA JATAH (BIAR GAK KURANG)
+                    def cek_sisa(row):
                         nama = row['nama']
                         tipe = row['tipe']
                         hari_off = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
-                        
-                        # Set Target sesuai permintaan lu
                         if tipe == "Part-Full": target = 9 - (hari_off * 2)
                         else: target = 6 - hari_off
                         return target - weekly_total.get(nama, 0)
 
-                    kandidat['hutang'] = kandidat.apply(cek_hutang, axis=1)
-                    
-                    # 4. SORTING: Prioritas yang hutangnya paling gede
+                    kandidat['hutang'] = kandidat.apply(cek_sisa, axis=1)
                     kandidat = kandidat.sort_values(by='hutang', ascending=False)
                     kandidat_list = kandidat.to_dict('records')
 
                     assigned = ""
                     for k in kandidat_list:
                         nama = k['nama']
-                        shift_hari_ini = used_today.get(nama, 0)
-                        
-                        # Aturan Main: 
-                        # - Part-Full wajib ngejar sampai 2 shift/hari kalau hutang masih banyak
-                        # - Full-Time/Lainnya 1 shift/hari aja
+                        shift_skrg = used_today.get(nama, 0)
                         if k['hutang'] > 0:
                             if k['tipe'] == "Part-Full":
-                                if shift_hari_ini < 2:
-                                    assigned = nama
+                                if shift_skrg < 2: assigned = nama
                             else:
-                                if shift_hari_ini < 1:
-                                    assigned = nama
-
+                                if shift_skrg < 1: assigned = nama
                         if assigned:
                             weekly_total[nama] += 1
-                            used_today[nama] = shift_hari_ini + 1
+                            used_today[nama] = shift_skrg + 1
                             break
                     day_col.append(assigned)
-                else:
-                    day_col.append("")
+                else: day_col.append("")
             weekly_data.append(day_col)
 
-        # Output Tabel
         df_final = pd.DataFrame(weekly_data, index=day_names).T
         df_final.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles])
         st.session_state.res_df = df_final
         st.session_state.summary_shift = weekly_total
 
-    # --- E. TAMPILAN (SAMA SEPERTI SEBELUMNYA) ---
+    # --- D. TAMPILAN HASIL ---
     if 'res_df' in st.session_state:
-        st.subheader(f"📊 HASIL JADWAL - {start_date}")
-        col_res1, col_res2 = st.columns([5, 1.5])
-        with col_res1:
-            st.dataframe(st.session_state.res_df, use_container_width=True, height=650)
-        with col_res2:
+        c_res1, c_res2 = st.columns([5, 1.5])
+        with c_res1:
+            st.dataframe(st.session_state.res_df, use_container_width=True, height=600)
+        with c_res2:
             st.write("**Total Shift / Nama**")
             sum_data = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
             st.table(pd.DataFrame(sum_data).sort_values(by="TOTAL", ascending=False))
