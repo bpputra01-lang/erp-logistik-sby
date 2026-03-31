@@ -4977,7 +4977,7 @@ if menu == "Logistic Schedule":
         c1, c2, c3 = st.columns(3)
         nama_input = c1.text_input("Nama Lengkap")
         posisi_input = c2.selectbox("Posisi/Role", 
-            ["WF-PICKER", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
+            ["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
         tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
         
         if st.form_submit_button("💾 SIMPAN TIM"):
