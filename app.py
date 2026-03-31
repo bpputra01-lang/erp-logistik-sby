@@ -4987,9 +4987,35 @@ if menu == "Logistic Schedule":
                 st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
-    with st.expander("🔍 Lihat Daftar Tim"):
-        df_tim = pd.read_sql_query("SELECT * FROM karyawan", conn)
-        st.dataframe(df_tim, use_container_width=True)
+    # --- C. DAFTAR KARYAWAN AKTIF ---
+    with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
+        df_cek = pd.read_sql_query("SELECT nama AS 'NAMA', posisi AS 'ROLE', tipe AS 'TIPE' FROM karyawan", conn)
+        
+        if not df_cek.empty:
+            # Buat header kolom
+            h_col1, h_col2, h_col3, h_col4 = st.columns([3, 2, 2, 1])
+            h_col1.write("**NAMA**")
+            h_col2.write("**ROLE**")
+            h_col3.write("**TIPE**")
+            h_col4.write("**AKSI**")
+            st.markdown("---")
+
+            # Loop isi data
+            for i, row in df_cek.iterrows():
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+                c1.write(row['NAMA'])
+                c2.write(row['ROLE'])
+                c3.write(row['TIPE'])
+                
+                # Tombol hapus spesifik per nama
+                if c4.button("🗑️", key=f"del_{row['NAMA']}_{i}"):
+                    conn.execute("DELETE FROM karyawan WHERE nama = ? AND posisi = ? AND tipe = ?", 
+                                 (row['NAMA'], row['ROLE'], row['TIPE']))
+                    conn.commit()
+                    st.success(f"Dihapus: {row['NAMA']}")
+                    st.rerun()
+        else:
+            st.info("Belum ada data tim.")
 
     st.divider()
 
