@@ -4923,51 +4923,54 @@ import sqlite3
 from datetime import datetime, timedelta
 import streamlit as st
 
-# Pastikan koneksi DB lu didefinisikan (contoh: conn = sqlite3.connect('data.db'))
+# Pastikan koneksi DB lu didefinisikan
+# conn = sqlite3.connect('logistic_sby_final.db')
 
 if menu == "Logistic Schedule":
-    # --- CSS FIX: TEKS PUTIH & BG HITAM PEKAT (RATA KIRI) ---
-st.markdown("""
-    <style>
-        .hero-header {
-            background-color: #007BFF;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            margin-bottom: 25px;
-            font-weight: bold;
-            font-size: 20px;
-        }
-        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        
-        /* FIX BACKGROUND PUTIH INPUT: Kita set transparan biar ngikut warna gelap div-nya */
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div {
-            background-color: #1a1c27 !important; /* Warna gelap yang lu mau */
-            border: 1px solid #3d4156 !important;
-            border-radius: 6px !important;
-        }
-        
-        input, textarea { 
-            background-color: transparent !important; 
-            border: none !important; 
-            color: white !important; 
-            -webkit-text-fill-color: white !important; /* Biar teks beneran putih di Chrome */
-        }
+    # --- CSS FIX: TEKS PUTIH & BG HITAM PEKAT (WAJIB MENJOROK KE DALAM) ---
+    st.markdown("""
+        <style>
+            .hero-header {
+                background-color: #007BFF;
+                color: white;
+                padding: 12px;
+                border-radius: 8px;
+                text-align: center;
+                margin-bottom: 25px;
+                font-weight: bold;
+                font-size: 20px;
+            }
+            [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+            
+            /* FIX BACKGROUND PUTIH INPUT */
+            div[data-testid="stTextInput"] > div > div, 
+            div[data-testid="stTextArea"] > div > div {
+                background-color: #1a1c27 !important; 
+                border: 1px solid #3d4156 !important;
+                border-radius: 6px !important;
+            }
+            
+            input, textarea { 
+                background-color: transparent !important; 
+                border: none !important; 
+                color: white !important; 
+                -webkit-text-fill-color: white !important; 
+            }
 
-        div.stButton > button {
-            background-color: #007BFF !important;
-            color: white !important;
-            border-radius: 8px !important;
-            width: 100% !important;
-            height: 48px !important;
-            font-weight: bold !important;
-        }
-        label { color: #E0E0E0 !important; font-weight: 600 !important; }
-    </style>
-""", unsafe_allow_html=True)
-st.markdown('<div class="hero-header">📅LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
+            div.stButton > button {
+                background-color: #007BFF !important;
+                color: white !important;
+                border-radius: 8px !important;
+                width: 100% !important;
+                height: 48px !important;
+                font-weight: bold !important;
+            }
+            label { color: #E0E0E0 !important; font-weight: 600 !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Render Header hanya di menu ini
+    st.markdown('<div class="hero-header">📅LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
     # --- 1. DATABASE TIM (FULL) ---
     st.subheader("👤 1. Database & Input Tim")
