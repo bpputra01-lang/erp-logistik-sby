@@ -3696,29 +3696,6 @@ elif menu == "Input Libur/Cuti":
             conn.commit()
             st.success(f"Berhasil mencatat libur untuk {target}")
 
-# --- MENU: LOGISTIC SCHEDULE (CORE) ---
-elif menu == "Logistic Schedule":
-    st.header("📅 Generate Weekly Logistic Schedule")
-    
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        start_date = st.date_input("Pilih Tanggal Mulai (Senin)", datetime.now())
-        process = st.button("🚀 Generate Ultra-Fast Schedule")
-    
-    if process:
-        df_hasil = generate_logic(start_date)
-        
-        st.subheader(f"Jadwal Minggu: {start_date} s/d {start_date + timedelta(days=6)}")
-        
-        # Styling agar mirip gambar (Warna-warni tipis)
-        def highlight_off(s):
-            return ['background-color: #ffcccc' if v == 'OFF / LIBUR' else '' for v in s]
-        
-        st.dataframe(df_hasil.style.apply(highlight_off, axis=1), height=600, use_container_width=True)
-        
-        # Fitur Download Excel
-        csv = df_hasil.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Excel (CSV)", csv, f"Schedule_{start_date}.csv", "text/csv")
 
 
 with st.sidebar:
@@ -5040,6 +5017,30 @@ elif menu == "Compare System":
             
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
+# --- MENU: LOGISTIC SCHEDULE (CORE) ---
+elif menu == "Logistic Schedule":
+    st.header("📅 Generate Weekly Logistic Schedule")
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        start_date = st.date_input("Pilih Tanggal Mulai (Senin)", datetime.now())
+        process = st.button("🚀 Generate Ultra-Fast Schedule")
+    
+    if process:
+        df_hasil = generate_logic(start_date)
+        
+        st.subheader(f"Jadwal Minggu: {start_date} s/d {start_date + timedelta(days=6)}")
+        
+        # Styling agar mirip gambar (Warna-warni tipis)
+        def highlight_off(s):
+            return ['background-color: #ffcccc' if v == 'OFF / LIBUR' else '' for v in s]
+        
+        st.dataframe(df_hasil.style.apply(highlight_off, axis=1), height=600, use_container_width=True)
+        
+        # Fitur Download Excel
+        csv = df_hasil.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Excel (CSV)", csv, f"Schedule_{start_date}.csv", "text/csv")
+
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
