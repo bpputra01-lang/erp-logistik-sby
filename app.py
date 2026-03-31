@@ -5026,83 +5026,77 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (VERSI ANTI-BACOK: SYNC LIBUR & SUMMARY) ---
+   # --- D. GENERATOR JADWAL (VERSI: TARGET DRIVEN - ANTI-BACOK) ---
     if st.button("RUN GENERATOR JADWAL", use_container_width=True):
-        # List Tanggal Real (Y-M-D) untuk cek database libur
         dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        # Template Row (Shift 3 Kosong, Shift 0 Khusus LOG-PICKER)
-        base_template = [
+        # Template Row Tetap (Sesuai request lu bos)
+        base_roles = [
             ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
             ("SHIFT 0", "LOG-PICKER"),
             ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
             ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
         ]
 
-        # 1. Target Shift (9 untuk Part-Full, 6 untuk Reguler)
+        # 1. Target & Data Karyawan
         karyawan_list = df_staff.to_dict('records')
         for k in karyawan_list:
             k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
         
-        # Sortir: Prioritas yang targetnya gede
-        karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True)
-        
-        storage = {d: {f"{s} - {r}": [] for s, r in base_template} for d in day_names}
+        storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
+        weekly_counter = {k['nama']: 0 for k in karyawan_list}
 
-        # 2. Plotting Logic (Hajar 7 Hari)
+        # 2. Plotting: Paksa Sampai Target Habis
+        # Kita putar hari demi hari sampai target semua orang terpenuhi
         for d_idx, day_name in enumerate(day_names):
             current_date_str = dates_real[d_idx]
             
-            # Setiap hari, prioritaskan orang yang shift-nya masih dikit (biar adil)
-            # Dan PASTIKAN tidak sedang LIBUR di tanggal tersebut
-            for shf_jam, shf_role in base_template:
-                if shf_jam == "SHIFT 3": continue # Biarkan kosong
+            # Setiap hari, coba masukkan setiap karyawan ke slot yang cocok
+            for k in karyawan_list:
+                nama = k['nama']
+                if weekly_counter[nama] >= k['target_fix']: continue
                 
-                slot_key = f"{shf_jam} - {shf_role}"
+                # Cek Libur di tanggal ini
+                if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == current_date_str)].empty:
+                    continue
                 
-                for k in karyawan_sorted:
-                    nama = k['nama']
-                    
-                    # HITUNG REAL-TIME TOTAL SHIFT (Biar Summary Gak Halu)
-                    total_so_far = sum([len([n for n in storage[d][sk] if n == nama]) for d in day_names for sk in storage[d]])
-                    
-                    if total_so_far >= k['target_fix']: continue
-                    if k['posisi'] != shf_role: continue
-                    
-                    # CEK LIBUR (Nama + Tanggal Wajib Pas)
-                    is_libur = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == current_date_str)].empty
-                    if is_libur: continue
-                    
-                    # Cek apakah sudah kerja di shift lain di hari yang sama
-                    already_work_today = any(nama in storage[day_name][sk] for sk in storage[day_name])
-                    
-                    if not already_work_today:
+                # Cari slot yang sesuai posisi (Lewati Shift 3 sesuai request lu)
+                for shf_jam, shf_role in base_roles:
+                    if shf_jam == "SHIFT 3": continue
+                    if k['posisi'] == shf_role:
+                        slot_key = f"{shf_jam} - {shf_role}"
                         storage[day_name][slot_key].append(nama)
-                        break 
+                        weekly_counter[nama] += 1
+                        break # Sudah dapat 1 shift hari ini, lanjut karyawan lain
 
-        # 3. Build Table dengan Dynamic Rows
+        # 3. Konversi ke Tabel (Dynamic Row Expansion)
         final_table = []
-        summary_real = {k['nama']: 0 for k in karyawan_list}
+        real_summary = {k['nama']: 0 for k in karyawan_list}
 
-        for shf_jam, shf_role in base_template:
+        for shf_jam, shf_role in base_roles:
             slot_key = f"{shf_jam} - {shf_role}"
+            # Cari baris terbanyak yang dibutuhkan slot ini di antara 7 hari
             max_r = max([len(storage[d][slot_key]) for d in day_names])
             
+            # Jika SHIFT 3 atau slot kosong, tetep kasih 1 baris template
             for r in range(max(1, max_r)):
                 row = {"SHIFT - ROLE": slot_key}
                 for d in day_names:
-                    names_list = storage[d][slot_key]
-                    val = names_list[r] if r < len(names_list) else ""
-                    row[d] = val
-                    if val in summary_real: summary_real[val] += 1
+                    names_in_slot = storage[d][slot_key]
+                    if r < len(names_in_slot):
+                        nama_hasil = names_in_slot[r]
+                        row[d] = nama_hasil
+                        real_summary[nama_hasil] += 1
+                    else:
+                        row[d] = ""
                 final_table.append(row)
 
         st.session_state.res_df = pd.DataFrame(final_table)
-        st.session_state.summary_shift = summary_real
+        st.session_state.summary_shift = real_summary
 
     # --- TAMPILAN TETAP DARK MODE ---
     if 'res_df' in st.session_state:
