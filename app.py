@@ -3595,17 +3595,16 @@ def init_db():
 
 conn = init_db()
 
-    # Bagian CSS Custom Rounded Input yang lo minta
-    st.markdown("""
-        <style>
-        div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
-            background-color: #1e2129 !important;
-            border-radius: 12px !important;
-            border: 1px solid #3e4451 !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
+# SEKARANG SUDAH RATA KIRI (TIDAK ADA SPASI DI DEPAN st.markdown)
+st.markdown("""
+    <style>
+    div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
+        background-color: #1e2129 !important;
+        border-radius: 12px !important;
+        border: 1px solid #3e4451 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 
 with st.sidebar:
