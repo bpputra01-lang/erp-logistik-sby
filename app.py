@@ -5220,6 +5220,17 @@ if menu == "Logistic Schedule":
         st.session_state.res_df = df_final
         st.session_state.summary_shift = weekly_total
 
+    # --- E. TAMPILAN (SAMA SEPERTI SEBELUMNYA) ---
+    if 'res_df' in st.session_state:
+        st.subheader(f"📊 HASIL JADWAL - {start_date}")
+        col_res1, col_res2 = st.columns([5, 1.5])
+        with col_res1:
+            st.dataframe(st.session_state.res_df, use_container_width=True, height=650)
+        with col_res2:
+            st.write("**Total Shift / Nama**")
+            sum_data = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
+            st.table(pd.DataFrame(sum_data).sort_values(by="TOTAL", ascending=False))
+
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
