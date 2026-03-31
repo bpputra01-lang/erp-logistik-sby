@@ -3595,22 +3595,6 @@ def init_db():
 
 conn = init_db()
 
-# --- 2. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="JEZ SBY - Logistic System", layout="wide")
-
-# CSS: Teks Hijau Neon & Input Box Gelap
-st.markdown("""
-    <style>
-    input { color: #00FF00 !important; background-color: #1e2129 !important; border: 1px solid #333 !important; }
-    .stSelectbox div { color: #00FF00 !important; }
-    div[data-baseweb="select"] > div { background-color: #1e2129 !important; color: #00FF00 !important; }
-    .stDataFrame { border: 1px solid #059669; }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- 3. SIDEBAR NAVIGATION (HANYA SATU MENU) ---
-st.sidebar.title("🚛 JEZ LOGISTICS SBY")
-menu = st.sidebar.radio("Navigasi", ["Logistic Schedule"])
 
 
 
