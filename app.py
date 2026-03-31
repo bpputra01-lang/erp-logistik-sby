@@ -3636,8 +3636,6 @@ st.markdown("""
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
     </style>
 """, unsafe_allow_html=True)
-
-# Hapus spasi di depan st.markdown ini:
 st.markdown('<div class="hero-header">📅LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
 with st.sidebar:
