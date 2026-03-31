@@ -5009,7 +5009,7 @@ if menu == "Logistic Schedule":
                 st.rerun()
 
     with col_l2:
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 10", conn)
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
         if not df_off_view.empty:
             for i, row in df_off_view.iterrows():
                 m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
