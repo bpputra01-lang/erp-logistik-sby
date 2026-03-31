@@ -3602,8 +3602,8 @@ st.markdown("""
     
     /* FIX WARNA TEKS: Paksa jadi PUTIH BERSIH */
     input { 
-        color: #00000 !important; 
-        -webkit-text-fill-color: #00000 !important;
+        color: #000000 !important; 
+        -webkit-text-fill-color: #000000 !important;
     }
     
     /* Warna teks di Selectbox & Date */
