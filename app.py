@@ -3444,7 +3444,7 @@ def tampilan_balancing_stock():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><p class="hero-text">PERCENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">PRECENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
     
     conn = init_db()
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
@@ -3507,13 +3507,28 @@ def tampilan_balancing_stock():
             )
         """
 
-        # --- 2. QUERY METRIKS (HITUNG SKALI JALAN) ---
+        # --- 2. QUERY METRIKS (FIX SYNC WITH LOGIC) ---
         q_data = pd.read_sql(f"""
             SELECT  
-                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as Total_SKU_Clean,
-                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as DC_Clean_Total,
+                (SELECT COUNT(*) FROM (
+                    SELECT "{col_sku}" FROM stock_raw 
+                    WHERE {base_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
+                )) as Total_SKU_Clean,
+                
+                (SELECT COUNT(*) FROM (
+                    SELECT "{col_sku}" FROM stock_raw 
+                    WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl} 
+                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
+                )) as DC_Clean_Total,
+                
                 (SELECT COUNT(*) FROM ({q_logic_dc_missing})) as DC_Missing_Count,
-                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as GL4_Clean_Total,
+                
+                (SELECT COUNT(*) FROM (
+                    SELECT "{col_sku}" FROM stock_raw 
+                    WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl} 
+                    GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
+                )) as GL4_Clean_Total,
+                
                 (SELECT COUNT(*) FROM ({q_logic_gl_missing})) as GL_Missing_Count
         """, conn).iloc[0]
 
