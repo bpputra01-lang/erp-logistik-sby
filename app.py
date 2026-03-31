@@ -3595,114 +3595,36 @@ def init_db():
 
 conn = init_db()
 
-# SEKARANG SUDAH RATA KIRI (TIDAK ADA SPASI DI DEPAN st.markdown)
-   st.markdown("""
-        <style>
-        .hero-header {
-            background-color: #007BFF;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            margin-bottom: 25px;
-            font-weight: bold;
-            font-size: 20px;
-        }
-        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            border-radius: 6px !important;
-            color: white !important;
-        }
-        input, textarea { background-color: transparent !important; border: none !important; color: white !important; }
-        div.stButton > button {
-            background-color: #007BFF !important;
-            color: white !important;
-            border-radius: 8px !important;
-            width: 100% !important;
-            height: 48px !important;
-            font-weight: bold !important;
-        }
-        label { color: #E0E0E0 !important; font-weight: 600 !important; }
+# --- CSS FIX: TEKS PUTIH & BG HITAM PEKAT (RATA KIRI) ---
+st.markdown("""
+    <style>
+    /* Hilangkan sidebar */
+    [data-testid="stSidebar"] { display: none; }
+    
+    /* Styling Kotak Input: Rounded & Background HITAM PEKAT */
+    div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
+        background-color: #000000 !important; /* Hitam biar kontras sama Putih */
+        border-radius: 12px !important;
+        border: 2px solid #3e4451 !important;
+    }
+    
+    /* FIX WARNA TEKS: Paksa jadi PUTIH BERSIH */
+    input { 
+        color: #FFFFFF !important; 
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+    
+    /* Warna teks di Selectbox & Date */
+    div[data-testid="stSelectbox"] p, .stDateInput div {
+        color: #FFFFFF !important;
+    }
 
-        /* Styling khusus untuk tombol hapus - GOLD MENYALA ULTIMATE */
-        div[data-testid="stVerticalBlock"] > div:last-child button {
-            background-color: #D4AF37 !important; /* Metallic Gold Base */
-            color: white !important;
-            border: none !important;
-            border-radius: 8px !important;
-            font-weight: bold !important;
-            
-            /* 1. Neon Glow Efek Berlapis (Ambient Glow) */
-            box-shadow: 
-                0 0 5px rgba(255, 215, 0, 0.4),  /* Lapisan dekat */
-                0 0 10px rgba(255, 215, 0, 0.3), /* Lapisan tengah */
-                0 0 15px rgba(255, 215, 0, 0.2); /* Lapisan jauh */
-            
-            /* 2. Text Glow Efek agar teks ikut menyala */
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-            
-            transition: all 0.3s ease-in-out; /* Animasi halus */
-        }
-
-        /* --- MENYALA LEBIH TERANG SAAT DI-HOVER --- */
-        div[data-testid="stVerticalBlock"] > div:last-child button:hover {
-            background-color: #FFD700 !important; /* Gold Lebih Terang */
-            color: #1a1c27 !important; /* Ganti teks jadi gelap saat terang */
-            transform: translateY(-2px) scale(1.02); /* Sedikit membesar & naik */
-            
-            /* 3. Intense Neon Shine saat hover */
-            box-shadow: 
-                0 0 10px rgba(255, 215, 0, 0.8), /* Lapisan dalam pekat */
-                0 0 20px rgba(255, 215, 0, 0.6), /* Lapisan tengah menyebar */
-                0 0 30px rgba(255, 215, 0, 0.4), /* Lapisan luar halus */
-                0 0 40px rgba(255, 215, 0, 0.2); /* Lapisan jauh pudar */
-            
-            /* Matikan text glow karena teks jadi gelap */
-            text-shadow: none;
-        }
-        /* Styling Box untuk Label Grafik agar tidak polosan */
-        div.stPlotlyChart {
-            border: 1px solid #d4af37 !important; /* Border Gold Halus */
-            border-radius: 8px !important;
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.2) !important; /* Glow Gold Tipis */
-        }
-        
-        /* Box Biru Navy untuk Teks Label di Atas Grafik */
-        div.stPlotlyChart > div > div > div > div > div > span {
-            background-color: #1a1c27 !important; /* Biru Navy Gelap */
-            color: #ffd700 !important; /* Teks Gold */
-            padding: 5px 10px !important;
-            border-radius: 5px !important;
-            border: 1px solid #3d4156 !important;
-            font-weight: bold !important;
-            font-size: 14px !important;
-        }
-        /* Kunci Tinggi Metric Box agar RATA SEMUA */
-        [data-testid="stMetric"] {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            padding: 20px !important;
-            border-radius: 12px !important;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
-            
-            /* INI KUNCINYA */
-            min-height: 160px !important; 
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-        }
-
-        /* Styling tulisan angka agar makin Bold & Besar */
-        [data-testid="stMetricValue"] > div {
-            font-size: 32px !important;
-            font-weight: 900 !important;
-            color: #ffffff !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    /* Warna Placeholder */
+    input::placeholder {
+        color: #666666 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 
 with st.sidebar:
