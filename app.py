@@ -3594,35 +3594,19 @@ def init_db():
     return conn
 
 conn = init_db()
-# --- 2. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="JEZ SBY - Logistic System", layout="wide")
+# Pastikan jarak spasi dari pinggir kiri itu sama semua (konsisten)
+if menu == "Logistic Schedule":
+    st.title("📅 LOGISTIC SCHEDULE SYSTEM")
+    st.markdown("---") # <--- Error lo di sini tadi, pastiin sejajar sama st.title
 
-# CSS: Custom Input Box sesuai request (Rounded & Clean)
+    # Bagian CSS Custom Rounded Input yang lo minta
     st.markdown("""
         <style>
-    
-        /* Styling Kotak Input (Text, Select, Date) biar mirip gambar lo */
         div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
-        background-color: #1e2129 !important;
-        border-radius: 12px !important; /* Rounded corner sesuai gambar */
-        border: 1px solid #3e4451 !important;
-        padding: 2px 5px !important;
+            background-color: #1e2129 !important;
+            border-radius: 12px !important;
+            border: 1px solid #3e4451 !important;
         }
-    
-        /* Warna teks saat ngetik */
-        input { 
-        color: #FFFFFF !important; 
-        font-family: sans-serif !important;
-        }
-    
-        /* Hover & Focus state */
-        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
-        border: 1px solid #00FF00 !important;
-        box-shadow: 0 0 5px rgba(0, 255, 0, 0.2) !important;
-        }
-
-        /* Styling tabel agar gahar */
-        .stDataFrame, .stTable { border-radius: 10px !important; overflow: hidden !important; }
         </style>
     """, unsafe_allow_html=True)
 
