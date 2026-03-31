@@ -5025,103 +5025,116 @@ if menu == "Logistic Schedule":
     # --- 3. GENERATOR ANTI-TABRAK (LOGIC STRICT 9-6-6) ---
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
-    # --- D. GENERATOR JADWAL (VERSI: DYNAMIC, SHUFFLE, & AUTO-BACKUP) ---
-    if st.button("RUN GENERATOR JADWAL", use_container_width=True):
-        dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-        day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+    
+# --- D. GENERATOR JADWAL (VERSI: DYNAMIC ROW + AUTO-FILL & SHUFFLE) ---
+if st.button("RUN GENERATOR JADWAL", use_container_width=True):
+    dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+    
+    df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
+    df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
+
+    base_roles = [
+        ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
+        ("SHIFT 0", "LOG-PICKER"),
+        ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
+        ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
+    ]
+
+    karyawan_list = df_staff.to_dict('records')
+    for k in karyawan_list:
+        k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
+    
+    # Penampung per hari, per slot, per baris (bisa banyak baris kalau orangnya banyak)
+    storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
+    weekly_counter = {k['nama']: 0 for k in karyawan_list}
+
+    # --- LOGIC: ISI SEMUA ORANG SAMPAI TARGET PAS ---
+    # Kita loop per orang dulu biar jatah mereka (9/6) terjamin terbagi rata di 7 hari
+    for k in sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True):
+        nama = k['nama']
         
-        df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
-        df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
-
-        # Daftar role utama (tanpa shift 3 sesuai request)
-        base_roles = [
-            ("SHIFT 0", "LOG-PICKER"),
-            ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
-            ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
-        ]
-
-        karyawan_list = df_staff.to_dict('records')
-        for k in karyawan_list:
-            k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
+        # Biar masuk shiftnya acak (tidak Shift 1 terus), kita shuffle urutan hari dan urutan base_roles
+        shuffled_days = day_names.copy()
+        random.shuffle(shuffled_days)
         
-        storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
-        weekly_counter = {k['nama']: 0 for k in karyawan_list}
-
-        # --- STEP 1: PLOTTING UTAMA (BERDASARKAN ROLE ASLI) ---
-        for day_name in day_names:
-            tgl_ini = dates_real[day_names.index(day_name)]
+        for day_name in shuffled_days:
+            if weekly_counter[nama] >= k['target_fix']: break
             
-            # ACAK urutan slot biar gak Shift 1 terus yang penuh duluan
-            current_slots = base_roles.copy()
-            random.shuffle(current_slots)
+            d_idx = day_names.index(day_name)
+            tgl_ini = dates_real[d_idx]
+            if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty:
+                continue
 
-            for shf_jam, shf_role in current_slots:
-                slot_key = f"{shf_jam} - {shf_role}"
-                
-                # Filter karyawan yang posisinya cocok & jatah masih ada
-                kandidat = [k for k in karyawan_list if k['posisi'] == shf_role and weekly_counter[k['nama']] < k['target_fix']]
-                
-                # Aturan SPV: Sabtu Prioritas Shift 2
-                if shf_role == "SPV":
-                    if day_name == "SABTU" and shf_jam != "SHIFT 2": continue
-                    if day_name != "SABTU": random.shuffle(kandidat) # Hari lain acak
-                else:
-                    random.shuffle(kandidat) # Acak buat Admin/Loader/Picker
+            # Shuffle base_roles biar jam masuknya acak tiap minggu
+            shuffled_roles = base_roles.copy()
+            random.shuffle(shuffled_roles)
 
-                for k in kandidat:
-                    nama = k['nama']
-                    if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                    if nama in storage[day_name][slot_key]: continue
+            for shf_jam, shf_role in shuffled_roles:
+                if weekly_counter[nama] >= k['target_fix']: break
+                if shf_jam == "SHIFT 3": continue # Shift 3 wajib kosong
+                
+                # Logic SPV: Sabtu wajib Shift 2, hari lain acak
+                if k['posisi'] == "SPV" and day_name == "SABTU" and shf_jam != "SHIFT 2":
+                    continue
+
+                if k['posisi'] == shf_role:
+                    slot_key = f"{shf_jam} - {shf_role}"
                     
-                    # Cek double shift (Part-Full boleh 2x, Full cuma 1x)
-                    sudah_shift_lain = any(nama in storage[day_name][sk] for sk in storage[day_name])
-                    if k['target_fix'] == 6 and sudah_shift_lain: continue
+                    if nama not in storage[day_name][slot_key]:
+                        storage[day_name][slot_key].append(nama)
+                        weekly_counter[nama] += 1
+                        if k['target_fix'] == 6: break 
 
-                    storage[day_name][slot_key].append(nama)
-                    weekly_counter[nama] += 1
-                    break
-
-        # --- STEP 2: AUTO-BACKUP (ISI SLOT KOSONG DARI ROLE LAIN) ---
-        for day_name in day_names:
-            tgl_ini = dates_real[day_names.index(day_name)]
-            for shf_jam, shf_role in base_roles:
-                slot_key = f"{shf_jam} - {shf_role}"
-                
-                # Jika slot masih kosong (minimal 1 orang), ambil dari siapa saja yang jatahnya masih ada
-                if not storage[day_name][slot_key] and shf_role != "SPV":
-                    backup_kandidat = [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix']]
-                    random.shuffle(backup_kandidat)
-                    
-                    for bk in backup_kandidat:
-                        nama = bk['nama']
-                        if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                        
-                        sudah_shift_lain = any(nama in storage[day_name][sk] for sk in storage[day_name])
-                        if bk['target_fix'] == 6 and sudah_shift_lain: continue
-                        
-                        storage[day_name][slot_key].append(nama + " (BACKUP)")
-                        weekly_counter[bk['nama']] += 1
-                        break
-
-        # --- STEP 3: GENERATE TABEL ---
-        final_table = []
-        real_summary = {k['nama']: 0 for k in karyawan_list}
-
+    # --- LOGIC TAMBAHAN: BACKUP ROLE (JANGAN SAMPAI KOSONG) ---
+    # Jika slot masih kosong minimal 1 orang, ambil dari role lain yang jatahnya belum habis
+    for day_name in day_names:
+        d_idx = day_names.index(day_name)
+        tgl_ini = dates_real[d_idx]
+        
         for shf_jam, shf_role in base_roles:
             slot_key = f"{shf_jam} - {shf_role}"
-            max_r = max([len(storage[d][slot_key]) for d in day_names])
-            for r in range(max(1, max_r)):
-                row = {"SHIFT - ROLE": slot_key}
-                for d in day_names:
-                    names = storage[d][slot_key]
-                    val = names[r] if r < len(names) else ""
-                    row[d] = val
-                    clean_name = val.replace(" (BACKUP)", "")
-                    if clean_name in real_summary: real_summary[clean_name] += 1
-                final_table.append(row)
+            if shf_jam == "SHIFT 3" or shf_role == "SPV": continue # SPV dan Shift 3 dikecualikan
+            
+            # Jika baris pertama di slot ini masih kosong
+            if not storage[day_name][slot_key]:
+                # Cari karyawan backup (role apa saja) yang masih punya jatah
+                potential_backups = [kb for kb in karyawan_list if weekly_counter[kb['nama']] < kb['target_fix']]
+                random.shuffle(potential_backups)
+                
+                for kb in potential_backups:
+                    nama_bk = kb['nama']
+                    # Cek libur & cek supaya gak double shift di jam yang sama
+                    if not df_libur[(df_libur['nama'] == nama_bk) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+                    
+                    # Cek double shift (Full-Time cuma boleh 1x sehari)
+                    sudah_ada_di_hari_ini = any(nama_bk in storage[day_name][sk] for sk in storage[day_name])
+                    if kb['target_fix'] == 6 and sudah_ada_di_hari_ini: continue
+                    
+                    if nama_bk not in storage[day_name][slot_key]:
+                        storage[day_name][slot_key].append(nama_bk)
+                        weekly_counter[nama_bk] += 1
+                        break # Slot sudah terisi minimal 1 orang
 
-        st.session_state.res_df = pd.DataFrame(final_table)
-        st.session_state.summary_shift = real_summary
+    # --- GENERATE TABEL (EXPAND BARIS SESUAI JUMLAH ORANG) ---
+    final_table = []
+    real_summary = {k['nama']: 0 for k in karyawan_list}
+
+    for shf_jam, shf_role in base_roles:
+        slot_key = f"{shf_jam} - {shf_role}"
+        max_r = max([len(storage[d][slot_key]) for d in day_names])
+        
+        for r in range(max(1, max_r)):
+            row = {"SHIFT - ROLE": slot_key}
+            for d in day_names:
+                names_in_day = storage[d][slot_key]
+                val = names_in_day[r] if r < len(names_in_day) else ""
+                row[d] = val
+                if val in real_summary: real_summary[val] += 1
+            final_table.append(row)
+
+    st.session_state.res_df = pd.DataFrame(final_table)
+    st.session_state.summary_shift = real_summary
 
     # --- TAMPILAN TETAP DARK MODE ---
     if 'res_df' in st.session_state:
