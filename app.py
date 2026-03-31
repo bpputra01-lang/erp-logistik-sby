@@ -5061,6 +5061,108 @@ if menu == "Logistic Schedule":
         else:
             st.info("Belum ada data tim.")
 
+    # ==========================================
+# SEMUA FITUR MASUK KE MENU INI
+# ==========================================
+if menu == "Logistic Schedule":
+    st.markdown("---")
+
+    # --- A. SUB-SECTION: INPUT DATA TIM ---
+    st.subheader("👤 1. Input Database Tim")
+    with st.form("form_master_tim", clear_on_submit=True):
+        c1, c2, c3 = st.columns(3)
+        nama_input = c1.text_input("Nama Lengkap (Contoh: GALIH)")
+        posisi_input = c2.selectbox("Posisi/Role", 
+            ["WF-PICKER", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
+        tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
+        
+        if st.form_submit_button("💾 SIMPAN TIM"):
+            if nama_input:
+                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper(), posisi_input, tipe_input))
+                conn.commit()
+                st.success(f"✅ {nama_input.upper()} Berhasil Terdaftar!")
+                st.rerun()
+
+    st.divider()
+
+    # --- B. SUB-SECTION: PLOT LIBUR & MONITORING ---
+    st.subheader("🚫 2. Plot Libur & Monitoring")
+    col_l1, col_l2 = st.columns([1, 2])
+    
+    with col_l1:
+        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+        with st.form("form_libur", clear_on_submit=True):
+            target = st.selectbox("Pilih Nama Tim", df_k['nama']) if not df_k.empty else st.warning("Isi Data Tim Dulu!")
+            tgl_off = st.date_input("Tanggal")
+            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH", "TGL MERAH"], horizontal=True)
+            if st.form_submit_button("SUBMIT OFF"):
+                conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
+                conn.commit()
+                st.rerun()
+
+    with col_l2:
+        st.write("**Monitoring Libur Terkini**")
+        # Ambil data libur terbaru
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
+        
+        if not df_off_view.empty:
+            # Header Tabel Monitoring
+            h1, h2, h3, h4 = st.columns([3, 3, 2, 1])
+            h1.caption("NAMA")
+            h2.caption("TANGGAL")
+            h3.caption("JENIS")
+            h4.caption("AKSI")
+            st.markdown("---")
+
+            # Isi Data Monitoring dengan tombol hapus
+            for i, row in df_off_view.iterrows():
+                m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
+                m1.write(f"**{row['nama']}**")
+                m2.write(row['tanggal'])
+                m3.write(row['jenis'])
+                
+                # Tombol hapus spesifik baris libur
+                if m4.button("🗑️", key=f"del_libur_{row['nama']}_{row['tanggal']}_{i}"):
+                    conn.execute("DELETE FROM libur_request WHERE nama = ? AND tanggal = ? AND jenis = ?", 
+                                 (row['nama'], row['tanggal'], row['jenis']))
+                    conn.commit()
+                    st.success("Record Libur Dihapus!")
+                    st.rerun()
+        else:
+            st.info("Belum ada data libur.")
+
+    st.divider()
+
+    # --- C. DAFTAR KARYAWAN AKTIF ---
+    with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
+        df_cek = pd.read_sql_query("SELECT nama AS 'NAMA', posisi AS 'ROLE', tipe AS 'TIPE' FROM karyawan", conn)
+        
+        if not df_cek.empty:
+            # Buat header kolom
+            h_col1, h_col2, h_col3, h_col4 = st.columns([3, 2, 2, 1])
+            h_col1.write("**NAMA**")
+            h_col2.write("**ROLE**")
+            h_col3.write("**TIPE**")
+            h_col4.write("**AKSI**")
+            st.markdown("---")
+
+            # Loop isi data
+            for i, row in df_cek.iterrows():
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
+                c1.write(row['NAMA'])
+                c2.write(row['ROLE'])
+                c3.write(row['TIPE'])
+                
+                # Tombol hapus spesifik per nama
+                if c4.button("🗑️", key=f"del_{row['NAMA']}_{i}"):
+                    conn.execute("DELETE FROM karyawan WHERE nama = ? AND posisi = ? AND tipe = ?", 
+                                 (row['NAMA'], row['ROLE'], row['TIPE']))
+                    conn.commit()
+                    st.success(f"Dihapus: {row['NAMA']}")
+                    st.rerun()
+        else:
+            st.info("Belum ada data tim.")
+
     # --- D. GENERATOR JADWAL ---
     st.subheader("🚀 3. Generate Jadwal")
     c_g1, c_g2 = st.columns([1, 4])
@@ -5106,6 +5208,13 @@ if menu == "Logistic Schedule":
             df_final = pd.DataFrame(weekly_data, index=day_names).T
             df_final.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles])
             st.session_state.res_df = df_final
+
+    if 'res_df' in st.session_state:
+        st.subheader(f"📊 HASIL JADWAL - {start_date}")
+        def style_f(val):
+            if val == "": return 'background-color: #1e2129'
+            return 'background-color: #064e3b; color: #00ff00; font-weight: bold; border: 0.5px solid #059669'
+        st.dataframe(st.session_state.res_df.style.applymap(style_f), use_container_width=True, height=650)
 
     if 'res_df' in st.session_state:
         st.subheader(f"📊 HASIL JADWAL - {start_date}")
