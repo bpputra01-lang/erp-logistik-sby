@@ -5069,14 +5069,11 @@ if menu == "Logistic Schedule":
 
     # --- A. SUB-SECTION: INPUT DATA TIM ---
     st.subheader("👤 1. Input Database Tim")
-    with st.form("form_master_tim", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        nama_input = c1.text_input("Nama Lengkap (Contoh: GALIH)")
-        posisi_input = c2.selectbox("Posisi/Role", 
-            ["WF-PICKER", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
-        tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
-        
+    # Ganti nama key-nya kalau ada form lain yang mirip
+    with st.form("form_input_karyawan_baru", clear_on_submit=True): 
+    # ... isi form lu ...
         if st.form_submit_button("💾 SIMPAN TIM"):
+        # ... logika simpan ...
             if nama_input:
                 conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper(), posisi_input, tipe_input))
                 conn.commit()
