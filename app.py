@@ -3598,8 +3598,6 @@ conn = init_db()
 # SEKARANG SUDAH RATA KIRI (TIDAK ADA SPASI DI DEPAN st.markdown)
 st.markdown("""
     <style>
-    /* Hilangkan sidebar */
-    [data-testid="stSidebar"] { display: none; }
     
     /* Styling Kotak Input: Rounded & Background Gelap */
     div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
