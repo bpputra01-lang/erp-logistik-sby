@@ -4920,55 +4920,62 @@ elif menu == "Compare System":
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
 # ==========================================
-# MENU 2: LOGISTIC SCHEDULE (KODE KAMU DI SINI)
+# MENU 2: LOGISTIC SCHEDULE
 # ==========================================
 elif menu == "Logistic Schedule":
     st.title("🗓️ LOGISTIC & WAREHOUSE SCHEDULE")
+    st.markdown("---")
 
-    # --- SECTION 1: INPUT DATA ---
+    # --- SECTION 1: INPUT DATA (Styling Modern) ---
     col_input1, col_input2 = st.columns(2)
 
     with col_input1:
-        with st.expander("➕ INPUT KARYAWAN BARU", expanded=False):
+        st.markdown("### 👤 Karyawan Baru")
+        with st.expander("Buka Form Input", expanded=False):
             with st.form("form_k"):
-                n = st.text_input("Nama Karyawan")
+                n = st.text_input("Nama Karyawan", placeholder="Masukkan Nama...")
                 p = st.selectbox("Posisi", ["PICKER", "ADMIN", "LOADER", "BACKLINER"])
                 t = st.selectbox("Tipe", ["Full-Time", "Part-Full", "Part-Time"])
-                if st.form_submit_button("SIMPAN KARYAWAN"):
-                    conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (n.upper(), p, t))
-                    conn.commit()
-                    st.success("Data Tersimpan!")
-                    st.rerun()
+                if st.form_submit_button("💾 SIMPAN DATA"):
+                    if n:
+                        conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (n.upper(), p, t))
+                        conn.commit()
+                        st.success(f"✅ {n.upper()} Berhasil Disimpan!")
+                        st.rerun()
+                    else:
+                        st.error("Nama tidak boleh kosong!")
 
     with col_input2:
-        with st.expander("📅 INPUT LIBUR / CUTI / LPH", expanded=False):
+        st.markdown("### 📅 Cuti & Libur")
+        with st.expander("Buka Form Libur", expanded=False):
             df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
             with st.form("form_l"):
-                target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else st.write("Isi karyawan dulu!")
+                target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else st.write("Data karyawan masih kosong.")
                 tgl = st.date_input("Tanggal Off")
-                ket = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
-                if st.form_submit_button("SUBMIT OFF"):
+                ket = st.radio("Keterangan", ["LIBUR", "CUTI", "LPH"], horizontal=True)
+                if st.form_submit_button("📤 SUBMIT OFF"):
                     conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl), ket))
                     conn.commit()
-                    st.warning(f"{target} OFF pada {tgl}")
+                    st.warning(f"⚠️ {target} OFF pada {tgl}")
                     st.rerun()
 
-    st.divider()
+    st.markdown("---")
 
     # --- SECTION 2: GENERATOR ---
-    col_gen1, col_gen2 = st.columns([1, 3])
+    col_gen1, col_gen2 = st.columns([1, 4])
 
     with col_gen1:
-        start_date = st.date_input("Mulai Hari Senin", datetime.now())
-        btn_generate = st.button("🚀 GENERATE JADWAL SEKARANG", use_container_width=True)
+        st.markdown("### ⚙️ Control")
+        start_date = st.date_input("Senin Mulai", datetime.now())
+        btn_generate = st.button("🚀 GENERATE", use_container_width=True)
         
-        if st.button("🗑️ RESET SEMUA DATA", type="secondary"):
+        if st.button("🗑️ RESET DATA", type="secondary", use_container_width=True):
             conn.execute("DELETE FROM karyawan")
             conn.execute("DELETE FROM libur_request")
             conn.commit()
             st.rerun()
 
-    # --- ENGINE LOGIC ---
+    # --- ENGINE LOGIC & TABLE DISPLAY ---
     if btn_generate:
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -4987,11 +4994,7 @@ elif menu == "Logistic Schedule":
         for pos, shifts in posisi_config.items():
             staff_pool = df_karyawan[df_karyawan['posisi'] == pos].to_dict('records')
             for shf in shifts:
-                if "LONG" in shf:
-                    current_staff = [s for s in staff_pool if s['tipe'] in ["Part-Time", "Part-Full"]]
-                else:
-                    current_staff = staff_pool
-                
+                current_staff = [s for s in staff_pool if s['tipe'] in ["Part-Time", "Part-Full"]] if "LONG" in shf else staff_pool
                 if not current_staff: continue
                 
                 for idx, person in enumerate(current_staff):
@@ -5003,21 +5006,42 @@ elif menu == "Logistic Schedule":
                         status = name
                         if is_off_db: status = "LIBUR/CUTI"
                         elif tipe == "Part-Full":
-                            if (idx % 2 == 0 and i >= 3) or (idx % 2 != 0 and i < 3): status = "OFF (GANTIAN)"
+                            if (idx % 2 == 0 and i >= 3) or (idx % 2 != 0 and i < 3): status = "GANTIAN"
                         
                         if "LONG" in shf and hari not in ["SABTU", "MINGGU"]: status = "-"
                         row[hari] = status
                     final_rows.append(row)
 
         df_hasil = pd.DataFrame(final_rows)
-        def color_grid(val):
-            if val in ["LIBUR/CUTI", "OFF (GANTIAN)"]: return 'background-color: #ff4b4b; color: white'
-            if val == "-": return 'color: #777'
-            return 'background-color: #262730; color: #00ff00'
 
-        st.subheader(f"JADWAL WEEKLY: {start_date}")
-        st.dataframe(df_hasil.style.applymap(color_grid), use_container_width=True, height=500)
-        st.download_button("📥 DOWNLOAD CSV", df_hasil.to_csv(index=False), "jadwal.csv", "text/csv")
+        # --- STYLING TABEL MENARIK (DARK THEME OPTIMIZED) ---
+        def color_grid(val):
+            # Merah Gelap untuk Libur
+            if val in ["LIBUR/CUTI", "GANTIAN"]:
+                return 'background-color: #721c24; color: #f8d7da; border: 0.5px solid #f5c6cb'
+            # Abu-abu untuk slot kosong
+            if val == "-":
+                return 'color: #444; border: none'
+            # Hijau Emerald untuk Masuk Kerja
+            return 'background-color: #064e3b; color: #ecfdf5; font-weight: bold; border: 0.5px solid #059669'
+
+        with col_gen2:
+            st.subheader(f"📊 JADWAL MINGGUAN: {start_date}")
+            st.dataframe(
+                df_hasil.style.applymap(color_grid), 
+                use_container_width=True, 
+                height=550
+            )
+            
+            # Tombol Download dengan style yang lebih oke
+            csv = df_hasil.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 DOWNLOAD JADWAL (CSV)",
+                data=csv,
+                file_name=f'jadwal_{start_date}.csv',
+                mime='text/csv',
+                use_container_width=True
+            )
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
