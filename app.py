@@ -3603,9 +3603,15 @@ st.markdown("""
     /* FIX WARNA TEKS: Paksa jadi PUTIH BERSIH */
     input { 
         color: #FFFFFF !important; 
-        -webkit-text-fill-color: #000000 !important;
+        -webkit-text-fill-color: #FFFFFF !important;
     }
-    
+    /* 1. Hilangkan background hitam pada container luar input */
+    div[data-testid="stTextInput"], 
+    div[data-testid="stNumberInput"], 
+    div[data-testid="stSelectbox"] {
+    background-color: transparent !important;
+    border: none !important;
+}
     /* Warna teks di Selectbox & Date */
     div[data-testid="stSelectbox"] p, .stDateInput div {
         color: #FFFFFF !important;
