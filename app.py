@@ -5054,14 +5054,16 @@ if menu == "Logistic Schedule":
 
 import random
 
-# --- D. GENERATOR JADWAL (VERSI: STORE IMMUNITY & CROSS-BACKUP) ---
+# --- D. GENERATOR JADWAL (VERSI: STATIC SHIFT ORDER - NO JUMPING) ---
 if st.button("RUN GENERATOR JADWAL", use_container_width=True):
     dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    # 1. URUTAN HARI STATIS (BIAR GAK ACAK-ACAKAN)
     day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
     
     df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
     df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
+    # 2. URUTAN ROLE STATIS (DARI SHIFT 0 KE SHIFT 2)
     base_roles = [
         ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
         ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
@@ -5084,19 +5086,16 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                 count += 1
         return count
 
-    # --- STEP 1: PRIORITAS ANTI-BOLONG (ISI SEMUA SLOT 1 ORANG) ---
+    # --- STEP 1: PRIORITAS ANTI-BOLONG (URUTAN TETAP) ---
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
-        shuffled_roles = base_roles.copy()
-        random.shuffle(shuffled_roles)
-        
-        for shf_jam, shf_role in shuffled_roles:
+        for shf_jam, shf_role in base_roles: # PAKAI URUTAN TETAP
             if shf_jam == "SHIFT 3": continue
             slot_key = f"{shf_jam} - {shf_role}"
             
-            # Cari yang posisinya cocok dulu
             potential = [k for k in karyawan_list if k['posisi'] == shf_role and weekly_counter[k['nama']] < k['target_fix']]
-            random.shuffle(potential)
+            # Shuffle hanya daftar orangnya saja, bukan urutan role/harinya
+            random.shuffle(potential) 
             
             for p in potential:
                 nama = p['nama']
@@ -5108,20 +5107,15 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                     weekly_counter[nama] += 1
                     break
 
-    # --- STEP 2: BACKUP & DOUBLE SHIFT (STORE TIDAK BOLEH JADI BACKUP) ---
+    # --- STEP 2: FILLING DOUBLE SHIFT (STORE/ADMIN/SPV IMMUNITY) ---
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
-        shuffled_roles = base_roles.copy()
-        random.shuffle(shuffled_roles)
-        
-        for shf_jam, shf_role in shuffled_roles:
+        for shf_jam, shf_role in base_roles: # PAKAI URUTAN TETAP
             if shf_jam == "SHIFT 3" or shf_role == "SPV": continue
             slot_key = f"{shf_jam} - {shf_role}"
             
             limit = 2 if not ("STORE" in shf_role and shf_jam != "SHIFT 2") else 1
             if len(storage[day_name][slot_key]) < limit:
-                # KUNCI: Store dilarang jadi backup di role lain
-                # Admin dan SPV juga dilarang backup
                 potential = [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix'] 
                              and k['posisi'] not in ["LOG-STORE", "SPV", "LOG-ADMIN", "WF-ADMIN"]]
                 random.shuffle(potential)
@@ -5143,11 +5137,11 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                             double_day_count[nama] += 1
                         if len(storage[day_name][slot_key]) >= limit: break
 
-    # --- STEP 3: FINAL SWEEP (PENGHABISAN JATAH) ---
+    # --- STEP 3: FINAL SWEEP ---
     for kb in [k for k in karyawan_list if weekly_counter[k['nama']] < k['target_fix'] 
                and k['posisi'] not in ["LOG-STORE", "SPV", "LOG-ADMIN", "WF-ADMIN"]]:
         nama_sisa = kb['nama']
-        for day_name in day_names:
+        for day_name in day_names: # URUTAN TETAP
             if weekly_counter[nama_sisa] >= kb['target_fix']: break
             tgl_ini = dates_real[day_names.index(day_name)]
             if not df_libur[(df_libur['nama'] == nama_sisa) & (df_libur['tanggal'] == tgl_ini)].empty: continue
