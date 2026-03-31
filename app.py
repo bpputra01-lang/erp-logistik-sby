@@ -4963,7 +4963,6 @@ elif menu == "Compare System":
 # SEMUA FITUR MASUK KE MENU INI
 # ==========================================
 if menu == "Logistic Schedule":
-    st.title("📅 LOGISTIC SCHEDULE SYSTEM")
     st.markdown("---")
 
     # --- A. SUB-SECTION: INPUT DATA TIM ---
