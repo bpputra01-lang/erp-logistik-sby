@@ -5026,7 +5026,7 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (LOGIC BRUTAL - TAMPILAN RAPI) ---
+   # --- D. GENERATOR JADWAL (REVISI TAMPILAN - LOGIC TETAP) ---
     if st.button("RUN GENERATOR JADWAL (TARGET ONLY)", use_container_width=True):
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5037,7 +5037,6 @@ if menu == "Logistic Schedule":
         list_shift_jam = ["SHIFT 3", "SHIFT 0", "SHIFT 1", "SHIFT 2"]
         
         weekly_total = {nama: 0 for nama in df_staff['nama']}
-        # Struktur simpan: {Hari: {Jam: [List Nama]}}
         hasil_mentah = {d: {j: [] for j in list_shift_jam} for d in day_names}
 
         # 1. HITUNG TARGET FIX PER ORANG
@@ -5049,8 +5048,11 @@ if menu == "Logistic Schedule":
             else:
                 k['target'] = 6 - hari_off
 
-        # 2. SEBAR NAMA (LOGIC TETAP SAMA)
-        for k in karyawan_sorted: # Pastikan urutan Part-Full dulu
+        # --- INI YANG TADI KETINGGALAN (SORTIR KARYAWAN) ---
+        karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target'], reverse=True)
+
+        # 2. SEBAR NAMA (LOGIC BRUTAL PUNYA LU)
+        for k in karyawan_sorted:
             nama = k['nama']
             target = k['target']
             posisi = k['posisi']
@@ -5071,29 +5073,28 @@ if menu == "Logistic Schedule":
                     weekly_total[nama] += 1
                     count_harian += 1
 
-        # 3. PERBAIKAN TAMPILAN: GRUP PER SHIFT
+        # 3. TAMPILAN RAPI PER GRUP SHIFT
         final_table_rows = []
         for jam in list_shift_jam:
-            # Cari baris terbanyak di jam ini di antara semua hari
-            max_rows_jam = max([len(hasil_mentah[d][jam]) for d in day_names])
+            # Hitung baris terbanyak di jam ini
+            max_rows_jam = max([len(hasil_mentah[d][jam]) for d in day_names]) if hasil_mentah else 0
             
             for r in range(max_rows_jam):
-                row_data = {"SHIFT": jam} # Kolom penanda Shift
+                row_data = {"SHIFT": jam}
                 for d in day_names:
                     row_data[d] = hasil_mentah[d][jam][r] if r < len(hasil_mentah[d][jam]) else ""
                 final_table_rows.append(row_data)
             
-            # Tambah baris kosong tipis sebagai pemisah antar grup shift (opsional)
-            final_table_rows.append({d: "---" for d in (["SHIFT"] + day_names)})
+            # Garis pemisah antar shift
+            if max_rows_jam > 0:
+                final_table_rows.append({d: "---" for d in (["SHIFT"] + day_names)})
 
         st.session_state.res_df = pd.DataFrame(final_table_rows)
         st.session_state.summary_shift = weekly_total
 
-    # --- TAMPILAN ---
+    # --- TAMPILAN AKHIR ---
     if 'res_df' in st.session_state:
         st.divider()
-        st.write("### 📊 Jadwal Rapi Per Shift (Target 9-6-6)")
-        # Tampilkan dataframe dengan tinggi yang cukup
         st.dataframe(st.session_state.res_df, use_container_width=True, height=600)
         
         st.write("### 📈 Summary Realisasi")
