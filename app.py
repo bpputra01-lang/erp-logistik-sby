@@ -5026,7 +5026,7 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
 
-# --- D. GENERATOR JADWAL (VERSI: SHIFT 0 SAFE + DYNAMIC ROW + AUTO-FILL) ---
+# --- D. GENERATOR JADWAL (VERSI: PICKER EQUAL DISTRIBUTION - SHIFT 0 SAFE) ---
 if st.button("RUN GENERATOR JADWAL", use_container_width=True):
     dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5034,7 +5034,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
     df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
     df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-    # DAFTAR ROLE TETAP UTUH (SHIFT 0 ADA DI SINI BOS!)
+    # Susunan base_roles tetap utuh sesuai permintaan
     base_roles = [
         ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
         ("SHIFT 0", "LOG-PICKER"),
@@ -5053,7 +5053,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
     for k in sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True):
         nama = k['nama']
         
-        # Shuffle hari biar adil 7 hari
+        # Shuffle hari biar sebaran merata di 7 hari
         shuffled_days = day_names.copy()
         random.shuffle(shuffled_days)
         
@@ -5065,15 +5065,23 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
             if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty:
                 continue
 
-            # Shuffle roles tapi tetap utamakan posisi asli
-            shuffled_roles = base_roles.copy()
-            random.shuffle(shuffled_roles)
+            # LOGIC BARU: Khusus Picker, kita prioritaskan SHIFT 0 agar tidak kosong
+            current_roles = base_roles.copy()
+            if "PICKER" in k['posisi']:
+                # Filter hanya shift yang sesuai role picker
+                picker_slots = [r for r in current_roles if "PICKER" in r[1]]
+                # Acak urutan shift (0, 1, 2) biar Picker masuknya merata
+                random.shuffle(picker_slots)
+                active_roles = picker_slots
+            else:
+                random.shuffle(current_roles)
+                active_roles = current_roles
 
-            for shf_jam, shf_role in shuffled_roles:
+            for shf_jam, shf_role in active_roles:
                 if weekly_counter[nama] >= k['target_fix']: break
-                if shf_jam == "SHIFT 3": continue # Shift 3 wajib kosong
+                if shf_jam == "SHIFT 3": continue # Shift 3 tetap kosong
                 
-                # Logic SPV: Sabtu Prioritas Shift 2
+                # Logic SPV: Sabtu wajib Shift 2
                 if k['posisi'] == "SPV" and day_name == "SABTU" and shf_jam != "SHIFT 2":
                     continue
 
@@ -5083,10 +5091,10 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                     if nama not in storage[day_name][slot_key]:
                         storage[day_name][slot_key].append(nama)
                         weekly_counter[nama] += 1
-                        # Aturan: Full-Time (6) cuma 1 shift sehari, Part-Full (9) boleh lebih
+                        # Aturan: Full-Time (6) jatah 1x sehari, Part-Full (9) bisa 2x
                         if k['target_fix'] == 6: break 
 
-    # --- LOGIC BACKUP: JANGAN ADA ROLE KOSONG (KECUALI SPV) ---
+    # --- LOGIC BACKUP: MINIMAL 1 ORANG PER SLOT (KECUALI SPV) ---
     for day_name in day_names:
         d_idx = day_names.index(day_name)
         tgl_ini = dates_real[d_idx]
@@ -5095,6 +5103,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
             slot_key = f"{shf_jam} - {shf_role}"
             if shf_jam == "SHIFT 3" or shf_role == "SPV": continue 
             
+            # Jika baris pertama masih kosong, tarik backup
             if not storage[day_name][slot_key]:
                 potential_backups = [kb for kb in karyawan_list if weekly_counter[kb['nama']] < kb['target_fix']]
                 random.shuffle(potential_backups)
@@ -5103,7 +5112,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                     nama_bk = kb['nama']
                     if not df_libur[(df_libur['nama'] == nama_bk) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                     
-                    # Cek double shift biar gak bentrok jam
+                    # Anti double di jam yang sama
                     sudah_ada = any(nama_bk in storage[day_name][sk] for sk in storage[day_name])
                     if kb['target_fix'] == 6 and sudah_ada: continue
                     
@@ -5112,7 +5121,7 @@ if st.button("RUN GENERATOR JADWAL", use_container_width=True):
                         weekly_counter[kb['nama']] += 1
                         break 
 
-    # --- GENERATE TABEL (UTUH TANPA DISERDEHANAKAN) ---
+    # --- GENERATE TABEL FINAL ---
     final_table = []
     real_summary = {k['nama']: 0 for k in karyawan_list}
 
