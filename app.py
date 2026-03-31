@@ -3254,7 +3254,7 @@ def apply_custom_ui():
             border-radius: 8px !important;
         }
     </style>
-    <div class="hero-header">📦 RTO COMPARE & ALLOCATION SYSTEM SBY</div>
+    <div class="hero-header">RTO RECEIVING PROCESS</div>
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIKA ALOKASI (KODE ASLI LU YANG SUDAH GUE WRAP) ---
@@ -3329,7 +3329,7 @@ def main():
         file_tf = st.file_uploader("Upload Data TF", type=['xlsx', 'csv'])
 
     if file_scan and file_tf:
-        if st.button("🚀 PROSES ALOKASI SEKARANG"):
+        if st.button("▶️RUN DATA"):
             try:
                 # Load Data
                 df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
@@ -3359,7 +3359,7 @@ def main():
             except Exception as e:
                 st.error(f"Gagal memproses data: {e}")
     else:
-        st.info("Silakan upload kedua file di atas untuk memulai alokasi.")
+        st.info("Silakan upload kedua file di atas untuk proses.")
                 
 import streamlit as st
 import pandas as pd
