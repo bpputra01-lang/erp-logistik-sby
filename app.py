@@ -5026,7 +5026,7 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (VERSI: TARGET DRIVEN - ANTI-BACOK) ---
+   # --- D. GENERATOR JADWAL (VERSI FINAL: TARGET 9/6 HARGA MATI) ---
     if st.button("RUN GENERATOR JADWAL", use_container_width=True):
         dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5034,7 +5034,6 @@ if menu == "Logistic Schedule":
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        # Template Row Tetap (Sesuai request lu bos)
         base_roles = [
             ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
             ("SHIFT 0", "LOG-PICKER"),
@@ -5042,57 +5041,59 @@ if menu == "Logistic Schedule":
             ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
         ]
 
-        # 1. Target & Data Karyawan
         karyawan_list = df_staff.to_dict('records')
         for k in karyawan_list:
             k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
         
+        # PRIORITAS: Part-Full (Target 9) harus di atas biar dapet slot duluan
+        karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True)
+        
         storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
         weekly_counter = {k['nama']: 0 for k in karyawan_list}
 
-        # 2. Plotting: Paksa Sampai Target Habis
-        # Kita putar hari demi hari sampai target semua orang terpenuhi
-        for d_idx, day_name in enumerate(day_names):
-            current_date_str = dates_real[d_idx]
+        # --- LOGIC PLOTTING (SISTEM PAKSA TARGET) ---
+        for k in karyawan_sorted:
+            nama = k['nama']
             
-            # Setiap hari, coba masukkan setiap karyawan ke slot yang cocok
-            for k in karyawan_list:
-                nama = k['nama']
-                if weekly_counter[nama] >= k['target_fix']: continue
+            # Putar hari terus-terusan sampe target orang ini (9 atau 6) habis
+            # Kunci: Part-Full boleh kerja 2 shift sehari asal beda jam
+            for d_idx, day_name in enumerate(day_names):
+                if weekly_counter[nama] >= k['target_fix']: break
                 
-                # Cek Libur di tanggal ini
-                if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == current_date_str)].empty:
-                    continue
-                
-                # Cari slot yang sesuai posisi (Lewati Shift 3 sesuai request lu)
+                tgl_ini = dates_real[d_idx]
+                if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty:
+                    continue # Skip kalau libur
+
                 for shf_jam, shf_role in base_roles:
-                    if shf_jam == "SHIFT 3": continue
+                    if weekly_counter[nama] >= k['target_fix']: break
+                    if shf_jam == "SHIFT 3": continue # Tetap kosongin Shift 3
+                    
                     if k['posisi'] == shf_role:
                         slot_key = f"{shf_jam} - {shf_role}"
-                        storage[day_name][slot_key].append(nama)
-                        weekly_counter[nama] += 1
-                        break # Sudah dapat 1 shift hari ini, lanjut karyawan lain
+                        
+                        # Cek apakah jam ini sudah ada orang lain (biar gak numpuk di satu baris template)
+                        # Tapi kalau Part-Full butuh jatah, dia boleh masuk shift beda di hari yang sama
+                        already_in_this_specific_shift = nama in storage[day_name][slot_key]
+                        
+                        if not already_in_this_specific_shift:
+                            storage[day_name][slot_key].append(nama)
+                            weekly_counter[nama] += 1
 
-        # 3. Konversi ke Tabel (Dynamic Row Expansion)
+        # --- GENERATE TABEL ---
         final_table = []
         real_summary = {k['nama']: 0 for k in karyawan_list}
 
         for shf_jam, shf_role in base_roles:
             slot_key = f"{shf_jam} - {shf_role}"
-            # Cari baris terbanyak yang dibutuhkan slot ini di antara 7 hari
             max_r = max([len(storage[d][slot_key]) for d in day_names])
             
-            # Jika SHIFT 3 atau slot kosong, tetep kasih 1 baris template
             for r in range(max(1, max_r)):
                 row = {"SHIFT - ROLE": slot_key}
                 for d in day_names:
-                    names_in_slot = storage[d][slot_key]
-                    if r < len(names_in_slot):
-                        nama_hasil = names_in_slot[r]
-                        row[d] = nama_hasil
-                        real_summary[nama_hasil] += 1
-                    else:
-                        row[d] = ""
+                    names = storage[d][slot_key]
+                    val = names[r] if r < len(names) else ""
+                    row[d] = val
+                    if val in real_summary: real_summary[val] += 1
                 final_table.append(row)
 
         st.session_state.res_df = pd.DataFrame(final_table)
