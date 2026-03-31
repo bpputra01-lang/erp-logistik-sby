@@ -5069,7 +5069,7 @@ if menu == "Logistic Schedule":
 
     # --- A. SUB-SECTION: INPUT DATA TIM ---
     st.subheader("👤 1. Input Database Tim")
-    with st.form("form_tim_final", clear_on_submit=True): 
+    with st.form("form_tim_final_v2", clear_on_submit=True): 
         c1, c2, c3 = st.columns(3)
         nama_input = c1.text_input("Nama Lengkap (Contoh: GALIH)")
         posisi_input = c2.selectbox("Posisi/Role", 
@@ -5091,7 +5091,7 @@ if menu == "Logistic Schedule":
     
     with col_l1:
         df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        with st.form("form_libur_final", clear_on_submit=True):
+        with st.form("form_libur_final_v2", clear_on_submit=True):
             target = st.selectbox("Pilih Nama Tim", df_k['nama']) if not df_k.empty else st.warning("Isi Data Tim Dulu!")
             tgl_off = st.date_input("Tanggal")
             jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH", "TGL MERAH"], horizontal=True)
@@ -5160,15 +5160,13 @@ if menu == "Logistic Schedule":
             ]
 
             weekly_total_masuk = {nama: 0 for nama in df_staff['nama']}
-
             weekly_data = []
+
             for d_str in days:
                 used_today = {} 
                 day_col = []
-                
                 for shf_name, pos in roles:
                     kandidat = df_staff[df_staff['posisi'] == pos].to_dict('records')
-                    # Filter Libur
                     kandidat = [k for k in kandidat if df_libur[(df_libur['nama'] == k['nama']) & (df_libur['tanggal'] == d_str)].empty]
                     random.shuffle(kandidat)
 
@@ -5177,27 +5175,20 @@ if menu == "Logistic Schedule":
                         nama = k['nama']
                         total_minggu = weekly_total_masuk.get(nama, 0)
                         shift_hari_ini = used_today.get(nama, 0)
-                        
-                        # Cek berapa hari dia libur minggu ini untuk potong kuota
                         hari_libur = len(df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'].isin(days))])
                         
-                        # Tentukan Limit Berdasarkan Tipe (Potong jatah kalau dia ada OFF)
+                        # Tentukan Limit (9-6-6) dikurangi jumlah hari libur
                         if k['tipe'] == "Part-Full":
-                            limit_minggu = 9 - (hari_libur * 2) # Asumsi libur potong jatah double shift
-                        elif k['tipe'] == "Full-Time":
-                            limit_minggu = 6 - hari_libur
-                        elif k['tipe'] == "Part-Time":
-                            limit_minggu = 6 - hari_libur
+                            limit_minggu = 9 - (hari_libur * 2) 
                         else:
                             limit_minggu = 6 - hari_libur
 
-                        # Logika Pengisian
                         if total_minggu < limit_minggu:
                             if k['tipe'] == "Part-Full":
-                                if shift_hari_ini < 2: # Boleh double shift
+                                if shift_hari_ini < 2: # Part-Full boleh 2x sehari
                                     assigned = nama
                             else:
-                                if shift_hari_ini < 1: # Role lain haram double shift
+                                if shift_hari_ini < 1: # Sisanya 1x sehari
                                     assigned = nama
 
                         if assigned:
@@ -5207,16 +5198,33 @@ if menu == "Logistic Schedule":
                     day_col.append(assigned)
                 weekly_data.append(day_col)
 
-            df_final = pd.DataFrame(weekly_data, index=day_names).T
-            df_final.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles])
-            st.session_state.res_df = df_final
+            # Buat DataFrame Utama
+            df_res = pd.DataFrame(weekly_data, index=day_names).T
+            df_res.insert(0, "ROLE", [f"{s} - {p}" for s, p in roles])
+            
+            # Simpan hasil ke session state
+            st.session_state.res_df = df_res
+            st.session_state.summary_shift = weekly_total_masuk
 
+    # --- E. TAMPILAN HASIL & SUMMARY ---
     if 'res_df' in st.session_state:
         st.subheader(f"📊 HASIL JADWAL - {start_date}")
-        def style_f(val):
-            if val == "" or val is None: return 'background-color: #1e2129'
-            return 'background-color: #064e3b; color: #00ff00; font-weight: bold; border: 0.5px solid #059669'
-        st.dataframe(st.session_state.res_df.style.applymap(style_f), use_container_width=True, height=650)
+        
+        # Buat kolom: Tabel Jadwal (Lebar) & Summary (Kecil)
+        col_res1, col_res2 = st.columns([5, 1.5])
+        
+        with col_res1:
+            def style_f(val):
+                if val == "" or val is None: return 'background-color: #1e2129'
+                return 'background-color: #064e3b; color: #00ff00; font-weight: bold; border: 0.5px solid #059669'
+            st.dataframe(st.session_state.res_df.style.applymap(style_f), use_container_width=True, height=650)
+            
+        with col_res2:
+            st.write("**Total Shift / Nama**")
+            # Convert dictionary summary ke DataFrame untuk tampilan cantik
+            sum_data = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
+            df_sum = pd.DataFrame(sum_data).sort_values(by="TOTAL", ascending=False)
+            st.table(df_sum)
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
