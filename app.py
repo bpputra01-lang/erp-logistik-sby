@@ -3598,33 +3598,33 @@ conn = init_db()
 st.set_page_config(page_title="JEZ SBY - Logistic System", layout="wide")
 
 # CSS: Custom Input Box sesuai request (Rounded & Clean)
-st.markdown("""
-    <style>
+    st.markdown("""
+        <style>
     
-    /* Styling Kotak Input (Text, Select, Date) biar mirip gambar lo */
-    div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
+        /* Styling Kotak Input (Text, Select, Date) biar mirip gambar lo */
+        div[data-baseweb="input"], div[data-baseweb="select"], .stDateInput div {
         background-color: #1e2129 !important;
         border-radius: 12px !important; /* Rounded corner sesuai gambar */
         border: 1px solid #3e4451 !important;
         padding: 2px 5px !important;
-    }
+        }
     
-    /* Warna teks saat ngetik */
-    input { 
+        /* Warna teks saat ngetik */
+        input { 
         color: #FFFFFF !important; 
         font-family: sans-serif !important;
-    }
+        }
     
-    /* Hover & Focus state */
-    div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+        /* Hover & Focus state */
+        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
         border: 1px solid #00FF00 !important;
         box-shadow: 0 0 5px rgba(0, 255, 0, 0.2) !important;
-    }
+        }
 
-    /* Styling tabel agar gahar */
-    .stDataFrame, .stTable { border-radius: 10px !important; overflow: hidden !important; }
-    </style>
-""", unsafe_allow_html=True)
+        /* Styling tabel agar gahar */
+        .stDataFrame, .stTable { border-radius: 10px !important; overflow: hidden !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
 
 
