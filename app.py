@@ -5006,13 +5006,37 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
-    # --- C. DAFTAR KARYAWAN AKTIF (NAMA, TIPE, ROLE) ---
+    # --- C. DAFTAR KARYAWAN AKTIF (DENGAN FITUR HAPUS) ---
     with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
+        # Ambil data terbaru
         df_cek = pd.read_sql_query("SELECT nama AS 'NAMA', posisi AS 'ROLE', tipe AS 'TIPE' FROM karyawan", conn)
+        
         if not df_cek.empty:
-            st.dataframe(df_cek, use_container_width=True)
+            st.write("💡 *Klik baris lalu tekan **Backspace/Delete** pada keyboard untuk hapus, atau edit langsung di tabel.*")
+            
+            # Gunakan data_editor agar baris bisa dipilih/dihapus
+            edited_df = st.data_editor(
+                df_cek, 
+                use_container_width=True, 
+                num_rows="dynamic", # Ini yang memunculkan tombol hapus di samping
+                key="editor_karyawan"
+            )
 
-    st.divider()
+            # Logika sinkronisasi: Jika jumlah baris di editor berkurang dibanding database
+            if len(edited_df) < len(df_cek):
+                # Cari nama yang hilang (yang dihapus user di UI)
+                nama_sebelumnya = set(df_cek['NAMA'])
+                nama_sekarang = set(edited_df['NAMA'])
+                nama_dihapus = nama_sebelumnya - nama_sekarang
+                
+                for nama in nama_dihapus:
+                    conn.execute("DELETE FROM karyawan WHERE nama = ?", (nama,))
+                
+                conn.commit()
+                st.success(f"🗑️ Data berhasil diperbarui!")
+                st.rerun()
+        else:
+            st.info("Belum ada data karyawan.")
 
     # --- D. GENERATOR JADWAL ---
     st.subheader("🚀 3. Generate Jadwal")
