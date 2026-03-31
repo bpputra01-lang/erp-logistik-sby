@@ -3595,6 +3595,28 @@ def init_db():
 conn = init_db()
 
 st.set_page_config(page_title="JEZ SBY System", layout="wide")
+# --- INJECT CSS BIAR TULISAN PAS NGETIK KELIHATAN ---
+st.markdown("""
+    <style>
+    /* Paksa warna teks di dalam semua input box */
+    input {
+        color: #FFFFFF !important; /* Ganti jadi #000000 kalau kamu pakai tema putih */
+        background-color: #0E1117 !important; /* Warna background box input */
+    }
+    
+    /* Warna teks placeholder (Masukkan Nama...) */
+    ::placeholder {
+        color: #808495 !important;
+        opacity: 1; 
+    }
+
+    /* Warna teks saat box di klik (fokus) */
+    div[data-baseweb="input"] > div {
+        background-color: #1e2129 !important;
+        color: white !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 
 
