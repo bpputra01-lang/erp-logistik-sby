@@ -3438,7 +3438,7 @@ def tampilan_balancing_stock():
         """
 
         # Target Store: TOKO, STORE, GUDANG LT.2
-        f_target_store = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
+        f_target_store = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%GL2-STORE%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
         
         # Source DC: Area pusat
         f_source_dc = f"UPPER(\"{col_bin}\") LIKE '%DC%' AND {base_excl}"
