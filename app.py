@@ -3597,7 +3597,7 @@ conn = init_db()
 
 # --- CSS FIX: TEKS PUTIH & BG HITAM PEKAT (RATA KIRI) ---
 st.markdown("""
-        <style>
+    <style>
         .hero-header {
             background-color: #007BFF;
             color: white;
@@ -3609,14 +3609,22 @@ st.markdown("""
             font-size: 20px;
         }
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+        
+        /* FIX BACKGROUND PUTIH INPUT: Kita set transparan biar ngikut warna gelap div-nya */
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div {
-            background-color: #1a1c27 !important;
+            background-color: #1a1c27 !important; /* Warna gelap yang lu mau */
             border: 1px solid #3d4156 !important;
             border-radius: 6px !important;
-            color: white !important;
         }
-        input, textarea { background-color: transparent !important; border: none !important; color: white !important; }
+        
+        input, textarea { 
+            background-color: transparent !important; 
+            border: none !important; 
+            color: white !important; 
+            -webkit-text-fill-color: white !important; /* Biar teks beneran putih di Chrome */
+        }
+
         div.stButton > button {
             background-color: #007BFF !important;
             color: white !important;
@@ -3628,7 +3636,9 @@ st.markdown("""
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
     </style>
 """, unsafe_allow_html=True)
- st.markdown('<div class="hero-header">📅LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
+
+# Hapus spasi di depan st.markdown ini:
+st.markdown('<div class="hero-header">📅LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
 with st.sidebar:
        st.markdown("""
