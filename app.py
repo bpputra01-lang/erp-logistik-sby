@@ -5026,75 +5026,83 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (VERSI: SHIFT 3 KOSONG + SHIFT 0 KHUSUS PICKER) ---
+   # --- D. GENERATOR JADWAL (VERSI ANTI-BACOK: SYNC LIBUR & SUMMARY) ---
     if st.button("RUN GENERATOR JADWAL", use_container_width=True):
-        days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+        # List Tanggal Real (Y-M-D) untuk cek database libur
+        dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        # TEMPLATE LENGKAP (Termasuk Shift 3 yang bakal dikosongin)
+        # Template Row (Shift 3 Kosong, Shift 0 Khusus LOG-PICKER)
         base_template = [
             ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
-            ("SHIFT 0", "LOG-PICKER"), # KHUSUS PICKER DI SINI
+            ("SHIFT 0", "LOG-PICKER"),
             ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
             ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
         ]
 
-        # 1. TARGET & SORTING (9/6)
+        # 1. Target Shift (9 untuk Part-Full, 6 untuk Reguler)
         karyawan_list = df_staff.to_dict('records')
         for k in karyawan_list:
             k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
+        
+        # Sortir: Prioritas yang targetnya gede
         karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True)
-
-        weekly_total = {nama: 0 for nama in df_staff['nama']}
+        
         storage = {d: {f"{s} - {r}": [] for s, r in base_template} for d in day_names}
 
-        # 2. FILLING LOGIC (7 HARI FULL)
-        for d_idx, (day_name, d_str) in enumerate(zip(day_names, days)):
-            daily_sorted = sorted(karyawan_sorted, key=lambda x: (weekly_total[x['nama']], x['target_fix']), reverse=False)
+        # 2. Plotting Logic (Hajar 7 Hari)
+        for d_idx, day_name in enumerate(day_names):
+            current_date_str = dates_real[d_idx]
             
+            # Setiap hari, prioritaskan orang yang shift-nya masih dikit (biar adil)
+            # Dan PASTIKAN tidak sedang LIBUR di tanggal tersebut
             for shf_jam, shf_role in base_template:
-                # SKIP SHIFT 3 (Biar tetep ada di tabel tapi kosong)
-                if shf_jam == "SHIFT 3":
-                    continue
+                if shf_jam == "SHIFT 3": continue # Biarkan kosong
                 
                 slot_key = f"{shf_jam} - {shf_role}"
                 
-                for k in daily_sorted:
+                for k in karyawan_sorted:
                     nama = k['nama']
-                    if weekly_total[nama] >= k['target_fix']: continue
                     
-                    # Cek Libur
-                    if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == d_str)].empty:
-                        continue
+                    # HITUNG REAL-TIME TOTAL SHIFT (Biar Summary Gak Halu)
+                    total_so_far = sum([len([n for n in storage[d][sk] if n == nama]) for d in day_names for sk in storage[d]])
                     
-                    # Cek Double Shift & Role Match
+                    if total_so_far >= k['target_fix']: continue
+                    if k['posisi'] != shf_role: continue
+                    
+                    # CEK LIBUR (Nama + Tanggal Wajib Pas)
+                    is_libur = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == current_date_str)].empty
+                    if is_libur: continue
+                    
+                    # Cek apakah sudah kerja di shift lain di hari yang sama
                     already_work_today = any(nama in storage[day_name][sk] for sk in storage[day_name])
                     
-                    # LOGIC: Harus sesuai posisi DAN kalau SHIFT 0 cuma buat LOG-PICKER
-                    if k['posisi'] == shf_role and not already_work_today:
+                    if not already_work_today:
                         storage[day_name][slot_key].append(nama)
-                        weekly_total[nama] += 1
                         break 
 
-        # 3. BUILD TABEL DYNAMIC ROWS
+        # 3. Build Table dengan Dynamic Rows
         final_table = []
+        summary_real = {k['nama']: 0 for k in karyawan_list}
+
         for shf_jam, shf_role in base_template:
             slot_key = f"{shf_jam} - {shf_role}"
-            # Cari baris terbanyak
             max_r = max([len(storage[d][slot_key]) for d in day_names])
             
             for r in range(max(1, max_r)):
                 row = {"SHIFT - ROLE": slot_key}
                 for d in day_names:
-                    names = storage[d][slot_key]
-                    row[d] = names[r] if r < len(names) else ""
+                    names_list = storage[d][slot_key]
+                    val = names_list[r] if r < len(names_list) else ""
+                    row[d] = val
+                    if val in summary_real: summary_real[val] += 1
                 final_table.append(row)
 
         st.session_state.res_df = pd.DataFrame(final_table)
-        st.session_state.summary_shift = weekly_total
+        st.session_state.summary_shift = summary_real
 
     # --- TAMPILAN TETAP DARK MODE ---
     if 'res_df' in st.session_state:
