@@ -5026,7 +5026,7 @@ if menu == "Logistic Schedule":
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
     
-   # --- D. GENERATOR JADWAL (VERSI FINAL: FIX SHIFT SPREAD & FULL WEEK) ---
+   # --- D. GENERATOR JADWAL (VERSI: NO SHIFT 3 + FULL WEEK) ---
     if st.button("RUN GENERATOR JADWAL", use_container_width=True):
         days = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
@@ -5034,27 +5034,25 @@ if menu == "Logistic Schedule":
         df_staff = pd.read_sql_query("SELECT * FROM karyawan", conn)
         df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
 
-        # TEMPLATE URUTAN SHIFT YANG BENER
+        # TEMPLATE TANPA SHIFT 3 (Sesuai request lu bos)
         base_template = [
-            ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "SPV"), ("SHIFT 3", "WF-PICKER"),
             ("SHIFT 0", "LOG-ADMIN"), ("SHIFT 0", "LOG-LOADER"), ("SHIFT 0", "LOG-STORE"), ("SHIFT 0", "WF-PICKER"),
             ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
             ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
         ]
 
-        # 1. TARGET & SORTING
+        # 1. TARGET & SORTING (Part-Full 9, Reguler 6)
         karyawan_list = df_staff.to_dict('records')
         for k in karyawan_list:
             k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
         karyawan_sorted = sorted(karyawan_list, key=lambda x: x['target_fix'], reverse=True)
 
         weekly_total = {nama: 0 for nama in df_staff['nama']}
-        # Struktur: {day: { (shift, role): [list_nama] }}
         storage = {d: {f"{s} - {r}": [] for s, r in base_template} for d in day_names}
 
-        # 2. SEBAR NAMA (7 HARI - SHIFT NYEBAR)
+        # 2. SEBAR JATAH KE 7 HARI (SENIN - MINGGU)
         for d_idx, (day_name, d_str) in enumerate(zip(day_names, days)):
-            # Ambil orang yang jatahnya masih banyak dulu setiap harinya
+            # Tiap hari, prioritaskan orang yang total shift-nya masih paling dikit
             daily_sorted = sorted(karyawan_sorted, key=lambda x: (weekly_total[x['nama']], x['target_fix']), reverse=False)
             
             for shf_jam, shf_role in base_template:
@@ -5062,28 +5060,27 @@ if menu == "Logistic Schedule":
                 
                 for k in daily_sorted:
                     nama = k['nama']
-                    if weekly_total[nama] >= k['target_fix']: continue # Jatah habis
+                    if weekly_total[nama] >= k['target_fix']: continue
                     
                     # Cek Libur
                     if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == d_str)].empty:
                         continue
                     
-                    # Cek apakah orang ini sudah kerja di shift lain di hari yang sama
+                    # Satu orang satu shift per hari biar nyebar ke Minggu
                     already_work_today = any(nama in storage[day_name][sk] for sk in storage[day_name])
                     
-                    # Syarat: Posisi cocok DAN belum kerja hari ini (biar nyebar ke hari lain/minggu)
                     if k['posisi'] == shf_role and not already_work_today:
                         storage[day_name][slot_key].append(nama)
                         weekly_total[nama] += 1
-                        break # Slot ini sudah terisi, lanjut ke slot template berikutnya
+                        break 
 
-        # 3. BUILD TABEL (DYNAMIC ROW)
+        # 3. BUILD TABEL DYNAMIC ROWS (Satu kotak satu nama)
         final_table = []
         for shf_jam, shf_role in base_template:
             slot_key = f"{shf_jam} - {shf_role}"
             max_r = max([len(storage[d][slot_key]) for d in day_names])
             
-            for r in range(max(1, max_r)): # Minimal 1 baris buat template
+            for r in range(max(1, max_r)):
                 row = {"SHIFT - ROLE": slot_key}
                 for d in day_names:
                     names = storage[d][slot_key]
