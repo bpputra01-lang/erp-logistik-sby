@@ -3578,7 +3578,158 @@ def tampilan_balancing_stock():
     finally:
         conn.close()
 
-                           
+import sqlite3
+import pandas as pd
+
+def init_db():
+    conn = sqlite3.connect('logistic_schedule.db')
+    cursor = conn.cursor()
+    
+    # Tabel Karyawan
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS karyawan (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nama TEXT NOT NULL,
+            posisi TEXT NOT NULL, -- loader, admin, picker, backliner
+            tipe_kontrak TEXT NOT NULL -- part-time, part-full, full-time
+        )
+    ''')
+    
+    # Tabel Request Libur/Cuti
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS request_off (
+            nama TEXT NOT NULL,
+            tanggal TEXT NOT NULL, -- Format YYYY-MM-DD
+            keterangan TEXT -- Libur Mingguan, Cuti, LPH
+        )
+    ''')
+    conn.commit()
+    return conn
+
+# Contoh Input Data Karyawan
+def input_karyawan(conn, nama, posisi, tipe):
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO karyawan (nama, posisi, tipe_kontrak) VALUES (?, ?, ?)", 
+                   (nama, posisi, tipe))
+    conn.commit()
+
+def generate_weekly_schedule(conn, start_date):
+    # 1. Ambil data semua karyawan
+    df_karyawan = pd.read_sql_query("SELECT * FROM karyawan", conn)
+    
+    # 2. Ambil data libur/cuti minggu ini
+    # (Asumsi kita memproses 7 hari ke depan)
+    days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+    
+    schedule = {day: [] for day in days}
+    
+    # 3. Fungsi pembantu untuk cek ketersediaan
+    def is_available(nama, tanggal):
+        res = conn.execute("SELECT 1 FROM request_off WHERE nama=? AND tanggal=?", (nama, tanggal)).fetchone()
+        return res is None
+
+    # LOGIKA SHIFT (Contoh sederhana)
+    # Anda bisa melakukan looping per posisi lalu per shift
+    for posisi in ['loader', 'admin', 'picker', 'backliner']:
+        available_staff = df_karyawan[df_karyawan['posisi'] == posisi]
+        
+        for day in days:
+            # Filter staf yang tidak sedang libur/cuti di hari tersebut
+            current_candidates = [n for n in available_staff['nama'] if is_available(n, day)]
+            
+            # TODO: Masukkan logika pembagian shift 0, 1, 2
+            # Dan logika SHIFT LONG khusus Sabtu-Minggu (Part-Time & Part-Full)
+            if day in ['Sabtu', 'Minggu']:
+                # Filter kandidat khusus Part-Time/Part-Full untuk Long Shift
+                pass 
+
+    return schedule
+import streamlit as st
+import sqlite3
+import pandas as pd
+from datetime import datetime
+
+# --- DATABASE SETUP ---
+def init_db():
+    conn = sqlite3.connect('schedule_logistik.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS karyawan 
+                 (nama TEXT, posisi TEXT, tipe TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS libur_request 
+                 (nama TEXT, tanggal TEXT, jenis TEXT)''')
+    conn.commit()
+    return conn
+
+conn = init_db()
+
+# --- UI STREAMLIT ---
+st.set_page_config(page_title="Schedule Maker JEZ SBY", layout="wide")
+st.title("🗓️ Logistics & Warehouse Schedule Maker")
+
+menu = st.sidebar.selectbox("Pilih Menu", ["Dashboard", "Input Karyawan", "Request Libur/Cuti", "Generate Schedule"])
+
+# --- MENU 1: INPUT KARYAWAN ---
+if menu == "Input Karyawan":
+    st.header("👤 Management Data Karyawan")
+    with st.form("form_karyawan"):
+        col1, col2, col3 = st.columns(3)
+        nama = col1.text_input("Nama Karyawan")
+        posisi = col2.selectbox("Posisi", ["Loader", "Admin", "Picker", "Backliner"])
+        tipe = col3.selectbox("Tipe Kontrak", ["Part-Time", "Part-Full", "Full-Time"])
+        submit = st.form_submit_button("Simpan Data")
+        
+        if submit:
+            conn.execute("INSERT INTO karyawan VALUES (?, ?, ?)", (nama, posisi, tipe))
+            conn.commit()
+            st.success(f"Data {nama} berhasil disimpan!")
+
+    df_k = pd.read_sql_query("SELECT * FROM karyawan", conn)
+    st.dataframe(df_k, use_container_width=True)
+
+# --- MENU 2: REQUEST LIBUR / CUTI ---
+elif menu == "Request Libur/Cuti":
+    st.header("🔴 Input Libur, Cuti, & LPH")
+    df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+    
+    with st.form("form_libur"):
+        nama_off = st.selectbox("Nama Karyawan", df_k['nama'])
+        tgl_off = st.date_input("Tanggal Libur/Cuti")
+        jenis = st.radio("Keterangan", ["Libur Mingguan", "Cuti", "LPH (Pengganti)"], horizontal=True)
+        submit_off = st.form_submit_button("Submit Libur")
+        
+        if submit_off:
+            conn.execute("INSERT INTO libur_request VALUES (?, ?, ?)", (nama_off, str(tgl_off), jenis))
+            conn.commit()
+            st.warning(f"{nama_off} dipastikan tidak akan masuk jadwal pada {tgl_off}")
+
+# --- MENU 3: GENERATE SCHEDULE (LOGIC UTAMA) ---
+elif menu == "Generate Schedule":
+    st.header("⚙️ Process Weekly Schedule")
+    
+    col_a, col_b = st.columns(2)
+    start_date = col_a.date_input("Pilih Tanggal Mulai (Senin)")
+    
+    if st.button("🚀 Generate Ultra-Fast Schedule"):
+        # Di sini nanti Logika Python (Pandas/NumPy) kamu bekerja 
+        # untuk mengisi slot kosong berdasarkan tipe Part-Time/Full-Time
+        st.info("Sistem sedang menghitung slot kosong sesuai ketersediaan...")
+        
+        # Contoh Preview Dummy Tabel sesuai gambar kamu
+        days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+        df_dummy = pd.DataFrame(index=["SHIFT 0 - Picker", "SHIFT 1 - Admin", "SHIFT 1 - Loader", "SHIFT 2 - Long (Sabtu/Minggu)"], columns=days)
+        st.table(df_dummy.fillna("-"))
+        st.success("Jadwal Berhasil Dibuat!")
+
+# --- DASHBOARD (HOME) ---
+else:
+    st.write("Selamat Datang di Sistem Penjadwalan Cabang Surabaya.")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Total Karyawan", len(pd.read_sql_query("SELECT * FROM karyawan", conn)))
+    with col2:
+        st.metric("Total Request Libur (Minggu Ini)", len(pd.read_sql_query("SELECT * FROM libur_request", conn)))
+        
+                                  
 with st.sidebar:
        st.markdown("""
         <style>
