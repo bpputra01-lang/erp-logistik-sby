@@ -3484,19 +3484,27 @@ def tampilan_balancing_stock():
         gl_excl = f"{base_excl} AND UPPER(\"{col_bin}\") NOT LIKE '%RAK%'"
         filter_retail = f"(UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
 
-        # --- 1. DEFINISI LOGIKA MISSING (SATU SUMBER KEBENARAN) ---
+        # --- 1. DEFINISI LOGIKA MISSING (REVISED TO BE ACCURATE) ---
+        
+        # Logic DC to Store: SKU ada di DC (Qty > 0) tapi TIDAK ADA di Store/Toko/Gudang LT.2
         q_logic_dc_missing = f"""
-            SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
+            SELECT "{col_sku}" FROM stock_raw 
+            WHERE UPPER("{col_bin}") LIKE '%DC%' AND {base_excl}
             GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-            EXCEPT
-            SELECT "{col_sku}" FROM stock_raw WHERE {filter_retail}
+            AND "{col_sku}" NOT IN (
+                SELECT DISTINCT "{col_sku}" FROM stock_raw WHERE {filter_retail}
+            )
         """
 
+        # Logic GL4 to GL3: SKU ada di GL4 (Qty > 0) tapi TIDAK ADA di GL3
+        # Kita hapus filter Qty > 0 di subquery tujuan biar SKU stok 0 gak dianggap missing
         q_logic_gl_missing = f"""
-            SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
+            SELECT "{col_sku}" FROM stock_raw 
+            WHERE UPPER("{col_bin}") LIKE '%GL4%' AND {gl_excl}
             GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0
-            EXCEPT
-            SELECT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%'
+            AND "{col_sku}" NOT IN (
+                SELECT DISTINCT "{col_sku}" FROM stock_raw WHERE UPPER("{col_bin}") LIKE '%GL3%'
+            )
         """
 
         # --- 2. QUERY METRIKS (HITUNG SKALI JALAN) ---
