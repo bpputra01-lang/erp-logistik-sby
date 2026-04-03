@@ -3123,15 +3123,15 @@ import streamlit as st
 import sqlite3
 from datetime import datetime
 
-# --- 1. FUNGSI DATABASE (Gue satuin biar rapi) ---
+# --- FUNGSI KONEKSI ---
 def get_db_connection():
-    conn = sqlite3.connect('reject_system.db', check_same_thread=False)
-    return conn
+    # check_same_thread=False WAJIB untuk Streamlit
+    return sqlite3.connect('reject_system.db', check_same_thread=False)
 
-def init_db():
+# --- FUNGSI PENJAGA (Panggil ini setiap mau akses DB) ---
+def ensure_table_exists():
     conn = get_db_connection()
     c = conn.cursor()
-    # Pastikan tabel dibuat di awal
     c.execute('''CREATE TABLE IF NOT EXISTS requests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
@@ -3140,8 +3140,8 @@ def init_db():
     conn.close()
 
 def project_approval_reject():
-    # WAJIB: Jalankan init_db di paling atas fungsi
-    init_db()
+    # 1. Pastikan tabel ada pas halaman dibuka
+    ensure_table_exists()
     
     st.markdown("""
         <style>
@@ -3185,30 +3185,41 @@ def project_approval_reject():
         keterangan = st.text_area("KETERANGAN KERUSAKAN")
         submit = st.form_submit_button("📤 SENT REQUEST")
 
+    # --- PROSES SIMPAN (Line 3193 Safe Zone) ---
     if submit:
         if nama and sku:
-            conn = get_db_connection()
-            c = conn.cursor()
-            tgl_skrg = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            c.execute("INSERT INTO requests (tanggal, nama, sku, article, bin, size, kategori, keterangan, status) VALUES (?,?,?,?,?,?,?,?,?)",
-                      (tgl_skrg, nama, sku, article, bin_asal, size, kategori, keterangan, 1))
-            conn.commit()
-            conn.close()
-            st.success(f"✅ Berhasil Disimpan! SKU: {sku}")
-            st.rerun() # Refresh biar timeline update
+            # DOUBLE CHECK: Pastikan tabel ada lagi sebelum insert
+            ensure_table_exists() 
+            
+            try:
+                conn = get_db_connection()
+                c = conn.cursor()
+                tgl_skrg = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                # INSERT DATA
+                c.execute("INSERT INTO requests (tanggal, nama, sku, article, bin, size, kategori, keterangan, status) VALUES (?,?,?,?,?,?,?,?,?)",
+                          (tgl_skrg, nama, sku, article, bin_asal, size, kategori, keterangan, 1))
+                
+                conn.commit()
+                conn.close()
+                st.success(f"✅ Berhasil Disimpan! SKU: {sku}")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Gagal simpan data: {e}")
         else:
             st.warning("⚠️ Nama dan SKU wajib diisi!")
 
     st.divider()
 
-    # --- 2. LOGIKA AMBIL DATA DENGAN TRY-EXCEPT (BIAR GAK CRASH) ---
+    # --- TRACKING TIMELINE ---
     try:
+        ensure_table_exists() # Pastikan tabel ada sebelum select
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT sku, status FROM requests ORDER BY id DESC LIMIT 1")
         data_akhir = c.fetchone()
         conn.close()
-    except sqlite3.OperationalError:
+    except:
         data_akhir = None
 
     if data_akhir:
@@ -3216,19 +3227,14 @@ def project_approval_reject():
         st.markdown(f"### 🕒 Tracking Status: SKU-{sku_display}")
         
         colA, colB, colC = st.columns(3)
-        with colA:
-            st.markdown(f"{'🟢' if status_step >= 1 else '⚪'} **Step 1** \n\nDone Pengajuan")
-        with colB:
-            # Step 2 Kuning kalau sudah diapprove (status >= 2)
-            st.markdown(f"{'🟡' if status_step >= 2 else '⚪'} **Step 2** \n\nWaiting Purchasing")
-        with colC:
-            # Step 3 Hijau kalau sudah setup (status >= 3)
-            st.markdown(f"{'🟢' if status_step >= 3 else '⚪'} **Step 3** \n\nDone Set Up")
+        with colA: st.markdown(f"{'🟢' if status_step >= 1 else '⚪'} **Step 1** \n\nDone Pengajuan")
+        with colB: st.markdown(f"{'🟡' if status_step >= 2 else '⚪'} **Step 2** \n\nWaiting Purchasing")
+        with colC: st.markdown(f"{'🟢' if status_step >= 3 else '⚪'} **Step 3** \n\nDone Set Up")
         
         st.progress(status_step / 3)
     else:
-        st.info("Belum ada data pengajuan. Silahkan isi form di atas.")
-        
+        st.info("Belum ada data pengajuan hari ini.")
+
 import pandas as pd
 import streamlit as st
 from io import BytesIO
