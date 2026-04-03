@@ -3119,48 +3119,56 @@ def main():
     else:
         st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
 
-def project_approval_reject():    
-    # WAJIB dibungkus tag <style> biar CSS-nya aktif
+def project_approval_reject():
     st.markdown("""
         <style>
         .hero-header-custom {
-            background-color: #007BFF;
+            /* Warna Gradient Biru sesuai gambar */
+            background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
             color: white;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
+            padding: 20px 25px;
+            border-radius: 12px;
+            text-align: left; /* Gue buat rata kiri dikit biar mirip tombol di gambar */
             margin-bottom: 25px;
-            font-weight: bold;
-            font-size: 20px;
+            font-weight: 800; /* Lebih tebal */
+            font-size: 24px;
+            letter-spacing: 1px; /* Jarak antar huruf biar cakep */
+            
+            /* Efek Shadow biar kelihatan Premium */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            
+            /* Font Style */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+
+        /* Styling Form & Input tetap gue jaga biar seragam */
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        
-        /* Warna Input Field biar Dark Mode Surabaya Style */
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
         div[data-testid="stSelectbox"] > div > div {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
-            border-radius: 6px !important;
+            border-radius: 8px !important;
             color: white !important;
         }
-        
-        /* Button Style */
+
         div.stButton > button {
-            background-color: #007BFF !important;
+            background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
             color: white !important;
-            border-radius: 8px !important;
+            border-radius: 10px !important;
             width: 100% !important;
-            height: 48px !important;
+            height: 50px !important;
             font-weight: bold !important;
             border: none !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         }
         
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
-    # Ganti class="hero-header" jadi class="hero-header-custom"
-    st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT/DEFECT</div>', unsafe_allow_html=True)
+
+    # Panggil Class yang bener
+    st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
     # --- FORM INPUT ---
     with st.form("form_reject"):
         col1, col2 = st.columns(2)
