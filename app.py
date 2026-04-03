@@ -3119,9 +3119,7 @@ def main():
     else:
         st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
 
-def project_approval_reject():
-    st.subheader("⚠️ Pengajuan Reject & Defect")
-    
+def project_approval_reject():    
     # WAJIB dibungkus tag <style> biar CSS-nya aktif
     st.markdown("""
         <style>
