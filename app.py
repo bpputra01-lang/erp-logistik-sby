@@ -2935,7 +2935,23 @@ def menu_reject_defect():
         }
         </style>
     """, unsafe_allow_html=True)
-
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Input Single Item Defect/Reject:**
+        - **BIN AWAL**: Isi dengan Bin Awal item tersebut tersimpan
+        - **BIN LOKASI**: Pilih Bin untuk lokasi tujuan item tersebut sesuai dropdown yang tersedia
+        - **SKU**: Tulis SKU lengkap secara Manual
+        - **NAMA BARANG**: Ambil dari Article Name di file Multiple Adjusment
+        - **SIZE**: Tulis ukurannya berdasarkan SKU yang sudah dituliskan
+        - **KATEGORI**: Isi dengan kategori yang sudah di tentukan sesuai tingkat kerusakannya **(Jika item tersebut berbeda baik dari size article maka pilih pilihan yang menggambarkan perbedaannya, Dan jika beda article dan beda size maka mohon untuk upload 2 kali namun jika sebelahnya saja maka cukup sekali)**
+        - **DETAIL**: Isi dengan detail kerusakannya sehingga menggambar kondisinya
+        **Input Mass Item Defect/Reject:**
+        - Klik pilihan **Download template Input** yang tersedia
+        - Lalu jangan diubah apapun header dan nama sheetnya
+        - Isikan didalam file Excel sesuai dengan ketika melakukan input **Single Item**
+        - Jika sudah terisi semua maka upload file tersebut ke Uploader yang ada di sebelahnya
+        - Proses Selesai
+        """)
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
     
     init_db()
