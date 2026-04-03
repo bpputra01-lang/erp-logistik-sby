@@ -3121,7 +3121,36 @@ def main():
 
 def project_approval_reject():
     st.subheader("⚠️ Pengajuan Reject & Defect")
-    
+    st.markdown("""
+    .hero-header {
+            background-color: #007BFF;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+        div[data-testid="stTextInput"] > div > div, 
+        div[data-testid="stTextArea"] > div > div {
+            background-color: #1a1c27 !important;
+            border: 1px solid #3d4156 !important;
+            border-radius: 6px !important;
+            color: white !important;
+        }
+        input, textarea { background-color: transparent !important; border: none !important; color: white !important; }
+        div.stButton > button {
+            background-color: #007BFF !important;
+            color: white !important;
+            border-radius: 8px !important;
+            width: 100% !important;
+            height: 48px !important;
+            font-weight: bold !important;
+        }
+        label { color: #E0E0E0 !important; font-weight: 600 !important; }
+    """, unsafe_allow_html=True)
     # --- FORM INPUT ---
     with st.form("form_reject"):
         col1, col2 = st.columns(2)
