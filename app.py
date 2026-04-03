@@ -3118,7 +3118,6 @@ def main():
             st.plotly_chart(fig_bar, use_container_width=True)
     else:
         st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
-import streamlit as st
 
 def project_approval_reject():
     st.subheader("⚠️ Pengajuan Reject & Defect")
@@ -3801,7 +3800,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System","Reject/Defect List"]
+    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "Pengajuan Reject/Defect", "Reject/Defect List"]
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
 
@@ -5167,3 +5166,6 @@ elif menu == "Reject/Defect List":
 
 elif menu == "Compare Penerimaan RTO":
     main()
+
+elif menu == "Pengajuan Reject/Defect":
+    project_approval_reject()
