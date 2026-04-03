@@ -1744,7 +1744,7 @@ def menu_refill_withdraw():
                 st.success("Trx Loaded: Data Transaksi")
             except:
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name=0)
-                st.warning("Pakai Sheet Pertama")
+             
 
     st.divider()
 
@@ -2141,6 +2141,9 @@ def engine_generate_new_draft(df_compared):
             k_l = f"{bin_l}|{sku}"; dict_final[k_l] = dict_final.get(k_l, 0) + q_m
     res = pd.DataFrame([{'BIN': k.split('|')[0], 'SKU': k.split('|')[1], 'QUANTITY': v} for k, v in dict_final.items()])
     return res.sort_values(['BIN', 'SKU']).reset_index(drop=True) if not res.empty else res
+
+import pandas as pd
+import math
 
 import pandas as pd
 import math
