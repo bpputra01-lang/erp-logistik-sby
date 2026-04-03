@@ -3452,7 +3452,15 @@ def tampilan_balancing_stock():
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header"><p class="hero-text">PRECENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
-    
+       st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format File :**
+        - Donwload Multiple Adjusment dan pastikan pilih **Termasuk yang sudah habis**
+        - Data yang dihasilkan adalah data dari total SKU bukan total QTY jadi yang dihitung adalah unique SKU nya
+        - Presentase minimal untuk **GL4 ➡️ GL3 adalah 100%**
+        - Presentase minimal untuk **ALL DC ➡️ Store adalah 98%** 
+        """)
     conn = init_db()
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
 
