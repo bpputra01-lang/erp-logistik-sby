@@ -3130,25 +3130,28 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
-    # Create basic table
+    
+    # 1. Pastikan tabel utama ada
     c.execute('''CREATE TABLE IF NOT EXISTS requests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
                   bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, status INTEGER)''')
     
-    # Ambil list kolom yang saat ini ada di DB
+    # 2. CEK KOLOM REAL-TIME (Pake PRAGMA)
     c.execute("PRAGMA table_info(requests)")
     columns = [info[1] for info in c.fetchall()]
     
-    kolom_baru = ["nama_approver", "nama_setup"]
-    changed = False
-    for kolom in kolom_baru:
-        if kolom not in columns:
-            c.execute(f"ALTER TABLE requests ADD COLUMN {kolom} TEXT")
-            changed = True
+    # List kolom yang wajib ada untuk SELECT di baris 3242
+    required_columns = ["nama_approver", "nama_setup"]
     
-    if changed:
-        conn.commit()
+    for col in required_columns:
+        if col not in columns:
+            try:
+                c.execute(f"ALTER TABLE requests ADD COLUMN {col} TEXT")
+            except Exception as e:
+                st.error(f"Gagal tambah kolom {col}: {e}")
+    
+    conn.commit()
     conn.close()
 
 def project_approval_reject():
