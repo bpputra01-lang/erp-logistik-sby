@@ -1716,8 +1716,9 @@ def menu_refill_withdraw():
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **HANYA ADA DI STOCK**
+        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **TERMASUK YANG SUDAH HABIS**
         - **STOCK TRACKING**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu untuk rentang waktu pilih **7 HARI SEBELUMNYA**
+        - **BISA DIJALANKAN TANPA STOCK TRACKING**
         """)
     # --- 0. INIT STATE ---
     for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
@@ -1734,7 +1735,6 @@ def menu_refill_withdraw():
                 st.success("Stock Loaded: All Stock SBY")
             except:
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name=0)
-                st.warning("Pakai Sheet Pertama")
 
     with col2:
         u_trx = st.file_uploader("📤 Upload STOCK TRACKING", type=["xlsx"])
