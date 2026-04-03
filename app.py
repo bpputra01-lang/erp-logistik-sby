@@ -3124,33 +3124,26 @@ import sqlite3
 from datetime import datetime
 
 def get_db_connection():
-    # Tambah check_same_thread biar gak bentrok di Streamlit Cloud
-    return sqlite3.connect('reject_system.db', check_same_thread=False)
+    # Ganti ke v4 atau nama apapun yang belum pernah dipake
+    return sqlite3.connect('reject_system_v4.db', check_same_thread=False)
 
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
-    
-    # 1. Pastikan tabel utama ada
+    # Langsung bikin tabel dengan SEMUA kolom yang lu butuhin buat SELECT
     c.execute('''CREATE TABLE IF NOT EXISTS requests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                  tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
-                  bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, status INTEGER)''')
-    
-    # 2. CEK KOLOM REAL-TIME (Pake PRAGMA)
-    c.execute("PRAGMA table_info(requests)")
-    columns = [info[1] for info in c.fetchall()]
-    
-    # List kolom yang wajib ada untuk SELECT di baris 3242
-    required_columns = ["nama_approver", "nama_setup"]
-    
-    for col in required_columns:
-        if col not in columns:
-            try:
-                c.execute(f"ALTER TABLE requests ADD COLUMN {col} TEXT")
-            except Exception as e:
-                st.error(f"Gagal tambah kolom {col}: {e}")
-    
+                  tanggal TEXT, 
+                  nama TEXT, 
+                  sku TEXT, 
+                  article TEXT, 
+                  bin TEXT, 
+                  size TEXT, 
+                  kategori TEXT, 
+                  keterangan TEXT, 
+                  status INTEGER,
+                  nama_approver TEXT,
+                  nama_setup TEXT)''')
     conn.commit()
     conn.close()
 
