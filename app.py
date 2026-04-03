@@ -3123,58 +3123,44 @@ import streamlit as st
 import sqlite3
 from datetime import datetime
 
-# --- FUNGSI KONEKSI ---
+# --- DATABASE SETUP ---
 def get_db_connection():
-    # check_same_thread=False WAJIB untuk Streamlit
     return sqlite3.connect('reject_system.db', check_same_thread=False)
 
-# --- FUNGSI PENJAGA (Panggil ini setiap mau akses DB) ---
 def ensure_table_exists():
     conn = get_db_connection()
     c = conn.cursor()
+    # Tambah kolom nama_approver dan nama_setup buat nyatet siapa yang approve
     c.execute('''CREATE TABLE IF NOT EXISTS requests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
-                  bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, status INTEGER)''')
+                  bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, 
+                  status INTEGER, nama_approver TEXT, nama_setup TEXT)''')
     conn.commit()
     conn.close()
 
 def project_approval_reject():
-    # 1. Pastikan tabel ada pas halaman dibuka
     ensure_table_exists()
     
+    # --- CSS CUSTOM ---
     st.markdown("""
         <style>
-        .hero-header-custom {
-            background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
-            color: white; padding: 12px 25px; border-radius: 10px;
-            margin-bottom: 25px; font-weight: 800; font-size: 22px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
-        }
-        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stSelectbox"] > div > div {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            border-radius: 8px !important;
-        }
-        input, textarea, div[data-baseweb="select"] span { color: white !important; }
-        div.stButton > button {
-            background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
-            color: white !important; border-radius: 10px !important;
-            width: 100% !important; height: 50px !important; font-weight: bold !important;
-        }
+        .hero-header-custom { background: linear-gradient(135deg, #1e468a 0%, #163462 100%); color: white; padding: 12px 25px; border-radius: 10px; margin-bottom: 25px; font-weight: 800; font-size: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; }
+        .detail-box { background-color: #1a1c27; border: 1px solid #3d4156; padding: 20px; border-radius: 12px; margin-top: 10px; }
+        .stButton > button { border-radius: 8px !important; font-weight: bold !important; width: 100% !important; }
+        /* Tombol Biru */ .stButton > button[kind="primary"] { background: #1e468a !important; color: white !important; }
+        /* Tombol Gold */ .gold-btn button { background-color: #D4AF37 !important; color: white !important; border: none !important; box-shadow: 0 0 10px rgba(212, 175, 55, 0.4); }
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
     
+    # --- FORM INPUT ---
     with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            nama = st.text_input("NAMA")
+            nama = st.text_input("NAMA PENGIRIM")
             sku = st.text_input("SKU")
             article = st.text_input("ARTICLE NAME")
         with col2:
@@ -3185,55 +3171,96 @@ def project_approval_reject():
         keterangan = st.text_area("KETERANGAN KERUSAKAN")
         submit = st.form_submit_button("📤 SENT REQUEST")
 
-    # --- PROSES SIMPAN (Line 3193 Safe Zone) ---
     if submit:
         if nama and sku:
-            # DOUBLE CHECK: Pastikan tabel ada lagi sebelum insert
-            ensure_table_exists() 
-            
-            try:
-                conn = get_db_connection()
-                c = conn.cursor()
-                tgl_skrg = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
-                # INSERT DATA
-                c.execute("INSERT INTO requests (tanggal, nama, sku, article, bin, size, kategori, keterangan, status) VALUES (?,?,?,?,?,?,?,?,?)",
-                          (tgl_skrg, nama, sku, article, bin_asal, size, kategori, keterangan, 1))
-                
-                conn.commit()
-                conn.close()
-                st.success(f"✅ Berhasil Disimpan! SKU: {sku}")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Gagal simpan data: {e}")
-        else:
-            st.warning("⚠️ Nama dan SKU wajib diisi!")
+            conn = get_db_connection()
+            c = conn.cursor()
+            tgl_skrg = datetime.now().strftime("%Y-%m-%d %H:%M")
+            c.execute("INSERT INTO requests (tanggal, nama, sku, article, bin, size, kategori, keterangan, status) VALUES (?,?,?,?,?,?,?,?,?)",
+                      (tgl_skrg, nama, sku, article, bin_asal, size, kategori, keterangan, 1))
+            conn.commit()
+            conn.close()
+            st.success(f"✅ Berhasil Dikirim!")
+            st.rerun()
 
-    st.divider()
+    # --- TAMPILAN DETAIL & APPROVAL ---
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM requests ORDER BY id DESC LIMIT 1")
+    res = c.fetchone()
+    conn.close()
 
-    # --- TRACKING TIMELINE ---
-    try:
-        ensure_table_exists() # Pastikan tabel ada sebelum select
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT sku, status FROM requests ORDER BY id DESC LIMIT 1")
-        data_akhir = c.fetchone()
-        conn.close()
-    except:
-        data_akhir = None
+    if res:
+        # Mapping Kolom: 0:id, 1:tgl, 2:nama, 3:sku, 4:article, 5:bin, 6:size, 7:kategori, 8:ket, 9:status, 10:approver, 11:setup
+        rid, r_tgl, r_nama, r_sku, r_art, r_bin, r_size, r_kat, r_ket, r_stat, r_app, r_set = res
 
-    if data_akhir:
-        sku_display, status_step = data_akhir
-        st.markdown(f"### 🕒 Tracking Status: SKU-{sku_display}")
+        st.divider()
+        st.subheader("🔍 Detail Pengajuan Terakhir")
+        with st.container():
+            st.markdown(f"""
+            <div class="detail-box">
+                <table style="width:100%; color:white;">
+                    <tr><td><b>SKU</b></td><td>: {r_sku}</td><td><b>Tanggal</b></td><td>: {r_tgl}</td></tr>
+                    <tr><td><b>Artikel</b></td><td colspan="3">: {r_art}</td></tr>
+                    <tr><td><b>Nama</b></td><td>: {r_nama}</td><td><b>Kategori</b></td><td>: {r_kat}</td></tr>
+                </table>
+                <hr style="border:0.5px solid #3d4156">
+                <small>Keterangan: {r_ket}</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # --- TRACKING TIMELINE ---
+        st.markdown(f"### 🕒 Tracking Status: SKU-{r_sku}")
+        t1, t2, t3 = st.columns(3)
         
-        colA, colB, colC = st.columns(3)
-        with colA: st.markdown(f"{'🟢' if status_step >= 1 else '⚪'} **Step 1** \n\nDone Pengajuan")
-        with colB: st.markdown(f"{'🟡' if status_step >= 2 else '⚪'} **Step 2** \n\nWaiting Purchasing")
-        with colC: st.markdown(f"{'🟢' if status_step >= 3 else '⚪'} **Step 3** \n\nDone Set Up")
-        
-        st.progress(status_step / 3)
+        # Step 1: Done Pengajuan
+        with t1:
+            st.markdown(f"🟢 **Step 1**\n\nDone Pengajuan ({r_nama})")
+
+        # Step 2: Approval Purchasing
+        with t2:
+            if r_stat == 1:
+                st.markdown("⚪ **Step 2**\n\nWaiting Purchasing")
+                with st.expander("Klik untuk Approve"):
+                    nama_p = st.text_input("Nama Purchasing", key="p_name")
+                    if st.button("APPROVE NOW", type="primary"):
+                        if nama_p:
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute("UPDATE requests SET status=2, nama_approver=? WHERE id=?", (nama_p, rid))
+                            conn.commit()
+                            conn.close()
+                            st.rerun()
+                        else: st.error("Isi nama dulu!")
+            else:
+                st.markdown(f"🟡 **Step 2**\n\nDone Approval ({r_app})")
+
+        # Step 3: Final Setup
+        with t3:
+            if r_stat < 2:
+                st.markdown("⚪ **Step 3**\n\nWaiting Setup")
+            elif r_stat == 2:
+                st.markdown("⚪ **Step 3**\n\nWaiting Admin Setup")
+                with st.expander("Klik untuk Done"):
+                    nama_s = st.text_input("Nama Admin Setup", key="s_name")
+                    st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+                    if st.button("DONE SET UP (FINISH)"):
+                        if nama_s:
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute("UPDATE requests SET status=3, nama_setup=? WHERE id=?", (nama_s, rid))
+                            conn.commit()
+                            conn.close()
+                            st.rerun()
+                        else: st.error("Isi nama dulu!")
+                    st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f"🟢 **Step 3**\n\nDone Set Up ({r_set})")
+
+        st.progress(r_stat / 3)
+
     else:
-        st.info("Belum ada data pengajuan hari ini.")
+        st.info("Silahkan isi form untuk memulai pengajuan.")
 
 import pandas as pd
 import streamlit as st
