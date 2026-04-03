@@ -3159,7 +3159,8 @@ def project_approval_reject():
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
-    st.markdown('<div class="hero-header">📋PENGAJUAN REJECT/DEFECT</div>', unsafe_allow_html=True)
+    # Ganti class="hero-header" jadi class="hero-header-custom"
+st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT/DEFECT</div>', unsafe_allow_html=True)
     # --- FORM INPUT ---
     with st.form("form_reject"):
         col1, col2 = st.columns(2)
