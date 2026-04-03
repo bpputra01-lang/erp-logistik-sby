@@ -3321,7 +3321,7 @@ def main():
     col1, col2 = st.columns(2)
     
     with col1:
-        file_scan = st.file_uploader("Upload Hasil Scan rto", type=['xlsx', 'csv'])
+        file_scan = st.file_uploader("Upload Hasil Scan RTO/RTD", type=['xlsx', 'csv'])
         
     with col2:
         file_tf = st.file_uploader("Upload Transfer Stock Jezpro", type=['xlsx', 'csv'])
