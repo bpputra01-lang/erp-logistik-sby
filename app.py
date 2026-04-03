@@ -3121,8 +3121,11 @@ def main():
 
 def project_approval_reject():
     st.subheader("⚠️ Pengajuan Reject & Defect")
+    
+    # WAJIB dibungkus tag <style> biar CSS-nya aktif
     st.markdown("""
-    .hero-header {
+        <style>
+        .hero-header-custom {
             background-color: #007BFF;
             color: white;
             padding: 12px;
@@ -3133,14 +3136,18 @@ def project_approval_reject():
             font-size: 20px;
         }
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+        
+        /* Warna Input Field biar Dark Mode Surabaya Style */
         div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div {
+        div[data-testid="stTextArea"] > div > div,
+        div[data-testid="stSelectbox"] > div > div {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             border-radius: 6px !important;
             color: white !important;
         }
-        input, textarea { background-color: transparent !important; border: none !important; color: white !important; }
+        
+        /* Button Style */
         div.stButton > button {
             background-color: #007BFF !important;
             color: white !important;
@@ -3148,8 +3155,11 @@ def project_approval_reject():
             width: 100% !important;
             height: 48px !important;
             font-weight: bold !important;
+            border: none !important;
         }
+        
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
+        </style>
     """, unsafe_allow_html=True)
     # --- FORM INPUT ---
     with st.form("form_reject"):
