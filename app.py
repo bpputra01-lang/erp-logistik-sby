@@ -3172,16 +3172,16 @@ def project_approval_reject():
     with st.form("form_reject"):
         col1, col2 = st.columns(2)
         with col1:
-            nama = st.text_input("Nama Pengaju")
+            nama = st.text_input("NAMA")
             sku = st.text_input("SKU")
-            article = st.text_input("Article Name")
+            article = st.text_input("ARTICLE NAME")
         with col2:
-            bin_asal = st.text_input("Bin Asal")
-            size = st.text_input("Size")
-            kategori = st.selectbox("Kategori", ["Reject", "Defect"])
+            bin_asal = st.text_input("BIN ASAL")
+            size = st.text_input("SIZE")
+            kategori = st.selectbox("KATEGORI", ["Reject", "Defect"])
         
-        keterangan = st.text_area("Keterangan Kerusakan")
-        submit = st.form_submit_button("Kirim Pengajuan")
+        keterangan = st.text_area("KETERANGAN KERUSAKAN")
+        submit = st.form_submit_button("📤SENT REQUEST")
 
     # --- SIMULASI TIMELINE (Contoh untuk 1 Item) ---
     st.divider()
