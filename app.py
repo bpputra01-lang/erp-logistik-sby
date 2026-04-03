@@ -3118,6 +3118,47 @@ def main():
             st.plotly_chart(fig_bar, use_container_width=True)
     else:
         st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
+import streamlit as st
+
+def project_approval_reject():
+    st.subheader("⚠️ Pengajuan Reject & Defect")
+    
+    # --- FORM INPUT ---
+    with st.form("form_reject"):
+        col1, col2 = st.columns(2)
+        with col1:
+            nama = st.text_input("Nama Pengaju")
+            sku = st.text_input("SKU")
+            article = st.text_input("Article Name")
+        with col2:
+            bin_asal = st.text_input("Bin Asal")
+            size = st.text_input("Size")
+            kategori = st.selectbox("Kategori", ["Reject", "Defect"])
+        
+        keterangan = st.text_area("Keterangan Kerusakan")
+        submit = st.form_submit_button("Kirim Pengajuan")
+
+    # --- SIMULASI TIMELINE (Contoh untuk 1 Item) ---
+    st.divider()
+    st.markdown("### 🕒 Tracking Status: SKU-12345")
+    
+    # Logic buat ganti warna titik
+    # Misal status sekarang = "Waiting Set Up"
+    status_step = 2 
+
+    colA, colB, colC = st.columns(3)
+    
+    with colA:
+        color = "🟢" if status_step >= 1 else "⚪"
+        st.markdown(f"{color} **Step 1**\n\nDone Pengajuan")
+    with colB:
+        color = "🟡" if status_step >= 2 else "⚪"
+        st.markdown(f"{color} **Step 2**\n\nDone Approval (Purchasing)")
+    with colC:
+        color = "🟢" if status_step >= 3 else "⚪"
+        st.markdown(f"{color} **Step 3**\n\nDone Set Up (Selesai)")
+
+    st.progress(status_step / 3) # Visual progress bar     
 import pandas as pd
 import streamlit as st
 from io import BytesIO
