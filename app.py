@@ -3452,7 +3452,6 @@ def tampilan_balancing_stock():
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header"><p class="hero-text">PRECENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
-       st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format File :**
