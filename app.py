@@ -1608,7 +1608,7 @@ def menu_refill_withdraw():
             dictPreTotDCInbound = {}; dictBestValDC = {}; dictBestVal02 = {}
             dictUniqueRef = {}; dictUniqueWdr = {}
 
-            # --- STEP 1: SCAN STOCK ---
+            # --- STEP 1: SCAN STOCK (Sesuai Logic Surabaya Branch) ---
             for _, row in df_s.iterrows():
                 sku = str(row[2]).strip()
                 if sku == "" or sku == "nan" or sku == "SKU": continue
@@ -1616,12 +1616,16 @@ def menu_refill_withdraw():
                 binLoc = str(row[1]).upper().strip()
                 qtySys = pd.to_numeric(row[9], errors='coerce') or 0
 
+                # GLOBAL EXCLUSION (Biar gak ambil dari area yang salah)
+                is_excluded = any(ex in binLoc for ex in ["DEFECT", "REJECT", "ONLINE", "LIVE", "MARKOM", "KARANTINA", "STAGING", "PUTAWAY"])
+                if is_excluded: continue
+
                 if sku not in dictBrand:
                     dictBrand[sku] = str(row[3])
                     dictItem[sku] = str(row[4])
                     dictVar[sku] = str(row[5])
 
-                # AREA TOKO
+                # AREA TOKO (02, STORE, LT.2)
                 if any(x in binLoc for x in ["02", "TOKO", "STORE", "LT.2"]):
                     dictPreTotToko[sku] = dictPreTotToko.get(sku, 0) + qtySys
                     if qtySys > dictBestVal02.get(sku, -1):
@@ -1630,14 +1634,11 @@ def menu_refill_withdraw():
                     dictTot02[sku] = dictTot02.get(sku, 0) + qtySys
                     dictBinList02[sku] = dictBinList02.get(sku, "") + binLoc + ", "
 
-                # AREA DC
+                # AREA DC (Murni DC & INBOUND)
                 elif any(x in binLoc for x in ["DC", "INBOUND"]):
                     dictPreTotDCInbound[sku] = dictPreTotDCInbound.get(sku, 0) + qtySys
                     
-                    # Filter Karantina/Defect/Reject
-                    if any(x in binLoc for x in ["KARANTINA", "DEFECT", "REJECT"]): continue
-
-                    if "KL" not in binLoc:
+                    if "KL" not in binLoc and "RAK" not in binLoc:
                         if qtySys > dictBestValDC.get(sku, -1):
                             dictBestValDC[sku] = qtySys
                             dictDC[sku] = binLoc
@@ -1648,7 +1649,7 @@ def menu_refill_withdraw():
 
             outRef = []; outWdr = []
 
-            # --- STEP 2: LOGIKA TRANSAKSI ---
+            # --- STEP 2: LOGIKA TRANSAKSI (Hanya jalan jika file diupload) ---
             if not df_t.empty:
                 for _, row in df_t.iterrows():
                     sku_t = str(row[1]).strip()
@@ -1657,41 +1658,35 @@ def menu_refill_withdraw():
                     safeInvoice = str(row[0]).upper()
                     safeLoc = str(row[6]).upper()
 
-                    # Jalur Refill via INV
+                    # Refill Proaktif (Berdasarkan Penjualan)
                     if "INV" in safeInvoice and not any(x in safeLoc for x in ["02", "TOKO"]):
                         if sku_t not in dictUniqueRef:
-                            # Logic: (Tot02 + TotDC <= 3)
-                            if (dictTot02.get(sku_t, 0) + dictTotDC.get(sku_t, 0) <= 3) and sku_t in dictDC:
+                            # Jika stok Toko kritis (<= 3)
+                            if dictTot02.get(sku_t, 0) <= 3 and sku_t in dictDC:
                                 bestQty = dictBestValDC.get(sku_t, 0)
                                 if bestQty > 1:
                                     outRef.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2]])
                                     dictUniqueRef[sku_t] = True
-                    
-                    # Jalur Withdraw via Trx
-                    elif "INV" not in safeInvoice and any(x in safeLoc for x in ["02", "TOKO"]):
-                        if sku_t not in dictUniqueWdr:
-                            if dictTotDCKLRAK.get(sku_t, 0) <= 3 and sku_t in dict02:
-                                bestQty = dictBestVal02.get(sku_t, 0)
-                                if bestQty > 1:
-                                    outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dict02[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotDCInbound.get(sku_t, 0), dictBinList02.get(sku_t, "")[:-2]])
-                                    dictUniqueWdr[sku_t] = True
 
-            # --- STEP 3: AUTO-BALANCE (FORCE) ---
+            # --- STEP 3: AUTO-BALANCE (LOGIC BALANCING - DC TO STORE) ---
             for sku_k in dictBrand.keys():
-                # AUTO REFILL
+                # REFILL OTOMATIS (Meskipun tanpa Stock Tracking)
                 if sku_k not in dictUniqueRef:
-                    if dictTotDC.get(sku_k, 0) > 3 and dictPreTotToko.get(sku_k, 0) == 0 and sku_k in dictDC:
+                    stok_toko = dictPreTotToko.get(sku_k, 0)
+                    stok_dc = dictTotDC.get(sku_k, 0)
+                    
+                    # LOGIC BALANCING: Ada di DC (>1) tapi KOSONG di Toko (0)
+                    if stok_dc > 1 and stok_toko == 0 and sku_k in dictDC:
                         bestQty = dictBestValDC.get(sku_k, 0)
                         outRef.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dictDC[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinListDC.get(sku_k, "")[:-2]])
                         dictUniqueRef[sku_k] = True
 
-                # AUTO WITHDRAW
+                # WITHDRAW OTOMATIS (Balancing Inbound)
                 if sku_k not in dictUniqueWdr:
                     if dictTot02.get(sku_k, 0) > 3 and dictPreTotDCInbound.get(sku_k, 0) == 0 and sku_k in dict02:
                         bestQty = dictBestVal02.get(sku_k, 0)
                         outWdr.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dict02[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinList02.get(sku_k, "")[:-2]])
                         dictUniqueWdr[sku_k] = True
-
             # Export to State
             cols_ref = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN 02", "BIN LAIN"]
             cols_wdr = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN DC", "BIN LAIN"]
