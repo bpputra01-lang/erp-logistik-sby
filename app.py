@@ -2975,16 +2975,20 @@ def menu_reject_defect():
 
     if btn_submit:
         if sku:
-            # Tambahkan timedelta(hours=7) agar sesuai waktu WIB
             waktu_sekarang = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
             
             new_data = pd.DataFrame([{
-                'BIN': bin_val, 'SKU': sku, 'ARTICLE_NAME': article,
-                'SIZE': size, 'KATEGORI': kategori, 'KETERANGAN': keterangan,
+                'BIN_AWAL': bin_awal,  # <--- WAJIB DITAMBAHIN DISINI
+                'BIN': bin_val, 
+                'SKU': sku, 
+                'ARTICLE_NAME': article,
+                'SIZE': size, 
+                'KATEGORI': kategori, 
+                'KETERANGAN': keterangan,
                 'TANGGAL_INPUT': waktu_sekarang
             }])
             save_data(new_data)
-            st.success(f"Data {sku} berhasil disimpan jam {waktu_sekarang}!")
+            st.success(f"Data {sku} dari {bin_awal} berhasil disimpan!")
             st.rerun()
         else:
             st.error("SKU wajib diisi!")
@@ -3001,7 +3005,7 @@ def menu_reject_defect():
     col_dl, col_up = st.columns([1, 2])
 
     with col_dl:
-        template_cols = ['BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
+        template_cols = ['BIN AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
         df_template = pd.DataFrame(columns=template_cols)
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
