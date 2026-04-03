@@ -3130,22 +3130,25 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
-    # 1. Bikin tabel dasar kalau belum ada
+    # Create basic table
     c.execute('''CREATE TABLE IF NOT EXISTS requests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
                   bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, status INTEGER)''')
     
-    # 2. INI KUNCINYA: Paksa tambah kolom satu-satu biar baris 3239 gak crash
+    # Ambil list kolom yang saat ini ada di DB
+    c.execute("PRAGMA table_info(requests)")
+    columns = [info[1] for info in c.fetchall()]
+    
     kolom_baru = ["nama_approver", "nama_setup"]
+    changed = False
     for kolom in kolom_baru:
-        try:
+        if kolom not in columns:
             c.execute(f"ALTER TABLE requests ADD COLUMN {kolom} TEXT")
-        except sqlite3.OperationalError:
-            # Kalau error berarti kolom udah ada, aman, lanjut...
-            pass
-            
-    conn.commit()
+            changed = True
+    
+    if changed:
+        conn.commit()
     conn.close()
 
 def project_approval_reject():
