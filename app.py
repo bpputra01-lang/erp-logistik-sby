@@ -3129,11 +3129,23 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
+    # 1. Pastikan tabel dasar ada
     c.execute('''CREATE TABLE IF NOT EXISTS requests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
-                  bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, 
-                  status INTEGER, nama_approver TEXT, nama_setup TEXT)''')
+                  bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, status INTEGER)''')
+    
+    # 2. Paksa tambah kolom baru kalau belum ada (Biar gak ValueError/OperationalError)
+    try:
+        c.execute("ALTER TABLE requests ADD COLUMN nama_approver TEXT")
+    except:
+        pass # Kalau sudah ada, dia skip
+    
+    try:
+        c.execute("ALTER TABLE requests ADD COLUMN nama_setup TEXT")
+    except:
+        pass # Kalau sudah ada, dia skip
+        
     conn.commit()
     conn.close()
 
