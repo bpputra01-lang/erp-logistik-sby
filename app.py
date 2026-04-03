@@ -3123,25 +3123,24 @@ def project_approval_reject():
     st.markdown("""
         <style>
         .hero-header-custom {
-            /* Warna Gradient Biru sesuai gambar */
+            /* Warna Gradient Biru */
             background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
             color: white;
-            padding: 20px 25px;
-            border-radius: 12px;
-            text-align: left; /* Gue buat rata kiri dikit biar mirip tombol di gambar */
+            padding: 12px 25px; /* Padding disesuaikan biar proporsional */
+            border-radius: 10px;
             margin-bottom: 25px;
-            font-weight: 800; /* Lebih tebal */
-            font-size: 24px;
-            letter-spacing: 1px; /* Jarak antar huruf biar cakep */
-            
-            /* Efek Shadow biar kelihatan Premium */
+            font-weight: 800;
+            font-size: 22px;
+            letter-spacing: 1px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             
-            /* Font Style */
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* KUNCI RAHASIANYA DI SINI BIAR GAK MELAR */
+            width: fit-content; 
+            /* Kalau lu mau kotaknya pindah ke tengah layar, aktifin kode di bawah ini: */
+            /* margin: 0 auto 25px auto; */
         }
 
-        /* Styling Form & Input tetap gue jaga biar seragam */
+        /* Styling Form & Input */
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
@@ -3167,7 +3166,7 @@ def project_approval_reject():
         </style>
     """, unsafe_allow_html=True)
 
-    # Panggil Class yang bener
+    # Panggil Classnya
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
     # --- FORM INPUT ---
     with st.form("form_reject"):
