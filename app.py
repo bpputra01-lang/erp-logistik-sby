@@ -3119,24 +3119,33 @@ def main():
     else:
         st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
 
+import streamlit as st
+import sqlite3
+from datetime import datetime
+
+# --- 1. DATABASE SETUP (Dijalankan di awal) ---
+def init_db():
+    conn = sqlite3.connect('reject_system.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS requests 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
+                  bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, status INTEGER)''')
+    conn.commit()
+    conn.close()
+
 def project_approval_reject():
+    init_db() # Pastikan tabel siap
+    
     st.markdown("""
         <style>
         .hero-header-custom {
-            /* Warna Gradient Biru */
             background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
-            color: white;
-            padding: 12px 25px; 
-            border-radius: 10px;
-            margin-bottom: 25px;
-            font-weight: 800;
-            font-size: 22px;
-            letter-spacing: 1px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            width: fit-content; 
+            color: white; padding: 12px 25px; border-radius: 10px;
+            margin-bottom: 25px; font-weight: 800; font-size: 22px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
         }
-
-        /* Styling Form & Container Input */
+        /* Input & Form Styling */
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
@@ -3145,120 +3154,37 @@ def project_approval_reject():
             border: 1px solid #3d4156 !important;
             border-radius: 8px !important;
         }
+        input, textarea, div[data-baseweb="select"] span { color: white !important; }
 
-        /* 👇 INI KUNCINYA BIAR TEKS YANG DIKETIK JADI PUTIH 👇 */
-        input, textarea {
-            color: white !important;
-            background-color: transparent !important;
-        }
-
-        /* Warna teks dropdown selectbox saat dipilih */
-        div[data-baseweb="select"] span {
-            color: white !important;
-        }
-
-        div.stButton > button {
+        /* SENT REQUEST BUTTON (Blue Gradient) */
+        div.stButton > button:first-child {
             background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
-            color: white !important;
-            border-radius: 10px !important;
-            width: 100% !important;
-            height: 50px !important;
-            font-weight: bold !important;
-            border: none !important;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-        }
-        /* Styling khusus untuk tombol hapus - GOLD MENYALA ULTIMATE */
-
-        div[data-testid="stVerticalBlock"] > div:last-child button {
-
-            background-color: #D4AF37 !important; /* Metallic Gold Base */
-
-            color: white !important;
-
-            border: none !important;
-
-            border-radius: 8px !important;
-
-            font-weight: bold !important;
-
-            
-
-            /* 1. Neon Glow Efek Berlapis (Ambient Glow) */
-
-            box-shadow: 
-
-                0 0 5px rgba(255, 215, 0, 0.4),  /* Lapisan dekat */
-
-                0 0 10px rgba(255, 215, 0, 0.3), /* Lapisan tengah */
-
-                0 0 15px rgba(255, 215, 0, 0.2); /* Lapisan jauh */
-
-            
-
-            /* 2. Text Glow Efek agar teks ikut menyala */
-
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-
-            
-
-            transition: all 0.3s ease-in-out; /* Animasi halus */
-
+            color: white !important; border-radius: 10px !important;
+            width: 100% !important; height: 50px !important; font-weight: bold !important;
         }
 
-
-        /* --- MENYALA LEBIH TERANG SAAT DI-HOVER --- */
-
-        div[data-testid="stVerticalBlock"] > div:last-child button:hover {
-
-            background-color: #FFD700 !important; /* Gold Lebih Terang */
-
-            color: #1a1c27 !important; /* Ganti teks jadi gelap saat terang */
-
-            transform: translateY(-2px) scale(1.02); /* Sedikit membesar & naik */
-
-            
-
-            /* 3. Intense Neon Shine saat hover */
-
-            box-shadow: 
-
-                0 0 10px rgba(255, 215, 0, 0.8), /* Lapisan dalam pekat */
-
-                0 0 20px rgba(255, 215, 0, 0.6), /* Lapisan tengah menyebar */
-
-                0 0 30px rgba(255, 215, 0, 0.4), /* Lapisan luar halus */
-
-                0 0 40px rgba(255, 215, 0, 0.2); /* Lapisan jauh pudar */
-
-            
-
-            /* Matikan text glow karena teks jadi gelap */
-
-            text-shadow: none;
-
+        /* GOLD BUTTON (Untuk aksi tambahan diluar form jika ada) */
+        .gold-glow-button button {
+            background-color: #D4AF37 !important;
+            color: white !important; border: none !important;
+            border-radius: 8px !important; font-weight: bold !important;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+            transition: all 0.3s ease;
         }
-
-        /* Styling Box untuk Label Grafik agar tidak polosan */
-
-        div.stPlotlyChart {
-
-            border: 1px solid #d4af37 !important; /* Border Gold Halus */
-
-            border-radius: 8px !important;
-
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.2) !important; /* Glow Gold Tipis */
-
+        .gold-glow-button button:hover {
+            background-color: #FFD700 !important;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+            transform: scale(1.02);
         }
         
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # Panggil Classnya
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
     
     # --- FORM INPUT ---
-    with st.form("form_reject"):
+    with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
             nama = st.text_input("NAMA")
@@ -3272,27 +3198,45 @@ def project_approval_reject():
         keterangan = st.text_area("KETERANGAN KERUSAKAN")
         submit = st.form_submit_button("📤 SENT REQUEST")
 
-    # --- SIMULASI TIMELINE (Contoh untuk 1 Item) ---
+    # --- LOGIC SIMPAN DATA ---
+    if submit:
+        if nama and sku:
+            conn = sqlite3.connect('reject_system.db')
+            c = conn.cursor()
+            tgl_skrg = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            c.execute("INSERT INTO requests (tanggal, nama, sku, article, bin, size, kategori, keterangan, status) VALUES (?,?,?,?,?,?,?,?,?)",
+                      (tgl_skrg, nama, sku, article, bin_asal, size, kategori, keterangan, 1))
+            conn.commit()
+            conn.close()
+            st.success(f"✅ Berhasil Dikirim! SKU: {sku}")
+        else:
+            st.warning("⚠️ Nama dan SKU wajib diisi!")
+
+    # --- TRACKING TIMELINE (Ambil Data Terakhir) ---
+    conn = sqlite3.connect('reject_system.db')
+    c = conn.cursor()
+    c.execute("SELECT sku, status FROM requests ORDER BY id DESC LIMIT 1")
+    data_akhir = c.fetchone()
+    conn.close()
+
     st.divider()
-    st.markdown("### 🕒 Tracking Status: SKU-12345")
-    
-    # Logic buat ganti warna titik
-    # Misal status sekarang = "Waiting Set Up"
-    status_step = 2 
 
-    colA, colB, colC = st.columns(3)
-    
-    with colA:
-        color = "🟢" if status_step >= 1 else "⚪"
-        st.markdown(f"{color} **Step 1**\n\nDone Pengajuan")
-    with colB:
-        color = "🟡" if status_step >= 2 else "⚪"
-        st.markdown(f"{color} **Step 2**\n\nDone Approval (Purchasing)")
-    with colC:
-        color = "🟢" if status_step >= 3 else "⚪"
-        st.markdown(f"{color} **Step 3**\n\nDone Set Up (Selesai)")
-
-    st.progress(status_step / 3) # Visual progress bar     
+    if data_akhir:
+        sku_display, status_step = data_akhir
+        st.markdown(f"### 🕒 Tracking Status: SKU-{sku_display}")
+        
+        colA, colB, colC = st.columns(3)
+        with colA:
+            st.markdown(f"{'🟢' if status_step >= 1 else '⚪'} **Step 1** \nDone Pengajuan")
+        with colB:
+            st.markdown(f"{'🟡' if status_step >= 2 else '⚪'} **Step 2** \nWaiting Purchasing")
+        with colC:
+            st.markdown(f"{'⚪' if status_step < 3 else '🟢'} **Step 3** \nDone Set Up")
+        
+        st.progress(status_step / 3)
+    else:
+        st.markdown("### 🕒 Tracking Status: No Data")
+        st.info("Belum ada pengajuan terdeteksi.")
 import pandas as pd
 import streamlit as st
 from io import BytesIO
