@@ -2963,7 +2963,7 @@ def menu_reject_defect():
         col1, col2 = st.columns(2)
         with col1:
             bin_awal = st.text_input("BIN AWAL")
-            bin_val = st.selectbox("BIN LOKASI", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
+            bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
             sku = st.text_input("SKU")
             article = st.text_input("NAMA BARANG")
         with col2:
