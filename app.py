@@ -2935,6 +2935,7 @@ def menu_reject_defect():
         }
         </style>
     """, unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Input Single Item Defect/Reject:**
@@ -2952,7 +2953,7 @@ def menu_reject_defect():
         - Jika sudah terisi semua maka upload file tersebut ke Uploader yang ada di sebelahnya
         - Proses Selesai
         """)
-    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
+    
     
     init_db()
 
