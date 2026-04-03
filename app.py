@@ -1716,9 +1716,8 @@ def menu_refill_withdraw():
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **TERMASUK YANG SUDAH HABIS**
+        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **HANYA ADA DI STOCK**
         - **STOCK TRACKING**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu untuk rentang waktu pilih **7 HARI SEBELUMNYA**
-        - **BISA DIJALANKAN TANPA STOCK TRACKING**
         """)
     # --- 0. INIT STATE ---
     for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
@@ -1735,6 +1734,7 @@ def menu_refill_withdraw():
                 st.success("Stock Loaded: All Stock SBY")
             except:
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name=0)
+                st.warning("Pakai Sheet Pertama")
 
     with col2:
         u_trx = st.file_uploader("📤 Upload STOCK TRACKING", type=["xlsx"])
@@ -1744,7 +1744,7 @@ def menu_refill_withdraw():
                 st.success("Trx Loaded: Data Transaksi")
             except:
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name=0)
-             
+                st.warning("Pakai Sheet Pertama")
 
     st.divider()
 
@@ -2158,6 +2158,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
             return df_gl3, df_gl4, df_refill_final, df_overstock_final
 
         srcArr = df_all_data.values
+        # AMBIL NAMA KOLOM ASLI
         header_names = df_all_data.columns.tolist()
         
         outGL3 = []
@@ -2173,25 +2174,26 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
             if "GL4" in binCode and not any(x in binCode for x in ["DEFECT", "REJECT", "ONLINE", "RAK"]):
                 outGL4.append(srcArr[i][:11])
 
+        # PERBAIKAN: Masukkan header_names agar kolom tidak jadi angka
         df_gl3 = pd.DataFrame(outGL3, columns=header_names[:11])
         df_gl4 = pd.DataFrame(outGL4, columns=header_names[:11])
 
-        # --- SUB 2: FILTER STOCK TRACKING ---
+        # --- SUB 2: FILTER STOCK TRACKING (Proteksi jika None/Kosong) ---
         dictTrans = {}
-        has_tracking = False
+        # Cek apakah df_stock_tracking ada isinya
         if df_stock_tracking is not None and not df_stock_tracking.empty:
-            has_tracking = True
             st_data = df_stock_tracking.values
             for i in range(len(st_data)):
                 col_a = str(st_data[i][0]).upper() if not pd.isna(st_data[i][0]) else ""
                 col_g = str(st_data[i][6]).upper() if not pd.isna(st_data[i][6]) else ""
                 
+                # Sesuai logic VBA: Bukan INV dan ada DC
                 if "INV" not in col_a and "DC" in col_g:
                     sku_st = str(st_data[i][1]).strip()
                     qty_st = float(st_data[i][10]) if not pd.isna(st_data[i][10]) else 0
                     dictTrans[sku_st] = dictTrans.get(sku_st, 0) + qty_st
 
-        # --- SUB 3: CREATE REFILL SHEET (LOGIC BALANCING SBY) ---
+        # --- SUB 3: CREATE REFILL SHEET ---
         dictGL3 = {}
         if not df_gl3.empty:
             for row in df_gl3.values:
@@ -2200,30 +2202,20 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
                 dictGL3[sku] = dictGL3.get(sku, 0) + qty
 
         dictSKUs_Target = {}
-        
-        # 1. Logic Standar: Stok menipis (< 3)
         for sku, total_qty in dictGL3.items():
-            if total_qty < 3: 
-                dictSKUs_Target[sku] = True
+            if total_qty < 3: dictSKUs_Target[sku] = True
         
-        # 2. Logic Balancing: Ada di GL4 tapi KOSONG di GL3
-        # Ini jalan otomatis baik ada tracking maupun tidak (sinkron dengan dashboard balancing)
         if not df_gl4.empty:
             for row in df_gl4.values:
                 sku_g4 = str(row[2]).strip()
-                q_g4_actual = int(float(row[9])) if not pd.isna(row[9]) else 0
-                
-                # Jika SKU tidak ada sama sekali di GL3 dan stok di GL4 tersedia
-                if sku_g4 not in dictGL3 and q_g4_actual > 0:
-                    dictSKUs_Target[sku_g4] = True
+                if sku_g4 not in dictGL3: dictSKUs_Target[sku_g4] = True
 
         refill_output = []
         if not df_gl4.empty:
             dataGL4 = df_gl4.values
             for sku in dictSKUs_Target.keys():
                 q_gl3_val = dictGL3.get(sku, 0)
-                sisaLoad = 12 # Default max load refill
-                
+                sisaLoad = 12
                 for i in range(len(dataGL4)):
                     bin_sumber = str(dataGL4[i][1]).upper() if not pd.isna(dataGL4[i][1]) else ""
                     if "LIVE" in bin_sumber: continue
@@ -2250,6 +2242,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
                 qty_sys = int(float(row[9]))
                 if qty_sys > 24:
                     load_os = qty_sys - 24
+                    # Jika dictTrans kosong (karena file tidak upload), defaultnya dianggap 0
                     if dictTrans.get(sku_g3, 0) >= 7:
                         load_os = math.ceil(load_os / 3)
                     
