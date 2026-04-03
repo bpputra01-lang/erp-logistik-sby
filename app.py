@@ -3123,10 +3123,15 @@ import streamlit as st
 import sqlite3
 from datetime import datetime
 
-# --- 1. DATABASE SETUP (Dijalankan di awal) ---
+# --- 1. FUNGSI DATABASE (Gue satuin biar rapi) ---
+def get_db_connection():
+    conn = sqlite3.connect('reject_system.db', check_same_thread=False)
+    return conn
+
 def init_db():
-    conn = sqlite3.connect('reject_system.db')
+    conn = get_db_connection()
     c = conn.cursor()
+    # Pastikan tabel dibuat di awal
     c.execute('''CREATE TABLE IF NOT EXISTS requests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
@@ -3135,7 +3140,8 @@ def init_db():
     conn.close()
 
 def project_approval_reject():
-    init_db() # Pastikan tabel siap
+    # WAJIB: Jalankan init_db di paling atas fungsi
+    init_db()
     
     st.markdown("""
         <style>
@@ -3145,7 +3151,6 @@ def project_approval_reject():
             margin-bottom: 25px; font-weight: 800; font-size: 22px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
         }
-        /* Input & Form Styling */
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
@@ -3155,35 +3160,17 @@ def project_approval_reject():
             border-radius: 8px !important;
         }
         input, textarea, div[data-baseweb="select"] span { color: white !important; }
-
-        /* SENT REQUEST BUTTON (Blue Gradient) */
-        div.stButton > button:first-child {
+        div.stButton > button {
             background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
             color: white !important; border-radius: 10px !important;
             width: 100% !important; height: 50px !important; font-weight: bold !important;
         }
-
-        /* GOLD BUTTON (Untuk aksi tambahan diluar form jika ada) */
-        .gold-glow-button button {
-            background-color: #D4AF37 !important;
-            color: white !important; border: none !important;
-            border-radius: 8px !important; font-weight: bold !important;
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
-            transition: all 0.3s ease;
-        }
-        .gold-glow-button button:hover {
-            background-color: #FFD700 !important;
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
-            transform: scale(1.02);
-        }
-        
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
     
-    # --- FORM INPUT ---
     with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -3198,28 +3185,31 @@ def project_approval_reject():
         keterangan = st.text_area("KETERANGAN KERUSAKAN")
         submit = st.form_submit_button("📤 SENT REQUEST")
 
-    # --- LOGIC SIMPAN DATA ---
     if submit:
         if nama and sku:
-            conn = sqlite3.connect('reject_system.db')
+            conn = get_db_connection()
             c = conn.cursor()
             tgl_skrg = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             c.execute("INSERT INTO requests (tanggal, nama, sku, article, bin, size, kategori, keterangan, status) VALUES (?,?,?,?,?,?,?,?,?)",
                       (tgl_skrg, nama, sku, article, bin_asal, size, kategori, keterangan, 1))
             conn.commit()
             conn.close()
-            st.success(f"✅ Berhasil Dikirim! SKU: {sku}")
+            st.success(f"✅ Berhasil Disimpan! SKU: {sku}")
+            st.rerun() # Refresh biar timeline update
         else:
             st.warning("⚠️ Nama dan SKU wajib diisi!")
 
-    # --- TRACKING TIMELINE (Ambil Data Terakhir) ---
-    conn = sqlite3.connect('reject_system.db')
-    c = conn.cursor()
-    c.execute("SELECT sku, status FROM requests ORDER BY id DESC LIMIT 1")
-    data_akhir = c.fetchone()
-    conn.close()
-
     st.divider()
+
+    # --- 2. LOGIKA AMBIL DATA DENGAN TRY-EXCEPT (BIAR GAK CRASH) ---
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT sku, status FROM requests ORDER BY id DESC LIMIT 1")
+        data_akhir = c.fetchone()
+        conn.close()
+    except sqlite3.OperationalError:
+        data_akhir = None
 
     if data_akhir:
         sku_display, status_step = data_akhir
@@ -3227,16 +3217,18 @@ def project_approval_reject():
         
         colA, colB, colC = st.columns(3)
         with colA:
-            st.markdown(f"{'🟢' if status_step >= 1 else '⚪'} **Step 1** \nDone Pengajuan")
+            st.markdown(f"{'🟢' if status_step >= 1 else '⚪'} **Step 1** \n\nDone Pengajuan")
         with colB:
-            st.markdown(f"{'🟡' if status_step >= 2 else '⚪'} **Step 2** \nWaiting Purchasing")
+            # Step 2 Kuning kalau sudah diapprove (status >= 2)
+            st.markdown(f"{'🟡' if status_step >= 2 else '⚪'} **Step 2** \n\nWaiting Purchasing")
         with colC:
-            st.markdown(f"{'⚪' if status_step < 3 else '🟢'} **Step 3** \nDone Set Up")
+            # Step 3 Hijau kalau sudah setup (status >= 3)
+            st.markdown(f"{'🟢' if status_step >= 3 else '⚪'} **Step 3** \n\nDone Set Up")
         
         st.progress(status_step / 3)
     else:
-        st.markdown("### 🕒 Tracking Status: No Data")
-        st.info("Belum ada pengajuan terdeteksi.")
+        st.info("Belum ada data pengajuan. Silahkan isi form di atas.")
+        
 import pandas as pd
 import streamlit as st
 from io import BytesIO
