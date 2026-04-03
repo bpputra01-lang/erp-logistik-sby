@@ -3124,27 +3124,27 @@ import sqlite3
 from datetime import datetime
 
 def get_db_connection():
+    # Tambah check_same_thread biar gak bentrok di Streamlit Cloud
     return sqlite3.connect('reject_system.db', check_same_thread=False)
 
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
-    # 1. Pastikan tabel dasar ada
+    # 1. Bikin tabel dasar kalau belum ada
     c.execute('''CREATE TABLE IF NOT EXISTS requests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
                   bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, status INTEGER)''')
     
-    # 2. Paksa tambah kolom baru jika belum ada (Biar SELECT di baris 3240 tidak crash)
-    columns_to_add = ["nama_approver", "nama_setup"]
-    for col in columns_to_add:
+    # 2. INI KUNCINYA: Paksa tambah kolom satu-satu biar baris 3239 gak crash
+    kolom_baru = ["nama_approver", "nama_setup"]
+    for kolom in kolom_baru:
         try:
-            # Perintah ALTER TABLE untuk nambahin kolom ke tabel yang sudah ada
-            c.execute(f"ALTER TABLE requests ADD COLUMN {col} TEXT")
+            c.execute(f"ALTER TABLE requests ADD COLUMN {kolom} TEXT")
         except sqlite3.OperationalError:
-            # Kalau kolom sudah ada, SQLite bakal error, jadi kita biarkan saja (pass)
+            # Kalau error berarti kolom udah ada, aman, lanjut...
             pass
-        
+            
     conn.commit()
     conn.close()
 
