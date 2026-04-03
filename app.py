@@ -3135,16 +3135,15 @@ def init_db():
                   tanggal TEXT, nama TEXT, sku TEXT, article TEXT, 
                   bin TEXT, size TEXT, kategori TEXT, keterangan TEXT, status INTEGER)''')
     
-    # 2. Paksa tambah kolom baru kalau belum ada (Biar gak ValueError/OperationalError)
-    try:
-        c.execute("ALTER TABLE requests ADD COLUMN nama_approver TEXT")
-    except:
-        pass # Kalau sudah ada, dia skip
-    
-    try:
-        c.execute("ALTER TABLE requests ADD COLUMN nama_setup TEXT")
-    except:
-        pass # Kalau sudah ada, dia skip
+    # 2. Paksa tambah kolom baru jika belum ada (Biar SELECT di baris 3240 tidak crash)
+    columns_to_add = ["nama_approver", "nama_setup"]
+    for col in columns_to_add:
+        try:
+            # Perintah ALTER TABLE untuk nambahin kolom ke tabel yang sudah ada
+            c.execute(f"ALTER TABLE requests ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            # Kalau kolom sudah ada, SQLite bakal error, jadi kita biarkan saja (pass)
+            pass
         
     conn.commit()
     conn.close()
