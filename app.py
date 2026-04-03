@@ -3167,6 +3167,88 @@ def project_approval_reject():
             border: none !important;
             box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         }
+        /* Styling khusus untuk tombol hapus - GOLD MENYALA ULTIMATE */
+
+        div[data-testid="stVerticalBlock"] > div:last-child button {
+
+            background-color: #D4AF37 !important; /* Metallic Gold Base */
+
+            color: white !important;
+
+            border: none !important;
+
+            border-radius: 8px !important;
+
+            font-weight: bold !important;
+
+            
+
+            /* 1. Neon Glow Efek Berlapis (Ambient Glow) */
+
+            box-shadow: 
+
+                0 0 5px rgba(255, 215, 0, 0.4),  /* Lapisan dekat */
+
+                0 0 10px rgba(255, 215, 0, 0.3), /* Lapisan tengah */
+
+                0 0 15px rgba(255, 215, 0, 0.2); /* Lapisan jauh */
+
+            
+
+            /* 2. Text Glow Efek agar teks ikut menyala */
+
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+
+            
+
+            transition: all 0.3s ease-in-out; /* Animasi halus */
+
+        }
+
+
+        /* --- MENYALA LEBIH TERANG SAAT DI-HOVER --- */
+
+        div[data-testid="stVerticalBlock"] > div:last-child button:hover {
+
+            background-color: #FFD700 !important; /* Gold Lebih Terang */
+
+            color: #1a1c27 !important; /* Ganti teks jadi gelap saat terang */
+
+            transform: translateY(-2px) scale(1.02); /* Sedikit membesar & naik */
+
+            
+
+            /* 3. Intense Neon Shine saat hover */
+
+            box-shadow: 
+
+                0 0 10px rgba(255, 215, 0, 0.8), /* Lapisan dalam pekat */
+
+                0 0 20px rgba(255, 215, 0, 0.6), /* Lapisan tengah menyebar */
+
+                0 0 30px rgba(255, 215, 0, 0.4), /* Lapisan luar halus */
+
+                0 0 40px rgba(255, 215, 0, 0.2); /* Lapisan jauh pudar */
+
+            
+
+            /* Matikan text glow karena teks jadi gelap */
+
+            text-shadow: none;
+
+        }
+
+        /* Styling Box untuk Label Grafik agar tidak polosan */
+
+        div.stPlotlyChart {
+
+            border: 1px solid #d4af37 !important; /* Border Gold Halus */
+
+            border-radius: 8px !important;
+
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.2) !important; /* Glow Gold Tipis */
+
+        }
         
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
