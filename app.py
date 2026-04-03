@@ -3186,14 +3186,16 @@ def project_approval_reject():
     # --- TAMPILAN DETAIL & APPROVAL ---
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM requests ORDER BY id DESC LIMIT 1")
+    # Panggil nama kolomnya satu-satu biar urutannya pasti dan jumlahnya pas
+    c.execute("""SELECT id, tanggal, nama, sku, article, bin, size, 
+                        kategori, keterangan, status, nama_approver, nama_setup 
+                 FROM requests ORDER BY id DESC LIMIT 1""")
     res = c.fetchone()
     conn.close()
 
     if res:
-        # Mapping Kolom: 0:id, 1:tgl, 2:nama, 3:sku, 4:article, 5:bin, 6:size, 7:kategori, 8:ket, 9:status, 10:approver, 11:setup
+        # Sekarang urutannya udah pasti 12 kolom, nggak bakal ValueError lagi
         rid, r_tgl, r_nama, r_sku, r_art, r_bin, r_size, r_kat, r_ket, r_stat, r_app, r_set = res
-
         st.divider()
         st.subheader("🔍 Detail Pengajuan Terakhir")
         with st.container():
