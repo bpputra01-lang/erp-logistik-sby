@@ -2946,6 +2946,7 @@ def menu_reject_defect():
         - **SIZE**: Tulis ukurannya berdasarkan SKU yang sudah dituliskan
         - **KATEGORI**: Isi dengan kategori yang sudah di tentukan sesuai tingkat kerusakannya **(Jika item tersebut berbeda baik dari size article maka pilih pilihan yang menggambarkan perbedaannya, Dan jika beda article dan beda size maka mohon untuk upload 2 kali namun jika sebelahnya saja maka cukup sekali)**
         - **DETAIL**: Isi dengan detail kerusakannya sehingga menggambar kondisinya
+        
         **Input Mass Item Defect/Reject:**
         - Klik pilihan **Download template Input** yang tersedia
         - Lalu jangan diubah apapun header dan nama sheetnya
