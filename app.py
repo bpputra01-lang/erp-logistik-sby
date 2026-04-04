@@ -3287,7 +3287,7 @@ def project_approval_reject():
                             st.caption("Purchasing")
                             # Input Nama & Tombol Approval Purchasing
                             nama_app = st.text_input("Nama Purchasing", key=f"inp_app_{row['id']}", placeholder="Isi nama...", label_visibility="collapsed")
-                            if st.button("Approve Step 2", key=f"btn_app_{row['id']}", disabled=not nama_app):
+                            if st.button("Approved", key=f"btn_app_{row['id']}", disabled=not nama_app):
                                 conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (nama_app, row['id']))
                                 conn.commit()
                                 st.rerun()
@@ -3298,7 +3298,7 @@ def project_approval_reject():
                     with tcol3:
                         if row['status'] >= 3:
                             st.markdown("🟢 **Done Setup BIN**")
-                            st.caption("Set Up")
+                            st.caption("Done Process")
                             if row.get('setup_by'): st.caption(f"✍️ {row['setup_by']}")
                         else:
                             st.markdown("⚪ **Process Request**")
