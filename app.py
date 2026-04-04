@@ -2768,23 +2768,38 @@ def menu_reject_defect():
     
     init_db()
 
-    # --- 2. FORM INPUT MANUAL ---
+    # --- FORM INPUT MANUAL RAPI (GRID 3x3) ---
     with st.form("form_reject", clear_on_submit=True):
-        col0, col1, col2 = st.columns(3)
-        with col0:
-            # PENAMBAHAN TAB CABANG SESUAI REQUEST
+        # BARIS 1 (3 Kolom)
+        r1c1, r1c2, r1c3 = st.columns(3)
+        with r1c1:
             cabang_pilih = st.selectbox("CABANG", ["SURABAYA", "SEMARANG", "SIDOARJO"])
-            bin_awal = st.text_input("BIN AWAL")
-        with col1:
+        with r1c2:
             bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
-            sku = st.text_input("SKU")
-            article = st.text_input("NAMA BARANG")
-        with col2:
+        with r1c3:
             size = st.text_input("SIZE")
-            kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
-            keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
-        btn_submit = st.form_submit_button("📤UPLOAD SINGLE LIST")
+        # BARIS 2 (3 Kolom)
+        r2c1, r2c2, r2c3 = st.columns(3)
+        with r2c1:
+            bin_awal = st.text_input("BIN AWAL")
+        with r2c2:
+            sku = st.text_input("SKU")
+        with r2c3:
+            kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
+
+        # BARIS 3 (3 Kolom - INI PERBAIKANNYA)
+        r3c1, r3c2, r3c3 = st.columns(3)
+        with r3c1:
+            article = st.text_input("NAMA BARANG")
+        with r3c2:
+            # Keterangan dibuat text_input biar tingginya sama rata dengan yang lain
+            keterangan = st.text_input("DETAIL KERUSAKAN (Keterangan)")
+        with r3c3:
+            # Kolom kosong untuk menjaga estetika grid atau bisa diisi button nantinya
+            st.write("") 
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Spacer
+            btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST")
 
     if btn_submit:
         if sku:
