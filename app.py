@@ -3287,47 +3287,51 @@ def project_approval_reject():
                     st.warning("⚠️ Nama Tim dan SKU wajib diisi!")
 
     with tabs[1]:
-       # --- CSS FINAL: FIX TEKS RADIO & EXPANDER ---
+        # --- CSS JURUS PAMUNGKAS (Targeting Spesifik) ---
         st.markdown("""
             <style>
-            /* 1. Paksa Teks Radio Button Jadi Gelap (Biar Gak Putih Hantu) */
+            /* 1. PAKSA Teks Radio Button (Filter) jadi HITAM PEKAT */
+            /* Ini supaya kelihatan jelas di atas background putih/abu terang lo */
             [data-testid="stMain"] div[data-testid="stRadio"] label p {
-                color: #262730 !important; /* Warna gelap standar Streamlit */
-                font-weight: 500 !important;
+                color: #111111 !important;
+                font-weight: 700 !important;
+                font-size: 1rem !important;
             }
 
-            /* 2. Expander Header (Tetap Putih karena Background-nya Gelap) */
+            /* 2. PAKSA Box Expander jadi Gelap Solid */
+            [data-testid="stMain"] div[data-testid="stExpander"] {
+                background-color: #1a1c27 !important;
+                border: 2px solid #3d4156 !important;
+                border-radius: 12px !important;
+            }
+
+            /* 3. PAKSA Teks Header Expander (SKU/Nama) jadi PUTIH BERSIH */
             [data-testid="stMain"] div[data-testid="stExpander"] summary p {
                 color: #FFFFFF !important;
                 font-weight: bold !important;
             }
-            
-            [data-testid="stMain"] div[data-testid="stExpander"] {
-                background-color: #1a1c27 !important;
-                border: 1px solid #3d4156 !important;
-                border-radius: 12px !important;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
-            }
 
-            /* 3. Hover Effect pada Expander */
-            [data-testid="stMain"] div[data-testid="stExpander"] summary:hover p {
+            /* 4. FIX TULISAN BIRU DI KETERANGAN (Box Biru Gelap) */
+            /* Kita tembak langsung ke div notification biar teksnya Putih */
+            [data-testid="stNotification"] div[data-testid="stMarkdownContainer"] p {
+                color: #FFFFFF !important;
+                font-weight: 500 !important;
+            }
+            
+            /* Judul "Keterangan:" tetap Biru Neon biar keren */
+            [data-testid="stMain"] div[data-testid="stExpander"] h3 {
                 color: #00bfff !important;
             }
 
-            /* 4. Input Search Box (Teks di dalam kolom cari) */
+            /* 5. Perbaikan Input Search biar Teksnya Putih */
             [data-testid="stMain"] div[data-testid="stTextInput"] input {
                 color: #FFFFFF !important;
                 background-color: #0e1117 !important;
             }
 
-            /* 5. Timeline Text (Progres Status) */
-            [data-testid="stMain"] .stMarkdown p {
-                color: #31333F !important; /* Teks di luar expander dibikin gelap */
-            }
-            
-            /* Khusus teks di DALAM expander dibikin putih lagi */
-            [data-testid="stMain"] div[data-testid="stExpander"] .stMarkdown p {
-                color: #FFFFFF !important;
+            /* Efek Hover Header */
+            [data-testid="stMain"] div[data-testid="stExpander"] summary:hover p {
+                color: #00bfff !important;
             }
             </style>
         """, unsafe_allow_html=True)
