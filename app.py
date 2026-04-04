@@ -3284,42 +3284,47 @@ def project_approval_reject():
                     st.warning("⚠️ Nama Tim dan SKU wajib diisi!")
 
     with tabs[1]:
-       # --- CSS PERBAIKAN: KHUSUS KONTEN TENGAH (SIDEBAR AMAN) ---
-        # --- CSS PERBAIKAN: TULISAN TERANG & AKSEN BIRU ---
+       # --- CSS FINAL: FIX TEKS RADIO & EXPANDER ---
         st.markdown("""
             <style>
-            /* 1. Perbaikan Expander (Tulisan Header) */
+            /* 1. Paksa Teks Radio Button Jadi Gelap (Biar Gak Putih Hantu) */
+            [data-testid="stMain"] div[data-testid="stRadio"] label p {
+                color: #262730 !important; /* Warna gelap standar Streamlit */
+                font-weight: 500 !important;
+            }
+
+            /* 2. Expander Header (Tetap Putih karena Background-nya Gelap) */
             [data-testid="stMain"] div[data-testid="stExpander"] summary p {
-                color: #FFFFFF !important; /* Paksa tulisan jadi putih */
+                color: #FFFFFF !important;
                 font-weight: bold !important;
-                font-size: 1.05rem !important;
             }
             
             [data-testid="stMain"] div[data-testid="stExpander"] {
                 background-color: #1a1c27 !important;
                 border: 1px solid #3d4156 !important;
                 border-radius: 12px !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
             }
 
-            /* 2. Warna Teks saat Hover di Expander */
+            /* 3. Hover Effect pada Expander */
             [data-testid="stMain"] div[data-testid="stExpander"] summary:hover p {
-                color: #00bfff !important; /* Berubah jadi biru neon pas disentuh */
+                color: #00bfff !important;
             }
 
-            /* 3. Perbaikan Radio Button (Tulisan Status) */
-            [data-testid="stMain"] div[data-testid="stRadio"] label p {
-                color: #E0E0E0 !important; /* Tulisan status jadi abu terang */
-            }
-
-            /* 4. Teks Detail di Dalam Expander */
-            [data-testid="stMain"] .stMarkdown p, [data-testid="stMain"] .stMarkdown span {
-                color: #FFFFFF !important;
-            }
-
-            /* 5. Input Text biar tulisannya putih */
+            /* 4. Input Search Box (Teks di dalam kolom cari) */
             [data-testid="stMain"] div[data-testid="stTextInput"] input {
-                color: white !important;
+                color: #FFFFFF !important;
                 background-color: #0e1117 !important;
+            }
+
+            /* 5. Timeline Text (Progres Status) */
+            [data-testid="stMain"] .stMarkdown p {
+                color: #31333F !important; /* Teks di luar expander dibikin gelap */
+            }
+            
+            /* Khusus teks di DALAM expander dibikin putih lagi */
+            [data-testid="stMain"] div[data-testid="stExpander"] .stMarkdown p {
+                color: #FFFFFF !important;
             }
             </style>
         """, unsafe_allow_html=True)
