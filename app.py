@@ -2761,23 +2761,7 @@ def menu_reject_defect():
         with st.expander("📋 Informasi Format & Prosedur"):
             st.info("Pilih Cabang sebelum melakukan input Single atau Massal.")
 
-        # --- FORM INPUT ---
-        with st.form("form_reject", clear_on_submit=True):
-            # DROPDOWN CABANG (Ganti dari st.radio ke st.selectbox)
-            cabang_input = st.selectbox("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"])
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                bin_awal = st.text_input("BIN AWAL")
-                bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
-                sku = st.text_input("SKU")
-                article = st.text_input("NAMA BARANG")
-            with col2:
-                size = st.text_input("SIZE")
-                kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
-                keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
-
-            btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST")
+    
 
         if btn_submit and sku:
             waktu_sekarang = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
