@@ -2758,8 +2758,23 @@ def menu_reject_defect():
     tab_input, tab_dashboard = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
 
     with tab_input:
-        with st.expander("📋 Informasi Format & Prosedur"):
-            st.info("Pilih Cabang sebelum melakukan input Single atau Massal.")
+        with st.expander("📋 Informasi Format File & Prosedur"):
+            st.info("""
+            **Input Single Item Defect/Reject:**
+            - **LOKASI**: Pilih Cabang (Surabaya, Sidoarjo, Semarang)
+            - **BIN AWAL**: Isi dengan Bin Awal item tersimpan
+            - **BIN TUJUAN**: Pilih lokasi tujuan sesuai dropdown
+            - **SKU**: Tulis SKU lengkap secara Manual
+            - **NAMA BARANG**: Ambil dari Article Name di file Multiple Adjustment
+            - **SIZE**: Tulis ukurannya berdasarkan SKU
+            - **KATEGORI**: Pilih kategori kerusakan (D1-D4 / R1-R4)
+            - **DETAIL**: Isi keterangan kondisi barang secara detail
+            
+            **Input Mass Item:**
+            - Gunakan template terbaru (v2) yang memiliki kolom **CABANG**
+            - Jangan ubah header atau nama sheet
+            - Upload file Excel melalui uploader di bawah
+            """)
 
         # --- FORM INPUT ---
         with st.form("form_reject", clear_on_submit=True):
