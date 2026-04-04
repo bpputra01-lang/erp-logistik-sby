@@ -2692,7 +2692,8 @@ def clear_all_data():
 
 # 3. UI MENU REJECT/DEFECT
 def menu_reject_defect():
-   # --- CSS & HEADER (Glow Gold & Navy Styling Lu Balik Semua!) ---
+    # --- CSS & HEADER (Glow Gold & Navy Styling Lu Balik Semua!) ---
+    # --- CSS & HEADER (Glow Gold & Navy Styling Lu Balik Semua!) ---
     st.markdown("""
         <style>
         /* 1. Header Utama */
@@ -2711,20 +2712,24 @@ def menu_reject_defect():
         /* 2. Input Fields & Dropdown (NAVY STYLE) */
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
         
+        /* Menargetkan TextInput, TextArea, dan Selectbox */
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
         div[data-testid="stSelectbox"] > div > div {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             border-radius: 6px !important;
+            color: white !important;
         }
         
+        /* Maksa teks di dalam input jadi putih */
         input, textarea, div[data-baseweb="select"] > div { 
+            background-color: transparent !important; 
             color: white !important; 
         }
 
-        /* 3. TOMBOL SINGLE LIST (DALAM FORM) - BIRU GLOW */
-        button[kind="primaryFormSubmit"] {
+        /* 3. Tombol Submit Utama (BIRU) */
+        div.stButton > button {
             background-color: #007BFF !important;
             color: white !important;
             border-radius: 8px !important;
@@ -2732,18 +2737,12 @@ def menu_reject_defect():
             height: 48px !important;
             font-weight: bold !important;
             border: none !important;
-            box-shadow: 0 0 10px rgba(0, 123, 255, 0.4) !important;
-            transition: all 0.3s ease-in-out !important;
-        }
-        button[kind="primaryFormSubmit"]:hover {
-            background-color: #0056b3 !important;
-            box-shadow: 0 0 20px rgba(0, 123, 255, 0.8) !important;
-            transform: scale(1.01);
         }
 
-        /* 4. TOMBOL GOLD (Download, Import, Hapus, Kosongkan) */
+        /* 4. TOMBOL GOLD NYALA (Download, Import, Hapus Single, Kosongkan) */
+        /* Selector ini bakal nyari semua tombol selain tombol submit form utama */
         div.stDownloadButton > button,
-        div.stButton > button:not([kind="primaryFormSubmit"]) {
+        div[data-testid="stVerticalBlock"] > div.element-container button:not([kind="secondaryFormSubmit"]) {
             background-color: #D4AF37 !important;
             color: white !important;
             border: 1px solid #FFD700 !important;
@@ -2753,8 +2752,9 @@ def menu_reject_defect():
             transition: all 0.3s ease-in-out !important;
         }
 
+        /* Hover Effect Gold */
         div.stDownloadButton > button:hover,
-        div.stButton > button:not([kind="primaryFormSubmit"]):hover {
+        div[data-testid="stVerticalBlock"] > div.element-container button:not([kind="secondaryFormSubmit"]):hover {
             background-color: #FFD700 !important;
             color: #1a1c27 !important;
             transform: scale(1.02);
@@ -2768,13 +2768,19 @@ def menu_reject_defect():
             border: 1px solid #3d4156 !important;
             padding: 20px !important;
             border-radius: 12px !important;
+            min-height: 160px !important; 
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
         }
         [data-testid="stMetricValue"] > div { 
-            color: #FFD700 !important; 
+            font-size: 32px !important; 
             font-weight: 900 !important; 
+            color: #FFD700 !important; 
         }
         </style>
     """, unsafe_allow_html=True)
+
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
 
     # --- PEMBAGIAN TAB ---
