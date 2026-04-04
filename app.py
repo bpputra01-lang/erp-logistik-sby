@@ -3213,26 +3213,7 @@ def project_approval_reject():
         .line-active {
             background: #1E90FF !important; box-shadow: 0 0 8px rgba(30, 144, 255, 0.6);
         }
-        /* Memaksa semua elemen di dalam kolom tcol untuk center */
-        [data-testid="column"] {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            text-align: center;
-        }
-    
-        /* Menghilangkan margin bawah default input agar rapat dengan tombol */
-        .stTextInput {
-            width: 100% !important;
-            margin-bottom: -10px !important;
-        }
-
-        /* Memastikan tombol memiliki lebar penuh yang konsisten */
-        div.stButton > button {
-            width: 100% !important;
-            margin-top: 5px !important;
-        }
+        
         </style>
     """, unsafe_allow_html=True)
 
