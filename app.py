@@ -2638,28 +2638,41 @@ from io import BytesIO
 import datetime as dt_logic  # <--- INI KUNCINYA!
 
 
-# 1. Database Logic (GW SAMAIN NAMA KOLOMNYA BIAR SINKRON SAMA FORM)
+# 1. Database Logic dengan ALTER TABLE (Update Otomatis)
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
-    # Kita paksa hapus tabel lama dan bikin yang baru dengan skema bener
-    # HATI-HATI: Ini bakal hapus semua data lama lu!
-    c.execute('DROP TABLE IF EXISTS reject_list') 
+    
+    # 1. Pastikan Tabel ada dulu
     c.execute('''
-        CREATE TABLE reject_list (
-            BIN_AWAL TEXT,
+        CREATE TABLE IF NOT EXISTS reject_list (
             BIN TEXT,
             SKU TEXT,
             ARTICLE_NAME TEXT,
             SIZE TEXT,
             KATEGORI TEXT,
             KETERANGAN TEXT,
-            TANGGAL_INPUT TEXT
+            TANGGAL_INPUT DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    conn.commit()
+    
+    # 2. Cek apakah kolom BIN_AWAL sudah ada, kalau belum baru di-ALTER
+    c.execute("PRAGMA table_info(reject_list)")
+    columns = [column[1] for column in c.fetchall()]
+    
+    if 'BIN_AWAL' not in columns:
+        try:
+            # NYUNTIK KOLOM BARU KE TABEL LAMA
+            c.execute('ALTER TABLE reject_list ADD COLUMN BIN_AWAL TEXT')
+            conn.commit()
+            st.success("✅ Database Updated: Kolom BIN_AWAL berhasil ditambahkan!")
+        except Exception as e:
+            st.error(f"Gagal Update Database: {e}")
+            
     conn.close()
 
+# JALANKAN INIT_DB DI SETIAP REFRESH
+init_db()
 # 2. Fungsi Simpan (Tambahin pembersihan nama kolom)
 def save_data(df):
     try:
