@@ -3242,32 +3242,48 @@ def project_approval_reject():
                     st.rerun()
 
     with tabs[1]:
-        # --- TAMBAHAN FILTER STATUS ---
-        st.markdown("### 🔍 Filter Data")
-        filter_status = st.radio(
-            "Pilih Status:",
-            ["Semua", "Waiting Approval", "Waiting Set Up", "Done Set Up"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
+        # --- FITUR SEARCH & FILTER ---
+        col_search, col_filter = st.columns([1, 1])
+        
+        with col_search:
+            search_query = st.text_input("🔍 Cari SKU / Bin / Nama:", placeholder="Ketik di sini...", label_visibility="collapsed")
+        
+        with col_filter:
+            filter_status = st.radio(
+                "Pilih Status:",
+                ["Semua", "Waiting Approval", "Waiting Set Up", "Done Set Up"],
+                horizontal=True,
+                label_visibility="collapsed"
+            )
 
-        # Logika Query berdasarkan Filter
+        # Logika Query Dasar
+        query = "SELECT * FROM submissions WHERE 1=1"
+        params = []
+
+        # Tambahkan Filter Status ke Query
         if filter_status == "Waiting Approval":
-            query = "SELECT * FROM submissions WHERE status = 1 ORDER BY id DESC"
+            query += " AND status = 1"
         elif filter_status == "Waiting Set Up":
-            query = "SELECT * FROM submissions WHERE status = 2 ORDER BY id DESC"
+            query += " AND status = 2"
         elif filter_status == "Done Set Up":
-            query = "SELECT * FROM submissions WHERE status = 3 ORDER BY id DESC"
-        else:
-            query = "SELECT * FROM submissions ORDER BY id DESC"
+            query += " AND status = 3"
 
-        df = pd.read_sql_query(query, conn)
+        # Tambahkan Logika Search (SKU, Bin, atau Nama)
+        if search_query:
+            query += " AND (sku LIKE ? OR bin_asal LIKE ? OR nama_tim LIKE ?)"
+            search_val = f"%{search_query}%"
+            params.extend([search_val, search_val, search_val])
+
+        query += " ORDER BY id DESC"
+        
+        # Eksekusi Query dengan Parameter untuk Keamanan
+        df = pd.read_sql_query(query, conn, params=params)
         
         if df.empty:
-            st.info(f"Belum ada riwayat pengajuan untuk status: {filter_status}")
+            st.info(f"Data tidak ditemukan.")
         else:
             for index, row in df.iterrows():
-                # SEMUA elemen harus masuk ke dalam expander ini agar tidak double keluar
+                # SEMUA elemen tetap di dalam expander agar tidak double
                 with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
                     st.markdown("### 📄 Detail Pengajuan")
                     col_det1, col_det2 = st.columns(2)
@@ -3283,7 +3299,7 @@ def project_approval_reject():
                     st.info(f"**Keterangan:**\n{row['keterangan']}")
                     st.divider()
 
-                    # TIMELINE PROGRESS
+                    # --- TIMELINE PROGRESS ---
                     st.write("**Progres Status:**")
                     line1_class = "line-active" if row['status'] >= 2 else ""
                     line2_class = "line-active" if row['status'] >= 3 else ""
@@ -3331,11 +3347,9 @@ def project_approval_reject():
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
 
-                    # PESAN SELESAI
                     if row['status'] == 3:
                         st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
 
-                    # TOMBOL HAPUS
                     st.write("") 
                     with st.expander("🗑️ Hapus Data"):
                         st.warning("Data yang dihapus tidak dapat dikembalikan!")
