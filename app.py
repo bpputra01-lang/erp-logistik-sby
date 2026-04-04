@@ -3284,11 +3284,50 @@ def project_approval_reject():
                     st.warning("⚠️ Nama Tim dan SKU wajib diisi!")
 
     with tabs[1]:
+        # --- CSS KHUSUS TAB HISTORY (Anti Polos) ---
+        st.markdown("""
+            <style>
+            /* Style buat Box Expander (Kartu Data) */
+            .streamlit-expanderHeader {
+                background-color: #1a1c27 !important;
+                border: 1px solid #3d4156 !important;
+                border-radius: 8px !important;
+                color: #00bfff !important; /* Warna teks SKU jadi biru neon */
+                font-weight: bold !important;
+            }
+            
+            /* Style isi di dalam expander */
+            .streamlit-expanderContent {
+                background-color: #12141d !important;
+                border: 1px solid #3d4156 !important;
+                border-top: none !important;
+                border-radius: 0 0 8px 8px !important;
+                padding: 20px !important;
+            }
+
+            /* Style buat st.info (Keterangan) biar gak putih polos */
+            div[data-testid="stNotification"] {
+                background-color: #1e2130 !important;
+                color: #00d4ff !important;
+                border: 1px solid #007bff !important;
+                border-radius: 10px !important;
+            }
+            
+            /* Bikin Divider (Garis) lebih kelihatan */
+            hr {
+                border: 0;
+                height: 1px;
+                background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 191, 255, 0.75), rgba(0, 0, 0, 0));
+                margin: 20px 0 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         # --- FITUR SEARCH & FILTER ---
         col_search, col_filter = st.columns([1, 1])
         
         with col_search:
-            search_query = st.text_input("🔍 Cari SKU / Bin / Nama:", placeholder="Ketik di sini...", label_visibility="collapsed").strip()
+            search_query = st.text_input("🔍 Cari SKU / Bin / Nama:", placeholder="Ketik SKU atau Nama...", label_visibility="collapsed").strip()
         
         with col_filter:
             filter_status = st.radio(
@@ -3298,19 +3337,14 @@ def project_approval_reject():
                 label_visibility="collapsed"
             )
 
-        # Logika Query Dasar
+        # Logika Query
         query = "SELECT * FROM submissions WHERE 1=1"
         params = []
 
-        # Tambahkan Filter Status ke Query
-        if filter_status == "Waiting Approval":
-            query += " AND status = 1"
-        elif filter_status == "Waiting Set Up":
-            query += " AND status = 2"
-        elif filter_status == "Done Set Up":
-            query += " AND status = 3"
+        if filter_status == "Waiting Approval": query += " AND status = 1"
+        elif filter_status == "Waiting Set Up": query += " AND status = 2"
+        elif filter_status == "Done Set Up": query += " AND status = 3"
 
-        # --- PERBAIKAN LOGIKA SEARCH ---
         if search_query:
             query += " AND (LOWER(sku) LIKE LOWER(?) OR LOWER(bin_asal) LIKE LOWER(?) OR LOWER(nama_tim) LIKE LOWER(?) OR LOWER(article_name) LIKE LOWER(?))"
             search_val = f"%{search_query}%"
@@ -3321,105 +3355,85 @@ def project_approval_reject():
         try:
             df = pd.read_sql_query(query, conn, params=params)
         except Exception as e:
-            st.error(f"Terjadi kesalahan database: {e}")
+            st.error(f"Database Error: {e}")
             df = pd.DataFrame()
         
         if df.empty:
-            st.info(f"Data tidak ditemukan.")
+            st.info("📭 Belum ada data pengajuan.")
         else:
             for index, row in df.iterrows():
-                with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
-                    st.markdown("### 📄 Detail Pengajuan")
-                    col_det1, col_det2 = st.columns(2)
-                    with col_det1:
-                        st.write(f"**Nama Pengaju:** {row['nama_tim']}")
-                        st.write(f"**Bin Asal:** {row['bin_asal']}")
-                        st.write(f"**SKU:** {row['sku']}")
-                    with col_det2:
-                        st.write(f"**Article Name:** {row['article_name']}")
-                        st.write(f"**Size:** {row['size']}")
-                        st.write(f"**Waktu Input:** {row['timestamp']}")
+                # HEADER EXPANDER BERWARNA
+                with st.expander(f"📦 {row['sku']} - {row['article_name']} | {row['nama_tim']}"):
+                    st.markdown(f"### 📑 Detail [ID: {row['id']}]")
                     
-                    st.info(f"**Keterangan:**\n{row['keterangan']}")
-                    st.divider()
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.markdown(f"**👤 Pengaju:** `{row['nama_tim']}`")
+                        st.markdown(f"**📍 Bin Asal:** `{row['bin_asal']}`")
+                        st.markdown(f"**🆔 SKU:** `{row['sku']}`")
+                    with c2:
+                        st.markdown(f"**👟 Article:** `{row['article_name']}`")
+                        st.markdown(f"**📏 Size:** `{row['size']}`")
+                        # Jam WIB di History
+                        st.markdown(f"**🕒 Waktu:** `{row['timestamp']}`")
+                    
+                    st.info(f"**📝 Keterangan:**\n\n{row['keterangan']}")
+                    st.write("---")
 
                     # --- TIMELINE PROGRESS ---
                     st.write("**Progres Status:**")
-                    line1_class = "line-active" if row['status'] >= 2 else ""
-                    line2_class = "line-active" if row['status'] >= 3 else ""
+                    line1_active = "line-active" if row['status'] >= 2 else ""
+                    line2_active = "line-active" if row['status'] >= 3 else ""
 
                     tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
                     
                     with tcol1:
-                        st.markdown("🟢 **Done Pengajuan**")
-                        st.caption("Waiting Approval Purchasing")
-                    
+                        st.markdown("🟢 **Pengajuan**")
+                        st.caption("Waiting Approval")
                     with tline1:
-                        st.markdown(f'<div class="timeline-line {line1_class}"></div>', unsafe_allow_html=True)
-                    
+                        st.markdown(f'<div class="timeline-line {line1_active}"></div>', unsafe_allow_html=True)
                     with tcol2:
                         if row['status'] >= 2:
-                            st.markdown("🟢 **Done Approval**")
-                            st.caption("Approval")
-                            if row.get('approved_by'): st.caption(f"✍️ {row['approved_by']}")
+                            st.markdown("🔵 **Approved**")
+                            st.caption(f"By: {row.get('approved_by', '-')}")
                         else:
-                            st.markdown("🟡 **Approval Purchasing**")
-                            st.caption("Purchasing")
-                            nama_app = st.text_input("Nama Purchasing", key=f"inp_app_{row['id']}", placeholder="Isi nama...", label_visibility="collapsed")
-                            if st.button("Approved", key=f"btn_app_{row['id']}", disabled=not nama_app):
-                                conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (nama_app, row['id']))
-                                conn.commit()
-                                st.rerun()
-                                
+                            st.markdown("🟡 **Purchasing**")
+                            n_app = st.text_input("Nama Purchasing", key=f"app_{row['id']}", label_visibility="collapsed")
+                            if st.button("Approve", key=f"bt_ap_{row['id']}", disabled=not n_app):
+                                conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (n_app, row['id']))
+                                conn.commit(); st.rerun()
                     with tline2:
-                        st.markdown(f'<div class="timeline-line {line2_class}"></div>', unsafe_allow_html=True)
-                    
+                        st.markdown(f'<div class="timeline-line {line2_active}"></div>', unsafe_allow_html=True)
                     with tcol3:
                         if row['status'] >= 3:
-                            st.markdown("🟢 **Done Setup BIN**")
-                            st.caption("Done Process")
-                            if row.get('setup_by'): st.caption(f"✍️ {row['setup_by']}")
+                            st.markdown("🟣 **Done Set Up**")
+                            st.caption(f"By: {row.get('setup_by', '-')}")
                         else:
-                            st.markdown("⚪ **Process Request**")
-                            st.caption("Set Up")
+                            st.markdown("⚪ **Finalizing**")
                             if row['status'] == 2:
-                                nama_set = st.text_input("Nama Set Up", key=f"inp_set_{row['id']}", placeholder="Isi nama...", label_visibility="collapsed")
+                                n_set = st.text_input("Nama Set Up", key=f"set_{row['id']}", label_visibility="collapsed")
                                 st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-                                if st.button("Final Set Up", key=f"btn_set_{row['id']}", disabled=not nama_set):
-                                    conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (nama_set, row['id']))
-                                    conn.commit()
-                                    st.rerun()
+                                if st.button("Final Set Up", key=f"bt_set_{row['id']}", disabled=not n_set):
+                                    conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (n_set, row['id']))
+                                    conn.commit(); st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
 
-                    # --- TAMBAHAN: KOLOM ADDITIONAL NOTE ---
+                    # --- ADDITIONAL NOTE ---
                     st.write("---")
-                    current_note = row.get('additional_note') if row.get('additional_note') is not None else ""
-                    
-                    new_note = st.text_area(
-                        "📝 Additional Note:", 
-                        value=current_note, 
-                        placeholder="Tambahkan catatan tambahan di sini...",
-                        key=f"note_{row['id']}"
-                    )
-                    
-                    if new_note != current_note:
-                        if st.button("Simpan Catatan", key=f"save_note_{row['id']}"):
-                            conn.execute("UPDATE submissions SET additional_note = ? WHERE id = ?", (new_note, row['id']))
-                            conn.commit()
-                            st.success("Catatan berhasil diperbarui!")
-                            st.rerun()
+                    c_note = row.get('additional_note') if row.get('additional_note') else ""
+                    n_note = st.text_area("📝 Catatan Tambahan:", value=c_note, key=f"n_{row['id']}")
+                    if n_note != c_note:
+                        if st.button("💾 Update Note", key=f"sn_{row['id']}"):
+                            conn.execute("UPDATE submissions SET additional_note = ? WHERE id = ?", (n_note, row['id']))
+                            conn.commit(); st.success("Note tersimpan!"); st.rerun()
 
-                    # PESAN SELESAI
                     if row['status'] == 3:
-                        st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
+                        st.success(f"🎯 Selesai diproses oleh {row.get('setup_by')}")
 
-                    st.write("") 
-                    with st.expander("🗑️ Hapus Data"):
-                        st.warning("Data yang dihapus tidak dapat dikembalikan!")
-                        if st.button(f"Konfirmasi Hapus SKU {row['sku']}", key=f"del_{row['id']}"):
+                    with st.expander("🗑️ Hapus"):
+                        if st.button(f"Konfirmasi Hapus {row['sku']}", key=f"d_{row['id']}"):
                             conn.execute("DELETE FROM submissions WHERE id = ?", (row['id'],))
-                            conn.commit()
-                            st.rerun()
+                            conn.commit(); st.rerun()
 
     conn.close()
 
