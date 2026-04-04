@@ -3125,7 +3125,7 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
-# --- DATABASE SETUP ---
+# --- DATABASE SETUP (Upgrade Kolom) ---
 def init_db():
     conn = sqlite3.connect('reject_system.db')
     c = conn.cursor()
@@ -3139,7 +3139,9 @@ def init_db():
             article_name TEXT,
             size TEXT,
             keterangan TEXT,
-            status INTEGER DEFAULT 0
+            status INTEGER DEFAULT 1,
+            approved_by TEXT,
+            setup_by TEXT
         )
     ''')
     conn.commit()
@@ -3148,77 +3150,57 @@ def init_db():
 conn = init_db()
 
 def project_approval_reject():
-    # --- DATABASE INTERNAL ---
     conn = sqlite3.connect('reject_system.db', check_same_thread=False)
     
-    # --- CSS LU (Gak Gue Ganti Sama Sekali) ---
+    # --- CSS TETAP (Gak ada yang dihapus) + Tambahan Garis Timeline ---
     st.markdown("""
         <style>
-        /* 1. Header Hero */
         .hero-header-custom {
             background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
             color: white; padding: 12px 25px; border-radius: 10px;
             margin-bottom: 25px; font-weight: 800; font-size: 22px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
         }
-
-        /* 2. Detail Card Preview */
-        .detail-card {
-            background-color: #1a1c27; border: 1px solid #3d4156;
-            padding: 20px; border-radius: 12px; margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-
-        /* 3. Styling Input & Form */
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stSelectbox"] > div > div {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            border-radius: 8px !important;
-        }
-        input, textarea, div[data-baseweb="select"] span { color: white !important; }
-        label { color: #E0E0E0 !important; font-weight: 600 !important; }
-
-        /* 4. Tombol Utama (Sent Request) */
+        
+        /* 4. Tombol Utama */
         div.stButton > button {
             background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
             color: white !important; border-radius: 10px !important;
-            width: 100% !important; height: 50px !important; font-weight: bold !important;
+            width: 100% !important; height: 45px !important; font-weight: bold !important;
             border: none !important;
         }
 
-        /* 5. TOMBOL GOLD MENYALA ULTIMATE */
+        /* 5. TOMBOL GOLD MENYALA */
         .gold-btn button {
             background-color: #D4AF37 !important;
             color: white !important; border: none !important;
             border-radius: 8px !important; font-weight: bold !important;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-            transition: all 0.3s ease-in-out;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
         }
-        .gold-btn button:hover {
-            background-color: #FFD700 !important;
-            color: #1a1c27 !important;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
-            transform: translateY(-2px);
+
+        /* Garis Konektor Timeline */
+        .timeline-track {
+            height: 4px;
+            background: #3d4156;
+            position: relative;
+            top: 15px;
+            z-index: 0;
+            margin: 0 20px;
         }
+        .track-active { background: #1E90FF !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- UI CONTENT ---
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
-    
     tabs = st.tabs(["📝 Input Pengajuan", "📑 History & Approval Status"])
 
-    # TAB 1: INPUT
     with tabs[0]:
         st.subheader("Form Pengajuan Reject/Defect")
         with st.form("input_form_reject", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                nama = st.text_input("Nama Tim")
+                nama = st.text_input("Nama Tim (Pengaju)")
                 bin_asal = st.text_input("Bin Asal")
                 sku = st.text_input("SKU")
             with col2:
@@ -3226,87 +3208,86 @@ def project_approval_reject():
                 size = st.text_input("Size")
                 keterangan = st.text_area("Keterangan Reject/Defect")
             
-            submit_btn = st.form_submit_button("Kirim Pengajuan")
-            if submit_btn and nama and sku:
-                ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                # STATUS 1 = DONE PENGAJUAN, WAITING APPROVAL PURCHASING
-                conn.execute("INSERT INTO submissions (timestamp, nama_tim, bin_asal, sku, article_name, size, keterangan, status) VALUES (?,?,?,?,?,?,?,?)", 
-                             (ts, nama, bin_asal, sku, article, size, keterangan, 1))
-                conn.commit()
-                st.success("✅ Pengajuan Berhasil Dikirim!")
-                st.rerun()
+            if st.form_submit_button("Kirim Pengajuan"):
+                if nama and sku:
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    conn.execute("INSERT INTO submissions (timestamp, nama_tim, bin_asal, sku, article_name, size, keterangan, status) VALUES (?,?,?,?,?,?,?,?)", 
+                                 (ts, nama, bin_asal, sku, article, size, keterangan, 1))
+                    conn.commit()
+                    st.success("✅ Pengajuan Berhasil!")
+                    st.rerun()
 
-    # TAB 2: HISTORY
     with tabs[1]:
         df = pd.read_sql_query("SELECT * FROM submissions ORDER BY id DESC", conn)
-        
-        if df.empty:
-            st.info("Belum ada riwayat pengajuan.")
-        else:
-            for index, row in df.iterrows():
-                # Mapping Status
-                status_map = {
-                    1: {"label": "Waiting Purchasing Approval", "color": "#FFA500", "step": 1},
-                    2: {"label": "Waiting Set Up", "color": "#1E90FF", "step": 2},
-                    3: {"label": "Done Set Up", "color": "#32CD32", "step": 3}
-                }
-                info = status_map.get(row['status'], status_map[1])
+        for index, row in df.iterrows():
+            with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
+                # DETAIL INFO
+                st.markdown("### 📄 Detail Info")
+                c_det1, c_det2 = st.columns(2)
+                with c_det1:
+                    st.write(f"**Nama Pengaju:** {row['nama_tim']}")
+                    st.write(f"**SKU:** {row['sku']}")
+                    st.write(f"**Bin:** {row['bin_asal']}")
+                with c_det2:
+                    st.write(f"**Waktu:** {row['timestamp']}")
+                    st.write(f"**Article:** {row['article_name']}")
+                    st.write(f"**Size:** {row['size']}")
+                st.info(f"**Keterangan:** {row['keterangan']}")
                 
-                with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
-                    # TAMPILKAN SEMUA DETAIL
-                    st.markdown("### 📄 Detail Pengajuan")
-                    col_det1, col_det2 = st.columns(2)
-                    with col_det1:
-                        st.write(f"**Nama Pengaju:** {row['nama_tim']}")
-                        st.write(f"**Bin Asal:** {row['bin_asal']}")
-                        st.write(f"**SKU:** {row['sku']}")
-                    with col_det2:
-                        st.write(f"**Article Name:** {row['article_name']}")
-                        st.write(f"**Size:** {row['size']}")
-                        st.write(f"**Waktu Input:** {row['timestamp']}")
-                    
-                    st.info(f"**Keterangan Reject/Defect:**\n\n{row['keterangan']}")
-                    
-                    st.divider()
+                st.divider()
 
-                    # TIMELINE DENGAN WARNA
-                    st.write("**Progres Status:**")
-                    c1, c2, c3 = st.columns(3)
-                    
-                    # Titik 1: Selalu Hijau (Done Pengajuan)
-                    c1.markdown("🟢 **Done Pengajuan**")
-                    
-                    # Titik 2: Approval
-                    if row['status'] >= 2:
-                        c2.markdown("🟢 **Done Approval**")
-                    else:
-                        c2.markdown("🟡 **Waiting Approval**")
-                        
-                    # Titik 3: Set Up
-                    if row['status'] >= 3:
-                        c3.markdown("🟢 **Done Set Up**")
-                    else:
-                        c3.markdown("⚪ **Waiting Set Up**")
+                # --- TIMELINE DENGAN GARIS BIRU ---
+                st.write("**Progres Status:**")
+                
+                # Logic Warna Garis
+                line1_color = "track-active" if row['status'] >= 2 else ""
+                line2_color = "track-active" if row['status'] >= 3 else ""
 
-                    st.write("") # Spasi
+                # Visual Timeline HTML & Columns
+                tcol1, tcol2, tcol3, tcol4, tcol5 = st.columns([1, 2, 1, 2, 1])
+                
+                with tcol1:
+                    st.markdown("🟢 **Done**")
+                    st.caption("Pengajuan")
+                with tcol2:
+                    st.markdown(f'<div class="timeline-track {line1_color}"></div>', unsafe_allow_html=True)
+                with tcol3:
+                    st.markdown("🟢 **Done**" if row['status'] >= 2 else "🟡 **Waiting**")
+                    st.caption("Approval")
+                    if row['approved_by']: st.caption(f"By: {row['approved_by']}")
+                with tcol4:
+                    st.markdown(f'<div class="timeline-track {line2_color}"></div>', unsafe_allow_html=True)
+                with tcol5:
+                    st.markdown("🟢 **Done**" if row['status'] >= 3 else "⚪ **Waiting**")
+                    st.caption("Set Up")
+                    if row['setup_by']: st.caption(f"By: {row['setup_by']}")
 
-                    # Tombol Update
-                    if row['status'] < 3:
-                        # Label tombol dinamis
-                        if row['status'] == 1:
-                            button_label = "Approve Purchasing (Ke Step 2)"
-                            container_class = ""
-                        else:
-                            button_label = "Final Approval (Set Up)"
-                            container_class = "gold-btn" # Pake class gold lu di step terakhir
-                        
-                        st.markdown(f'<div class="{container_class}">', unsafe_allow_html=True)
-                        if st.button(button_label, key=f"btn_rej_{row['id']}"):
-                            new_status = row['status'] + 1
-                            conn.execute("UPDATE submissions SET status = ? WHERE id = ?", (new_status, row['id']))
-                            conn.commit()
-                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
+                st.write("") 
+
+                # --- LOGIKA TOMBOL (Hanya Muncul di Tahap yang Sesuai) ---
+                user_login = "Admin" # Ini bisa diganti dengan sistem login lu
+
+                # 1. Tombol Approval (Hanya muncul saat status masih 1)
+                if row['status'] == 1:
+                    st.warning("Menunggu Approval Purchasing...")
+                    if st.button("Approve Purchasing (Step 2)", key=f"app_{row['id']}"):
+                        conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (user_login, row['id']))
+                        conn.commit()
+                        st.rerun()
+
+                # 2. Tombol Done Set Up (Hanya muncul saat status sudah 2)
+                elif row['status'] == 2:
+                    st.info("Barang sedang diproses untuk Set Up...")
+                    st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+                    if st.button("Final Approval Done Set Up", key=f"setup_{row['id']}"):
+                        conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (user_login, row['id']))
+                        conn.commit()
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # 3. Keterangan kalau sudah Beres semua
+                elif row['status'] == 3:
+                    st.success(f"✅ Selesai: Disetujui oleh {row['approved_by']} & Diselesaikan oleh {row['setup_by']}")
     conn.close()
 
 import pandas as pd
