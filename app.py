@@ -3270,7 +3270,7 @@ def project_approval_reject():
 
         # Tambahkan Logika Search (SKU, Bin, atau Nama)
         if search_query:
-            query += " AND (sku LIKE ? OR bin_asal LIKE ? OR nama_tim LIKE ?)"
+            query += " AND (sku LIKE ? OR bin_asal LIKE ? OR nama_tim LIKE ? OR article_name LIKE ?)"
             search_val = f"%{search_query}%"
             params.extend([search_val, search_val, search_val])
 
