@@ -3230,23 +3230,38 @@ def project_approval_reject():
         st.subheader("Form Pengajuan Reject/Defect")
         
         # --- CSS KHUSUS TOMBOL SUBMIT (Biar gak polos) ---
+        # --- CSS FINAL: FIX TULISAN BIRU & KONTRAS ---
         st.markdown("""
             <style>
-            div[data-testid="stForm"] button {
-                background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
-                color: white !important;
-                border: 1px solid #3d4156 !important;
-                padding: 0.5rem 1rem !important;
-                font-weight: bold !important;
-                text-transform: uppercase !important;
-                letter-spacing: 1px !important;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
-                transition: all 0.3s ease !important;
+            /* 1. Reset Warna Teks di dalam Expander (Biar Gak Biru) */
+            [data-testid="stMain"] div[data-testid="stExpander"] .stMarkdown p {
+                color: #FFFFFF !important; /* Paksa jadi Putih */
             }
-            div[data-testid="stForm"] button:hover {
-                transform: translateY(-2px) !important;
-                box-shadow: 0 6px 20px rgba(30, 70, 138, 0.5) !important;
-                background: linear-gradient(135deg, #2557ab 0%, #1e468a 100%) !important;
+
+            /* 2. Khusus Judul/Header Expander tetap Putih */
+            [data-testid="stMain"] div[data-testid="stExpander"] summary p {
+                color: #FFFFFF !important;
+                font-weight: bold !important;
+            }
+
+            /* 3. Efek Hover HANYA untuk Header Expander (Teks Detail Aman) */
+            [data-testid="stMain"] div[data-testid="stExpander"] summary:hover p {
+                color: #00bfff !important;
+            }
+
+            /* 4. Fix st.info (Keterangan) agar teks didalamnya Putih atau Abu Terang */
+            div[data-testid="stNotification"] .stMarkdown p {
+                color: #FFFFFF !important;
+            }
+
+            /* 5. Radio Button Text (Tetap Gelap karena Background Putih) */
+            [data-testid="stMain"] div[data-testid="stRadio"] label p {
+                color: #262730 !important;
+            }
+
+            /* 6. Label Keterangan (Yang ada icon pensil) */
+            [data-testid="stMain"] h3, [data-testid="stMain"] b {
+                color: #00bfff !important; /* Biru cuma buat Judul/Label */
             }
             </style>
         """, unsafe_allow_html=True)
