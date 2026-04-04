@@ -3299,20 +3299,20 @@ def project_approval_reject():
                         st.markdown(f'<div class="timeline-line {line1_class}"></div>', unsafe_allow_html=True)
                     
                     with tcol2:
-                        if row['status'] >= 2:
-                            st.markdown("🟢 **Done**")
-                            st.caption("Approval")
-                            if row.get('approved_by'): st.caption(f"✍️ {row['approved_by']}")
-                        else:
-                            st.markdown("🟡 **Waiting**")
-                            st.caption("Approval")
-                            # Input Nama untuk Approval
-                            input_app = st.text_input("Nama Purchasing", key=f"inp_app_{row['id']}", placeholder="Nama...", label_visibility="collapsed")
-                            # Tombol hanya aktif jika nama diisi
-                            if st.button("Approve Step 2", key=f"btn_app_{row['id']}", disabled=not input_app):
-                                conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (input_app, row['id']))
-                                conn.commit()
-                                st.rerun()
+    if row['status'] >= 2:
+        st.markdown("🟢 **Done**")
+        st.caption("Approval")
+        st.caption(f"✍️ {row['approved_by']}")
+    else:
+        st.markdown("🟡 **Waiting**")
+        st.caption("Approval")
+        # Bungkus dalam container agar CSS flexbox bekerja maksimal
+        container = st.container()
+        nama_app = container.text_input("Nama Approval", key=f"inp_app_{row['id']}", placeholder="Isi Nama...", label_visibility="collapsed")
+        if container.button("Approve", key=f"btn_app_{row['id']}", disabled=not nama_app):
+            conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (nama_app, row['id']))
+            conn.commit()
+            st.rerun()
                                 
                     with tline2:
                         st.markdown(f'<div class="timeline-line {line2_class}"></div>', unsafe_allow_html=True)
