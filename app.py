@@ -2980,7 +2980,7 @@ def menu_reject_defect():
                 else:
                     st.info(f"Belum ada data untuk Cabang {cab}")
     else:
-        st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
+        st.warning("Belum ada data yang diupload.")
 
 
 import streamlit as st
