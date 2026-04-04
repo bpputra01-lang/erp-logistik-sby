@@ -3242,10 +3242,29 @@ def project_approval_reject():
                     st.rerun()
 
     with tabs[1]:
-        df = pd.read_sql_query("SELECT * FROM submissions ORDER BY id DESC", conn)
+        # --- TAMBAHAN FILTER STATUS ---
+        st.markdown("### 🔍 Filter Data")
+        filter_status = st.radio(
+            "Pilih Status:",
+            ["Semua", "Waiting Approval", "Waiting Set Up", "Done Set Up"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+
+        # Logika Query berdasarkan Filter
+        if filter_status == "Waiting Approval":
+            query = "SELECT * FROM submissions WHERE status = 1 ORDER BY id DESC"
+        elif filter_status == "Waiting Set Up":
+            query = "SELECT * FROM submissions WHERE status = 2 ORDER BY id DESC"
+        elif filter_status == "Done Set Up":
+            query = "SELECT * FROM submissions WHERE status = 3 ORDER BY id DESC"
+        else:
+            query = "SELECT * FROM submissions ORDER BY id DESC"
+
+        df = pd.read_sql_query(query, conn)
         
         if df.empty:
-            st.info("Belum ada riwayat pengajuan.")
+            st.info(f"Belum ada riwayat pengajuan untuk status: {filter_status}")
         else:
             for index, row in df.iterrows():
                 # SEMUA elemen harus masuk ke dalam expander ini agar tidak double keluar
@@ -3312,11 +3331,11 @@ def project_approval_reject():
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
 
-                    # PESAN SELESAI (Sekarang di dalam expander baris tersebut)
+                    # PESAN SELESAI
                     if row['status'] == 3:
                         st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
 
-                    # TOMBOL HAPUS (Sekarang di dalam expander baris tersebut)
+                    # TOMBOL HAPUS
                     st.write("") 
                     with st.expander("🗑️ Hapus Data"):
                         st.warning("Data yang dihapus tidak dapat dikembalikan!")
