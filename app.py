@@ -2639,21 +2639,12 @@ from datetime import datetime
 from datetime import datetime, timedelta
 
 
-# 1. DATABASE LOGIC (VERSI RESET TOTAL)
+# 1. Database Logic
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
-    # Cek apakah kolom CABANG sudah ada, kalau belum ada kita paksa RESET
-    try:
-        c.execute("SELECT CABANG FROM reject_list LIMIT 1")
-    except sqlite3.OperationalError:
-        # ERROR BERARTI KOLOM CABANG GAK ADA -> HAPUS TABEL LAMA!
-        c.execute("DROP TABLE IF EXISTS reject_list")
-        
     c.execute('''
         CREATE TABLE IF NOT EXISTS reject_list (
-            CABANG TEXT,           
-            BIN_AWAL TEXT,
             BIN TEXT,
             SKU TEXT,
             ARTICLE_NAME TEXT,
@@ -2666,23 +2657,8 @@ def init_db():
     conn.commit()
     conn.close()
 
-# 2. FUNGSI CLEAR ALL (INI YANG LU MINTA - RESET STRUKTUR JUGA)
-def clear_all_data():
-    try:
-        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
-            cursor = conn.cursor()
-            # JANGAN CUMA DELETE ISI, TAPI HAPUS TABELNYA BIAR STRUKTUR BARU MASUK
-            cursor.execute("DROP TABLE IF EXISTS reject_list")
-            conn.commit()
-        
-        # Panggil init_db lagi buat bikin tabel yang fresh dengan kolom CABANG
-        init_db()
-        
-        st.cache_data.clear() 
-        st.success("🔥 DATABASE DI-RESET TOTAL! Struktur sekarang sudah mendukung CABANG.")
-        st.rerun() 
-    except Exception as e:
-        st.error(f"Gagal reset: {e}")
+import sqlite3
+import streamlit as st
 
 # 1. Fungsi Simpan (Append)
 def save_data(df):
@@ -2694,6 +2670,18 @@ def save_data(df):
     except Exception as e:
         st.error(f"Gagal menyimpan data: {e}")
 
+# 2. Fungsi Hapus Semua (Multiple/Clear All)
+def clear_all_data():
+    try:
+        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM reject_list")
+            conn.commit()
+        st.cache_data.clear() # Paksa Streamlit lupakan data lama
+        st.success("Database berhasil dikosongkan!")
+        st.rerun() # Refresh halaman agar tabel langsung kosong
+    except Exception as e:
+        st.error(f"Gagal mengosongkan database: {e}")
 
 # 3. Fungsi Hapus Per Baris (Single Row)
 def delete_single_row(sku, tanggal):
@@ -2846,7 +2834,6 @@ def menu_reject_defect():
     with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            cabang_pilih = st.selectbox("CABANG", ["SURABAYA", "SIDOARJO", "SEMARANG"])
             bin_awal = st.text_input("BIN AWAL")
             bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
             sku = st.text_input("SKU")
@@ -2860,16 +2847,10 @@ def menu_reject_defect():
 
     if btn_submit:
         if sku:
-            # Gunakan import inline dengan alias unik biar gak bentrok sama variabel lokal manapun
-            import datetime as dt_logic
-            
-            # Hitung waktu
-            waktu_obj = dt_logic.datetime.now() + dt_logic.timedelta(hours=7)
-            waktu_sekarang = waktu_obj.strftime("%Y-%m-%d %H:%M:%S")
+            waktu_sekarang = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
             
             new_data = pd.DataFrame([{
-                'CABANG': cabang_pilih,
-                'BIN_AWAL': bin_awal,
+                'BIN_AWAL': bin_awal,  # <--- WAJIB DITAMBAHIN DISINI
                 'BIN': bin_val, 
                 'SKU': sku, 
                 'ARTICLE_NAME': article,
@@ -2878,9 +2859,8 @@ def menu_reject_defect():
                 'KETERANGAN': keterangan,
                 'TANGGAL_INPUT': waktu_sekarang
             }])
-            
             save_data(new_data)
-            st.success(f"✅ Data {sku} Berhasil Disimpan!")
+            st.success(f"Data {sku} dari {bin_awal} berhasil disimpan!")
             st.rerun()
         else:
             st.error("SKU wajib diisi!")
@@ -2939,7 +2919,7 @@ def menu_reject_defect():
             except Exception as e:
                 st.error(f"⚠️ Terjadi Kesalahan: {e}")
 # ==========================================
-    # --- DASHBOARD VISUALISASI (VERSI TAB CABANG) ---
+    # --- DASHBOARD VISUALISASI (NYELIP DISINI) ---
     # ==========================================
     st.divider()
     
@@ -2949,59 +2929,195 @@ def menu_reject_defect():
     conn.close()
 
     if not df_chart.empty:
+        # Header Dashboard dengan gaya JEZ
         st.markdown("""
-            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #D4AF37; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #D4AF37; margin: 0; font-size: 20px; font-weight: 900;">📊 ANALISA DATA PER LOKASI</h3>
+            <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="color: #007BFF; margin: 0; font-size: 20px; font-weight: 900;">📊 CHART DEFECT / REJECT</h3>
             </div>
         """, unsafe_allow_html=True)
-        
-        # 1. LOGIKA TAB CABANG
-        tab1, tab2, tab3 = st.tabs(["📍 SURABAYA", "📍 SIDOARJO", "📍 SEMARANG"])
-        cabang_list = ["SURABAYA", "SIDOARJO", "SEMARANG"]
-        tabs = [tab1, tab2, tab3]
 
-        for i, cab in enumerate(cabang_list):
-            with tabs[i]:
-                # Filter data khusus cabang ini
-                df_cab = df_chart[df_chart['CABANG'] == cab]
+       # --- LOGIKA MEMORY (SESSION STATE) ---
+        # Kita bikin tempat penyimpanan nilai lama di memori browser
+        if 'old_total' not in st.session_state: st.session_state.old_total = 0
+        if 'old_defect' not in st.session_state: st.session_state.old_defect = 0
+        if 'old_reject' not in st.session_state: st.session_state.old_reject = 0
+
+        st.markdown("<br>", unsafe_allow_html=True) 
+        with st.container():
+            m1, m2, m3 = st.columns(3)
+            total_val = len(df_chart)
+            
+            with m1:
+                # 1. Hitung selisih total
+                diff_total = total_val - st.session_state.old_total
+                st.metric(
+                    label="📊 TOTAL REJECT/DEFECT", 
+                    value=f"{total_val} ITEMS", 
+                    delta=f"{diff_total} Items" if diff_total != 0 else "OVERALL"
+                )
+                # Simpan nilai sekarang jadi nilai lama buat update berikutnya
+                st.session_state.old_total = total_val
                 
-                if not df_cab.empty:
-                    # --- METRIK RINGKASAN CABANG ---
-                    m1, m2, m3 = st.columns(3)
-                    total_cab = len(df_cab)
-                    defect_cab = len(df_cab[df_cab['KATEGORI'].str.startswith('D', na=False)])
-                    reject_cab = len(df_cab[df_cab['KATEGORI'].str.startswith('R', na=False)])
-                    
-                    m1.metric(f"TOTAL {cab}", f"{total_cab} ITEMS")
-                    m2.metric("📦 DEFECT (D)", f"{defect_cab}", f"{(defect_cab/total_cab*100):.1f}%")
-                    m3.metric("❌ REJECT (R)", f"{reject_cab}", f"{(reject_cab/total_cab*100):.1f}%")
-                    
-                    # --- GRAFIK CABANG ---
-                    c_left, c_right = st.columns(2)
-                    with c_left:
-                        df_p = df_cab['KATEGORI'].value_counts().reset_index()
-                        df_p.columns = ['KATEGORI', 'TOTAL']
-                        fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4, 
-                                       title=f"Proporsi Defect {cab}")
-                        fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
-                        st.plotly_chart(fig_p, use_container_width=True)
-                        
-                    # --- BAGIAN GRAFIK DI DALAM TAB ---
-                    with c_right:
-                        # Value counts menghasilkan kolom 'index' (atau nama kolom asli) dan 'count'
-                        df_b = df_cab['BIN'].value_counts().reset_index()
-                        
-                        # Biar AMAN, kita paksa kasih nama kolomnya
-                        df_b.columns = ['BIN', 'TOTAL'] 
-                        
-                        fig_b = px.bar(df_b, x='BIN', y='TOTAL', 
-                                    title=f"Sebaran Bin {cab}",
-                                    color_discrete_sequence=['#D4AF37'])
-                        st.plotly_chart(fig_b, use_container_width=True)
-                else:
-                    st.info(f"Belum ada data untuk Cabang {cab}")
+            with m2:
+                defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
+                p_defect = (defect_cnt / total_val * 100) if total_val > 0 else 0
+                
+                # 2. Hitung selisih Defect
+                diff_d = defect_cnt - st.session_state.old_defect
+                st.metric(
+                    label="📦 TOTAL DEFECT (D)", 
+                    value=f"{defect_cnt} ITEMS", 
+                    delta=f"{diff_d} Items ({p_defect:.1f}%)"
+                )
+                st.session_state.old_defect = defect_cnt
+                
+            with m3:
+                reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
+                p_reject = (reject_cnt / total_val * 100) if total_val > 0 else 0
+                
+                # 3. Hitung selisih Reject
+                diff_r = reject_cnt - st.session_state.old_reject
+                st.metric(
+                    label="❌ TOTAL REJECT (R)", 
+                    value=f"{reject_cnt} ITEMS", 
+                    delta=f"{diff_r} Items ({p_reject:.1f}%)"
+                )
+                st.session_state.old_reject = reject_cnt
+
+        # --- ROW 2: GRAFIK (PIE & BAR) ---
+        col_pie, col_bar = st.columns(2)
+        
+        with col_pie:
+            df_p = df_chart['KATEGORI'].value_counts().reset_index()
+            df_p.columns = ['KATEGORI', 'TOTAL']
+            fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4,
+                           title="PERCENTAGE BY CAUSE (D1-R4)", 
+                           color_discrete_sequence=px.colors.qualitative.Bold)
+            fig_p.update_layout(margin=dict(t=50, b=0, l=0, r=0), height=350)
+            st.plotly_chart(fig_p, use_container_width=True)
+
+        # --- INI BAGIAN YANG TADI HILANG (BAR CHART) ---
+        with col_bar:
+            # Hitung data per BIN
+            df_b = df_chart['BIN'].value_counts().reset_index()
+            df_b.columns = ['BIN', 'TOTAL']
+            
+            # --- FIX WARNA TERLALU SOFT ---
+            # Kita ganti gradasi (color='TOTAL') jadi SATU warna solid yang garang
+            fig_b = px.bar(df_b, x='BIN', y='TOTAL', 
+                           title="TOTAL BY LOCATION (BIN)",
+                           color_discrete_sequence=['#D4AF37']) # <--- WARNA GOLD SOLID
+            
+            # Tambahin text di atas batang biar makin jelas angkanya
+            fig_b.update_traces(textposition='outside', text=df_b['TOTAL'])
+            
+            # Rapihin layout
+            fig_b.update_layout(
+                margin=dict(t=50, b=0, l=0, r=0), 
+                height=350,
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)',
+                font_color="white", # <--- Font putih biar kontras
+                coloraxis_showscale=False # Sembunyikan color scale legend
+            )
+            st.plotly_chart(fig_b, use_container_width=True)
+        
+    # --- 4. TAMPILAN DATA & ACTION ---
+    st.divider()
+    st.markdown("""
+        <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+            <h3 style="color: #007BFF; margin: 0; font-size: 20px;">📋 DATABASE REJECT/DEFECT LIST</h3>
+        </div>
+    """, unsafe_allow_html=True)
+
+    conn = sqlite3.connect('inventory_logistik.db')
+    df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
+    conn.close()
+
+    if not df_db.empty:
+        # Hapus Semua
+        with st.popover("🗑️ CLEAR ALL DATA", use_container_width=True):
+            st.warning("Hapus permanen seluruh isi database?")
+            if st.button("YA, KOSONGKAN DATABASE", type="primary"):
+                clear_all_data()
+                st.rerun()
+
+        # Hapus Single Row
+        with st.expander("❌ HAPUS SINGLE DATA"):
+            c1, c2 = st.columns(2)
+            with c1:
+                sel_sku = st.selectbox("Pilih SKU", df_db['SKU'].unique(), key="del_sku")
+            with c2:
+                sel_date = st.selectbox("Pilih Tanggal", df_db[df_db['SKU']==sel_sku]['TANGGAL_INPUT'], key="del_date")
+            
+            if st.button(f"Hapus {sel_sku} Terpilih", use_container_width=True):
+                delete_single_row(sel_sku, sel_date)
+                st.rerun()
+
+        st.dataframe(df_db, use_container_width=True)
     else:
-        st.warning("Belum ada data yang diupload.")
+        st.info("Database kosong.")
+
+# 3. Integrasi ke Main Menu
+def main():
+    st.sidebar.title("LOGISTIC SYSTEM")
+    menu_pilihan = st.sidebar.radio("Navigasi", ["Dashboard", "Reject/Defect List"])
+# ==========================================
+    # --- BAGIAN 4: DASHBOARD VISUALISASI ---
+    # ==========================================
+    st.divider()
+    
+    st.markdown("""
+        <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #D4AF37; border-radius: 5px; margin-bottom: 20px;">
+            <h3 style="color: #D4AF37; margin: 0; font-size: 20px; font-weight: 900;">📊 ANALISA DATA REJECT (WIB)</h3>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Ambil Data
+    conn = sqlite3.connect('inventory_logistik.db')
+    df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
+    conn.close()
+
+    if not df_chart.empty:
+        # Konversi Tanggal agar terbaca Plotly
+        df_chart['TANGGAL_INPUT'] = pd.to_datetime(df_chart['TANGGAL_INPUT'])
+        
+        # Kolom Metrik Ringkasan
+        m1, m2, m3 = st.columns(3)
+        with m1:
+            st.metric("TOTAL REJECT", f"{len(df_chart)} SKU")
+        with m2:
+            major_cnt = len(df_chart[df_chart['KATEGORI'] == 'MAJOR'])
+            st.metric("MAJOR DEFECT", f"{major_cnt}", delta=f"{(major_cnt/len(df_chart)*100):.1f}%", delta_color="inverse")
+        with m3:
+            minor_cnt = len(df_chart[df_chart['KATEGORI'] == 'MINOR'])
+            st.metric("MINOR DEFECT", f"{minor_cnt}", delta=f"{(minor_cnt/len(df_chart)*100):.1f}%")
+
+        st.write("") # Spasi
+
+        # BIKIN DUA CHART SEJAJAR
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            # 1. PIE CHART KATEGORI
+            df_pie = df_chart['KATEGORI'].value_counts().reset_index()
+            df_pie.columns = ['KATEGORI', 'JUMLAH']
+            fig_pie = px.pie(df_pie, values='JUMLAH', names='KATEGORI', 
+                             title="Porsi Defect", hole=0.4,
+                             color_discrete_sequence=['#FF4B4B', '#D4AF37', '#007BFF', '#28a745'])
+            fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+        with col_right:
+            # 2. BAR CHART PER BIN
+            df_bar = df_chart['BIN'].value_counts().reset_index()
+            df_bar.columns = ['BIN', 'JUMLAH']
+            fig_bar = px.bar(df_bar, x='BIN', y='JUMLAH', title="Reject per Lokasi",
+                             color_discrete_sequence=['#D4AF37'])
+            fig_bar.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
+            st.plotly_chart(fig_bar, use_container_width=True)
+    else:
+        st.warning("Input minimal 1 data dulu Bro, baru grafik muncul otomatis.")
 
 
 import streamlit as st
