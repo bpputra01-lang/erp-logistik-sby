@@ -3164,6 +3164,13 @@ def project_approval_reject():
     # --- DATABASE INTERNAL ---
     conn = sqlite3.connect('reject_system.db', check_same_thread=False)
     
+    # --- FIX ERROR: TAMBAH KOLOM JIKA BELUM ADA ---
+    try:
+        conn.execute("ALTER TABLE submissions ADD COLUMN additional_note TEXT")
+        conn.commit()
+    except:
+        pass # Abaikan jika kolom sudah ada
+
     # --- CSS LU (Tetap Utuh) ---
     st.markdown("""
         <style>
@@ -3246,7 +3253,6 @@ def project_approval_reject():
         col_search, col_filter = st.columns([1, 1])
         
         with col_search:
-            # Tambahkan .strip() agar spasi di awal/akhir input tidak merusak pencarian
             search_query = st.text_input("🔍 Cari SKU / Bin / Nama:", placeholder="Ketik di sini...", label_visibility="collapsed").strip()
         
         with col_filter:
@@ -3271,15 +3277,12 @@ def project_approval_reject():
 
         # --- PERBAIKAN LOGIKA SEARCH ---
         if search_query:
-            # Gunakan LOWER() agar tidak sensitif huruf besar/kecil
             query += " AND (LOWER(sku) LIKE LOWER(?) OR LOWER(bin_asal) LIKE LOWER(?) OR LOWER(nama_tim) LIKE LOWER(?) OR LOWER(article_name) LIKE LOWER(?))"
             search_val = f"%{search_query}%"
-            # JUMLAH PARAMETER HARUS PAS (4 Tanda Tanya = 4 Kali search_val)
             params.extend([search_val, search_val, search_val, search_val])
 
         query += " ORDER BY id DESC"
         
-        # Eksekusi Query dengan Parameter untuk Keamanan
         try:
             df = pd.read_sql_query(query, conn, params=params)
         except Exception as e:
@@ -3290,7 +3293,6 @@ def project_approval_reject():
             st.info(f"Data tidak ditemukan.")
         else:
             for index, row in df.iterrows():
-                # SEMUA elemen tetap di dalam expander agar tidak double
                 with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
                     st.markdown("### 📄 Detail Pengajuan")
                     col_det1, col_det2 = st.columns(2)
@@ -3353,12 +3355,11 @@ def project_approval_reject():
                                     conn.commit()
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
+
                     # --- TAMBAHAN: KOLOM ADDITIONAL NOTE ---
                     st.write("---")
-                    # Mengambil note yang sudah ada dari database (jika ada)
-                    current_note = row.get('additional_note', "")
+                    current_note = row.get('additional_note') if row.get('additional_note') is not None else ""
                     
-                    # Kolom input note diletakkan tepat di atas status Selesai
                     new_note = st.text_area(
                         "📝 Additional Note:", 
                         value=current_note, 
@@ -3366,7 +3367,6 @@ def project_approval_reject():
                         key=f"note_{row['id']}"
                     )
                     
-                    # Tombol simpan note (opsional, atau bisa otomatis saat ganti status)
                     if new_note != current_note:
                         if st.button("Simpan Catatan", key=f"save_note_{row['id']}"):
                             conn.execute("UPDATE submissions SET additional_note = ? WHERE id = ?", (new_note, row['id']))
@@ -3374,10 +3374,9 @@ def project_approval_reject():
                             st.success("Catatan berhasil diperbarui!")
                             st.rerun()
 
-                    # PESAN SELESAI (Tulisan Selesai yang lo maksud)
+                    # PESAN SELESAI
                     if row['status'] == 3:
                         st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
-                    
 
                     st.write("") 
                     with st.expander("🗑️ Hapus Data"):
