@@ -3164,7 +3164,7 @@ def project_approval_reject():
     # --- DATABASE INTERNAL ---
     conn = sqlite3.connect('reject_system.db', check_same_thread=False)
     
-    # --- CSS LU (Ditambah sedikit untuk merapikan input timeline) ---
+    # --- CSS LU (Tetap Utuh) ---
     st.markdown("""
         <style>
         .hero-header-custom {
@@ -3187,51 +3187,31 @@ def project_approval_reject():
         }
         input, textarea, div[data-baseweb="select"] span { color: white !important; }
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
-        
-        /* Modifikasi tombol agar pas di dalam kolom timeline */
         div.stButton > button {
             background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
             color: white !important; border-radius: 10px !important;
-            width: 100% !important; height: 40px !important; font-weight: bold !important;
-            border: none !important; font-size: 12px !important;
+            width: 100% !important; height: 50px !important; font-weight: bold !important;
+            border: none !important;
         }
         .gold-btn button {
-            background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%) !important;
+            background-color: #D4AF37 !important;
             color: white !important; border: none !important;
             border-radius: 8px !important; font-weight: bold !important;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
             text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+            transition: all 0.3s ease-in-out;
         }
-        .stTextInput input {
-            height: 30px !important;
-            font-size: 11px !important;
-            text-align: center !important;
+        .gold-btn button:hover {
+            background-color: #FFD700 !important;
+            color: #1a1c27 !important;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
+            transform: translateY(-2px);
         }
         .timeline-line {
             height: 4px; background: #3d4156; margin-top: 15px; border-radius: 2px;
         }
         .line-active {
             background: #1E90FF !important; box-shadow: 0 0 8px rgba(30, 144, 255, 0.6);
-        }
-        /* Memaksa semua elemen di dalam kolom tcol untuk center */
-        [data-testid="column"] {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            text-align: center;
-        }
-    
-        /* Menghilangkan margin bawah default input agar rapat dengan tombol */
-        .stTextInput {
-            width: 100% !important;
-            margin-bottom: -10px !important;
-        }
-
-        /* Memastikan tombol memiliki lebar penuh yang konsisten */
-        div.stButton > button {
-            width: 100% !important;
-            margin-top: 5px !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -3283,21 +3263,17 @@ def project_approval_reject():
                     st.info(f"**Keterangan:**\n{row['keterangan']}")
                     st.divider()
 
-                    # TIMELINE DENGAN GARIS BIRU DAN TOMBOL DI MASING-MASING BULATAN
+                    # TIMELINE DENGAN GARIS BIRU
                     st.write("**Progres Status:**")
                     line1_class = "line-active" if row['status'] >= 2 else ""
                     line2_class = "line-active" if row['status'] >= 3 else ""
 
-                    # Menggunakan proporsi kolom yang lebih pas untuk tombol dan input
-                    tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
-                    
+                    tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1, 2, 1, 2, 1])
                     with tcol1:
                         st.markdown("🟢 **Done**")
                         st.caption("Pengajuan")
-                    
                     with tline1:
                         st.markdown(f'<div class="timeline-line {line1_class}"></div>', unsafe_allow_html=True)
-                    
                     with tcol2:
                         if row['status'] >= 2:
                             st.markdown("🟢 **Done**")
@@ -3306,17 +3282,8 @@ def project_approval_reject():
                         else:
                             st.markdown("🟡 **Waiting**")
                             st.caption("Approval")
-                            # Input Nama untuk Approval
-                            input_app = st.text_input("Nama Purchasing", key=f"inp_app_{row['id']}", placeholder="Nama...", label_visibility="collapsed")
-                            # Tombol hanya aktif jika nama diisi
-                            if st.button("Approve Step 2", key=f"btn_app_{row['id']}", disabled=not input_app):
-                                conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (input_app, row['id']))
-                                conn.commit()
-                                st.rerun()
-                                
                     with tline2:
                         st.markdown(f'<div class="timeline-line {line2_class}"></div>', unsafe_allow_html=True)
-                    
                     with tcol3:
                         if row['status'] >= 3:
                             st.markdown("🟢 **Done**")
@@ -3325,15 +3292,25 @@ def project_approval_reject():
                         else:
                             st.markdown("⚪ **Waiting**")
                             st.caption("Set Up")
-                            # Tombol Set Up muncul jika sudah melewati Approval
-                            if row['status'] == 2:
-                                input_set = st.text_input("Nama Set Up", key=f"inp_set_{row['id']}", placeholder="Nama...", label_visibility="collapsed")
-                                st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-                                if st.button("Final Set Up", key=f"btn_set_{row['id']}", disabled=not input_set):
-                                    conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (input_set, row['id']))
-                                    conn.commit()
-                                    st.rerun()
-                                st.markdown('</div>', unsafe_allow_html=True)
+
+                    st.write("") 
+
+                    # LOGIKA TOMBOL
+                    current_user = "Admin" # Ganti dengan session user lu
+                    if row['status'] == 1:
+                        if st.button("Approve Purchasing (Step 2)", key=f"btn_app_{row['id']}"):
+                            conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (current_user, row['id']))
+                            conn.commit()
+                            st.rerun()
+                    elif row['status'] == 2:
+                        st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+                        if st.button("Final Approval Done Set Up", key=f"btn_set_{row['id']}"):
+                            conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (current_user, row['id']))
+                            conn.commit()
+                            st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    elif row['status'] == 3:
+                        st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
 
     conn.close()
 
