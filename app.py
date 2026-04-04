@@ -2788,18 +2788,16 @@ def menu_reject_defect():
         with r2c3:
             kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
 
-        # BARIS 3 (3 Kolom - INI PERBAIKANNYA)
+       # BARIS 3 (3 Kolom - FIX SEJAJAR)
         r3c1, r3c2, r3c3 = st.columns(3)
         with r3c1:
             article = st.text_input("NAMA BARANG")
         with r3c2:
-            # Keterangan dibuat text_input biar tingginya sama rata dengan yang lain
             keterangan = st.text_input("DETAIL KERUSAKAN (Keterangan)")
         with r3c3:
-            # Kolom kosong untuk menjaga estetika grid atau bisa diisi button nantinya
-            st.write("") 
-            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True) # Spacer
-            btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST")
+            # Trik buat nurunin tombol biar sejajar sama inputan sebelah
+            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+            btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST", use_container_width=True)
 
     if btn_submit:
         if sku:
