@@ -2655,10 +2655,6 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
-
-import sqlite3
-import streamlit as st
-
 # 1. Fungsi Simpan (Append)
 def save_data(df):
     try:
@@ -2846,7 +2842,9 @@ def menu_reject_defect():
 
     if btn_submit:
         if sku:
-            waktu_sekarang = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+            # Panggil lewat alias dt_logic
+            waktu_obj = dt_logic.datetime.now() + dt_logic.timedelta(hours=7)
+            waktu_sekarang = waktu_obj.strftime("%Y-%m-%d %H:%M:%S")
             
             new_data = pd.DataFrame([{
                 'BIN_AWAL': bin_awal,  # <--- WAJIB DITAMBAHIN DISINI
