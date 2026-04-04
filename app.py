@@ -2637,11 +2637,10 @@ import plotly.express as px
 from io import BytesIO
 from datetime import datetime, timedelta
 
-# 1. Database Logic - TETEP ASLI
+# 1. Database Logic - URUTAN KOLOM TETAP ASLI + CABANG DI DEPAN
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
-    # Tambahkan kolom CABANG di awal skema
     c.execute('''
         CREATE TABLE IF NOT EXISTS reject_list (
             CABANG TEXT,
@@ -2667,33 +2666,9 @@ def save_data(df):
     except Exception as e:
         st.error(f"Gagal menyimpan data: {e}")
 
-def clear_all_data():
-    try:
-        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM reject_list")
-            conn.commit()
-        st.cache_data.clear()
-        st.success("Database berhasil dikosongkan!")
-        st.rerun()
-    except Exception as e:
-        st.error(f"Gagal mengosongkan database: {e}")
-
-def delete_single_row(sku, tanggal):
-    try:
-        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM reject_list WHERE SKU = ? AND TANGGAL_INPUT = ?', (sku, tanggal))
-            conn.commit()
-        st.cache_data.clear()
-        st.success(f"SKU {sku} berhasil dihapus!")
-        st.rerun()
-    except Exception as e:
-        st.error(f"Gagal menghapus baris: {e}")
-        
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # --- CSS ASLI LU (Glow Gold & Metric Navy) ---
+    # --- CSS ASLI LU ---
     st.markdown("""
         <style>
         .hero-header { background-color: #007BFF; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 25px; font-weight: bold; font-size: 20px; }
@@ -2708,16 +2683,6 @@ def menu_reject_defect():
             width: 100% !important; height: 48px !important; font-weight: bold !important;
         }
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
-
-        div[data-testid="stVerticalBlock"] > div:last-child button {
-            background-color: #D4AF37 !important; color: white !important; border: none !important; border-radius: 8px !important; font-weight: bold !important;
-            box-shadow: 0 0 5px rgba(255, 215, 0, 0.4), 0 0 10px rgba(255, 215, 0, 0.3);
-            transition: all 0.3s ease-in-out;
-        }
-        div[data-testid="stVerticalBlock"] > div:last-child button:hover {
-            background-color: #FFD700 !important; color: #1a1c27 !important; transform: scale(1.02);
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
-        }
         [data-testid="stMetric"] {
             background-color: #1a1c27 !important; border: 1px solid #3d4156 !important; padding: 20px !important; border-radius: 12px !important;
             min-height: 160px !important; display: flex !important; flex-direction: column !important; justify-content: center !important;
@@ -2727,26 +2692,23 @@ def menu_reject_defect():
     
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
     
-    with st.expander("📋 Informasi Format File"):
-        st.info("Input Single/Mass Item Defect/Reject sesuai ketentuan operasional.")
-
     init_db()
 
-    # --- 2. FORM INPUT MANUAL (2 KOLOM ASLI) ---
+    # --- FORM INPUT (GRID 2 KOLOM + KOLOM CABANG) ---
     with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            cabang_pilih = st.selectbox("CABANG", ["SURABAYA", "SEMARANG", "SIDOARJO"])
+            cabang_pilih = st.selectbox("CABANG", ["SURABAYA", "SIDOARJO", "SEMARANG"])
             bin_awal = st.text_input("BIN AWAL")
             bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
             sku = st.text_input("SKU")
-            article = st.text_input("NAMA BARANG")
         with col2:
+            article = st.text_input("NAMA BARANG")
             size = st.text_input("SIZE")
             kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
             keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
 
-        btn_submit = st.form_submit_button("📤UPLOAD SINGLE LIST")
+        btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST")
 
     if btn_submit:
         if sku:
@@ -2763,72 +2725,52 @@ def menu_reject_defect():
                 'TANGGAL_INPUT': waktu_sekarang
             }])
             save_data(new_data)
-            st.success(f"Data {sku} ({cabang_pilih}) Berhasil!")
+            st.success(f"Data {sku} Berhasil Disimpan ke {cabang_pilih}!")
             st.rerun()
 
-    # --- 3. MULTIPLE UPLOAD (UTUH) ---
-    st.divider()
-    st.markdown('<h3 style="color: #007BFF;">📁 MULTIPLE UPLOAD LIST</h3>', unsafe_allow_html=True)
-    col_dl, col_up = st.columns([1, 2])
-    with col_dl:
-        template_cols = ['CABANG', 'BIN_AWAL', 'BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
-        df_template = pd.DataFrame(columns=template_cols)
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df_template.to_excel(writer, index=False)
-        st.download_button("📥 Download Template", output.getvalue(), "template_reject.xlsx")
-
-    with col_up:
-        uploaded_file = st.file_uploader("Upload File Excel", type=['xlsx'])
-        if uploaded_file:
-            df_upload = pd.read_excel(uploaded_file)
-            if st.button("⤴️ EXPORT MULTIPLE DATA TO DATABASE"):
-                df_upload['TANGGAL_INPUT'] = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
-                save_data(df_upload)
-                st.success("Import Berhasil!")
-                st.rerun()
-
-    # --- 4. DASHBOARD VISUALISASI (LOGIC LAMA + CABANG) ---
+    # --- 4. DASHBOARD VISUALISASI PER CABANG (SESUAI GAMBAR) ---
     st.divider()
     conn = sqlite3.connect('inventory_logistik.db')
     df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
     conn.close()
 
     if not df_chart.empty:
-        st.markdown('<h3 style="color: #007BFF;">📊 DASHBOARD ANALISA</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 style="color: #007BFF;">📊 ANALISA DATA PER CABANG</h3>', unsafe_allow_html=True)
         
-        # Grafik Per Cabang
-        fig_cab = px.bar(df_chart['CABANG'].value_counts().reset_index(), x='CABANG', y='count', title="TOTAL REJECT PER CABANG", color_discrete_sequence=['#D4AF37'])
-        st.plotly_chart(fig_cab, use_container_width=True)
+        # Bikin Tab per Cabang biar grafiknya terpisah sesuai gambar lu
+        tab1, tab2, tab3 = st.tabs(["📍 SURABAYA", "📍 SIDOARJO", "📍 SEMARANG"])
+        
+        cabang_list = ["SURABAYA", "SIDOARJO", "SEMARANG"]
+        tabs = [tab1, tab2, tab3]
 
-        # Row Metrik Lu
-        m1, m2, m3 = st.columns(3)
-        m1.metric("TOTAL ITEMS", f"{len(df_chart)} SKU")
-        m2.metric("DEFECT (D)", len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)]))
-        m3.metric("REJECT (R)", len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)]))
+        for i, cab in enumerate(cabang_list):
+            with tabs[i]:
+                df_cab = df_chart[df_chart['CABANG'] == cab]
+                if not df_cab.empty:
+                    m1, m2 = st.columns(2)
+                    m1.metric(f"TOTAL {cab}", f"{len(df_cab)} ITEMS")
+                    m2.metric("MAJOR/MINOR", f"{len(df_cab[df_cab['KATEGORI'].str.startswith('R')])} R / {len(df_cab[df_cab['KATEGORI'].str.startswith('D')])} D")
+                    
+                    c_left, c_right = st.columns(2)
+                    with c_left:
+                        fig_p = px.pie(df_cab, names='KATEGORI', title=f"PORSI DEFECT {cab}", hole=0.4)
+                        st.plotly_chart(fig_p, use_container_width=True)
+                    with c_right:
+                        fig_b = px.bar(df_cab['BIN'].value_counts().reset_index(), x='BIN', y='count', title=f"LOKASI BIN {cab}", color_discrete_sequence=['#D4AF37'])
+                        st.plotly_chart(fig_b, use_container_width=True)
+                else:
+                    st.info(f"Belum ada data untuk cabang {cab}")
 
-        # Row Grafik Pie & Bar Bin Lu
-        col_pie, col_bar = st.columns(2)
-        with col_pie:
-            fig_p = px.pie(df_chart, names='KATEGORI', title="PERCENTAGE BY CAUSE", hole=0.4)
-            st.plotly_chart(fig_p, use_container_width=True)
-        with col_bar:
-            fig_b = px.bar(df_chart['BIN'].value_counts().reset_index(), x='BIN', y='count', title="TOTAL BY LOCATION (BIN)", color_discrete_sequence=['#007BFF'])
-            st.plotly_chart(fig_b, use_container_width=True)
+        # Tabel Database di bawah
+        st.divider()
+        st.markdown('### 📋 DATABASE HISTORY')
+        st.dataframe(df_chart.sort_values(by='TANGGAL_INPUT', ascending=False), use_container_width=True)
     else:
         st.info("Database kosong. Input data dulu buat munculin grafik.")
 
-    # --- 5. DATABASE VIEW & ACTION (UTUH) ---
-    st.divider()
-    conn = sqlite3.connect('inventory_logistik.db')
-    df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
-    conn.close()
-
-    if not df_db.empty:
-        with st.popover("🗑️ CLEAR ALL DATA"):
-            if st.button("YA, KOSONGKAN DATABASE"): clear_all_data()
-        st.dataframe(df_db, use_container_width=True)
-
+def main():
+    st.set_page_config(layout="wide", page_title="REJECT SYSTEM JEZ")
+    menu_reject_defect()
 
 
 import streamlit as st
