@@ -3159,7 +3159,7 @@ def get_status_info(status_code):
 # --- UI STREAMLIT ---
 st.set_page_config(page_title="Reject & Defect Gateway", layout="wide")
 # --- SEMUA CSS LU GUE TARO SINI, JANGAN ADA YANG KETINGGALAN ---
-    st.markdown("""
+st.markdown("""
         <style>
         /* 1. Header Hero */
         .hero-header-custom {
