@@ -3228,6 +3228,29 @@ def project_approval_reject():
 
     with tabs[0]:
         st.subheader("Form Pengajuan Reject/Defect")
+        
+        # --- CSS KHUSUS TOMBOL SUBMIT (Biar gak polos) ---
+        st.markdown("""
+            <style>
+            div[data-testid="stForm"] button {
+                background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
+                color: white !important;
+                border: 1px solid #3d4156 !important;
+                padding: 0.5rem 1rem !important;
+                font-weight: bold !important;
+                text-transform: uppercase !important;
+                letter-spacing: 1px !important;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+                transition: all 0.3s ease !important;
+            }
+            div[data-testid="stForm"] button:hover {
+                transform: translateY(-2px) !important;
+                box-shadow: 0 6px 20px rgba(30, 70, 138, 0.5) !important;
+                background: linear-gradient(135deg, #2557ab 0%, #1e468a 100%) !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         with st.form("input_form_reject", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
@@ -3239,15 +3262,11 @@ def project_approval_reject():
                 size = st.text_input("Size")
                 keterangan = st.text_area("Keterangan Reject/Defect")
             
-            # --- TOMBOL KIRIM DENGAN STYLE GOLD ---
-            st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-            submit_button = st.form_submit_button("▶️SUBMIT REQUEST")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            if submit_button:
+            # Gunakan st.form_submit_button asli, CSS di atas yang akan merubah warnanya
+            if st.form_submit_button("▶️ SUBMIT REQUEST"):
                 if nama and sku:
-                    # FIX JAM: Menggunakan WIB (UTC+7) agar sesuai jam sekarang di Indonesia
-                    # Pastikan lo sudah 'from datetime import datetime, timedelta' di bagian atas script
+                    # FIX JAM: Menggunakan WIB (UTC+7)
+                    # Pastikan di paling atas kode sudah ada: from datetime import datetime, timedelta
                     tz_wib = timedelta(hours=7)
                     ts = (datetime.now() + tz_wib).strftime("%Y-%m-%d %H:%M:%S")
                     
@@ -3257,12 +3276,12 @@ def project_approval_reject():
                             (ts, nama, bin_asal, sku, article, size, keterangan, 1)
                         )
                         conn.commit()
-                        st.success(f"✅ Pengajuan Berhasil Disimpan pada {ts} WIB!")
+                        st.success(f"✅ Berhasil! Data tercatat jam {ts} WIB")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Gagal simpan ke database: {e}")
                 else:
-                    st.warning("⚠️ Nama Tim dan SKU wajib diisi, Bos!")
+                    st.warning("⚠️ Nama Tim dan SKU wajib diisi!")
 
     with tabs[1]:
         # --- FITUR SEARCH & FILTER ---
