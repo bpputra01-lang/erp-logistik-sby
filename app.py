@@ -2692,108 +2692,76 @@ def clear_all_data():
 
 # 2. UI Menu Reject/Defect List 
 def menu_reject_defect(): 
-    # --- 1. CSS ULTIMATE (GLOW GOLD & NAVY) --- 
-    st.markdown(""" 
-        <style> 
-        /* --- HEADER UTAMA --- */
-        .hero-header { 
-            background-color: #007BFF; 
-            color: white; 
-            padding: 12px; 
-            border-radius: 8px; 
-            text-align: center; 
-            margin-bottom: 25px; 
-            font-weight: bold; 
-            font-size: 20px; 
+    # --- CSS & HEADER (SIDEBAR TETAP AMAN / DEFAULT) ---
+    st.markdown("""
+        <style>
+        /* 1. Header Utama */
+        .hero-header {
+            background-color: #007BFF;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 20px;
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
-        } 
-
-        /* --- INPUT FIELDS & SELECTBOX (NAVY STYLE) --- */
-        [data-testid="stForm"] { border: none !important; padding: 0 !important; } 
-        
-        div[data-testid="stTextInput"] > div > div,  
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stSelectbox"] > div > div { 
-            background-color: #1a1c27 !important; 
-            border: 1px solid #3d4156 !important; 
-            border-radius: 6px !important; 
-        } 
-        
-        input, textarea, div[data-baseweb="select"] > div { 
-            background-color: transparent !important; 
-            color: white !important; 
-        } 
-        
-        label { color: #E0E0E0 !important; font-weight: 600 !important; } 
-
-        /* --- 2. TOMBOL SUBMIT FORM (BIRU GLOW) --- */
-        button[kind="primaryFormSubmit"] { 
-            background-color: #007BFF !important; 
-            color: white !important; 
-            border-radius: 8px !important; 
-            width: 100% !important; 
-            height: 48px !important; 
-            font-weight: bold !important; 
-            border: none !important;
-            box-shadow: 0 0 10px rgba(0, 123, 255, 0.4) !important;
-            transition: all 0.3s ease;
-        } 
-        button[kind="primaryFormSubmit"]:hover {
-            background-color: #0056b3 !important;
-            box-shadow: 0 0 20px rgba(0, 123, 255, 0.7) !important;
-            transform: scale(1.01);
         }
 
-        /* --- 3. TOMBOL ACTION (GOLD MENYALA ULTIMATE) --- */
-        /* Target: Download, Import, Delete Single, & Kosongkan Database */
-        div.stDownloadButton > button,
-        div.stButton > button:not([kind="primaryFormSubmit"]) { 
-            background-color: #D4AF37 !important; 
-            color: white !important; 
-            border: 1px solid #FFD700 !important; 
-            border-radius: 8px !important; 
-            font-weight: bold !important; 
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5); 
-            box-shadow: 0 0 5px rgba(255, 215, 0, 0.3), 0 0 10px rgba(255, 215, 0, 0.2); 
-            transition: all 0.3s ease-in-out; 
-        } 
-
-        div.stDownloadButton > button:hover,
-        div.stButton > button:not([kind="primaryFormSubmit"]):hover { 
-            background-color: #FFD700 !important; 
-            color: #1a1c27 !important; 
-            transform: translateY(-2px) scale(1.02); 
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 215, 0, 0.4); 
-            text-shadow: none; 
-        } 
-
-        /* --- 4. GRAFIK & DASHBOARD --- */
-        div.stPlotlyChart { 
-            border: 1px solid #3d4156 !important; 
-            border-radius: 12px !important; 
-            padding: 10px;
+        /* 2. Kunci Styling Cuma di MAIN CONTENT (Bukan Sidebar) */
+        [data-testid="stMain"] div[data-testid="stTextInput"] > div > div, 
+        [data-testid="stMain"] div[data-testid="stTextArea"] > div > div,
+        [data-testid="stMain"] div[data-testid="stSelectbox"] > div > div {
             background-color: #1a1c27 !important;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important; 
-        } 
+            border: 1px solid #3d4156 !important;
+            border-radius: 6px !important;
+        }
+        
+        [data-testid="stMain"] input, 
+        [data-testid="stMain"] textarea, 
+        [data-testid="stMain"] div[data-baseweb="select"] > div { 
+            color: white !important; 
+        }
 
-        /* --- 5. METRIC BOX (RATA SEMUA) --- */
-        [data-testid="stMetric"] { 
-            background-color: #1a1c27 !important; 
-            border: 1px solid #3d4156 !important; 
-            padding: 20px !important; 
-            border-radius: 12px !important; 
-            min-height: 160px !important;  
-            display: flex !important; 
-            flex-direction: column !important; 
-            justify-content: center !important; 
-        } 
+        /* 3. TOMBOL SUBMIT FORM DI MAIN CONTENT (BIRU) */
+        [data-testid="stMain"] button[kind="primaryFormSubmit"] {
+            background-color: #007BFF !important;
+            color: white !important;
+            border-radius: 8px !important;
+            width: 100% !important;
+            height: 48px !important;
+            font-weight: bold !important;
+            border: none !important;
+            box-shadow: 0 0 10px rgba(0, 123, 255, 0.4) !important;
+        }
 
-        [data-testid="stMetricValue"] > div { 
-            font-size: 32px !important; 
-            font-weight: 900 !important; 
-            color: #FFD700 !important; /* Angka Metric Jadi Gold Agar Sangar */
-        } 
-        </style> 
+        /* 4. TOMBOL ACTION DI MAIN CONTENT (GOLD) */
+        [data-testid="stMain"] div.stDownloadButton > button,
+        [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]) {
+            background-color: #D4AF37 !important;
+            color: white !important;
+            border: 1px solid #FFD700 !important;
+            border-radius: 8px !important;
+            font-weight: bold !important;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.4) !important;
+            transition: all 0.3s ease-in-out !important;
+        }
+
+        [data-testid="stMain"] div.stDownloadButton > button:hover,
+        [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]):hover {
+            background-color: #FFD700 !important;
+            color: #1a1c27 !important;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+        }
+
+        /* 5. Metric Box (Cuma di Main) */
+        [data-testid="stMain"] [data-testid="stMetric"] {
+            background-color: #1a1c27 !important;
+            border: 1px solid #3d4156 !important;
+            padding: 20px !important;
+            border-radius: 12px !important;
+        }
+        </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
