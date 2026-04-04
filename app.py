@@ -2980,7 +2980,7 @@ def menu_reject_defect():
                 else:
                     st.info(f"Belum ada data untuk Cabang {cab}")
     else:
-        st.warning("Belum ada data yang.")
+        st.warning("Belum ada data yang diupload.")
 
 
 import streamlit as st
