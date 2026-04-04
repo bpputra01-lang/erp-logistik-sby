@@ -2756,8 +2756,6 @@ def menu_reject_defect():
 
     # --- PEMBAGIAN TAB ---
     tab_input, tab_dashboard = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
-
-    with tab_input:
         with st.expander("📋 Informasi Format File & Prosedur"):
             st.info("""
             **Input Single Item Defect/Reject:**
