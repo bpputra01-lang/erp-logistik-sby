@@ -2637,7 +2637,7 @@ import plotly.express as px
 from io import BytesIO
 import datetime as dt_logic
 
-# 1. DATABASE LOGIC (Tetap Aman dengan ALTER TABLE)
+# 1. DATABASE LOGIC
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
@@ -2650,137 +2650,88 @@ def init_db():
             SIZE TEXT,
             KATEGORI TEXT,
             KETERANGAN TEXT,
-            TANGGAL_INPUT DATETIME DEFAULT CURRENT_TIMESTAMP
+            TANGGAL_INPUT TEXT,
+            CABANG TEXT
         )
     ''')
-    
-    # Check & Add Column CABANG
+    # Update kolom CABANG kalau belum ada
     c.execute("PRAGMA table_info(reject_list)")
     columns = [column[1] for column in c.fetchall()]
     if 'CABANG' not in columns:
-        try:
-            c.execute('ALTER TABLE reject_list ADD COLUMN CABANG TEXT')
-            conn.commit()
-            st.success("✅ Database Updated: Fitur 3 Cabang Aktif!")
-        except: pass
+        c.execute('ALTER TABLE reject_list ADD COLUMN CABANG TEXT')
+        conn.commit()
     conn.close()
 
-# Inisialisasi awal
 init_db()
 
-# 2. FUNGSI HELPER
+# 2. FUNGSI ACTION (SAVE, DELETE SINGLE, CLEAR ALL)
 def save_data(df):
-    try:
-        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
-            df.to_sql('reject_list', conn, if_exists='append', index=False)
-            conn.commit()
-        st.cache_data.clear() 
-    except Exception as e:
-        st.error(f"Gagal menyimpan data: {e}")
+    with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
+        df.to_sql('reject_list', conn, if_exists='append', index=False)
+        conn.commit()
+    st.cache_data.clear()
+
+def delete_single_row(sku, tanggal):
+    with sqlite3.connect('inventory_logistik.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM reject_list WHERE SKU = ? AND TANGGAL_INPUT = ?', (sku, tanggal))
+        conn.commit()
+    st.cache_data.clear()
+    st.rerun()
 
 def clear_all_data():
-    try:
-        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM reject_list")
-            conn.commit()
-        st.cache_data.clear()
-        st.success("Database berhasil dikosongkan!")
-        st.rerun()
-    except Exception as e:
-        st.error(f"Gagal mengosongkan database: {e}")
+    with sqlite3.connect('inventory_logistik.db') as conn:
+        conn.cursor().execute("DELETE FROM reject_list")
+        conn.commit()
+    st.cache_data.clear()
+    st.rerun()
 
 # 3. UI MENU REJECT/DEFECT
 def menu_reject_defect():
-    # --- CSS & HEADER (Glow Gold & Navy Styling Lu Balik Semua!) ---
+    # --- CSS ASLI LU (GLOW GOLD & NAVY ULTIMATE) ---
     st.markdown("""
         <style>
-        .hero-header {
-            background-color: #007BFF;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            margin-bottom: 25px;
-            font-weight: bold;
-            font-size: 20px;
-        }
+        .hero-header { background-color: #007BFF; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 25px; font-weight: bold; font-size: 20px; }
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            border-radius: 6px !important;
-            color: white !important;
+        div[data-testid="stTextInput"] > div > div, div[data-testid="stTextArea"] > div > div {
+            background-color: #1a1c27 !important; border: 1px solid #3d4156 !important; border-radius: 6px !important; color: white !important;
         }
         input, textarea { background-color: transparent !important; border: none !important; color: white !important; }
-        div.stButton > button {
-            background-color: #007BFF !important;
-            color: white !important;
-            border-radius: 8px !important;
-            width: 100% !important;
-            height: 48px !important;
-            font-weight: bold !important;
-        }
+        div.stButton > button { background-color: #007BFF !important; color: white !important; border-radius: 8px !important; width: 100% !important; height: 48px !important; font-weight: bold !important; }
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
 
-        /* Styling tombol hapus - GOLD MENYALA ULTIMATE */
-        .stButton button[kind="primary"], .stButton button:contains("KOSONGKAN") {
-            background-color: #D4AF37 !important;
-            color: white !important;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+        /* CSS TOMBOL DELETE SINGLE & CLEAR ALL - GOLD MENYALA ULTIMATE */
+        button[key^="del_"], .stButton button:contains("KOSONGKAN") {
+            background-color: #D4AF37 !important; color: white !important; border: none !important; border-radius: 8px !important; font-weight: bold !important;
+            box-shadow: 0 0 5px rgba(255, 215, 0, 0.4), 0 0 10px rgba(255, 215, 0, 0.3);
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
             transition: all 0.3s ease-in-out;
         }
-        .stButton button:contains("KOSONGKAN"):hover {
-            background-color: #FFD700 !important;
-            transform: scale(1.02);
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+        button[key^="del_"]:hover, .stButton button:contains("KOSONGKAN"):hover {
+            background-color: #FFD700 !important; color: #1a1c27 !important; transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 215, 0, 0.4);
         }
 
-        /* Metric Box Rata */
-        [data-testid="stMetric"] {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            padding: 20px !important;
-            border-radius: 12px !important;
-            min-height: 160px !important; 
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
-        }
+        /* Metric Box Navy */
+        [data-testid="stMetric"] { background-color: #1a1c27 !important; border: 1px solid #3d4156 !important; padding: 20px !important; border-radius: 12px !important; min-height: 160px !important; }
         [data-testid="stMetricValue"] > div { font-size: 32px !important; font-weight: 900 !important; color: #ffffff !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - 3 CABANG</div>', unsafe_allow_html=True)
 
-    # --- PEMBAGIAN TAB ---
     tab_input, tab_dashboard = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
 
     with tab_input:
-        with st.expander("📋 Informasi Format File & Prosedur"):
+        with st.expander("📋 Informasi Format File"):
             st.info("""
-            **Input Single Item Defect/Reject:**
-            - **LOKASI**: Pilih Cabang (Surabaya, Sidoarjo, Semarang)
-            - **BIN AWAL**: Isi dengan Bin Awal item tersimpan
-            - **BIN TUJUAN**: Pilih lokasi tujuan sesuai dropdown
-            - **SKU**: Tulis SKU lengkap secara Manual
-            - **NAMA BARANG**: Ambil dari Article Name di file Multiple Adjustment
-            - **SIZE**: Tulis ukurannya berdasarkan SKU
-            - **KATEGORI**: Pilih kategori kerusakan (D1-D4 / R1-R4)
-            - **DETAIL**: Isi keterangan kondisi barang secara detail
-            
-            **Input Mass Item:**
-            - Gunakan template terbaru (v2) yang memiliki kolom **CABANG**
-            - Jangan ubah header atau nama sheet
-            - Upload file Excel melalui uploader di bawah
+            **Input Single:** Pilih Cabang -> Isi Form -> Upload.
+            **Input Massal:** Download Template v2 -> Isi kolom CABANG, SKU, dll -> Upload.
+            **Delete Single:** Cek di Tab Dashboard untuk hapus per baris.
             """)
 
-        # --- FORM INPUT ---
         with st.form("form_reject", clear_on_submit=True):
-            # DROPDOWN CABANG (Ganti dari st.radio ke st.selectbox)
             cabang_input = st.selectbox("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"])
-            
             col1, col2 = st.columns(2)
             with col1:
                 bin_awal = st.text_input("BIN AWAL")
@@ -2790,85 +2741,58 @@ def menu_reject_defect():
             with col2:
                 size = st.text_input("SIZE")
                 kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
-                keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
-
+                keterangan = st.text_area("DETAIL KERUSAKAN")
             btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST")
 
         if btn_submit and sku:
-            waktu_sekarang = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
-            new_data = pd.DataFrame([{
-                'CABANG': cabang_input, 'BIN_AWAL': bin_awal, 'BIN': bin_val, 'SKU': sku, 
-                'ARTICLE_NAME': article, 'SIZE': size, 'KATEGORI': kategori, 
-                'KETERANGAN': keterangan, 'TANGGAL_INPUT': waktu_sekarang
-            }])
-            save_data(new_data)
-            st.success(f"✅ Data {sku} [{cabang_input}] Berhasil Disimpan!")
-            st.rerun()
+            jam = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+            save_data(pd.DataFrame([{'CABANG': cabang_input, 'BIN_AWAL': bin_awal, 'BIN': bin_val, 'SKU': sku, 'ARTICLE_NAME': article, 'SIZE': size, 'KATEGORI': kategori, 'KETERANGAN': keterangan, 'TANGGAL_INPUT': jam}]))
+            st.success(f"✅ SKU {sku} Tersimpan!"); st.rerun()
 
-        # --- MASS UPLOAD ---
         st.divider()
-        col_dl, col_up = st.columns([1, 2])
-        with col_dl:
+        c_dl, c_up = st.columns([1, 2])
+        with c_dl:
             template_cols = ['CABANG', 'BIN_AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
-            df_template = pd.DataFrame(columns=template_cols)
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_template.to_excel(writer, index=False)
-            st.download_button("📥 Download Template v2", output.getvalue(), "template_reject_cabang.xlsx")
-
-        with col_up:
-            uploaded_file = st.file_uploader("Upload Excel Massal", type=['xlsx'])
-            if uploaded_file:
-                try:
-                    df_upload = pd.read_excel(uploaded_file)
-                    if 'CABANG' in df_upload.columns and 'SKU' in df_upload.columns:
-                        if st.button("⤴️ IMPORT DATA KE DATABASE"):
-                            df_upload['TANGGAL_INPUT'] = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
-                            save_data(df_upload)
-                            st.success("✅ Import Massal Berhasil!")
-                            st.rerun()
-                    else: st.error("❌ Gunakan template v2 (Pastikan ada kolom CABANG)")
-                except Exception as e: st.error(f"⚠️ Error: {e}")
+            out = BytesIO()
+            with pd.ExcelWriter(out, engine='xlsxwriter') as writer:
+                pd.DataFrame(columns=template_cols).to_excel(writer, index=False)
+            st.download_button("📥 Download Template v2", out.getvalue(), "template_reject_3cabang.xlsx")
+        with c_up:
+            up_file = st.file_uploader("Upload Excel", type=['xlsx'])
+            if up_file:
+                df_up = pd.read_excel(up_file)
+                if 'CABANG' in df_up.columns and st.button("⤴️ IMPORT SEKARANG"):
+                    df_up['TANGGAL_INPUT'] = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+                    save_data(df_up); st.success("✅ Import Berhasil!"); st.rerun()
 
     with tab_dashboard:
         conn = sqlite3.connect('inventory_logistik.db')
-        df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
+        df = pd.read_sql_query("SELECT * FROM reject_list", conn)
         conn.close()
 
-        if not df_chart.empty:
-            st.markdown("### 🔍 FILTER & SUMMARY")
-            filter_cabang = st.selectbox("PILIH TAMPILAN CABANG:", ["SEMUA CABANG", "SURABAYA", "SIDOARJO", "SEMARANG"])
-            
-            df_final = df_chart.copy() if filter_cabang == "SEMUA CABANG" else df_chart[df_chart['CABANG'] == filter_cabang]
+        if not df.empty:
+            sel_cabang = st.selectbox("FILTER CABANG:", ["SEMUA CABANG", "SURABAYA", "SIDOARJO", "SEMARANG"])
+            df_f = df.copy() if sel_cabang == "SEMUA CABANG" else df[df['CABANG'] == sel_cabang]
 
-            # Metrics
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("TOTAL ITEMS", f"{len(df_final)} SKU")
-            m2.metric("SBY", len(df_chart[df_chart['CABANG'] == 'SURABAYA']))
-            m3.metric("SDA", len(df_chart[df_chart['CABANG'] == 'SIDOARJO']))
-            m4.metric("SMG", len(df_chart[df_chart['CABANG'] == 'SEMARANG']))
+            m1.metric("TOTAL SKU", len(df_f))
+            m2.metric("SBY", len(df[df['CABANG']=='SURABAYA']))
+            m3.metric("SDA", len(df[df['CABANG']=='SIDOARJO']))
+            m4.metric("SMG", len(df[df['CABANG']=='SEMARANG']))
 
-            # Charts
-            c1, c2 = st.columns(2)
-            with c1:
-                fig_p = px.pie(df_final, names='KATEGORI', hole=0.4, title=f"Proporsi Kerusakan ({filter_cabang})", color_discrete_sequence=px.colors.qualitative.Bold)
-                fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
-                st.plotly_chart(fig_p, use_container_width=True)
-            with c2:
-                df_b = df_chart['CABANG'].value_counts().reset_index()
-                df_b.columns = ['CABANG', 'TOTAL']
-                fig_b = px.bar(df_b, x='CABANG', y='TOTAL', title="Sebaran Per Cabang", color='CABANG', color_discrete_map={'SURABAYA':'#007BFF', 'SIDOARJO':'#D4AF37', 'SEMARANG':'#28A745'})
-                fig_b.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
-                st.plotly_chart(fig_b, use_container_width=True)
+            # DATA TABLE DENGAN TOMBOL HAPUS SINGLE
+            st.write("### 📋 DETAIL DATABASE & ACTION")
+            for i, row in df_f.sort_values('TANGGAL_INPUT', ascending=False).iterrows():
+                with st.expander(f"Row: {row['SKU']} - {row['CABANG']} ({row['TANGGAL_INPUT']})"):
+                    st.write(row)
+                    if st.button(f"🗑️ Hapus SKU {row['SKU']}", key=f"del_{i}"):
+                        delete_single_row(row['SKU'], row['TANGGAL_INPUT'])
 
-            # Table
-            st.write("### 📋 DETAIL DATABASE")
-            st.dataframe(df_final.sort_values('TANGGAL_INPUT', ascending=False), use_container_width=True)
-            
-            if st.button("🗑️ KOSONGKAN DATABASE"):
+            if st.button("🚨 KOSONGKAN SEMUA DATABASE"):
                 clear_all_data()
         else:
-            st.info("💡 Belum ada data. Silakan input di Tab ENTRY DATA!")
+            st.info("Belum ada data.")
+
 
 
 
