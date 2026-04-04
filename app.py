@@ -3139,12 +3139,10 @@ def init_db():
             article_name TEXT,
             size TEXT,
             keterangan TEXT,
-            status INTEGER DEFAULT 1,
-            approved_by TEXT,
-            setup_by TEXT
+            status INTEGER DEFAULT 1
         )
     ''')
-    # Patch kolom jika belum ada (antisipasi database lama)
+    # Patch kolom jika belum ada
     try: c.execute("ALTER TABLE submissions ADD COLUMN approved_by TEXT")
     except: pass
     try: c.execute("ALTER TABLE submissions ADD COLUMN setup_by TEXT")
@@ -3165,24 +3163,18 @@ def project_approval_reject():
             margin-bottom: 25px; font-weight: 800; font-size: 22px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
         }
-        /* Style Tombol agar pas di kolom */
+        /* Tombol dikecilkan dikit biar pas di kolom timeline */
         div.stButton > button {
             width: 100% !important;
-            font-size: 13px !important;
-            height: 38px !important;
-            border-radius: 8px !important;
+            font-size: 12px !important;
+            height: 35px !important;
+            padding: 0px !important;
         }
         .gold-btn button {
             background-color: #D4AF37 !important;
             color: white !important;
             border: none !important;
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
-        }
-        /* Style Input Nama Manual */
-        .stTextInput input {
-            height: 30px !important;
-            font-size: 12px !important;
-            text-align: center !important;
         }
         .timeline-line {
             height: 4px; background: #3d4156; margin-top: 15px; border-radius: 2px;
@@ -3221,7 +3213,7 @@ def project_approval_reject():
         for index, row in df.iterrows():
             with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
                 # DETAIL INFO
-                st.markdown("### 📄 Detail Item")
+                st.markdown("### 📄 Detail Detail")
                 c_det1, c_det2 = st.columns(2)
                 with c_det1:
                     st.write(f"**Pengaju:** {row['nama_tim']} | **Bin:** {row['bin_asal']}")
@@ -3233,17 +3225,20 @@ def project_approval_reject():
                 
                 st.divider()
 
-                # --- TIMELINE DENGAN INPUT NAMA & TOMBOL ---
+                # --- TIMELINE DENGAN TOMBOL DI BAWAH BULATAN ---
                 st.write("**Progres Status:**")
                 line1_active = "line-active" if row['status'] >= 2 else ""
                 line2_active = "line-active" if row['status'] >= 3 else ""
 
                 # Layout: [Titik 1] [Garis 1] [Titik 2] [Garis 2] [Titik 3]
-                tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 1.8, 1.5, 1.8, 1.5])
+                tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
                 
+                current_user = "Admin" # Bisa ganti pakai session login
+
                 with tcol1:
                     st.markdown("🟢 **Done**")
                     st.caption("Pengajuan")
+                    # Step 1 sudah otomatis done, tidak butuh tombol
 
                 with tline1:
                     st.markdown(f'<div class="timeline-line {line1_active}"></div>', unsafe_allow_html=True)
@@ -3252,15 +3247,13 @@ def project_approval_reject():
                     if row['status'] >= 2:
                         st.markdown("🟢 **Done**")
                         st.caption("Approval")
-                        st.caption(f"✍️ {row['approved_by']}")
+                        if row.get('approved_by'): st.caption(f"✍️ {row['approved_by']}")
                     else:
                         st.markdown("🟡 **Waiting**")
                         st.caption("Approval")
-                        # INPUT NAMA MANUAL
-                        nama_app = st.text_input("Nama Approval", key=f"inp_app_{row['id']}", placeholder="Isi Nama...", label_visibility="collapsed")
-                        # TOMBOL VALIDASI
-                        if st.button("Approve", key=f"btn_app_{row['id']}", disabled=not nama_app):
-                            conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (nama_app, row['id']))
+                        # TOMBOL DISINI (Step 2)
+                        if st.button("Approve", key=f"btn_app_{row['id']}"):
+                            conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (current_user, row['id']))
                             conn.commit()
                             st.rerun()
 
@@ -3271,17 +3264,15 @@ def project_approval_reject():
                     if row['status'] >= 3:
                         st.markdown("🟢 **Done**")
                         st.caption("Set Up")
-                        st.caption(f"✍️ {row['setup_by']}")
+                        if row.get('setup_by'): st.caption(f"✍️ {row['setup_by']}")
                     else:
                         st.markdown("⚪ **Waiting**")
                         st.caption("Set Up")
-                        if row['status'] == 2:
-                            # INPUT NAMA MANUAL UNTUK SET UP
-                            nama_set = st.text_input("Nama Set Up", key=f"inp_set_{row['id']}", placeholder="Isi Nama...", label_visibility="collapsed")
-                            # TOMBOL DENGAN CLASS GOLD
+                        # TOMBOL DISINI (Step 3) - Pakai CSS Gold
+                        if row['status'] == 2: # Tombol set up cuma muncul kalau sudah di approve
                             st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-                            if st.button("Set Up", key=f"btn_set_{row['id']}", disabled=not nama_set):
-                                conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (nama_set, row['id']))
+                            if st.button("Set Up", key=f"btn_set_{row['id']}"):
+                                conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (current_user, row['id']))
                                 conn.commit()
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
