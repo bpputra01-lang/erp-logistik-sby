@@ -2788,16 +2788,28 @@ def menu_reject_defect():
         with r2c3:
             kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
 
-       # BARIS 3 (3 Kolom - FIX SEJAJAR)
+       # BARIS 3 (GRID 3x3 PRESISI)
         r3c1, r3c2, r3c3 = st.columns(3)
         with r3c1:
             article = st.text_input("NAMA BARANG")
         with r3c2:
-            keterangan = st.text_input("DETAIL KERUSAKAN (Keterangan)")
+            # Pake text_area tapi kita paksa tingginya lewat CSS di bawah
+            keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)", height=45) 
         with r3c3:
-            # Trik buat nurunin tombol biar sejajar sama inputan sebelah
+            # Spacer biar tombolnya turun sejajar sama inputan sebelah
             st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
             btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST", use_container_width=True)
+
+    # TAMBAHKAN CSS INI DI BAGIAN ATAS (STYLE) BIAR TEXT AREA NYA GAK KEGEDEAN
+    st.markdown("""
+        <style>
+        /* Paksa semua text area di dalam form biar tingginya pas sama text input */
+        div[data-testid="stTextArea"] textarea {
+            height: 42px !important;
+            min-height: 42px !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
     if btn_submit:
         if sku:
