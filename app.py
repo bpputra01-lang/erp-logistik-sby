@@ -3285,12 +3285,44 @@ def project_approval_reject():
                         else:
                             st.markdown("🟡 **Approval Purchasing**")
                             st.caption("Purchasing")
-                            # Input Nama & Tombol Approval Purchasing
                             nama_app = st.text_input("Nama Purchasing", key=f"inp_app_{row['id']}", placeholder="Isi nama...", label_visibility="collapsed")
                             if st.button("Approved", key=f"btn_app_{row['id']}", disabled=not nama_app):
                                 conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (nama_app, row['id']))
                                 conn.commit()
                                 st.rerun()
+                                
+                    with tline2:
+                        st.markdown(f'<div class="timeline-line {line2_class}"></div>', unsafe_allow_html=True)
+                    
+                    with tcol3:
+                        if row['status'] >= 3:
+                            st.markdown("🟢 **Done Setup BIN**")
+                            st.caption("Done Process")
+                            if row.get('setup_by'): st.caption(f"✍️ {row['setup_by']}")
+                        else:
+                            st.markdown("⚪ **Process Request**")
+                            st.caption("Set Up")
+                            if row['status'] == 2:
+                                nama_set = st.text_input("Nama Set Up", key=f"inp_set_{row['id']}", placeholder="Isi nama...", label_visibility="collapsed")
+                                st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+                                if st.button("Final Set Up", key=f"btn_set_{row['id']}", disabled=not nama_set):
+                                    conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (nama_set, row['id']))
+                                    conn.commit()
+                                    st.rerun()
+                                st.markdown('</div>', unsafe_allow_html=True)
+
+                    if row['status'] == 3:
+                        st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
+
+                    # --- FITUR DELETE (TAMBAHAN) ---
+                    st.write("") 
+                    with st.expander("🗑️ Hapus Data"):
+                        st.warning("Data yang dihapus tidak dapat dikembalikan!")
+                        if st.button(f"Konfirmasi Hapus SKU {row['sku']}", key=f"del_{row['id']}"):
+                            conn.execute("DELETE FROM submissions WHERE id = ?", (row['id'],))
+                            conn.commit()
+                            st.error(f"Data {row['sku']} berhasil dihapus!")
+                            st.rerun()
                                 
                     with tline2:
                         st.markdown(f'<div class="timeline-line {line2_class}"></div>', unsafe_allow_html=True)
