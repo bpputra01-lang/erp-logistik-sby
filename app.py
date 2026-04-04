@@ -3263,17 +3263,20 @@ def project_approval_reject():
                     st.info(f"**Keterangan:**\n{row['keterangan']}")
                     st.divider()
 
-                    # TIMELINE DENGAN GARIS BIRU
+                    # TIMELINE PROGRESS
                     st.write("**Progres Status:**")
                     line1_class = "line-active" if row['status'] >= 2 else ""
                     line2_class = "line-active" if row['status'] >= 3 else ""
 
-                    tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1, 2, 1, 2, 1])
+                    tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
+                    
                     with tcol1:
                         st.markdown("🟢 **Done**")
                         st.caption("Pengajuan")
+                    
                     with tline1:
                         st.markdown(f'<div class="timeline-line {line1_class}"></div>', unsafe_allow_html=True)
+                    
                     with tcol2:
                         if row['status'] >= 2:
                             st.markdown("🟢 **Done**")
@@ -3282,8 +3285,16 @@ def project_approval_reject():
                         else:
                             st.markdown("🟡 **Waiting**")
                             st.caption("Approval")
+                            # Input Nama & Tombol Approval Purchasing
+                            nama_app = st.text_input("Nama Purchasing", key=f"inp_app_{row['id']}", placeholder="Isi nama...", label_visibility="collapsed")
+                            if st.button("Approve Step 2", key=f"btn_app_{row['id']}", disabled=not nama_app):
+                                conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (nama_app, row['id']))
+                                conn.commit()
+                                st.rerun()
+                                
                     with tline2:
                         st.markdown(f'<div class="timeline-line {line2_class}"></div>', unsafe_allow_html=True)
+                    
                     with tcol3:
                         if row['status'] >= 3:
                             st.markdown("🟢 **Done**")
@@ -3292,24 +3303,18 @@ def project_approval_reject():
                         else:
                             st.markdown("⚪ **Waiting**")
                             st.caption("Set Up")
+                            # Tombol muncul hanya jika Step 2 sudah Done
+                            if row['status'] == 2:
+                                nama_set = st.text_input("Nama Set Up", key=f"inp_set_{row['id']}", placeholder="Isi nama...", label_visibility="collapsed")
+                                st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+                                if st.button("Final Set Up", key=f"btn_set_{row['id']}", disabled=not nama_set):
+                                    conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (nama_set, row['id']))
+                                    conn.commit()
+                                    st.rerun()
+                                st.markdown('</div>', unsafe_allow_html=True)
 
-                    st.write("") 
-
-                    # LOGIKA TOMBOL
-                    current_user = "Admin" # Ganti dengan session user lu
-                    if row['status'] == 1:
-                        if st.button("Approve Purchasing (Step 2)", key=f"btn_app_{row['id']}"):
-                            conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (current_user, row['id']))
-                            conn.commit()
-                            st.rerun()
-                    elif row['status'] == 2:
-                        st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-                        if st.button("Final Approval Done Set Up", key=f"btn_set_{row['id']}"):
-                            conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (current_user, row['id']))
-                            conn.commit()
-                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    elif row['status'] == 3:
+                    # Tampilkan pesan sukses di bawah jika sudah selesai semua
+                    if row['status'] == 3:
                         st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
 
     conn.close()
