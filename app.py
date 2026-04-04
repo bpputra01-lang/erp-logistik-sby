@@ -2635,7 +2635,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px  # <--- INI WAJIB ADA
 from io import BytesIO
-from datetime import datetime, timedelta
+import datetime as dt_logic  # <--- INI KUNCINYA!
 
 
 # 1. Database Logic
