@@ -2976,12 +2976,17 @@ def menu_reject_defect():
                         fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
                         st.plotly_chart(fig_p, use_container_width=True)
                         
+                    # --- BAGIAN GRAFIK DI DALAM TAB ---
                     with c_right:
+                        # Value counts menghasilkan kolom 'index' (atau nama kolom asli) dan 'count'
                         df_b = df_cab['BIN'].value_counts().reset_index()
-                        df_b.columns = ['BIN', 'TOTAL']
-                        fig_b = px.bar(df_b, x='BIN', y='TOTAL', title=f"Reject per Lokasi {cab}",
-                                       color_discrete_sequence=['#D4AF37'])
-                        fig_b.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
+                        
+                        # Biar AMAN, kita paksa kasih nama kolomnya
+                        df_b.columns = ['BIN', 'TOTAL'] 
+                        
+                        fig_b = px.bar(df_b, x='BIN', y='TOTAL', 
+                                    title=f"Sebaran Bin {cab}",
+                                    color_discrete_sequence=['#D4AF37'])
                         st.plotly_chart(fig_b, use_container_width=True)
                 else:
                     st.info(f"Belum ada data untuk Cabang {cab}")
