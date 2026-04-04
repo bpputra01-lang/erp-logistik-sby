@@ -3353,9 +3353,31 @@ def project_approval_reject():
                                     conn.commit()
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
+                    # --- TAMBAHAN: KOLOM ADDITIONAL NOTE ---
+                    st.write("---")
+                    # Mengambil note yang sudah ada dari database (jika ada)
+                    current_note = row.get('additional_note', "")
+                    
+                    # Kolom input note diletakkan tepat di atas status Selesai
+                    new_note = st.text_area(
+                        "📝 Additional Note:", 
+                        value=current_note, 
+                        placeholder="Tambahkan catatan tambahan di sini...",
+                        key=f"note_{row['id']}"
+                    )
+                    
+                    # Tombol simpan note (opsional, atau bisa otomatis saat ganti status)
+                    if new_note != current_note:
+                        if st.button("Simpan Catatan", key=f"save_note_{row['id']}"):
+                            conn.execute("UPDATE submissions SET additional_note = ? WHERE id = ?", (new_note, row['id']))
+                            conn.commit()
+                            st.success("Catatan berhasil diperbarui!")
+                            st.rerun()
 
+                    # PESAN SELESAI (Tulisan Selesai yang lo maksud)
                     if row['status'] == 3:
                         st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
+                    
 
                     st.write("") 
                     with st.expander("🗑️ Hapus Data"):
