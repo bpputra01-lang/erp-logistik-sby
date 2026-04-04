@@ -2690,7 +2690,10 @@ def clear_all_data():
     except Exception as e:
         st.error(f"Gagal mengosongkan database: {e}")
 
-# --- CSS & HEADER (Glow Gold & Navy Styling Lu Balik Semua!) ---
+# 3. UI MENU REJECT/DEFECT
+def menu_reject_defect():
+    # --- CSS & HEADER (Glow Gold & Navy Styling Lu Balik Semua!) ---
+    # --- CSS & HEADER (Glow Gold & Navy Styling Lu Balik Semua!) ---
     st.markdown("""
         <style>
         /* 1. Header Utama */
