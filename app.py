@@ -3285,50 +3285,41 @@ def project_approval_reject():
 
     with tabs[1]:
        # --- CSS PERBAIKAN: KHUSUS KONTEN TENGAH (SIDEBAR AMAN) ---
+        # --- CSS PERBAIKAN: TULISAN TERANG & AKSEN BIRU ---
         st.markdown("""
             <style>
-            /* 1. Target cuma di area Utama (stMain), Sidebar (stSidebar) gak bakal kena */
-            [data-testid="stMain"] div[data-testid="stRadio"] label {
-                background-color: #1a1c27 !important;
-                border: 1px solid #3d4156 !important;
-                padding: 5px 15px !important;
-                border-radius: 20px !important;
-                margin-right: 10px !important;
-                transition: all 0.3s ease !important;
+            /* 1. Perbaikan Expander (Tulisan Header) */
+            [data-testid="stMain"] div[data-testid="stExpander"] summary p {
+                color: #FFFFFF !important; /* Paksa tulisan jadi putih */
+                font-weight: bold !important;
+                font-size: 1.05rem !important;
             }
             
-            [data-testid="stMain"] div[data-testid="stRadio"] label:hover {
-                border-color: #00bfff !important;
-                background-color: #252836 !important;
-            }
-
-            /* Warna Teks Radio saat dipilih */
-            [data-testid="stMain"] div[data-testid="stRadio"] input:checked + div {
-                color: #00bfff !important;
-                font-weight: bold !important;
-            }
-
-            /* 2. Style Card Expander cuma di area Utama */
             [data-testid="stMain"] div[data-testid="stExpander"] {
                 background-color: #1a1c27 !important;
                 border: 1px solid #3d4156 !important;
                 border-radius: 12px !important;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
-                margin-bottom: 15px !important;
             }
 
-            /* 3. Style Bar Pencarian cuma di area Utama */
-            [data-testid="stMain"] div[data-testid="stTextInput"] input {
-                border: 2px solid #3d4156 !important;
-                background-color: #0e1117 !important;
-                border-radius: 10px !important;
+            /* 2. Warna Teks saat Hover di Expander */
+            [data-testid="stMain"] div[data-testid="stExpander"] summary:hover p {
+                color: #00bfff !important; /* Berubah jadi biru neon pas disentuh */
             }
-            
-            /* CSS Sidebar Reset (Opsional: buat mastiin sidebar tetap default) */
-            [data-testid="stSidebar"] div[data-testid="stRadio"] label {
-                background-color: transparent !important;
-                border: none !important;
-                padding: 0 !important;
+
+            /* 3. Perbaikan Radio Button (Tulisan Status) */
+            [data-testid="stMain"] div[data-testid="stRadio"] label p {
+                color: #E0E0E0 !important; /* Tulisan status jadi abu terang */
+            }
+
+            /* 4. Teks Detail di Dalam Expander */
+            [data-testid="stMain"] .stMarkdown p, [data-testid="stMain"] .stMarkdown span {
+                color: #FFFFFF !important;
+            }
+
+            /* 5. Input Text biar tulisannya putih */
+            [data-testid="stMain"] div[data-testid="stTextInput"] input {
+                color: white !important;
+                background-color: #0e1117 !important;
             }
             </style>
         """, unsafe_allow_html=True)
