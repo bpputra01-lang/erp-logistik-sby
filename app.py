@@ -2763,7 +2763,8 @@ def menu_reject_defect():
 
         # --- FORM INPUT ---
         with st.form("form_reject", clear_on_submit=True):
-            cabang_input = st.radio("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"], horizontal=True)
+            # DROPDOWN CABANG (Ganti dari st.radio ke st.selectbox)
+            cabang_input = st.selectbox("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"])
             
             col1, col2 = st.columns(2)
             with col1:
