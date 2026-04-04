@@ -2850,11 +2850,12 @@ def menu_reject_defect():
 
     if btn_submit:
         if sku:
+            # PAKAI INI SAJA, JANGAN ADA IMPORT LAGI DI DALAM IF
             waktu_sekarang = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
             
             new_data = pd.DataFrame([{
-                'CABANG' : cabang_pilih,
-                'BIN_AWAL': bin_awal, 
+                'CABANG': cabang_pilih,
+                'BIN_AWAL': bin_awal,
                 'BIN': bin_val, 
                 'SKU': sku, 
                 'ARTICLE_NAME': article,
@@ -2864,10 +2865,10 @@ def menu_reject_defect():
                 'TANGGAL_INPUT': waktu_sekarang
             }])
             save_data(new_data)
-            st.success(f"Data {sku} dari {bin_awal} berhasil disimpan!")
+            st.success(f"Data {sku} Berhasil Disimpan!")
             st.rerun()
-        else:
-            st.error("SKU wajib diisi!")
+            else:
+                st.error("SKU wajib diisi!")
 
     # --- 3. UPLOAD FILE & TEMPLATE ---
     st.divider()
