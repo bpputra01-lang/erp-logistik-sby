@@ -2829,13 +2829,13 @@ def menu_reject_defect():
     
     init_db()
 
- # ==========================================
-    # --- 2. FORM INPUT MANUAL ---
+# ==========================================
+    # --- 2. FORM INPUT MANUAL (FIX KOLOM) ---
     # ==========================================
     with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            bin_awal = st.text_input("BIN AWAL")
+            bin_awal = st.text_input("BIN AWAL") # Label boleh pakai spasi
             bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
             sku = st.text_input("SKU")
             article = st.text_input("NAMA BARANG")
@@ -2849,12 +2849,12 @@ def menu_reject_defect():
     if btn_submit:
         if sku:
             import datetime as dt_logic
-            # Ambil jam WIB (Server + 7 Jam)
             waktu_obj = dt_logic.datetime.now() + dt_logic.timedelta(hours=7)
             waktu_sekarang = waktu_obj.strftime("%Y-%m-%d %H:%M:%S")
             
+            # PAKAI UNDERSCORE: BIN_AWAL
             new_data = pd.DataFrame([{
-                'BIN_AWAL': bin_awal,
+                'BIN_AWAL': bin_awal, 
                 'BIN': bin_val, 
                 'SKU': sku, 
                 'ARTICLE_NAME': article,
@@ -2864,25 +2864,18 @@ def menu_reject_defect():
                 'TANGGAL_INPUT': waktu_sekarang
             }])
             save_data(new_data)
-            st.success(f"✅ Data {sku} dari {bin_awal} Berhasil Disimpan!")
+            st.success(f"✅ Data {sku} Berhasil Disimpan!")
             st.rerun()
-        else:
-            st.error("⚠️ SKU wajib diisi!")
 
     # ==========================================
-    # --- 3. UPLOAD FILE & TEMPLATE ---
+    # --- 3. UPLOAD FILE (FIX TEMPLATE KOLOM) ---
     # ==========================================
     st.divider()
-    st.markdown("""
-        <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-            <h3 style="color: #007BFF; margin: 0; font-size: 18px; font-weight: 900;">📁 MULTIPLE UPLOAD LIST</h3>
-        </div>
-    """, unsafe_allow_html=True)
-
     col_dl, col_up = st.columns([1, 2])
 
     with col_dl:
-        template_cols = ['BIN AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
+        # SAMAIN PAKAI UNDERSCORE: BIN_AWAL
+        template_cols = ['BIN_AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
         df_template = pd.DataFrame(columns=template_cols)
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -2894,16 +2887,17 @@ def menu_reject_defect():
         if uploaded_file:
             try:
                 df_upload = pd.read_excel(uploaded_file)
-                if 'SKU' in df_upload.columns:
+                # Cek kolom BIN_AWAL (Underscore)
+                if 'BIN_AWAL' in df_upload.columns and 'SKU' in df_upload.columns:
                     if st.button("⤴️ IMPORT DATA KE DATABASE"):
                         import datetime as dt_logic
                         jam_fix = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
                         df_upload['TANGGAL_INPUT'] = jam_fix
                         save_data(df_upload)
-                        st.success(f"✅ Import Berhasil! ({jam_fix} WIB)")
+                        st.success("✅ Import Berhasil!")
                         st.rerun()
                 else:
-                    st.error("❌ Kolom 'SKU' tidak ditemukan!")
+                    st.error("❌ Template Salah! Pastikan kolom pertama namanya 'BIN_AWAL' (Tanpa Spasi)")
             except Exception as e:
                 st.error(f"⚠️ Error: {e}")
 
