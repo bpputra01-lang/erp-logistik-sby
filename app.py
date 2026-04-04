@@ -2637,11 +2637,11 @@ import plotly.express as px
 from io import BytesIO
 from datetime import datetime, timedelta
 
-# 1. Database Logic
+# 1. Database Logic - TETEP ASLI
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
-    # Tambahkan CABANG ke skema tabel agar sinkron
+    # Tambahkan kolom CABANG di awal skema
     c.execute('''
         CREATE TABLE IF NOT EXISTS reject_list (
             CABANG TEXT,
@@ -2693,7 +2693,7 @@ def delete_single_row(sku, tanggal):
         
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # --- 1. CSS & HEADER (Gaya Asli Lu) ---
+    # --- CSS ASLI LU (Glow Gold & Metric Navy) ---
     st.markdown("""
         <style>
         .hero-header { background-color: #007BFF; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 25px; font-weight: bold; font-size: 20px; }
@@ -2709,7 +2709,6 @@ def menu_reject_defect():
         }
         label { color: #E0E0E0 !important; font-weight: 600 !important; }
 
-        /* Gold Menyala Lu Tetap Ada */
         div[data-testid="stVerticalBlock"] > div:last-child button {
             background-color: #D4AF37 !important; color: white !important; border: none !important; border-radius: 8px !important; font-weight: bold !important;
             box-shadow: 0 0 5px rgba(255, 215, 0, 0.4), 0 0 10px rgba(255, 215, 0, 0.3);
@@ -2733,7 +2732,7 @@ def menu_reject_defect():
 
     init_db()
 
-    # --- 2. FORM INPUT MANUAL (2 KOLOM) ---
+    # --- 2. FORM INPUT MANUAL (2 KOLOM ASLI) ---
     with st.form("form_reject", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -2741,8 +2740,8 @@ def menu_reject_defect():
             bin_awal = st.text_input("BIN AWAL")
             bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
             sku = st.text_input("SKU")
-        with col2:
             article = st.text_input("NAMA BARANG")
+        with col2:
             size = st.text_input("SIZE")
             kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
             keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
@@ -2764,10 +2763,10 @@ def menu_reject_defect():
                 'TANGGAL_INPUT': waktu_sekarang
             }])
             save_data(new_data)
-            st.success(f"Data {sku} ({cabang_pilih}) Berhasil Disimpan!")
+            st.success(f"Data {sku} ({cabang_pilih}) Berhasil!")
             st.rerun()
 
-    # --- 3. MULTIPLE UPLOAD (MASIH UTUH) ---
+    # --- 3. MULTIPLE UPLOAD (UTUH) ---
     st.divider()
     st.markdown('<h3 style="color: #007BFF;">📁 MULTIPLE UPLOAD LIST</h3>', unsafe_allow_html=True)
     col_dl, col_up = st.columns([1, 2])
@@ -2782,40 +2781,44 @@ def menu_reject_defect():
     with col_up:
         uploaded_file = st.file_uploader("Upload File Excel", type=['xlsx'])
         if uploaded_file:
-            df_up = pd.read_excel(uploaded_file)
-            if st.button("⤴️ EXPORT MULTIPLE DATA"):
-                df_up['TANGGAL_INPUT'] = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
-                save_data(df_up)
+            df_upload = pd.read_excel(uploaded_file)
+            if st.button("⤴️ EXPORT MULTIPLE DATA TO DATABASE"):
+                df_upload['TANGGAL_INPUT'] = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+                save_data(df_upload)
                 st.success("Import Berhasil!")
                 st.rerun()
 
-    # --- 4. DASHBOARD (GRAFIK LAMA + CABANG) ---
+    # --- 4. DASHBOARD VISUALISASI (LOGIC LAMA + CABANG) ---
     st.divider()
     conn = sqlite3.connect('inventory_logistik.db')
     df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
     conn.close()
 
     if not df_chart.empty:
-        st.markdown("### 📊 ANALISA DATA")
+        st.markdown('<h3 style="color: #007BFF;">📊 DASHBOARD ANALISA</h3>', unsafe_allow_html=True)
         
-        # Grafik Per Cabang (Request Lu)
-        fig_cab = px.bar(df_chart['CABANG'].value_counts().reset_index(), x='CABANG', y='count', title="Reject per Cabang", color_discrete_sequence=['#D4AF37'])
+        # Grafik Per Cabang
+        fig_cab = px.bar(df_chart['CABANG'].value_counts().reset_index(), x='CABANG', y='count', title="TOTAL REJECT PER CABANG", color_discrete_sequence=['#D4AF37'])
         st.plotly_chart(fig_cab, use_container_width=True)
 
+        # Row Metrik Lu
         m1, m2, m3 = st.columns(3)
         m1.metric("TOTAL ITEMS", f"{len(df_chart)} SKU")
         m2.metric("DEFECT (D)", len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)]))
         m3.metric("REJECT (R)", len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)]))
 
-        c1, c2 = st.columns(2)
-        with c1:
-            fig_p = px.pie(df_chart, names='KATEGORI', title="Percentage by Cause", hole=0.4)
+        # Row Grafik Pie & Bar Bin Lu
+        col_pie, col_bar = st.columns(2)
+        with col_pie:
+            fig_p = px.pie(df_chart, names='KATEGORI', title="PERCENTAGE BY CAUSE", hole=0.4)
             st.plotly_chart(fig_p, use_container_width=True)
-        with c2:
-            fig_b = px.bar(df_chart['BIN'].value_counts().reset_index(), x='BIN', y='count', title="Total per Bin", color_discrete_sequence=['#007BFF'])
+        with col_bar:
+            fig_b = px.bar(df_chart['BIN'].value_counts().reset_index(), x='BIN', y='count', title="TOTAL BY LOCATION (BIN)", color_discrete_sequence=['#007BFF'])
             st.plotly_chart(fig_b, use_container_width=True)
+    else:
+        st.info("Database kosong. Input data dulu buat munculin grafik.")
 
-    # --- 5. DATABASE VIEW & ACTION ---
+    # --- 5. DATABASE VIEW & ACTION (UTUH) ---
     st.divider()
     conn = sqlite3.connect('inventory_logistik.db')
     df_db = pd.read_sql_query("SELECT * FROM reject_list ORDER BY TANGGAL_INPUT DESC", conn)
@@ -2823,10 +2826,9 @@ def menu_reject_defect():
 
     if not df_db.empty:
         with st.popover("🗑️ CLEAR ALL DATA"):
-            if st.button("KONFIRMASI HAPUS SEMUA"): clear_all_data()
+            if st.button("YA, KOSONGKAN DATABASE"): clear_all_data()
         st.dataframe(df_db, use_container_width=True)
-    else:
-        st.info("Database kosong.")
+
 
 
 import streamlit as st
