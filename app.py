@@ -2832,6 +2832,22 @@ def menu_reject_defect():
     
     init_db()
 
+    # --- 2. FORM INPUT MANUAL ---
+    with st.form("form_reject", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            cabang_pilih = st.selectbox("CABANG", ["SURABAYA", "SIDOARJO", "SEMARANG"])
+            bin_awal = st.text_input("BIN AWAL")
+            bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
+            sku = st.text_input("SKU")
+            article = st.text_input("NAMA BARANG")
+        with col2:
+            size = st.text_input("SIZE")
+            kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
+            keterangan = st.text_area("DETAIL KERUSAKAN (Keterangan)")
+
+        btn_submit = st.form_submit_button("📤UPLOAD SINGLE LIST")
+
     if btn_submit:
         if sku:
             # Gunakan import inline dengan alias unik biar gak bentrok sama variabel lokal manapun
@@ -2858,6 +2874,7 @@ def menu_reject_defect():
             st.rerun()
         else:
             st.error("SKU wajib diisi!")
+
     # --- 3. UPLOAD FILE & TEMPLATE ---
     st.divider()
     # Header berwarna Biru dengan Icon
