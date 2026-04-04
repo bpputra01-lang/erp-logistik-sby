@@ -2638,30 +2638,34 @@ from io import BytesIO
 import datetime as dt_logic  # <--- INI KUNCINYA!
 
 
-# 1. Database Logic
+# 1. Database Logic (GW SAMAIN NAMA KOLOMNYA BIAR SINKRON SAMA FORM)
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
+    # Gw tambahin BIN_AWAL di sini biar pas sama form lu
     c.execute('''
         CREATE TABLE IF NOT EXISTS reject_list (
+            BIN_AWAL TEXT,
             BIN TEXT,
             SKU TEXT,
             ARTICLE_NAME TEXT,
             SIZE TEXT,
             KATEGORI TEXT,
             KETERANGAN TEXT,
-            TANGGAL_INPUT DATETIME DEFAULT CURRENT_TIMESTAMP
+            TANGGAL_INPUT TEXT
         )
     ''')
     conn.commit()
     conn.close()
-# 1. Fungsi Simpan (Append)
+
+# 2. Fungsi Simpan (Tambahin pembersihan nama kolom)
 def save_data(df):
     try:
         with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
+            # Pastikan nama kolom di DataFrame SAMA PERSIS dengan di Database
             df.to_sql('reject_list', conn, if_exists='append', index=False)
             conn.commit()
-        st.cache_data.clear() # Bersihkan cache agar data baru muncul
+        st.cache_data.clear() 
     except Exception as e:
         st.error(f"Gagal menyimpan data: {e}")
 
@@ -2911,6 +2915,8 @@ def menu_reject_defect():
     df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
     conn.close()
 
+    # 3. BAGIAN DASHBOARD (GW FIX LOGIKA FILTERNYA)
+# Ganti bagian "if not df_chart.empty:" lu dengan ini:
     if not df_chart.empty:
         st.markdown("""
             <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #D4AF37; border-radius: 5px; margin-bottom: 20px;">
@@ -2918,12 +2924,17 @@ def menu_reject_defect():
             </div>
         """, unsafe_allow_html=True)
 
+        # FIX: Paksa kolom jadi string biar gak error pas difilter .str.startswith
+        df_chart['KATEGORI'] = df_chart['KATEGORI'].astype(str)
+        df_chart['BIN'] = df_chart['BIN'].astype(str)
+
         # Metrik Ringkasan
         m1, m2, m3 = st.columns(3)
         total_val = len(df_chart)
-        # Filter: D (Defect), R (Reject)
-        defect_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('D', na=False)])
-        reject_cnt = len(df_chart[df_chart['KATEGORI'].str.startswith('R', na=False)])
+        
+        # Filter: Ambil yang mengandung 'D' (Defect) atau 'R' (Reject)
+        defect_cnt = len(df_chart[df_chart['KATEGORI'].str.contains('D', na=False)])
+        reject_cnt = len(df_chart[df_chart['KATEGORI'].str.contains('R', na=False)])
 
         with m1:
             st.metric("TOTAL ITEMS", f"{total_val} SKU")
@@ -2939,14 +2950,17 @@ def menu_reject_defect():
         with c_pie:
             df_p = df_chart['KATEGORI'].value_counts().reset_index()
             df_p.columns = ['KATEGORI', 'TOTAL']
-            fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4, title="Proporsi Kerusakan")
-            fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
+            fig_p = px.pie(df_p, values='TOTAL', names='KATEGORI', hole=0.4, 
+                           title="Proporsi Kerusakan",
+                           color_discrete_sequence=px.colors.qualitative.Bold)
+            fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white", showlegend=True)
             st.plotly_chart(fig_p, use_container_width=True)
 
         with c_bar:
             df_b = df_chart['BIN'].value_counts().reset_index()
             df_b.columns = ['BIN', 'TOTAL']
-            fig_b = px.bar(df_b, x='BIN', y='TOTAL', title="Sebaran per Lokasi Bin", color_discrete_sequence=['#D4AF37'])
+            fig_b = px.bar(df_b, x='BIN', y='TOTAL', title="Sebaran per Lokasi Bin", 
+                           color_discrete_sequence=['#D4AF37'])
             fig_b.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
             st.plotly_chart(fig_b, use_container_width=True)
 
