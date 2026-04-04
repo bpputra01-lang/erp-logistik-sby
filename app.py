@@ -2690,12 +2690,11 @@ def clear_all_data():
     except Exception as e:
         st.error(f"Gagal mengosongkan database: {e}")
 
-# 2. UI Menu Reject/Defect List 
-def menu_reject_defect(): 
-    # --- CSS & HEADER (SIDEBAR TETAP AMAN / DEFAULT) ---
+# 3. UI MENU REJECT/DEFECT
+def menu_reject_defect():
+    # --- CSS & HEADER (Glow Gold & Navy Styling Lu Balik Semua!) ---
     st.markdown("""
         <style>
-        /* 1. Header Utama */
         .hero-header {
             background-color: #007BFF;
             color: white;
@@ -2705,62 +2704,51 @@ def menu_reject_defect():
             margin-bottom: 25px;
             font-weight: bold;
             font-size: 20px;
-            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
-
-        /* 2. Kunci Styling Cuma di MAIN CONTENT (Bukan Sidebar) */
-        [data-testid="stMain"] div[data-testid="stTextInput"] > div > div, 
-        [data-testid="stMain"] div[data-testid="stTextArea"] > div > div,
-        [data-testid="stMain"] div[data-testid="stSelectbox"] > div > div {
+        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+        div[data-testid="stTextInput"] > div > div, 
+        div[data-testid="stTextArea"] > div > div {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             border-radius: 6px !important;
+            color: white !important;
         }
-        
-        [data-testid="stMain"] input, 
-        [data-testid="stMain"] textarea, 
-        [data-testid="stMain"] div[data-baseweb="select"] > div { 
-            color: white !important; 
-        }
-
-        /* 3. TOMBOL SUBMIT FORM DI MAIN CONTENT (BIRU) */
-        [data-testid="stMain"] button[kind="primaryFormSubmit"] {
+        input, textarea { background-color: transparent !important; border: none !important; color: white !important; }
+        div.stButton > button {
             background-color: #007BFF !important;
             color: white !important;
             border-radius: 8px !important;
             width: 100% !important;
             height: 48px !important;
             font-weight: bold !important;
-            border: none !important;
-            box-shadow: 0 0 10px rgba(0, 123, 255, 0.4) !important;
         }
+        label { color: #E0E0E0 !important; font-weight: 600 !important; }
 
-        /* 4. TOMBOL ACTION DI MAIN CONTENT (GOLD) */
-        [data-testid="stMain"] div.stDownloadButton > button,
-        [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]) {
+        /* Styling tombol hapus - GOLD MENYALA ULTIMATE */
+        .stButton button[kind="primary"], .stButton button:contains("KOSONGKAN") {
             background-color: #D4AF37 !important;
             color: white !important;
-            border: 1px solid #FFD700 !important;
-            border-radius: 8px !important;
-            font-weight: bold !important;
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.4) !important;
-            transition: all 0.3s ease-in-out !important;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+            transition: all 0.3s ease-in-out;
         }
-
-        [data-testid="stMain"] div.stDownloadButton > button:hover,
-        [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]):hover {
+        .stButton button:contains("KOSONGKAN"):hover {
             background-color: #FFD700 !important;
-            color: #1a1c27 !important;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
         }
 
-        /* 5. Metric Box (Cuma di Main) */
-        [data-testid="stMain"] [data-testid="stMetric"] {
+        /* Metric Box Rata */
+        [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             padding: 20px !important;
             border-radius: 12px !important;
+            min-height: 160px !important; 
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
         }
+        [data-testid="stMetricValue"] > div { font-size: 32px !important; font-weight: 900 !important; color: #ffffff !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -2770,23 +2758,8 @@ def menu_reject_defect():
     tab_input, tab_dashboard = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
 
     with tab_input:
-        with st.expander("📋 Informasi Format File & Prosedur"):
-            st.info("""
-            **Input Single Item Defect/Reject:**
-            - **LOKASI**: Pilih Cabang (Surabaya, Sidoarjo, Semarang)
-            - **BIN AWAL**: Isi dengan Bin Awal item tersimpan
-            - **BIN TUJUAN**: Pilih lokasi tujuan sesuai dropdown
-            - **SKU**: Tulis SKU lengkap secara Manual
-            - **NAMA BARANG**: Ambil dari Article Name di file Multiple Adjustment
-            - **SIZE**: Tulis ukurannya berdasarkan SKU
-            - **KATEGORI**: Pilih kategori kerusakan (D1-D4 / R1-R4)
-            - **DETAIL**: Isi keterangan kondisi barang secara detail
-            
-            **Input Mass Item:**
-            - Gunakan template terbaru (v2) yang memiliki kolom **CABANG**
-            - Jangan ubah header atau nama sheet
-            - Upload file Excel melalui uploader di bawah
-            """)
+        with st.expander("📋 Informasi Format & Prosedur"):
+            st.info("Pilih Cabang sebelum melakukan input Single atau Massal.")
 
         # --- FORM INPUT ---
         with st.form("form_reject", clear_on_submit=True):
