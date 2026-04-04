@@ -2639,10 +2639,17 @@ from datetime import datetime
 from datetime import datetime, timedelta
 
 
-# 1. Database Logic
+# 1. DATABASE LOGIC (VERSI RESET TOTAL)
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
+    # Cek apakah kolom CABANG sudah ada, kalau belum ada kita paksa RESET
+    try:
+        c.execute("SELECT CABANG FROM reject_list LIMIT 1")
+    except sqlite3.OperationalError:
+        # ERROR BERARTI KOLOM CABANG GAK ADA -> HAPUS TABEL LAMA!
+        c.execute("DROP TABLE IF EXISTS reject_list")
+        
     c.execute('''
         CREATE TABLE IF NOT EXISTS reject_list (
             CABANG TEXT,           
@@ -2659,8 +2666,23 @@ def init_db():
     conn.commit()
     conn.close()
 
-import sqlite3
-import streamlit as st
+# 2. FUNGSI CLEAR ALL (INI YANG LU MINTA - RESET STRUKTUR JUGA)
+def clear_all_data():
+    try:
+        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
+            cursor = conn.cursor()
+            # JANGAN CUMA DELETE ISI, TAPI HAPUS TABELNYA BIAR STRUKTUR BARU MASUK
+            cursor.execute("DROP TABLE IF EXISTS reject_list")
+            conn.commit()
+        
+        # Panggil init_db lagi buat bikin tabel yang fresh dengan kolom CABANG
+        init_db()
+        
+        st.cache_data.clear() 
+        st.success("🔥 DATABASE DI-RESET TOTAL! Struktur sekarang sudah mendukung CABANG.")
+        st.rerun() 
+    except Exception as e:
+        st.error(f"Gagal reset: {e}")
 
 # 1. Fungsi Simpan (Append)
 def save_data(df):
@@ -2672,18 +2694,6 @@ def save_data(df):
     except Exception as e:
         st.error(f"Gagal menyimpan data: {e}")
 
-# 2. Fungsi Hapus Semua (Multiple/Clear All)
-def clear_all_data():
-    try:
-        with sqlite3.connect('inventory_logistik.db', timeout=10) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM reject_list")
-            conn.commit()
-        st.cache_data.clear() # Paksa Streamlit lupakan data lama
-        st.success("Database berhasil dikosongkan!")
-        st.rerun() # Refresh halaman agar tabel langsung kosong
-    except Exception as e:
-        st.error(f"Gagal mengosongkan database: {e}")
 
 # 3. Fungsi Hapus Per Baris (Single Row)
 def delete_single_row(sku, tanggal):
