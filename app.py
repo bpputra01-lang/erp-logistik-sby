@@ -3284,44 +3284,65 @@ def project_approval_reject():
                     st.warning("⚠️ Nama Tim dan SKU wajib diisi!")
 
     with tabs[1]:
-        # --- CSS KHUSUS TAB HISTORY (Anti Polos) ---
+        # --- CSS KHUSUS BIAR RADIO & EXPANDER GAK POLOS ---
         st.markdown("""
             <style>
-            /* Style buat Box Expander (Kartu Data) */
-            .streamlit-expanderHeader {
+            /* 1. Style Radio Button (Filter Status) */
+            div[data-testid="stRadio"] label {
                 background-color: #1a1c27 !important;
                 border: 1px solid #3d4156 !important;
-                border-radius: 8px !important;
-                color: #00bfff !important; /* Warna teks SKU jadi biru neon */
+                padding: 5px 15px !important;
+                border-radius: 20px !important;
+                margin-right: 10px !important;
+                transition: all 0.3s ease !important;
+            }
+            div[data-testid="stRadio"] label:hover {
+                border-color: #00bfff !important;
+                background-color: #252836 !important;
+            }
+            /* Style saat radio dipilih */
+            div[data-testid="stRadio"] input:checked + div {
+                color: #00bfff !important;
                 font-weight: bold !important;
             }
-            
-            /* Style isi di dalam expander */
-            .streamlit-expanderContent {
-                background-color: #12141d !important;
+
+            /* 2. Style Card Expander (Daftar History) */
+            div[data-testid="stExpander"] {
+                background-color: #1a1c27 !important;
                 border: 1px solid #3d4156 !important;
-                border-top: none !important;
-                border-radius: 0 0 8px 8px !important;
-                padding: 20px !important;
+                border-radius: 12px !important;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+                margin-bottom: 15px !important;
+            }
+            div[data-testid="stExpander"] summary {
+                color: #E0E0E0 !important;
+                font-weight: 600 !important;
+            }
+            div[data-testid="stExpander"] summary:hover {
+                color: #00bfff !important;
             }
 
-            /* Style buat st.info (Keterangan) biar gak putih polos */
-            div[data-testid="stNotification"] {
-                background-color: #1e2130 !important;
-                color: #00d4ff !important;
-                border: 1px solid #007bff !important;
+            /* 3. Style Bar Pencarian */
+            div[data-testid="stTextInput"] input {
+                border: 2px solid #3d4156 !important;
+                background-color: #0e1117 !important;
                 border-radius: 10px !important;
             }
-            
-            /* Bikin Divider (Garis) lebih kelihatan */
-            hr {
-                border: 0;
-                height: 1px;
-                background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 191, 255, 0.75), rgba(0, 0, 0, 0));
-                margin: 20px 0 !important;
+            div[data-testid="stTextInput"] input:focus {
+                border-color: #00bfff !important;
+                box-shadow: 0 0 10px rgba(0, 191, 255, 0.2) !important;
+            }
+
+            /* 4. Timeline Line biar lebih 'Glow' */
+            .line-active {
+                background: linear-gradient(90deg, #1E90FF, #00bfff) !important;
+                box-shadow: 0 0 12px rgba(30, 144, 255, 0.8) !important;
             }
             </style>
         """, unsafe_allow_html=True)
+
+        # --- LANJUT KE LOGIKA SEARCH & FILTER ---
+        # (Gunakan kode filter lo yang sudah ada di bawah ini)
 
         # --- FITUR SEARCH & FILTER ---
         col_search, col_filter = st.columns([1, 1])
