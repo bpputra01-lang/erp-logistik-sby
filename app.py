@@ -2867,8 +2867,6 @@ def menu_reject_defect():
             save_data(new_data)
             st.success(f"Data {sku} Berhasil Disimpan!")
             st.rerun()
-            else:
-                st.error("SKU wajib diisi!")
 
     # --- 3. UPLOAD FILE & TEMPLATE ---
     st.divider()
