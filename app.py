@@ -3147,152 +3147,130 @@ def init_db():
 
 conn = init_db()
 
-# --- FUNGSI PENDUKUNG ---
-def get_status_info(status_code):
-    status_map = {
-        0: {"label": "Waiting Purchasing Approval", "color": "#FFA500", "step": 1},
-        1: {"label": "Waiting Set Up", "color": "#1E90FF", "step": 2},
-        2: {"label": "Done Set Up", "color": "#32CD32", "step": 3}
-    }
-    return status_map.get(status_code)
+def project_approval_reject():
+    # --- 1. DATABASE SETUP (Internal Connection) ---
+    # Gunakan check_same_thread=False agar tidak error saat diakses banyak user
+    conn = sqlite3.connect('reject_system.db', check_same_thread=False)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            nama_tim TEXT,
+            bin_asal TEXT,
+            sku TEXT,
+            article_name TEXT,
+            size TEXT,
+            keterangan TEXT,
+            status INTEGER DEFAULT 0
+        )
+    ''')
+    conn.commit()
 
-# --- UI STREAMLIT ---
-st.set_page_config(page_title="Reject & Defect Gateway", layout="wide")
+    # --- 2. CSS STYLING ---
+    st.markdown("""
+        <style>
+        .hero-header-custom {
+            background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
+            color: white; padding: 12px 25px; border-radius: 10px;
+            margin-bottom: 25px; font-weight: 800; font-size: 22px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
+        }
+        .detail-card {
+            background-color: #1a1c27; border: 1px solid #3d4156;
+            padding: 20px; border-radius: 12px; margin-bottom: 20px;
+        }
+        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+        div.stButton > button {
+            background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
+            color: white !important; border-radius: 10px !important;
+            width: 100% !important; font-weight: bold !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-# --- SEMUA CSS LU GUE TARO SINI, JANGAN ADA YANG KETINGGALAN ---
-# Pastikan baris di bawah ini nempel ke kiri (tidak ada spasi/tab)
-st.markdown("""
-    <style>
-    /* 1. Header Hero */
-    .hero-header-custom {
-        background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
-        color: white; padding: 12px 25px; border-radius: 10px;
-        margin-bottom: 25px; font-weight: 800; font-size: 22px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
-    }
+    # --- 3. HEADER & TABS ---
+    st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
+    tabs = st.tabs(["📝 Input Pengajuan", "📑 History & Approval Status"])
 
-    /* 2. Detail Card Preview */
-    .detail-card {
-        background-color: #1a1c27; border: 1px solid #3d4156;
-        padding: 20px; border-radius: 12px; margin-bottom: 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }
-
-    /* 3. Styling Input & Form */
-    [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-    div[data-testid="stTextInput"] > div > div, 
-    div[data-testid="stTextArea"] > div > div,
-    div[data-testid="stSelectbox"] > div > div {
-        background-color: #1a1c27 !important;
-        border: 1px solid #3d4156 !important;
-        border-radius: 8px !important;
-    }
-    input, textarea, div[data-baseweb="select"] span { color: white !important; }
-    label { color: #E0E0E0 !important; font-weight: 600 !important; }
-
-    /* 4. Tombol Utama (Sent Request) */
-    div.stButton > button {
-        background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
-        color: white !important; border-radius: 10px !important;
-        width: 100% !important; height: 50px !important; font-weight: bold !important;
-        border: none !important;
-    }
-
-    /* 5. TOMBOL GOLD MENYALA ULTIMATE (Untuk Step 3) */
-    .gold-btn button {
-        background-color: #D4AF37 !important;
-        color: white !important; border: none !important;
-        border-radius: 8px !important; font-weight: bold !important;
-        box-shadow: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
-        text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-        transition: all 0.3s ease-in-out;
-    }
-    .gold-btn button:hover {
-        background-color: #FFD700 !important;
-        color: #1a1c27 !important;
-        box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
-        transform: translateY(-2px);
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
-
-tabs = st.tabs(["📝 Input Pengajuan", "📑 History & Approval Status"])
-# --- TAB 1: INPUT FORM ---
-with tabs[0]:
-    st.subheader("Form Pengajuan Reject/Defect")
-    with st.form("input_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            nama = st.text_input("Nama Tim")
-            bin_asal = st.text_input("Bin Asal")
-            sku = st.text_input("SKU")
-        with col2:
-            article = st.text_input("Article Name")
-            size = st.text_input("Size")
-            keterangan = st.text_area("Keterangan Reject/Defect")
-        
-        submit_btn = st.form_submit_button("Kirim Pengajuan")
-
-        if submit_btn:
-            if nama and sku:
-                ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                query = "INSERT INTO submissions (timestamp, nama_tim, bin_asal, sku, article_name, size, keterangan, status) VALUES (?,?,?,?,?,?,?,?)"
-                conn.execute(query, (ts, nama, bin_asal, sku, article, size, keterangan, 0))
-                conn.commit()
-                st.success("✅ Pengajuan berhasil dikirim!")
-            else:
-                st.error("Mohon isi minimal Nama dan SKU.")
-
-# --- TAB 2: HISTORY & TIMELINE ---
-with tabs[1]:
-    st.subheader("Monitoring History & Approval")
-    
-    # Load Data
-    df = pd.read_sql_query("SELECT * FROM submissions ORDER BY id DESC", conn)
-    
-    if df.empty:
-        st.info("Belum ada riwayat pengajuan.")
-    else:
-        for index, row in df.iterrows():
-            info = get_status_info(row['status'])
+    # --- TAB 1: INPUT FORM ---
+    with tabs[0]:
+        st.subheader("Form Pengajuan Reject/Defect")
+        with st.form("input_form_reject", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                nama = st.text_input("Nama Tim")
+                bin_asal = st.text_input("Bin Asal")
+                sku = st.text_input("SKU")
+            with col2:
+                article = st.text_input("Article Name")
+                size = st.text_input("Size")
+                keterangan = st.text_area("Keterangan Reject/Defect")
             
-            with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
-                # Header Status
-                st.markdown(f"**Status Saat Ini:** <span style='color:{info['color']}'>{info['label']}</span>", unsafe_allow_html=True)
-                
-                # Visual Timeline (3 Titik)
-                col1, col2, col3 = st.columns(3)
-                
-                steps = ["1. Pengajuan", "2. Approval", "3. Set Up"]
-                cols = [col1, col2, col3]
-                
-                for i in range(3):
-                    with cols[i]:
-                        if i < info['step']:
-                            st.markdown(f"🟢 **{steps[i]}**")
-                        elif i == info['step']:
-                            st.markdown(f"🟡 **{steps[i]}**")
-                        else:
-                            st.markdown(f"⚪ {steps[i]}")
-                
-                st.divider()
-                
-                # Detail Info
-                c1, c2, c3 = st.columns(3)
-                c1.write(f"**Bin:** {row['bin_asal']}")
-                c2.write(f"**Size:** {row['size']}")
-                c3.write(f"**Tanggal:** {row['timestamp']}")
-                st.write(f"**Keterangan:** {row['keterangan']}")
+            submit_btn = st.form_submit_button("Kirim Pengajuan")
 
-                # Tombol Update Status (Simulasi Approval)
-                if row['status'] < 2:
-                    if st.button(f"Update ke Status Berikutnya", key=f"btn_{row['id']}"):
-                        new_status = row['status'] + 1
-                        conn.execute("UPDATE submissions SET status = ? WHERE id = ?", (new_status, row['id']))
-                        conn.commit()
-                        st.rerun()
+            if submit_btn:
+                if nama and sku:
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    query = "INSERT INTO submissions (timestamp, nama_tim, bin_asal, sku, article_name, size, keterangan, status) VALUES (?,?,?,?,?,?,?,?)"
+                    conn.execute(query, (ts, nama, bin_asal, sku, article, size, keterangan, 0))
+                    conn.commit()
+                    st.success("✅ Pengajuan berhasil dikirim!")
+                else:
+                    st.error("Mohon isi minimal Nama dan SKU.")
+
+    # --- TAB 2: HISTORY & TIMELINE ---
+    with tabs[1]:
+        st.subheader("Monitoring History & Approval")
+        
+        # Load Data
+        df = pd.read_sql_query("SELECT * FROM submissions ORDER BY id DESC", conn)
+        
+        if df.empty:
+            st.info("Belum ada riwayat pengajuan.")
+        else:
+            for index, row in df.iterrows():
+                # Logika Status Mapping internal
+                status_map = {
+                    0: {"label": "Waiting Purchasing Approval", "color": "#FFA500", "step": 1},
+                    1: {"label": "Waiting Set Up", "color": "#1E90FF", "step": 2},
+                    2: {"label": "Done Set Up", "color": "#32CD32", "step": 3}
+                }
+                info = status_map.get(row['status'])
+                
+                with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
+                    st.markdown(f"**Status Saat Ini:** <span style='color:{info['color']}'>{info['label']}</span>", unsafe_allow_html=True)
+                    
+                    # Visual Timeline (3 Titik)
+                    col_t1, col_t2, col_t3 = st.columns(3)
+                    steps = ["1. Pengajuan", "2. Approval", "3. Set Up"]
+                    cols = [col_t1, col_t2, col_t3]
+                    
+                    for i in range(3):
+                        with cols[i]:
+                            if i < info['step']:
+                                st.markdown(f"🟢 **{steps[i]}**")
+                            elif i == info['step']:
+                                st.markdown(f"🟡 **{steps[i]}**")
+                            else:
+                                st.markdown(f"⚪ {steps[i]}")
+                    
+                    st.divider()
+                    
+                    # Detail Info
+                    c1, c2, c3 = st.columns(3)
+                    c1.write(f"**Bin:** {row['bin_asal']}")
+                    c2.write(f"**Size:** {row['size']}")
+                    c3.write(f"**Tanggal:** {row['timestamp']}")
+                    st.write(f"**Keterangan:** {row['keterangan']}")
+
+                    # Tombol Update Status
+                    if row['status'] < 2:
+                        if st.button(f"Update ke Status Berikutnya", key=f"btn_rej_{row['id']}"):
+                            new_status = row['status'] + 1
+                            conn.execute("UPDATE submissions SET status = ? WHERE id = ?", (new_status, row['id']))
+                            conn.commit()
+                            st.rerun()
 
 import pandas as pd
 import streamlit as st
