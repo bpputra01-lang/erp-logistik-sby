@@ -3229,45 +3229,85 @@ def project_approval_reject():
             submit_btn = st.form_submit_button("Kirim Pengajuan")
             if submit_btn and nama and sku:
                 ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                # STATUS 1 = DONE PENGAJUAN, WAITING APPROVAL PURCHASING
                 conn.execute("INSERT INTO submissions (timestamp, nama_tim, bin_asal, sku, article_name, size, keterangan, status) VALUES (?,?,?,?,?,?,?,?)", 
-                             (ts, nama, bin_asal, sku, article, size, keterangan, 0))
+                             (ts, nama, bin_asal, sku, article, size, keterangan, 1))
                 conn.commit()
-                st.success("✅ Pengajuan dikirim!")
+                st.success("✅ Pengajuan Berhasil Dikirim!")
+                st.rerun()
 
     # TAB 2: HISTORY
     with tabs[1]:
         df = pd.read_sql_query("SELECT * FROM submissions ORDER BY id DESC", conn)
-        for index, row in df.iterrows():
-            status_map = {
-                0: {"label": "Waiting Purchasing Approval", "color": "#FFA500", "step": 1},
-                1: {"label": "Waiting Set Up", "color": "#1E90FF", "step": 2},
-                2: {"label": "Done Set Up", "color": "#32CD32", "step": 3}
-            }
-            info = status_map.get(row['status'])
-            
-            with st.expander(f"📌 {row['sku']} - {row['nama_tim']}"):
-                st.markdown(f"**Status:** <span style='color:{info['color']}'>{info['label']}</span>", unsafe_allow_html=True)
+        
+        if df.empty:
+            st.info("Belum ada riwayat pengajuan.")
+        else:
+            for index, row in df.iterrows():
+                # Mapping Status
+                status_map = {
+                    1: {"label": "Waiting Purchasing Approval", "color": "#FFA500", "step": 1},
+                    2: {"label": "Waiting Set Up", "color": "#1E90FF", "step": 2},
+                    3: {"label": "Done Set Up", "color": "#32CD32", "step": 3}
+                }
+                info = status_map.get(row['status'], status_map[1])
                 
-                # Timeline
-                c1, c2, c3 = st.columns(3)
-                steps = ["Pengajuan", "Approval", "Set Up"]
-                cols = [c1, c2, c3]
-                for i in range(3):
-                    icon = "🟢" if i < info['step'] else "🟡" if i == info['step']-1 else "⚪"
-                    cols[i].write(f"{icon} {steps[i]}")
-
-                # Tombol Update pakai Class Gold (Step 2 ke 3)
-                if row['status'] < 2:
-                    button_label = "Approve ke Step 2" if row['status'] == 0 else "Final Approval (Set Up)"
-                    # Pake div class gold-btn buat button terakhir
-                    container_class = "gold-btn" if row['status'] == 1 else ""
+                with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
+                    # TAMPILKAN SEMUA DETAIL
+                    st.markdown("### 📄 Detail Pengajuan")
+                    col_det1, col_det2 = st.columns(2)
+                    with col_det1:
+                        st.write(f"**Nama Pengaju:** {row['nama_tim']}")
+                        st.write(f"**Bin Asal:** {row['bin_asal']}")
+                        st.write(f"**SKU:** {row['sku']}")
+                    with col_det2:
+                        st.write(f"**Article Name:** {row['article_name']}")
+                        st.write(f"**Size:** {row['size']}")
+                        st.write(f"**Waktu Input:** {row['timestamp']}")
                     
-                    st.markdown(f'<div class="{container_class}">', unsafe_allow_html=True)
-                    if st.button(button_label, key=f"btn_rej_{row['id']}"):
-                        conn.execute("UPDATE submissions SET status = ? WHERE id = ?", (row['status'] + 1, row['id']))
-                        conn.commit()
-                        st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.info(f"**Keterangan Reject/Defect:**\n\n{row['keterangan']}")
+                    
+                    st.divider()
+
+                    # TIMELINE DENGAN WARNA
+                    st.write("**Progres Status:**")
+                    c1, c2, c3 = st.columns(3)
+                    
+                    # Titik 1: Selalu Hijau (Done Pengajuan)
+                    c1.markdown("🟢 **Done Pengajuan**")
+                    
+                    # Titik 2: Approval
+                    if row['status'] >= 2:
+                        c2.markdown("🟢 **Done Approval**")
+                    else:
+                        c2.markdown("🟡 **Waiting Approval**")
+                        
+                    # Titik 3: Set Up
+                    if row['status'] >= 3:
+                        c3.markdown("🟢 **Done Set Up**")
+                    else:
+                        c3.markdown("⚪ **Waiting Set Up**")
+
+                    st.write("") # Spasi
+
+                    # Tombol Update
+                    if row['status'] < 3:
+                        # Label tombol dinamis
+                        if row['status'] == 1:
+                            button_label = "Approve Purchasing (Ke Step 2)"
+                            container_class = ""
+                        else:
+                            button_label = "Final Approval (Set Up)"
+                            container_class = "gold-btn" # Pake class gold lu di step terakhir
+                        
+                        st.markdown(f'<div class="{container_class}">', unsafe_allow_html=True)
+                        if st.button(button_label, key=f"btn_rej_{row['id']}"):
+                            new_status = row['status'] + 1
+                            conn.execute("UPDATE submissions SET status = ? WHERE id = ?", (new_status, row['id']))
+                            conn.commit()
+                            st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
+    conn.close()
 
 import pandas as pd
 import streamlit as st
