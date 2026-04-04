@@ -3268,6 +3268,7 @@ def project_approval_reject():
             st.info("Belum ada riwayat pengajuan.")
         else:
             for index, row in df.iterrows():
+                # Pastikan key expander unik
                 with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
                     st.markdown("### 📄 Detail Pengajuan")
                     col_det1, col_det2 = st.columns(2)
@@ -3283,12 +3284,11 @@ def project_approval_reject():
                     st.info(f"**Keterangan:**\n{row['keterangan']}")
                     st.divider()
 
-                    # TIMELINE DENGAN GARIS BIRU DAN TOMBOL DI MASING-MASING BULATAN
                     st.write("**Progres Status:**")
                     line1_class = "line-active" if row['status'] >= 2 else ""
                     line2_class = "line-active" if row['status'] >= 3 else ""
 
-                    # Menggunakan proporsi kolom yang lebih pas untuk tombol dan input
+                    # Layout Kolom Timeline
                     tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
                     
                     with tcol1:
@@ -3298,21 +3298,22 @@ def project_approval_reject():
                     with tline1:
                         st.markdown(f'<div class="timeline-line {line1_class}"></div>', unsafe_allow_html=True)
                     
+                    # --- PERBAIKAN INDENTASI TCOL2 ---
                     with tcol2:
-    if row['status'] >= 2:
-        st.markdown("🟢 **Done**")
-        st.caption("Approval")
-        st.caption(f"✍️ {row['approved_by']}")
-    else:
-        st.markdown("🟡 **Waiting**")
-        st.caption("Approval")
-        # Bungkus dalam container agar CSS flexbox bekerja maksimal
-        container = st.container()
-        nama_app = container.text_input("Nama Approval", key=f"inp_app_{row['id']}", placeholder="Isi Nama...", label_visibility="collapsed")
-        if container.button("Approve", key=f"btn_app_{row['id']}", disabled=not nama_app):
-            conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (nama_app, row['id']))
-            conn.commit()
-            st.rerun()
+                        if row['status'] >= 2:
+                            st.markdown("🟢 **Done**")
+                            st.caption("Approval")
+                            st.caption(f"✍️ {row['approved_by']}")
+                        else:
+                            st.markdown("🟡 **Waiting**")
+                            st.caption("Approval")
+                            # Gunakan container agar CSS alignment bekerja
+                            cont_app = st.container()
+                            nama_app = cont_app.text_input("Nama Approval", key=f"inp_app_{row['id']}", placeholder="Isi Nama...", label_visibility="collapsed")
+                            if cont_app.button("Approve", key=f"btn_app_{row['id']}", disabled=not nama_app):
+                                conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (nama_app, row['id']))
+                                conn.commit()
+                                st.rerun()
                                 
                     with tline2:
                         st.markdown(f'<div class="timeline-line {line2_class}"></div>', unsafe_allow_html=True)
@@ -3325,18 +3326,18 @@ def project_approval_reject():
                         else:
                             st.markdown("⚪ **Waiting**")
                             st.caption("Set Up")
-                            # Tombol Set Up muncul jika sudah melewati Approval
                             if row['status'] == 2:
-                                input_set = st.text_input("Nama Set Up", key=f"inp_set_{row['id']}", placeholder="Nama...", label_visibility="collapsed")
+                                # Gunakan container juga di sini biar pas tengah
+                                cont_set = st.container()
+                                input_set = cont_set.text_input("Nama Set Up", key=f"inp_set_{row['id']}", placeholder="Nama...", label_visibility="collapsed")
                                 st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-                                if st.button("Final Set Up", key=f"btn_set_{row['id']}", disabled=not input_set):
+                                if cont_set.button("Final Set Up", key=f"btn_set_{row['id']}", disabled=not input_set):
                                     conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (input_set, row['id']))
                                     conn.commit()
                                     st.rerun()
                                 st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
-
 import pandas as pd
 import streamlit as st
 from io import BytesIO
