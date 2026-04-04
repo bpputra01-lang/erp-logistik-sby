@@ -3265,10 +3265,13 @@ def project_approval_reject():
             # Gunakan st.form_submit_button asli, CSS di atas yang akan merubah warnanya
             if st.form_submit_button("▶️ SUBMIT REQUEST"):
                 if nama and sku:
-                    # FIX JAM: Menggunakan WIB (UTC+7)
-                    # Pastikan di paling atas kode sudah ada: from datetime import datetime, timedelta
-                    tz_wib = timedelta(hours=7)
-                    ts = (datetime.now() + tz_wib).strftime("%Y-%m-%d %H:%M:%S")
+                    # --- PERBAIKAN JAM TOTAL (ANTI-SALAH) ---
+                    import pytz # Import lokal di sini biar aman
+                    from datetime import datetime
+                    
+                    # Setel ke zona waktu Jakarta (WIB)
+                    tz_jakarta = pytz.timezone('Asia/Jakarta')
+                    ts = datetime.now(tz_jakarta).strftime("%Y-%m-%d %H:%M:%S")
                     
                     try:
                         conn.execute(
