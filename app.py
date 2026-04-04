@@ -3246,7 +3246,8 @@ def project_approval_reject():
         col_search, col_filter = st.columns([1, 1])
         
         with col_search:
-            search_query = st.text_input("🔍 Cari SKU / Bin / Nama:", placeholder="Ketik di sini...", label_visibility="collapsed")
+            # Tambahkan .strip() agar spasi di awal/akhir input tidak merusak pencarian
+            search_query = st.text_input("🔍 Cari SKU / Bin / Nama:", placeholder="Ketik di sini...", label_visibility="collapsed").strip()
         
         with col_filter:
             filter_status = st.radio(
@@ -3268,16 +3269,22 @@ def project_approval_reject():
         elif filter_status == "Done Set Up":
             query += " AND status = 3"
 
-        # Tambahkan Logika Search (SKU, Bin, atau Nama)
+        # --- PERBAIKAN LOGIKA SEARCH ---
         if search_query:
-            query += " AND (sku LIKE ? OR bin_asal LIKE ? OR nama_tim LIKE ? OR article_name LIKE ?)"
+            # Gunakan LOWER() agar tidak sensitif huruf besar/kecil
+            query += " AND (LOWER(sku) LIKE LOWER(?) OR LOWER(bin_asal) LIKE LOWER(?) OR LOWER(nama_tim) LIKE LOWER(?) OR LOWER(article_name) LIKE LOWER(?))"
             search_val = f"%{search_query}%"
-            params.extend([search_val, search_val, search_val])
+            # JUMLAH PARAMETER HARUS PAS (4 Tanda Tanya = 4 Kali search_val)
+            params.extend([search_val, search_val, search_val, search_val])
 
         query += " ORDER BY id DESC"
         
         # Eksekusi Query dengan Parameter untuk Keamanan
-        df = pd.read_sql_query(query, conn, params=params)
+        try:
+            df = pd.read_sql_query(query, conn, params=params)
+        except Exception as e:
+            st.error(f"Terjadi kesalahan database: {e}")
+            df = pd.DataFrame()
         
         if df.empty:
             st.info(f"Data tidak ditemukan.")
