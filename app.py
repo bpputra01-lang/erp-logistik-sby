@@ -2642,9 +2642,11 @@ import datetime as dt_logic  # <--- INI KUNCINYA!
 def init_db():
     conn = sqlite3.connect('inventory_logistik.db')
     c = conn.cursor()
-    # Gw tambahin BIN_AWAL di sini biar pas sama form lu
+    # Kita paksa hapus tabel lama dan bikin yang baru dengan skema bener
+    # HATI-HATI: Ini bakal hapus semua data lama lu!
+    c.execute('DROP TABLE IF EXISTS reject_list') 
     c.execute('''
-        CREATE TABLE IF NOT EXISTS reject_list (
+        CREATE TABLE reject_list (
             BIN_AWAL TEXT,
             BIN TEXT,
             SKU TEXT,
