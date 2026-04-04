@@ -3284,11 +3284,11 @@ def project_approval_reject():
                     st.warning("⚠️ Nama Tim dan SKU wajib diisi!")
 
     with tabs[1]:
-        # --- CSS KHUSUS BIAR RADIO & EXPANDER GAK POLOS ---
+       # --- CSS PERBAIKAN: KHUSUS KONTEN TENGAH (SIDEBAR AMAN) ---
         st.markdown("""
             <style>
-            /* 1. Style Radio Button (Filter Status) */
-            div[data-testid="stRadio"] label {
+            /* 1. Target cuma di area Utama (stMain), Sidebar (stSidebar) gak bakal kena */
+            [data-testid="stMain"] div[data-testid="stRadio"] label {
                 background-color: #1a1c27 !important;
                 border: 1px solid #3d4156 !important;
                 padding: 5px 15px !important;
@@ -3296,47 +3296,39 @@ def project_approval_reject():
                 margin-right: 10px !important;
                 transition: all 0.3s ease !important;
             }
-            div[data-testid="stRadio"] label:hover {
+            
+            [data-testid="stMain"] div[data-testid="stRadio"] label:hover {
                 border-color: #00bfff !important;
                 background-color: #252836 !important;
             }
-            /* Style saat radio dipilih */
-            div[data-testid="stRadio"] input:checked + div {
+
+            /* Warna Teks Radio saat dipilih */
+            [data-testid="stMain"] div[data-testid="stRadio"] input:checked + div {
                 color: #00bfff !important;
                 font-weight: bold !important;
             }
 
-            /* 2. Style Card Expander (Daftar History) */
-            div[data-testid="stExpander"] {
+            /* 2. Style Card Expander cuma di area Utama */
+            [data-testid="stMain"] div[data-testid="stExpander"] {
                 background-color: #1a1c27 !important;
                 border: 1px solid #3d4156 !important;
                 border-radius: 12px !important;
                 box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
                 margin-bottom: 15px !important;
             }
-            div[data-testid="stExpander"] summary {
-                color: #E0E0E0 !important;
-                font-weight: 600 !important;
-            }
-            div[data-testid="stExpander"] summary:hover {
-                color: #00bfff !important;
-            }
 
-            /* 3. Style Bar Pencarian */
-            div[data-testid="stTextInput"] input {
+            /* 3. Style Bar Pencarian cuma di area Utama */
+            [data-testid="stMain"] div[data-testid="stTextInput"] input {
                 border: 2px solid #3d4156 !important;
                 background-color: #0e1117 !important;
                 border-radius: 10px !important;
             }
-            div[data-testid="stTextInput"] input:focus {
-                border-color: #00bfff !important;
-                box-shadow: 0 0 10px rgba(0, 191, 255, 0.2) !important;
-            }
-
-            /* 4. Timeline Line biar lebih 'Glow' */
-            .line-active {
-                background: linear-gradient(90deg, #1E90FF, #00bfff) !important;
-                box-shadow: 0 0 12px rgba(30, 144, 255, 0.8) !important;
+            
+            /* CSS Sidebar Reset (Opsional: buat mastiin sidebar tetap default) */
+            [data-testid="stSidebar"] div[data-testid="stRadio"] label {
+                background-color: transparent !important;
+                border: none !important;
+                padding: 0 !important;
             }
             </style>
         """, unsafe_allow_html=True)
