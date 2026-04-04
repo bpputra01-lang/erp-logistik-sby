@@ -2853,7 +2853,7 @@ def menu_reject_defect():
             waktu_sekarang = (datetime.now() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
             
             new_data = pd.DataFrame([{
-                'CABANG' : cabang_pilih
+                'CABANG' : cabang_pilih,
                 'BIN_AWAL': bin_awal, 
                 'BIN': bin_val, 
                 'SKU': sku, 
