@@ -3224,7 +3224,7 @@ def project_approval_reject():
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
-    tabs = st.tabs(["📝 Input Pengajuan", "📑 History & Approval Status"])
+    tabs = st.tabs(["💻 Input Pengajuan", "📑 History & Approval Status"])
 
     with tabs[0]:
         st.subheader("Form Pengajuan Reject/Defect")
@@ -3239,14 +3239,30 @@ def project_approval_reject():
                 size = st.text_input("Size")
                 keterangan = st.text_area("Keterangan Reject/Defect")
             
-            if st.form_submit_button("Kirim Pengajuan"):
+            # --- TOMBOL KIRIM DENGAN STYLE GOLD ---
+            st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+            submit_button = st.form_submit_button("▶️SUBMIT REQUEST")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            if submit_button:
                 if nama and sku:
-                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    conn.execute("INSERT INTO submissions (timestamp, nama_tim, bin_asal, sku, article_name, size, keterangan, status) VALUES (?,?,?,?,?,?,?,?)", 
-                                 (ts, nama, bin_asal, sku, article, size, keterangan, 1))
-                    conn.commit()
-                    st.success("✅ Pengajuan Berhasil!")
-                    st.rerun()
+                    # FIX JAM: Menggunakan WIB (UTC+7) agar sesuai jam sekarang di Indonesia
+                    # Pastikan lo sudah 'from datetime import datetime, timedelta' di bagian atas script
+                    tz_wib = timedelta(hours=7)
+                    ts = (datetime.now() + tz_wib).strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    try:
+                        conn.execute(
+                            "INSERT INTO submissions (timestamp, nama_tim, bin_asal, sku, article_name, size, keterangan, status) VALUES (?,?,?,?,?,?,?,?)", 
+                            (ts, nama, bin_asal, sku, article, size, keterangan, 1)
+                        )
+                        conn.commit()
+                        st.success(f"✅ Pengajuan Berhasil Disimpan pada {ts} WIB!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Gagal simpan ke database: {e}")
+                else:
+                    st.warning("⚠️ Nama Tim dan SKU wajib diisi, Bos!")
 
     with tabs[1]:
         # --- FITUR SEARCH & FILTER ---
