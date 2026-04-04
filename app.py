@@ -3125,11 +3125,10 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
-# --- DATABASE SETUP (DENGAN AUTO-PATCH KOLOM) ---
+# --- DATABASE SETUP ---
 def init_db():
     conn = sqlite3.connect('reject_system.db')
     c = conn.cursor()
-    # 1. Pastikan Tabel Ada
     c.execute('''
         CREATE TABLE IF NOT EXISTS submissions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3143,28 +3142,19 @@ def init_db():
             status INTEGER DEFAULT 1
         )
     ''')
-    
-    # 2. PATCH: Tambah kolom approved_by & setup_by kalau belum ada (Biar Gak KeyError)
-    try:
-        c.execute("ALTER TABLE submissions ADD COLUMN approved_by TEXT")
-    except:
-        pass # Berarti kolom sudah ada
-    
-    try:
-        c.execute("ALTER TABLE submissions ADD COLUMN setup_by TEXT")
-    except:
-        pass # Berarti kolom sudah ada
-        
+    # Patch kolom jika belum ada
+    try: c.execute("ALTER TABLE submissions ADD COLUMN approved_by TEXT")
+    except: pass
+    try: c.execute("ALTER TABLE submissions ADD COLUMN setup_by TEXT")
+    except: pass
     conn.commit()
     return conn
 
 conn = init_db()
 
 def project_approval_reject():
-    # --- DATABASE INTERNAL ---
     conn = sqlite3.connect('reject_system.db', check_same_thread=False)
     
-    # --- CSS LU (Tetap Utuh) ---
     st.markdown("""
         <style>
         .hero-header-custom {
@@ -3173,46 +3163,23 @@ def project_approval_reject():
             margin-bottom: 25px; font-weight: 800; font-size: 22px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
         }
-        .detail-card {
-            background-color: #1a1c27; border: 1px solid #3d4156;
-            padding: 20px; border-radius: 12px; margin-bottom: 20px;
-        }
-        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stSelectbox"] > div > div {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            border-radius: 8px !important;
-        }
-        input, textarea, div[data-baseweb="select"] span { color: white !important; }
-        label { color: #E0E0E0 !important; font-weight: 600 !important; }
+        /* Tombol dikecilkan dikit biar pas di kolom timeline */
         div.stButton > button {
-            background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
-            color: white !important; border-radius: 10px !important;
-            width: 100% !important; height: 50px !important; font-weight: bold !important;
-            border: none !important;
+            width: 100% !important;
+            font-size: 12px !important;
+            height: 35px !important;
+            padding: 0px !important;
         }
         .gold-btn button {
             background-color: #D4AF37 !important;
-            color: white !important; border: none !important;
-            border-radius: 8px !important; font-weight: bold !important;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-            transition: all 0.3s ease-in-out;
-        }
-        .gold-btn button:hover {
-            background-color: #FFD700 !important;
-            color: #1a1c27 !important;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
-            transform: translateY(-2px);
+            color: white !important;
+            border: none !important;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
         }
         .timeline-line {
             height: 4px; background: #3d4156; margin-top: 15px; border-radius: 2px;
         }
-        .line-active {
-            background: #1E90FF !important; box-shadow: 0 0 8px rgba(30, 144, 255, 0.6);
-        }
+        .line-active { background: #1E90FF !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -3243,74 +3210,72 @@ def project_approval_reject():
 
     with tabs[1]:
         df = pd.read_sql_query("SELECT * FROM submissions ORDER BY id DESC", conn)
-        
-        if df.empty:
-            st.info("Belum ada riwayat pengajuan.")
-        else:
-            for index, row in df.iterrows():
-                with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
-                    st.markdown("### 📄 Detail Pengajuan")
-                    col_det1, col_det2 = st.columns(2)
-                    with col_det1:
-                        st.write(f"**Nama Pengaju:** {row['nama_tim']}")
-                        st.write(f"**Bin Asal:** {row['bin_asal']}")
-                        st.write(f"**SKU:** {row['sku']}")
-                    with col_det2:
-                        st.write(f"**Article Name:** {row['article_name']}")
-                        st.write(f"**Size:** {row['size']}")
-                        st.write(f"**Waktu Input:** {row['timestamp']}")
-                    
-                    st.info(f"**Keterangan:**\n{row['keterangan']}")
-                    st.divider()
+        for index, row in df.iterrows():
+            with st.expander(f"📌 {row['sku']} - {row['article_name']} ({row['nama_tim']})"):
+                # DETAIL INFO
+                st.markdown("### 📄 Detail Detail")
+                c_det1, c_det2 = st.columns(2)
+                with c_det1:
+                    st.write(f"**Pengaju:** {row['nama_tim']} | **Bin:** {row['bin_asal']}")
+                    st.write(f"**SKU:** {row['sku']}")
+                with c_det2:
+                    st.write(f"**Article:** {row['article_name']} | **Size:** {row['size']}")
+                    st.write(f"**Waktu:** {row['timestamp']}")
+                st.info(f"**Keterangan:** {row['keterangan']}")
+                
+                st.divider()
 
-                    # TIMELINE DENGAN GARIS BIRU
-                    st.write("**Progres Status:**")
-                    line1_class = "line-active" if row['status'] >= 2 else ""
-                    line2_class = "line-active" if row['status'] >= 3 else ""
+                # --- TIMELINE DENGAN TOMBOL DI BAWAH BULATAN ---
+                st.write("**Progres Status:**")
+                line1_active = "line-active" if row['status'] >= 2 else ""
+                line2_active = "line-active" if row['status'] >= 3 else ""
 
-                    tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1, 2, 1, 2, 1])
-                    with tcol1:
+                # Layout: [Titik 1] [Garis 1] [Titik 2] [Garis 2] [Titik 3]
+                tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
+                
+                current_user = "Admin" # Bisa ganti pakai session login
+
+                with tcol1:
+                    st.markdown("🟢 **Done**")
+                    st.caption("Pengajuan")
+                    # Step 1 sudah otomatis done, tidak butuh tombol
+
+                with tline1:
+                    st.markdown(f'<div class="timeline-line {line1_active}"></div>', unsafe_allow_html=True)
+
+                with tcol2:
+                    if row['status'] >= 2:
                         st.markdown("🟢 **Done**")
-                        st.caption("Pengajuan")
-                    with tline1:
-                        st.markdown(f'<div class="timeline-line {line1_class}"></div>', unsafe_allow_html=True)
-                    with tcol2:
-                        if row['status'] >= 2:
-                            st.markdown("🟢 **Done**")
-                            st.caption("Approval")
-                            if row.get('approved_by'): st.caption(f"✍️ {row['approved_by']}")
-                        else:
-                            st.markdown("🟡 **Waiting**")
-                            st.caption("Approval")
-                    with tline2:
-                        st.markdown(f'<div class="timeline-line {line2_class}"></div>', unsafe_allow_html=True)
-                    with tcol3:
-                        if row['status'] >= 3:
-                            st.markdown("🟢 **Done**")
-                            st.caption("Set Up")
-                            if row.get('setup_by'): st.caption(f"✍️ {row['setup_by']}")
-                        else:
-                            st.markdown("⚪ **Waiting**")
-                            st.caption("Set Up")
-
-                    st.write("") 
-
-                    # LOGIKA TOMBOL
-                    current_user = "Admin" # Ganti dengan session user lu
-                    if row['status'] == 1:
-                        if st.button("Approve Purchasing (Step 2)", key=f"btn_app_{row['id']}"):
+                        st.caption("Approval")
+                        if row.get('approved_by'): st.caption(f"✍️ {row['approved_by']}")
+                    else:
+                        st.markdown("🟡 **Waiting**")
+                        st.caption("Approval")
+                        # TOMBOL DISINI (Step 2)
+                        if st.button("Approve", key=f"btn_app_{row['id']}"):
                             conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (current_user, row['id']))
                             conn.commit()
                             st.rerun()
-                    elif row['status'] == 2:
-                        st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-                        if st.button("Final Approval Done Set Up", key=f"btn_set_{row['id']}"):
-                            conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (current_user, row['id']))
-                            conn.commit()
-                            st.rerun()
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    elif row['status'] == 3:
-                        st.success(f"✅ Selesai: Approved by {row.get('approved_by')} | Set Up by {row.get('setup_by')}")
+
+                with tline2:
+                    st.markdown(f'<div class="timeline-line {line2_active}"></div>', unsafe_allow_html=True)
+
+                with tcol3:
+                    if row['status'] >= 3:
+                        st.markdown("🟢 **Done**")
+                        st.caption("Set Up")
+                        if row.get('setup_by'): st.caption(f"✍️ {row['setup_by']}")
+                    else:
+                        st.markdown("⚪ **Waiting**")
+                        st.caption("Set Up")
+                        # TOMBOL DISINI (Step 3) - Pakai CSS Gold
+                        if row['status'] == 2: # Tombol set up cuma muncul kalau sudah di approve
+                            st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+                            if st.button("Set Up", key=f"btn_set_{row['id']}"):
+                                conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (current_user, row['id']))
+                                conn.commit()
+                                st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
 
     conn.close()
 
