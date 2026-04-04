@@ -3271,20 +3271,20 @@ def project_approval_reject():
                     tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
                     
                     with tcol1:
-                        st.markdown("🟢 **Done**")
-                        st.caption("Pengajuan")
+                        st.markdown("🟢 **Done Pengajuan**")
+                        st.caption("Waiting Approval Purchasing")
                     
                     with tline1:
                         st.markdown(f'<div class="timeline-line {line1_class}"></div>', unsafe_allow_html=True)
                     
                     with tcol2:
                         if row['status'] >= 2:
-                            st.markdown("🟢 **Done**")
+                            st.markdown("🟢 **Done Approval**")
                             st.caption("Approval")
                             if row.get('approved_by'): st.caption(f"✍️ {row['approved_by']}")
                         else:
-                            st.markdown("🟡 **Waiting**")
-                            st.caption("Approval")
+                            st.markdown("🟡 **Approval Purchasing**")
+                            st.caption("Purchasing")
                             # Input Nama & Tombol Approval Purchasing
                             nama_app = st.text_input("Nama Purchasing", key=f"inp_app_{row['id']}", placeholder="Isi nama...", label_visibility="collapsed")
                             if st.button("Approve Step 2", key=f"btn_app_{row['id']}", disabled=not nama_app):
@@ -3297,11 +3297,11 @@ def project_approval_reject():
                     
                     with tcol3:
                         if row['status'] >= 3:
-                            st.markdown("🟢 **Done**")
+                            st.markdown("🟢 **Done Setup BIN**")
                             st.caption("Set Up")
                             if row.get('setup_by'): st.caption(f"✍️ {row['setup_by']}")
                         else:
-                            st.markdown("⚪ **Waiting**")
+                            st.markdown("⚪ **Process Request**")
                             st.caption("Set Up")
                             # Tombol muncul hanya jika Step 2 sudah Done
                             if row['status'] == 2:
