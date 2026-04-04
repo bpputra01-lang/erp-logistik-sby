@@ -3158,66 +3158,67 @@ def get_status_info(status_code):
 
 # --- UI STREAMLIT ---
 st.set_page_config(page_title="Reject & Defect Gateway", layout="wide")
+
 # --- SEMUA CSS LU GUE TARO SINI, JANGAN ADA YANG KETINGGALAN ---
+# Pastikan baris di bawah ini nempel ke kiri (tidak ada spasi/tab)
 st.markdown("""
-        <style>
-        /* 1. Header Hero */
-        .hero-header-custom {
-            background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
-            color: white; padding: 12px 25px; border-radius: 10px;
-            margin-bottom: 25px; font-weight: 800; font-size: 22px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
-        }
+    <style>
+    /* 1. Header Hero */
+    .hero-header-custom {
+        background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
+        color: white; padding: 12px 25px; border-radius: 10px;
+        margin-bottom: 25px; font-weight: 800; font-size: 22px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
+    }
 
-        /* 2. Detail Card Preview */
-        .detail-card {
-            background-color: #1a1c27; border: 1px solid #3d4156;
-            padding: 20px; border-radius: 12px; margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
+    /* 2. Detail Card Preview */
+    .detail-card {
+        background-color: #1a1c27; border: 1px solid #3d4156;
+        padding: 20px; border-radius: 12px; margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
 
-        /* 3. Styling Input & Form */
-        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stSelectbox"] > div > div {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            border-radius: 8px !important;
-        }
-        input, textarea, div[data-baseweb="select"] span { color: white !important; }
-        label { color: #E0E0E0 !important; font-weight: 600 !important; }
+    /* 3. Styling Input & Form */
+    [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+    div[data-testid="stTextInput"] > div > div, 
+    div[data-testid="stTextArea"] > div > div,
+    div[data-testid="stSelectbox"] > div > div {
+        background-color: #1a1c27 !important;
+        border: 1px solid #3d4156 !important;
+        border-radius: 8px !important;
+    }
+    input, textarea, div[data-baseweb="select"] span { color: white !important; }
+    label { color: #E0E0E0 !important; font-weight: 600 !important; }
 
-        /* 4. Tombol Utama (Sent Request) */
-        div.stButton > button {
-            background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
-            color: white !important; border-radius: 10px !important;
-            width: 100% !important; height: 50px !important; font-weight: bold !important;
-            border: none !important;
-        }
+    /* 4. Tombol Utama (Sent Request) */
+    div.stButton > button {
+        background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
+        color: white !important; border-radius: 10px !important;
+        width: 100% !important; height: 50px !important; font-weight: bold !important;
+        border: none !important;
+    }
 
-        /* 5. TOMBOL GOLD MENYALA ULTIMATE (Untuk Step 3) */
-        .gold-btn button {
-            background-color: #D4AF37 !important;
-            color: white !important; border: none !important;
-            border-radius: 8px !important; font-weight: bold !important;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-            transition: all 0.3s ease-in-out;
-        }
-        .gold-btn button:hover {
-            background-color: #FFD700 !important;
-            color: #1a1c27 !important;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
-            transform: translateY(-2px);
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    /* 5. TOMBOL GOLD MENYALA ULTIMATE (Untuk Step 3) */
+    .gold-btn button {
+        background-color: #D4AF37 !important;
+        color: white !important; border: none !important;
+        border-radius: 8px !important; font-weight: bold !important;
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
+        text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+        transition: all 0.3s ease-in-out;
+    }
+    .gold-btn button:hover {
+        background-color: #FFD700 !important;
+        color: #1a1c27 !important;
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
+        transform: translateY(-2px);
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
 
 tabs = st.tabs(["📝 Input Pengajuan", "📑 History & Approval Status"])
-
 # --- TAB 1: INPUT FORM ---
 with tabs[0]:
     st.subheader("Form Pengajuan Reject/Defect")
