@@ -2831,12 +2831,29 @@ def menu_reject_defect():
             st.download_button("📥 Download Template", output.getvalue(), "template_reject.xlsx")
 
         with col_up:
-            uploaded_file = st.file_uploader("Upload Excel Massal", type=['xlsx'])
+            # 1. Bikin ID dinamis biar file otomatis hilang pasca-import
+            if 'upload_key' not in st.session_state:
+                st.session_state.upload_key = 0
+
+            # 2. Tambahin parameter 'key' yang berubah-ubah
+            uploaded_file = st.file_uploader(
+                "Upload Excel Massal", 
+                type=['xlsx'], 
+                key=f"excel_up_{st.session_state.upload_key}"
+            )
+
             if uploaded_file:
                 df_upload = pd.read_excel(uploaded_file)
                 if st.button("⤴️ IMPORT DATA KE DATABASE"):
+                    # Logika waktu Lu
                     df_upload['TANGGAL_INPUT'] = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # Simpan data
                     save_data(df_upload)
+                    
+                    # 3. Trik reset: Ubah ID key-nya sebelum rerun
+                    st.session_state.upload_key += 1
+                    
                     st.success("✅ Import Berhasil!")
                     st.rerun()
 
