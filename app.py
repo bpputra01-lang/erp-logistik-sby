@@ -5727,24 +5727,18 @@ if menu == "Logistic Schedule":
         
         with col_v1:
             st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
-            
-            # --- LOGIKA WARNA TABEL ANTI-NORAK ---
-            def style_jadwal(val):
-                if not val:
-                    return 'background-color: #12141d; color: transparent;' 
-                return 'background-color: rgba(255, 255, 255, 0.05); color: #FFFFFF; border: 0.1px solid #222;'
 
-            # Tampilkan DataFrame dengan Style Baru (Sudah masuk ke dalam col_v1)
+            # Tampilkan DataFrame dengan Konsep Stealth Glow
             st.dataframe(
                 st.session_state.res_df.style.apply(lambda x: [
-                    'background-color: rgba(255, 107, 107, 0.15); color: #ff6b6b; font-weight: 600;' if x.name == 'SENIN' else
-                    'background-color: rgba(72, 219, 251, 0.15); color: #48dbfb; font-weight: 600;' if x.name == 'SELASA' else
-                    'background-color: rgba(29, 209, 161, 0.15); color: #1dd1a1; font-weight: 600;' if x.name == 'RABU' else
-                    'background-color: rgba(255, 159, 67, 0.15); color: #ff9f43; font-weight: 600;' if x.name == 'KAMIS' else
-                    'background-color: rgba(95, 39, 205, 0.15); color: #5f27cd; font-weight: 600;' if x.name == 'JUMAT' else
-                    'background-color: rgba(255, 234, 167, 0.15); color: #ffeaa7; font-weight: 600;' if x.name == 'SABTU' else
-                    'background-color: rgba(255, 121, 121, 0.15); color: #ff7979; font-weight: 600;' if x.name == 'MINGGU' else
-                    'background-color: rgba(255, 255, 255, 0.05); color: #00D4FF; font-weight: 800; border-left: 3px solid #00D4FF;' # Kolom SHIFT-ROLE
+                    'color: #ff6b6b; font-weight: 700;' if x.name == 'SENIN' else
+                    'color: #48dbfb; font-weight: 700;' if x.name == 'SELASA' else
+                    'color: #1dd1a1; font-weight: 700;' if x.name == 'RABU' else
+                    'color: #ff9f43; font-weight: 700;' if x.name == 'KAMIS' else
+                    'color: #a29bfe; font-weight: 700;' if x.name == 'JUMAT' else
+                    'color: #ffeaa7; font-weight: 700;' if x.name == 'SABTU' else
+                    'color: #ff7675; font-weight: 700;' if x.name == 'MINGGU' else
+                    'color: #00D4FF; font-weight: 800; border-right: 1px solid #333;' # Kolom SHIFT-ROLE
                     for i in x
                 ], axis=0), 
                 use_container_width=True, 
