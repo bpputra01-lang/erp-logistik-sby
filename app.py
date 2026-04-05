@@ -2856,9 +2856,7 @@ def menu_reject_defect():
                 df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
             else:
                 df_match_result = pd.DataFrame()
-        else:
-            df_match_result = pd.DataFrame()
-            if not df_chart.empty:
+        if not df_chart.empty:
             # 1. Selector Cabang (Masuk lagi 1 tab dari 'if')
             filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
             
