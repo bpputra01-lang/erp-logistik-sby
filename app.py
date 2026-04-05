@@ -5449,7 +5449,7 @@ if menu == "Logistic Schedule":
         with st.form("form_libur_komplit", clear_on_submit=True):
             target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
             tgl_off = st.date_input("Tanggal Off")
-            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH", "TGL MERAH"], horizontal=True)
+            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
             if st.form_submit_button("SUBMIT OFF"):
                 if target:
                     conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
