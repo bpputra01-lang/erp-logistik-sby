@@ -2632,6 +2632,7 @@ def process_stock_comparison(file1, file2):
         raise e
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
+    # --- 1. CSS & HEADER (FIX JUDUL HITAM & WARNA TEKS) ---
     st.markdown("""
         <style>
         .hero-header {
@@ -2646,10 +2647,11 @@ def menu_reject_defect():
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
         
-        /* --- FIX TEKS JUDUL YANG ITEM --- */
+        /* FIX: Judul Metric & Label Widget agar TIDAK HITAM */
         [data-testid="stMetricLabel"] > div, 
         [data-testid="stWidgetLabel"] p, 
-        label p {
+        label p,
+        .stMarkdown p {
             color: #E0E0E0 !important; 
         }
 
@@ -2660,9 +2662,11 @@ def menu_reject_defect():
             border: 1px solid #3d4156 !important;
             border-radius: 6px !important;
         }
+        
         [data-testid="stMain"] input, [data-testid="stMain"] textarea, [data-testid="stMain"] div[data-baseweb="select"] > div { 
             color: white !important; 
         }
+
         [data-testid="stMain"] button[kind="primaryFormSubmit"] {
             background-color: #007BFF !important;
             color: white !important;
@@ -2673,6 +2677,7 @@ def menu_reject_defect():
             border: none !important;
             box-shadow: 0 0 10px rgba(0, 123, 255, 0.4) !important;
         }
+
         [data-testid="stMain"] div.stDownloadButton > button,
         [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]) {
             background-color: #D4AF37 !important;
@@ -2681,8 +2686,8 @@ def menu_reject_defect():
             border-radius: 8px !important;
             font-weight: bold !important;
             box-shadow: 0 0 10px rgba(212, 175, 55, 0.4) !important;
-            transition: all 0.3s ease-in-out !important;
         }
+
         [data-testid="stMain"] [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
@@ -2693,11 +2698,11 @@ def menu_reject_defect():
             flex-direction: column !important;
             justify-content: center !important;
         }
-        [data-testid="stMetricValue"] > div { font-size: 32px !important; font-weight: 900 !important; color: #FFD700 !important; }
         
-        /* Delta Color (Persentase) biar tetep nyala */
-        [data-testid="stMetricDelta"] > div {
-            font-weight: bold !important;
+        [data-testid="stMetricValue"] > div { 
+            font-size: 32px !important; 
+            font-weight: 900 !important; 
+            color: #FFD700 !important; 
         }
         </style>
     """, unsafe_allow_html=True)
@@ -2709,7 +2714,6 @@ def menu_reject_defect():
     tab_entry, tab_analytics = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
 
     with tab_entry:
-        # --- FORM INPUT SINGLE ---
         with st.form("form_reject_new", clear_on_submit=True):
             cabang_input = st.selectbox("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"])
             col1, col2 = st.columns(2)
@@ -2733,16 +2737,11 @@ def menu_reject_defect():
                 'KETERANGAN': keterangan, 'TANGGAL_INPUT': jam
             }])
             save_data(new_data)
-            st.success(f"✅ SKU {sku} [{cabang_input}] Berhasil Disimpan!")
+            st.success(f"✅ SKU {sku} Berhasil Disimpan!")
             st.rerun()
 
         # --- MASS ADJUSTMENT SECTION ---
-        st.markdown("""
-            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;">
-                <h3 style="color: #007BFF; margin: 0; font-size: 18px; font-weight: 900;">📂 MASS ADJUSTMENT - IMPORT EXCEL</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("### 📂 MASS ADJUSTMENT - IMPORT EXCEL")
         col_dl, col_up = st.columns([1, 2])
         with col_dl:
             template_cols = ['CABANG', 'BIN_AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
@@ -2772,7 +2771,7 @@ def menu_reject_defect():
             filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
             df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
 
-            # Metric Ringkasan + DELTA KEMBALI
+            # Metric Ringkasan (DELTA NORMAL: Naik Hijau, Turun Merah)
             m1, m2, m3 = st.columns(3)
             total_val = len(df_final)
             defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', na=False)])
@@ -2785,17 +2784,8 @@ def menu_reject_defect():
                 st.metric("📦 DEFECT (D)", f"{defect_cnt}", f"{p_d:.1f}%")
             with m3:
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-                st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%", delta_color="inverse")
-
-            c_pie, c_bar = st.columns(2)
-            with c_pie:
-                fig_p = px.pie(df_final, names='KATEGORI', title="Proporsi Kerusakan", hole=0.4)
-                fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
-                st.plotly_chart(fig_p, use_container_width=True)
-            with c_bar:
-                fig_b = px.bar(df_final['BIN'].value_counts().reset_index(), x='BIN', y='count', title="Sebaran Lokasi")
-                fig_b.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
-                st.plotly_chart(fig_b, use_container_width=True)
+                # FIX: delta_color="inverse" DIHAPUS agar Naik=Hijau, Turun=Merah
+                st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
             st.write("### 📋 DETAIL DATABASE")
             st.dataframe(df_final.sort_values('TANGGAL_INPUT', ascending=False), use_container_width=True)
