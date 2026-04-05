@@ -5479,10 +5479,10 @@ if menu == "Logistic Schedule":
     st.divider()
 
 
-# --- 3. GENERATOR JADWAL JEZ SBY (LOGIC V4 - CONSECUTIVE SHIFT) ---
+# --- 3. GENERATOR JADWAL JEZ SBY (LOGIC V5 - STRICT & CONSECUTIVE) ---
 st.subheader("🚀 3. Generator Jadwal Otomatis")
 
-start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v4")
+start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v5")
 df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
 karyawan_list = df_staff_master.to_dict('records')
 
@@ -5503,7 +5503,6 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
     double_day_count = {k['nama']: 0 for k in karyawan_list}
     for k in karyawan_list: k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
 
-    # Fungsi cek dia udah masuk shift apa aja hari ini
     def get_active_shifts(nama, day_name):
         return [slot.split(" - ")[0] for slot in storage[day_name] if any(nama in n for n in storage[day_name][slot])]
 
@@ -5523,21 +5522,19 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
                     if weekly_counter[nama] >= k['target_fix']: continue
                     if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                     
-                    # Cek jam yang sudah diambil hari ini
                     active_shifts = get_active_shifts(nama, day_name)
-                    if shf_jam in active_shifts: continue # Gak boleh di slot jam yang sama
+                    if shf_jam in active_shifts: continue 
                     
-                    # --- LOGIKA SHIFT BERURUTAN (CONSECUTIVE) ---
+                    # --- LOGIKA SHIFT BERURUTAN (MANUSIAWI) ---
                     if k['tipe'] == "Part-Full" and active_shifts:
-                        # Kalau sudah ada shift 0, shift berikutnya HARUS shift 1
                         if "SHIFT 0" in active_shifts and shf_jam != "SHIFT 1": continue
-                        # Kalau sudah ada shift 1, shift berikutnya BISA shift 0 atau shift 2
                         if "SHIFT 1" in active_shifts and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
-                        # Kalau sudah ada shift 2, shift berikutnya HARUS shift 1
                         if "SHIFT 2" in active_shifts and shf_jam != "SHIFT 1": continue
                     
-                    # --- ATURAN NO BACKUP ---
-                    if (shf_role == "SPV" or shf_role == "LOG-ADMIN") and k['posisi'] != shf_role: continue
+                    # --- ATURAN KERAS NO BACKUP (SPV, LOG-ADMIN, LOG-STORE) ---
+                    role_haram_backup = ["SPV", "LOG-ADMIN", "LOG-STORE"]
+                    if shf_role in role_haram_backup and k['posisi'] != shf_role:
+                        continue
                     
                     is_match = (k['posisi'] == shf_role)
                     current_daily = len(active_shifts)
@@ -5559,7 +5556,7 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
                     if len(get_active_shifts(p['k']['nama'], day_name)) == 2:
                         double_day_count[p['k']['nama']] += 1
 
-    # --- FINAL TABLE GENERATION ---
+    # --- SIMPAN HASIL ---
     final_table = []
     real_summary = {k['nama']: 0 for k in karyawan_list}
     for shf_jam, shf_role in base_roles:
@@ -5578,7 +5575,7 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
     st.session_state.summary_shift = real_summary
     st.rerun()
 
-# --- TAMPILAN JADWAL ---
+# --- TAMPILAN JADWAL MINGGUAN ---
 if 'res_df' in st.session_state:
     st.divider()
     col_v1, col_v2 = st.columns([5, 2])
