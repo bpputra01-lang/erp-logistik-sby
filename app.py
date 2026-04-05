@@ -2751,6 +2751,24 @@ def menu_reject_defect():
             border-radius: 4px !important;
             font-size: 12px !important;
         }
+        /* FIX JUDUL MASS ADJUSTMENT: Paksa Putih Terang */
+        h1, h2, h3, .stMarkdown h3 {
+            color: #FFFFFF !important;
+            font-weight: 800 !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            margin-top: 20px !important;
+        }
+
+        /* Teks "Upload Excel Massal" kecil di bawahnya juga biar gak ilang */
+        .stMarkdown p {
+            color: #E0E0E0 !important;
+        }
+
+        /* Tapi TETEP JAGA Label Form Putih Tebal */
+        [data-testid="stWidgetLabel"] p {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
