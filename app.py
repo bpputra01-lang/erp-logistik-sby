@@ -2524,13 +2524,7 @@ def menu_retur_out_system():
                 font-size: 1.85rem;
                 margin: 0;
             }
-            /* STYLE METRIC CARD DARK MODE (PERSIS GAMBAR) */
-            .metric-container {
-                display: flex;
-                justify-content: bwtween;
-                gap: 15px;
-                margin-bottom: 25px;
-            }
+            /* STYLE METRIC CARD DARK MODE (SESUAI GAMBAR) */
             .metric-card {
                 background-color: #1e2130;
                 padding: 20px;
@@ -2538,14 +2532,14 @@ def menu_retur_out_system():
                 box-shadow: 0 10px 20px rgba(0,0,0,0.3);
                 width: 100%;
                 text-align: center;
-                border-left: 6px solid #6366f1; /* Default Purple */
+                margin-bottom: 10px;
             }
             .metric-label {
                 color: #9ea0a9;
-                font-size: 0.9rem;
+                font-size: 0.85rem;
                 font-weight: 700;
                 text-transform: uppercase;
-                margin-bottom: 10px;
+                margin-bottom: 8px;
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -2559,7 +2553,7 @@ def menu_retur_out_system():
             }
             .metric-delta {
                 color: #00ff41;
-                font-size: 0.85rem;
+                font-size: 0.82rem;
                 font-weight: 700;
             }
         </style>
@@ -2573,7 +2567,7 @@ def menu_retur_out_system():
     if uploaded_file:
         df_upload = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
 
-        # Nama kolom sesuai format Excel lu (A=Identify, B=BIN, ..., H=Harga Beli, J=QTY SYSTEM, K=QTY SO)
+        # Nama kolom sesuai format Excel (H=Harga Beli, J=QTY SYSTEM)
         required_cols = [
             'Identify', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 
             'VARIANT', 'SUB KATEGORI', 'Harga Beli', 'Harga Jual', 
@@ -2582,19 +2576,20 @@ def menu_retur_out_system():
         
         if all(col in df_upload.columns for col in required_cols):
             # --- KALKULASI DATA ---
-            total_qty_so = df_upload['QTY SO'].sum()
             total_sku = df_upload['SKU'].nunique()
             
+            # TOTAL QTY = Kolom J (QTY SYSTEM) tanpa koma
+            total_qty_system = df_upload['QTY SYSTEM'].sum()
+            
             # TOTAL VALUE = Kolom J (QTY SYSTEM) * Kolom H (Harga Beli)
-            df_upload['VALUE_CALC'] = df_upload['QTY SYSTEM'] * df_upload['Harga Beli']
-            total_value = df_upload['VALUE_CALC'].sum()
+            total_value = (df_upload['QTY SYSTEM'] * df_upload['Harga Beli']).sum()
 
-            # --- TAMPILAN METRIK MODEL DARK (HTML/CSS) ---
+            # --- TAMPILAN METRIK MODEL DARK ---
             m1, m2, m3 = st.columns(3)
             
             with m1: # Card Ungu
                 st.markdown(f"""
-                    <div class="metric-card" style="border-left-color: #8b5cf6;">
+                    <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
                         <div class="metric-label">📦 TOTAL SKU AKTIF</div>
                         <div class="metric-value">{total_sku:,}</div>
                         <div class="metric-delta">↑ OVERALL</div>
@@ -2603,19 +2598,19 @@ def menu_retur_out_system():
             
             with m2: # Card Hijau
                 st.markdown(f"""
-                    <div class="metric-card" style="border-left-color: #10b981;">
-                        <div class="metric-label">📥 TOTAL QTY SO</div>
-                        <div class="metric-value">{int(total_qty_so)}</div>
-                        <div class="metric-delta">↑ {len(df_upload)} Items Tersedia</div>
+                    <div class="metric-card" style="border-left: 6px solid #10b981;">
+                        <div class="metric-label">📊 TOTAL QTY SYSTEM (COL J)</div>
+                        <div class="metric-value">{int(total_qty_system)}</div>
+                        <div class="metric-delta">↑ {len(df_upload)} Baris Data</div>
                     </div>
                 """, unsafe_allow_html=True)
                 
             with m3: # Card Kuning
                 st.markdown(f"""
-                    <div class="metric-card" style="border-left-color: #f59e0b;">
-                        <div class="metric-label">💰 TOTAL VALUE (J*H)</div>
+                    <div class="metric-card" style="border-left: 6px solid #f59e0b;">
+                        <div class="metric-label">💰 TOTAL VALUE (J * H)</div>
                         <div class="metric-value">Rp {total_value:,.0f}</div>
-                        <div class="metric-delta">↑ 100% Calculated</div>
+                        <div class="metric-delta">↑ Calculated Value</div>
                     </div>
                 """, unsafe_allow_html=True)
 
@@ -2629,19 +2624,20 @@ def menu_retur_out_system():
             if st.button("💾 SIMPAN KE DATABASE SQLITE", type="primary", use_container_width=True):
                 conn = None
                 try:
+                    import sqlite3
                     conn = sqlite3.connect('inventory_logistics.db')
                     df_to_save = edited_df.copy()
                     df_to_save.columns = ['identify', 'bin', 'sku', 'brand', 'item_name', 'variant', 'sub_kategori', 'harga_beli', 'harga_jual', 'qty_system', 'qty_so']
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
                     conn.commit()
-                    st.success(f"🚀 Gaspol! Data masuk database.")
+                    st.success(f"🚀 Data Berhasil Disimpan ke SQLite!")
                     st.balloons()
                 except Exception as e:
                     st.error(f"Gagal simpan: {e}")
                 finally:
                     if conn: conn.close()
         else:
-            st.warning("⚠️ Kolom tidak sesuai format gambar!")
+            st.warning("⚠️ Kolom tidak sesuai format!")
 
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
