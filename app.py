@@ -2543,23 +2543,31 @@ def menu_retur_out_system():
         }
         .metric-card {
             background-color: #1E1E2E;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 2px 2px 12px rgba(0,0,0,0.4);
-            text-align: center;
-            border-bottom: 4px solid #3d4455;
-        }
-        .metric-value {
-            font-size: 28px;
-            font-weight: 800;
-            color: #FFFFFF;
-            margin: 5px 0;
+            padding: 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            color: white;
+            margin-bottom: 15px;
         }
         .metric-label {
-            font-size: 12px;
+            font-size: 11px;
             color: #A0A0A0;
             text-transform: uppercase;
             letter-spacing: 1.2px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 26px;
+            font-weight: 800;
+            color: #FFFFFF;
+            margin: 0;
+        }
+        .metric-delta {
+            font-size: 10px;
+            color: #10b981;
+            font-weight: 600;
+            margin-top: 5px;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -2568,60 +2576,76 @@ def menu_retur_out_system():
 
     conn = init_db()
 
-    # --- 3. UPLOAD & AUTO-SAVE ---
-    with st.expander("📥 Upload Data", expanded=True):
-        uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up")
-        
-        if uploaded_file:
-            try:
-                df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-                
-                # Standarisasi Header (Hapus spasi depan/belakang)
-                df_upload.columns = [str(c).strip() for c in df_upload.columns]
-                
-                required_cols = {
-                    'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
-                    'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
-                    'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 
-                    'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
-                }
+    # --- 3. UPLOAD & AUTO-SAVE (TANPA EXPANDER) ---
+    st.markdown("### 📥 UPLOAD DATA BARU")
+    uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
+    
+    if uploaded_file:
+        try:
+            df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
+            
+            # Standarisasi Header
+            df_upload.columns = [str(c).strip() for c in df_upload.columns]
+            
+            required_cols = {
+                'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
+                'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
+                'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 
+                'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
+            }
 
-                if all(col in df_upload.columns for col in required_cols.keys()):
-                    df_to_save = df_upload[list(required_cols.keys())].copy()
-                    df_to_save.rename(columns=required_cols, inplace=True)
-                    
-                    # Anti-Duplicate Upload (Session Check)
-                    file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
-                    if st.session_state.get('last_file_key') != file_key:
-                        df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                        st.session_state['last_file_key'] = file_key
-                        st.success(f"✅Berhasil {len(df_to_save)} Baris berhasil masuk database.")
-                        st.rerun()
-                else:
-                    st.error("Gagal: Kolom di file lu gak match sama sistem!")
-            except Exception as e:
-                st.error(f"Error Upload: {e}")
+            if all(col in df_upload.columns for col in required_cols.keys()):
+                df_to_save = df_upload[list(required_cols.keys())].copy()
+                df_to_save.rename(columns=required_cols, inplace=True)
+                
+                file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
+                if st.session_state.get('last_file_key') != file_key:
+                    df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
+                    st.session_state['last_file_key'] = file_key
+                    st.success(f"✅ Berhasil! {len(df_to_save)} Baris masuk database.")
+                    st.rerun()
+            else:
+                st.error("Gagal: Kolom di file lu gak match sama sistem!")
+        except Exception as e:
+            st.error(f"Error Upload: {e}")
 
     # --- 4. DATA VIEW & METRICS ---
     try:
-        # Tarik data lengkap + rowid buat fungsi delete
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
         if not df_db.empty:
-            # Kalkulasi Dashboard
+            # Kalkulasi Dashboard (Gue pastiin nama variabelnya sinkron sama box di bawah)
             total_sku = df_db['sku'].nunique()
-            total_qty = df_db['qty_system'].sum()
-            total_val = (df_db['qty_system'] * df_db['harga_beli']).sum()
+            total_qty_system = df_db['qty_system'].sum()
+            total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #8b5cf6;"><div class="metric-label">🗄️ TOTAL SKU</div><div class="metric-value">{total_sku:,}</div><div class="metric-delta">↑ IN DATABASE</div></div>', unsafe_allow_html=True)
-            with c2:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #10b981;"><div class="metric-label">📦TOTAL QTY</div><div class="metric-value">{int(total_qty_system)}</div><div class="metric-delta">↑ TOTAL STOCK</div></div>', unsafe_allow_html=True)
-            with c3:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #f59e0b;"><div class="metric-label">💰 TOTAL VALUE</div><div class="metric-value">Rp {total_value:,.0f}</div><div class="metric-delta">↑ TOTAL COST</div></div>', unsafe_allow_html=True)
-
-            st.markdown("### 📜 Retur Out History")
+            # TAMPILAN METRIK BOX GAYA BARU
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
+                        <div class="metric-label">🗄️ TOTAL SKU</div>
+                        <div class="metric-value">{total_sku:,}</div>
+                        <div class="metric-delta">↑ IN DATABASE</div>
+                    </div>
+                ''', unsafe_allow_html=True)
+            with m2:
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #10b981;">
+                        <div class="metric-label">📦 TOTAL QTY</div>
+                        <div class="metric-value">{int(total_qty_system):,}</div>
+                        <div class="metric-delta">↑ TOTAL STOCK</div>
+                    </div>
+                ''', unsafe_allow_html=True)
+            with m3:
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #f59e0b;">
+                        <div class="metric-label">💰 TOTAL VALUE</div>
+                        <div class="metric-value">Rp {total_value:,.0f}</div>
+                        <div class="metric-delta">↑ TOTAL COST</div>
+                    </div>
+                ''', unsafe_allow_html=True)
+            st.markdown("### 📜 Retur History")
             
             # Pengaturan tampilan tabel
             df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
