@@ -2490,7 +2490,7 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
-# --- 1. INITIALIZE DATABASE (WITH AUTO-PATCH ALTER TABLE) ---
+# --- 1. INITIALIZE DATABASE (DENGAN AUTO-PATCH ALTER) ---
 def init_db():
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
@@ -2506,25 +2506,26 @@ def init_db():
         )
     ''')
     
-    # --- LOGIKA ALTER TABLE (FORCE ADD COLUMN) ---
+    # --- LOGIKA ALTER TABLE (WAJIB ADA) ---
+    # Cek struktur kolom yang ada sekarang
     c.execute("PRAGMA table_info(retur_out)")
     existing_cols = [row[1] for row in c.fetchall()]
     
-    # Jika kolom 'tanggal' belum ada di DB lu, suntik sekarang
+    # Jika kolom 'tanggal' tidak ditemukan, tambahkan secara manual
     if 'tanggal' not in existing_cols:
         try:
             c.execute("ALTER TABLE retur_out ADD COLUMN tanggal TEXT")
             conn.commit()
         except Exception as e:
-            st.error(f"Gagal Alter Table: {e}")
+            st.error(f"Gagal Update Struktur Database: {e}")
             
     return conn
 
 def menu_retur_out_system():
-    # Setting Jam Surabaya
+    # Jam Jakarta/Surabaya
     tz_sub = pytz.timezone('Asia/Jakarta')
 
-    # --- 2. CSS DASHBOARD PREMIUM ---
+    # --- 2. CSS DASHBOARD ---
     st.markdown("""
         <style>
         .hero-header { background-color: #1d3e7a; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-left: 8px solid #007BFF; }
@@ -2546,11 +2547,13 @@ def menu_retur_out_system():
     
     if uploaded_file:
         try:
+            # Baca file berdasarkan ekstensi
             if uploaded_file.name.endswith('.xlsx'):
                 df_up = pd.read_excel(uploaded_file)
             else:
                 df_up = pd.read_csv(uploaded_file)
             
+            # Bersihkan spasi di header
             df_up.columns = [str(c).strip() for c in df_up.columns]
             
             mapping = {
@@ -2562,7 +2565,7 @@ def menu_retur_out_system():
 
             if all(k in df_up.columns for k in mapping.keys()):
                 df_to_save = df_up[list(mapping.keys())].rename(columns=mapping)
-                # Tambah data waktu sekarang
+                # Tambahkan data tanggal saat ini
                 df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
                 # Simpan ke DB
@@ -2572,15 +2575,17 @@ def menu_retur_out_system():
                 st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris!")
                 st.rerun()
             else:
-                st.error("Kolom file gak sesuai sama mapping sistem!")
+                st.error("Kolom file tidak sesuai!")
         except Exception as e:
             st.error(f"Gagal Simpan: {e}")
 
     # --- 4. VIEW DATA ---
     try:
+        # Load data termasuk rowid untuk keperluan hapus
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
         
         if not df_db.empty:
+            # Layout Metrik
             m1, m2, m3 = st.columns(3)
             m1.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL SKU</div><div class="metric-value">{df_db["sku"].nunique()}</div></div>', unsafe_allow_html=True)
             m2.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL QTY</div><div class="metric-value">{int(df_db["qty_system"].sum()):,}</div></div>', unsafe_allow_html=True)
@@ -2594,9 +2599,11 @@ def menu_retur_out_system():
                 df_display = df_display[df_display['sku'].astype(str).str.contains(search, case=False) | 
                                         df_display['item_name'].str.contains(search, case=False)]
 
+            # Sembunyikan kolom sistem dari user
             cols_view = [c for c in df_display.columns if c not in ['rowid', 'id']]
             event = st.dataframe(df_display[cols_view], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
 
+            # Logika Hapus Baris
             if event.selection.rows:
                 idx = event.selection.rows[0]
                 t_id = df_display.iloc[idx]['rowid']
