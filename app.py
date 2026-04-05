@@ -3797,6 +3797,92 @@ def init_db():
 
 conn = init_db()
 
+import streamlit as st
+import pandas as pd
+import sqlite3
+
+# --- DATABASE SETUP ---
+def init_db():
+    conn = sqlite3.connect('inventory_logistics.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS retur_out (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sku TEXT,
+            article_name TEXT,
+            qty INTEGER,
+            price_buy REAL,
+            tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def menu_retur_out_uploader():
+    st.markdown("### 📤 BULK RETUR OUT SYSTEM (SQLITE)")
+
+    # 1. FILE UPLOADER
+    uploaded_file = st.file_uploader("Upload File Retur (Excel atau CSV)", type=['xlsx', 'csv'])
+
+    if uploaded_file:
+        # Load Data berdasarkan tipe file
+        if uploaded_file.name.endswith('.csv'):
+            df_upload = pd.read_csv(uploaded_file)
+        else:
+            df_upload = pd.read_excel(uploaded_file)
+
+        # Standarisasi Nama Kolom (Memastikan match dengan DB)
+        # Asumsi kolom di file: SKU, ARTICLE_NAME, QTY, PRICE_BUY
+        df_upload.columns = [c.upper() for c in df_upload.columns]
+        
+        required_cols = ['SKU', 'ARTICLE_NAME', 'QTY', 'PRICE_BUY']
+        if all(col in df_upload.columns for col in required_cols):
+            
+            # --- 2. METRICS BOX (AUTO CALC FROM UPLOAD) ---
+            total_qty = df_upload['QTY'].sum()
+            total_sku = df_upload['SKU'].nunique()
+            # COGS = Qty * Harga Beli
+            total_cogs = (df_upload['QTY'] * df_upload['PRICE_BUY']).sum()
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("TOTAL QTY", f"{total_qty:,} Pcs")
+            m2.metric("UNIQUE SKU", f"{total_sku:,}")
+            m3.metric("TOTAL COGS", f"Rp {total_cogs:,.0f}")
+
+            st.divider()
+
+            # --- 3. PREVIEW & EDIT ---
+            st.write("🔍 **Preview Data Sebelum Simpan:**")
+            edited_df = st.data_editor(
+                df_upload[required_cols], 
+                use_container_width=True, 
+                hide_index=True,
+                num_rows="dynamic"
+            )
+
+            # --- 4. TOMBOL SIMPAN KE SQLITE ---
+            if st.button("💾 SIMPAN SEMUA KE DATABASE", type="primary", use_container_width=True):
+                try:
+                    conn = sqlite3.connect('inventory_logistics.db')
+                    
+                    # Mapping balik ke lowercase untuk SQLite
+                    df_to_save = edited_df.copy()
+                    df_to_save.columns = ['sku', 'article_name', 'qty', 'price_buy']
+                    
+                    # Inject ke database (Fast Append)
+                    df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
+                    conn.close()
+                    
+                    st.success(f"🚀 Berhasil! {len(df_to_save)} baris data telah masuk ke database.")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Terjadi kesalahan saat simpan: {e}")
+        else:
+            st.error(f"Kolom file tidak sesuai! Pastikan ada kolom: {required_cols}")
+
+
 with st.sidebar:
        st.markdown("""
         <style>
@@ -4062,7 +4148,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System"]
+    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out"]
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
 
@@ -5438,3 +5524,6 @@ elif menu == "Compare Penerimaan RTO":
 
 elif menu == "Pengajuan Reject/Defect":
     project_approval_reject()
+
+elif menu == List Retur Out
+    menu_retur_out_uploader()
