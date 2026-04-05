@@ -2841,7 +2841,7 @@ def menu_reject_defect():
                     st.success("✅ Import Berhasil!")
                     st.rerun()
 
-        with tab_analytics:
+    with tab_analytics:
         # BARIS DI BAWAH INI HARUS MASUK 1 TAB DARI 'WITH'
         conn = sqlite3.connect('inventory_logistik.db')
         df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
