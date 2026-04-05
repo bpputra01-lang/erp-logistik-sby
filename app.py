@@ -2864,40 +2864,48 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
+            # 1. Judul Hitam & Tebal
             st.markdown('<h3 style="color: #31333F; font-weight: 800; margin-top: 30px;">📋 DETAIL DATABASE</h3>', unsafe_allow_html=True)
-            
-            # Ambil data
+
+            # 2. Ambil Data
             df_view = df_final.sort_values('rowid', ascending=False)
 
-            # Buat Container biar rapi
-            with st.container():
-                # HEADER TABEL
-                h_cols = st.columns([0.6, 1.5, 1.5, 2.5, 2, 2.5])
-                headers = ["ACT", "CABANG", "SKU", "NAMA BARANG", "KATEGORI", "WAKTU"]
-                for col, text in zip(h_cols, headers):
-                    col.markdown(f"**{text}**")
-                st.divider()
+            # 3. CSS KHUSUS BIAR TABEL RAPET
+            st.markdown("""
+                <style>
+                .custom-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-family: sans-serif; }
+                .custom-table th { text-align: left; padding: 12px; border-bottom: 2px solid #EEE; color: #666; font-size: 13px; }
+                .custom-table td { padding: 12px; border-bottom: 1px solid #F5F5F5; vertical-align: middle; font-size: 14px; color: #333; }
+                </style>
+            """, unsafe_allow_html=True)
 
-                # ISI DATA
-                for _, row in df_view.iterrows():
-                    r_cols = st.columns([0.6, 1.5, 1.5, 2.5, 2, 2.5])
-                    
-                    # Tombol Hapus (Kolom ACT)
-                    with r_cols[0]:
-                        if st.button("🗑️", key=f"del_{row['rowid']}", help="Hapus baris ini"):
-                            delete_reject_item(row['rowid'])
-                            st.rerun()
-                    
-                    # Data Lainnya (Kolom sisa)
-                    # Pake st.text biar font-nya konsisten dan gak kegedean
-                    r_cols[1].text(row['CABANG'])
-                    r_cols[2].text(row['SKU'])
-                    r_cols[3].text(row['ARTICLE_NAME'])
-                    r_cols[4].text(row['KATEGORI'])
-                    r_cols[5].markdown(f"<code style='font-size: 11px;'>{row['TANGGAL_INPUT']}</code>", unsafe_allow_html=True)
-                    
-                    st.divider() # Garis tipis antar baris
-
+            # 4. MULAI RENDER TABEL
+            # Kita pake columns cuma buat tempat tombol hapus (ACT) biar tetep bisa diklik
+            # Sisanya kita masukin ke HTML biar rapih sejajar
+            for _, row in df_view.iterrows():
+                # Bikin baris pake st.columns tapi rasionya kita kunci ketat
+                c_act, c_data = st.columns([0.1, 0.9])
+                
+                with c_act:
+                    # Tombol hapus kecil di pojok kiri
+                    if st.button("🗑️", key=f"del_{row['rowid']}"):
+                        delete_reject_item(row['rowid'])
+                        st.rerun()
+                
+                with c_data:
+                    # Gabungin semua data jadi satu baris HTML biar lurus
+                    html_row = f"""
+                    <table class="custom-table">
+                        <tr>
+                            <td style="width: 15%;"><b>{row['CABANG']}</b></td>
+                            <td style="width: 15%;">{row['SKU']}</td>
+                            <td style="width: 25%;">{row['ARTICLE_NAME']}</td>
+                            <td style="width: 20%; color: #007BFF;">{row['KATEGORI']}</td>
+                            <td style="width: 25%; font-size: 11px; color: #999;">{row['TANGGAL_INPUT']}</td>
+                        </tr>
+                    </table>
+                    """
+                    st.markdown(html_row, unsafe_allow_html=True)
 import streamlit as st
 import sqlite3
 import pandas as pd
