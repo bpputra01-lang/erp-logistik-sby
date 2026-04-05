@@ -2490,9 +2490,13 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
-# --- 1. INITIALIZE DATABASE ---
+# --- 1. KONEKSI DB DENGAN CACHE (BIAR GAK KEDUT) ---
+@st.cache_resource
+def get_connection():
+    return sqlite3.connect('inventory_logistics.db', check_same_thread=False)
+
 def init_db():
-    conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
+    conn = get_connection()
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out_v2 (
@@ -2505,121 +2509,97 @@ def init_db():
         )
     ''')
     conn.commit()
-    return conn
-
-# Fungsi biar upload gak lemot (Cache memory)
-@st.cache_data(show_spinner=False)
-def process_upload(file):
-    if file.name.endswith('.xlsx'):
-        return pd.read_excel(file)
-    return pd.read_csv(file)
 
 def menu_retur_out_system():
     tz_sub = pytz.timezone('Asia/Jakarta')
+    init_db()
+    conn = get_connection()
 
-    # --- 2. CSS DASHBOARD (BOX METRICS RECOVERY) ---
+    # --- 2. CSS DASHBOARD ---
     st.markdown("""
         <style>
-        .hero-header { background-color: #1d3e7a; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-left: 8px solid #007BFF; }
-        .hero-text { color: white !important; margin: 0 !important; font-size: 24px !important; font-weight: 800 !important; }
-        
-        /* BOX METRICS STYLE */
-        .metric-container { display: flex; gap: 15px; margin-bottom: 20px; }
+        .hero-header { background-color: #1d3e7a; padding: 15px; border-radius: 12px; margin-bottom: 20px; border-left: 8px solid #007BFF; }
+        .hero-text { color: white !important; margin: 0; font-size: 22px; font-weight: 800; }
+        .metric-container { display: flex; gap: 10px; margin-bottom: 20px; }
         .metric-box { 
-            flex: 1; background: #1E1E2E; padding: 20px; border-radius: 15px; 
-            border-bottom: 4px solid #007BFF; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            flex: 1; background: #1E1E2E; padding: 15px; border-radius: 10px; 
+            border-bottom: 3px solid #007BFF; text-align: center;
         }
-        .m-label { color: #A0A0A0; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
-        .m-value { color: #FFFFFF; font-size: 24px; font-weight: 800; }
-        
-        div[data-baseweb="input"] + div { display: none; }
+        .m-label { color: #A0A0A0; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+        .m-value { color: #FFFFFF; font-size: 20px; font-weight: 800; }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><p class="hero-text">📦 RETUR OUT - DATABASE V2</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">📦 RETUR OUT - DATABASE</p></div>', unsafe_allow_html=True)
 
-    conn = init_db()
-
-    # --- 3. UPLOAD LOGIC (OPTIMIZED) ---
-    uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
-    
-    if uploaded_file:
-        try:
-            df_up = process_upload(uploaded_file)
-            df_up.columns = [str(c).strip() for c in df_up.columns]
-            
-            mapping = {
-                'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 'BRAND': 'brand', 
-                'ITEM NAME': 'item_name', 'VARIANT': 'variant', 'SUB KATEGORI': 'sub_kategori', 
-                'Harga Beli': 'harga_beli', 'Harga Jual': 'harga_jual', 
-                'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
-            }
-
-            if all(k in df_up.columns for k in mapping.keys()):
-                df_to_save = df_up[list(mapping.keys())].rename(columns=mapping)
-                df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
-                
-                df_to_save.to_sql('retur_out_v2', conn, if_exists='append', index=False)
-                conn.commit()
-                
-                st.success(f"🔥 God-speed! {len(df_to_save)} baris masuk database.")
-                st.cache_data.clear() # Bersihin cache biar upload selanjutnya gak stuck
-                st.rerun()
-        except Exception as e:
-            st.error(f"Error: {e}")
-
-    # --- 4. VIEW DATA ---
-    try:
-        # Load data (rowid penting buat delete cepat)
-        df_db = pd.read_sql("SELECT rowid, * FROM retur_out_v2", conn)
+    # --- 3. UPLOAD AREA (Gunakan Container biar gak goyang) ---
+    with st.container():
+        uploaded_file = st.file_uploader("Upload File Baru", type=['xlsx', 'csv'])
         
-        if not df_db.empty:
-            # Tampilan Metriks Box
-            total_val = (df_db["qty_system"] * df_db["harga_beli"]).sum()
-            
-            st.markdown(f"""
-                <div class="metric-container">
-                    <div class="metric-box">
-                        <div class="m-label">Total SKU</div>
-                        <div class="m-value">{df_db["sku"].nunique()}</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="m-label">Total QTY</div>
-                        <div class="m-value">{int(df_db["qty_system"].sum()):,}</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="m-label">Total Value</div>
-                        <div class="m-value">Rp {total_val:,.0f}</div>
-                    </div>
+        if uploaded_file:
+            try:
+                # Load data tanpa cache di sini karena filenya bisa beda-beda
+                if uploaded_file.name.endswith('.xlsx'):
+                    df_up = pd.read_excel(uploaded_file)
+                else:
+                    df_up = pd.read_csv(uploaded_file)
+                
+                df_up.columns = [str(c).strip() for c in df_up.columns]
+                mapping = {
+                    'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 'BRAND': 'brand', 
+                    'ITEM NAME': 'item_name', 'VARIANT': 'variant', 'SUB KATEGORI': 'sub_kategori', 
+                    'Harga Beli': 'harga_beli', 'Harga Jual': 'harga_jual', 
+                    'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
+                }
+
+                if all(k in df_up.columns for k in mapping.keys()):
+                    df_to_save = df_up[list(mapping.keys())].rename(columns=mapping)
+                    df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    df_to_save.to_sql('retur_out_v2', conn, if_exists='append', index=False)
+                    conn.commit()
+                    st.success(f"🔥 Selesai! {len(df_to_save)} Data Masuk.")
+                    # PENTING: Jangan st.rerun() kalau gak darurat banget biar gak flickering
+                else:
+                    st.error("Kolom Gak Cocok!")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    # --- 4. DATA AREA ---
+    # Tarik data terbaru
+    df_db = pd.read_sql("SELECT rowid, * FROM retur_out_v2", conn)
+    
+    if not df_db.empty:
+        # Metrik Box
+        st.markdown(f"""
+            <div class="metric-container">
+                <div class="metric-box">
+                    <div class="m-label">Total SKU</div>
+                    <div class="m-value">{df_db["sku"].nunique()}</div>
                 </div>
-            """, unsafe_allow_html=True)
+                <div class="metric-box">
+                    <div class="m-label">Total QTY</div>
+                    <div class="m-value">{int(df_db["qty_system"].sum()):,}</div>
+                </div>
+                <div class="metric-box">
+                    <div class="m-label">Total Nilai</div>
+                    <div class="m-value">Rp {(df_db["qty_system"] * df_db["harga_beli"]).sum():,.0f}</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-            # Search Bar & Table
-            search = st.text_input("🔍 Filter Cepat...", placeholder="Cari SKU atau Nama...")
-            
-            df_display = df_db.sort_values(by='rowid', ascending=False)
-            if search:
-                df_display = df_display[df_display['sku'].astype(str).str.contains(search, case=False) | 
-                                        df_display['item_name'].str.contains(search, case=False)]
+        # Filter & Table (Gunakan key unik biar gak reset pas diketik)
+        search = st.text_input("🔍 Cari Data...", key="main_search_input")
+        
+        df_display = df_db.sort_values(by='rowid', ascending=False)
+        if search:
+            df_display = df_display[df_display['sku'].astype(str).str.contains(search, case=False) | 
+                                    df_display['item_name'].str.contains(search, case=False)]
 
-            cols_view = [c for c in df_display.columns if c not in ['rowid', 'id']]
-            
-            # Gunakan st.dataframe standar (tanpa selection kalo mau makin kenceng)
-            st.dataframe(df_display[cols_view], use_container_width=True, hide_index=True)
-
-            # Tombol Nuke (Optional: Hapus Terakhir)
-            if st.button("🗑️ HAPUS SEMUA DATA V2"):
-                conn.execute("DELETE FROM retur_out_v2")
-                conn.commit()
-                st.rerun()
-
-        else:
-            st.info("💡 Database v2 masih kosong.")
-            
-    finally:
-        conn.close()
-
-
+        cols_view = [c for c in df_display.columns if c not in ['rowid', 'id']]
+        st.dataframe(df_display[cols_view], use_container_width=True, hide_index=True)
+    else:
+        st.info("Database Kosong.")
 
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
