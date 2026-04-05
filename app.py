@@ -2594,8 +2594,7 @@ def menu_retur_out_system():
 
     conn = init_db()
 
-    # --- 3. UPLOAD & AUTO-SAVE ---
-    uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
+    uploaded_file = st.file_uploader("📥 Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
         try:
