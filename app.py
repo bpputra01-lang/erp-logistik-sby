@@ -2492,8 +2492,6 @@ import streamlit as st
 def init_db():
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
-    
-    # Buat tabel jika belum ada
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2505,16 +2503,14 @@ def init_db():
         )
     ''')
     
-    # LOGIKA AUTO-PATCH: Cek jika ada kolom yang kurang di DB lama
+    # Auto-patch kolom jika kurang
     c.execute("PRAGMA table_info(retur_out)")
     existing_cols = [row[1] for row in c.fetchall()]
-    
     required_db_cols = {
         'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
         'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
         'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 'qty_so': 'INTEGER'
     }
-    
     for col, dtype in required_db_cols.items():
         if col not in existing_cols:
             c.execute(f"ALTER TABLE retur_out ADD COLUMN {col} {dtype}")
@@ -2523,46 +2519,16 @@ def init_db():
     return conn
 
 def menu_retur_out_system():
-    # --- 2. CSS DASHBOARD PREMIUM ---
+    # --- 2. CSS ---
     st.markdown("""
         <style>
-        .hero-header {
-            background-color: #1d3e7a;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
-            border-left: 8px solid #007BFF;
-        }
-        .hero-text {
-            color: white !important;
-            margin: 0 !important;
-            font-size: 24px !important;
-            font-weight: 800 !important;
-            letter-spacing: 1px;
-        }
-        .metric-card {
-            background-color: #1E1E2E;
-            padding: 18px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            color: white;
-            margin-bottom: 15px;
-        }
-        .metric-label {
-            font-size: 11px; color: #A0A0A0; text-transform: uppercase;
-            letter-spacing: 1.2px; font-weight: 700; margin-bottom: 5px;
-        }
-        .metric-value { font-size: 26px; font-weight: 800; color: #FFFFFF; margin: 0; }
-        .metric-delta { font-size: 10px; color: #10b981; font-weight: 600; margin-top: 5px; }
-        
-        /* Style Search Bar */
+        .hero-header { background-color: #1d3e7a; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-left: 8px solid #007BFF; }
+        .hero-text { color: white !important; margin: 0 !important; font-size: 24px !important; font-weight: 800 !important; }
+        .metric-card { background-color: #1E1E2E; padding: 18px; border-radius: 12px; color: white; margin-bottom: 15px; border-left: 5px solid #007BFF; }
+        .metric-label { font-size: 11px; color: #A0A0A0; font-weight: 700; }
+        .metric-value { font-size: 24px; font-weight: 800; }
         div[data-baseweb="input"] + div { display: none; }
-        .stTextInput>div>div>input {
-            background-color: #1E1E2E; color: #FFFFFF; border-radius: 10px;
-            border: 1px solid #3d4455; padding: 10px 15px; font-size: 14px;
-        }
-        .stTextInput>div>div>input::placeholder { color: #A0A0A0; }
+        .stTextInput>div>div>input { background-color: #1E1E2E; color: #FFFFFF; border-radius: 10px; border: 1px solid #3d4455; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -2570,93 +2536,73 @@ def menu_retur_out_system():
 
     conn = init_db()
 
-    # --- 3. UPLOAD LOGIC ---
+    # --- 3. UPLOAD ---
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
-    
     if uploaded_file:
         try:
-            df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-            df_upload.columns = [str(c).strip() for c in df_upload.columns]
+            df_up = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
+            df_up.columns = [str(c).strip() for c in df_up.columns]
             
-            required_cols = {
-                'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
-                'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
-                'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 
-                'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
+            mapping = {
+                'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 'BRAND': 'brand', 
+                'ITEM NAME': 'item_name', 'VARIANT': 'variant', 'SUB KATEGORI': 'sub_kategori', 
+                'Harga Beli': 'harga_beli', 'Harga Jual': 'harga_jual', 
+                'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
             }
 
-            if all(col in df_upload.columns for col in required_cols.keys()):
-                df_to_save = df_upload[list(required_cols.keys())].copy()
-                df_to_save.rename(columns=required_cols, inplace=True)
-                
-                file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
-                if st.session_state.get('last_file_key') != file_key:
+            if all(k in df_up.columns for k in mapping.keys()):
+                df_to_save = df_up[list(mapping.keys())].rename(columns=mapping)
+                f_key = f"up_{uploaded_file.name}_{len(df_up)}"
+                if st.session_state.get('last_file_key') != f_key:
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
                     conn.commit()
-                    st.session_state['last_file_key'] = file_key
-                    st.success(f"✅ Berhasil! {len(df_to_save)} Baris masuk database.")
+                    st.session_state['last_file_key'] = f_key
+                    st.success("✅ Data Berhasil Masuk!")
                     st.rerun()
             else:
-                st.error("Gagal: Kolom di file lu gak match sama sistem!")
+                st.error("Kolom file gak sesuai!")
         except Exception as e:
-            st.error(f"Error Upload: {e}")
+            st.error(f"Upload Gagal: {e}")
 
-    # --- 4. DASHBOARD & DATA VIEW ---
+    # --- 4. DISPLAY DATA ---
     try:
+        # Ambil semua data
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
-
+        
         if not df_db.empty:
-            # Kalkulasi Metrics
-            total_sku = df_db['sku'].nunique()
-            total_qty = df_db['qty_system'].sum()
-            total_val = (df_db['qty_system'] * df_db['harga_beli']).sum()
-
-            col_m1, col_m2, col_m3 = st.columns(3)
-            with col_m1:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #8b5cf6;"><div class="metric-label">🗄️ TOTAL SKU</div><div class="metric-value">{total_sku:,}</div><div class="metric-delta">↑ IN DATABASE</div></div>', unsafe_allow_html=True)
-            with col_m2:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #10b981;"><div class="metric-label">📦 TOTAL QTY</div><div class="metric-value">{int(total_qty):,}</div><div class="metric-delta">↑ TOTAL QTY</div></div>', unsafe_allow_html=True)
-            with col_m3:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #f59e0b;"><div class="metric-label">💰 TOTAL VALUE</div><div class="metric-value">Rp {total_val:,.0f}</div><div class="metric-delta">↑ TOTAL VALUE</div></div>', unsafe_allow_html=True)
+            # Metrics
+            m1, m2, m3 = st.columns(3)
+            m1.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL SKU</div><div class="metric-value">{df_db["sku"].nunique()}</div></div>', unsafe_allow_html=True)
+            m2.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL QTY</div><div class="metric-value">{int(df_db["qty_system"].sum()):,}</div></div>', unsafe_allow_html=True)
+            m3.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL VALUE</div><div class="metric-value">Rp {(df_db["qty_system"] * df_db["harga_beli"]).sum():,.0f}</div></div>', unsafe_allow_html=True)
 
             st.markdown("### 📜 Database History")
-            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang di sini...")
+            search = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Ketik di sini...")
 
-            # Filter Logic
             df_display = df_db.sort_values(by='rowid', ascending=False)
-            if search_query:
-                df_display = df_display[
-                    df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
-                    df_display['item_name'].str.contains(search_query, case=False, na=False)
-                ]
+            if search:
+                df_display = df_display[df_display['sku'].astype(str).str.contains(search, case=False) | 
+                                        df_display['item_name'].str.contains(search, case=False)]
 
-            # Display Table
-            cols_to_show = [col for col in df_display.columns if col != 'rowid']
+            # Tampilkan Tabel
             event = st.dataframe(
-                df_display[cols_to_show],
-                use_container_width=True, 
-                hide_index=True, 
-                on_select="rerun", 
-                selection_mode="single-row" 
+                df_display.drop(columns=['rowid', 'id'], errors='ignore'),
+                use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row"
             )
 
             # Delete Logic
             if event.selection.rows:
-                row_idx = event.selection.rows[0]
-                target_id = df_display.iloc[row_idx]['rowid']
-                target_sku = df_display.iloc[row_idx]['sku']
-                
-                st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
-                if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                    conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
+                idx = event.selection.rows[0]
+                t_id = df_display.iloc[idx]['rowid']
+                if st.button(f"🗑️ HAPUS SKU {df_display.iloc[idx]['sku']}", type="primary"):
+                    conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(t_id),))
                     conn.commit()
-                    st.success("Data berhasil dihapus!")
                     st.rerun()
         else:
-            st.info("Database masih kosong. Silakan upload file.")
+            st.info("💡 Database Kosong. Silakan upload file dulu.")
 
     except Exception as e:
-        st.error(f"Sistem Gagal Memuat Database: {e}")
+        st.error(f"Gagal memuat tabel: {e}")
     finally:
         conn.close()
 
