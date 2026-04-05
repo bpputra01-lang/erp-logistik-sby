@@ -2621,7 +2621,7 @@ def menu_retur_out_system():
             with c3:
                 st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">💰 Asset Value</p><p class="metric-value">Rp {total_val:,.0f}</p></div>', unsafe_allow_html=True)
 
-            st.markdown("### 📜 Database History (Latest 500)")
+            st.markdown("### 📜 Retur Out History")
             
             # Pengaturan tampilan tabel
             df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
@@ -2643,7 +2643,7 @@ def menu_retur_out_system():
                 target_id = df_display.iloc[row_idx]['rowid']
                 target_sku = df_display.iloc[row_idx]['sku']
                 
-                st.warning(f"⚠️ Yakin Hapus ?: **{target_sku}**?")
+                st.warning(f"⚠️ Yakin Hapus : **{target_sku}**?")
                 if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
                     conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
                     conn.commit()
