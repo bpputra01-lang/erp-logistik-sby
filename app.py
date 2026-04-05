@@ -3037,7 +3037,20 @@ def menu_reject_defect():
             df_final_match = df_core.merge(df_pivot, on='SKU', how='left')
 
             # --- TABEL HASIL ---
-            st.markdown('<p style="color: #000000 !important; font-weight: 700; margin-bottom: 10px; opacity: 1 !important;">📋 Rangkuman Lokasi Temuan per SKU</p>', unsafe_allow_html=True)
+            # --- TABEL HASIL (VERSI ANTI-GAGAL) ---
+            st.markdown("""
+                <div style="margin-bottom: 10px; padding: 5px 0;">
+                    <span style="
+                        color: #000000 !important; 
+                        font-size: 1.1rem !important; 
+                        font-weight: 800 !important;
+                        display: inline-block !important;
+                        -webkit-text-fill-color: #000000 !important;
+                    ">
+                        📋 Rangkuman Lokasi Temuan per SKU
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
             
             st.data_editor(
                 df_final_match,
