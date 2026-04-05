@@ -5678,16 +5678,29 @@ if 'res_df' in st.session_state:
     with col_v2:
         st.markdown("### 📈 REALISASI")
         sum_data = []
-        for k in karyawan_list:
+        
+        # Ambil ulang data karyawan buat dapet kolom 'tipe'
+        df_staff_master = pd.read_sql_query("SELECT nama, tipe FROM karyawan", conn)
+        
+        for _, k in df_staff_master.iterrows():
             n = k['nama']
             t = st.session_state.summary_shift.get(n, 0)
+            
             if t > 0:
-                # BALIKIN STATUS OK/KURANG
-                status = "✅ OK" if t >= k['target_fix'] else "⚠️ KURANG"
-                sum_data.append({"NAMA": n, "SHIFT": t, "STATUS": status})
+                # HITUNG ULANG DISINI BIAR GAK KEYERROR
+                target = 9 if k['tipe'] == "Part-Full" else 6
+                status = "✅ OK" if t >= target else "⚠️ KURANG"
+                
+                sum_data.append({
+                    "NAMA": n, 
+                    "SHIFT": int(t), 
+                    "STATUS": status
+                })
         
-        st.table(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False))
-
+        if sum_data:
+            st.table(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False))
+        else:
+            st.info("Belum ada data realisasi.")
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
