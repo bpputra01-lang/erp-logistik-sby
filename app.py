@@ -2489,12 +2489,11 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
-# --- 1. INITIALIZE DATABASE (FISIK & AUTO-PATCH) ---
 def init_db():
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
     
-    # Buat tabel jika belum ada
+    # 1. Pastikan tabel ada
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2506,21 +2505,16 @@ def init_db():
         )
     ''')
     
-    # LOGIKA AUTO-PATCH: Cek jika ada kolom yang kurang di DB lama
+    # 2. PAKSA TAMBAH KOLOM (Jika database sudah ada dari versi lama)
     c.execute("PRAGMA table_info(retur_out)")
     existing_cols = [row[1] for row in c.fetchall()]
     
-    # Daftar kolom wajib (Termasuk upload_at)
-    required_db_cols = {
-        'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
-        'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
-        'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 
-        'qty_so': 'INTEGER', 'upload_at': 'TEXT'
-    }
-    
-    for col, dtype in required_db_cols.items():
-        if col not in existing_cols:
-            c.execute(f"ALTER TABLE retur_out ADD COLUMN {col} {dtype}")
+    if 'upload_at' not in existing_cols:
+        try:
+            c.execute("ALTER TABLE retur_out ADD COLUMN upload_at TEXT")
+            conn.commit()
+        except Exception as e:
+            st.error(f"Gagal update struktur database: {e}")
             
     conn.commit()
     return conn
