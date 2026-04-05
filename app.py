@@ -5728,21 +5728,30 @@ if menu == "Logistic Schedule":
         with col_v1:
             st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
 
-            # Tampilkan DataFrame dengan Konsep Stealth Glow
+            # Fungsi buat nentuin warna background berdasarkan SHIFT
+            def color_by_shift(row):
+                shift_type = str(row['SHIFT - ROLE'])
+                # Default style (Teks putih, background gelap)
+                base_style = 'color: #FFFFFF; font-weight: 600; border: 0.5px solid #222;'
+                
+                if "SHIFT 0" in shift_type:
+                    bg = "background-color: #004e92;" # Biru Deep
+                elif "SHIFT 1" in shift_type:
+                    bg = "background-color: #1b4d3e;" # Hijau Forest
+                elif "SHIFT 2" in shift_type:
+                    bg = "background-color: #4b0082;" # Ungu Indigo
+                elif "SHIFT 3" in shift_type:
+                    bg = "background-color: #b45f06;" # Orange Bata
+                else:
+                    bg = "background-color: #1a1c27;"
+                
+                return [bg + base_style for _ in row]
+
+            # Tampilkan dengan warna per baris (Shift)
             st.dataframe(
-                st.session_state.res_df.style.apply(lambda x: [
-                    'color: #ff6b6b; font-weight: 700;' if x.name == 'SENIN' else
-                    'color: #48dbfb; font-weight: 700;' if x.name == 'SELASA' else
-                    'color: #1dd1a1; font-weight: 700;' if x.name == 'RABU' else
-                    'color: #ff9f43; font-weight: 700;' if x.name == 'KAMIS' else
-                    'color: #a29bfe; font-weight: 700;' if x.name == 'JUMAT' else
-                    'color: #ffeaa7; font-weight: 700;' if x.name == 'SABTU' else
-                    'color: #ff7675; font-weight: 700;' if x.name == 'MINGGU' else
-                    'color: #00D4FF; font-weight: 800; border-right: 1px solid #333;' # Kolom SHIFT-ROLE
-                    for i in x
-                ], axis=0), 
-                use_container_width=True, 
-                height=800, 
+                st.session_state.res_df.style.apply(color_by_shift, axis=1),
+                use_container_width=True,
+                height=800,
                 hide_index=True
             )
 
