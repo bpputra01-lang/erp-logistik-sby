@@ -2572,32 +2572,37 @@ def menu_retur_out_system():
 st.markdown("### 📥 UPLOAD DATA BARU")
 uploaded_file = st.file_uploader("Seret file lu kemari", type=['xlsx', 'csv'], key="retur_up_permanent")
 
-if uploaded_file:
-    try:
-        df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-        
-        # Standarisasi Header (Hapus spasi depan/belakang)
-        df_upload.columns = [str(c).strip() for c in df_upload.columns]
-        
-        required_cols = {
-            'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
-            'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
-            'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 
-            'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
-        }
-
-        # BARIS 2591 HARUS SEJAJAR DISINI (1 TAB DARI IF)
-        if all(col in df_upload.columns for col in required_cols.keys()):
-            df_to_save = df_upload[list(required_cols.keys())].copy()
-            df_to_save.rename(columns=required_cols, inplace=True)
+# --- 3. UPLOAD & AUTO-SAVE ---
+    if uploaded_file:
+        try:
+            df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             
-            # Simpan ke SQLite logic...
-            file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
-            if st.session_state.get('last_file_key') != file_key:
-                df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                st.session_state['last_file_key'] = file_key
-                st.success(f"🚀 JOS! {len(df_to_save)} Baris masuk database.")
-                st.rerun()
+            # Standarisasi Header
+            df_upload.columns = [str(c).strip() for c in df_upload.columns]
+            
+            required_cols = {
+                'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
+                'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
+                'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 
+                'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
+            }
+
+            if all(col in df_upload.columns for col in required_cols.keys()):
+                df_to_save = df_upload[list(required_cols.keys())].copy()
+                df_to_save.rename(columns=required_cols, inplace=True)
+                
+                file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
+                if st.session_state.get('last_file_key') != file_key:
+                    df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
+                    st.session_state['last_file_key'] = file_key
+                    st.success(f"🚀 JOS! {len(df_to_save)} Baris masuk database.")
+                    st.rerun()
+            else:
+                st.error("Format kolom tidak sesuai!")
+        
+        except Exception as e:
+            st.error(f"Gagal proses upload: {e}")
+        # Blok di atas tadinya ngga ada penutup except-nya, makanya baris di bawah ini error.
 
     # --- 4. DATA VIEW & METRICS ---
     try:
@@ -2619,18 +2624,14 @@ if uploaded_file:
                 st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">💰 Asset Value</p><p class="metric-value">Rp {total_val:,.0f}</p></div>', unsafe_allow_html=True)
 
             st.markdown("### 📜 Database History (Latest 500)")
-            
-            # Pengaturan tampilan tabel
             df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
             
-            # Main Dataframe Editor
-            # CARI BAGIAN INI DI KODE LU:
             event = st.dataframe(
                 df_display, 
                 use_container_width=True, 
                 hide_index=True, 
                 on_select="rerun", 
-                selection_mode="single-row"  # <--- GANTI "single" JADI "single-row"
+                selection_mode="single-row" 
             )
 
             # --- 5. ACTIONS (DELETE & RESET) ---
@@ -2652,7 +2653,6 @@ if uploaded_file:
                     conn.execute("DELETE FROM retur_out")
                     conn.commit()
                     st.rerun()
-
         else:
             st.info("Database masih kosong. Silakan upload file di atas.")
 
