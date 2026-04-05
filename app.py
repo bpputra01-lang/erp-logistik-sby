@@ -5359,88 +5359,43 @@ def init_db_logistic():
 conn = init_db_logistic()
 
 if menu == "Logistic Schedule":
-    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
+    # --- CSS V-PREMIUM DENGAN ISOLASI ---
     st.markdown("""
         <style>
-            /* 1. Header Utama - Efek Gradient Glass */
-            .hero-header {
+            /* HANYA BERLAKU UNTUK ELEMEN DI DALAM #logistic-root */
+            #logistic-root .hero-header {
                 background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
-                color: white;
-                padding: 25px;
-                border-radius: 12px;
-                text-align: center;
-                margin-bottom: 35px;
-                font-weight: 800;
-                font-size: 26px;
-                letter-spacing: 0.5px;
-                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: white; padding: 25px; border-radius: 12px;
+                text-align: center; margin-bottom: 35px; font-weight: 800;
             }
 
-            /* 2. Input Fields - Modern Dark Glass */
-            [data-testid="stForm"] { 
-                border: none !important; 
-                padding: 0 !important; 
-            }
-            
-            div[data-testid="stTextInput"] > div > div, 
-            div[data-testid="stTextArea"] > div > div,
-            div[data-testid="stDateInput"] > div > div,
-            div[data-testid="stSelectbox"] > div > div {
-                background-color: #12141d !important; 
-                border: 1px solid #2d3142 !important;
-                border-radius: 10px !important;
-                transition: all 0.3s ease-in-out !important;
-                padding: 2px !important;
-            }
-
-            /* Efek Focus Pas Diklik */
-            div[data-testid="stTextInput"] > div > div:focus-within, 
-            div[data-testid="stDateInput"] > div > div:focus-within {
-                border-color: #007BFF !important;
-                box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
-            }
-
-            /* 3. Button - Premium Glow Effect */
-            div.stButton > button {
+            /* Tombol khusus di menu logistik */
+            #logistic-root div.stButton > button {
                 background: linear-gradient(90deg, #007BFF 0%, #0056b3 100%) !important;
                 color: white !important;
                 border-radius: 10px !important;
-                border: none !important;
-                padding: 12px 24px !important;
-                font-weight: 700 !important;
-                text-transform: uppercase !important;
-                letter-spacing: 1px !important;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
             }
 
-            div.stButton > button:hover {
-                transform: translateY(-2px) !important;
-                box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4) !important;
-                background: linear-gradient(90deg, #0085FF 0%, #0069d9 100%) !important;
+            /* Input khusus di menu logistik */
+            #logistic-root div[data-testid="stTextInput"] > div > div {
+                background-color: #12141d !important; 
+                border: 1px solid #2d3142 !important;
             }
 
-            div.stButton > button:active {
-                transform: translateY(0px) !important;
-            }
-
-            /* 4. Font & Labels - Soft Neutral */
-            label { 
+            /* Label khusus di menu logistik */
+            #logistic-root label { 
                 color: #B0B3B8 !important; 
-                font-size: 14px !important;
-                font-weight: 500 !important;
-                margin-bottom: 8px !important;
             }
 
-            input, textarea { 
-                background-color: transparent !important; 
-                color: #ffffff !important; 
-                font-family: 'Inter', sans-serif !important;
-                -webkit-text-fill-color: #ffffff !important; 
+            /* Card tetap aman karena nama class-nya unik */
+            .custom-card {
+                display: flex; align-items: center; justify-content: space-between;
+                background-color: #1a1c27; border-radius: 8px; padding: 12px 18px;
+                margin-bottom: 10px; border-left: 5px solid #00FF00;
             }
-
         </style>
+        
+        <div id="logistic-root">
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
