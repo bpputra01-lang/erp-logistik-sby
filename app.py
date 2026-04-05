@@ -2569,8 +2569,8 @@ def menu_retur_out_system():
     conn = init_db()
 
     # --- 3. UPLOAD & AUTO-SAVE ---
-    with st.expander("📥 UPLOAD DATA BARU (EXCEL/CSV)", expanded=True):
-        uploaded_file = st.file_uploader("Seret file lu kemari", type=['xlsx', 'csv'], key="retur_up")
+    with st.expander("📥 Upload Data", expanded=True):
+        uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up")
         
         if uploaded_file:
             try:
@@ -2595,7 +2595,7 @@ def menu_retur_out_system():
                     if st.session_state.get('last_file_key') != file_key:
                         df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
                         st.session_state['last_file_key'] = file_key
-                        st.success(f"🚀 JOS! {len(df_to_save)} Baris berhasil masuk database.")
+                        st.success(f"✅Berhasil {len(df_to_save)} Baris berhasil masuk database.")
                         st.rerun()
                 else:
                     st.error("Gagal: Kolom di file lu gak match sama sistem!")
@@ -2643,7 +2643,7 @@ def menu_retur_out_system():
                 target_id = df_display.iloc[row_idx]['rowid']
                 target_sku = df_display.iloc[row_idx]['sku']
                 
-                st.warning(f"⚠️ Lu mau hapus data SKU: **{target_sku}**?")
+                st.warning(f"⚠️ Yakin Hapus ?: **{target_sku}**?")
                 if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
                     conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
                     conn.commit()
