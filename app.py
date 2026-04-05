@@ -2630,6 +2630,13 @@ def process_stock_comparison(file1, file2):
     except Exception as e:
         # Lempar error agar bisa ditangkap oleh UI (st.error)
         raise e
+
+def delete_reject_item(row_id):
+    conn = sqlite3.connect('inventory_logistik.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM reject_list WHERE rowid = ?", (row_id,))
+    conn.commit()
+    conn.close()
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
     st.markdown("""
@@ -2734,6 +2741,15 @@ def menu_reject_defect():
         /* Delta Panah: Bold & Hijau */
         [data-testid="stMetricDelta"] > div {
             font-weight: bold !important;
+        }
+        /* --- CSS TOMBOL DELETE --- */
+        button[key^="del_"] {
+            background-color: #ff4b4b !important;
+            color: white !important;
+            border: none !important;
+            padding: 2px 10px !important;
+            border-radius: 4px !important;
+            font-size: 12px !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -2840,7 +2856,33 @@ def menu_reject_defect():
                 st.plotly_chart(fig_b, use_container_width=True)
 
             st.write("### 📋 DETAIL DATABASE")
-            st.dataframe(df_final.sort_values('TANGGAL_INPUT', ascending=False), use_container_width=True)
+            
+            # Ambil data beserta ROWID-nya buat kunci hapus
+            conn = sqlite3.connect('inventory_logistik.db')
+            df_view = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
+            conn.close()
+            
+            if filter_view != "SEMUA":
+                df_view = df_view[df_view['CABANG'] == filter_view]
+
+            # Urutkan data terbaru di atas
+            df_view = df_view.sort_values('rowid', ascending=False)
+
+            # Tampilkan Tabel dengan Tombol Hapus di sampingnya
+            for index, row in df_view.iterrows():
+                cols = st.columns([0.5, 2, 2, 2, 1, 1]) # Atur lebar kolom
+                with cols[0]:
+                    # Tombol Delete pake key unik (rowid)
+                    if st.button("🗑️", key=f"del_{row['rowid']}"):
+                        delete_reject_item(row['rowid'])
+                        st.success(f"Berhasil hapus SKU {row['SKU']}!")
+                        st.rerun()
+                with cols[1]: st.write(row['CABANG'])
+                with cols[2]: st.write(row['SKU'])
+                with cols[3]: st.write(row['ARTICLE_NAME'])
+                with cols[4]: st.write(row['KATEGORI'])
+                with cols[5]: st.write(row['TANGGAL_INPUT'])
+                st.markdown("---") # Garis pemisah antar baris biar rapi
             
             if st.button("🗑️ KOSONGKAN SEMUA DATA"):
                 clear_all_data()
