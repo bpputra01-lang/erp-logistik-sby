@@ -2588,11 +2588,6 @@ def menu_retur_out_system():
             .stTextInput>div>div>input::placeholder {
                 color: #A0A0A0; /* Warna Abu-abu pudar */
             }
-
-            /* Menghilangkan label widget bawaan streamlit */
-            [data-testid="stWidgetLabel"] {
-                display: none;
-            }
         </style>
     """, unsafe_allow_html=True)
 
