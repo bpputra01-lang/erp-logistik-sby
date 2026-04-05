@@ -2490,32 +2490,29 @@ from datetime import datetime
 import pytz
 
 def init_db():
+    # Pastikan koneksi bersih
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
     
-    # 1. Pastikan tabel ada
+    # BUAT TABEL DENGAN STRUKTUR LENGKAP (Termasuk upload_at)
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
-            item_name TEXT, variant TEXT, sub_kategori TEXT,
-            harga_beli REAL, harga_jual REAL, 
-            qty_system INTEGER, qty_so INTEGER,
-            upload_at TEXT
+            identify TEXT, 
+            bin TEXT, 
+            sku TEXT, 
+            brand TEXT, 
+            item_name TEXT, 
+            variant TEXT, 
+            sub_kategori TEXT,
+            harga_beli REAL, 
+            harga_jual REAL, 
+            qty_system INTEGER, 
+            qty_so INTEGER,
+            upload_at TEXT -- KOLOM INI WAJIB ADA
         )
     ''')
     
-    # 2. PAKSA TAMBAH KOLOM (Jika database sudah ada dari versi lama)
-    c.execute("PRAGMA table_info(retur_out)")
-    existing_cols = [row[1] for row in c.fetchall()]
-    
-    if 'upload_at' not in existing_cols:
-        try:
-            c.execute("ALTER TABLE retur_out ADD COLUMN upload_at TEXT")
-            conn.commit()
-        except Exception as e:
-            st.error(f"Gagal update struktur database: {e}")
-            
     conn.commit()
     return conn
 
