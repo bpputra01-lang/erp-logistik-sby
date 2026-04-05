@@ -2611,15 +2611,16 @@ def menu_retur_out_system():
 
     # --- 4. DATA VIEW & METRICS ---
     try:
+        # Pastikan variabel conn sudah didefinisikan sebelumnya
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
         if not df_db.empty:
-            # Kalkulasi Dashboard (Gue pastiin nama variabelnya sinkron sama box di bawah)
+            # 1. Kalkulasi Dashboard
             total_sku = df_db['sku'].nunique()
             total_qty_system = df_db['qty_system'].sum()
             total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
-            # TAMPILAN METRIK BOX GAYA BARU
+            # 2. Tampilan Metrik Box
             m1, m2, m3 = st.columns(3)
             with m1:
                 st.markdown(f'''
@@ -2645,16 +2646,12 @@ def menu_retur_out_system():
                         <div class="metric-delta">↑ TOTAL COST</div>
                     </div>
                 ''', unsafe_allow_html=True)
-      # --- 4. DATA VIEW & METRICS ---
-    try:
-        df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
-        # CEK APAKAH DATABASE ADA ISINYA
-        if not df_db.empty:
-            # ... (Bagian Kalkulasi Metrik Lu di sini) ...
-
+            # 3. Database History
             st.markdown("### 📜 Database History")
             df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
+            
+            # Sembunyikan rowid dari user tapi simpan untuk keperluan delete
             cols_to_show = [col for col in df_display.columns if col != 'rowid']
 
             event = st.dataframe(
@@ -2665,7 +2662,7 @@ def menu_retur_out_system():
                 selection_mode="single-row" 
             )
 
-            # LOGIKA HAPUS (Hanya muncul kalau diklik)
+            # 4. Logika Hapus (Hanya muncul jika baris dipilih)
             if event.selection.rows:
                 row_idx = event.selection.rows[0]
                 target_id = df_display.iloc[row_idx]['rowid']
@@ -2678,12 +2675,13 @@ def menu_retur_out_system():
                     st.success("Data berhasil dihapus!")
                     st.rerun()
         else:
-            # INFO INI HANYA MUNCUL KALAU DATA EMANG NOL
+            # Muncul hanya jika query return nol baris
             st.info("Database masih kosong. Silakan upload file di atas.")
 
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Database: {e}")
     finally:
+        # Menutup koneksi dengan aman
         conn.close()
 
 
