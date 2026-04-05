@@ -2487,11 +2487,12 @@ import sqlite3
 import pandas as pd
 import streamlit as st
 
-# --- 1. INITIALIZE DATABASE (FISIK & PERMANEN) ---
+# --- 1. INITIALIZE DATABASE (FISIK & AUTO-PATCH) ---
 def init_db():
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
-    # Pastikan tabel ada sejak awal
+    
+    # Buat tabel jika belum ada
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2502,65 +2503,82 @@ def init_db():
             tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # LOGIKA AUTO-PATCH: Cek jika ada kolom yang kurang di DB lama
+    c.execute("PRAGMA table_info(retur_out)")
+    existing_cols = [row[1] for row in c.fetchall()]
+    
+    # Daftar kolom wajib (lowercase sesuai DB)
+    required_db_cols = {
+        'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
+        'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
+        'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 'qty_so': 'INTEGER'
+    }
+    
+    for col, dtype in required_db_cols.items():
+        if col not in existing_cols:
+            c.execute(f"ALTER TABLE retur_out ADD COLUMN {col} {dtype}")
+            
     conn.commit()
     return conn
 
 def menu_retur_out_system():
-    # --- 2. CSS CUSTOM (STYLE DASHBOARD PREMIUM) ---
+    # --- 2. CSS DASHBOARD PREMIUM (GAYA SURABAYA BRANCH) ---
     st.markdown("""
         <style>
         .hero-header {
             background-color: #1d3e7a;
-            padding: 15px 25px;
-            border-radius: 10px;
+            padding: 20px;
+            border-radius: 12px;
             margin-bottom: 25px;
-            box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+            border-left: 8px solid #007BFF;
         }
         .hero-text {
             color: white !important;
             margin: 0 !important;
-            font-size: 22px !important;
+            font-size: 24px !important;
             font-weight: 800 !important;
-            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .metric-card {
             background-color: #1E1E2E;
             padding: 20px;
-            border-radius: 12px;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+            border-radius: 15px;
+            box-shadow: 2px 2px 12px rgba(0,0,0,0.4);
             text-align: center;
-            color: white;
-            margin-bottom: 15px;
+            border-bottom: 4px solid #3d4455;
         }
         .metric-value {
-            font-size: 26px;
-            font-weight: bold;
+            font-size: 28px;
+            font-weight: 800;
             color: #FFFFFF;
-            margin: 0;
+            margin: 5px 0;
         }
         .metric-label {
-            font-size: 11px;
+            font-size: 12px;
             color: #A0A0A0;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
+            letter-spacing: 1.2px;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><p class="hero-text">📦 RETUR OUT - DATABASE SYSTEM</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">📊 RETUR OUT - DATABASE SYSTEM</p></div>', unsafe_allow_html=True)
 
     conn = init_db()
 
-    # --- 3. UPLOAD & AUTO-SAVE KE SQLITE ---
-    with st.expander("📥 UPLOAD DATA BARU", expanded=True):
-        uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'])
+    # --- 3. UPLOAD & AUTO-SAVE ---
+    with st.expander("📥 UPLOAD DATA BARU (EXCEL/CSV)", expanded=True):
+        uploaded_file = st.file_uploader("Seret file lu kemari", type=['xlsx', 'csv'], key="retur_up")
         
         if uploaded_file:
             try:
                 df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
                 
-                # Standarisasi kolom
+                # Standarisasi Header (Hapus spasi depan/belakang)
+                df_upload.columns = [str(c).strip() for c in df_upload.columns]
+                
                 required_cols = {
                     'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
                     'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
@@ -2569,49 +2587,46 @@ def menu_retur_out_system():
                 }
 
                 if all(col in df_upload.columns for col in required_cols.keys()):
-                    # Filter & Rename
                     df_to_save = df_upload[list(required_cols.keys())].copy()
                     df_to_save.rename(columns=required_cols, inplace=True)
                     
-                    # Cek session biar gak double save pas refresh
-                    file_key = f"save_{uploaded_file.name}_{len(df_upload)}"
-                    if st.session_state.get('last_processed') != file_key:
+                    # Anti-Duplicate Upload (Session Check)
+                    file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
+                    if st.session_state.get('last_file_key') != file_key:
                         df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                        st.session_state['last_processed'] = file_key
-                        st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris ke Database!")
+                        st.session_state['last_file_key'] = file_key
+                        st.success(f"🚀 JOS! {len(df_to_save)} Baris berhasil masuk database.")
                         st.rerun()
                 else:
-                    st.error("Gagal: Format kolom tidak sesuai!")
+                    st.error("Gagal: Kolom di file lu gak match sama sistem!")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error Upload: {e}")
 
-    # --- 4. DATA ANALYSIS & METRICS (NARIK DARI DATABASE) ---
+    # --- 4. DATA VIEW & METRICS ---
     try:
-        # Tarik data terbaru dari DB
+        # Tarik data lengkap + rowid buat fungsi delete
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
         if not df_db.empty:
-            # Kalkulasi Metrik
+            # Kalkulasi Dashboard
             total_sku = df_db['sku'].nunique()
             total_qty = df_db['qty_system'].sum()
             total_val = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
-            # Tampilan Metrik ala Surabaya Branch
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">🗄️ Total Unique SKU</p><p class="metric-value">{total_sku:,}</p></div>', unsafe_allow_html=True)
-            with m2:
-                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">📦 Total Qty System</p><p class="metric-value">{int(total_qty):,}</p></div>', unsafe_allow_html=True)
-            with m3:
-                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">💰 Total Asset Value</p><p class="metric-value">Rp {total_val:,.0f}</p></div>', unsafe_allow_html=True)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">🗄️ Total SKU</p><p class="metric-value">{total_sku:,}</p></div>', unsafe_allow_html=True)
+            with c2:
+                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">📦 Total Qty</p><p class="metric-value">{int(total_qty):,}</p></div>', unsafe_allow_html=True)
+            with c3:
+                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">💰 Asset Value</p><p class="metric-value">Rp {total_val:,.0f}</p></div>', unsafe_allow_html=True)
 
-            # --- 5. TABLE HISTORY & ACTIONS ---
-            st.markdown("### 📜 Database History (Ready to Sync)")
+            st.markdown("### 📜 Database History (Latest 500)")
             
-            # Tampilkan 500 data terakhir
+            # Pengaturan tampilan tabel
             df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
             
-            # Widget Dataframe dengan fitur select
+            # Main Dataframe Editor
             event = st.dataframe(
                 df_display, 
                 use_container_width=True, 
@@ -2620,29 +2635,28 @@ def menu_retur_out_system():
                 selection_mode="single"
             )
 
-            # Logika Hapus Data Terpilih
+            # --- 5. ACTIONS (DELETE & RESET) ---
             selected_rows = event.selection.rows
             if selected_rows:
                 row_idx = selected_rows[0]
                 target_id = df_display.iloc[row_idx]['rowid']
                 target_sku = df_display.iloc[row_idx]['sku']
                 
-                st.warning(f"Konfirmasi hapus SKU: **{target_sku}**?")
+                st.warning(f"⚠️ Lu mau hapus data SKU: **{target_sku}**?")
                 if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
                     conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
                     conn.commit()
-                    st.success("Data berhasil dihapus!")
+                    st.success("Data dihapus!")
                     st.rerun()
             
-            # Tombol Clear All (Hati-hati!)
-            with st.expander("⚙️ Advanced Settings"):
-                if st.button("🔴 RESET SELURUH DATABASE", use_container_width=True):
+            with st.expander("🛠️ ADVANCED SETTINGS"):
+                if st.button("🔴 RESET / KOSONGKAN DATABASE", use_container_width=True):
                     conn.execute("DELETE FROM retur_out")
                     conn.commit()
                     st.rerun()
 
         else:
-            st.info("Belum ada data di database. Silakan upload file Excel/CSV di atas.")
+            st.info("Database masih kosong. Silakan upload file di atas.")
 
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Database: {e}")
