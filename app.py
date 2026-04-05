@@ -2490,12 +2490,12 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
-# --- 1. INITIALIZE DATABASE (WITH AUTO-PATCH) ---
+# --- 1. INITIALIZE DATABASE (WITH AUTO-PATCH ALTER TABLE) ---
 def init_db():
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
     
-    # 1. Buat tabel dasar dulu
+    # Buat tabel dasar jika belum ada
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2506,20 +2506,25 @@ def init_db():
         )
     ''')
     
-    # 2. FIX GAGAL SIMPAN: Cek & Paksa tambah kolom 'tanggal' kalau belum ada
+    # --- LOGIKA ALTER TABLE (FORCE ADD COLUMN) ---
     c.execute("PRAGMA table_info(retur_out)")
     existing_cols = [row[1] for row in c.fetchall()]
     
+    # Jika kolom 'tanggal' belum ada di DB lu, suntik sekarang
     if 'tanggal' not in existing_cols:
-        c.execute("ALTER TABLE retur_out ADD COLUMN tanggal TEXT")
-        conn.commit()
+        try:
+            c.execute("ALTER TABLE retur_out ADD COLUMN tanggal TEXT")
+            conn.commit()
+        except Exception as e:
+            st.error(f"Gagal Alter Table: {e}")
             
     return conn
 
 def menu_retur_out_system():
+    # Setting Jam Surabaya
     tz_sub = pytz.timezone('Asia/Jakarta')
 
-    # --- 2. CSS ---
+    # --- 2. CSS DASHBOARD PREMIUM ---
     st.markdown("""
         <style>
         .hero-header { background-color: #1d3e7a; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-left: 8px solid #007BFF; }
@@ -2557,6 +2562,7 @@ def menu_retur_out_system():
 
             if all(k in df_up.columns for k in mapping.keys()):
                 df_to_save = df_up[list(mapping.keys())].rename(columns=mapping)
+                # Tambah data waktu sekarang
                 df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
                 # Simpan ke DB
@@ -2566,13 +2572,14 @@ def menu_retur_out_system():
                 st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris!")
                 st.rerun()
             else:
-                st.error("Kolom file gak cocok!")
+                st.error("Kolom file gak sesuai sama mapping sistem!")
         except Exception as e:
             st.error(f"Gagal Simpan: {e}")
 
     # --- 4. VIEW DATA ---
     try:
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
+        
         if not df_db.empty:
             m1, m2, m3 = st.columns(3)
             m1.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL SKU</div><div class="metric-value">{df_db["sku"].nunique()}</div></div>', unsafe_allow_html=True)
@@ -2580,7 +2587,7 @@ def menu_retur_out_system():
             m3.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL VALUE</div><div class="metric-value">Rp {(df_db["qty_system"] * df_db["harga_beli"]).sum():,.0f}</div></div>', unsafe_allow_html=True)
 
             st.markdown("### 📜 Database History")
-            search = st.text_input("🔍 Cari...", placeholder="Ketik SKU/Nama...")
+            search = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Ketik di sini...")
             
             df_display = df_db.sort_values(by='rowid', ascending=False)
             if search:
@@ -2593,7 +2600,7 @@ def menu_retur_out_system():
             if event.selection.rows:
                 idx = event.selection.rows[0]
                 t_id = df_display.iloc[idx]['rowid']
-                if st.button(f"🗑️ HAPUS PERMANEN", type="primary"):
+                if st.button(f"🗑️ HAPUS SKU {df_display.iloc[idx]['sku']}", type="primary", use_container_width=True):
                     conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(t_id),))
                     conn.commit()
                     st.rerun()
