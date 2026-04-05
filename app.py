@@ -2889,64 +2889,63 @@ def menu_reject_defect():
                         <span style="color: #28a745; font-size: 0.8rem;">↑ {p_r:.1f}%</span>
                     </div>
                 """, unsafe_allow_html=True)
-                    
-                        
-                    st.markdown("<br>", unsafe_allow_html=True)
-                        # Judul dengan class CSS baru (Hitam)
-                        st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
-                        
-                        # Ambil data terbaru
-                        conn = sqlite3.connect('inventory_logistik.db')
-                        df_editor = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-                        conn.close()
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            # Judul dengan class CSS baru (Hitam)
+            st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
+            
+            # Ambil data terbaru
+            conn = sqlite3.connect('inventory_logistik.db')
+            df_editor = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
+            conn.close()
 
-                        if filter_view != "SEMUA":
-                            df_editor = df_editor[df_editor['CABANG'] == filter_view]
-                        
-                        df_editor = df_editor.sort_values('rowid', ascending=False)
+            if filter_view != "SEMUA":
+                df_editor = df_editor[df_editor['CABANG'] == filter_view]
+            
+            df_editor = df_editor.sort_values('rowid', ascending=False)
 
-                        # TAMBAHKAN KOLOM 'HAPUS' (Default False)
-                        df_editor['HAPUS'] = False
+            # TAMBAHKAN KOLOM 'HAPUS' (Default False)
+            df_editor['HAPUS'] = False
 
-                        # TAMPILAN TABEL INTERAKTIF
-                        event = st.data_editor(
-                            df_editor,
-                            column_config={
-                                "rowid": None, # Sembunyikan ID
-                                "HAPUS": st.column_config.CheckboxColumn(
-                                    "🗑️",
-                                    help="Centang untuk hapus",
-                                    default=False,
-                                ),
-                                "TANGGAL_INPUT": st.column_config.TextColumn("WAKTU", width="medium"),
-                                "SKU": st.column_config.TextColumn("SKU", width="small"),
-                            },
-                            use_container_width=True,
-                            hide_index=True, # Indeks angka kiri dimatikan biar bersih
-                            key="database_editor"
-                        )
-            # ... (lanjutan setelah st.data_editor)
-                        rows_to_delete = event[event['HAPUS'] == True]
+            # TAMPILAN TABEL INTERAKTIF
+            event = st.data_editor(
+                df_editor,
+                column_config={
+                    "rowid": None, # Sembunyikan ID
+                    "HAPUS": st.column_config.CheckboxColumn(
+                        "🗑️",
+                        help="Centang untuk hapus",
+                        default=False,
+                    ),
+                    "TANGGAL_INPUT": st.column_config.TextColumn("WAKTU", width="medium"),
+                    "SKU": st.column_config.TextColumn("SKU", width="small"),
+                },
+                use_container_width=True,
+                hide_index=True, # Indeks angka kiri dimatikan biar bersih
+                key="database_editor"
+            )
+# ... (lanjutan setelah st.data_editor)
+            rows_to_delete = event[event['HAPUS'] == True]
 
-                        st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
 
-                        # --- SMART BUTTON PANEL ---
-                        if not rows_to_delete.empty:
-                            # Mode 1: Ada yang dicentang (Hapus Selektif)
-                            st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
-                            if st.button(f"🗑️ HAPUS {len(rows_to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
-                                for rid in rows_to_delete['rowid']:
-                                    delete_reject_item(rid)
-                                st.success("Data pilihan berhasil dihapus!")
-                                st.rerun()
-                        else:
-                            # Mode 2: Gak ada yang dicentang (Hapus Semua)
-                            # Pake warna secondary/biasa biar gak gampang kepencet
-                            if st.button("🚨 KOSONGKAN SEMUA DATABASE", use_container_width=True):
-                                # Tambahin konfirmasi biar gak nyesel
-                                clear_all_data()
-                                st.success("Seluruh database telah dikosongkan!")
-                                st.rerun()
+            # --- SMART BUTTON PANEL ---
+            if not rows_to_delete.empty:
+                # Mode 1: Ada yang dicentang (Hapus Selektif)
+                st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
+                if st.button(f"🗑️ HAPUS {len(rows_to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
+                    for rid in rows_to_delete['rowid']:
+                        delete_reject_item(rid)
+                    st.success("Data pilihan berhasil dihapus!")
+                    st.rerun()
+            else:
+                # Mode 2: Gak ada yang dicentang (Hapus Semua)
+                # Pake warna secondary/biasa biar gak gampang kepencet
+                if st.button("🚨 KOSONGKAN SEMUA DATABASE", use_container_width=True):
+                    # Tambahin konfirmasi biar gak nyesel
+                    clear_all_data()
+                    st.success("Seluruh database telah dikosongkan!")
+                    st.rerun()
 import streamlit as st
 import sqlite3
 import pandas as pd
