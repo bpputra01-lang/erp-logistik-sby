@@ -5476,7 +5476,7 @@ if menu == "Logistic Schedule":
                 st.rerun()
 
     # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
-    with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
+    with st.expander("🔍 Staff Database", expanded=True):
         df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
         if not df_cek.empty:
             for i, row in df_cek.iterrows():
@@ -5501,7 +5501,7 @@ if menu == "Logistic Schedule":
     st.divider()
 
     # --- 2. PLOT LIBUR (MODEL KARTU) ---
-    st.subheader("🚫 2. Plot Libur & Monitoring")
+    st.subheader("🚫 2. Day Off Request")
     col_l1, col_l2 = st.columns([1, 2])
 
     with col_l1:
@@ -5559,7 +5559,7 @@ if menu == "Logistic Schedule":
         df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
 
     # --- 3. TAMPILAN INPUT ---
-    st.subheader("🌙 2. Plotting Manual Shift 3")
+    st.subheader("🌙 2. Stock Opname Plot")
 
     df_karyawan = pd.read_sql_query("SELECT nama, tipe, posisi FROM karyawan", conn)
     karyawan_options = df_karyawan['nama'].tolist()
