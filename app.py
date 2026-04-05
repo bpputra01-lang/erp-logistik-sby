@@ -2486,33 +2486,42 @@ def process_scan_out(df_scan, df_history, df_stock):
 import sqlite3
 import pandas as pd
 import streamlit as st
-from datetime import datetime
+from datetime import datetime # Fix Import: Biar gak error 'type object has no attribute datetime'
 import pytz
 
+# --- 1. INITIALIZE DATABASE (FISIK & AUTO-PATCH) ---
 def init_db():
-    # Pastikan koneksi bersih
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
     
-    # BUAT TABEL DENGAN STRUKTUR LENGKAP (Termasuk upload_at)
+    # Buat tabel jika belum ada
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            identify TEXT, 
-            bin TEXT, 
-            sku TEXT, 
-            brand TEXT, 
-            item_name TEXT, 
-            variant TEXT, 
-            sub_kategori TEXT,
-            harga_beli REAL, 
-            harga_jual REAL, 
-            qty_system INTEGER, 
-            qty_so INTEGER,
-            upload_at TEXT -- KOLOM INI WAJIB ADA
+            identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
+            item_name TEXT, variant TEXT, sub_kategori TEXT,
+            harga_beli REAL, harga_jual REAL, 
+            qty_system INTEGER, qty_so INTEGER,
+            upload_at TEXT
         )
     ''')
     
+    # LOGIKA AUTO-PATCH: Cek jika ada kolom yang kurang di DB lama
+    c.execute("PRAGMA table_info(retur_out)")
+    existing_cols = [row[1] for row in c.fetchall()]
+    
+    # Daftar kolom wajib (Termasuk upload_at)
+    required_db_cols = {
+        'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
+        'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
+        'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 
+        'qty_so': 'INTEGER', 'upload_at': 'TEXT'
+    }
+    
+    for col, dtype in required_db_cols.items():
+        if col not in existing_cols:
+            c.execute(f"ALTER TABLE retur_out ADD COLUMN {col} {dtype}")
+            
     conn.commit()
     return conn
 
@@ -2566,12 +2575,8 @@ def menu_retur_out_system():
             font-weight: 600;
             margin-top: 5px;
         }
-        
-        /* CSS FIX: Sembunyikan label Search saja, Label Uploader tetap muncul */
-        div[data-testid="stTextInput"] label {
-            display: none;
-        }
-
+        /* Style Search Bar Minimalis */
+        div[data-baseweb="input"] + div { display: none; }
         .stTextInput>div>div>input {
             background-color: #1E1E2E;
             color: #FFFFFF;
@@ -2580,9 +2585,7 @@ def menu_retur_out_system():
             padding: 10px 15px;
             font-size: 14px;
         }
-        .stTextInput>div>div>input::placeholder {
-            color: #A0A0A0;
-        }
+        
         </style>
     """, unsafe_allow_html=True)
 
@@ -2591,8 +2594,7 @@ def menu_retur_out_system():
     conn = init_db()
 
     # --- 3. UPLOAD & AUTO-SAVE ---
-    # Pakai label di sini supaya muncul di atas kotak uploader
-    uploaded_file = st.file_uploader("📥 UPLOAD DATA BARU", type=['xlsx', 'csv'], key="retur_up_permanent")
+    uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
         try:
@@ -2610,13 +2612,12 @@ def menu_retur_out_system():
                 df_to_save = df_upload[list(required_cols.keys())].copy()
                 df_to_save.rename(columns=required_cols, inplace=True)
                 
-                # TAMBAH TIMESTAMP WIB
+                # TAMBAH TIMESTAMP WIB (Fix pemanggilan datetime)
                 df_to_save['upload_at'] = datetime.now(wib).strftime('%Y-%m-%d %H:%M:%S')
                 
                 file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
                 if st.session_state.get('last_file_key') != file_key:
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                    conn.commit() # Pastikan data dikunci ke DB
                     st.session_state['last_file_key'] = file_key
                     st.success(f"✅ Berhasil! {len(df_to_save)} Baris disimpan ke database.")
                     st.rerun()
@@ -2646,7 +2647,7 @@ def menu_retur_out_system():
 
             st.markdown("### 📜 Database History")
             
-            # 3. SEARCH BAR (Label disembunyikan CSS)
+            # 3. SEARCH BAR (Gaya Minimalis)
             search_query = st.text_input("Search", placeholder="Ketik SKU atau Nama...", key="minimal_search")
 
             # Urutkan berdasarkan rowid (Terbaru di atas)
