@@ -2707,29 +2707,35 @@ def menu_reject_defect():
         [data-testid="stMetricDelta"] > div {
             font-weight: bold !important;
         }
-        /* --- CSS KHUSUS METRIC BOX (BIAR GAK NABRAK KE JUDUL LAIN) --- */
+        /* --- FIX METRIC BOX: RAPI, TEBAL, PUTIH --- */
         [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
-            padding: 20px !important;
+            padding: 25px !important; /* Tambah padding biar gak sesek */
             border-radius: 12px !important;
+            display: flex !important;
+            justify-content: center !important;
         }
 
-        /* Judul kecil di dalem Metric Box jadi Putih */
+        /* Judul Metric: Putih & Tebal (Bold) */
         [data-testid="stMetricLabel"] div {
             color: #FFFFFF !important;
-            font-weight: 700 !important;
+            font-weight: 800 !important; /* Lebih tebal */
+            font-size: 15px !important;
+            letter-spacing: 0.5px !important;
         }
 
-        /* Angka Utama Metric tetap Kuning */
+        /* Angka Utama: Putih (Bukan Kuning) & Sangat Tebal */
         [data-testid="stMetricValue"] div {
-            color: #FFD700 !important;
-            font-weight: 900 !important;
+            color: #FFFFFF !important; 
+            font-weight: 900 !important; 
+            font-size: 36px !important; /* Ukuran pas biar rapi */
         }
 
-        /* Fix Delta: Pastiin background label delta gak nutupin panah */
+        /* Delta: Tetap Hijau & Bold */
         [data-testid="stMetricDelta"] div {
             font-weight: bold !important;
+            font-size: 14px !important;
         }
         </style>
     """, unsafe_allow_html=True)
