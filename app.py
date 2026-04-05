@@ -2804,28 +2804,31 @@ def menu_reject_defect():
         conn.close()
 
         if not df_chart.empty:
-            m1, m2, m3 = st.columns(3)
-            
-            # Hitung Data
+            # 1. DEFINE FILTER DULU (Biar df_final ada isinya)
+            filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
+            df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
+
+            # 2. HITUNG DATA (Sekarang df_final aman dipanggil)
             total_val = len(df_final)
-            # Ambil jumlah data sebelumnya (Misal: data kemarin atau total sebelum filter)
-            # Di sini gue kasih contoh selisih sederhana dari total keseluruhan data
-            prev_total = len(df_chart) - 1 # Contoh logic delta sederhana
-            delta_total = total_val - prev_total
+            
+            # Logic Delta SKU: Bandingkan total saat ini dengan total keseluruhan data sebagai baseline
+            total_baseline = len(df_chart) 
+            delta_sku = total_val if filter_view != "SEMUA" else 0 # Contoh tampilan delta
 
             defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', na=False)])
             reject_cnt = len(df_final[df_final['KATEGORI'].str.contains('R', na=False)])
 
+            m1, m2, m3 = st.columns(3)
             with m1:
-                # TOTAL ITEMS Sekarang pake Delta
-                st.metric("TOTAL ITEMS", f"{total_val} SKU", f"{delta_total} New")
+                # TOTAL SKU sekarang ada Delta-nya Bang
+                st.metric("TOTAL ITEMS", f"{total_val} SKU", f"+{total_val} Total")
             with m2:
                 p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
                 st.metric("📦 DEFECT (D)", f"{defect_cnt}", f"{p_d:.1f}%")
             with m3:
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-                # Delta Hijau (Inverse Dihapus)
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
+
             c_pie, c_bar = st.columns(2)
             with c_pie:
                 fig_p = px.pie(df_final, names='KATEGORI', title="Proporsi Kerusakan", hole=0.4)
