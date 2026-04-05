@@ -5359,39 +5359,94 @@ def init_db_logistic():
 conn = init_db_logistic()
 
 if menu == "Logistic Schedule":
-    # --- CSS FIX: TEKS PUTIH & BG HITAM PEKAT ---
+    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
     st.markdown("""
         <style>
+            /* 1. Header Utama - Efek Gradient Glass */
             .hero-header {
-                background-color: #007BFF;
+                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
                 color: white;
-                padding: 12px;
-                border-radius: 8px;
+                padding: 25px;
+                border-radius: 12px;
                 text-align: center;
-                margin-bottom: 25px;
-                font-weight: bold;
-                font-size: 20px;
+                margin-bottom: 35px;
+                font-weight: 800;
+                font-size: 26px;
+                letter-spacing: 0.5px;
+                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
             }
-            [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+
+            /* 2. Input Fields - Modern Dark Glass */
+            [data-testid="stForm"] { 
+                border: none !important; 
+                padding: 0 !important; 
+            }
+            
             div[data-testid="stTextInput"] > div > div, 
-            div[data-testid="stTextArea"] > div > div {
-                background-color: #1a1c27 !important; 
-                border: 1px solid #3d4156 !important;
-                border-radius: 6px !important;
+            div[data-testid="stTextArea"] > div > div,
+            div[data-testid="stDateInput"] > div > div,
+            div[data-testid="stSelectbox"] > div > div {
+                background-color: #12141d !important; 
+                border: 1px solid #2d3142 !important;
+                border-radius: 10px !important;
+                transition: all 0.3s ease-in-out !important;
+                padding: 2px !important;
             }
+
+            /* Efek Focus Pas Diklik */
+            div[data-testid="stTextInput"] > div > div:focus-within, 
+            div[data-testid="stDateInput"] > div > div:focus-within {
+                border-color: #007BFF !important;
+                box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
+            }
+
+            /* 3. Button - Premium Glow Effect */
+            div.stButton > button {
+                background: linear-gradient(90deg, #007BFF 0%, #0056b3 100%) !important;
+                color: white !important;
+                border-radius: 10px !important;
+                border: none !important;
+                padding: 12px 24px !important;
+                font-weight: 700 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 1px !important;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
+            }
+
+            div.stButton > button:hover {
+                transform: translateY(-2px) !important;
+                box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4) !important;
+                background: linear-gradient(90deg, #0085FF 0%, #0069d9 100%) !important;
+            }
+
+            div.stButton > button:active {
+                transform: translateY(0px) !important;
+            }
+
+            /* 4. Font & Labels - Soft Neutral */
+            label { 
+                color: #B0B3B8 !important; 
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                margin-bottom: 8px !important;
+            }
+
             input, textarea { 
                 background-color: transparent !important; 
-                color: white !important; 
-                -webkit-text-fill-color: white !important; 
+                color: #ffffff !important; 
+                font-family: 'Inter', sans-serif !important;
+                -webkit-text-fill-color: #ffffff !important; 
             }
-            div.stButton > button {
-                background-color: #007BFF !important;
-                color: white !important;
-                border-radius: 8px !important;
-                width: 100% !important;
-                font-weight: bold !important;
+
+            /* 5. Metrics & Cards (Jika ada) */
+            div[data-testid="metric-container"] {
+                background-color: #1a1c27 !important;
+                padding: 15px !important;
+                border-radius: 12px !important;
+                border: 1px solid #2d3142 !important;
             }
-            label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
 
