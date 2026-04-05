@@ -2864,50 +2864,43 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
-            # 1. Judul (Hitam & Tebal)
-            st.markdown('<h3 style="color: #31333F; font-weight: 800; margin-top: 30px;">📋 DETAIL DATABASE</h3>', unsafe_allow_html=True)
+            # 1. Judul (Paksa Hitam)
+            st.markdown('<h3 style="color: #000000 !important; font-weight: 800;">📋 DETAIL DATABASE</h3>', unsafe_allow_html=True)
             
-            # 2. Ambil Data
             df_view = df_final.sort_values('rowid', ascending=False)
             
             if not df_view.empty:
-                # 3. FITUR MULTI-DELETE (Paling Aman & Rapi)
-                st.info("💡 Centang item di bawah, lalu klik 'HAPUS DATA TERPILIH' untuk menghapus.")
-                
-                # Buat list untuk nampung ID yang mau dihapus
                 to_delete = []
                 
-                # Header Tabel Manual (Lurus & Presisi)
+                # 2. Header (Paksa Hitam & Tebal)
                 h_cols = st.columns([0.5, 1.5, 1.5, 2.5, 2, 2])
                 headers = ["SEL", "CABANG", "SKU", "NAMA BARANG", "KATEGORI", "WAKTU"]
                 for col, text in zip(h_cols, headers):
-                    col.write(f"**{text}**")
+                    col.markdown(f'<p style="color: #000000 !important; font-weight: bold; margin-bottom: 0px;">{text}</p>', unsafe_allow_html=True)
                 st.divider()
 
-                # Render Baris Data
+                # 3. Render Baris Data (Paksa Hitam per Item)
                 for _, row in df_view.iterrows():
                     r_cols = st.columns([0.5, 1.5, 1.5, 2.5, 2, 2])
                     
-                    # Checkbox untuk seleksi (Gak bakal nabrak tulisan)
                     with r_cols[0]:
                         sel = st.checkbox("", key=f"check_{row['rowid']}")
                         if sel:
                             to_delete.append(row['rowid'])
                     
-                    r_cols[1].text(row['CABANG'])
-                    r_cols[2].text(row['SKU'])
-                    r_cols[3].text(row['ARTICLE_NAME'])
-                    r_cols[4].text(row['KATEGORI'])
-                    r_cols[5].caption(row['TANGGAL_INPUT'])
-                    st.markdown('<div style="margin-top: -15px;"></div>', unsafe_allow_html=True)
+                    # Kita bungkus tiap teks pake div style color hitam
+                    r_cols[1].markdown(f'<div style="color: #000000 !important;">{row["CABANG"]}</div>', unsafe_allow_html=True)
+                    r_cols[2].markdown(f'<div style="color: #000000 !important;">{row["SKU"]}</div>', unsafe_allow_html=True)
+                    r_cols[3].markdown(f'<div style="color: #000000 !important;">{row["ARTICLE_NAME"]}</div>', unsafe_allow_html=True)
+                    r_cols[4].markdown(f'<div style="color: #000000 !important;">{row["KATEGORI"]}</div>', unsafe_allow_html=True)
+                    r_cols[5].markdown(f'<div style="color: #555555 !important; font-size: 0.8rem;">{row["TANGGAL_INPUT"]}</div>', unsafe_allow_html=True)
+                    
+                    st.markdown('<div style="margin-top: -10px;"></div>', unsafe_allow_html=True)
 
-                # 4. TOMBOL EKSEKUSI (Muncul di bawah kalau ada yang dicentang)
                 if to_delete:
-                    st.divider()
                     if st.button(f"🗑️ HAPUS {len(to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
                         for rid in to_delete:
                             delete_reject_item(rid)
-                        st.success(f"✅ {len(to_delete)} Data Berhasil Dihapus!")
                         st.rerun()
             else:
                 st.warning("Belum ada data.")
