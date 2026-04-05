@@ -2600,14 +2600,12 @@ def menu_retur_out_system():
 
     conn = init_db()
 
-    # --- 3. UPLOAD & AUTO-SAVE (TANPA EXPANDER) ---
+    # --- 3. UPLOAD & AUTO-SAVE ---
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
         try:
             df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-            
-            # Standarisasi Header
             df_upload.columns = [str(c).strip() for c in df_upload.columns]
             
             required_cols = {
@@ -2628,73 +2626,46 @@ def menu_retur_out_system():
                     st.success(f"✅ Berhasil! {len(df_to_save)} Baris masuk database.")
                     st.rerun()
             else:
-                st.error("Gagal: Kolom di file lu gak match sama sistem!")
+                st.error("Gagal: Kolom di file lu gak match!")
         except Exception as e:
             st.error(f"Error Upload: {e}")
+        # --- PENUTUP TRY UPLOAD SUDAH ADA DI ATAS (EXCEPT) ---
 
     # --- 4. DATA VIEW & METRICS ---
     try:
-        # Pastikan variabel conn sudah didefinisikan sebelumnya
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
         if not df_db.empty:
-            # 1. Kalkulasi Dashboard
+            # Kalkulasi Dashboard
             total_sku = df_db['sku'].nunique()
             total_qty_system = df_db['qty_system'].sum()
             total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
-            # 2. Tampilan Metrik Box
+            # TAMPILAN METRIK
             m1, m2, m3 = st.columns(3)
             with m1:
-                st.markdown(f'''
-                    <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
-                        <div class="metric-label">🗄️ TOTAL SKU</div>
-                        <div class="metric-value">{total_sku:,}</div>
-                        <div class="metric-delta">↑ IN DATABASE</div>
-                    </div>
-                ''', unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #8b5cf6;"><div class="metric-label">🗄️ TOTAL SKU</div><div class="metric-value">{total_sku:,}</div><div class="metric-delta">↑ IN DATABASE</div></div>', unsafe_allow_html=True)
             with m2:
-                st.markdown(f'''
-                    <div class="metric-card" style="border-left: 6px solid #10b981;">
-                        <div class="metric-label">📦 TOTAL QTY</div>
-                        <div class="metric-value">{int(total_qty_system):,}</div>
-                        <div class="metric-delta">↑ TOTAL QTY</div>
-                    </div>
-                ''', unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #10b981;"><div class="metric-label">📦 TOTAL QTY</div><div class="metric-value">{int(total_qty_system):,}</div><div class="metric-delta">↑ TOTAL STOCK</div></div>', unsafe_allow_html=True)
             with m3:
-                st.markdown(f'''
-                    <div class="metric-card" style="border-left: 6px solid #f59e0b;">
-                        <div class="metric-label">💰 TOTAL VALUE</div>
-                        <div class="metric-value">Rp {total_value:,.0f}</div>
-                        <div class="metric-delta">↑ TOTAL VALUE</div>
-                    </div>
-                ''', unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #f59e0b;"><div class="metric-label">💰 TOTAL VALUE</div><div class="metric-value">Rp {total_value:,.0f}</div><div class="metric-delta">↑ TOTAL COST</div></div>', unsafe_allow_html=True)
 
-            # --- 4. DATA VIEW & SEARCH ---
-    try:
-        df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
-
-        if not df_db.empty:
             st.markdown("### 📜 Database History")
             
-            # 1. SEARCH BAR
+            # SEARCH BAR MINIMALIS
             search_query = st.text_input("Search Bar", placeholder="Ketik SKU atau Nama...", key="minimal_search")
 
-            # 2. AMBIL DATA & URUTKAN
             df_display = df_db.sort_values(by='rowid', ascending=False)
 
-            # 3. LOGIKA FILTER
             if search_query:
                 df_display = df_display[
                     df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
                     df_display['item_name'].str.contains(search_query, case=False, na=False)
                 ]
 
-            # TAMPILKAN SEMUA DATA
-            df_final = df_display 
+            df_final = df_display
             cols_to_show = [col for col in df_final.columns if col != 'rowid']
 
-            # 4. TAMPILAN TABEL
             event = st.dataframe(
                 df_final[cols_to_show],
                 use_container_width=True, 
@@ -2703,7 +2674,7 @@ def menu_retur_out_system():
                 selection_mode="single-row" 
             )
 
-            # 5. LOGIKA HAPUS (Hanya muncul kalau baris di-klik)
+            # LOGIKA HAPUS
             if event.selection.rows:
                 row_idx = event.selection.rows[0]
                 target_id = df_final.iloc[row_idx]['rowid']
@@ -2715,9 +2686,7 @@ def menu_retur_out_system():
                     conn.commit()
                     st.success("Data berhasil dihapus!")
                     st.rerun()
-        
         else:
-            # INI POSISI ELSE YANG BENER (Sejajar sama if not df_db.empty)
             st.info("Database masih kosong. Silakan upload file di atas.")
 
     except Exception as e:
