@@ -2766,6 +2766,17 @@ def menu_reject_defect():
             color: #FFFFFF !important;
             font-weight: 800 !important;
         }
+        /* Fix Judul Detail Database: Hitam & Tebal */
+        .detail-header {
+            color: #31333F !important;
+            font-weight: 800 !important;
+            font-size: 22px !important;
+            margin-top: 30px !important;
+            margin-bottom: 10px !important;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
         .stMarkdown p {
             color: #E0E0E0 !important;
@@ -2853,33 +2864,50 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
-            st.write("### 📋 DETAIL DATABASE")
+            # Judul dengan class CSS baru (Hitam)
+            st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
             
-            # 1. TAMPILKAN TABEL UTAMA (Bersih & Rapi)
-            # Sembunyikan kolom rowid biar user nggak bingung
-            df_display = df_final.drop(columns=['rowid'], errors='ignore').sort_values('TANGGAL_INPUT', ascending=False)
-            st.dataframe(df_display, use_container_width=True)
+            # Ambil data terbaru
+            conn = sqlite3.connect('inventory_logistik.db')
+            df_editor = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
+            conn.close()
 
-            # 2. SEKSI KHUSUS HAPUS (Di bawah tabel biar gak numpuk)
-            st.markdown("---")
-            col_del1, col_del2 = st.columns([3, 1])
+            if filter_view != "SEMUA":
+                df_editor = df_editor[df_editor['CABANG'] == filter_view]
             
-            with col_del1:
-                # Pilih SKU yang mau dihapus berdasarkan data yang difilter
-                list_hapus = df_final['SKU'].tolist()
-                sku_to_del = st.selectbox("🎯 PILIH SKU UNTUK DIHAPUS:", ["-- Pilih SKU --"] + list_hapus, key="select_del")
-            
-            with col_del2:
-                st.write("##") # Spacer biar sejajar tombolnya
-                if st.button("🗑️ HAPUS DATA", use_container_width=True):
-                    if sku_to_del != "-- Pilih SKU --":
-                        # Cari rowid dari SKU yang dipilih
-                        target_id = df_final[df_final['SKU'] == sku_to_del]['rowid'].values[0]
-                        delete_reject_item(target_id)
-                        st.success(f"Berhasil hapus SKU {sku_to_del}!")
-                        st.rerun()
-                    else:
-                        st.warning("Pilih SKU dulu!")
+            df_editor = df_editor.sort_values('rowid', ascending=False)
+
+            # TAMPILAN TABEL INTERAKTIF (Bisa Hapus Langsung)
+            # User cukup pilih baris (klik angka di kiri) lalu tekan tombol "Delete" di keyboard
+            # Atau centang kolom delete yang kita buat manual
+            event = st.data_editor(
+                df_editor,
+                column_config={
+                    "rowid": None, # Sembunyikan ID sistem
+                    "TANGGAL_INPUT": st.column_config.TextColumn("WAKTU", width="medium"),
+                    "SKU": st.column_config.TextColumn("SKU", width="small"),
+                },
+                use_container_width=True,
+                hide_index=False,
+                num_rows="dynamic", # INI BIAR BISA HAPUS BARIS
+                key="database_editor"
+            )
+
+            # Logic jika ada data yang dihapus di editor
+            if len(event) < len(df_editor):
+                # Cari baris mana yang ilang
+                current_ids = set(event['rowid'].tolist())
+                old_ids = set(df_editor['rowid'].tolist())
+                deleted_ids = old_ids - current_ids
+                
+                for rid in deleted_ids:
+                    delete_reject_item(rid)
+                
+                st.success("Data berhasil dihapus!")
+                st.rerun()
+
+            if st.button("🚨 KOSONGKAN SEMUA DATA", use_container_width=True):
+                clear_all_data()
 
 import streamlit as st
 import sqlite3
