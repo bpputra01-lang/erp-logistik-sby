@@ -2897,21 +2897,30 @@ def menu_reject_defect():
                 hide_index=True, # Indeks angka kiri dimatikan biar bersih
                 key="database_editor"
             )
+# ... (kode data_editor Lu yang sudah bener)
 
-            # LOGIC HAPUS SINGLE/MULTIPLE BERDASARKAN CENTANG
-            # Cari baris mana yang kolom 'HAPUS'-nya jadi True
+            # LOGIC HAPUS SINGLE BERSIH
             rows_to_delete = event[event['HAPUS'] == True]
 
             if not rows_to_delete.empty:
-                st.warning(f"Terdeteksi {len(rows_to_delete)} item siap dihapus.")
-                if st.button("🚮 KONFIRMASI HAPUS ITEM TERPILIH", type="primary", use_container_width=True):
-                    for rid in rows_to_delete['rowid']:
-                        delete_reject_item(rid)
-                    st.success("Item berhasil dibuang!")
-                    st.rerun()
+                # Kita pake container biar ada jarak dan warnanya nggak nyampur
+                with st.container():
+                    st.markdown(f"""
+                        <div style="background-color: #ffe6e6; padding: 10px; border-radius: 5px; border-left: 5px solid #ff4b4b; margin: 10px 0;">
+                            <span style="color: #ff4b4b; font-weight: bold;">⚠️ SIAP DIHAPUS: {len(rows_to_delete)} Item terpilih.</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Tombol konfirmasi dibuat ramping di kolom kanan
+                    _, col_confirm = st.columns([2, 1])
+                    with col_confirm:
+                        if st.button("🚮 KONFIRMASI HAPUS", type="primary", use_container_width=True):
+                            for rid in rows_to_delete['rowid']:
+                                delete_reject_item(rid)
+                            st.rerun()
 
-            st.markdown("---")
-            if st.button("🚮 KOSONGKAN SEMUA DATA", use_container_width=True):
+            st.write("") # Spacer
+            if st.button("🚮 KOSONGKAN SEMUA DATABASE", use_container_width=True):
                 clear_all_data()
                 st.rerun()
 import streamlit as st
