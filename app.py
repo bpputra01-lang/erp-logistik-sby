@@ -4060,16 +4060,23 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "Pengajuan Reject/Defect", "Reject/Defect List"]
+    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System"]
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
 
-    # --- KELOMPOK 4: EXTRAS ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
+    # --- KELOMPOK 4: REJECT/DEFECT ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">REJECT & DEFECT</p>', unsafe_allow_html=True)
     
-    m4_list = ["Logistic Schedule", "Balancing Stock"]
+    m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"]
     idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else 0
     st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=change_m4, label_visibility="collapsed")
+
+    # --- KELOMPOK 5: EXTRAS ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
+    
+    m5_list = ["Logistic Schedule", "Balancing Stock"]
+    idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else 0
+    st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
 
     st.divider()
 
