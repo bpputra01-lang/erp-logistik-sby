@@ -2676,6 +2676,20 @@ def menu_retur_out_system():
             st.info("Belum ada data tersimpan di database.")
     except:
         st.info("Tabel belum terbentuk. Silakan upload dan simpan data.")
+# --- TAMBAHKAN INI DI BAWAH SECTION HISTORY DATA ---
+    st.markdown("---")
+    if st.checkbox("🔓 Aktifkan Fitur Hapus"):
+        if st.button("🗑️ KOSONGKAN SEMUA DATA DATABASE", type="secondary", use_container_width=True):
+            try:
+                conn = sqlite3.connect('inventory_logistics.db')
+                c = conn.cursor()
+                c.execute("DELETE FROM retur_out") # Menghapus semua isi tabel
+                conn.commit()
+                conn.close()
+                st.warning("💥 Seluruh data di database telah dihapus!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Gagal menghapus: {e}")
 
 
 def process_justification(df_case, df_tracking, df_po):
