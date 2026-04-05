@@ -5380,7 +5380,7 @@ if menu == "Logistic Schedule":
 
             /* 1.5 Sub-Header Stylings (INI YANG BARU) */
             div[data-testid="stVerticalBlock"] h3 {
-                color: #33AEFF !important;
+                color: #000000 !important;
                 border-left: 5px solid #0062E6;
                 padding-left: 15px;
                 font-weight: 700;
