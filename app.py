@@ -2926,31 +2926,32 @@ def menu_reject_defect():
             st.markdown("<br>", unsafe_allow_html=True)
     with tab_match:
         st.subheader("🔍 CROSS-CHECK SKU MATCHING")
-        if not df_match_result.empty:
+        
+        # Cek apakah df_match_result sudah didefinisikan dan tidak kosong
+        if 'df_match_result' in locals() and not df_match_result.empty:
             m_col1, m_col2 = st.columns(2)
             m_col1.metric("MATCH FOUND", f"{len(df_match_result)} Items")
             m_col2.metric("UNIQUE SKU", f"{df_match_result['SKU'].nunique()}")
             
-            st.dataframe(df_match_result[['CABANG', 'SKU', 'ARTICLE_NAME', 'KATEGORI', 'MATCH_DI_CABANG', 'TANGGAL_INPUT']], use_container_width=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Tampilkan Tabel Hasil Match pake data_editor biar rapi
+            st.data_editor(
+                df_match_result[['CABANG', 'SKU', 'ARTICLE_NAME', 'KATEGORI', 'MATCH_DI_CABANG', 'TANGGAL_INPUT']],
+                column_config={
+                    "MATCH_DI_CABANG": st.column_config.TextColumn(
+                        "DITEMUKAN DI",
+                        help="Cabang mana saja yang punya SKU ini",
+                        width="medium"
+                    ),
+                    "KATEGORI": "KET (NON-STD)"
+                },
+                use_container_width=True,
+                hide_index=True,
+                key="match_editor_v2"
+            )
         else:
             st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")
-        # Tampilkan Tabel Hasil Match
-        st.data_editor(
-            df_match_result[['CABANG', 'SKU', 'ARTICLE_NAME', 'KATEGORI', 'MATCH_DI_CABANG', 'TANGGAL_INPUT']],
-            column_config={
-                "MATCH_DI_CABANG": st.column_config.TextColumn(
-                    "DITEMUKAN DI",
-                    help="Cabang mana saja yang punya SKU ini",
-                    width="medium"
-                ),
-                "KATEGORI": "KET (NON-STD)"
-            },
-            use_container_width=True,
-            hide_index=True,
-            key="match_editor"
-        )
-    else:
-        st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")
             # Judul dengan class CSS baru (Hitam)
             st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
             
