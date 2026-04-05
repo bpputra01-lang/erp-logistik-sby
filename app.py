@@ -2864,46 +2864,50 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
-            # 1. Judul (Paksa Hitam)
-            st.markdown('<h3 style="color: #000000 !important; font-weight: 800;">📋 DETAIL DATABASE</h3>', unsafe_allow_html=True)
+            # Judul dengan class CSS baru (Hitam)
+            st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
             
-            df_view = df_final.sort_values('rowid', ascending=False)
+            # Ambil data terbaru
+            conn = sqlite3.connect('inventory_logistik.db')
+            df_editor = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
+            conn.close()
+
+            if filter_view != "SEMUA":
+                df_editor = df_editor[df_editor['CABANG'] == filter_view]
             
-            if not df_view.empty:
-                to_delete = []
+            df_editor = df_editor.sort_values('rowid', ascending=False)
+
+            # TAMPILAN TABEL INTERAKTIF (Bisa Hapus Langsung)
+            # User cukup pilih baris (klik angka di kiri) lalu tekan tombol "Delete" di keyboard
+            # Atau centang kolom delete yang kita buat manual
+            event = st.data_editor(
+                df_editor,
+                column_config={
+                    "rowid": None, # Sembunyikan ID sistem
+                    "TANGGAL_INPUT": st.column_config.TextColumn("WAKTU", width="medium"),
+                    "SKU": st.column_config.TextColumn("SKU", width="small"),
+                },
+                use_container_width=True,
+                hide_index=False,
+                num_rows="dynamic", # INI BIAR BISA HAPUS BARIS
+                key="database_editor"
+            )
+
+            # Logic jika ada data yang dihapus di editor
+            if len(event) < len(df_editor):
+                # Cari baris mana yang ilang
+                current_ids = set(event['rowid'].tolist())
+                old_ids = set(df_editor['rowid'].tolist())
+                deleted_ids = old_ids - current_ids
                 
-                # 2. Header (Paksa Hitam & Tebal)
-                h_cols = st.columns([0.5, 1.5, 1.5, 2.5, 2, 2])
-                headers = ["SEL", "CABANG", "SKU", "NAMA BARANG", "KATEGORI", "WAKTU"]
-                for col, text in zip(h_cols, headers):
-                    col.markdown(f'<p style="color: #000000 !important; font-weight: bold; margin-bottom: 0px;">{text}</p>', unsafe_allow_html=True)
-                st.divider()
+                for rid in deleted_ids:
+                    delete_reject_item(rid)
+                
+                st.success("Data berhasil dihapus!")
+                st.rerun()
 
-                # 3. Render Baris Data (Paksa Hitam per Item)
-                for _, row in df_view.iterrows():
-                    r_cols = st.columns([0.5, 1.5, 1.5, 2.5, 2, 2])
-                    
-                    with r_cols[0]:
-                        sel = st.checkbox("", key=f"check_{row['rowid']}")
-                        if sel:
-                            to_delete.append(row['rowid'])
-                    
-                    # Kita bungkus tiap teks pake div style color hitam
-                    r_cols[1].markdown(f'<div style="color: #000000 !important;">{row["CABANG"]}</div>', unsafe_allow_html=True)
-                    r_cols[2].markdown(f'<div style="color: #000000 !important;">{row["SKU"]}</div>', unsafe_allow_html=True)
-                    r_cols[3].markdown(f'<div style="color: #000000 !important;">{row["ARTICLE_NAME"]}</div>', unsafe_allow_html=True)
-                    r_cols[4].markdown(f'<div style="color: #000000 !important;">{row["KATEGORI"]}</div>', unsafe_allow_html=True)
-                    r_cols[5].markdown(f'<div style="color: #555555 !important; font-size: 0.8rem;">{row["TANGGAL_INPUT"]}</div>', unsafe_allow_html=True)
-                    
-                    st.markdown('<div style="margin-top: -10px;"></div>', unsafe_allow_html=True)
-
-                if to_delete:
-                    if st.button(f"🗑️ HAPUS {len(to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
-                        for rid in to_delete:
-                            delete_reject_item(rid)
-                        st.rerun()
-            else:
-                st.warning("Belum ada data.")
+            if st.button("🚨 KOSONGKAN SEMUA DATA", use_container_width=True):
+                clear_all_data()
 import streamlit as st
 import sqlite3
 import pandas as pd
