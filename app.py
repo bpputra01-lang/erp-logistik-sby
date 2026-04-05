@@ -3002,13 +3002,6 @@ def menu_reject_defect():
                 </h3>
             </div>
         """, unsafe_allow_html=True)
-        
-        # --- KETERANGAN (WARNA ABU-ABU BIAR TERBACA) ---
-        st.markdown("""
-            <p style="color: #888 !important; font-size: 0.9rem; margin-bottom: 25px; margin-left: 5px;">
-                Menampilkan rangkuman barang Non-Standar yang ditemukan di lebih dari satu inputan/cabang.
-            </p>
-        """, unsafe_allow_html=True)
 
         # Pastikan data ada
         if 'df_match_result' in locals() and not df_match_result.empty:
@@ -3044,7 +3037,7 @@ def menu_reject_defect():
             df_final_match = df_core.merge(df_pivot, on='SKU', how='left')
 
             # --- TABEL HASIL ---
-            st.markdown('<p style="color: #000000; font-weight: 700; margin-bottom: 10px;">📋 Rangkuman Lokasi Temuan per SKU</p>', unsafe_allow_html=True)
+st.markdown('<p style="color: #000000 !important; font-weight: 700; margin-bottom: 10px; opacity: 1 !important;">📋 Rangkuman Lokasi Temuan per SKU</p>', unsafe_allow_html=True)
             
             st.data_editor(
                 df_final_match,
