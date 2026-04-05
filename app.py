@@ -5478,6 +5478,43 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
+st.divider()
+st.subheader("🌙 LIST PLOT TIM SHIFT 3")
+
+if 'res_df' in st.session_state:
+    days = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+    # Filter baris yang ada tulisan SHIFT 3
+    df_s3 = st.session_state.res_df[st.session_state.res_df['SHIFT - ROLE'].str.contains("SHIFT 3", na=False)]
+    
+    # Kumpulkan data unik biar gak double tampil
+    plot_data = []
+    for day in days:
+        tgl_str = dates_real[days.index(day)] if 'dates_real' in locals() else day
+        names_today = df_s3[day].tolist()
+        
+        for n in names_today:
+            if n and n.strip() != "":
+                plot_data.append({"NAMA": n, "TANGGAL": tgl_str})
+
+    if plot_data:
+        # Tampilkan per baris mirip screenshot lu
+        for item in plot_data:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                # Background gelap, teks ijo terang (Vibe JEZ SBY)
+                st.markdown(f"""
+                    <div style="background-color: #1a1c27; padding: 10px; border-radius: 5px; border-left: 5px solid #00FF00; margin-bottom: 5px;">
+                        <span style="color: #FFFFFF; font-weight: bold; font-size: 1.1rem;">{item['NAMA']}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"""
+                    <div style="padding: 10px; text-align: right;">
+                        <span style="color: #888;">{item['TANGGAL']}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+    else:
+        st.info("Belum ada tim yang di-plot ke Shift 3.")
 
 # --- 3. GENERATOR JADWAL JEZ SBY (LOGIC V5 - STRICT & CONSECUTIVE) ---
 st.subheader("🚀 3. Generator Jadwal Otomatis")
