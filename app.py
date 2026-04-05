@@ -2660,35 +2660,54 @@ def menu_retur_out_system():
         else:
             st.warning("⚠️ Kolom tidak sesuai format!")
 
-    # --- TAMBAHAN: TAMPILAN DATA DARI SQLITE (AGAR TIDAK HILANG SAAT REFRESH) ---
+    # --- SECTION HISTORY & HAPUS SINGLE ROW ---
     st.markdown("---")
     st.markdown('<h4 style="color: #31333F; font-weight: 700;">📜 History Data di SQLite:</h4>', unsafe_allow_html=True)
     
     try:
         conn = sqlite3.connect('inventory_logistics.db')
-        # Tarik data terakhir yang masuk
-        df_history = pd.read_sql('SELECT * FROM retur_out ORDER BY rowid DESC LIMIT 100', conn)
+        # Ambil rowid sebagai kunci unik untuk hapus data
+        df_history = pd.read_sql('SELECT rowid, * FROM retur_out ORDER BY rowid DESC LIMIT 100', conn)
         conn.close()
         
         if not df_history.empty:
-            st.dataframe(df_history, use_container_width=True, hide_index=True)
+            # Tampilkan tabel dengan fitur seleksi baris
+            event = st.dataframe(
+                df_history, 
+                use_container_width=True, 
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single" # Lu bisa ganti "multi" kalau mau hapus banyak sekaligus
+            )
+
+            # Ambil index baris yang dipilih
+            selected_rows = event.selection.rows
+            
+            if selected_rows:
+                # Ambil nilai rowid dari baris yang dipilih
+                row_idx = selected_rows[0]
+                target_id = df_history.iloc[row_idx]['rowid']
+                target_sku = df_history.iloc[row_idx]['sku']
+
+                st.warning(f"⚠️ Kamu memilih SKU: **{target_sku}** (ID: {target_id})")
+                
+                if st.button(f"🗑️ HAPUS BARIS INI", type="primary", use_container_width=True):
+                    try:
+                        conn = sqlite3.connect('inventory_logistics.db')
+                        c = conn.cursor()
+                        # Hapus berdasarkan rowid yang unik
+                        c.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
+                        conn.commit()
+                        conn.close()
+                        st.success(f"✅ Baris {target_sku} berhasil dihapus!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Gagal hapus: {e}")
         else:
-            st.info("Belum ada data tersimpan di database.")
-    except:
-        st.info("Tabel belum terbentuk. Silakan upload dan simpan data.")
-# --- TAMBAHKAN INI DI BAWAH SECTION HISTORY DATA ---
-    st.markdown("---")
-        if st.button("🗑️ KOSONGKAN SEMUA DATA DATABASE", type="secondary", use_container_width=True):
-            try:
-                conn = sqlite3.connect('inventory_logistics.db')
-                c = conn.cursor()
-                c.execute("DELETE FROM retur_out") # Menghapus semua isi tabel
-                conn.commit()
-                conn.close()
-                st.warning("💥 Seluruh data di database telah dihapus!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Gagal menghapus: {e}")
+            st.info("Belum ada data tersimpan.")
+            
+    except Exception as e:
+        st.info("Database belum siap atau kosong.")
 
 
 def process_justification(df_case, df_tracking, df_po):
