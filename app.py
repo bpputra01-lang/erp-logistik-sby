@@ -2854,25 +2854,32 @@ def menu_reject_defect():
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
             st.write("### 📋 DETAIL DATABASE")
-            df_view = df_final.sort_values('rowid', ascending=False)
-
-            for index, row in df_view.iterrows():
-                cols = st.columns([0.5, 2, 2, 2, 1, 1])
-                with cols[0]:
-                    if st.button("🗑️", key=f"del_{row['rowid']}"):
-                        delete_reject_item(row['rowid'])
-                        st.rerun()
-                with cols[1]: st.write(row['CABANG'])
-                with cols[2]: st.write(row['SKU'])
-                with cols[3]: st.write(row['ARTICLE_NAME'])
-                with cols[4]: st.write(row['KATEGORI'])
-                with cols[5]: st.write(row['TANGGAL_INPUT'])
-                st.markdown("---")
             
-            if st.button("🚨 KOSONGKAN SEMUA DATA"):
-                clear_all_data()
-        else:
-            st.info("💡 Belum ada data untuk ditampilkan.")
+            # 1. TAMPILKAN TABEL UTAMA (Bersih & Rapi)
+            # Sembunyikan kolom rowid biar user nggak bingung
+            df_display = df_final.drop(columns=['rowid'], errors='ignore').sort_values('TANGGAL_INPUT', ascending=False)
+            st.dataframe(df_display, use_container_width=True)
+
+            # 2. SEKSI KHUSUS HAPUS (Di bawah tabel biar gak numpuk)
+            st.markdown("---")
+            col_del1, col_del2 = st.columns([3, 1])
+            
+            with col_del1:
+                # Pilih SKU yang mau dihapus berdasarkan data yang difilter
+                list_hapus = df_final['SKU'].tolist()
+                sku_to_del = st.selectbox("🎯 PILIH SKU UNTUK DIHAPUS:", ["-- Pilih SKU --"] + list_hapus, key="select_del")
+            
+            with col_del2:
+                st.write("##") # Spacer biar sejajar tombolnya
+                if st.button("🗑️ HAPUS DATA", use_container_width=True):
+                    if sku_to_del != "-- Pilih SKU --":
+                        # Cari rowid dari SKU yang dipilih
+                        target_id = df_final[df_final['SKU'] == sku_to_del]['rowid'].values[0]
+                        delete_reject_item(target_id)
+                        st.success(f"Berhasil hapus SKU {sku_to_del}!")
+                        st.rerun()
+                    else:
+                        st.warning("Pilih SKU dulu!")
 
 import streamlit as st
 import sqlite3
