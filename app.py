@@ -2507,7 +2507,7 @@ def init_db():
 init_db()
 
 def menu_retur_out_system():
-    # --- HERO HEADER BLOCK (FIXED) ---
+    # --- HERO HEADER BLOCK ---
     st.markdown("""
         <style>
             .hero-header {
@@ -2525,16 +2525,19 @@ def menu_retur_out_system():
                 font-weight: 800;
                 font-size: 1.85rem;
                 margin: 0;
-                display: flex;
-                align-items: center;
-                gap: 15px;
                 letter-spacing: 0.02em;
+            }
+            /* STYLE UNTUK METRIC CARD BIAR GAK POLOS */
+            div[data-testid="stMetric"] {
+                background-color: #f8f9fb;
+                padding: 15px;
+                border-radius: 10px;
+                border-left: 5px solid #1d3e7a;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             }
         </style>
         <div class="hero-header">
-            <h1 class="hero-title">
-                📋 RETUR OUT DATABASE
-            </h1>
+            <h1 class="hero-title">📋 RETUR OUT DATABASE</h1>
         </div>
     """, unsafe_allow_html=True)
 
@@ -2547,29 +2550,30 @@ def menu_retur_out_system():
         else:
             df_upload = pd.read_excel(uploaded_file)
 
-        # --- SESUAIKAN DENGAN FORMAT FOTO LU ---
-        # Kita pakai kolom asli sesuai foto agar tidak error saat filter
+        # Kolom sesuai format gambar
         required_cols = [
             'Identify', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 
             'VARIANT', 'SUB KATEGORI', 'Harga Beli', 'Harga Jual', 
             'QTY SYSTEM', 'QTY SO'
         ]
         
-        # Cek apakah kolom di file upload sudah lengkap
         if all(col in df_upload.columns for col in required_cols):
             
-            # --- 2. METRICS BOX (PAKAI QTY SO & HARGA BELI) ---
+            # --- 2. METRICS BOX (CUSTOM DESIGN) ---
             total_qty = df_upload['QTY SO'].sum()
             total_sku = df_upload['SKU'].nunique()
-            total_cogs = (df_upload['QTY SO'] * df_upload['Harga Beli']).sum()
+            # Kalkulasi Value dari Harga Beli
+            total_value = (df_upload['QTY SO'] * df_upload['Harga Beli']).sum()
 
             m1, m2, m3 = st.columns(3)
             with m1:
-                st.metric("TOTAL QTY (SO)", f"{total_qty:,} Pcs")
+                # QTY tanpa koma (pake int)
+                st.metric("TOTAL QTY", f"{int(total_qty)} Pcs")
             with m2:
                 st.metric("UNIQUE SKU", f"{total_sku:,}")
             with m3:
-                st.metric("TOTAL VALUE (COGS)", f"Rp {total_cogs:,.0f}")
+                # Value dari Harga Beli
+                st.metric("TOTAL VALUE (COGS)", f"Rp {total_value:,.0f}")
 
             st.markdown("<br>", unsafe_allow_html=True)
 
@@ -2581,7 +2585,7 @@ def menu_retur_out_system():
                 use_container_width=True, 
                 hide_index=True,
                 num_rows="dynamic",
-                key="editor_retur_out_new"
+                key="editor_retur_out_final"
             )
 
             # --- 4. TOMBOL SIMPAN (SQLITE) ---
@@ -2591,7 +2595,7 @@ def menu_retur_out_system():
                     conn = sqlite3.connect('inventory_logistics.db')
                     df_to_save = edited_df.copy()
                     
-                    # Rename untuk masuk ke DB (menghilangkan spasi agar aman di SQL)
+                    # Mapping kolom ke lowercase untuk SQLite
                     df_to_save.columns = [
                         'identify', 'bin', 'sku', 'brand', 'item_name', 
                         'variant', 'sub_kategori', 'harga_beli', 'harga_jual', 
@@ -2601,15 +2605,14 @@ def menu_retur_out_system():
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
                     conn.commit()
                     
-                    st.success(f"🚀 Gaspol! {len(df_to_save)} baris data masuk database.")
+                    st.success(f"🚀 Data Berhasil Disimpan! {len(df_to_save)} baris aman.")
                     st.balloons()
                 except Exception as e:
                     st.error(f"Gagal simpan: {e}")
                 finally:
                     if conn:
-                        conn.close() # Proteksi NoneType Error
+                        conn.close()
         else:
-            # Kasih tau kolom mana yang kurang
             missing = [c for c in required_cols if c not in df_upload.columns]
             st.warning(f"⚠️ Kolom tidak sesuai! Kurang: {', '.join(missing)}")
 
