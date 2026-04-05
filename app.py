@@ -2569,22 +2569,24 @@ def menu_retur_out_system():
     conn = init_db()
 
     # --- 3. UPLOAD & AUTO-SAVE (LANGSUNG TAMPIL TANPA EXPANDER) ---
-    st.markdown("### 📥 UPLOAD DATA BARU")
-    uploaded_file = st.file_uploader("Seret file lu kemari", type=['xlsx', 'csv'], key="retur_up_permanent")
+st.markdown("### 📥 UPLOAD DATA BARU")
+uploaded_file = st.file_uploader("Seret file lu kemari", type=['xlsx', 'csv'], key="retur_up_permanent")
+
+# INI HARUS SEJAJAR KE KIRI (GAK BOLEH MENJOROK KE DALAM)
+if uploaded_file:
+    try:
+        df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
         
-        if uploaded_file:
-            try:
-                df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-                
-                # Standarisasi Header (Hapus spasi depan/belakang)
-                df_upload.columns = [str(c).strip() for c in df_upload.columns]
-                
-                required_cols = {
-                    'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
-                    'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
-                    'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 
-                    'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
-                }
+        # Standarisasi Header
+        df_upload.columns = [str(c).strip() for c in df_upload.columns]
+        
+        required_cols = {
+            'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
+            'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
+            'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 
+            'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
+        }
+        # ... lanjutin sisa kodenya dengan indentasi yang bener
 
                 if all(col in df_upload.columns for col in required_cols.keys()):
                     df_to_save = df_upload[list(required_cols.keys())].copy()
