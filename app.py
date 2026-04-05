@@ -3197,10 +3197,18 @@ def project_approval_reject():
 
     with tabs[0]:
         st.markdown("""
-            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;">
-                <h3 style="color: #007BFF; margin: 0; font-size: 18px; font-weight: 900;">Form Pengajuan Reject/Defect</h3>
-            </div>
-        """, unsafe_allow_html=True)
+    <div style="background-color: #1a1c27; padding: 12px 15px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;">
+        <h3 style="
+            color: #FFFFFF !important; 
+            margin: 0; 
+            font-size: 18px; 
+            font-weight: 900;
+            letter-spacing: 0.5px;
+        ">
+            Form Pengajuan Reject/Defect
+        </h3>
+    </div>
+""", unsafe_allow_html=True)
         
         st.markdown("""
             <style>
