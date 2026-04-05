@@ -2558,7 +2558,7 @@ def menu_retur_out_system():
             }
         </style>
         <div class="hero-header">
-            <h1 class="hero-title">📋 RETUR OUT DATABASE</h1>
+            <h1 class="hero-title">RETUR OUT DATABASE</h1>
         </div>
     """, unsafe_allow_html=True)
 
@@ -2590,7 +2590,7 @@ def menu_retur_out_system():
             with m1: # Card Ungu
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
-                        <div class="metric-label">📦 TOTAL SKU AKTIF</div>
+                        <div class="metric-label">🗄️ TOTAL SKU</div>
                         <div class="metric-value">{total_sku:,}</div>
                         <div class="metric-delta">↑ OVERALL</div>
                     </div>
@@ -2599,7 +2599,7 @@ def menu_retur_out_system():
             with m2: # Card Hijau
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #10b981;">
-                        <div class="metric-label">📊 TOTAL QTY SYSTEM (COL J)</div>
+                        <div class="metric-label">📦TOTAL QTY</div>
                         <div class="metric-value">{int(total_qty_system)}</div>
                         <div class="metric-delta">↑ {len(df_upload)} Baris Data</div>
                     </div>
@@ -2608,7 +2608,7 @@ def menu_retur_out_system():
             with m3: # Card Kuning
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #f59e0b;">
-                        <div class="metric-label">💰 TOTAL VALUE (J * H)</div>
+                        <div class="metric-label">💰 TOTAL VALUE RETUR</div>
                         <div class="metric-value">Rp {total_value:,.0f}</div>
                         <div class="metric-delta">↑ Calculated Value</div>
                     </div>
@@ -2621,7 +2621,7 @@ def menu_retur_out_system():
             edited_df = st.data_editor(df_upload[required_cols], use_container_width=True, hide_index=True, num_rows="dynamic")
 
             # --- TOMBOL SIMPAN ---
-            if st.button("💾 SIMPAN KE DATABASE SQLITE", type="primary", use_container_width=True):
+            if st.button("💾 SIMPAN KE DATABASE", type="primary", use_container_width=True):
                 conn = None
                 try:
                     import sqlite3
@@ -2630,7 +2630,7 @@ def menu_retur_out_system():
                     df_to_save.columns = ['identify', 'bin', 'sku', 'brand', 'item_name', 'variant', 'sub_kategori', 'harga_beli', 'harga_jual', 'qty_system', 'qty_so']
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
                     conn.commit()
-                    st.success(f"🚀 Data Berhasil Disimpan ke SQLite!")
+                    st.success(f"✅Data Berhasil Disimpan ke SQLite!")
                     st.balloons()
                 except Exception as e:
                     st.error(f"Gagal simpan: {e}")
