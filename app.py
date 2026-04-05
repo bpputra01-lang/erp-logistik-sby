@@ -2842,8 +2842,8 @@ def menu_reject_defect():
                     st.rerun()
 
     with tab_analytics:
+    # SEMUA BARIS DI BAWAH INI HARUS MASUK KE DALAM (INDENTED)
     conn = sqlite3.connect('inventory_logistik.db')
-    # Ambil semua data dulu untuk referensi filter
     df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
     conn.close()
 
@@ -2851,16 +2851,16 @@ def menu_reject_defect():
         # 1. Selector Cabang
         filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
         
-        # 2. Filter Data berdasarkan pilihan
+        # 2. Filter Data
         df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
 
-        # 3. Hitung Metrik dari df_final (Hasil Filter)
+        # 3. Hitung Metrik Berdasarkan BIN (Defect/Reject)
         total_val = len(df_final)
-        # Cek kolom KATEGORI untuk 'D' (Defect) atau 'R' (Reject)
-        defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', case=False, na=False)])
-        reject_cnt = len(df_final[df_final['KATEGORI'].str.contains('R', case=False, na=False)])
+        # Menghitung jika kolom BIN mengandung kata 'DEFECT' atau 'REJECT'
+        defect_cnt = len(df_final[df_final['BIN'].str.contains('DEFECT', case=False, na=False)])
+        reject_cnt = len(df_final[df_final['BIN'].str.contains('REJECT', case=False, na=False)])
 
-        # 4. Render Dashboard Box (Custom HTML biar cakep)
+        # 4. Render Box Metrik (Sesuai gaya visual Lu)
         m1, m2, m3 = st.columns(3)
         
         with m1:
