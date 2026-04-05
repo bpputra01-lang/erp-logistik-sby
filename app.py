@@ -2632,7 +2632,7 @@ def process_stock_comparison(file1, file2):
         raise e
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-   st.markdown("""
+    st.markdown("""
         <style>
         .hero-header {
             background-color: #007BFF;
@@ -2718,7 +2718,7 @@ def menu_reject_defect():
         </style>
     """, unsafe_allow_html=True)
 
-        st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
     
     init_db()
 
