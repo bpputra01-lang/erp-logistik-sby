@@ -5591,8 +5591,6 @@ if menu == "Logistic Schedule":
 
     # --- 4. LIST MONITORING ---
     st.divider()
-    st.markdown("### 📋 LIST MONITORING SHIFT 3")
-
     if not df_monitor_s3.empty:
         for index, row in df_monitor_s3.iterrows():
             lc1, lc2, lc3 = st.columns([3, 1, 0.5])
