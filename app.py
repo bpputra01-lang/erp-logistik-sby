@@ -5613,13 +5613,13 @@ if not df_monitor_s3.empty:
 else:
     st.info("Belum ada tim yang di-plot ke Shift 3.")
 # --- 3. GENERATOR JADWAL JEZ SBY (LOGIC V-ULTIMATE: SHIFT 0 MAX 2) ---
-st.subheader("x x3. Generator Jadwal Otomatis")
+st.subheader("3. Generator Jadwal Otomatis")
 
 start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v_final_final")
 df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
 karyawan_list = df_staff_master.to_dict('records')
 
-if st.button("▶️ RUNS JADWAL", use_container_width=True):
+if st.button("▶️ RUN JADWAL", use_container_width=True):
     dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
     df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
