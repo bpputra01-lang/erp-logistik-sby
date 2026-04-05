@@ -2645,35 +2645,38 @@ def menu_retur_out_system():
                         <div class="metric-delta">↑ TOTAL COST</div>
                     </div>
                 ''', unsafe_allow_html=True)
-            st.markdown("### 📜 Retur History")
-            
-            # Pengaturan tampilan tabel
-            df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
-            
-            # Main Dataframe Editor
-            # CARI BAGIAN INI DI KODE LU:
-            event = st.dataframe(
-                df_display, 
-                use_container_width=True, 
-                hide_index=True, 
-                on_select="rerun", 
-                selection_mode="single-row"  # <--- GANTI "single" JADI "single-row"
-            )
+            # --- TABEL HISTORY (ROWID DISEMBUNYIKAN) ---
+        st.markdown("### 📜 Database History")
 
-            # --- 5. ACTIONS (DELETE & RESET) ---
-            selected_rows = event.selection.rows
-            if selected_rows:
-                row_idx = selected_rows[0]
-                target_id = df_display.iloc[row_idx]['rowid']
-                target_sku = df_display.iloc[row_idx]['sku']
-                
-                st.warning(f"⚠️ Yakin Hapus : **{target_sku}**?")
-                if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                    conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
-                    conn.commit()
-                    st.success("Data dihapus!")
-                    st.rerun()
+        # Urutkan data berdasarkan rowid terbaru
+        df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
 
+        # KUNCI DISINI: Kita list semua kolom KECUALI 'rowid' untuk ditampilkan
+        cols_to_show = [col for col in df_display.columns if col != 'rowid']
+
+        event = st.dataframe(
+            df_display[cols_to_show], # Tampilkan hanya kolom yang dipilih
+            use_container_width=True, 
+            hide_index=True, 
+            on_select="rerun", 
+            selection_mode="single-row" 
+        )
+
+        # --- LOGIKA HAPUS (TETAP PAKAI ROWID DARI DF_DISPLAY) ---
+        # Cek apakah ada baris yang dipilih dari dataframe
+        if event.selection.rows:
+            row_idx = event.selection.rows[0]
+            
+            # Kita ambil rowid dari df_display asli (bukan dari yang difilter)
+            target_id = df_display.iloc[row_idx]['rowid']
+            target_sku = df_display.iloc[row_idx]['sku']
+            
+            st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
+            if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
+                conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
+                conn.commit()
+                st.success("Data berhasil dihapus!")
+                st.rerun()
         else:
             st.info("Database masih kosong. Silakan upload file di atas.")
 
