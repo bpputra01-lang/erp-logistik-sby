@@ -5581,119 +5581,122 @@ if menu == "Logistic Schedule":
                                     double_day_count[nama] += 1
                                 if len(storage[day_name][slot_key]) >= limit: break
 
-# --- 3. GENERATOR ANTI-TABRAK ---
+# --- 3. GENERATOR ANTI-TABRAK (JEZ SBY EDITION) ---
 st.subheader("🚀 3. Generator Jadwal Otomatis")
 
-# TAMBAHKAN KEY UNIK DI SINI (Baris 5586)
 start_date = st.date_input(
     "Pilih Hari Senin (Awal Minggu)", 
     datetime.now(), 
-    key="log_schedule_date_picker" # <-- Ini obat DuplicateElementId
+    key="log_schedule_date_picker"
 )
 
-# AMBIL DATA MASTER (Di luar button biar gak NameError)
+# AMBIL DATA MASTER (Wajib di luar button biar gak NameError)
 df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
 karyawan_list = df_staff_master.to_dict('records')
 
 if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True, key="btn_run_gen_logistik"):
-    # ... (Logika Generator Lu: Step 1, 2, dan Step 3 yang Smart Spread) ...
-    # Pastikan di akhir generator lu simpan ke session_state:
-    # st.session_state.res_df = pd.DataFrame(final_table)
-    # st.session_state.summary_shift = real_summary
+    dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+    df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
+
+    base_roles = [
+        ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
+        ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
+        ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
+        ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
+    ]
+
+    # Inisialisasi Data
+    storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
+    weekly_counter = {k['nama']: 0 for k in karyawan_list}
+    double_day_count = {k['nama']: 0 for k in karyawan_list}
+    for k in karyawan_list: k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
+
+    def get_daily_count(nama, day_name):
+        return sum(1 for slot in storage[day_name] if any(nama in n for n in storage[day_name][slot]))
+
+    # --- LOGIC GENERATOR: RATA & ANTI-BENTROK ---
+    for phase in ["MIN_1", "MIN_2", "FILL_REST"]:
+        for day_name in day_names:
+            tgl_ini = dates_real[day_names.index(day_name)]
+            for shf_jam, shf_role in base_roles:
+                slot_key = f"{shf_jam} - {shf_role}"
+                
+                # Filter Phase
+                if phase == "MIN_1" and len(storage[day_name][slot_key]) >= 1: continue
+                if phase == "MIN_2" and (shf_jam == "SHIFT 3" or shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
+
+                potential = []
+                for k in karyawan_list:
+                    nama = k['nama']
+                    if weekly_counter[nama] >= k['target_fix']: continue
+                    if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+                    if any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)): continue
+                    
+                    # LOG-ADMIN GAK BOLEH DI-BACKUP
+                    if shf_role == "LOG-ADMIN" and k['posisi'] != "LOG-ADMIN": continue
+                    
+                    is_match = (k['posisi'] == shf_role)
+                    current_daily = get_daily_count(nama, day_name)
+                    
+                    if k['tipe'] == "Part-Full":
+                        if current_daily >= 2 or (current_daily == 1 and double_day_count[nama] >= 3): continue
+                    else:
+                        if current_daily >= 1: continue
+                    
+                    potential.append({'k': k, 'match': is_match})
+
+                if potential:
+                    random.shuffle(potential)
+                    # Utamakan yang rolenya pas
+                    potential = sorted(potential, key=lambda x: x['match'], reverse=True)
+                    p = potential[0]
+                    tag = "" if p['match'] else " (BACKUP)"
+                    if phase == "FILL_REST": tag = " (FIX)"
+                    
+                    storage[day_name][slot_key].append(p['k']['nama'] + tag)
+                    weekly_counter[p['k']['nama']] += 1
+                    if get_daily_count(p['k']['nama'], day_name) == 2: double_day_count[p['k']['nama']] += 1
+
+    # --- STEP 4: TRANSFORMASI TABEL ---
+    final_table = []
+    real_summary = {k['nama']: 0 for k in karyawan_list}
+    for shf_jam, shf_role in base_roles:
+        slot_key = f"{shf_jam} - {shf_role}"
+        max_r = max([len(storage[d][slot_key]) for d in day_names])
+        for r in range(max(1, max_r)):
+            row = {"SHIFT - ROLE": slot_key}
+            for d in day_names:
+                names = storage[d][slot_key]
+                val = names[r] if r < len(names) else ""
+                row[d] = val
+                clean = val.replace(" (BACKUP)", "").replace(" (FIX)", "").strip()
+                if clean in real_summary: real_summary[clean] += 1
+            final_table.append(row)
+
+    st.session_state.res_df = pd.DataFrame(final_table)
+    st.session_state.summary_shift = real_summary
     st.rerun()
 
-# --- TAMPILAN OUTPUT (DI LUAR BUTTON) ---
+# --- TAMPILAN (DI LUAR BUTTON) ---
 if 'res_df' in st.session_state:
     st.divider()
     col_v1, col_v2 = st.columns([5, 2])
-    
     with col_v1:
-        st.dataframe(st.session_state.res_df, use_container_width=True, height=600)
-        
+        st.markdown("### 📋 JADWAL MINGGUAN")
+        def style_dk(val):
+            if not val or val == "": return 'background-color: #1E1E1E;'
+            return 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 0.1px solid #333;'
+        st.dataframe(st.session_state.res_df.style.applymap(style_dk), use_container_width=True, height=800, hide_index=True)
+
     with col_v2:
-        st.markdown("### 📈 REALISASI (9/6)")
-        try:
-            summary_data = []
-            for name, total_shift in st.session_state.summary_shift.items():
-                # Cari tipe karyawan dari list master
-                tipe = next((item['tipe'] for item in karyawan_list if item['nama'] == name), "Full-Time")
-                target = 9 if tipe == "Part-Full" else 6
-                
-                summary_data.append({
-                    "NAMA": name,
-                    "SHIFT": total_shift,
-                    "STATUS": "✅ OK" if total_shift >= target else "⚠️ KURANG"
-                })
-            
-            if summary_data:
-                st.table(pd.DataFrame(summary_data).sort_values(by="SHIFT", ascending=False))
-        except Exception as e:
-            st.error(f"Gagal memuat summary: {e}")
-
-        # --- STEP 4: TABLE GENERATION (FIXED SUMMARY LOGIC) ---
-        final_table = []
-        # Inisialisasi summary hanya untuk nama yang ada di database
-        real_summary = {k['nama']: 0 for k in karyawan_list}
-        
-        for shf_jam, shf_role in base_roles:
-            slot_key = f"{shf_jam} - {shf_role}"
-            # Cari baris terbanyak di slot ini dalam seminggu
-            max_r = max([len(storage[d][slot_key]) for d in day_names])
-            
-            for r in range(max(1, max_r)):
-                row = {"SHIFT - ROLE": slot_key}
-                for d in day_names:
-                    names_in_slot = storage[d][slot_key]
-                    if r < len(names_in_slot):
-                        val = names_in_slot[r]
-                        row[d] = val
-                        
-                        # CLEANING NAMA: Hapus tag status untuk hitung realisasi
-                        clean_name = val.replace(" (BACKUP)", "").replace(" (SWEEP)", "").replace(" (FIX)", "").strip()
-                        
-                        # Hitung hanya jika nama tersebut ada di daftar karyawan
-                        if clean_name in real_summary:
-                            real_summary[clean_name] += 1
-                    else:
-                        row[d] = ""
-                final_table.append(row)
-
-        # Simpan ke session state biar gak ilang pas interact
-        st.session_state.res_df = pd.DataFrame(final_table)
-        st.session_state.summary_shift = real_summary
-
-    # --- TAMPILAN OUTPUT (DI LUAR IF BUTTON BIAR TETAP MUNCUL) ---
-    if 'res_df' in st.session_state:
-        st.divider()
-        col_v1, col_v2 = st.columns([5, 2])
-        
-        with col_v1:
-            st.markdown("### 📋 JADWAL MINGGUAN")
-            def style_dark_green(val):
-                if not val or val == "": 
-                    return 'background-color: #1E1E1E; color: #1E1E1E;'
-                return 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 1px solid #1a1c27;'
-            
-            st.dataframe(
-                st.session_state.res_df.style.applymap(style_dark_green), 
-                use_container_width=True, 
-                height=800,
-                hide_index=True
-            )
-            
-        with col_v2:
-            st.markdown("### 📈 REALISASI (9/6)")
-            # Konversi summary ke DataFrame untuk tabel yang rapi
-            summary_data = [
-                {"NAMA": k, "SHIFT": v, "STATUS": "✅ OK" if v >= (9 if next(item['tipe'] for item in karyawan_list if item['nama'] == k) == "Part-Full" else 6) else "⚠️ KURANG"} 
-                for k, v in st.session_state.summary_shift.items()
-            ]
-            
-            if summary_data:
-                df_sum = pd.DataFrame(summary_data).sort_values(by="SHIFT", ascending=False)
-                st.table(df_sum)
-            else:
-                st.info("Belum ada data realisasi.")
+        st.markdown("### 📈 REALISASI")
+        sum_data = []
+        for name, total in st.session_state.summary_shift.items():
+            tipe = next((i['tipe'] for i in karyawan_list if i['nama'] == name), "Full-Time")
+            target = 9 if tipe == "Part-Full" else 6
+            sum_data.append({"NAMA": name, "SHIFT": total, "STATUS": "✅ OK" if total >= target else "⚠️ KURANG"})
+        st.table(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False))
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
