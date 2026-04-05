@@ -5478,35 +5478,6 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
-    # --- 2. PLOT LIBUR (FULL) ---
-    st.subheader("🚫 2. Plot Libur & Monitoring")
-    col_l1, col_l2 = st.columns([1, 2])
-    
-    with col_l1:
-        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        with st.form("form_libur_komplit", clear_on_submit=True):
-            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else st.warning("Isi Data Tim!")
-            tgl_off = st.date_input("Tanggal Off")
-            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH", "TGL MERAH"], horizontal=True)
-            if st.form_submit_button("SUBMIT OFF"):
-                conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
-                conn.commit()
-                st.rerun()
-
-    with col_l2:
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
-        if not df_off_view.empty:
-            for i, row in df_off_view.iterrows():
-                m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
-                m1.write(f"**{row['nama']}**")
-                m2.write(row['tanggal'])
-                m3.write(row['jenis'])
-                if m4.button("🗑️", key=f"del_{i}"):
-                    conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                    conn.commit(); st.rerun()
-
-    st.divider()
-
     # --- 3. GENERATOR ANTI-TABRAK (LOGIC STRICT 9-6-6) ---
     st.subheader("🚀 3. Generator Jadwal Otomatis")
     start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
