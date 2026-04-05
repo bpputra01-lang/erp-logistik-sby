@@ -2651,7 +2651,20 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
+# --- LOGIKA MATCHING (TARUH DISINI SETELAH DF_CHART ADA) ---
+        standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
+        df_non_std = df_chart[~df_chart['KATEGORI'].isin(standard_codes)].copy()
 
+        if not df_non_std.empty:
+            def find_matches(row, full_df):
+                # Cari SKU sama tapi rowid beda (biar gak deteksi diri sendiri)
+                matches = full_df[(full_df['SKU'] == row['SKU']) & (full_df['rowid'] != row['rowid'])]
+                return ", ".join(matches['CABANG'].unique()) if not matches.empty else "TIDAK ADA"
+
+            df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
+            df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
+        else:
+            df_match_result = pd.DataFrame()
 def save_data(df):
     conn = sqlite3.connect('inventory_logistik.db')
     df.to_sql('reject_list', conn, if_exists='append', index=False)
@@ -2672,32 +2685,7 @@ def clear_all_data():
     conn.commit()
     conn.close()
     st.rerun()
-# --- LOGIKA MATCHING (CROSS-BRANCH) ---
-standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
 
-# 1. Filter barang yang keterangannya TIDAK STANDAR
-df_non_std = df_chart[~df_chart['KATEGORI'].isin(standard_codes)].copy()
-
-def find_matches(row, full_df):
-    # Cari SKU yang sama tapi rowid berbeda (biar nggak deteksi diri sendiri)
-    matches = full_df[
-        (full_df['SKU'] == row['SKU']) & 
-        (full_df.index != row.name)
-    ]
-    if matches.empty:
-        return "TIDAK ADA"
-    
-    # Ambil list cabang mana aja yang ada kembarannya
-    cabang_found = matches['CABANG'].unique().tolist()
-    return ", ".join(cabang_found)
-
-# 2. Jalankan pengecekan
-if not df_non_std.empty:
-    df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
-    # Filter hanya yang beneran ketemu kembarannya
-    df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
-else:
-    df_match_result = pd.DataFrame()
 # --- 2. UI MENU ---
 def menu_reject_defect():
     # --- CSS AREA (FIXED: NO CONFLICT) ---
@@ -2812,7 +2800,7 @@ def menu_reject_defect():
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
     init_db()
 
-    tab_entry, tab_analytics = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
+    tab_entry, tab_analytics, tab_match = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD", "🔍 MATCH DEFECT/REJECT"])
 
     with tab_entry:
         with st.form("form_reject_new", clear_on_submit=True):
@@ -2940,35 +2928,16 @@ def menu_reject_defect():
                 """, unsafe_allow_html=True)
                
             st.markdown("<br>", unsafe_allow_html=True)
-    # Tambahkan tab di list tab Lu (misal: tab_input, tab_analytics, tab_match)
-with tab_match:
-    st.subheader("🔍 CROSS-CHECK SKU MATCHING")
-    st.info("Menampilkan barang dengan kode Non-Standar yang ditemukan di lebih dari satu lokasi/inputan.")
-
-    if not df_match_result.empty:
-        # Metrics Khusus Match
-        total_match = len(df_match_result)
-        unique_sku_match = df_match_result['SKU'].nunique()
-        
-        m_col1, m_col2 = st.columns(2)
-        with m_col1:
-            st.markdown(f"""
-                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #6f42c1;">
-                    <p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL MATCH FOUND</p>
-                    <h2 style="color: white; margin: 0; font-weight: 800;">{total_match} Items</h2>
-                </div>
-            """, unsafe_allow_html=True)
-        
-        with m_col2:
-            st.markdown(f"""
-                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #20c997;">
-                    <p style="color: #888; margin: 0; font-size: 0.9rem;">UNIQUE SKU MATCH</p>
-                    <h2 style="color: white; margin: 0; font-weight: 800;">{unique_sku_match} SKU</h2>
-                </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
+    with tab_match:
+        st.subheader("🔍 CROSS-CHECK SKU MATCHING")
+        if not df_match_result.empty:
+            m_col1, m_col2 = st.columns(2)
+            m_col1.metric("MATCH FOUND", f"{len(df_match_result)} Items")
+            m_col2.metric("UNIQUE SKU", f"{df_match_result['SKU'].nunique()}")
+            
+            st.dataframe(df_match_result[['CABANG', 'SKU', 'ARTICLE_NAME', 'KATEGORI', 'MATCH_DI_CABANG', 'TANGGAL_INPUT']], use_container_width=True)
+        else:
+            st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")
         # Tampilkan Tabel Hasil Match
         st.data_editor(
             df_match_result[['CABANG', 'SKU', 'ARTICLE_NAME', 'KATEGORI', 'MATCH_DI_CABANG', 'TANGGAL_INPUT']],
