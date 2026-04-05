@@ -5478,68 +5478,76 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
+# --- 1. PASTIKAN TABEL ADA DULU (TARUH DI ATAS) ---
+cursor = conn.cursor()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS plot_shift3 (
+        nama TEXT,
+        tanggal TEXT,
+        posisi TEXT,
+        tipe TEXT
+    )
+''')
+conn.commit()
+
+# --- 2. BARU BOLEH READ DATA ---
+try:
+    df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
+except Exception:
+    df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
+
+# --- 3. TAMPILAN INPUT (Sesuai Request Lu) ---
 st.subheader("🌙 2. Plotting Manual Shift 3")
 
-# Ambil data karyawan buat dropdown
 df_karyawan = pd.read_sql_query("SELECT nama, tipe, posisi FROM karyawan", conn)
 karyawan_options = df_karyawan['nama'].tolist()
 
-col_input1, col_input2 = st.columns(2)
+col_in1, col_in2 = st.columns(2)
 
-with col_input1:
-    nama_s3 = st.selectbox("Pilih Nama Tim", karyawan_options, key="s3_name_select")
-    tgl_s3 = st.date_input("Tanggal Masuk Shift 3", datetime.now(), key="s3_date_select")
+with col_in1:
+    nama_s3 = st.selectbox("Pilih Nama Tim", karyawan_options, key="s3_name_input")
+    tgl_s3 = st.date_input("Tanggal Masuk Shift 3", datetime.now(), key="s3_date_input")
 
-with col_input2:
-    # Role otomatis ngikutin posisi asli karyawan biar gak dongo
-    posisi_asli = df_karyawan[df_karyawan['nama'] == nama_s3]['posisi'].values[0]
-    tipe_asli = df_karyawan[df_karyawan['nama'] == nama_s3]['tipe'].values[0]
-    st.info(f"Posisi: {posisi_asli} | Tipe: {tipe_asli}")
+with col_in2:
+    selected_data = df_karyawan[df_karyawan['nama'] == nama_s3].iloc[0]
+    st.info(f"Posisi: {selected_data['posisi']} | Tipe: {selected_data['tipe']}")
 
 if st.button("SUBMIT PLOT SHIFT 3", use_container_width=True):
-    # Simpan ke Database (Bikin tabel baru kalau belum ada)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS plot_shift3 (
-            nama TEXT,
-            tanggal TEXT,
-            posisi TEXT,
-            tipe TEXT
-        )
-    ''')
+    # Cek duplikat biar gak double input
+    check = conn.execute("SELECT * FROM plot_shift3 WHERE nama=? AND tanggal=?", 
+                         (nama_s3, tgl_s3.strftime('%Y-%m-%d'))).fetchone()
     
-    # ATURAN MAIN: Kalau Part-Full, ingetin user dia harus ada di Shift 2 juga
-    if tipe_asli == "Part-Full":
-        st.warning(f"⚠️ {nama_s3} adalah Part-Full. Pastikan jadwal Shift 2 nya juga sudah diatur!")
+    if not check:
+        conn.execute("INSERT INTO plot_shift3 (nama, tanggal, posisi, tipe) VALUES (?, ?, ?, ?)", 
+                     (nama_s3, tgl_s3.strftime('%Y-%m-%d'), selected_data['posisi'], selected_data['tipe']))
+        conn.commit()
+        st.success(f"✅ {nama_s3} Masuk Plot Shift 3!")
+        st.rerun()
+    else:
+        st.warning("Nama ini sudah terdaftar di tanggal tersebut!")
 
-    cursor.execute("INSERT INTO plot_shift3 (nama, tanggal, posisi, tipe) VALUES (?, ?, ?, ?)", 
-                   (nama_s3, tgl_s3.strftime('%Y-%m-%d'), posisi_asli, tipe_asli))
-    conn.commit()
-    st.success(f"✅ {nama_s3} berhasil di-plot ke Shift 3 tanggal {tgl_s3}")
-    st.rerun()
-
-# --- TAMPILAN MONITORING (Sesuai Gambar Lu) ---
+# --- 4. LIST MONITORING (Layout Persis Gambar) ---
 st.divider()
 st.markdown("### 📋 LIST MONITORING SHIFT 3")
 
-df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
-
 if not df_monitor_s3.empty:
-    for _, row in df_monitor_s3.iterrows():
-        c1, c2 = st.columns([3, 1])
+    for index, row in df_monitor_s3.iterrows():
+        c1, c2, c3 = st.columns([3, 1, 0.5])
         with c1:
             st.markdown(f"""
                 <div style="background-color: #1a1c27; padding: 10px; border-radius: 5px; border-left: 5px solid #00FF00; margin-bottom: 5px;">
-                    <span style="color: #FFFFFF; font-weight: bold;">{row['nama']}</span> 
-                    <span style="color: #888; font-size: 0.8rem;">({row['posisi']})</span>
+                    <span style="color: #FFFFFF; font-weight: bold;">{row['nama']}</span>
                 </div>
             """, unsafe_allow_html=True)
         with c2:
             st.markdown(f"<div style='padding: 10px; color: #888;'>{row['tanggal']}</div>", unsafe_allow_html=True)
-            if st.button("Hapus", key=f"del_{row['nama']}_{row['tanggal']}"):
+        with c3:
+            if st.button("🗑️", key=f"del_s3_{index}"):
                 conn.execute("DELETE FROM plot_shift3 WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
                 conn.commit()
                 st.rerun()
+else:
+    st.info("Belum ada tim yang di-plot ke Shift 3.")
 # --- 3. GENERATOR JADWAL JEZ SBY (LOGIC V5 - STRICT & CONSECUTIVE) ---
 st.subheader("🚀 3. Generator Jadwal Otomatis")
 
