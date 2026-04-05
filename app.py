@@ -2707,35 +2707,33 @@ def menu_reject_defect():
         [data-testid="stMetricDelta"] > div {
             font-weight: bold !important;
         }
-        /* --- FIX METRIC BOX: RAPI, TEBAL, PUTIH --- */
+        /* --- CSS METRIC: LAYOUT ASLI, TEBAL, PUTIH, RAPI --- */
         [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
-            padding: 25px !important; /* Tambah padding biar gak sesek */
+            padding: 20px !important; 
             border-radius: 12px !important;
-            display: flex !important;
-            justify-content: center !important;
+            min-height: 150px !important; /* Biar tinggi kotak sama rata semua */
         }
 
-        /* Judul Metric: Putih & Tebal (Bold) */
-        [data-testid="stMetricLabel"] div {
+        /* Judul Metric: Putih Terang & Tebal */
+        [data-testid="stMetricLabel"] > div {
             color: #FFFFFF !important;
-            font-weight: 800 !important; /* Lebih tebal */
+            font-weight: 800 !important; /* Tebal Maksimal */
             font-size: 15px !important;
-            letter-spacing: 0.5px !important;
+            opacity: 1 !important; /* Biar gak burem/abu-abu */
         }
 
-        /* Angka Utama: Putih (Bukan Kuning) & Sangat Tebal */
-        [data-testid="stMetricValue"] div {
+        /* Angka Utama: Putih Bersih (Gak Kuning Lagi) */
+        [data-testid="stMetricValue"] > div {
             color: #FFFFFF !important; 
             font-weight: 900 !important; 
-            font-size: 36px !important; /* Ukuran pas biar rapi */
+            font-size: 38px !important;
         }
 
-        /* Delta: Tetap Hijau & Bold */
-        [data-testid="stMetricDelta"] div {
+        /* Delta Panah: Bold & Hijau */
+        [data-testid="stMetricDelta"] > div {
             font-weight: bold !important;
-            font-size: 14px !important;
         }
         </style>
     """, unsafe_allow_html=True)
