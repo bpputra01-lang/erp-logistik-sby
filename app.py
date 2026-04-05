@@ -2598,10 +2598,6 @@ if uploaded_file:
                 st.session_state['last_file_key'] = file_key
                 st.success(f"🚀 JOS! {len(df_to_save)} Baris masuk database.")
                 st.rerun()
-                else:
-                    st.error("Gagal: Kolom di file lu gak match sama sistem!")
-            except Exception as e:
-                st.error(f"Error Upload: {e}")
 
     # --- 4. DATA VIEW & METRICS ---
     try:
