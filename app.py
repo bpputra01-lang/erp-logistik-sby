@@ -5525,5 +5525,5 @@ elif menu == "Compare Penerimaan RTO":
 elif menu == "Pengajuan Reject/Defect":
     project_approval_reject()
 
-elif menu == "List Retur Out"
+elif menu == "List Retur Out":
     menu_retur_out_uploader()
