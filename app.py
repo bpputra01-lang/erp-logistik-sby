@@ -2483,28 +2483,45 @@ def process_scan_out(df_scan, df_history, df_stock):
     df_res = df_res[['BIN AWAL', 'SKU', 'QTY SCAN', 'Keterangan', 'Total Qty Setup/Terjual', 'Bin After Set Up', 'Invoice']]
     
     return df_res, df_draft
-import streamlit as st
-import pandas as pd
 import sqlite3
+import pandas as pd
+import streamlit as st
 
-# --- DATABASE SETUP ---
-def init_db():
+def patch_database():
     conn = sqlite3.connect('inventory_logistics.db')
     c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS retur_out (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sku TEXT,
-            article_name TEXT,
-            qty INTEGER,
-            price_buy REAL,
-            tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    
+    # Ambil daftar kolom yang sudah ada di tabel saat ini
+    c.execute("PRAGMA table_info(retur_out)")
+    existing_cols = [row[1] for row in c.fetchall()]
+    
+    # List kolom baru yang mau kita tambahkan jika belum ada
+    # Format: (Nama Kolom, Tipe Data)
+    new_cols = [
+        ('identify', 'TEXT'),
+        ('bin', 'TEXT'),
+        ('brand', 'TEXT'),
+        ('item_name', 'TEXT'),
+        ('variant', 'TEXT'),
+        ('sub_kategori', 'TEXT'),
+        ('harga_jual', 'REAL'),
+        ('qty_system', 'INTEGER'),
+        ('qty_so', 'INTEGER')
+    ]
+    
+    # Jalankan ALTER TABLE untuk setiap kolom yang absen
+    for col_name, col_type in new_cols:
+        if col_name not in existing_cols:
+            try:
+                c.execute(f"ALTER TABLE retur_out ADD COLUMN {col_name} {col_type}")
+            except Exception as e:
+                st.error(f"Gagal Alter Kolom {col_name}: {e}")
+                
     conn.commit()
     conn.close()
 
-init_db()
+# Jalankan Patch sebelum masuk ke menu utama
+patch_database()
 
 def menu_retur_out_system():
     # --- HERO HEADER & CUSTOM METRIC STYLE ---
