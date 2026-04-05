@@ -2674,6 +2674,8 @@ def menu_retur_out_system():
             st.dataframe(df_history, use_container_width=True, hide_index=True)
         else:
             st.info("Belum ada data tersimpan di database.")
+    except:
+        st.info("Tabel belum terbentuk. Silakan upload dan simpan data.")
 
 
 def process_justification(df_case, df_tracking, df_po):
