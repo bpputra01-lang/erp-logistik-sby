@@ -5609,14 +5609,31 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
                     active_shifts = get_active_shifts(nama, day_name)
                     if shf_jam in active_shifts: continue 
                     
-                    if shf_role in ["SPV", "LOG-ADMIN", "LOG-STORE"] and k['posisi'] != shf_role: continue
+                    # --- 🛑 RULE KERAS: NO BACKUP & SPV ISOLATION ---
+                    # 1. LOG-ADMIN & LOG-STORE: Hanya boleh diisi posisi yang sama
+                    if shf_role in ["LOG-ADMIN", "LOG-STORE"] and k['posisi'] != shf_role:
+                        continue
                     
-                    # Rule Consecutive buat Part-Full (Biar gak loncat jam)
+                    # 2. SPV: Tidak bisa backup (hanya boleh isi slot SPV) & Tidak bisa dibackup
+                    if shf_role == "SPV" and k['posisi'] != "SPV":
+                        continue
+                    if k['posisi'] == "SPV" and shf_role != "SPV":
+                        continue
+                    
+                    # --- ⛓️ RULE: SHIFT BERURUTAN (CONSECUTIVE) ---
                     if k['tipe'] == "Part-Full" and active_shifts:
-                        if "SHIFT 0" in active_shifts and shf_jam != "SHIFT 1": continue
-                        if "SHIFT 1" in active_shifts and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
+                        # Ambil shift yang sudah dia ambil hari ini (misal: ['SHIFT 1'])
+                        s_udah = active_shifts[0] 
+                        
+                        # Cek kecocokan pasangan shift
+                        if s_udah == "SHIFT 0" and shf_jam != "SHIFT 1": continue
+                        if s_udah == "SHIFT 1" and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
+                        if s_udah == "SHIFT 2" and shf_jam not in ["SHIFT 1", "SHIFT 3"]: continue
+                        if s_udah == "SHIFT 3" and shf_jam != "SHIFT 2": continue
 
+                    # --- MATCHING POSISI ---
                     is_match = (k['posisi'] == shf_role)
+                    
                     if k['tipe'] == "Part-Full":
                         if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
                     else:
