@@ -2632,10 +2632,8 @@ def process_stock_comparison(file1, file2):
         raise e
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # --- 1. REBUILD CSS (SPECIFIC & CLEAN) ---
     st.markdown("""
         <style>
-        /* Header Hero */
         .hero-header {
             background-color: #007BFF;
             color: white;
@@ -2648,57 +2646,58 @@ def menu_reject_defect():
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
         
-        /* Label & Teks Input (Fix Judul Hitam/Tipis) */
-        [data-testid="stWidgetLabel"] p {
-            color: #FFFFFF !important;
-            font-weight: 600 !important;
-            font-size: 14px !important;
+        /* --- FIX TEKS JUDUL YANG ITEM --- */
+        [data-testid="stMetricLabel"] > div, 
+        [data-testid="stWidgetLabel"] p, 
+        label p {
+            color: #E0E0E0 !important; 
         }
 
-        /* Container Input */
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stSelectbox"] > div > div {
+        [data-testid="stMain"] div[data-testid="stTextInput"] > div > div, 
+        [data-testid="stMain"] div[data-testid="stTextArea"] > div > div,
+        [data-testid="stMain"] div[data-testid="stSelectbox"] > div > div {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
-            border-radius: 8px !important;
+            border-radius: 6px !important;
         }
-        
-        input, textarea, div[data-baseweb="select"] > div { 
+        [data-testid="stMain"] input, [data-testid="stMain"] textarea, [data-testid="stMain"] div[data-baseweb="select"] > div { 
             color: white !important; 
         }
-
-        /* Button Utama (Biru) */
-        button[kind="primaryFormSubmit"] {
+        [data-testid="stMain"] button[kind="primaryFormSubmit"] {
             background-color: #007BFF !important;
             color: white !important;
             border-radius: 8px !important;
             width: 100% !important;
-            height: 45px !important;
+            height: 48px !important;
             font-weight: bold !important;
             border: none !important;
+            box-shadow: 0 0 10px rgba(0, 123, 255, 0.4) !important;
         }
-
-        /* Button Gold (Download/Import) */
-        div.stDownloadButton > button,
-        div.stButton > button {
+        [data-testid="stMain"] div.stDownloadButton > button,
+        [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]) {
             background-color: #D4AF37 !important;
             color: white !important;
             border: 1px solid #FFD700 !important;
             border-radius: 8px !important;
             font-weight: bold !important;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.4) !important;
+            transition: all 0.3s ease-in-out !important;
         }
-
-        /* Metric Dashboard */
-        [data-testid="stMetric"] {
+        [data-testid="stMain"] [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             padding: 20px !important;
             border-radius: 12px !important;
+            min-height: 160px !important; 
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
         }
-        [data-testid="stMetricValue"] > div { 
-            color: #FFD700 !important; 
-            font-weight: 900 !important; 
+        [data-testid="stMetricValue"] > div { font-size: 32px !important; font-weight: 900 !important; color: #FFD700 !important; }
+        
+        /* Delta Color (Persentase) biar tetep nyala */
+        [data-testid="stMetricDelta"] > div {
+            font-weight: bold !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -2710,28 +2709,40 @@ def menu_reject_defect():
     tab_entry, tab_analytics = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
 
     with tab_entry:
-        # --- SEKSI FORM (DIPERBAIKI STRUKTURNYA) ---
+        # --- FORM INPUT SINGLE ---
         with st.form("form_reject_new", clear_on_submit=True):
-            st.write("### 📍 LOKASI OPERASIONAL")
-            cabang_input = st.radio("Pilih Cabang:", ["SURABAYA", "SIDOARJO", "SEMARANG"], horizontal=True)
-            
-            st.divider()
-            
+            cabang_input = st.selectbox("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"])
             col1, col2 = st.columns(2)
             with col1:
-                bin_awal = st.text_input("BIN AWAL", placeholder="Contoh: A-01-01")
+                bin_awal = st.text_input("BIN AWAL")
                 bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
-                sku = st.text_input("SKU / BARCODE")
-                article = st.text_input("NAMA BARANG / ARTICLE")
+                sku = st.text_input("SKU")
+                article = st.text_input("NAMA BARANG")
             with col2:
-                size = st.text_input("SIZE / UKURAN")
+                size = st.text_input("SIZE")
                 kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
-                keterangan = st.text_area("DETAIL KERUSAKAN", placeholder="Jelaskan kondisi barang...")
+                keterangan = st.text_area("DETAIL KERUSAKAN")
 
-            st.form_submit_button("📤 UPLOAD SINGLE LIST")
+            btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST")
 
-        # --- SEKSI MASS ADJUSTMENT (MAKIN RAPI) ---
-        st.write("### 📂 MASS ADJUSTMENT - IMPORT EXCEL")
+        if btn_submit and sku:
+            jam = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+            new_data = pd.DataFrame([{
+                'CABANG': cabang_input, 'BIN_AWAL': bin_awal, 'BIN': bin_val, 'SKU': sku, 
+                'ARTICLE_NAME': article, 'SIZE': size, 'KATEGORI': kategori, 
+                'KETERANGAN': keterangan, 'TANGGAL_INPUT': jam
+            }])
+            save_data(new_data)
+            st.success(f"✅ SKU {sku} [{cabang_input}] Berhasil Disimpan!")
+            st.rerun()
+
+        # --- MASS ADJUSTMENT SECTION ---
+        st.markdown("""
+            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;">
+                <h3 style="color: #007BFF; margin: 0; font-size: 18px; font-weight: 900;">📂 MASS ADJUSTMENT - IMPORT EXCEL</h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
         col_dl, col_up = st.columns([1, 2])
         with col_dl:
             template_cols = ['CABANG', 'BIN_AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
@@ -2742,18 +2753,26 @@ def menu_reject_defect():
             st.download_button("📥 Download Template", output.getvalue(), "template_reject.xlsx")
 
         with col_up:
-            uploaded_file = st.file_uploader("Upload File Excel", type=['xlsx'], help="Gunakan template yang sudah disediakan")
+            uploaded_file = st.file_uploader("Upload Excel Massal", type=['xlsx'])
+            if uploaded_file:
+                df_upload = pd.read_excel(uploaded_file)
+                if 'SKU' in df_upload.columns:
+                    if st.button("⤴️ IMPORT DATA KE DATABASE"):
+                        df_upload['TANGGAL_INPUT'] = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+                        save_data(df_upload)
+                        st.success("✅ Import Berhasil!")
+                        st.rerun()
 
     with tab_analytics:
-        # Bagian Dashboard tetap sama dengan logic Delta yang sudah normal (Naik=Hijau)
         conn = sqlite3.connect('inventory_logistik.db')
         df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
         conn.close()
 
         if not df_chart.empty:
-            filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"])
+            filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
             df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
 
+            # Metric Ringkasan + DELTA KEMBALI
             m1, m2, m3 = st.columns(3)
             total_val = len(df_final)
             defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', na=False)])
@@ -2766,9 +2785,23 @@ def menu_reject_defect():
                 st.metric("📦 DEFECT (D)", f"{defect_cnt}", f"{p_d:.1f}%")
             with m3:
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-                st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
+                st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%", delta_color="inverse")
 
-            st.dataframe(df_final, use_container_width=True)
+            c_pie, c_bar = st.columns(2)
+            with c_pie:
+                fig_p = px.pie(df_final, names='KATEGORI', title="Proporsi Kerusakan", hole=0.4)
+                fig_p.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
+                st.plotly_chart(fig_p, use_container_width=True)
+            with c_bar:
+                fig_b = px.bar(df_final['BIN'].value_counts().reset_index(), x='BIN', y='count', title="Sebaran Lokasi")
+                fig_b.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
+                st.plotly_chart(fig_b, use_container_width=True)
+
+            st.write("### 📋 DETAIL DATABASE")
+            st.dataframe(df_final.sort_values('TANGGAL_INPUT', ascending=False), use_container_width=True)
+            
+            if st.button("🗑️ KOSONGKAN SEMUA DATA"):
+                clear_all_data()
         else:
             st.info("💡 Belum ada data untuk ditampilkan.")
 import streamlit as st
