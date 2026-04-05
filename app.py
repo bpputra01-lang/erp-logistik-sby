@@ -5440,19 +5440,6 @@ if menu == "Logistic Schedule":
                 -webkit-text-fill-color: #ffffff !important; 
             }
 
-            .custom-card {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                background-color: #1a1c27;
-                border-radius: 8px;
-                padding: 12px 18px;
-                margin-bottom: 10px;
-                border-left: 5px solid #00FF00; /* Warna Hijau Default */
-                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            }
-            .card-text { color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 14px; }
-            .card-subtext { color: #888888; font-size: 12px; }
         </style>
     """, unsafe_allow_html=True)
 
