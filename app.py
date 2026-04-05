@@ -2688,6 +2688,15 @@ def menu_retur_out_system():
                 conn.commit()
                 st.success("Data berhasil dihapus!")
                 st.rerun()
+        else:
+            # Muncul hanya jika query return nol baris
+            st.info("Database masih kosong. Silakan upload file di atas.")
+
+    except Exception as e:
+        st.error(f"Sistem Gagal Memuat Database: {e}")
+    finally:
+        # Menutup koneksi dengan aman
+        conn.close()
 
 
 def process_justification(df_case, df_tracking, df_po):
