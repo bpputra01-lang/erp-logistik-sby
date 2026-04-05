@@ -2707,6 +2707,30 @@ def menu_reject_defect():
         [data-testid="stMetricDelta"] > div {
             font-weight: bold !important;
         }
+        /* --- CSS KHUSUS METRIC BOX (BIAR GAK NABRAK KE JUDUL LAIN) --- */
+        [data-testid="stMetric"] {
+            background-color: #1a1c27 !important;
+            border: 1px solid #3d4156 !important;
+            padding: 20px !important;
+            border-radius: 12px !important;
+        }
+
+        /* Judul kecil di dalem Metric Box jadi Putih */
+        [data-testid="stMetricLabel"] div {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+        }
+
+        /* Angka Utama Metric tetap Kuning */
+        [data-testid="stMetricValue"] div {
+            color: #FFD700 !important;
+            font-weight: 900 !important;
+        }
+
+        /* Fix Delta: Pastiin background label delta gak nutupin panah */
+        [data-testid="stMetricDelta"] div {
+            font-weight: bold !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
