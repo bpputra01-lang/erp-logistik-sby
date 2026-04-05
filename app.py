@@ -2491,45 +2491,11 @@ def patch_database():
     conn = sqlite3.connect('inventory_logistics.db')
     c = conn.cursor()
     
-    # Ambil daftar kolom yang sudah ada di tabel saat ini
-    c.execute("PRAGMA table_info(retur_out)")
-    existing_cols = [row[1] for row in c.fetchall()]
-    
-    # List kolom baru yang mau kita tambahkan jika belum ada
-    # Format: (Nama Kolom, Tipe Data)
-    new_cols = [
-        ('identify', 'TEXT'),
-        ('bin', 'TEXT'),
-        ('brand', 'TEXT'),
-        ('item_name', 'TEXT'),
-        ('variant', 'TEXT'),
-        ('sub_kategori', 'TEXT'),
-        ('harga_jual', 'REAL'),
-        ('qty_system', 'INTEGER'),
-        ('qty_so', 'INTEGER')
-    ]
-    
-    # Jalankan ALTER TABLE untuk setiap kolom yang absen
-    for col_name, col_type in new_cols:
-        if col_name not in existing_cols:
-            try:
-                c.execute(f"ALTER TABLE retur_out ADD COLUMN {col_name} {col_type}")
-            except Exception as e:
-                st.error(f"Gagal Alter Kolom {col_name}: {e}")
-                
-    conn.commit()
-    conn.close()
-
-def patch_database():
-    conn = sqlite3.connect('inventory_logistics.db')
-    c = conn.cursor()
-    
     # Ambil daftar kolom yang sudah ada saat ini
     c.execute("PRAGMA table_info(retur_out)")
     existing_cols = [row[1] for row in c.fetchall()]
     
-    # DAFTAR LENGKAP KOLOM YANG HARUS ADA (Sesuai format 11 kolom lu)
-    # Kita cek satu-satu, kalau belum ada kita ALTER
+    # DAFTAR LENGKAP KOLOM YANG HARUS ADA
     check_cols = [
         ('identify', 'TEXT'),
         ('bin', 'TEXT'),
@@ -2538,7 +2504,7 @@ def patch_database():
         ('item_name', 'TEXT'),
         ('variant', 'TEXT'),
         ('sub_kategori', 'TEXT'),
-        ('harga_beli', 'REAL'), # <-- Tadi ini yang ketinggalan di alter
+        ('harga_beli', 'REAL'), 
         ('harga_jual', 'REAL'),
         ('qty_system', 'INTEGER'),
         ('qty_so', 'INTEGER')
@@ -2550,13 +2516,22 @@ def patch_database():
                 c.execute(f"ALTER TABLE retur_out ADD COLUMN {col_name} {col_type}")
                 print(f"Berhasil menambah kolom: {col_name}")
             except Exception as e:
-                # Kalau gagal karena tabel belum ada sama sekali, kita buat baru
-                pass
+                # Jika tabel belum ada, buat tabel baru
+                c.execute('''
+                    CREATE TABLE IF NOT EXISTS retur_out (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
+                        item_name TEXT, variant TEXT, sub_kategori TEXT,
+                        harga_beli REAL, harga_jual REAL, 
+                        qty_system INTEGER, qty_so INTEGER,
+                        tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
                 
     conn.commit()
     conn.close()
 
-# JALANKAN PATCH INI DI ATAS MENU
+# JALANKAN PATCH SEBELUM MENU
 patch_database()
 
 def menu_retur_out_system():
@@ -2620,7 +2595,6 @@ def menu_retur_out_system():
     if uploaded_file:
         df_upload = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
 
-        # Nama kolom sesuai format Excel (H=Harga Beli, J=QTY SYSTEM)
         required_cols = [
             'Identify', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 
             'VARIANT', 'SUB KATEGORI', 'Harga Beli', 'Harga Jual', 
@@ -2630,17 +2604,13 @@ def menu_retur_out_system():
         if all(col in df_upload.columns for col in required_cols):
             # --- KALKULASI DATA ---
             total_sku = df_upload['SKU'].nunique()
-            
-            # TOTAL QTY = Kolom J (QTY SYSTEM) tanpa koma
             total_qty_system = df_upload['QTY SYSTEM'].sum()
-            
-            # TOTAL VALUE = Kolom J (QTY SYSTEM) * Kolom H (Harga Beli)
             total_value = (df_upload['QTY SYSTEM'] * df_upload['Harga Beli']).sum()
 
             # --- TAMPILAN METRIK MODEL DARK ---
             m1, m2, m3 = st.columns(3)
             
-            with m1: # Card Ungu
+            with m1:
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
                         <div class="metric-label">🗄️ TOTAL SKU</div>
@@ -2649,7 +2619,7 @@ def menu_retur_out_system():
                     </div>
                 """, unsafe_allow_html=True)
             
-            with m2: # Card Hijau
+            with m2:
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #10b981;">
                         <div class="metric-label">📦TOTAL QTY</div>
@@ -2658,7 +2628,7 @@ def menu_retur_out_system():
                     </div>
                 """, unsafe_allow_html=True)
                 
-            with m3: # Card Kuning
+            with m3:
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #f59e0b;">
                         <div class="metric-label">💰 TOTAL VALUE RETUR</div>
@@ -2669,15 +2639,12 @@ def menu_retur_out_system():
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # --- PREVIEW ---
             st.markdown('<h4 style="color: #31333F; font-weight: 700;">Data Ready to Sync:</h4>', unsafe_allow_html=True)
             edited_df = st.data_editor(df_upload[required_cols], use_container_width=True, hide_index=True, num_rows="dynamic")
 
-            # --- TOMBOL SIMPAN ---
             if st.button("💾 SIMPAN KE DATABASE", type="primary", use_container_width=True):
                 conn = None
                 try:
-                    import sqlite3
                     conn = sqlite3.connect('inventory_logistics.db')
                     df_to_save = edited_df.copy()
                     df_to_save.columns = ['identify', 'bin', 'sku', 'brand', 'item_name', 'variant', 'sub_kategori', 'harga_beli', 'harga_jual', 'qty_system', 'qty_so']
@@ -2685,12 +2652,29 @@ def menu_retur_out_system():
                     conn.commit()
                     st.success(f"✅Data Berhasil Disimpan ke SQLite!")
                     st.balloons()
+                    st.rerun() # Refresh biar muncul di tabel history bawah
                 except Exception as e:
                     st.error(f"Gagal simpan: {e}")
                 finally:
                     if conn: conn.close()
         else:
             st.warning("⚠️ Kolom tidak sesuai format!")
+
+    # --- TAMBAHAN: TAMPILAN DATA DARI SQLITE (AGAR TIDAK HILANG SAAT REFRESH) ---
+    st.markdown("---")
+    st.markdown('<h4 style="color: #31333F; font-weight: 700;">📜 History Data di SQLite:</h4>', unsafe_allow_html=True)
+    
+    try:
+        conn = sqlite3.connect('inventory_logistics.db')
+        # Tarik data terakhir yang masuk
+        df_history = pd.read_sql('SELECT * FROM retur_out ORDER BY rowid DESC LIMIT 100', conn)
+        conn.close()
+        
+        if not df_history.empty:
+            st.dataframe(df_history, use_container_width=True, hide_index=True)
+        else:
+            st.info("Belum ada data tersimpan di database.")
+
 
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
