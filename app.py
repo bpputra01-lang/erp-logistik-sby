@@ -2572,12 +2572,11 @@ def menu_retur_out_system():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><p class="hero-text">📊 RETUR OUT - DATABASE SYSTEM</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">RETUR OUT - DATABASE</p></div>', unsafe_allow_html=True)
 
     conn = init_db()
 
     # --- 3. UPLOAD & AUTO-SAVE (TANPA EXPANDER) ---
-    st.markdown("### 📥 UPLOAD DATA BARU")
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
