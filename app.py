@@ -2533,7 +2533,7 @@ def menu_retur_out_system():
         </style>
         <div class="hero-header">
             <h1 class="hero-title">
-                📋 BULK RETUR OUT SYSTEM
+                RETUR OUT DATABASE
             </h1>
         </div>
     """, unsafe_allow_html=True)
