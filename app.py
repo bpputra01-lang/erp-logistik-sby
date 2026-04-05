@@ -2777,8 +2777,17 @@ def menu_reject_defect():
             gap: 10px;
         }
 
-        .stMarkdown p {
+        /* FIX: Jangan tembak SEMUA p, tapi cuma p yang ada di Main Content */
+        [data-testid="stMain"] .stMarkdown p {
             color: #E0E0E0 !important;
+        }
+
+        /* Fix Judul Detail Database: Tetap Hitam & Tebal */
+        .detail-header {
+            color: #31333F !important;
+            font-weight: 800 !important;
+            font-size: 22px !important;
+            /* ... sisa kode Lu ... */
         }
         </style>
     """, unsafe_allow_html=True)
