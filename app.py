@@ -2569,6 +2569,30 @@ def menu_retur_out_system():
             font-weight: 600;
             margin-top: 5px;
         }
+        /* Hapus label teks di atas input (st.text_input("")) */
+            div[data-baseweb="input"] + div {
+                display: none;
+            }
+            
+            /* Style kotak inputnya */
+            .stTextInput>div>div>input {
+                background-color: #1E1E2E; /* Warna Dark Background */
+                color: #FFFFFF; /* Warna Teks Putih */
+                border-radius: 10px; /* Sedikit membulat */
+                border: 1px solid #3d4455; /* Border tipis dark */
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+
+            /* Warna placeholder (teks ketik...) */
+            .stTextInput>div>div>input::placeholder {
+                color: #A0A0A0; /* Warna Abu-abu pudar */
+            }
+
+            /* Menghilangkan label widget bawaan streamlit */
+            [data-testid="stWidgetLabel"] {
+                display: none;
+            }
         </style>
     """, unsafe_allow_html=True)
 
