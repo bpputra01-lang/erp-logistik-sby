@@ -2483,7 +2483,6 @@ def process_scan_out(df_scan, df_history, df_stock):
     df_res = df_res[['BIN AWAL', 'SKU', 'QTY SCAN', 'Keterangan', 'Total Qty Setup/Terjual', 'Bin After Set Up', 'Invoice']]
     
     return df_res, df_draft
-
     
 import sqlite3
 import pandas as pd
