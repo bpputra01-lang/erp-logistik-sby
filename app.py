@@ -5611,7 +5611,7 @@ if menu == "Logistic Schedule":
         st.info("Belum ada tim yang di-plot ke Shift 3.")
 
     # --- 3. GENERATOR JADWAL JEZ SBY ---
-    st.subheader("3. Generator Jadwal Otomatis")
+    st.subheader("✅3. Schedule Shift")
 
     start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v_final_final")
     df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
