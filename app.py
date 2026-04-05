@@ -2487,6 +2487,7 @@ import sqlite3
 import pandas as pd
 import streamlit as st
 
+# 1. FUNGSI PATCH DATABASE (PASTIIN TABEL SIAP)
 def patch_database():
     conn = sqlite3.connect('inventory_logistics.db')
     c = conn.cursor()
@@ -2510,22 +2511,26 @@ def patch_database():
         ('qty_so', 'INTEGER')
     ]
     
-    for col_name, col_type in check_cols:
-        if col_name not in existing_cols:
-            try:
-                c.execute(f"ALTER TABLE retur_out ADD COLUMN {col_name} {col_type}")
-            except Exception:
-                # Jika tabel belum ada sama sekali, buat tabel baru
-                c.execute('''
-                    CREATE TABLE IF NOT EXISTS retur_out (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
-                        item_name TEXT, variant TEXT, sub_kategori TEXT,
-                        harga_beli REAL, harga_jual REAL, 
-                        qty_system INTEGER, qty_so INTEGER,
-                        tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
+    if not existing_cols:
+        # Jika tabel belum ada sama sekali, buat tabel baru
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS retur_out (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
+                item_name TEXT, variant TEXT, sub_kategori TEXT,
+                harga_beli REAL, harga_jual REAL, 
+                qty_system INTEGER, qty_so INTEGER,
+                tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+    else:
+        # Cek kolom satu-satu
+        for col_name, col_type in check_cols:
+            if col_name not in existing_cols:
+                try:
+                    c.execute(f"ALTER TABLE retur_out ADD COLUMN {col_name} {col_type}")
+                except Exception:
+                    pass
                 
     conn.commit()
     conn.close()
@@ -2534,7 +2539,7 @@ def patch_database():
 patch_database()
 
 def menu_retur_out_system():
-    # --- HERO HEADER & CUSTOM METRIC STYLE (GAK ADA YANG DIHAPUS) ---
+    # --- HERO HEADER & CUSTOM METRIC STYLE (DARK MODE) ---
     st.markdown("""
         <style>
             .hero-header {
@@ -2601,42 +2606,45 @@ def menu_retur_out_system():
         ]
         
         if all(col in df_upload.columns for col in required_cols):
-            # --- LOGIKA AUTO-SAVE ---
-            file_key = f"processed_{uploaded_file.name}_{len(df_upload)}"
-            if st.session_state.get('last_file_processed') != file_key:
+            # LOGIKA AUTO-SAVE KE SQLITE
+            file_key = f"save_{uploaded_file.name}_{len(df_upload)}"
+            if st.session_state.get('last_processed') != file_key:
                 try:
                     conn = sqlite3.connect('inventory_logistics.db')
                     df_to_save = df_upload[required_cols].copy()
+                    # Mapping kolom ke lowercase (sesuai DB)
                     df_to_save.columns = ['identify', 'bin', 'sku', 'brand', 'item_name', 'variant', 'sub_kategori', 'harga_beli', 'harga_jual', 'qty_system', 'qty_so']
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
                     conn.commit()
                     conn.close()
                     
-                    st.session_state['last_file_processed'] = file_key
+                    st.session_state['last_processed'] = file_key
                     st.success(f"🚀 AUTO-SAVE BERHASIL: {len(df_upload)} Baris ditambahkan!")
                     st.balloons()
-                    st.rerun()
+                    st.rerun() # Refresh agar metrik & history update dari DB
                 except Exception as e:
-                    st.error(f"Gagal Auto-Save: {e}")
+                    st.error(f"Gagal Simpan Database: {e}")
 
-            # --- PREVIEW DATA YANG BARU DIUPLOAD (DETAIL YANG LU MAU) ---
+            # PREVIEW DATA TERUPLOAD
             st.markdown('<h4 style="color: #31333F; font-weight: 700;">🔍 Preview Data Terupload:</h4>', unsafe_allow_html=True)
             st.data_editor(df_upload[required_cols], use_container_width=True, hide_index=True, key="preview_editor")
             st.markdown("<br>", unsafe_allow_html=True)
         else:
-            st.warning("⚠️ Kolom tidak sesuai format!")
+            st.warning("⚠️ Kolom tidak sesuai format! Pastikan kolom Excel lu bener.")
 
-    # --- TAMPILAN METRIK (DARI DATABASE) ---
+    # --- TAMPILAN UTAMA (DATA DARI DATABASE) ---
     try:
         conn = sqlite3.connect('inventory_logistics.db')
         df_db = pd.read_sql('SELECT rowid, * FROM retur_out', conn)
         conn.close()
 
         if not df_db.empty:
+            # KALKULASI METRIK DARI DB
             total_sku = df_db['sku'].nunique()
             total_qty_system = df_db['qty_system'].sum()
             total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
+            # TAMPILAN METRIK
             m1, m2, m3 = st.columns(3)
             with m1:
                 st.markdown(f'<div class="metric-card" style="border-left: 6px solid #8b5cf6;"><div class="metric-label">🗄️ TOTAL SKU</div><div class="metric-value">{total_sku:,}</div><div class="metric-delta">↑ IN DATABASE</div></div>', unsafe_allow_html=True)
@@ -2646,29 +2654,39 @@ def menu_retur_out_system():
                 st.markdown(f'<div class="metric-card" style="border-left: 6px solid #f59e0b;"><div class="metric-label">💰 TOTAL VALUE</div><div class="metric-value">Rp {total_value:,.0f}</div><div class="metric-delta">↑ TOTAL COST</div></div>', unsafe_allow_html=True)
 
             st.markdown("---")
-            st.markdown('<h4 style="color: #31333F; font-weight: 700;">📜 History Data di SQLite:</h4>', unsafe_allow_html=True)
+            st.markdown('<h4 style="color: #31333F; font-weight: 700;">📜 History Data Ready to Sync (Database):</h4>', unsafe_allow_html=True)
             
-            # Tabel History (100 terakhir)
-            df_history = df_db.sort_values(by='rowid', ascending=False).head(100)
-            event = st.dataframe(df_history, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single")
+            # Tabel History (Urutan terbaru di atas)
+            df_display = df_db.sort_values(by='rowid', ascending=False)
             
+            event = st.dataframe(
+                df_display, 
+                use_container_width=True, 
+                hide_index=True, 
+                on_select="rerun", 
+                selection_mode="single"
+            )
+            
+            # FITUR HAPUS BARIS
             selected_rows = event.selection.rows
             if selected_rows:
                 row_idx = selected_rows[0]
-                target_id = df_history.iloc[row_idx]['rowid']
-                target_sku = df_history.iloc[row_idx]['sku']
+                target_id = df_display.iloc[row_idx]['rowid']
+                target_sku = df_display.iloc[row_idx]['sku']
                 
-                st.warning(f"⚠️ Terpilih: **{target_sku}**")
-                if st.button(f"🗑️ HAPUS BARIS INI", type="primary", use_container_width=True):
+                st.warning(f"⚠️ Mau hapus SKU: **{target_sku}**?")
+                if st.button(f"🗑️ KONFIRMASI HAPUS", type="primary", use_container_width=True):
                     conn = sqlite3.connect('inventory_logistics.db')
                     conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
                     conn.commit()
                     conn.close()
+                    st.success(f"✅ Berhasil menghapus {target_sku}")
                     st.rerun()
         else:
-            st.info("Database masih kosong.")
-    except Exception:
-        st.info("Inisialisasi database...")
+            st.info("Database kosong. Silakan upload file untuk memulai.")
+            
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat memuat database: {e}")
 
 
 def process_justification(df_case, df_tracking, df_po):
