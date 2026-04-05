@@ -2504,7 +2504,7 @@ def init_db():
             item_name TEXT, variant TEXT, sub_kategori TEXT,
             harga_beli REAL, harga_jual REAL, 
             qty_system INTEGER, qty_so INTEGER,
-            upload_at TEXT -- <<< INI TAMBAHAN KOLOM JAM
+            upload_at TEXT
         )
     ''')
     
@@ -2517,7 +2517,7 @@ def init_db():
         'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
         'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
         'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 
-        'qty_so': 'INTEGER', 'upload_at': 'TEXT' # <<< INI TAMBAHAN
+        'qty_so': 'INTEGER', 'upload_at': 'TEXT'
     }
     
     for col, dtype in required_db_cols.items():
@@ -2577,25 +2577,17 @@ def menu_retur_out_system():
             font-weight: 600;
             margin-top: 5px;
         }
-        /* Hapus label teks di atas input (st.text_input("")) */
-            div[data-baseweb="input"] + div {
-                display: none;
-            }
-            
-            /* Style kotak inputnya */
-            .stTextInput>div>div>input {
-                background-color: #1E1E2E; /* Warna Dark Background */
-                color: #FFFFFF; /* Warna Teks Putih */
-                border-radius: 10px; /* Sedikit membulat */
-                border: 1px solid #3d4455; /* Border tipis dark */
-                padding: 10px 15px;
-                font-size: 14px;
-            }
-
-            /* Warna placeholder (teks ketik...) */
-            .stTextInput>div>div>input::placeholder {
-                color: #A0A0A0; /* Warna Abu-abu pudar */
-            }
+        /* Style input */
+        div[data-baseweb="input"] + div { display: none; }
+        .stTextInput>div>div>input {
+            background-color: #1E1E2E;
+            color: #FFFFFF;
+            border-radius: 10px;
+            border: 1px solid #3d4455;
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+        .stTextInput>div>div>input::placeholder { color: #A0A0A0; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -2603,14 +2595,12 @@ def menu_retur_out_system():
 
     conn = init_db()
 
-    # --- 3. UPLOAD & AUTO-SAVE (TANPA EXPANDER) ---
+    # --- 3. UPLOAD & AUTO-SAVE ---
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
         try:
             df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-            
-            # Standarisasi Header
             df_upload.columns = [str(c).strip() for c in df_upload.columns]
             
             required_cols = {
@@ -2624,80 +2614,54 @@ def menu_retur_out_system():
                 df_to_save = df_upload[list(required_cols.keys())].copy()
                 df_to_save.rename(columns=required_cols, inplace=True)
                 
-                # --- INI KODE TAMBAHAN JAMNYA ---
+                # Tambah Jam Upload
                 df_to_save['upload_at'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
                 file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
                 if st.session_state.get('last_file_key') != file_key:
+                    # PROSES SAVE
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                    conn.commit() # <<< BIAR GAK ERROR PAS UPLOAD
+                    conn.commit() # <<< INI HARUS ADA BIAR DATA KEKUNCI
+                    
                     st.session_state['last_file_key'] = file_key
-                    st.success(f"✅ Berhasil! {len(df_to_save)} Baris masuk database.")
+                    st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris!")
                     st.rerun()
             else:
-                st.error("Gagal: Kolom di file lu gak match sama sistem!")
+                st.error("Kolom gak cocok!")
         except Exception as e:
             st.error(f"Error Upload: {e}")
 
-    # --- 4. DATA VIEW & METRICS ---
+    # --- 4. DATA VIEW ---
     try:
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
         if not df_db.empty:
+            # Metrics
             total_sku = df_db['sku'].nunique()
-            total_qty_system = df_db['qty_system'].sum()
-            total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
+            total_qty = df_db['qty_system'].sum()
+            total_val = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
             m1, m2, m3 = st.columns(3)
-            with m1:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #8b5cf6;"><div class="metric-label">🗄️ TOTAL SKU</div><div class="metric-value">{total_sku:,}</div><div class="metric-delta">↑ IN DATABASE</div></div>', unsafe_allow_html=True)
-            with m2:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #10b981;"><div class="metric-label">📦 TOTAL QTY</div><div class="metric-value">{int(total_qty_system):,}</div><div class="metric-delta">↑ TOTAL QTY</div></div>', unsafe_allow_html=True)
-            with m3:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #f59e0b;"><div class="metric-label">💰 TOTAL VALUE</div><div class="metric-value">Rp {total_value:,.0f}</div><div class="metric-delta">↑ TOTAL VALUE</div></div>', unsafe_allow_html=True)
+            m1.markdown(f'<div class="metric-card"><div class="metric-label">SKU</div><div class="metric-value">{total_sku:,}</div></div>', unsafe_allow_html=True)
+            m2.markdown(f'<div class="metric-card"><div class="metric-label">QTY</div><div class="metric-value">{int(total_qty):,}</div></div>', unsafe_allow_html=True)
+            m3.markdown(f'<div class="metric-card"><div class="metric-label">VALUE</div><div class="metric-value">Rp {total_val:,.0f}</div></div>', unsafe_allow_html=True)
 
-        st.markdown("### 📜 Database History")
-        
-        search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang di sini...")
+            st.markdown("### 📜 Database History")
+            search = st.text_input("🔍 Cari...", placeholder="SKU atau Nama...")
 
-        df_display = df_db.sort_values(by='rowid', ascending=False)
+            df_display = df_db.sort_values(by='rowid', ascending=False)
+            if search:
+                df_display = df_display[df_display['sku'].astype(str).str.contains(search, case=False) | 
+                                        df_display['item_name'].str.contains(search, case=False)]
 
-        if search_query:
-            df_display = df_display[
-                df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
-                df_display['item_name'].str.contains(search_query, case=False, na=False)
-            ]
-
-        df_final = df_display
-        cols_to_show = [col for col in df_final.columns if col not in ['rowid', 'id']]
-
-        event = st.dataframe(
-            df_final[cols_to_show],
-            use_container_width=True, 
-            hide_index=True, 
-            on_select="rerun", 
-            selection_mode="single-row",
-            column_config={
-                "upload_at": st.column_config.DatetimeColumn("WAKTU UPLOAD", format="D MMM YYYY, HH:mm")
-            }
-        )
-
-        if event.selection.rows:
-            row_idx = event.selection.rows[0]
-            target_id = df_final.iloc[row_idx]['rowid']
-            target_sku = df_final.iloc[row_idx]['sku']
-            
-            st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
-            if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
-                conn.commit()
-                st.success("Data berhasil dihapus!")
-                st.rerun()
+            st.dataframe(df_display.drop(columns=['rowid', 'id'], errors='ignore'), 
+                         use_container_width=True, hide_index=True,
+                         column_config={"upload_at": st.column_config.DatetimeColumn("WAKTU UPLOAD", format="D MMM, HH:mm")})
 
     except Exception as e:
-        st.error(f"Sistem Gagal Memuat Database: {e}")
+        st.error(f"Gagal muat data: {e}")
     finally:
-        conn.close()
+        conn.close() # <<< DIPINDAH KE PALING BAWAH
 
 
 def process_justification(df_case, df_tracking, df_po):
