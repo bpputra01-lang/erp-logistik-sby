@@ -3044,7 +3044,7 @@ def menu_reject_defect():
             df_final_match = df_core.merge(df_pivot, on='SKU', how='left')
 
             # --- TABEL HASIL ---
-            st.markdown('<p style="color: #31333F; font-weight: 700; margin-bottom: 10px;">📋 Rangkuman Lokasi Temuan per SKU</p>', unsafe_allow_html=True)
+            st.markdown('<p style="color: #000000; font-weight: 700; margin-bottom: 10px;">📋 Rangkuman Lokasi Temuan per SKU</p>', unsafe_allow_html=True)
             
             st.data_editor(
                 df_final_match,
