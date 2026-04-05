@@ -5581,46 +5581,58 @@ if menu == "Logistic Schedule":
                                     double_day_count[nama] += 1
                                 if len(storage[day_name][slot_key]) >= limit: break
 
-        # --- STEP 3: SMART SAFETY NET (FIXED VERSION) ---
-        # Kita urutkan karyawan yang paling kurang jatah shift-nya
-        for k in sorted(karyawan_list, key=lambda x: weekly_counter[x['nama']]):
-            nama = k['nama']
-            if weekly_counter[nama] >= k['target_fix']: continue
-            
-            for day_name in day_names:
-                if weekly_counter[nama] >= k['target_fix']: break
-                tgl_ini = dates_real[day_names.index(day_name)]
-                
-                # Cek libur
-                if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                
-                # Aturan main: Orang ini gak boleh kerja 2x di shift yang sama (misal Shift 1 dua kali)
-                # Dan total per hari max 2 (untuk Part-Full)
-                current_daily = get_daily_count(nama, day_name)
-                if k['tipe'] == "Part-Full":
-                    if current_daily >= 2 or (current_daily == 1 and double_day_count[nama] >= 3): continue
-                else:
-                    if current_daily >= 1: continue
+        # --- 3. GENERATOR ANTI-TABRAK ---
+st.subheader("🚀 3. Generator Jadwal Otomatis")
+start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
 
-                # --- DISINI KUNCINYA: Cari slot yang MASIH KOSONG atau MINIM orang ---
-                for shf_jam, shf_role in base_roles:
-                    slot_key = f"{shf_jam} - {shf_role}"
-                    
-                    # 1. Jangan masuk ke slot SPV atau Shift 3 (kalau bukan role-nya)
-                    if shf_role == "SPV" and k['posisi'] != "SPV": continue
-                    
-                    # 2. CEK LIMIT: Kalau slot ini udah ada 1 atau 2 orang, JANGAN MASUK DULU
-                    # Biar sistem nyari slot lain yang bener-bener masih 0 orang (kosong)
-                    if len(storage[day_name][slot_key]) >= 1: 
-                        continue 
-                    
-                    # 3. Cek apakah dia udah ada di jam yang sama (biar gak bentrok jam kerja)
-                    if not any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
-                        storage[day_name][slot_key].append(nama + " (FIX)")
-                        weekly_counter[nama] += 1
-                        if get_daily_count(nama, day_name) == 2:
-                            double_day_count[nama] += 1
-                        break
+# AMBIL DATA MASTER DI LUAR BUTTON (Biar gak NameError)
+df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
+karyawan_list = df_staff_master.to_dict('records') # <--- Variabel ini sekarang aman
+
+if st.button("▶️RUN GENERATOR JADWAL", use_container_width=True):
+    dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+    
+    df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
+
+    base_roles = [
+        ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
+        ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
+        ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
+        ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
+    ]
+
+    # Set target shift
+    for k in karyawan_list:
+        k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
+    
+    # ... (LOGIC STEP 1, 2, 3 LU DISINI) ...
+    # (Pake logic Step 3 yang "Smart Spread" biar gak numpuk di Shift 0 lagi)
+
+    # --- SIMPAN HASIL KE SESSION STATE ---
+    # (Bagian Step 4 simpan ke st.session_state.res_df dan st.session_state.summary_shift)
+
+# --- TAMPILAN OUTPUT (DI LUAR BUTTON) ---
+if 'res_df' in st.session_state:
+    st.divider()
+    col_v1, col_v2 = st.columns([5, 2])
+    
+    with col_v1:
+        # (Tabel Jadwal Lu)
+        st.dataframe(st.session_state.res_df, use_container_width=True)
+        
+    with col_v2:
+        st.markdown("### 📈 REALISASI (9/6)")
+        # Sekarang baris ini GAK BAKAL ERROR karena karyawan_list sudah didefinisikan di atas
+        summary_data = [
+            {
+                "NAMA": k, 
+                "SHIFT": v, 
+                "STATUS": "✅ OK" if v >= (9 if next(item['tipe'] for item in karyawan_list if item['nama'] == k) == "Part-Full" else 6) else "⚠️ KURANG"
+            } 
+            for k, v in st.session_state.summary_shift.items()
+        ]
+        st.table(pd.DataFrame(summary_data).sort_values(by="SHIFT", ascending=False))
 
         # --- STEP 4: TABLE GENERATION (FIXED SUMMARY LOGIC) ---
         final_table = []
