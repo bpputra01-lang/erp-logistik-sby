@@ -5440,88 +5440,81 @@ if menu == "Logistic Schedule":
                 -webkit-text-fill-color: #ffffff !important; 
             }
 
-            /* 5. Metrics & Cards (Jika ada) */
-            div[data-testid="metric-container"] {
-                background-color: #1a1c27 !important;
-                padding: 15px !important;
-                border-radius: 12px !important;
-                border: 1px solid #2d3142 !important;
+            .custom-card {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background-color: #1a1c27;
+                border-radius: 8px;
+                padding: 12px 18px;
+                margin-bottom: 10px;
+                border-left: 5px solid #00FF00; /* Warna Hijau Default */
+                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             }
+            .card-text { color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 14px; }
+            .card-subtext { color: #888888; font-size: 12px; }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
-    # --- 1. DATABASE TIM ---
-    st.subheader("👤 1. Database & Input Tim")
-    with st.form("form_tim_komplit", clear_on_submit=True): 
-        c1, c2, c3 = st.columns(3)
-        nama_input = c1.text_input("Nama Lengkap")
-        posisi_input = c2.selectbox("Posisi/Role", 
-            ["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
-        tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
-        
-        if st.form_submit_button("💾 SIMPAN TIM"):
-            if nama_input:
-                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper().strip(), posisi_input, tipe_input))
+    # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
+with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
+    df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
+    if not df_cek.empty:
+        for i, row in df_cek.iterrows():
+            c1, c2 = st.columns([6, 1])
+            with c1:
+                st.markdown(f"""
+                    <div class="custom-card" style="border-left-color: #007BFF;">
+                        <div>
+                            <div class="card-text">{row['nama']}</div>
+                            <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            with c2:
+                if st.button("🗑️", key=f"del_staff_{i}", use_container_width=True):
+                    conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
+                    conn.commit()
+                    st.rerun()
+    else:
+        st.info("Belum ada data tim.")
+
+st.divider()
+
+# --- 2. PLOT LIBUR (MODEL KARTU) ---
+st.subheader("🚫 2. Plot Libur & Monitoring")
+col_l1, col_l2 = st.columns([1, 2])
+
+with col_l1:
+    df_k = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
+    with st.form("form_libur_komplit", clear_on_submit=True):
+        target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
+        tgl_off = st.date_input("Tanggal Off")
+        jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
+        if st.form_submit_button("SUBMIT OFF"):
+            if target:
+                conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
                 conn.commit()
-                st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
-    # --- DAFTAR KARYAWAN AKTIF ---
-    with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
-        df_cek = pd.read_sql_query("SELECT nama AS 'NAMA', posisi AS 'ROLE', tipe AS 'TIPE' FROM karyawan", conn)
-        
-        if not df_cek.empty:
-            h_col1, h_col2, h_col3, h_col4 = st.columns([3, 2, 2, 1])
-            h_col1.write("**NAMA**")
-            h_col2.write("**ROLE**")
-            h_col3.write("**TIPE**")
-            h_col4.write("**AKSI**")
-            st.markdown("---")
-
-            for i, row in df_cek.iterrows():
-                c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
-                c1.write(row['NAMA'])
-                c2.write(row['ROLE'])
-                c3.write(row['TIPE'])
-                if c4.button("🗑️", key=f"del_staff_{i}"):
-                    conn.execute("DELETE FROM karyawan WHERE nama = ? AND posisi = ? AND tipe = ?", 
-                                 (row['NAMA'], row['ROLE'], row['TIPE']))
-                    conn.commit()
-                    st.rerun()
-        else:
-            st.info("Belum ada data tim.")
-
-    st.divider()
-
-    # --- 2. PLOT LIBUR ---
-    st.subheader("🚫 2. Plot Libur & Monitoring")
-    col_l1, col_l2 = st.columns([1, 2])
-    
-    with col_l1:
-        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        with st.form("form_libur_komplit", clear_on_submit=True):
-            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
-            tgl_off = st.date_input("Tanggal Off")
-            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
-            if st.form_submit_button("SUBMIT OFF"):
-                if target:
-                    conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
-                    conn.commit()
-                    st.rerun()
-                else:
-                    st.error("Input Tim dulu!")
-
-    with col_l2:
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
-        if not df_off_view.empty:
-            for i, row in df_off_view.iterrows():
-                m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
-                m1.write(f"**{row['nama']}**")
-                m2.write(row['tanggal'])
-                m3.write(row['jenis'])
-                if m4.button("🗑️", key=f"del_libur_{i}"):
+with col_l2:
+    df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
+    if not df_off_view.empty:
+        for i, row in df_off_view.iterrows():
+            m1, m2 = st.columns([6, 1])
+            with m1:
+                st.markdown(f"""
+                    <div class="custom-card" style="border-left-color: #FF4B4B;">
+                        <div>
+                            <div class="card-text">{row['nama']}</div>
+                            <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            with m2:
+                if st.button("🗑️", key=f"del_libur_{i}", use_container_width=True):
                     conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
                     conn.commit()
                     st.rerun()
