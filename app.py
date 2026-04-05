@@ -2632,9 +2632,8 @@ def process_stock_comparison(file1, file2):
         raise e
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    st.markdown("""
+   st.markdown("""
         <style>
-        /* Header Hero */
         .hero-header {
             background-color: #007BFF;
             color: white;
@@ -2647,18 +2646,16 @@ def menu_reject_defect():
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
         
-        /* FIX: Cuma Label Form yang Putih (Biar kebaca di box navy) */
-        [data-testid="stWidgetLabel"] p {
+        /* FIX JUDUL: Warna Putih, Font Tebal */
+        [data-testid="stMetricLabel"] > div, 
+        [data-testid="stWidgetLabel"] p, 
+        label p {
             color: #FFFFFF !important;
             font-weight: 700 !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
 
-        /* FIX: Judul & Teks Lain Balik ke Warna Default (Biar gak ikutan putih) */
-        h1, h2, h3, .stMarkdown p:not([data-testid="stWidgetLabel"] p) {
-            color: inherit !important;
-        }
-
-        /* Container Input Box (Navy) */
+        /* BOX INPUT: Navy Gelap */
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
         div[data-testid="stSelectbox"] > div > div {
@@ -2667,12 +2664,12 @@ def menu_reject_defect():
             border-radius: 8px !important;
         }
         
-        /* Teks Input */
+        /* TEKS DI DALAM INPUT: Putih */
         input, textarea, div[data-baseweb="select"] > div { 
             color: white !important; 
         }
 
-        /* Button Biru */
+        /* BUTTON SINGLE (BIRU) */
         button[kind="primaryFormSubmit"] {
             background-color: #007BFF !important;
             color: white !important;
@@ -2682,15 +2679,16 @@ def menu_reject_defect():
             font-weight: bold !important;
         }
 
-        /* Button Gold */
+        /* BUTTON GOLD (DOWNLOAD) */
         div.stDownloadButton > button {
             background-color: #D4AF37 !important;
             color: white !important;
             border: 1px solid #FFD700 !important;
             border-radius: 8px !important;
+            font-weight: bold !important;
         }
 
-        /* Metric Box */
+        /* METRIC BOX */
         [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
@@ -2698,13 +2696,22 @@ def menu_reject_defect():
             border-radius: 12px !important;
         }
 
-        /* Angka Metric (Kuning) */
+        /* ANGKA METRIC: Tetap Kuning Sesuai Permintaan */
         [data-testid="stMetricValue"] > div { 
             color: #FFD700 !important; 
             font-weight: 900 !important; 
+            font-size: 32px !important;
+        }
+        /* --- TAMBAHAN KHUSUS BIAR JUDUL PUTIH & TIDAK ITEM --- */
+        [data-testid="stMetricLabel"] > div, 
+        [data-testid="stWidgetLabel"] p, 
+        label p,
+        .stMarkdown p {
+            color: #FFFFFF !important; /* Paksa jadi Putih Bersih */
+            font-weight: 700 !important; /* Biar lebih tegas teksnya */
         }
 
-        /* Delta (Panah) Bold */
+        /* --- FIX WARNA DELTA (PANAH) BIAR HIJAU SAAT NAIK --- */
         [data-testid="stMetricDelta"] > div {
             font-weight: bold !important;
         }
