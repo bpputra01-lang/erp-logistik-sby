@@ -2678,7 +2678,6 @@ def menu_retur_out_system():
         st.info("Tabel belum terbentuk. Silakan upload dan simpan data.")
 # --- TAMBAHKAN INI DI BAWAH SECTION HISTORY DATA ---
     st.markdown("---")
-    if st.checkbox("🔓 Aktifkan Fitur Hapus"):
         if st.button("🗑️ KOSONGKAN SEMUA DATA DATABASE", type="secondary", use_container_width=True):
             try:
                 conn = sqlite3.connect('inventory_logistics.db')
