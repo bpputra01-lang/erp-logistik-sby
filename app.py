@@ -2520,7 +2520,43 @@ def patch_database():
     conn.commit()
     conn.close()
 
-# Jalankan Patch sebelum masuk ke menu utama
+def patch_database():
+    conn = sqlite3.connect('inventory_logistics.db')
+    c = conn.cursor()
+    
+    # Ambil daftar kolom yang sudah ada saat ini
+    c.execute("PRAGMA table_info(retur_out)")
+    existing_cols = [row[1] for row in c.fetchall()]
+    
+    # DAFTAR LENGKAP KOLOM YANG HARUS ADA (Sesuai format 11 kolom lu)
+    # Kita cek satu-satu, kalau belum ada kita ALTER
+    check_cols = [
+        ('identify', 'TEXT'),
+        ('bin', 'TEXT'),
+        ('sku', 'TEXT'),
+        ('brand', 'TEXT'),
+        ('item_name', 'TEXT'),
+        ('variant', 'TEXT'),
+        ('sub_kategori', 'TEXT'),
+        ('harga_beli', 'REAL'), # <-- Tadi ini yang ketinggalan di alter
+        ('harga_jual', 'REAL'),
+        ('qty_system', 'INTEGER'),
+        ('qty_so', 'INTEGER')
+    ]
+    
+    for col_name, col_type in check_cols:
+        if col_name not in existing_cols:
+            try:
+                c.execute(f"ALTER TABLE retur_out ADD COLUMN {col_name} {col_type}")
+                print(f"Berhasil menambah kolom: {col_name}")
+            except Exception as e:
+                # Kalau gagal karena tabel belum ada sama sekali, kita buat baru
+                pass
+                
+    conn.commit()
+    conn.close()
+
+# JALANKAN PATCH INI DI ATAS MENU
 patch_database()
 
 def menu_retur_out_system():
