@@ -2718,7 +2718,7 @@ def menu_reject_defect():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
     
     init_db()
 
