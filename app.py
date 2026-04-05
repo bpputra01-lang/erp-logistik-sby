@@ -2483,7 +2483,117 @@ def process_scan_out(df_scan, df_history, df_stock):
     df_res = df_res[['BIN AWAL', 'SKU', 'QTY SCAN', 'Keterangan', 'Total Qty Setup/Terjual', 'Bin After Set Up', 'Invoice']]
     
     return df_res, df_draft
-    
+import streamlit as st
+import pandas as pd
+import sqlite3
+
+# --- DATABASE SETUP ---
+def init_db():
+    conn = sqlite3.connect('inventory_logistics.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS retur_out (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sku TEXT,
+            article_name TEXT,
+            qty INTEGER,
+            price_buy REAL,
+            tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def menu_retur_out_system():
+    # --- HERO HEADER BLOCK (PERSIS GAMBAR) ---
+    st.markdown("""
+        <style>
+            .hero-header {
+                background-color: #1d3e7a;
+                padding: 20px 25px;
+                border-radius: 12px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                margin-bottom: 30px;
+                display: flex;
+                align-items: center;
+            }
+            .hero-title {
+                color: white !important;
+                font-family: 'Source Sans Pro', sans-serif;
+                font-weight: 800;
+                font-size: 1.85rem;
+                margin: 0;
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                letter-spacing: 0.02em;
+            }
+        </style>
+        <div class="hero-header">
+            <h1 class="hero-title">
+                📋 BULK RETUR OUT SYSTEM
+            </h1>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 1. FILE UPLOADER
+    uploaded_file = st.file_uploader("Upload File Retur (Excel atau CSV)", type=['xlsx', 'csv'])
+
+    if uploaded_file:
+        if uploaded_file.name.endswith('.csv'):
+            df_upload = pd.read_csv(uploaded_file)
+        else:
+            df_upload = pd.read_excel(uploaded_file)
+
+        df_upload.columns = [c.upper() for c in df_upload.columns]
+        required_cols = ['SKU', 'ARTICLE_NAME', 'QTY', 'PRICE_BUY']
+        
+        if all(col in df_upload.columns for col in required_cols):
+            
+            # --- 2. METRICS BOX ---
+            total_qty = df_upload['QTY'].sum()
+            total_sku = df_upload['SKU'].nunique()
+            total_cogs = (df_upload['QTY'] * df_upload['PRICE_BUY']).sum()
+
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                st.metric("TOTAL QTY", f"{total_qty:,} Pcs")
+            with m2:
+                st.metric("UNIQUE SKU", f"{total_sku:,}")
+            with m3:
+                st.metric("TOTAL VALUE (COGS)", f"Rp {total_cogs:,.0f}")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # --- 3. PREVIEW & EDIT ---
+            st.markdown('<h4 style="color: #31333F; font-weight: 700;">Data Ready to Sync:</h4>', unsafe_allow_html=True)
+            
+            edited_df = st.data_editor(
+                df_upload[required_cols], 
+                use_container_width=True, 
+                hide_index=True,
+                num_rows="dynamic",
+                key="editor_retur_out"
+            )
+
+            # --- 4. TOMBOL SIMPAN (SQLITE) ---
+            if st.button("💾 SIMPAN KE DATABASE SQLITE", type="primary", use_container_width=True):
+                try:
+                    conn = sqlite3.connect('inventory_logistics.db')
+                    df_to_save = edited_df.copy()
+                    df_to_save.columns = ['sku', 'article_name', 'qty', 'price_buy']
+                    
+                    df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
+                    conn.close()
+                    
+                    st.success(f"🚀 Gaspol! {len(df_to_save)} baris data masuk database.")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Gagal simpan: {e}")
+        else:
+            st.warning(f"⚠️ Format kolom salah! Harus: {', '.join(required_cols)}")   
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
     res = df_case.copy()
@@ -3779,118 +3889,6 @@ def tampilan_balancing_stock():
         st.error(f"Error pada sistem analisis: {e}")
     finally:
         conn.close()
-
-import streamlit as st
-import pandas as pd
-import sqlite3
-
-# --- DATABASE SETUP ---
-def init_db():
-    conn = sqlite3.connect('inventory_logistics.db')
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS retur_out (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sku TEXT,
-            article_name TEXT,
-            qty INTEGER,
-            price_buy REAL,
-            tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def menu_retur_out_system():
-    # --- HERO HEADER BLOCK (PERSIS GAMBAR) ---
-    st.markdown("""
-        <style>
-            .hero-header {
-                background-color: #1d3e7a;
-                padding: 20px 25px;
-                border-radius: 12px;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-                margin-bottom: 30px;
-                display: flex;
-                align-items: center;
-            }
-            .hero-title {
-                color: white !important;
-                font-family: 'Source Sans Pro', sans-serif;
-                font-weight: 800;
-                font-size: 1.85rem;
-                margin: 0;
-                display: flex;
-                align-items: center;
-                gap: 15px;
-                letter-spacing: 0.02em;
-            }
-        </style>
-        <div class="hero-header">
-            <h1 class="hero-title">
-                📋 BULK RETUR OUT SYSTEM
-            </h1>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # 1. FILE UPLOADER
-    uploaded_file = st.file_uploader("Upload File Retur (Excel atau CSV)", type=['xlsx', 'csv'])
-
-    if uploaded_file:
-        if uploaded_file.name.endswith('.csv'):
-            df_upload = pd.read_csv(uploaded_file)
-        else:
-            df_upload = pd.read_excel(uploaded_file)
-
-        df_upload.columns = [c.upper() for c in df_upload.columns]
-        required_cols = ['SKU', 'ARTICLE_NAME', 'QTY', 'PRICE_BUY']
-        
-        if all(col in df_upload.columns for col in required_cols):
-            
-            # --- 2. METRICS BOX ---
-            total_qty = df_upload['QTY'].sum()
-            total_sku = df_upload['SKU'].nunique()
-            total_cogs = (df_upload['QTY'] * df_upload['PRICE_BUY']).sum()
-
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                st.metric("TOTAL QTY", f"{total_qty:,} Pcs")
-            with m2:
-                st.metric("UNIQUE SKU", f"{total_sku:,}")
-            with m3:
-                st.metric("TOTAL VALUE (COGS)", f"Rp {total_cogs:,.0f}")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- 3. PREVIEW & EDIT ---
-            st.markdown('<h4 style="color: #31333F; font-weight: 700;">Data Ready to Sync:</h4>', unsafe_allow_html=True)
-            
-            edited_df = st.data_editor(
-                df_upload[required_cols], 
-                use_container_width=True, 
-                hide_index=True,
-                num_rows="dynamic",
-                key="editor_retur_out"
-            )
-
-            # --- 4. TOMBOL SIMPAN (SQLITE) ---
-            if st.button("💾 SIMPAN KE DATABASE SQLITE", type="primary", use_container_width=True):
-                try:
-                    conn = sqlite3.connect('inventory_logistics.db')
-                    df_to_save = edited_df.copy()
-                    df_to_save.columns = ['sku', 'article_name', 'qty', 'price_buy']
-                    
-                    df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                    conn.close()
-                    
-                    st.success(f"🚀 Gaspol! {len(df_to_save)} baris data masuk database.")
-                    st.balloons()
-                except Exception as e:
-                    st.error(f"Gagal simpan: {e}")
-        else:
-            st.warning(f"⚠️ Format kolom salah! Harus: {', '.join(required_cols)}")
     
 with st.sidebar:
        st.markdown("""
