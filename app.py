@@ -2585,8 +2585,7 @@ def menu_retur_out_system():
             padding: 10px 15px;
             font-size: 14px;
         }
-        .stTextInput>div>div>input::placeholder { color: #A0A0A0; }
-        [data-testid="stWidgetLabel"] { display: none; }
+        
         </style>
     """, unsafe_allow_html=True)
 
@@ -2594,7 +2593,8 @@ def menu_retur_out_system():
 
     conn = init_db()
 
-    uploaded_file = st.file_uploader("📥 Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
+    # --- 3. UPLOAD & AUTO-SAVE ---
+    uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
         try:
