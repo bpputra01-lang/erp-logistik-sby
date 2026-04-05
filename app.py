@@ -2507,7 +2507,7 @@ def init_db():
 init_db()
 
 def menu_retur_out_system():
-    # --- HERO HEADER BLOCK (PERSIS GAMBAR) ---
+    # --- HERO HEADER BLOCK (FIXED) ---
     st.markdown("""
         <style>
             .hero-header {
@@ -2533,7 +2533,7 @@ def menu_retur_out_system():
         </style>
         <div class="hero-header">
             <h1 class="hero-title">
-                RETUR OUT DATABASE
+                📋 RETUR OUT DATABASE
             </h1>
         </div>
     """, unsafe_allow_html=True)
@@ -2547,19 +2547,25 @@ def menu_retur_out_system():
         else:
             df_upload = pd.read_excel(uploaded_file)
 
-        df_upload.columns = [c.upper() for c in df_upload.columns]
-        required_cols = ['SKU', 'ARTICLE_NAME', 'QTY', 'PRICE_BUY']
+        # --- SESUAIKAN DENGAN FORMAT FOTO LU ---
+        # Kita pakai kolom asli sesuai foto agar tidak error saat filter
+        required_cols = [
+            'Identify', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 
+            'VARIANT', 'SUB KATEGORI', 'Harga Beli', 'Harga Jual', 
+            'QTY SYSTEM', 'QTY SO'
+        ]
         
+        # Cek apakah kolom di file upload sudah lengkap
         if all(col in df_upload.columns for col in required_cols):
             
-            # --- 2. METRICS BOX ---
-            total_qty = df_upload['QTY'].sum()
+            # --- 2. METRICS BOX (PAKAI QTY SO & HARGA BELI) ---
+            total_qty = df_upload['QTY SO'].sum()
             total_sku = df_upload['SKU'].nunique()
-            total_cogs = (df_upload['QTY'] * df_upload['PRICE_BUY']).sum()
+            total_cogs = (df_upload['QTY SO'] * df_upload['Harga Beli']).sum()
 
             m1, m2, m3 = st.columns(3)
             with m1:
-                st.metric("TOTAL QTY", f"{total_qty:,} Pcs")
+                st.metric("TOTAL QTY (SO)", f"{total_qty:,} Pcs")
             with m2:
                 st.metric("UNIQUE SKU", f"{total_sku:,}")
             with m3:
@@ -2575,25 +2581,38 @@ def menu_retur_out_system():
                 use_container_width=True, 
                 hide_index=True,
                 num_rows="dynamic",
-                key="editor_retur_out"
+                key="editor_retur_out_new"
             )
 
             # --- 4. TOMBOL SIMPAN (SQLITE) ---
             if st.button("💾 SIMPAN KE DATABASE SQLITE", type="primary", use_container_width=True):
+                conn = None
                 try:
                     conn = sqlite3.connect('inventory_logistics.db')
                     df_to_save = edited_df.copy()
-                    df_to_save.columns = ['sku', 'article_name', 'qty', 'price_buy']
+                    
+                    # Rename untuk masuk ke DB (menghilangkan spasi agar aman di SQL)
+                    df_to_save.columns = [
+                        'identify', 'bin', 'sku', 'brand', 'item_name', 
+                        'variant', 'sub_kategori', 'harga_beli', 'harga_jual', 
+                        'qty_system', 'qty_so'
+                    ]
                     
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                    conn.close()
+                    conn.commit()
                     
                     st.success(f"🚀 Gaspol! {len(df_to_save)} baris data masuk database.")
                     st.balloons()
                 except Exception as e:
                     st.error(f"Gagal simpan: {e}")
+                finally:
+                    if conn:
+                        conn.close() # Proteksi NoneType Error
         else:
-            st.warning(f"⚠️ Format kolom salah! Harus: {', '.join(required_cols)}")   
+            # Kasih tau kolom mana yang kurang
+            missing = [c for c in required_cols if c not in df_upload.columns]
+            st.warning(f"⚠️ Kolom tidak sesuai! Kurang: {', '.join(missing)}")
+
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
     res = df_case.copy()
