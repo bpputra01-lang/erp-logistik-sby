@@ -3198,26 +3198,29 @@ def project_approval_reject():
     with tabs[0]:
         st.markdown("""
     <div style="
-        background-color: #1a1c27; 
-        padding: 15px 20px; 
-        border-left: 5px solid #007BFF; 
-        border-radius: 5px; 
-        margin-top: 20px; 
-        margin-bottom: 20px;
+        background-color: #1a1c27 !important; 
+        padding: 15px 20px !important; 
+        border-left: 5px solid #007BFF !important; 
+        border-radius: 5px !important; 
+        margin-top: 20px !important; 
+        margin-bottom: 20px !important;
         display: block !important;
     ">
-        <h3 style="
+        <span style="
             color: #FFFFFF !important; 
             -webkit-text-fill-color: #FFFFFF !important;
+            filter: brightness(200%) !important;
             opacity: 1 !important;
-            margin: 0; 
-            font-size: 18px; 
-            font-weight: 900;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
+            margin: 0 !important; 
+            font-size: 18px !important; 
+            font-weight: 900 !important;
+            font-family: sans-serif !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+            display: inline-block !important;
         ">
-            Form Pengajuan Reject/Defect
-        </h3>
+            <b>FORM PENGAJUAN REJECT / DEFECT</b>
+        </span>
     </div>
 """, unsafe_allow_html=True)
         
