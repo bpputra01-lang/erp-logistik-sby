@@ -2658,7 +2658,7 @@ def menu_retur_out_system():
                     <div class="metric-card" style="border-left: 6px solid #10b981;">
                         <div class="metric-label">📦 TOTAL QTY</div>
                         <div class="metric-value">{int(total_qty_system):,}</div>
-                        <div class="metric-delta">↑ TOTAL STOCK</div>
+                        <div class="metric-delta">↑ TOTAL QTY</div>
                     </div>
                 ''', unsafe_allow_html=True)
             with m3:
@@ -2666,7 +2666,7 @@ def menu_retur_out_system():
                     <div class="metric-card" style="border-left: 6px solid #f59e0b;">
                         <div class="metric-label">💰 TOTAL VALUE</div>
                         <div class="metric-value">Rp {total_value:,.0f}</div>
-                        <div class="metric-delta">↑ TOTAL COST</div>
+                        <div class="metric-delta">↑ TOTAL VALUE</div>
                     </div>
                 ''', unsafe_allow_html=True)
 
