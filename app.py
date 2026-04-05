@@ -5474,290 +5474,278 @@ if menu == "Logistic Schedule":
                 st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
-   # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
-with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
-    df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
-    if not df_cek.empty:
-        for i, row in df_cek.iterrows():
-            c1, c2 = st.columns([6, 1])
-            with c1:
-                st.markdown(f"""
-                    <div class="custom-card" style="border-left-color: #007BFF;">
-                        <div>
-                            <div class="card-text">{row['nama']}</div>
-                            <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
+    # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
+    with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
+        df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
+        if not df_cek.empty:
+            for i, row in df_cek.iterrows():
+                cc1, cc2 = st.columns([6, 1])
+                with cc1:
+                    st.markdown(f"""
+                        <div class="custom-card" style="border-left-color: #007BFF;">
+                            <div>
+                                <div class="card-text">{row['nama']}</div>
+                                <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
+                            </div>
                         </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            with c2:
-                if st.button("🗑️", key=f"del_staff_{i}", use_container_width=True):
-                    conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
-                    conn.commit()
-                    st.rerun()
-    else:
-        st.info("Belum ada data tim di database.") # Indentasi bener (sejajar IF)
-
-st.divider()
-
-# --- 2. PLOT LIBUR (MODEL KARTU) ---
-st.subheader("🚫 2. Plot Libur & Monitoring")
-col_l1, col_l2 = st.columns([1, 2])
-
-with col_l1:
-    df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-    with st.form("form_libur_komplit", clear_on_submit=True):
-        target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
-        tgl_off = st.date_input("Tanggal Off")
-        jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
-        if st.form_submit_button("SUBMIT OFF"):
-            if target:
-                conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
-                conn.commit()
-                st.rerun()
-
-with col_l2:
-    df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
-    if not df_off_view.empty:
-        for i, row in df_off_view.iterrows():
-            m1, m2 = st.columns([6, 1])
-            with m1:
-                st.markdown(f"""
-                    <div class="custom-card" style="border-left-color: #FF4B4B;">
-                        <div>
-                            <div class="card-text">{row['nama']}</div>
-                            <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            with m2:
-                if st.button("🗑️", key=f"del_libur_{i}", use_container_width=True):
-                    conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                    conn.commit()
-                    st.rerun()
-    else:
-        st.info("Belum ada data pengajuan libur.")
-
-    st.divider()
-
-# --- 1. PASTIKAN TABEL ADA DULU (TARUH DI ATAS) ---
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS plot_shift3 (
-        nama TEXT,
-        tanggal TEXT,
-        posisi TEXT,
-        tipe TEXT
-    )
-''')
-conn.commit()
-
-# --- 2. BARU BOLEH READ DATA ---
-try:
-    df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
-except Exception:
-    df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
-
-# --- 3. TAMPILAN INPUT (Sesuai Request Lu) ---
-st.subheader("🌙 2. Plotting Manual Shift 3")
-
-df_karyawan = pd.read_sql_query("SELECT nama, tipe, posisi FROM karyawan", conn)
-karyawan_options = df_karyawan['nama'].tolist()
-
-col_in1, col_in2 = st.columns(2)
-
-with col_in1:
-    nama_s3 = st.selectbox("Pilih Nama Tim", karyawan_options, key="s3_name_input")
-    tgl_s3 = st.date_input("Tanggal Masuk Shift 3", datetime.now(), key="s3_date_input")
-
-with col_in2:
-    selected_data = df_karyawan[df_karyawan['nama'] == nama_s3].iloc[0]
-    st.info(f"Posisi: {selected_data['posisi']} | Tipe: {selected_data['tipe']}")
-
-if st.button("SUBMIT PLOT SHIFT 3", use_container_width=True):
-    # Cek duplikat biar gak double input
-    check = conn.execute("SELECT * FROM plot_shift3 WHERE nama=? AND tanggal=?", 
-                         (nama_s3, tgl_s3.strftime('%Y-%m-%d'))).fetchone()
-    
-    if not check:
-        conn.execute("INSERT INTO plot_shift3 (nama, tanggal, posisi, tipe) VALUES (?, ?, ?, ?)", 
-                     (nama_s3, tgl_s3.strftime('%Y-%m-%d'), selected_data['posisi'], selected_data['tipe']))
-        conn.commit()
-        st.success(f"✅ {nama_s3} Masuk Plot Shift 3!")
-        st.rerun()
-    else:
-        st.warning("Nama ini sudah terdaftar di tanggal tersebut!")
-
-# --- 4. LIST MONITORING (Layout Persis Gambar) ---
-st.divider()
-st.markdown("### 📋 LIST MONITORING SHIFT 3")
-
-if not df_monitor_s3.empty:
-    for index, row in df_monitor_s3.iterrows():
-        c1, c2, c3 = st.columns([3, 1, 0.5])
-        with c1:
-            st.markdown(f"""
-                <div style="background-color: #1a1c27; padding: 10px; border-radius: 5px; border-left: 5px solid #00FF00; margin-bottom: 5px;">
-                    <span style="color: #FFFFFF; font-weight: bold;">{row['nama']}</span>
-                </div>
-            """, unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"<div style='padding: 10px; color: #888;'>{row['tanggal']}</div>", unsafe_allow_html=True)
-        with c3:
-            if st.button("🗑️", key=f"del_s3_{index}"):
-                conn.execute("DELETE FROM plot_shift3 WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                conn.commit()
-                st.rerun()
-else:
-    st.info("Belum ada tim yang di-plot ke Shift 3.")
-# --- 3. GENERATOR JADWAL JEZ SBY (LOGIC V-ULTIMATE: SHIFT 0 MAX 2) ---
-st.subheader("3. Generator Jadwal Otomatis")
-
-start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v_final_final")
-df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
-karyawan_list = df_staff_master.to_dict('records')
-
-if st.button("▶️ RUN JADWAL", use_container_width=True):
-    dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-    day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
-    df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
-    df_manual_s3 = pd.read_sql_query("SELECT * FROM plot_shift3", conn)
-
-    base_roles = [
-        ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
-        ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
-        ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV"),
-        ("SHIFT 3", "SO") 
-    ]
-
-    storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
-    weekly_counter = {k['nama']: 0 for k in karyawan_list}
-    double_day_count = {k['nama']: 0 for k in karyawan_list}
-    for k in karyawan_list: k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
-
-    def get_active_shifts(nama, day_name):
-        return [slot.split(" - ")[0] for slot in storage[day_name] if any(nama in n for n in storage[day_name][slot])]
-
-    # --- 1. PLOT MANUAL SHIFT 3 (TETAP HARUS ADA) ---
-    for day_name, tgl_str in zip(day_names, dates_real):
-        names_manual = df_manual_s3[df_manual_s3['tanggal'] == tgl_str]['nama'].tolist()
-        if names_manual:
-            storage[day_name]["SHIFT 3 - SO"] = names_manual
-            for nm in names_manual:
-                if nm in weekly_counter: weekly_counter[nm] += 1
-
-    # --- 2. ENGINE GENERATOR (WITH SHIFT 0 LIMIT) ---
-    for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
-        for day_name in day_names:
-            tgl_ini = dates_real[day_names.index(day_name)]
-            
-            # HITUNG JUMLAH ORANG DI SHIFT 0 PADA HARI INI
-            def count_s0(day):
-                count = 0
-                for k_slot in storage[day]:
-                    if "SHIFT 0" in k_slot:
-                        count += len(storage[day][k_slot])
-                return count
-
-            for shf_jam, shf_role in base_roles:
-                if shf_jam == "SHIFT 3": continue 
-                
-                # --- 🛑 LIMIT SHIFT 0: MAKSIMAL 2 ORANG ---
-                if shf_jam == "SHIFT 0" and count_s0(day_name) >= 2:
-                    continue
-
-                slot_key = f"{shf_jam} - {shf_role}"
-                if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
-                if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
-
-                potential = []
-                for k in karyawan_list:
-                    nama = k['nama']
-                    if weekly_counter[nama] >= k['target_fix']: continue
-                    if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                    
-                    active_shifts = get_active_shifts(nama, day_name)
-                    if shf_jam in active_shifts: continue 
-                    
-                    # --- RULE NO BACKUP ---
-                    if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
-                    if k['posisi'] == "SPV" and shf_role != "SPV": continue
-                    
-                    # --- RULE BERURUTAN ---
-                    if k['tipe'] == "Part-Full" and active_shifts:
-                        s_udah = active_shifts[0]
-                        if s_udah == "SHIFT 0" and shf_jam != "SHIFT 1": continue
-                        if s_udah == "SHIFT 1" and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
-                        if s_udah == "SHIFT 2" and shf_jam not in ["SHIFT 1", "SHIFT 3"]: continue
-                        if s_udah == "SHIFT 3" and shf_jam != "SHIFT 2": continue
-
-                    is_match = (k['posisi'] == shf_role)
-                    if k['tipe'] == "Part-Full":
-                        if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
-                    else:
-                        if len(active_shifts) >= 1: continue
-                    
-                    potential.append({'k': k, 'match': is_match})
-
-                if potential:
-                    random.shuffle(potential)
-                    potential = sorted(potential, key=lambda x: x['match'], reverse=True)
-                    p = potential[0]
-                    nm_fix = p['k']['nama']
-                    storage[day_name][slot_key].append(nm_fix)
-                    weekly_counter[nm_fix] += 1
-                    if len(get_active_shifts(nm_fix, day_name)) == 2:
-                        double_day_count[nm_fix] += 1
-
-    # --- 3. SIMPAN HASIL ---
-    final_table = []
-    for shf_jam, shf_role in base_roles:
-        slot_key = f"{shf_jam} - {shf_role}"
-        max_r = max([len(storage[d][slot_key]) for d in day_names])
-        for r in range(max(1, max_r)):
-            row = {"SHIFT - ROLE": slot_key}
-            for d in day_names:
-                names = storage[d][slot_key]
-                row[d] = names[r] if r < len(names) else ""
-            final_table.append(row)
-
-    st.session_state.res_df = pd.DataFrame(final_table)
-    st.session_state.summary_shift = weekly_counter
-    st.rerun()
-
-# --- TAMPILAN OUTPUT DENGAN STATUS OK/KURANG ---
-if 'res_df' in st.session_state:
-    st.divider()
-    col_v1, col_v2 = st.columns([5, 2])
-    with col_v1:
-        st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
-        st.dataframe(st.session_state.res_df.style.applymap(lambda v: 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 0.1px solid #444;' if v else ''), use_container_width=True, height=800, hide_index=True)
-
-    with col_v2:
-        st.markdown("### 📈 REALISASI")
-        sum_data = []
-        
-        # Ambil ulang data karyawan buat dapet kolom 'tipe'
-        df_staff_master = pd.read_sql_query("SELECT nama, tipe FROM karyawan", conn)
-        
-        for _, k in df_staff_master.iterrows():
-            n = k['nama']
-            t = st.session_state.summary_shift.get(n, 0)
-            
-            if t > 0:
-                # HITUNG ULANG DISINI BIAR GAK KEYERROR
-                target = 9 if k['tipe'] == "Part-Full" else 6
-                status = "✅ OK" if t >= target else "⚠️ KURANG"
-                
-                sum_data.append({
-                    "NAMA": n, 
-                    "SHIFT": int(t), 
-                    "STATUS": status
-                })
-        
-        if sum_data:
-            st.table(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False))
+                    """, unsafe_allow_html=True)
+                with cc2:
+                    if st.button("🗑️", key=f"del_staff_{i}", use_container_width=True):
+                        conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
+                        conn.commit()
+                        st.rerun()
         else:
-            st.info("Belum ada data realisasi.")
+            st.info("Belum ada data tim di database.") 
+
+    st.divider()
+
+    # --- 2. PLOT LIBUR (MODEL KARTU) ---
+    st.subheader("🚫 2. Plot Libur & Monitoring")
+    col_l1, col_l2 = st.columns([1, 2])
+
+    with col_l1:
+        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+        with st.form("form_libur_komplit", clear_on_submit=True):
+            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
+            tgl_off = st.date_input("Tanggal Off")
+            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
+            if st.form_submit_button("SUBMIT OFF"):
+                if target:
+                    conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
+                    conn.commit()
+                    st.rerun()
+
+    with col_l2:
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
+        if not df_off_view.empty:
+            for i, row in df_off_view.iterrows():
+                m1, m2 = st.columns([6, 1])
+                with m1:
+                    st.markdown(f"""
+                        <div class="custom-card" style="border-left-color: #FF4B4B;">
+                            <div>
+                                <div class="card-text">{row['nama']}</div>
+                                <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with m2:
+                    if st.button("🗑️", key=f"del_libur_{i}", use_container_width=True):
+                        conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
+                        conn.commit()
+                        st.rerun()
+        else:
+            st.info("Belum ada data pengajuan libur.")
+
+    st.divider()
+
+    # --- 1. PASTIKAN TABEL ADA DULU ---
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS plot_shift3 (
+            nama TEXT,
+            tanggal TEXT,
+            posisi TEXT,
+            tipe TEXT
+        )
+    ''')
+    conn.commit()
+
+    # --- 2. BARU BOLEH READ DATA ---
+    try:
+        df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
+    except Exception:
+        df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
+
+    # --- 3. TAMPILAN INPUT ---
+    st.subheader("🌙 2. Plotting Manual Shift 3")
+
+    df_karyawan = pd.read_sql_query("SELECT nama, tipe, posisi FROM karyawan", conn)
+    karyawan_options = df_karyawan['nama'].tolist()
+
+    col_in1, col_in2 = st.columns(2)
+
+    with col_in1:
+        nama_s3 = st.selectbox("Pilih Nama Tim", karyawan_options, key="s3_name_input")
+        tgl_s3 = st.date_input("Tanggal Masuk Shift 3", datetime.now(), key="s3_date_input")
+
+    with col_in2:
+        if not df_karyawan.empty:
+            selected_data = df_karyawan[df_karyawan['nama'] == nama_s3].iloc[0]
+            st.info(f"Posisi: {selected_data['posisi']} | Tipe: {selected_data['tipe']}")
+
+    if st.button("SUBMIT PLOT SHIFT 3", use_container_width=True):
+        # Cek duplikat biar gak double input
+        check = conn.execute("SELECT * FROM plot_shift3 WHERE nama=? AND tanggal=?", 
+                             (nama_s3, tgl_s3.strftime('%Y-%m-%d'))).fetchone()
+        
+        if not check:
+            conn.execute("INSERT INTO plot_shift3 (nama, tanggal, posisi, tipe) VALUES (?, ?, ?, ?)", 
+                         (nama_s3, tgl_s3.strftime('%Y-%m-%d'), selected_data['posisi'], selected_data['tipe']))
+            conn.commit()
+            st.success(f"✅ {nama_s3} Masuk Plot Shift 3!")
+            st.rerun()
+        else:
+            st.warning("Nama ini sudah terdaftar di tanggal tersebut!")
+
+    # --- 4. LIST MONITORING ---
+    st.divider()
+    st.markdown("### 📋 LIST MONITORING SHIFT 3")
+
+    if not df_monitor_s3.empty:
+        for index, row in df_monitor_s3.iterrows():
+            lc1, lc2, lc3 = st.columns([3, 1, 0.5])
+            with lc1:
+                st.markdown(f"""
+                    <div style="background-color: #1a1c27; padding: 10px; border-radius: 5px; border-left: 5px solid #00FF00; margin-bottom: 5px;">
+                        <span style="color: #FFFFFF; font-weight: bold;">{row['nama']}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+            with lc2:
+                st.markdown(f"<div style='padding: 10px; color: #888;'>{row['tanggal']}</div>", unsafe_allow_html=True)
+            with lc3:
+                if st.button("🗑️", key=f"del_s3_{index}"):
+                    conn.execute("DELETE FROM plot_shift3 WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
+                    conn.commit()
+                    st.rerun()
+    else:
+        st.info("Belum ada tim yang di-plot ke Shift 3.")
+
+    # --- 3. GENERATOR JADWAL JEZ SBY ---
+    st.subheader("3. Generator Jadwal Otomatis")
+
+    start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v_final_final")
+    df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
+    karyawan_list = df_staff_master.to_dict('records')
+
+    if st.button("▶️ RUN JADWAL", use_container_width=True):
+        dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+        day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
+        df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
+        df_manual_s3 = pd.read_sql_query("SELECT * FROM plot_shift3", conn)
+
+        base_roles = [
+            ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
+            ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
+            ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV"),
+            ("SHIFT 3", "SO") 
+        ]
+
+        storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
+        weekly_counter = {k['nama']: 0 for k in karyawan_list}
+        double_day_count = {k['nama']: 0 for k in karyawan_list}
+        for k in karyawan_list: k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
+
+        def get_active_shifts(nama, day_name):
+            return [slot.split(" - ")[0] for slot in storage[day_name] if any(nama in n for n in storage[day_name][slot])]
+
+        # --- 1. PLOT MANUAL SHIFT 3 ---
+        for day_name, tgl_str in zip(day_names, dates_real):
+            names_manual = df_manual_s3[df_manual_s3['tanggal'] == tgl_str]['nama'].tolist()
+            if names_manual:
+                storage[day_name]["SHIFT 3 - SO"] = names_manual
+                for nm in names_manual:
+                    if nm in weekly_counter: weekly_counter[nm] += 1
+
+        # --- 2. ENGINE GENERATOR ---
+        for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
+            for day_name in day_names:
+                tgl_ini = dates_real[day_names.index(day_name)]
+                
+                def count_s0(day):
+                    count = 0
+                    for k_slot in storage[day]:
+                        if "SHIFT 0" in k_slot:
+                            count += len(storage[day][k_slot])
+                    return count
+
+                for shf_jam, shf_role in base_roles:
+                    if shf_jam == "SHIFT 3": continue 
+                    
+                    if shf_jam == "SHIFT 0" and count_s0(day_name) >= 2:
+                        continue
+
+                    slot_key = f"{shf_jam} - {shf_role}"
+                    if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
+                    if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
+
+                    potential = []
+                    for k in karyawan_list:
+                        nama = k['nama']
+                        if weekly_counter[nama] >= k['target_fix']: continue
+                        if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+                        
+                        active_shifts = get_active_shifts(nama, day_name)
+                        if shf_jam in active_shifts: continue 
+                        
+                        if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
+                        if k['posisi'] == "SPV" and shf_role != "SPV": continue
+                        
+                        if k['tipe'] == "Part-Full" and active_shifts:
+                            s_udah = active_shifts[0]
+                            if s_udah == "SHIFT 0" and shf_jam != "SHIFT 1": continue
+                            if s_udah == "SHIFT 1" and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
+                            if s_udah == "SHIFT 2" and shf_jam not in ["SHIFT 1", "SHIFT 3"]: continue
+                            if s_udah == "SHIFT 3" and shf_jam != "SHIFT 2": continue
+
+                        is_match = (k['posisi'] == shf_role)
+                        if k['tipe'] == "Part-Full":
+                            if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
+                        else:
+                            if len(active_shifts) >= 1: continue
+                        
+                        potential.append({'k': k, 'match': is_match})
+
+                    if potential:
+                        random.shuffle(potential)
+                        potential = sorted(potential, key=lambda x: x['match'], reverse=True)
+                        p = potential[0]
+                        nm_fix = p['k']['nama']
+                        storage[day_name][slot_key].append(nm_fix)
+                        weekly_counter[nm_fix] += 1
+                        if len(get_active_shifts(nm_fix, day_name)) == 2:
+                            double_day_count[nm_fix] += 1
+
+        # --- 3. SIMPAN HASIL ---
+        final_table = []
+        for shf_jam, shf_role in base_roles:
+            slot_key = f"{shf_jam} - {shf_role}"
+            max_r = max([len(storage[d][slot_key]) for d in day_names])
+            for r in range(max(1, max_r)):
+                row = {"SHIFT - ROLE": slot_key}
+                for d in day_names:
+                    names = storage[d][slot_key]
+                    row[d] = names[r] if r < len(names) else ""
+                final_table.append(row)
+
+        st.session_state.res_df = pd.DataFrame(final_table)
+        st.session_state.summary_shift = weekly_counter
+        st.rerun()
+
+    if 'res_df' in st.session_state:
+        st.divider()
+        col_v1, col_v2 = st.columns([5, 2])
+        with col_v1:
+            st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
+            st.dataframe(st.session_state.res_df.style.applymap(lambda v: 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 0.1px solid #444;' if v else ''), use_container_width=True, height=800, hide_index=True)
+
+        with col_v2:
+            st.markdown("### 📈 REALISASI")
+            sum_data = []
+            df_staff_master = pd.read_sql_query("SELECT nama, tipe FROM karyawan", conn)
+            
+            for _, k in df_staff_master.iterrows():
+                n = k['nama']
+                t = st.session_state.summary_shift.get(n, 0)
+                if t > 0:
+                    target = 9 if k['tipe'] == "Part-Full" else 6
+                    status = "✅ OK" if t >= target else "⚠️ KURANG"
+                    sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": status})
+            
+            if sum_data:
+                st.table(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False))
+            else:
+                st.info("Belum ada data realisasi.")
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
