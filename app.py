@@ -2864,50 +2864,34 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
-            # Judul dengan class CSS baru (Hitam)
+            # Judul Detail Database (Warna Gelap/Hitam)
             st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
             
-            # Ambil data terbaru
-            conn = sqlite3.connect('inventory_logistik.db')
-            df_editor = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-            conn.close()
+            # Header Tabel Manual biar Rapi
+            h_cols = st.columns([0.5, 1.5, 1.5, 2, 1.5, 2])
+            with h_cols[0]: st.write("**ACT**")
+            with h_cols[1]: st.write("**CABANG**")
+            with h_cols[2]: st.write("**SKU**")
+            with h_cols[3]: st.write("**ARTICLE**")
+            with h_cols[4]: st.write("**KATEGORI**")
+            with h_cols[5]: st.write("**WAKTU**")
+            st.markdown("---")
 
-            if filter_view != "SEMUA":
-                df_editor = df_editor[df_editor['CABANG'] == filter_view]
-            
-            df_editor = df_editor.sort_values('rowid', ascending=False)
-
-            # TAMPILAN TABEL INTERAKTIF (Bisa Hapus Langsung)
-            # User cukup pilih baris (klik angka di kiri) lalu tekan tombol "Delete" di keyboard
-            # Atau centang kolom delete yang kita buat manual
-            event = st.data_editor(
-                df_editor,
-                column_config={
-                    "rowid": None, # Sembunyikan ID sistem
-                    "TANGGAL_INPUT": st.column_config.TextColumn("WAKTU", width="medium"),
-                    "SKU": st.column_config.TextColumn("SKU", width="small"),
-                },
-                use_container_width=True,
-                hide_index=False,
-                num_rows="dynamic", # INI BIAR BISA HAPUS BARIS
-                key="database_editor"
-            )
-
-            # Logic jika ada data yang dihapus di editor
-            if len(event) < len(df_editor):
-                # Cari baris mana yang ilang
-                current_ids = set(event['rowid'].tolist())
-                old_ids = set(df_editor['rowid'].tolist())
-                deleted_ids = old_ids - current_ids
-                
-                for rid in deleted_ids:
-                    delete_reject_item(rid)
-                
-                st.success("Data berhasil dihapus!")
-                st.rerun()
-
-            if st.button("🚨 KOSONGKAN SEMUA DATA", use_container_width=True):
-                clear_all_data()
+            # Isi Data dengan Tombol Sampah yang Jelas
+            df_view = df_final.sort_values('rowid', ascending=False)
+            for index, row in df_view.iterrows():
+                cols = st.columns([0.5, 1.5, 1.5, 2, 1.5, 2])
+                with cols[0]:
+                    # Tombol Sampah Merah per baris
+                    if st.button("🗑️", key=f"del_btn_{row['rowid']}"):
+                        delete_reject_item(row['rowid'])
+                        st.rerun()
+                with cols[1]: st.write(f"`{row['CABANG']}`")
+                with cols[2]: st.write(row['SKU'])
+                with cols[3]: st.write(row['ARTICLE_NAME'])
+                with cols[4]: st.write(row['KATEGORI'])
+                with cols[5]: st.write(f"<small>{row['TANGGAL_INPUT']}</small>", unsafe_allow_html=True)
+                st.markdown('<div style="margin: -10px 0;"></div>', unsafe_allow_html=True) # Rapatkan baris
 
 import streamlit as st
 import sqlite3
