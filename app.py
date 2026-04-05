@@ -2842,28 +2842,57 @@ def menu_reject_defect():
                     st.rerun()
 
     with tab_analytics:
-        conn = sqlite3.connect('inventory_logistik.db')
-        df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-        conn.close()
+    conn = sqlite3.connect('inventory_logistik.db')
+    # Ambil semua data dulu untuk referensi filter
+    df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
+    conn.close()
 
-        if not df_chart.empty:
-            filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
-            df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
+    if not df_chart.empty:
+        # 1. Selector Cabang
+        filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
+        
+        # 2. Filter Data berdasarkan pilihan
+        df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
 
-            total_val = len(df_final)
-            defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', na=False)])
-            reject_cnt = len(df_final[df_final['KATEGORI'].str.contains('R', na=False)])
+        # 3. Hitung Metrik dari df_final (Hasil Filter)
+        total_val = len(df_final)
+        # Cek kolom KATEGORI untuk 'D' (Defect) atau 'R' (Reject)
+        defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', case=False, na=False)])
+        reject_cnt = len(df_final[df_final['KATEGORI'].str.contains('R', case=False, na=False)])
 
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                st.metric("TOTAL ITEMS", f"{total_val} SKU", f"+{total_val} Total")
-            with m2:
-                p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
-                st.metric("📦 DEFECT (D)", f"{defect_cnt}", f"{p_d:.1f}%")
-            with m3:
-                p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-                st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
+        # 4. Render Dashboard Box (Custom HTML biar cakep)
+        m1, m2, m3 = st.columns(3)
+        
+        with m1:
+            st.markdown(f"""
+                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;">
+                    <p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p>
+                    <h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2>
+                    <span style="color: #28a745; font-size: 0.8rem; background: rgba(40,167,69,0.1); padding: 2px 8px; border-radius: 10px;">↑ +{total_val} Total</span>
+                </div>
+            """, unsafe_allow_html=True)
 
+        with m2:
+            p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
+            st.markdown(f"""
+                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;">
+                    <p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p>
+                    <h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2>
+                    <span style="color: #28a745; font-size: 0.8rem;">↑ {p_d:.1f}%</span>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with m3:
+            p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
+            st.markdown(f"""
+                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;">
+                    <p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p>
+                    <h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2>
+                    <span style="color: #28a745; font-size: 0.8rem;">↑ {p_r:.1f}%</span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
             # Judul dengan class CSS baru (Hitam)
             st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
             
