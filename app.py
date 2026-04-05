@@ -2841,81 +2841,81 @@ def menu_reject_defect():
                     st.success("✅ Import Berhasil!")
                     st.rerun()
 
-    with tab_analytics:
-    conn = sqlite3.connect('inventory_logistik.db')
-    df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-    conn.close()
+        with tab_analytics:
+        conn = sqlite3.connect('inventory_logistik.db')
+        df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
+        conn.close()
 
-    if not df_chart.empty:
-        # 1. Selector Cabang
-        filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
-        
-        # 2. Filter Data
-        df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
+        if not df_chart.empty:
+            # 1. Selector Cabang
+            filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
+            
+            # 2. Filter Data
+            df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
 
-        # 3. Hitung Metrik Berdasarkan kolom BIN (Cari kata DEFECT/REJECT)
-        total_val = len(df_final)
-        defect_cnt = len(df_final[df_final['BIN'].str.contains('DEFECT', case=False, na=False)])
-        reject_cnt = len(df_final[df_final['BIN'].str.contains('REJECT', case=False, na=False)])
+            # 3. Hitung Metrik Berdasarkan kolom BIN (Cari kata DEFECT/REJECT)
+            total_val = len(df_final)
+            defect_cnt = len(df_final[df_final['BIN'].str.contains('DEFECT', case=False, na=False)])
+            reject_cnt = len(df_final[df_final['BIN'].str.contains('REJECT', case=False, na=False)])
 
-        # --- LOGIKA DELTA (PANAH OTOMATIS) ---
-        # Simpan nilai sebelumnya untuk dibandingkan
-        if 'last_total' not in st.session_state:
+            # --- LOGIKA DELTA (PANAH OTOMATIS) ---
+            # Simpan nilai sebelumnya untuk dibandingkan
+            if 'last_total' not in st.session_state:
+                st.session_state.last_total = total_val
+                st.session_state.last_defect = defect_cnt
+                st.session_state.last_reject = reject_cnt
+
+            # Fungsi penentu arah panah dan warna
+            def get_delta(current, last):
+                if current > last:
+                    return "↑", "#28a745", "rgba(40,167,69,0.1)" # Hijau naik
+                elif current < last:
+                    return "↓", "#FF4B4B", "rgba(255,75,75,0.1)" # Merah turun
+                else:
+                    return "•", "#888", "rgba(136,136,136,0.1)"  # Abu-abu tetap
+
+            arr_t, col_t, bg_t = get_delta(total_val, st.session_state.last_total)
+            arr_d, col_d, bg_d = get_delta(defect_cnt, st.session_state.last_defect)
+            arr_r, col_r, bg_r = get_delta(reject_cnt, st.session_state.last_reject)
+
+            # Update nilai terakhir untuk session berikutnya
             st.session_state.last_total = total_val
             st.session_state.last_defect = defect_cnt
             st.session_state.last_reject = reject_cnt
 
-        # Fungsi penentu arah panah dan warna
-        def get_delta(current, last):
-            if current > last:
-                return "↑", "#28a745", "rgba(40,167,69,0.1)" # Hijau naik
-            elif current < last:
-                return "↓", "#FF4B4B", "rgba(255,75,75,0.1)" # Merah turun
-            else:
-                return "•", "#888", "rgba(136,136,136,0.1)"  # Abu-abu tetap
+            # 4. Tampilan Box Metrik (Dark Style)
+            m1, m2, m3 = st.columns(3)
+            
+            with m1:
+                st.markdown(f"""
+                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;">
+                        <p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p>
+                        <h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2>
+                        <span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Total</span>
+                    </div>
+                """, unsafe_allow_html=True)
 
-        arr_t, col_t, bg_t = get_delta(total_val, st.session_state.last_total)
-        arr_d, col_d, bg_d = get_delta(defect_cnt, st.session_state.last_defect)
-        arr_r, col_r, bg_r = get_delta(reject_cnt, st.session_state.last_reject)
+            with m2:
+                p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
+                st.markdown(f"""
+                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;">
+                        <p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p>
+                        <h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2>
+                        <span style="color: {col_d}; font-size: 0.8rem; background: {bg_d}; padding: 2px 8px; border-radius: 10px;">{arr_d} {p_d:.1f}%</span>
+                    </div>
+                """, unsafe_allow_html=True)
 
-        # Update nilai terakhir untuk session berikutnya
-        st.session_state.last_total = total_val
-        st.session_state.last_defect = defect_cnt
-        st.session_state.last_reject = reject_cnt
-
-        # 4. Tampilan Box Metrik (Dark Style)
-        m1, m2, m3 = st.columns(3)
-        
-        with m1:
-            st.markdown(f"""
-                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;">
-                    <p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p>
-                    <h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2>
-                    <span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Total</span>
-                </div>
-            """, unsafe_allow_html=True)
-
-        with m2:
-            p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
-            st.markdown(f"""
-                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;">
-                    <p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p>
-                    <h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2>
-                    <span style="color: {col_d}; font-size: 0.8rem; background: {bg_d}; padding: 2px 8px; border-radius: 10px;">{arr_d} {p_d:.1f}%</span>
-                </div>
-            """, unsafe_allow_html=True)
-
-        with m3:
-            p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-            st.markdown(f"""
-                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;">
-                    <p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p>
-                    <h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2>
-                    <span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span>
-                </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
+            with m3:
+                p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
+                st.markdown(f"""
+                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;">
+                        <p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p>
+                        <h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2>
+                        <span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
             # Judul dengan class CSS baru (Hitam)
             st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
             
