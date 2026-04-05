@@ -2504,13 +2504,6 @@ def init_db():
             tanggal TEXT
         )
     ''')
-    
-    # Auto-patch kolom jika kurang
-    c.execute("PRAGMA table_info(retur_out)")
-    existing_cols = [row[1] for row in c.fetchall()]
-    if 'tanggal' not in existing_cols:
-        c.execute("ALTER TABLE retur_out ADD COLUMN tanggal TEXT")
-            
     conn.commit()
     return conn
 
@@ -2532,15 +2525,20 @@ def menu_retur_out_system():
 
     st.markdown('<div class="hero-header"><p class="hero-text">RETUR OUT - DATABASE</p></div>', unsafe_allow_html=True)
 
-    # Buka koneksi di awal
     conn = init_db()
 
-    # --- 3. UPLOAD LOGIC ---
+    # --- 3. UPLOAD LOGIC (FIXED) ---
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
         try:
-            df_up = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
+            # Baca file
+            if uploaded_file.name.endswith('.xlsx'):
+                df_up = pd.read_excel(uploaded_file)
+            else:
+                df_up = pd.read_csv(uploaded_file)
+            
+            # Bersihkan header
             df_up.columns = [str(c).strip() for c in df_up.columns]
             
             mapping = {
@@ -2550,32 +2548,31 @@ def menu_retur_out_system():
                 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
             }
 
-            if all(k in df_up.columns for k in mapping.keys()):
+            # Validasi kolom
+            missing_cols = [k for k in mapping.keys() if k not in df_up.columns]
+            
+            if not missing_cols:
                 df_to_save = df_up[list(mapping.keys())].rename(columns=mapping)
                 df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
-                # Cek session state biar gak double upload
-                f_key = f"up_{uploaded_file.name}_{len(df_up)}"
-                if st.session_state.get('last_file_key') != f_key:
-                    # SIMPAN DATA
-                    df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                    conn.commit() # <<< WAJIB BIAR KETULIS KE FILE
-                    
-                    st.session_state['last_file_key'] = f_key
-                    st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris!")
-                    st.rerun() # Refresh biar tabel muncul
+                # LANGSUNG SIMPAN TANPA CEK KEY RIBET
+                df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
+                conn.commit()
+                
+                st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris!")
+                # Reset uploader biar gak looping
+                st.cache_resource.clear()
+                st.rerun()
             else:
-                st.error("Gagal: Kolom di file gak cocok sama mapping!")
+                st.error(f"Kolom kurang: {', '.join(missing_cols)}")
         except Exception as e:
-            st.error(f"Error Upload: {e}")
+            st.error(f"Gagal Simpan: {e}")
 
     # --- 4. DATA VIEW ---
     try:
-        # Load ulang data terbaru setelah commit
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
         if not df_db.empty:
-            # Row Metrics
             m1, m2, m3 = st.columns(3)
             m1.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL SKU</div><div class="metric-value">{df_db["sku"].nunique()}</div></div>', unsafe_allow_html=True)
             m2.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL QTY</div><div class="metric-value">{int(df_db["qty_system"].sum()):,}</div></div>', unsafe_allow_html=True)
@@ -2589,23 +2586,18 @@ def menu_retur_out_system():
                 df_display = df_display[df_display['sku'].astype(str).str.contains(search, case=False) | 
                                         df_display['item_name'].str.contains(search, case=False)]
 
-            # Tampilkan Tabel (Hapus ID & rowid dari view)
             cols_view = [c for c in df_display.columns if c not in ['rowid', 'id']]
             event = st.dataframe(df_display[cols_view], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
 
-            # Hapus
             if event.selection.rows:
                 idx = event.selection.rows[0]
                 t_id = df_display.iloc[idx]['rowid']
-                if st.button(f"🗑️ HAPUS SKU {df_display.iloc[idx]['sku']}", type="primary", use_container_width=True):
+                if st.button(f"🗑️ HAPUS PERMANEN", type="primary"):
                     conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(t_id),))
                     conn.commit()
                     st.rerun()
         else:
             st.info("💡 Database masih kosong.")
-
-    except Exception as e:
-        st.error(f"Gagal memuat data: {e}")
     finally:
         conn.close()
 
