@@ -2490,21 +2490,30 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
-# --- 1. INITIALIZE DATABASE ---
+# --- 1. INITIALIZE DATABASE (WITH AUTO-PATCH) ---
 def init_db():
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
+    
+    # 1. Buat tabel dasar dulu
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
             item_name TEXT, variant TEXT, sub_kategori TEXT,
             harga_beli REAL, harga_jual REAL, 
-            qty_system INTEGER, qty_so INTEGER,
-            tanggal TEXT
+            qty_system INTEGER, qty_so INTEGER
         )
     ''')
-    conn.commit()
+    
+    # 2. FIX GAGAL SIMPAN: Cek & Paksa tambah kolom 'tanggal' kalau belum ada
+    c.execute("PRAGMA table_info(retur_out)")
+    existing_cols = [row[1] for row in c.fetchall()]
+    
+    if 'tanggal' not in existing_cols:
+        c.execute("ALTER TABLE retur_out ADD COLUMN tanggal TEXT")
+        conn.commit()
+            
     return conn
 
 def menu_retur_out_system():
@@ -2527,18 +2536,16 @@ def menu_retur_out_system():
 
     conn = init_db()
 
-    # --- 3. UPLOAD LOGIC (FIXED) ---
+    # --- 3. UPLOAD LOGIC ---
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
         try:
-            # Baca file
             if uploaded_file.name.endswith('.xlsx'):
                 df_up = pd.read_excel(uploaded_file)
             else:
                 df_up = pd.read_csv(uploaded_file)
             
-            # Bersihkan header
             df_up.columns = [str(c).strip() for c in df_up.columns]
             
             mapping = {
@@ -2548,30 +2555,24 @@ def menu_retur_out_system():
                 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
             }
 
-            # Validasi kolom
-            missing_cols = [k for k in mapping.keys() if k not in df_up.columns]
-            
-            if not missing_cols:
+            if all(k in df_up.columns for k in mapping.keys()):
                 df_to_save = df_up[list(mapping.keys())].rename(columns=mapping)
                 df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
-                # LANGSUNG SIMPAN TANPA CEK KEY RIBET
+                # Simpan ke DB
                 df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
                 conn.commit()
                 
                 st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris!")
-                # Reset uploader biar gak looping
-                st.cache_resource.clear()
                 st.rerun()
             else:
-                st.error(f"Kolom kurang: {', '.join(missing_cols)}")
+                st.error("Kolom file gak cocok!")
         except Exception as e:
             st.error(f"Gagal Simpan: {e}")
 
-    # --- 4. DATA VIEW ---
+    # --- 4. VIEW DATA ---
     try:
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
-
         if not df_db.empty:
             m1, m2, m3 = st.columns(3)
             m1.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL SKU</div><div class="metric-value">{df_db["sku"].nunique()}</div></div>', unsafe_allow_html=True)
@@ -2579,8 +2580,8 @@ def menu_retur_out_system():
             m3.markdown(f'<div class="metric-card"><div class="metric-label">TOTAL VALUE</div><div class="metric-value">Rp {(df_db["qty_system"] * df_db["harga_beli"]).sum():,.0f}</div></div>', unsafe_allow_html=True)
 
             st.markdown("### 📜 Database History")
-            search = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Ketik di sini...")
-
+            search = st.text_input("🔍 Cari...", placeholder="Ketik SKU/Nama...")
+            
             df_display = df_db.sort_values(by='rowid', ascending=False)
             if search:
                 df_display = df_display[df_display['sku'].astype(str).str.contains(search, case=False) | 
