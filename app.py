@@ -2490,24 +2490,14 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
-# --- 1. INITIALIZE DATABASE (NUCLEAR OPTION) ---
+# --- 1. INITIALIZE DATABASE (PAKAI TABEL BARU: retur_out_v2) ---
 def init_db():
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
     
-    # Cek struktur tabel yang sekarang
-    c.execute("PRAGMA table_info(retur_out)")
-    existing_cols = [row[1] for row in c.fetchall()]
-    
-    # Kalau tabelnya udah ada TAPI cacat (gak ada kolom tanggal), KITA HANCURKAN!
-    if existing_cols and 'tanggal' not in existing_cols:
-        c.execute("DROP TABLE retur_out")
-        conn.commit()
-        # st.toast("Tabel lama dihapus, membuat ulang dengan format baru...") # Opsional
-        
-    # Buat ulang tabel dengan format yang udah PASTI bener dari awal
+    # Kita tinggalin tabel lama, bikin tabel V2 yang strukturnya udah sempurna
     c.execute('''
-        CREATE TABLE IF NOT EXISTS retur_out (
+        CREATE TABLE IF NOT EXISTS retur_out_v2 (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
             item_name TEXT, variant TEXT, sub_kategori TEXT,
@@ -2517,7 +2507,6 @@ def init_db():
         )
     ''')
     conn.commit()
-            
     return conn
 
 def menu_retur_out_system():
@@ -2567,21 +2556,21 @@ def menu_retur_out_system():
                 # Tambahkan data tanggal saat ini
                 df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
-                # Simpan ke DB
-                df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
+                # SIMPAN KE TABEL V2
+                df_to_save.to_sql('retur_out_v2', conn, if_exists='append', index=False)
                 conn.commit()
                 
-                st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris!")
+                st.success(f"✅ Berhasil Simpan {len(df_to_save)} Baris ke Database!")
                 st.rerun()
             else:
-                st.error("Kolom file tidak sesuai!")
+                st.error("Kolom file tidak sesuai dengan sistem!")
         except Exception as e:
             st.error(f"Gagal Simpan: {e}")
 
     # --- 4. VIEW DATA ---
     try:
-        # Load data termasuk rowid untuk keperluan hapus
-        df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
+        # PANGGIL DARI TABEL V2
+        df_db = pd.read_sql("SELECT rowid, * FROM retur_out_v2", conn)
         
         if not df_db.empty:
             # Layout Metrik
@@ -2602,16 +2591,18 @@ def menu_retur_out_system():
             cols_view = [c for c in df_display.columns if c not in ['rowid', 'id']]
             event = st.dataframe(df_display[cols_view], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
 
-            # Logika Hapus Baris
+            # Logika Hapus Baris (HAPUS DI TABEL V2)
             if event.selection.rows:
                 idx = event.selection.rows[0]
                 t_id = df_display.iloc[idx]['rowid']
                 if st.button(f"🗑️ HAPUS SKU {df_display.iloc[idx]['sku']}", type="primary", use_container_width=True):
-                    conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(t_id),))
+                    conn.execute("DELETE FROM retur_out_v2 WHERE rowid = ?", (int(t_id),))
                     conn.commit()
                     st.rerun()
         else:
-            st.info("💡 Database masih kosong.")
+            st.info("💡 Database masih kosong. Silakan upload file.")
+    except Exception as e:
+        st.error(f"Error load data: {e}")
     finally:
         conn.close()
 
