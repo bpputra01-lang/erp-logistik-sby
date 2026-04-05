@@ -2671,58 +2671,56 @@ def menu_retur_out_system():
                 ''', unsafe_allow_html=True)
 
             # --- 4. DATA VIEW & SEARCH ---
-    try:
-        df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
-
-        if not df_db.empty:
-            st.markdown("### 📜 Database History")
-            
-            # 1. SEARCH BAR
-            search_query = st.text_input("Search Bar", placeholder="Ketik SKU atau Nama...", key="minimal_search")
-
-            # 2. AMBIL DATA & URUTKAN
-            df_display = df_db.sort_values(by='rowid', ascending=False)
-
-            # 3. LOGIKA FILTER
-            if search_query:
-                df_display = df_display[
-                    df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
-                    df_display['item_name'].str.contains(search_query, case=False, na=False)
-                ]
-
-            # TAMPILKAN SEMUA DATA
-            df_final = df_display 
-            cols_to_show = [col for col in df_final.columns if col != 'rowid']
-
-            # 4. TAMPILAN TABEL
-            event = st.dataframe(
-                df_final[cols_to_show],
-                use_container_width=True, 
-                hide_index=True, 
-                on_select="rerun", 
-                selection_mode="single-row" 
-            )
-
-            # 5. LOGIKA HAPUS (Hanya muncul kalau baris di-klik)
-            if event.selection.rows:
-                row_idx = event.selection.rows[0]
-                target_id = df_final.iloc[row_idx]['rowid']
-                target_sku = df_final.iloc[row_idx]['sku']
-                
-                st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
-                if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                    conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
-                    conn.commit()
-                    st.success("Data berhasil dihapus!")
-                    st.rerun()
+        st.markdown("### 📜 Database History")
         
-        else:
-            # INI POSISI ELSE YANG BENER (Sejajar sama if not df_db.empty)
-            st.info("Database masih kosong. Silakan upload file di atas.")
+        # SEARCH BAR (Filter by SKU atau Item Name)
+        search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang di sini...")
+
+        # Ambil data asli
+        df_display = df_db.sort_values(by='rowid', ascending=False)
+
+        # LOGIKA FILTER
+        # --- LOGIKA FILTER ---
+        if search_query:
+            df_display = df_display[
+                df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
+                df_display['item_name'].str.contains(search_query, case=False, na=False)
+            ]
+
+        # TAMPILKAN SEMUA DATA (TANPA BATAS 500)
+        df_final = df_display # <--- Cukup hapus .head(500) nya cok
+
+        # Kolom yang mau ditampilkan (Sembunyikan rowid)
+        cols_to_show = [col for col in df_final.columns if col != 'rowid']
+
+        event = st.dataframe(
+            df_final[cols_to_show],
+            use_container_width=True, 
+            hide_index=True, 
+            on_select="rerun", 
+            selection_mode="single-row" 
+        )
+
+        # LOGIKA HAPUS (Tetap pakai df_final agar index match)
+        if event.selection.rows:
+            row_idx = event.selection.rows[0]
+            target_id = df_final.iloc[row_idx]['rowid']
+            target_sku = df_final.iloc[row_idx]['sku']
+            
+            st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
+            if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
+                conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
+                conn.commit()
+                st.success("Data berhasil dihapus!")
+                st.rerun()
+                else:
+                    # Muncul hanya jika query return nol baris
+                    st.info("Database masih kosong. Silakan upload file di atas.")
 
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Database: {e}")
     finally:
+        # Menutup koneksi dengan aman
         conn.close()
 
 
