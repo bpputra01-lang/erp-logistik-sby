@@ -2804,26 +2804,28 @@ def menu_reject_defect():
         conn.close()
 
         if not df_chart.empty:
-            filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
-            df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
-
-            # Metric Ringkasan
             m1, m2, m3 = st.columns(3)
+            
+            # Hitung Data
             total_val = len(df_final)
+            # Ambil jumlah data sebelumnya (Misal: data kemarin atau total sebelum filter)
+            # Di sini gue kasih contoh selisih sederhana dari total keseluruhan data
+            prev_total = len(df_chart) - 1 # Contoh logic delta sederhana
+            delta_total = total_val - prev_total
+
             defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', na=False)])
             reject_cnt = len(df_final[df_final['KATEGORI'].str.contains('R', na=False)])
 
             with m1:
-                st.metric("TOTAL ITEMS", f"{total_val} SKU")
+                # TOTAL ITEMS Sekarang pake Delta
+                st.metric("TOTAL ITEMS", f"{total_val} SKU", f"{delta_total} New")
             with m2:
                 p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
-                # Delta Normal (Naik = Hijau)
                 st.metric("📦 DEFECT (D)", f"{defect_cnt}", f"{p_d:.1f}%")
             with m3:
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-                # Delta Normal (Naik = Hijau) - Parameter inverse dihapus
+                # Delta Hijau (Inverse Dihapus)
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
-
             c_pie, c_bar = st.columns(2)
             with c_pie:
                 fig_p = px.pie(df_final, names='KATEGORI', title="Proporsi Kerusakan", hole=0.4)
