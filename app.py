@@ -2897,29 +2897,31 @@ def menu_reject_defect():
                 hide_index=True, # Indeks angka kiri dimatikan biar bersih
                 key="database_editor"
             )
-# ... (kode data_editor Lu yang sudah bener)
-
-            # LOGIC HAPUS SINGLE BERSIH
+# ... (lanjutan setelah st.data_editor)
             rows_to_delete = event[event['HAPUS'] == True]
 
             if not rows_to_delete.empty:
-                # Kita pake container biar ada jarak dan warnanya nggak nyampur
-                with st.container():
-                    st.markdown(f"""
-                        <div style="background-color: #ffe6e6; padding: 10px; border-radius: 5px; border-left: 5px solid #ff4b4b; margin: 10px 0;">
-                            <span style="color: #ff4b4b; font-weight: bold;">⚠️ SIAP DIHAPUS: {len(rows_to_delete)} Item terpilih.</span>
+                # PANEL KONTROL HAPUS (Satu Baris Kompak)
+                st.markdown(f"""
+                    <div style="background-color: #fff2f2; padding: 15px; border-radius: 10px; border: 1px solid #ffcccc; margin-top: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #d32f2f; font-weight: bold; font-size: 16px;">
+                                ⚠️ SIAP DIHAPUS: {len(rows_to_delete)} Item terpilih
+                            </span>
                         </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Tombol konfirmasi dibuat ramping di kolom kanan
-                    _, col_confirm = st.columns([2, 1])
-                    with col_confirm:
-                        if st.button("🚮 KONFIRMASI HAPUS", type="primary", use_container_width=True):
-                            for rid in rows_to_delete['rowid']:
-                                delete_reject_item(rid)
-                            st.rerun()
+                    </div>
+                """, unsafe_allow_html=True)
 
-            st.write("") # Spacer
+                # Tombol Konfirmasi ditaruh pas di bawah panel biar presisi
+                col_info, col_btn = st.columns([2, 1])
+                with col_btn:
+                    if st.button("KONFIRMASI HAPUS SEKARANG", type="primary", use_container_width=True):
+                        for rid in rows_to_delete['rowid']:
+                            delete_reject_item(rid)
+                        st.rerun()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            # Tombol reset total tetep di bawah sebagai opsi terakhir
             if st.button("🚮 KOSONGKAN SEMUA DATABASE", use_container_width=True):
                 clear_all_data()
                 st.rerun()
