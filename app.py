@@ -2632,8 +2632,7 @@ def process_stock_comparison(file1, file2):
         raise e
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # --- 1. CSS & HEADER (TIDAK DIUBAH SAMA SEKALI) ---
-    st.markdown("""
+   st.markdown("""
         <style>
         .hero-header {
             background-color: #007BFF;
@@ -2646,53 +2645,63 @@ def menu_reject_defect():
             font-size: 20px;
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
-        [data-testid="stMain"] div[data-testid="stTextInput"] > div > div, 
-        [data-testid="stMain"] div[data-testid="stTextArea"] > div > div,
-        [data-testid="stMain"] div[data-testid="stSelectbox"] > div > div {
+        
+        /* FIX JUDUL: Warna Putih, Font Tebal */
+        [data-testid="stMetricLabel"] > div, 
+        [data-testid="stWidgetLabel"] p, 
+        label p {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* BOX INPUT: Navy Gelap */
+        div[data-testid="stTextInput"] > div > div, 
+        div[data-testid="stTextArea"] > div > div,
+        div[data-testid="stSelectbox"] > div > div {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
-            border-radius: 6px !important;
+            border-radius: 8px !important;
         }
-        [data-testid="stMain"] input, [data-testid="stMain"] textarea, [data-testid="stMain"] div[data-baseweb="select"] > div { 
+        
+        /* TEKS DI DALAM INPUT: Putih */
+        input, textarea, div[data-baseweb="select"] > div { 
             color: white !important; 
         }
-        [data-testid="stMain"] button[kind="primaryFormSubmit"] {
+
+        /* BUTTON SINGLE (BIRU) */
+        button[kind="primaryFormSubmit"] {
             background-color: #007BFF !important;
             color: white !important;
             border-radius: 8px !important;
             width: 100% !important;
             height: 48px !important;
             font-weight: bold !important;
-            border: none !important;
-            box-shadow: 0 0 10px rgba(0, 123, 255, 0.4) !important;
         }
-        [data-testid="stMain"] div.stDownloadButton > button,
-        [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]) {
+
+        /* BUTTON GOLD (DOWNLOAD) */
+        div.stDownloadButton > button {
             background-color: #D4AF37 !important;
             color: white !important;
             border: 1px solid #FFD700 !important;
             border-radius: 8px !important;
             font-weight: bold !important;
-            box-shadow: 0 0 10px rgba(212, 175, 55, 0.4) !important;
-            transition: all 0.3s ease-in-out !important;
         }
-        [data-testid="stMain"] div.stDownloadButton > button:hover,
-        [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]):hover {
-            background-color: #FFD700 !important;
-            color: #1a1c27 !important;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
-        }
-        [data-testid="stMain"] [data-testid="stMetric"] {
+
+        /* METRIC BOX */
+        [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             padding: 20px !important;
             border-radius: 12px !important;
-            min-height: 160px !important; 
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: center !important;
         }
-        [data-testid="stMetricValue"] > div { font-size: 32px !important; font-weight: 900 !important; color: #FFD700 !important; }
+
+        /* ANGKA METRIC: Tetap Kuning Sesuai Permintaan */
+        [data-testid="stMetricValue"] > div { 
+            color: #FFD700 !important; 
+            font-weight: 900 !important; 
+            font-size: 32px !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
