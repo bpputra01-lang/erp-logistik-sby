@@ -2627,12 +2627,13 @@ def menu_retur_out_system():
             df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
             
             # Main Dataframe Editor
+            # CARI BAGIAN INI DI KODE LU:
             event = st.dataframe(
                 df_display, 
                 use_container_width=True, 
                 hide_index=True, 
                 on_select="rerun", 
-                selection_mode="single"
+                selection_mode="single-row"  # <--- GANTI "single" JADI "single-row"
             )
 
             # --- 5. ACTIONS (DELETE & RESET) ---
