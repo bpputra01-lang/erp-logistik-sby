@@ -2904,14 +2904,14 @@ def menu_reject_defect():
 
             if not rows_to_delete.empty:
                 st.warning(f"Terdeteksi {len(rows_to_delete)} item siap dihapus.")
-                if st.button("🗑️ KONFIRMASI HAPUS ITEM TERPILIH", type="primary", use_container_width=True):
+                if st.button("🚮 KONFIRMASI HAPUS ITEM TERPILIH", type="primary", use_container_width=True):
                     for rid in rows_to_delete['rowid']:
                         delete_reject_item(rid)
                     st.success("Item berhasil dibuang!")
                     st.rerun()
 
             st.markdown("---")
-            if st.button("🚨 KOSONGKAN SEMUA DATA", use_container_width=True):
+            if st.button("🚮 KOSONGKAN SEMUA DATA", use_container_width=True):
                 clear_all_data()
                 st.rerun()
 import streamlit as st
