@@ -5581,36 +5581,26 @@ if menu == "Logistic Schedule":
                                     double_day_count[nama] += 1
                                 if len(storage[day_name][slot_key]) >= limit: break
 
-        # --- 3. GENERATOR ANTI-TABRAK ---
+# --- 3. GENERATOR ANTI-TABRAK ---
 st.subheader("🚀 3. Generator Jadwal Otomatis")
-start_date = st.date_input("Pilih Hari Senin (Awal Minggu)", datetime.now())
 
-# AMBIL DATA MASTER DI LUAR BUTTON (Biar gak NameError)
+# TAMBAHKAN KEY UNIK DI SINI (Baris 5586)
+start_date = st.date_input(
+    "Pilih Hari Senin (Awal Minggu)", 
+    datetime.now(), 
+    key="log_schedule_date_picker" # <-- Ini obat DuplicateElementId
+)
+
+# AMBIL DATA MASTER (Di luar button biar gak NameError)
 df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
-karyawan_list = df_staff_master.to_dict('records') # <--- Variabel ini sekarang aman
+karyawan_list = df_staff_master.to_dict('records')
 
-if st.button("▶️RUN GENERATOR JADWAL", use_container_width=True):
-    dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-    day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
-    
-    df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
-
-    base_roles = [
-        ("SHIFT 3", "LOG-ADMIN"), ("SHIFT 3", "LOG-LOADER"), ("SHIFT 3", "LOG-STORE"), ("SHIFT 3", "WF-PICKER"),
-        ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
-        ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
-        ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV")
-    ]
-
-    # Set target shift
-    for k in karyawan_list:
-        k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
-    
-    # ... (LOGIC STEP 1, 2, 3 LU DISINI) ...
-    # (Pake logic Step 3 yang "Smart Spread" biar gak numpuk di Shift 0 lagi)
-
-    # --- SIMPAN HASIL KE SESSION STATE ---
-    # (Bagian Step 4 simpan ke st.session_state.res_df dan st.session_state.summary_shift)
+if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True, key="btn_run_gen_logistik"):
+    # ... (Logika Generator Lu: Step 1, 2, dan Step 3 yang Smart Spread) ...
+    # Pastikan di akhir generator lu simpan ke session_state:
+    # st.session_state.res_df = pd.DataFrame(final_table)
+    # st.session_state.summary_shift = real_summary
+    st.rerun()
 
 # --- TAMPILAN OUTPUT (DI LUAR BUTTON) ---
 if 'res_df' in st.session_state:
@@ -5618,21 +5608,27 @@ if 'res_df' in st.session_state:
     col_v1, col_v2 = st.columns([5, 2])
     
     with col_v1:
-        # (Tabel Jadwal Lu)
-        st.dataframe(st.session_state.res_df, use_container_width=True)
+        st.dataframe(st.session_state.res_df, use_container_width=True, height=600)
         
     with col_v2:
         st.markdown("### 📈 REALISASI (9/6)")
-        # Sekarang baris ini GAK BAKAL ERROR karena karyawan_list sudah didefinisikan di atas
-        summary_data = [
-            {
-                "NAMA": k, 
-                "SHIFT": v, 
-                "STATUS": "✅ OK" if v >= (9 if next(item['tipe'] for item in karyawan_list if item['nama'] == k) == "Part-Full" else 6) else "⚠️ KURANG"
-            } 
-            for k, v in st.session_state.summary_shift.items()
-        ]
-        st.table(pd.DataFrame(summary_data).sort_values(by="SHIFT", ascending=False))
+        try:
+            summary_data = []
+            for name, total_shift in st.session_state.summary_shift.items():
+                # Cari tipe karyawan dari list master
+                tipe = next((item['tipe'] for item in karyawan_list if item['nama'] == name), "Full-Time")
+                target = 9 if tipe == "Part-Full" else 6
+                
+                summary_data.append({
+                    "NAMA": name,
+                    "SHIFT": total_shift,
+                    "STATUS": "✅ OK" if total_shift >= target else "⚠️ KURANG"
+                })
+            
+            if summary_data:
+                st.table(pd.DataFrame(summary_data).sort_values(by="SHIFT", ascending=False))
+        except Exception as e:
+            st.error(f"Gagal memuat summary: {e}")
 
         # --- STEP 4: TABLE GENERATION (FIXED SUMMARY LOGIC) ---
         final_table = []
