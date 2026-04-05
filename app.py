@@ -2632,7 +2632,6 @@ def process_stock_comparison(file1, file2):
         raise e
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    # --- 1. CSS & HEADER (TIDAK DIUBAH SAMA SEKALI) ---
     st.markdown("""
         <style>
         .hero-header {
@@ -2646,6 +2645,14 @@ def menu_reject_defect():
             font-size: 20px;
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
+        
+        /* --- FIX TEKS JUDUL YANG ITEM --- */
+        [data-testid="stMetricLabel"] > div, 
+        [data-testid="stWidgetLabel"] p, 
+        label p {
+            color: #E0E0E0 !important; 
+        }
+
         [data-testid="stMain"] div[data-testid="stTextInput"] > div > div, 
         [data-testid="stMain"] div[data-testid="stTextArea"] > div > div,
         [data-testid="stMain"] div[data-testid="stSelectbox"] > div > div {
@@ -2676,12 +2683,6 @@ def menu_reject_defect():
             box-shadow: 0 0 10px rgba(212, 175, 55, 0.4) !important;
             transition: all 0.3s ease-in-out !important;
         }
-        [data-testid="stMain"] div.stDownloadButton > button:hover,
-        [data-testid="stMain"] div.stButton > button:not([kind="primaryFormSubmit"]):hover {
-            background-color: #FFD700 !important;
-            color: #1a1c27 !important;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
-        }
         [data-testid="stMain"] [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
@@ -2693,6 +2694,11 @@ def menu_reject_defect():
             justify-content: center !important;
         }
         [data-testid="stMetricValue"] > div { font-size: 32px !important; font-weight: 900 !important; color: #FFD700 !important; }
+        
+        /* Delta Color (Persentase) biar tetep nyala */
+        [data-testid="stMetricDelta"] > div {
+            font-weight: bold !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
