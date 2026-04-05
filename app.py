@@ -5581,26 +5581,40 @@ if menu == "Logistic Schedule":
                                     double_day_count[nama] += 1
                                 if len(storage[day_name][slot_key]) >= limit: break
 
-        # --- STEP 3: FINAL SAFETY NET (WAJIB 9/6) ---
+        # --- STEP 3: SMART SAFETY NET (FIXED VERSION) ---
+        # Kita urutkan karyawan yang paling kurang jatah shift-nya
         for k in sorted(karyawan_list, key=lambda x: weekly_counter[x['nama']]):
             nama = k['nama']
             if weekly_counter[nama] >= k['target_fix']: continue
+            
             for day_name in day_names:
                 if weekly_counter[nama] >= k['target_fix']: break
                 tgl_ini = dates_real[day_names.index(day_name)]
+                
+                # Cek libur
                 if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                 
+                # Aturan main: Orang ini gak boleh kerja 2x di shift yang sama (misal Shift 1 dua kali)
+                # Dan total per hari max 2 (untuk Part-Full)
                 current_daily = get_daily_count(nama, day_name)
                 if k['tipe'] == "Part-Full":
                     if current_daily >= 2 or (current_daily == 1 and double_day_count[nama] >= 3): continue
                 else:
                     if current_daily >= 1: continue
 
+                # --- DISINI KUNCINYA: Cari slot yang MASIH KOSONG atau MINIM orang ---
                 for shf_jam, shf_role in base_roles:
-                    if k['posisi'] == "LOG-STORE" and shf_role != "LOG-STORE": continue
-                    if shf_jam == "SHIFT 3" or shf_role == "SPV": continue
-                    
                     slot_key = f"{shf_jam} - {shf_role}"
+                    
+                    # 1. Jangan masuk ke slot SPV atau Shift 3 (kalau bukan role-nya)
+                    if shf_role == "SPV" and k['posisi'] != "SPV": continue
+                    
+                    # 2. CEK LIMIT: Kalau slot ini udah ada 1 atau 2 orang, JANGAN MASUK DULU
+                    # Biar sistem nyari slot lain yang bener-bener masih 0 orang (kosong)
+                    if len(storage[day_name][slot_key]) >= 1: 
+                        continue 
+                    
+                    # 3. Cek apakah dia udah ada di jam yang sama (biar gak bentrok jam kerja)
                     if not any(nama in storage[day_name][sk] for sk in storage[day_name] if sk.startswith(shf_jam)):
                         storage[day_name][slot_key].append(nama + " (FIX)")
                         weekly_counter[nama] += 1
