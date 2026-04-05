@@ -3820,49 +3820,30 @@ def init_db():
 
 init_db()
 
-def menu_retur_out_system():
-    # --- HEADER BLOCK (BIRU TUA SESUAI GAMBAR) ---
-    st.markdown("""
-        <div style="
-            background-color: #1d3e7a; 
-            padding: 15px; 
-            border-radius: 15px; 
-            box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 25px;
-            display: flex;
-            align-items: center;
-        ">
-            <h2 style="
-                color: white !important; 
-                font-family: 'Source Sans Pro', sans-serif; 
-                font-weight: 800; 
-                font-size: 1.8rem;
-                margin: 0;
-                padding: 0;
-                letter-spacing: 0.05em;
-            ">
-                📋 BULK RETUR OUT SYSTEM
-            </h2>
-        </div>
-    """, unsafe_allow_html=True)
+def menu_retur_out_uploader():
+    st.markdown("### 📤 BULK RETUR OUT SYSTEM (SQLITE)")
 
     # 1. FILE UPLOADER
     uploaded_file = st.file_uploader("Upload File Retur (Excel atau CSV)", type=['xlsx', 'csv'])
 
     if uploaded_file:
+        # Load Data berdasarkan tipe file
         if uploaded_file.name.endswith('.csv'):
             df_upload = pd.read_csv(uploaded_file)
         else:
             df_upload = pd.read_excel(uploaded_file)
 
+        # Standarisasi Nama Kolom (Memastikan match dengan DB)
+        # Asumsi kolom di file: SKU, ARTICLE_NAME, QTY, PRICE_BUY
         df_upload.columns = [c.upper() for c in df_upload.columns]
-        required_cols = ['SKU', 'ARTICLE_NAME', 'QTY', 'PRICE_BUY']
         
+        required_cols = ['SKU', 'ARTICLE_NAME', 'QTY', 'PRICE_BUY']
         if all(col in df_upload.columns for col in required_cols):
             
-            # --- 2. METRICS BOX ---
+            # --- 2. METRICS BOX (AUTO CALC FROM UPLOAD) ---
             total_qty = df_upload['QTY'].sum()
             total_sku = df_upload['SKU'].nunique()
+            # COGS = Qty * Harga Beli
             total_cogs = (df_upload['QTY'] * df_upload['PRICE_BUY']).sum()
 
             m1, m2, m3 = st.columns(3)
@@ -3870,35 +3851,36 @@ def menu_retur_out_system():
             m2.metric("UNIQUE SKU", f"{total_sku:,}")
             m3.metric("TOTAL COGS", f"Rp {total_cogs:,.0f}")
 
-            st.markdown("<br>", unsafe_allow_html=True)
+            st.divider()
 
             # --- 3. PREVIEW & EDIT ---
-            st.markdown('<h4 style="color: #31333F; font-weight: 700;">Preview Data Retur Out</h4>', unsafe_allow_html=True)
-            
+            st.write("🔍 **Preview Data Sebelum Simpan:**")
             edited_df = st.data_editor(
                 df_upload[required_cols], 
                 use_container_width=True, 
                 hide_index=True,
-                num_rows="dynamic",
-                key="editor_retur_out"
+                num_rows="dynamic"
             )
 
-            # --- 4. TOMBOL SIMPAN ---
-            if st.button("💾 SIMPAN KE DATABASE SQLITE", type="primary", use_container_width=True):
+            # --- 4. TOMBOL SIMPAN KE SQLITE ---
+            if st.button("💾 SIMPAN SEMUA KE DATABASE", type="primary", use_container_width=True):
                 try:
                     conn = sqlite3.connect('inventory_logistics.db')
+                    
+                    # Mapping balik ke lowercase untuk SQLite
                     df_to_save = edited_df.copy()
                     df_to_save.columns = ['sku', 'article_name', 'qty', 'price_buy']
                     
+                    # Inject ke database (Fast Append)
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
                     conn.close()
                     
-                    st.success(f"✅ Berhasil! {len(df_to_save)} baris data tersimpan.")
+                    st.success(f"🚀 Berhasil! {len(df_to_save)} baris data telah masuk ke database.")
                     st.balloons()
                 except Exception as e:
-                    st.error(f"Gagal simpan: {e}")
+                    st.error(f"Terjadi kesalahan saat simpan: {e}")
         else:
-            st.warning(f"⚠️ Kolom tidak sesuai. Gunakan: {', '.join(required_cols)}")
+            st.error(f"Kolom file tidak sesuai! Pastikan ada kolom: {required_cols}")
 
 
 with st.sidebar:
@@ -5543,5 +5525,5 @@ elif menu == "Compare Penerimaan RTO":
 elif menu == "Pengajuan Reject/Defect":
     project_approval_reject()
 
-elif menu == "List Retur Out":
-    menu_retur_out_system()
+elif menu == List Retur Out
+    menu_retur_out_uploader()
