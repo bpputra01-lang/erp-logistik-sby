@@ -2665,7 +2665,7 @@ def menu_retur_out_system():
                 selection_mode="single-row" 
             )
 
-            # LOGIKA HAPUS (Hanya muncul kalau ada baris dipilih)
+            # LOGIKA HAPUS (Hanya muncul kalau diklik)
             if event.selection.rows:
                 row_idx = event.selection.rows[0]
                 target_id = df_display.iloc[row_idx]['rowid']
@@ -2677,11 +2677,8 @@ def menu_retur_out_system():
                     conn.commit()
                     st.success("Data berhasil dihapus!")
                     st.rerun()
-            
-            # (Opsional: Tambahin tombol Reset Database di sini kalau mau)
-
         else:
-            # INI BARU BENER: Muncul cuma kalau tabel 'retur_out' emang gak ada datanya
+            # INFO INI HANYA MUNCUL KALAU DATA EMANG NOL
             st.info("Database masih kosong. Silakan upload file di atas.")
 
     except Exception as e:
