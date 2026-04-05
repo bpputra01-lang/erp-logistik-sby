@@ -2864,34 +2864,39 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
-            # Judul Detail Database (Warna Gelap/Hitam)
-            st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
+            st.markdown('<h3 style="color: #31333F; font-weight: 800; margin-top: 30px;">📋 DETAIL DATABASE</h3>', unsafe_allow_html=True)
             
-            # Header Tabel Manual biar Rapi
-            h_cols = st.columns([0.5, 1.5, 1.5, 2, 1.5, 2])
-            with h_cols[0]: st.write("**ACT**")
-            with h_cols[1]: st.write("**CABANG**")
-            with h_cols[2]: st.write("**SKU**")
-            with h_cols[3]: st.write("**ARTICLE**")
-            with h_cols[4]: st.write("**KATEGORI**")
-            with h_cols[5]: st.write("**WAKTU**")
-            st.markdown("---")
-
-            # Isi Data dengan Tombol Sampah yang Jelas
+            # Ambil data
             df_view = df_final.sort_values('rowid', ascending=False)
-            for index, row in df_view.iterrows():
-                cols = st.columns([0.5, 1.5, 1.5, 2, 1.5, 2])
-                with cols[0]:
-                    # Tombol Sampah Merah per baris
-                    if st.button("🗑️", key=f"del_btn_{row['rowid']}"):
-                        delete_reject_item(row['rowid'])
-                        st.rerun()
-                with cols[1]: st.write(f"`{row['CABANG']}`")
-                with cols[2]: st.write(row['SKU'])
-                with cols[3]: st.write(row['ARTICLE_NAME'])
-                with cols[4]: st.write(row['KATEGORI'])
-                with cols[5]: st.write(f"<small>{row['TANGGAL_INPUT']}</small>", unsafe_allow_html=True)
-                st.markdown('<div style="margin: -10px 0;"></div>', unsafe_allow_html=True) # Rapatkan baris
+
+            # Buat Container biar rapi
+            with st.container():
+                # HEADER TABEL
+                h_cols = st.columns([0.6, 1.5, 1.5, 2.5, 2, 2.5])
+                headers = ["ACT", "CABANG", "SKU", "NAMA BARANG", "KATEGORI", "WAKTU"]
+                for col, text in zip(h_cols, headers):
+                    col.markdown(f"**{text}**")
+                st.divider()
+
+                # ISI DATA
+                for _, row in df_view.iterrows():
+                    r_cols = st.columns([0.6, 1.5, 1.5, 2.5, 2, 2.5])
+                    
+                    # Tombol Hapus (Kolom ACT)
+                    with r_cols[0]:
+                        if st.button("🗑️", key=f"del_{row['rowid']}", help="Hapus baris ini"):
+                            delete_reject_item(row['rowid'])
+                            st.rerun()
+                    
+                    # Data Lainnya (Kolom sisa)
+                    # Pake st.text biar font-nya konsisten dan gak kegedean
+                    r_cols[1].text(row['CABANG'])
+                    r_cols[2].text(row['SKU'])
+                    r_cols[3].text(row['ARTICLE_NAME'])
+                    r_cols[4].text(row['KATEGORI'])
+                    r_cols[5].markdown(f"<code style='font-size: 11px;'>{row['TANGGAL_INPUT']}</code>", unsafe_allow_html=True)
+                    
+                    st.divider() # Garis tipis antar baris
 
 import streamlit as st
 import sqlite3
