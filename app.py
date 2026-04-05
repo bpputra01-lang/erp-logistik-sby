@@ -2877,37 +2877,43 @@ def menu_reject_defect():
             
             df_editor = df_editor.sort_values('rowid', ascending=False)
 
-            # TAMPILAN TABEL INTERAKTIF (Bisa Hapus Langsung)
-            # User cukup pilih baris (klik angka di kiri) lalu tekan tombol "Delete" di keyboard
-            # Atau centang kolom delete yang kita buat manual
+            # TAMBAHKAN KOLOM 'HAPUS' (Default False)
+            df_editor['HAPUS'] = False
+
+            # TAMPILAN TABEL INTERAKTIF
             event = st.data_editor(
                 df_editor,
                 column_config={
-                    "rowid": None, # Sembunyikan ID sistem
+                    "rowid": None, # Sembunyikan ID
+                    "HAPUS": st.column_config.CheckboxColumn(
+                        "🗑️",
+                        help="Centang untuk hapus",
+                        default=False,
+                    ),
                     "TANGGAL_INPUT": st.column_config.TextColumn("WAKTU", width="medium"),
                     "SKU": st.column_config.TextColumn("SKU", width="small"),
                 },
                 use_container_width=True,
-                hide_index=False,
-                num_rows="dynamic", # INI BIAR BISA HAPUS BARIS
+                hide_index=True, # Indeks angka kiri dimatikan biar bersih
                 key="database_editor"
             )
 
-            # Logic jika ada data yang dihapus di editor
-            if len(event) < len(df_editor):
-                # Cari baris mana yang ilang
-                current_ids = set(event['rowid'].tolist())
-                old_ids = set(df_editor['rowid'].tolist())
-                deleted_ids = old_ids - current_ids
-                
-                for rid in deleted_ids:
-                    delete_reject_item(rid)
-                
-                st.success("Data berhasil dihapus!")
-                st.rerun()
+            # LOGIC HAPUS SINGLE/MULTIPLE BERDASARKAN CENTANG
+            # Cari baris mana yang kolom 'HAPUS'-nya jadi True
+            rows_to_delete = event[event['HAPUS'] == True]
 
+            if not rows_to_delete.empty:
+                st.warning(f"Terdeteksi {len(rows_to_delete)} item siap dihapus.")
+                if st.button("🗑️ KONFIRMASI HAPUS ITEM TERPILIH", type="primary", use_container_width=True):
+                    for rid in rows_to_delete['rowid']:
+                        delete_reject_item(rid)
+                    st.success("Item berhasil dibuang!")
+                    st.rerun()
+
+            st.markdown("---")
             if st.button("🚨 KOSONGKAN SEMUA DATA", use_container_width=True):
                 clear_all_data()
+                st.rerun()
 import streamlit as st
 import sqlite3
 import pandas as pd
