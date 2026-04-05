@@ -2844,6 +2844,73 @@ def menu_reject_defect():
     
     init_db()
 
+    # --- TAMBAHAN FITUR: SISTEM TAB ---
+    tab_entry, tab_analytics = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
+
+    with tab_entry:
+        # --- FORM INPUT DENGAN PILIHAN 3 CABANG ---
+        with st.form("form_reject", clear_on_submit=True):
+            # CABANG BARU: SURABAYA, SIDOARJO, SEMARANG
+            cabang_input = st.selectbox("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                bin_awal = st.text_input("BIN AWAL")
+                bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
+                sku = st.text_input("SKU")
+                article = st.text_input("NAMA BARANG")
+            with col2:
+                size = st.text_input("SIZE")
+                kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
+                keterangan = st.text_area("DETAIL KERUSAKAN")
+
+            btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST")
+
+        # --- LOGIC SIMPAN DATA (CABANG TERMASUK) ---
+        if btn_submit and sku:
+            import datetime as dt_logic
+            jam = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
+            new_data = pd.DataFrame([{
+                'CABANG': cabang_input, 
+                'BIN_AWAL': bin_awal, 
+                'BIN': bin_val, 
+                'SKU': sku, 
+                'ARTICLE_NAME': article, 
+                'SIZE': size, 
+                'KATEGORI': kategori, 
+                'KETERANGAN': keterangan, 
+                'TANGGAL_INPUT': jam
+            }])
+            # Fungsi save_data lu panggil di sini
+            save_data(new_data)
+            st.success(f"✅ SKU {sku} [{cabang_input}] Berhasil Disimpan!")
+            st.rerun()
+
+    with tab_analytics:
+        # --- DASHBOARD LOGIC ---
+        import sqlite3
+        conn = sqlite3.connect('inventory_logistik.db')
+        df_view = pd.read_sql_query("SELECT * FROM reject_list", conn)
+        conn.close()
+
+        if not df_view.empty:
+            # Filter Cabang untuk View
+            filter_view = st.selectbox("FILTER TAMPILAN CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"])
+            df_final = df_view if filter_view == "SEMUA" else df_view[df_view['CABANG'] == filter_view]
+
+            # Metric Display (Menggunakan CSS Metric Box Lu yang Rata)
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("TOTAL ITEMS", f"{len(df_final)} SKU")
+            m2.metric("SBY", len(df_view[df_view['CABANG'] == 'SURABAYA']))
+            m3.metric("SDA", len(df_view[df_view['CABANG'] == 'SIDOARJO']))
+            m4.metric("SMG", len(df_view[df_view['CABANG'] == 'SEMARANG']))
+
+            # Tabel Data
+            st.write("### 📋 DETAIL DATABASE")
+            st.dataframe(df_final.sort_values('TANGGAL_INPUT', ascending=False), use_container_width=True)
+        else:
+            st.info("Belum ada data untuk ditampilkan.")
+
 # ==========================================
     # --- 2. FORM INPUT MANUAL (FIX KOLOM) ---
     # ==========================================
