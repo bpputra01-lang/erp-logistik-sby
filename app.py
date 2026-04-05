@@ -2707,24 +2707,24 @@ def menu_reject_defect():
         [data-testid="stMetricDelta"] > div {
             font-weight: bold !important;
         }
-        /* --- CSS METRIC: LAYOUT ASLI, TEBAL, PUTIH, RAPI --- */
+        /* --- CSS METRIC: PUTIH, TEBAL, RAPI --- */
         [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             padding: 20px !important; 
             border-radius: 12px !important;
-            min-height: 150px !important; /* Biar tinggi kotak sama rata semua */
+            min-height: 150px !important; 
         }
 
-        /* Judul Metric: Putih Terang & Tebal */
+        /* Judul Metric: Putih & Tebal (800) */
         [data-testid="stMetricLabel"] > div {
             color: #FFFFFF !important;
-            font-weight: 800 !important; /* Tebal Maksimal */
+            font-weight: 800 !important;
             font-size: 15px !important;
-            opacity: 1 !important; /* Biar gak burem/abu-abu */
+            opacity: 1 !important;
         }
 
-        /* Angka Utama: Putih Bersih (Gak Kuning Lagi) */
+        /* Angka Utama: Putih Bersih */
         [data-testid="stMetricValue"] > div {
             color: #FFFFFF !important; 
             font-weight: 900 !important; 
