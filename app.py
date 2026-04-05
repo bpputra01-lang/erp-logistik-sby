@@ -5458,6 +5458,22 @@ if menu == "Logistic Schedule":
 
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
+    # --- 1. DATABASE TIM ---
+    st.subheader("👤 1. Database & Input Tim")
+    with st.form("form_tim_komplit", clear_on_submit=True): 
+        c1, c2, c3 = st.columns(3)
+        nama_input = c1.text_input("Nama Lengkap")
+        posisi_input = c2.selectbox("Posisi/Role", 
+            ["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
+        tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
+        
+        if st.form_submit_button("💾 SIMPAN TIM"):
+            if nama_input:
+                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper().strip(), posisi_input, tipe_input))
+                conn.commit()
+                st.success("✅ Tim Berhasil Terdaftar!")
+                st.rerun()
+
     # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
 with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
     df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
