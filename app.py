@@ -5332,11 +5332,34 @@ import sqlite3
 from datetime import datetime, timedelta
 import streamlit as st
 
-# Pastikan koneksi DB lu didefinisikan
-# conn = sqlite3.connect('logistic_sby_final.db')
+# --- 1. KONEKSI & AUTO-REPAIR DATABASE ---
+def init_db_logistic():
+    conn = sqlite3.connect('logistic_sby_final.db', check_same_thread=False)
+    c = conn.cursor()
+    # Tabel Karyawan
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS karyawan (
+            nama TEXT, 
+            posisi TEXT, 
+            tipe TEXT
+        )
+    ''')
+    # Tabel Libur Request
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS libur_request (
+            nama TEXT, 
+            tanggal TEXT, 
+            jenis TEXT
+        )
+    ''')
+    conn.commit()
+    return conn
+
+# Panggil di paling atas biar gak error "no such table"
+conn = init_db_logistic()
 
 if menu == "Logistic Schedule":
-    # --- CSS FIX: TEKS PUTIH & BG HITAM PEKAT (WAJIB MENJOROK KE DALAM) ---
+    # --- CSS FIX: TEKS PUTIH & BG HITAM PEKAT ---
     st.markdown("""
         <style>
             .hero-header {
@@ -5350,38 +5373,31 @@ if menu == "Logistic Schedule":
                 font-size: 20px;
             }
             [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-            
-            /* FIX BACKGROUND PUTIH INPUT */
             div[data-testid="stTextInput"] > div > div, 
             div[data-testid="stTextArea"] > div > div {
                 background-color: #1a1c27 !important; 
                 border: 1px solid #3d4156 !important;
                 border-radius: 6px !important;
             }
-            
             input, textarea { 
                 background-color: transparent !important; 
-                border: none !important; 
                 color: white !important; 
                 -webkit-text-fill-color: white !important; 
             }
-
             div.stButton > button {
                 background-color: #007BFF !important;
                 color: white !important;
                 border-radius: 8px !important;
                 width: 100% !important;
-                height: 48px !important;
                 font-weight: bold !important;
             }
             label { color: #E0E0E0 !important; font-weight: 600 !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # Render Header hanya di menu ini
-    st.markdown('<div class="hero-header">📅LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
-    # --- 1. DATABASE TIM (FULL) ---
+    # --- 1. DATABASE TIM ---
     st.subheader("👤 1. Database & Input Tim")
     with st.form("form_tim_komplit", clear_on_submit=True): 
         c1, c2, c3 = st.columns(3)
@@ -5392,17 +5408,16 @@ if menu == "Logistic Schedule":
         
         if st.form_submit_button("💾 SIMPAN TIM"):
             if nama_input:
-                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper(), posisi_input, tipe_input))
+                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper().strip(), posisi_input, tipe_input))
                 conn.commit()
                 st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
-    # --- C. DAFTAR KARYAWAN AKTIF ---
+    # --- DAFTAR KARYAWAN AKTIF ---
     with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
         df_cek = pd.read_sql_query("SELECT nama AS 'NAMA', posisi AS 'ROLE', tipe AS 'TIPE' FROM karyawan", conn)
         
         if not df_cek.empty:
-            # Buat header kolom
             h_col1, h_col2, h_col3, h_col4 = st.columns([3, 2, 2, 1])
             h_col1.write("**NAMA**")
             h_col2.write("**ROLE**")
@@ -5410,20 +5425,54 @@ if menu == "Logistic Schedule":
             h_col4.write("**AKSI**")
             st.markdown("---")
 
-            # Loop isi data
             for i, row in df_cek.iterrows():
                 c1, c2, c3, c4 = st.columns([3, 2, 2, 1])
                 c1.write(row['NAMA'])
                 c2.write(row['ROLE'])
                 c3.write(row['TIPE'])
-                
-                # Tombol hapus spesifik per nama
-                if c4.button("🗑️", key=f"del_{row['NAMA']}_{i}"):
+                if c4.button("🗑️", key=f"del_staff_{i}"):
                     conn.execute("DELETE FROM karyawan WHERE nama = ? AND posisi = ? AND tipe = ?", 
                                  (row['NAMA'], row['ROLE'], row['TIPE']))
                     conn.commit()
-                    st.success(f"Dihapus: {row['NAMA']}")
                     st.rerun()
+        else:
+            st.info("Belum ada data tim.")
+
+    st.divider()
+
+    # --- 2. PLOT LIBUR ---
+    st.subheader("🚫 2. Plot Libur & Monitoring")
+    col_l1, col_l2 = st.columns([1, 2])
+    
+    with col_l1:
+        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+        with st.form("form_libur_komplit", clear_on_submit=True):
+            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
+            tgl_off = st.date_input("Tanggal Off")
+            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH", "TGL MERAH"], horizontal=True)
+            if st.form_submit_button("SUBMIT OFF"):
+                if target:
+                    conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
+                    conn.commit()
+                    st.rerun()
+                else:
+                    st.error("Input Tim dulu!")
+
+    with col_l2:
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
+        if not df_off_view.empty:
+            for i, row in df_off_view.iterrows():
+                m1, m2, m3, m4 = st.columns([3, 3, 2, 1])
+                m1.write(f"**{row['nama']}**")
+                m2.write(row['tanggal'])
+                m3.write(row['jenis'])
+                if m4.button("🗑️", key=f"del_libur_{i}"):
+                    conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
+                    conn.commit()
+                    st.rerun()
+
+    # Lanjut ke bagian Generator Jadwal lu...
+    # (Kode generator lu sudah benar logic-nya, tinggal pastikan query SELECT-nya merujuk ke conn ini)
         else:
             st.info("Belum ada data tim.")
 
