@@ -2651,20 +2651,6 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
-# --- LOGIKA MATCHING (TARUH DISINI SETELAH DF_CHART ADA) ---
-        standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
-        df_non_std = df_chart[~df_chart['KATEGORI'].isin(standard_codes)].copy()
-
-        if not df_non_std.empty:
-            def find_matches(row, full_df):
-                # Cari SKU sama tapi rowid beda (biar gak deteksi diri sendiri)
-                matches = full_df[(full_df['SKU'] == row['SKU']) & (full_df['rowid'] != row['rowid'])]
-                return ", ".join(matches['CABANG'].unique()) if not matches.empty else "TIDAK ADA"
-
-            df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
-            df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
-        else:
-            df_match_result = pd.DataFrame()
 def save_data(df):
     conn = sqlite3.connect('inventory_logistik.db')
     df.to_sql('reject_list', conn, if_exists='append', index=False)
@@ -2859,8 +2845,20 @@ def menu_reject_defect():
         conn = sqlite3.connect('inventory_logistik.db')
         df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
         conn.close()
-
+        standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
         if not df_chart.empty:
+            df_non_std = df_chart[~df_chart['KATEGORI'].isin(standard_codes)].copy()
+            if not df_non_std.empty:
+                def find_matches(row, full_df):
+                    matches = full_df[(full_df['SKU'] == row['SKU']) & (full_df['rowid'] != row['rowid'])]
+                    return ", ".join(matches['CABANG'].unique()) if not matches.empty else "TIDAK ADA"
+                df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
+                df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
+            else:
+                df_match_result = pd.DataFrame()
+        else:
+            df_match_result = pd.DataFrame()
+            if not df_chart.empty:
             # 1. Selector Cabang (Masuk lagi 1 tab dari 'if')
             filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
             
