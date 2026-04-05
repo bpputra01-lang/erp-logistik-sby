@@ -2632,78 +2632,91 @@ def process_stock_comparison(file1, file2):
         raise e
 # 2. UI Menu Reject/Defect List
 def menu_reject_defect():
-    st.markdown("""
-            <style>
-            .hero-header {
-                background-color: #007BFF;
-                color: white;
-                padding: 12px;
-                border-radius: 8px;
-                text-align: center;
-                margin-bottom: 25px;
-                font-weight: bold;
-                font-size: 20px;
-                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
-            }
-            
-            /* FIX JUDUL: Warna Putih, Font Tebal */
-            [data-testid="stMetricLabel"] > div, 
-            [data-testid="stWidgetLabel"] p, 
-            label p {
-                color: #FFFFFF !important;
-                font-weight: 700 !important;
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-            }
+   st.markdown("""
+        <style>
+        .hero-header {
+            background-color: #007BFF;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 20px;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+        
+        /* FIX JUDUL: Warna Putih, Font Tebal */
+        [data-testid="stMetricLabel"] > div, 
+        [data-testid="stWidgetLabel"] p, 
+        label p {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
 
-            /* BOX INPUT: Navy Gelap */
-            div[data-testid="stTextInput"] > div > div, 
-            div[data-testid="stTextArea"] > div > div,
-            div[data-testid="stSelectbox"] > div > div {
-                background-color: #1a1c27 !important;
-                border: 1px solid #3d4156 !important;
-                border-radius: 8px !important;
-            }
-            
-            /* TEKS DI DALAM INPUT: Putih */
-            input, textarea, div[data-baseweb="select"] > div { 
-                color: white !important; 
-            }
+        /* BOX INPUT: Navy Gelap */
+        div[data-testid="stTextInput"] > div > div, 
+        div[data-testid="stTextArea"] > div > div,
+        div[data-testid="stSelectbox"] > div > div {
+            background-color: #1a1c27 !important;
+            border: 1px solid #3d4156 !important;
+            border-radius: 8px !important;
+        }
+        
+        /* TEKS DI DALAM INPUT: Putih */
+        input, textarea, div[data-baseweb="select"] > div { 
+            color: white !important; 
+        }
 
-            /* BUTTON SINGLE (BIRU) */
-            button[kind="primaryFormSubmit"] {
-                background-color: #007BFF !important;
-                color: white !important;
-                border-radius: 8px !important;
-                width: 100% !important;
-                height: 48px !important;
-                font-weight: bold !important;
-            }
+        /* BUTTON SINGLE (BIRU) */
+        button[kind="primaryFormSubmit"] {
+            background-color: #007BFF !important;
+            color: white !important;
+            border-radius: 8px !important;
+            width: 100% !important;
+            height: 48px !important;
+            font-weight: bold !important;
+        }
 
-            /* BUTTON GOLD (DOWNLOAD) */
-            div.stDownloadButton > button {
-                background-color: #D4AF37 !important;
-                color: white !important;
-                border: 1px solid #FFD700 !important;
-                border-radius: 8px !important;
-                font-weight: bold !important;
-            }
+        /* BUTTON GOLD (DOWNLOAD) */
+        div.stDownloadButton > button {
+            background-color: #D4AF37 !important;
+            color: white !important;
+            border: 1px solid #FFD700 !important;
+            border-radius: 8px !important;
+            font-weight: bold !important;
+        }
 
-            /* METRIC BOX */
-            [data-testid="stMetric"] {
-                background-color: #1a1c27 !important;
-                border: 1px solid #3d4156 !important;
-                padding: 20px !important;
-                border-radius: 12px !important;
-            }
+        /* METRIC BOX */
+        [data-testid="stMetric"] {
+            background-color: #1a1c27 !important;
+            border: 1px solid #3d4156 !important;
+            padding: 20px !important;
+            border-radius: 12px !important;
+        }
 
-            /* ANGKA METRIC: Tetap Kuning Sesuai Permintaan */
-            [data-testid="stMetricValue"] > div { 
-                color: #FFD700 !important; 
-                font-weight: 900 !important; 
-                font-size: 32px !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
+        /* ANGKA METRIC: Tetap Kuning Sesuai Permintaan */
+        [data-testid="stMetricValue"] > div { 
+            color: #FFD700 !important; 
+            font-weight: 900 !important; 
+            font-size: 32px !important;
+        }
+        /* --- TAMBAHAN KHUSUS BIAR JUDUL PUTIH & TIDAK ITEM --- */
+        [data-testid="stMetricLabel"] > div, 
+        [data-testid="stWidgetLabel"] p, 
+        label p,
+        .stMarkdown p {
+            color: #FFFFFF !important; /* Paksa jadi Putih Bersih */
+            font-weight: 700 !important; /* Biar lebih tegas teksnya */
+        }
+
+        /* --- FIX WARNA DELTA (PANAH) BIAR HIJAU SAAT NAIK --- */
+        [data-testid="stMetricDelta"] > div {
+            font-weight: bold !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
     
@@ -2775,7 +2788,7 @@ def menu_reject_defect():
             filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
             df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
 
-            # Metric Ringkasan + DELTA KEMBALI
+            # Metric Ringkasan
             m1, m2, m3 = st.columns(3)
             total_val = len(df_final)
             defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', na=False)])
@@ -2785,10 +2798,12 @@ def menu_reject_defect():
                 st.metric("TOTAL ITEMS", f"{total_val} SKU")
             with m2:
                 p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
+                # Delta Normal (Naik = Hijau)
                 st.metric("📦 DEFECT (D)", f"{defect_cnt}", f"{p_d:.1f}%")
             with m3:
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-                st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%", delta_color="inverse")
+                # Delta Normal (Naik = Hijau) - Parameter inverse dihapus
+                st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
             c_pie, c_bar = st.columns(2)
             with c_pie:
