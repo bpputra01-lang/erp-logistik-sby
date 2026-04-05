@@ -2900,31 +2900,25 @@ def menu_reject_defect():
 # ... (lanjutan setelah st.data_editor)
             rows_to_delete = event[event['HAPUS'] == True]
 
-            if not rows_to_delete.empty:
-                # PANEL KONTROL HAPUS (Satu Baris Kompak)
-                st.markdown(f"""
-                    <div style="background-color: #fff2f2; padding: 15px; border-radius: 10px; border: 1px solid #ffcccc; margin-top: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="color: #d32f2f; font-weight: bold; font-size: 16px;">
-                                ⚠️ SIAP DIHAPUS: {len(rows_to_delete)} Item terpilih
-                            </span>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                # Tombol Konfirmasi ditaruh pas di bawah panel biar presisi
-                col_info, col_btn = st.columns([2, 1])
-                with col_btn:
-                    if st.button("KONFIRMASI HAPUS SEKARANG", type="primary", use_container_width=True):
-                        for rid in rows_to_delete['rowid']:
-                            delete_reject_item(rid)
-                        st.rerun()
-
             st.markdown("<br>", unsafe_allow_html=True)
-            # Tombol reset total tetep di bawah sebagai opsi terakhir
-            if st.button("🚮 KOSONGKAN SEMUA DATABASE", use_container_width=True):
-                clear_all_data()
-                st.rerun()
+
+            # --- SMART BUTTON PANEL ---
+            if not rows_to_delete.empty:
+                # Mode 1: Ada yang dicentang (Hapus Selektif)
+                st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
+                if st.button(f"🗑️ HAPUS {len(rows_to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
+                    for rid in rows_to_delete['rowid']:
+                        delete_reject_item(rid)
+                    st.success("Data pilihan berhasil dihapus!")
+                    st.rerun()
+            else:
+                # Mode 2: Gak ada yang dicentang (Hapus Semua)
+                # Pake warna secondary/biasa biar gak gampang kepencet
+                if st.button("🚨 KOSONGKAN SEMUA DATABASE", use_container_width=True):
+                    # Tambahin konfirmasi biar gak nyesel
+                    clear_all_data()
+                    st.success("Seluruh database telah dikosongkan!")
+                    st.rerun()
 import streamlit as st
 import sqlite3
 import pandas as pd
