@@ -4040,6 +4040,8 @@ def change_m3():
     st.session_state.main_menu = st.session_state.m3_key
 def change_m4():
     st.session_state.main_menu = st.session_state.m4_key
+def change_m5():
+    st.session_state.main_menu = st.session_state.m5_key
 
 with st.sidebar:
     # --- KELOMPOK 1: DASHBOARD SUMMARY ---
