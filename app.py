@@ -2889,8 +2889,7 @@ def menu_reject_defect():
                         <span style="color: #28a745; font-size: 0.8rem;">↑ {p_r:.1f}%</span>
                     </div>
                 """, unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
+        
             
         st.markdown("<br>", unsafe_allow_html=True)
             # Judul dengan class CSS baru (Hitam)
