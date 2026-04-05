@@ -2938,6 +2938,8 @@ def menu_reject_defect():
                         <span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span>
                     </div>
                 """, unsafe_allow_html=True)
+               
+            st.markdown("<br>", unsafe_allow_html=True)
     # Tambahkan tab di list tab Lu (misal: tab_input, tab_analytics, tab_match)
 with tab_match:
     st.subheader("🔍 CROSS-CHECK SKU MATCHING")
@@ -2983,8 +2985,7 @@ with tab_match:
             key="match_editor"
         )
     else:
-        st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")           
-            st.markdown("<br>", unsafe_allow_html=True)
+        st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")
             # Judul dengan class CSS baru (Hitam)
             st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
             
