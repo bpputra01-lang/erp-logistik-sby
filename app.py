@@ -2634,6 +2634,7 @@ def process_stock_comparison(file1, file2):
 def menu_reject_defect():
    st.markdown("""
         <style>
+        /* 1. Header Hero - Tetap Biru */
         .hero-header {
             background-color: #007BFF;
             color: white;
@@ -2646,16 +2647,18 @@ def menu_reject_defect():
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
         
-        /* FIX JUDUL: Warna Putih, Font Tebal */
-        [data-testid="stMetricLabel"] > div, 
-        [data-testid="stWidgetLabel"] p, 
-        label p {
+        /* 2. FIX LABEL INPUT: Cuma teks label di atas box input yang putih */
+        div[data-testid="stWidgetLabel"] p {
             color: #FFFFFF !important;
             font-weight: 700 !important;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
 
-        /* BOX INPUT: Navy Gelap */
+        /* 3. FIX JUDUL: Balikin judul H3 dan teks lain ke default (Hitam/Gelap) */
+        h3, .stMarkdown p:not(div[data-testid="stWidgetLabel"] p) {
+            color: inherit !important;
+        }
+
+        /* 4. Box Input (Navy Gelap) */
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
         div[data-testid="stSelectbox"] > div > div {
@@ -2664,12 +2667,12 @@ def menu_reject_defect():
             border-radius: 8px !important;
         }
         
-        /* TEKS DI DALAM INPUT: Putih */
+        /* 5. Teks di dalem input (Putih) */
         input, textarea, div[data-baseweb="select"] > div { 
             color: white !important; 
         }
 
-        /* BUTTON SINGLE (BIRU) */
+        /* 6. Button Style (Primary Biru & Gold) */
         button[kind="primaryFormSubmit"] {
             background-color: #007BFF !important;
             color: white !important;
@@ -2679,7 +2682,6 @@ def menu_reject_defect():
             font-weight: bold !important;
         }
 
-        /* BUTTON GOLD (DOWNLOAD) */
         div.stDownloadButton > button {
             background-color: #D4AF37 !important;
             color: white !important;
@@ -2688,7 +2690,7 @@ def menu_reject_defect():
             font-weight: bold !important;
         }
 
-        /* METRIC BOX */
+        /* 7. Metric Dashboard (Box Navy & Angka Kuning) */
         [data-testid="stMetric"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
@@ -2696,22 +2698,12 @@ def menu_reject_defect():
             border-radius: 12px !important;
         }
 
-        /* ANGKA METRIC: Tetap Kuning Sesuai Permintaan */
         [data-testid="stMetricValue"] > div { 
             color: #FFD700 !important; 
             font-weight: 900 !important; 
-            font-size: 32px !important;
-        }
-        /* --- TAMBAHAN KHUSUS BIAR JUDUL PUTIH & TIDAK ITEM --- */
-        [data-testid="stMetricLabel"] > div, 
-        [data-testid="stWidgetLabel"] p, 
-        label p,
-        .stMarkdown p {
-            color: #FFFFFF !important; /* Paksa jadi Putih Bersih */
-            font-weight: 700 !important; /* Biar lebih tegas teksnya */
         }
 
-        /* --- FIX WARNA DELTA (PANAH) BIAR HIJAU SAAT NAIK --- */
+        /* 8. Fix Delta (Panah Naik = Hijau) */
         [data-testid="stMetricDelta"] > div {
             font-weight: bold !important;
         }
