@@ -2490,34 +2490,33 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
-# --- 1. INITIALIZE DATABASE (DENGAN AUTO-PATCH ALTER) ---
+# --- 1. INITIALIZE DATABASE (NUCLEAR OPTION) ---
 def init_db():
     conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
     c = conn.cursor()
     
-    # Buat tabel dasar jika belum ada
+    # Cek struktur tabel yang sekarang
+    c.execute("PRAGMA table_info(retur_out)")
+    existing_cols = [row[1] for row in c.fetchall()]
+    
+    # Kalau tabelnya udah ada TAPI cacat (gak ada kolom tanggal), KITA HANCURKAN!
+    if existing_cols and 'tanggal' not in existing_cols:
+        c.execute("DROP TABLE retur_out")
+        conn.commit()
+        # st.toast("Tabel lama dihapus, membuat ulang dengan format baru...") # Opsional
+        
+    # Buat ulang tabel dengan format yang udah PASTI bener dari awal
     c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
             item_name TEXT, variant TEXT, sub_kategori TEXT,
             harga_beli REAL, harga_jual REAL, 
-            qty_system INTEGER, qty_so INTEGER
+            qty_system INTEGER, qty_so INTEGER,
+            tanggal TEXT
         )
     ''')
-    
-    # --- LOGIKA ALTER TABLE (WAJIB ADA) ---
-    # Cek struktur kolom yang ada sekarang
-    c.execute("PRAGMA table_info(retur_out)")
-    existing_cols = [row[1] for row in c.fetchall()]
-    
-    # Jika kolom 'tanggal' tidak ditemukan, tambahkan secara manual
-    if 'tanggal' not in existing_cols:
-        try:
-            c.execute("ALTER TABLE retur_out ADD COLUMN tanggal TEXT")
-            conn.commit()
-        except Exception as e:
-            st.error(f"Gagal Update Struktur Database: {e}")
+    conn.commit()
             
     return conn
 
