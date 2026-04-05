@@ -2514,9 +2514,8 @@ def patch_database():
         if col_name not in existing_cols:
             try:
                 c.execute(f"ALTER TABLE retur_out ADD COLUMN {col_name} {col_type}")
-                print(f"Berhasil menambah kolom: {col_name}")
-            except Exception as e:
-                # Jika tabel belum ada, buat tabel baru
+            except Exception:
+                # Jika tabel belum ada sama sekali, buat tabel baru
                 c.execute('''
                     CREATE TABLE IF NOT EXISTS retur_out (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2535,7 +2534,7 @@ def patch_database():
 patch_database()
 
 def menu_retur_out_system():
-    # --- HERO HEADER & CUSTOM METRIC STYLE ---
+    # --- HERO HEADER & CUSTOM METRIC STYLE (GAK ADA YANG DIGANTI) ---
     st.markdown("""
         <style>
             .hero-header {
@@ -2552,7 +2551,7 @@ def menu_retur_out_system():
                 font-size: 1.85rem;
                 margin: 0;
             }
-            /* STYLE METRIC CARD DARK MODE (SESUAI GAMBAR) */
+            /* STYLE METRIC CARD DARK MODE */
             .metric-card {
                 background-color: #1e2130;
                 padding: 20px;
@@ -2590,7 +2589,7 @@ def menu_retur_out_system():
         </div>
     """, unsafe_allow_html=True)
 
-    uploaded_file = st.file_uploader("Upload File Retur (Excel atau CSV)", type=['xlsx', 'csv'])
+    uploaded_file = st.file_uploader("Upload File Retur (Excel atau CSV) - AUTO SAVE ON", type=['xlsx', 'csv'])
 
     if uploaded_file:
         df_upload = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
@@ -2602,61 +2601,61 @@ def menu_retur_out_system():
         ]
         
         if all(col in df_upload.columns for col in required_cols):
+            
+            # --- LOGIKA AUTO-SAVE KE SQLITE ---
+            # Pakai session_state biar nggak double save pas refresh widget
+            save_key = f"auto_saved_{uploaded_file.name}_{len(df_upload)}"
+            if save_key not in st.session_state:
+                try:
+                    conn = sqlite3.connect('inventory_logistics.db')
+                    df_to_save = df_upload[required_cols].copy()
+                    # Mapping kolom ke format database (lowercase)
+                    df_to_save.columns = ['identify', 'bin', 'sku', 'brand', 'item_name', 'variant', 'sub_kategori', 'harga_beli', 'harga_jual', 'qty_system', 'qty_so']
+                    df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
+                    conn.commit()
+                    conn.close()
+                    st.session_state[save_key] = True
+                    st.success(f"🚀 AUTO-SAVE BERHASIL: {len(df_upload)} Baris ditambahkan!")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Gagal Auto-Save: {e}")
+
             # --- KALKULASI DATA ---
             total_sku = df_upload['SKU'].nunique()
             total_qty_system = df_upload['QTY SYSTEM'].sum()
             total_value = (df_upload['QTY SYSTEM'] * df_upload['Harga Beli']).sum()
 
-            # --- TAMPILAN METRIK MODEL DARK ---
+            # --- TAMPILAN METRIK ---
             m1, m2, m3 = st.columns(3)
-            
             with m1:
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
                         <div class="metric-label">🗄️ TOTAL SKU</div>
                         <div class="metric-value">{total_sku:,}</div>
-                        <div class="metric-delta">↑ OVERALL</div>
+                        <div class="metric-delta">↑ SAVED</div>
                     </div>
                 """, unsafe_allow_html=True)
-            
             with m2:
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #10b981;">
                         <div class="metric-label">📦TOTAL QTY</div>
                         <div class="metric-value">{int(total_qty_system)}</div>
-                        <div class="metric-delta">↑ {len(df_upload)} Baris Data</div>
+                        <div class="metric-delta">↑ SUCCESS</div>
                     </div>
                 """, unsafe_allow_html=True)
-                
             with m3:
                 st.markdown(f"""
                     <div class="metric-card" style="border-left: 6px solid #f59e0b;">
                         <div class="metric-label">💰 TOTAL VALUE RETUR</div>
                         <div class="metric-value">Rp {total_value:,.0f}</div>
-                        <div class="metric-delta">↑ Calculated Value</div>
+                        <div class="metric-delta">↑ IN DATABASE</div>
                     </div>
                 """, unsafe_allow_html=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown('<h4 style="color: #31333F; font-weight: 700;">Preview Data Terupload:</h4>', unsafe_allow_html=True)
+            st.data_editor(df_upload[required_cols], use_container_width=True, hide_index=True)
 
-            st.markdown('<h4 style="color: #31333F; font-weight: 700;">Data Ready to Sync:</h4>', unsafe_allow_html=True)
-            edited_df = st.data_editor(df_upload[required_cols], use_container_width=True, hide_index=True, num_rows="dynamic")
-
-            if st.button("💾 SIMPAN KE DATABASE", type="primary", use_container_width=True):
-                conn = None
-                try:
-                    conn = sqlite3.connect('inventory_logistics.db')
-                    df_to_save = edited_df.copy()
-                    df_to_save.columns = ['identify', 'bin', 'sku', 'brand', 'item_name', 'variant', 'sub_kategori', 'harga_beli', 'harga_jual', 'qty_system', 'qty_so']
-                    df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                    conn.commit()
-                    st.success(f"✅Data Berhasil Disimpan ke SQLite!")
-                    st.balloons()
-                    st.rerun() # Refresh biar muncul di tabel history bawah
-                except Exception as e:
-                    st.error(f"Gagal simpan: {e}")
-                finally:
-                    if conn: conn.close()
         else:
             st.warning("⚠️ Kolom tidak sesuai format!")
 
@@ -2666,36 +2665,33 @@ def menu_retur_out_system():
     
     try:
         conn = sqlite3.connect('inventory_logistics.db')
-        # Ambil rowid sebagai kunci unik untuk hapus data
+        # Ambil rowid agar bisa dihapus secara spesifik
         df_history = pd.read_sql('SELECT rowid, * FROM retur_out ORDER BY rowid DESC LIMIT 100', conn)
         conn.close()
         
         if not df_history.empty:
-            # Tampilkan tabel dengan fitur seleksi baris
+            # Tabel utama dengan fitur seleksi
             event = st.dataframe(
                 df_history, 
                 use_container_width=True, 
                 hide_index=True,
                 on_select="rerun",
-                selection_mode="single" # Lu bisa ganti "multi" kalau mau hapus banyak sekaligus
+                selection_mode="single"
             )
 
-            # Ambil index baris yang dipilih
+            # Logika Hapus Baris Terpilih
             selected_rows = event.selection.rows
-            
             if selected_rows:
-                # Ambil nilai rowid dari baris yang dipilih
                 row_idx = selected_rows[0]
                 target_id = df_history.iloc[row_idx]['rowid']
                 target_sku = df_history.iloc[row_idx]['sku']
 
-                st.warning(f"⚠️ Kamu memilih SKU: **{target_sku}** (ID: {target_id})")
+                st.warning(f"⚠️ Kamu memilih SKU: **{target_sku}**")
                 
                 if st.button(f"🗑️ HAPUS BARIS INI", type="primary", use_container_width=True):
                     try:
                         conn = sqlite3.connect('inventory_logistics.db')
                         c = conn.cursor()
-                        # Hapus berdasarkan rowid yang unik
                         c.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
                         conn.commit()
                         conn.close()
@@ -2704,10 +2700,10 @@ def menu_retur_out_system():
                     except Exception as e:
                         st.error(f"Gagal hapus: {e}")
         else:
-            st.info("Belum ada data tersimpan.")
+            st.info("Belum ada data tersimpan di database.")
             
-    except Exception as e:
-        st.info("Database belum siap atau kosong.")
+    except Exception:
+        st.info("Database kosong atau belum terinisialisasi.")
 
 
 def process_justification(df_case, df_tracking, df_po):
