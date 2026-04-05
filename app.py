@@ -2645,39 +2645,43 @@ def menu_retur_out_system():
                         <div class="metric-delta">↑ TOTAL COST</div>
                     </div>
                 ''', unsafe_allow_html=True)
-            # --- TABEL HISTORY (ROWID DISEMBUNYIKAN) ---
-        st.markdown("### 📜 Database History")
+      # --- 4. DATA VIEW & METRICS ---
+    try:
+        df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
-        # Urutkan data berdasarkan rowid terbaru
-        df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
+        # CEK APAKAH DATABASE ADA ISINYA
+        if not df_db.empty:
+            # ... (Bagian Kalkulasi Metrik Lu di sini) ...
 
-        # KUNCI DISINI: Kita list semua kolom KECUALI 'rowid' untuk ditampilkan
-        cols_to_show = [col for col in df_display.columns if col != 'rowid']
+            st.markdown("### 📜 Database History")
+            df_display = df_db.sort_values(by='rowid', ascending=False).head(500)
+            cols_to_show = [col for col in df_display.columns if col != 'rowid']
 
-        event = st.dataframe(
-            df_display[cols_to_show], # Tampilkan hanya kolom yang dipilih
-            use_container_width=True, 
-            hide_index=True, 
-            on_select="rerun", 
-            selection_mode="single-row" 
-        )
+            event = st.dataframe(
+                df_display[cols_to_show],
+                use_container_width=True, 
+                hide_index=True, 
+                on_select="rerun", 
+                selection_mode="single-row" 
+            )
 
-        # --- LOGIKA HAPUS (TETAP PAKAI ROWID DARI DF_DISPLAY) ---
-        # Cek apakah ada baris yang dipilih dari dataframe
-        if event.selection.rows:
-            row_idx = event.selection.rows[0]
+            # LOGIKA HAPUS (Hanya muncul kalau ada baris dipilih)
+            if event.selection.rows:
+                row_idx = event.selection.rows[0]
+                target_id = df_display.iloc[row_idx]['rowid']
+                target_sku = df_display.iloc[row_idx]['sku']
+                
+                st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
+                if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
+                    conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
+                    conn.commit()
+                    st.success("Data berhasil dihapus!")
+                    st.rerun()
             
-            # Kita ambil rowid dari df_display asli (bukan dari yang difilter)
-            target_id = df_display.iloc[row_idx]['rowid']
-            target_sku = df_display.iloc[row_idx]['sku']
-            
-            st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
-            if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
-                conn.commit()
-                st.success("Data berhasil dihapus!")
-                st.rerun()
+            # (Opsional: Tambahin tombol Reset Database di sini kalau mau)
+
         else:
+            # INI BARU BENER: Muncul cuma kalau tabel 'retur_out' emang gak ada datanya
             st.info("Database masih kosong. Silakan upload file di atas.")
 
     except Exception as e:
