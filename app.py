@@ -5360,6 +5360,7 @@ conn = init_db_logistic()
 
 if menu == "Logistic Schedule":
     # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
+    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
     st.markdown("""
         <style>
             /* 1. Header Utama - Efek Gradient Glass */
@@ -5375,6 +5376,16 @@ if menu == "Logistic Schedule":
                 letter-spacing: 0.5px;
                 box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
                 border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            /* 1.5 Sub-Header Stylings (INI YANG BARU) */
+            div[data-testid="stVerticalBlock"] h3 {
+                color: #33AEFF !important;
+                border-left: 5px solid #0062E6;
+                padding-left: 15px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1px;
             }
 
             /* 2. Input Fields - Modern Dark Glass */
@@ -5415,16 +5426,6 @@ if menu == "Logistic Schedule":
                 box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
             }
 
-            div.stButton > button:hover {
-                transform: translateY(-2px) !important;
-                box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4) !important;
-                background: linear-gradient(90deg, #0085FF 0%, #0069d9 100%) !important;
-            }
-
-            div.stButton > button:active {
-                transform: translateY(0px) !important;
-            }
-
             /* 4. Font & Labels - Soft Neutral */
             label { 
                 color: #B0B3B8 !important; 
@@ -5448,7 +5449,7 @@ if menu == "Logistic Schedule":
                 border-radius: 8px;
                 padding: 12px 18px;
                 margin-bottom: 10px;
-                border-left: 5px solid #00FF00; /* Warna Hijau Default */
+                border-left: 5px solid #00FF00;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             }
             .card-text { color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 14px; }
