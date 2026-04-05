@@ -2486,7 +2486,7 @@ def process_scan_out(df_scan, df_history, df_stock):
 import sqlite3
 import pandas as pd
 import streamlit as st
-import datetime
+from datetime import datetime # Fix Import: Biar gak error 'type object has no attribute datetime'
 import pytz
 
 # --- 1. INITIALIZE DATABASE (FISIK & AUTO-PATCH) ---
@@ -2510,7 +2510,7 @@ def init_db():
     c.execute("PRAGMA table_info(retur_out)")
     existing_cols = [row[1] for row in c.fetchall()]
     
-    # Daftar kolom wajib (Termasuk upload_at baru)
+    # Daftar kolom wajib (Termasuk upload_at)
     required_db_cols = {
         'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
         'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
@@ -2526,7 +2526,7 @@ def init_db():
     return conn
 
 def menu_retur_out_system():
-    # --- Set Timezone WIB ---
+    # --- Set Timezone WIB (Asia/Jakarta) ---
     wib = pytz.timezone('Asia/Jakarta')
 
     # --- 2. CSS DASHBOARD PREMIUM ---
@@ -2595,6 +2595,7 @@ def menu_retur_out_system():
     conn = init_db()
 
     # --- 3. UPLOAD & AUTO-SAVE ---
+    st.markdown("### 📥 UPLOAD DATA BARU") # Judul Uploader dimunculkan kembali sesuai request
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_permanent")
     
     if uploaded_file:
@@ -2613,8 +2614,8 @@ def menu_retur_out_system():
                 df_to_save = df_upload[list(required_cols.keys())].copy()
                 df_to_save.rename(columns=required_cols, inplace=True)
                 
-                # TAMBAH TIMESTAMP WIB
-                df_to_save['upload_at'] = datetime.datetime.now(wib).strftime('%Y-%m-%d %H:%M:%S')
+                # TAMBAH TIMESTAMP WIB (Fix pemanggilan datetime)
+                df_to_save['upload_at'] = datetime.now(wib).strftime('%Y-%m-%d %H:%M:%S')
                 
                 file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
                 if st.session_state.get('last_file_key') != file_key:
@@ -2648,7 +2649,7 @@ def menu_retur_out_system():
 
             st.markdown("### 📜 Database History")
             
-            # 3. SEARCH BAR
+            # 3. SEARCH BAR (Gaya Minimalis)
             search_query = st.text_input("Search", placeholder="Ketik SKU atau Nama...", key="minimal_search")
 
             # Urutkan berdasarkan rowid (Terbaru di atas)
@@ -2662,7 +2663,7 @@ def menu_retur_out_system():
                 ]
 
             df_final = df_display
-            cols_to_show = [col for col in df_final.columns if col != 'rowid']
+            cols_to_show = [col for col in df_final.columns if col != 'rowid' and col != 'id']
 
             # 5. TAMPILAN TABEL
             event = st.dataframe(
@@ -2693,7 +2694,6 @@ def menu_retur_out_system():
         st.error(f"Sistem Gagal Memuat Database: {e}")
     finally:
         conn.close()
-
 
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
