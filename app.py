@@ -2698,14 +2698,12 @@ def menu_reject_defect():
 
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
     
-    # Inisialisasi DB
     init_db()
 
-    # --- SISTEM TAB (Baru & Rapi) ---
     tab_entry, tab_analytics = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD"])
 
     with tab_entry:
-        # --- 1. FORM INPUT SINGLE (CABANG & TAB BARU) ---
+        # --- FORM INPUT SINGLE ---
         with st.form("form_reject_new", clear_on_submit=True):
             cabang_input = st.selectbox("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"])
             col1, col2 = st.columns(2)
@@ -2732,8 +2730,13 @@ def menu_reject_defect():
             st.success(f"✅ SKU {sku} [{cabang_input}] Berhasil Disimpan!")
             st.rerun()
 
-        # --- 2. UPLOAD MASSAL ---
-        st.divider()
+        # --- MASS ADJUSTMENT SECTION ---
+        st.markdown("""
+            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;">
+                <h3 style="color: #007BFF; margin: 0; font-size: 18px; font-weight: 900;">📂 MASS ADJUSTMENT - IMPORT EXCEL</h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
         col_dl, col_up = st.columns([1, 2])
         with col_dl:
             template_cols = ['CABANG', 'BIN_AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
@@ -2755,7 +2758,6 @@ def menu_reject_defect():
                         st.rerun()
 
     with tab_analytics:
-        # --- 3. DASHBOARD VISUALISASI ---
         conn = sqlite3.connect('inventory_logistik.db')
         df_chart = pd.read_sql_query("SELECT * FROM reject_list", conn)
         conn.close()
@@ -2764,11 +2766,20 @@ def menu_reject_defect():
             filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
             df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
 
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("TOTAL ITEMS", f"{len(df_final)} SKU")
-            m2.metric("SBY", len(df_chart[df_chart['CABANG'] == 'SURABAYA']))
-            m3.metric("SDA", len(df_chart[df_chart['CABANG'] == 'SIDOARJO']))
-            m4.metric("SMG", len(df_chart[df_chart['CABANG'] == 'SEMARANG']))
+            # Metric Ringkasan + DELTA KEMBALI
+            m1, m2, m3 = st.columns(3)
+            total_val = len(df_final)
+            defect_cnt = len(df_final[df_final['KATEGORI'].str.contains('D', na=False)])
+            reject_cnt = len(df_final[df_final['KATEGORI'].str.contains('R', na=False)])
+
+            with m1:
+                st.metric("TOTAL ITEMS", f"{total_val} SKU")
+            with m2:
+                p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
+                st.metric("📦 DEFECT (D)", f"{defect_cnt}", f"{p_d:.1f}%")
+            with m3:
+                p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
+                st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%", delta_color="inverse")
 
             c_pie, c_bar = st.columns(2)
             with c_pie:
@@ -2787,7 +2798,6 @@ def menu_reject_defect():
                 clear_all_data()
         else:
             st.info("💡 Belum ada data untuk ditampilkan.")
-
 import streamlit as st
 import sqlite3
 import pandas as pd
