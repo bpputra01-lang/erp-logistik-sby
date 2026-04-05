@@ -2526,55 +2526,42 @@ def menu_retur_out_system():
     # --- 2. CSS DASHBOARD PREMIUM (GAYA SURABAYA BRANCH) ---
     st.markdown("""
         <style>
-            .hero-header {
-                background-color: #1d3e7a;
-                padding: 20px 25px;
-                border-radius: 12px;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-                margin-bottom: 30px;
-            }
-            .hero-title {
-                color: white !important;
-                font-family: 'Source Sans Pro', sans-serif;
-                font-weight: 800;
-                font-size: 1.85rem;
-                margin: 0;
-            }
-            .metric-card {
-                background-color: #1e2130;
-                padding: 20px;
-                border-radius: 12px;
-                box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-                width: 100%;
-                text-align: center;
-                margin-bottom: 10px;
-            }
-            .metric-label {
-                color: #9ea0a9;
-                font-size: 0.85rem;
-                font-weight: 700;
-                text-transform: uppercase;
-                margin-bottom: 8px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                gap: 8px;
-            }
-            .metric-value {
-                color: white;
-                font-size: 1.8rem;
-                font-weight: 800;
-                margin-bottom: 5px;
-            }
-            .metric-delta {
-                color: #00ff41;
-                font-size: 0.82rem;
-                font-weight: 700;
-            }
+        .hero-header {
+            background-color: #1d3e7a;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+            border-left: 8px solid #007BFF;
+        }
+        .hero-text {
+            color: white !important;
+            margin: 0 !important;
+            font-size: 24px !important;
+            font-weight: 800 !important;
+            letter-spacing: 1px;
+        }
+        .metric-card {
+            background-color: #1E1E2E;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 2px 2px 12px rgba(0,0,0,0.4);
+            text-align: center;
+            border-bottom: 4px solid #3d4455;
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: #FFFFFF;
+            margin: 5px 0;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #A0A0A0;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
         </style>
-        <div class="hero-header">
-            <h1 class="hero-title">RETUR OUT DATABASE</h1>
-        </div>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header"><p class="hero-text">📊 RETUR OUT - DATABASE SYSTEM</p></div>', unsafe_allow_html=True)
