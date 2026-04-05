@@ -2981,31 +2981,57 @@ def menu_reject_defect():
                     st.success("Seluruh database telah dikosongkan!")
                     st.rerun()
     with tab_match:
-        st.subheader("🔍 CROSS-CHECK SKU MATCHING")
+        # --- FIX JUDUL: PAKSA HITAM & GEDE ---
+        st.markdown("""
+            <h1 style="color: #31333F !important; font-weight: 800; font-size: 32px; margin-bottom: 25px; display: flex; align-items: center;">
+                🔍 CROSS-CHECK SKU MATCHING
+            </h1>
+        """, unsafe_allow_html=True)
         
-        # Cek apakah df_match_result sudah didefinisikan dan tidak kosong
+        st.info("Menampilkan rangkuman barang Non-Standar yang ditemukan di lebih dari satu inputan/cabang.")
+        
+        # Pastikan data ada
         if 'df_match_result' in locals() and not df_match_result.empty:
+            # 1. Metrics Tetap (Hapus kalau double)
             m_col1, m_col2 = st.columns(2)
             m_col1.metric("MATCH FOUND", f"{len(df_match_result)} Items")
             m_col2.metric("UNIQUE SKU", f"{df_match_result['SKU'].nunique()}")
             
             st.markdown("<br>", unsafe_allow_html=True)
+
+            # --- LOGIKA TRANSFORMASI TABEL (PIVOT) ---
+            # Kita cuma butuh data unik SKU + Article
+            df_core = df_match_result[['SKU', 'ARTICLE_NAME']].drop_duplicates()
+
+            # Kita bikin kolom 'DITEMUKAN DI CABANG' jadi daftar cabang (SIDOARJO, SURABAYA, dll)
+            df_temp = df_match_result[['SKU', 'CABANG']].drop_duplicates()
+            # Pivot: Baris jadi SKU, Kolom jadi Cabang, Nilai jadi '✅'
+            df_pivot = df_temp.pivot(index='SKU', columns='CABANG', values='CABANG').notna()
             
-            # Tampilkan Tabel Hasil Match pake data_editor biar rapi
-            st.data_editor(
-                df_match_result[['CABANG', 'SKU', 'ARTICLE_NAME', 'KATEGORI', 'MATCH_DI_CABANG', 'TANGGAL_INPUT']],
+            # Ganti True jadi '✅' biar enak diliat
+            df_pivot = df_pivot.replace({True: '✅', False: ''})
+            
+            # Gabungkan kembali data core dengan hasil pivot
+            df_final_match = df_core.merge(df_pivot, on='SKU', how='left')
+
+            # --- TAMPILAN TABEL PIVOT BARU ---
+            st.markdown("""
+                <h4 style="color: #31333F !important; font-weight: 700;">Rangkuman Lokasi Temuan per SKU</h4>
+            """, unsafe_allow_html=True)
+
+            # Sembunyikan SKU di editor (karena di pivot udah ada)
+            event = st.data_editor(
+                df_final_match,
                 column_config={
-                    "MATCH_DI_CABANG": st.column_config.TextColumn(
-                        "DITEMUKAN DI",
-                        help="Cabang mana saja yang punya SKU ini",
-                        width="medium"
-                    ),
-                    "KATEGORI": "KET (NON-STD)"
+                    "SKU": st.column_config.TextColumn("SKU", width="small"),
+                    "ARTICLE_NAME": st.column_config.TextColumn("NAMA BARANG", width="medium"),
+                    # Cabang otomatis jadi nama kolom ✅
                 },
                 use_container_width=True,
                 hide_index=True,
-                key="match_editor_v2"
+                key="match_pivot_editor"
             )
+
         else:
             st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")
 import streamlit as st
