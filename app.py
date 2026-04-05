@@ -2680,15 +2680,16 @@ def menu_retur_out_system():
         df_display = df_db.sort_values(by='rowid', ascending=False)
 
         # LOGIKA FILTER
+        # --- LOGIKA FILTER ---
         if search_query:
             df_display = df_display[
                 df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
                 df_display['item_name'].str.contains(search_query, case=False, na=False)
             ]
 
-        # Ambil 500 data teratas setelah difilter
-        df_final = df_display.head(500)
-        
+        # TAMPILKAN SEMUA DATA (TANPA BATAS 500)
+        df_final = df_display # <--- Cukup hapus .head(500) nya cok
+
         # Kolom yang mau ditampilkan (Sembunyikan rowid)
         cols_to_show = [col for col in df_final.columns if col != 'rowid']
 
