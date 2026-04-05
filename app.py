@@ -2614,12 +2614,12 @@ def menu_retur_out_system():
             total_val = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
             c1, c2, c3 = st.columns(3)
-            with c1:
-                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">🗄️ Total SKU</p><p class="metric-value">{total_sku:,}</p></div>', unsafe_allow_html=True)
-            with c2:
-                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">📦 Total Qty</p><p class="metric-value">{int(total_qty):,}</p></div>', unsafe_allow_html=True)
-            with c3:
-                st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">💰 Asset Value</p><p class="metric-value">Rp {total_val:,.0f}</p></div>', unsafe_allow_html=True)
+            with m1:
+                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #8b5cf6;"><div class="metric-label">🗄️ TOTAL SKU</div><div class="metric-value">{total_sku:,}</div><div class="metric-delta">↑ IN DATABASE</div></div>', unsafe_allow_html=True)
+            with m2:
+                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #10b981;"><div class="metric-label">📦TOTAL QTY</div><div class="metric-value">{int(total_qty_system)}</div><div class="metric-delta">↑ TOTAL STOCK</div></div>', unsafe_allow_html=True)
+            with m3:
+                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #f59e0b;"><div class="metric-label">💰 TOTAL VALUE</div><div class="metric-value">Rp {total_value:,.0f}</div><div class="metric-delta">↑ TOTAL COST</div></div>', unsafe_allow_html=True)
 
             st.markdown("### 📜 Retur Out History")
             
