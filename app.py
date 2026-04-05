@@ -5667,17 +5667,26 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
     st.session_state.summary_shift = weekly_counter
     st.rerun()
 
-# --- TAMPILAN JADWAL & REALISASI ---
+# --- TAMPILAN OUTPUT DENGAN STATUS OK/KURANG ---
 if 'res_df' in st.session_state:
     st.divider()
     col_v1, col_v2 = st.columns([5, 2])
     with col_v1:
         st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
-        st.dataframe(st.session_state.res_df.style.applymap(lambda v: 'color: #00FF00; background-color: #0B3D2E; font-weight: bold;' if v else ''), use_container_width=True, height=800, hide_index=True)
+        st.dataframe(st.session_state.res_df.style.applymap(lambda v: 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 0.1px solid #444;' if v else ''), use_container_width=True, height=800, hide_index=True)
+
     with col_v2:
         st.markdown("### 📈 REALISASI")
-        sum_list = [{"NAMA": n, "SHIFT": t} for n, t in st.session_state.summary_shift.items() if t > 0]
-        st.table(pd.DataFrame(sum_list).sort_values(by="SHIFT", ascending=False))
+        sum_data = []
+        for k in karyawan_list:
+            n = k['nama']
+            t = st.session_state.summary_shift.get(n, 0)
+            if t > 0:
+                # BALIKIN STATUS OK/KURANG
+                status = "✅ OK" if t >= k['target_fix'] else "⚠️ KURANG"
+                sum_data.append({"NAMA": n, "SHIFT": t, "STATUS": status})
+        
+        st.table(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False))
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
