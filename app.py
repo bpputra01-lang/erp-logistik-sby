@@ -2864,48 +2864,53 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.metric("❌ REJECT (R)", f"{reject_cnt}", f"{p_r:.1f}%")
 
-            # 1. Judul Hitam & Tebal
+            # 1. Judul (Hitam & Tebal)
             st.markdown('<h3 style="color: #31333F; font-weight: 800; margin-top: 30px;">📋 DETAIL DATABASE</h3>', unsafe_allow_html=True)
-
+            
             # 2. Ambil Data
             df_view = df_final.sort_values('rowid', ascending=False)
-
-            # 3. CSS KHUSUS BIAR TABEL RAPET
-            st.markdown("""
-                <style>
-                .custom-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-family: sans-serif; }
-                .custom-table th { text-align: left; padding: 12px; border-bottom: 2px solid #EEE; color: #666; font-size: 13px; }
-                .custom-table td { padding: 12px; border-bottom: 1px solid #F5F5F5; vertical-align: middle; font-size: 14px; color: #333; }
-                </style>
-            """, unsafe_allow_html=True)
-
-            # 4. MULAI RENDER TABEL
-            # Kita pake columns cuma buat tempat tombol hapus (ACT) biar tetep bisa diklik
-            # Sisanya kita masukin ke HTML biar rapih sejajar
-            for _, row in df_view.iterrows():
-                # Bikin baris pake st.columns tapi rasionya kita kunci ketat
-                c_act, c_data = st.columns([0.1, 0.9])
+            
+            if not df_view.empty:
+                # 3. FITUR MULTI-DELETE (Paling Aman & Rapi)
+                st.info("💡 Centang item di bawah, lalu klik 'HAPUS DATA TERPILIH' untuk menghapus.")
                 
-                with c_act:
-                    # Tombol hapus kecil di pojok kiri
-                    if st.button("🗑️", key=f"del_{row['rowid']}"):
-                        delete_reject_item(row['rowid'])
+                # Buat list untuk nampung ID yang mau dihapus
+                to_delete = []
+                
+                # Header Tabel Manual (Lurus & Presisi)
+                h_cols = st.columns([0.5, 1.5, 1.5, 2.5, 2, 2])
+                headers = ["SEL", "CABANG", "SKU", "NAMA BARANG", "KATEGORI", "WAKTU"]
+                for col, text in zip(h_cols, headers):
+                    col.write(f"**{text}**")
+                st.divider()
+
+                # Render Baris Data
+                for _, row in df_view.iterrows():
+                    r_cols = st.columns([0.5, 1.5, 1.5, 2.5, 2, 2])
+                    
+                    # Checkbox untuk seleksi (Gak bakal nabrak tulisan)
+                    with r_cols[0]:
+                        sel = st.checkbox("", key=f"check_{row['rowid']}")
+                        if sel:
+                            to_delete.append(row['rowid'])
+                    
+                    r_cols[1].text(row['CABANG'])
+                    r_cols[2].text(row['SKU'])
+                    r_cols[3].text(row['ARTICLE_NAME'])
+                    r_cols[4].text(row['KATEGORI'])
+                    r_cols[5].caption(row['TANGGAL_INPUT'])
+                    st.markdown('<div style="margin-top: -15px;"></div>', unsafe_allow_html=True)
+
+                # 4. TOMBOL EKSEKUSI (Muncul di bawah kalau ada yang dicentang)
+                if to_delete:
+                    st.divider()
+                    if st.button(f"🗑️ HAPUS {len(to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
+                        for rid in to_delete:
+                            delete_reject_item(rid)
+                        st.success(f"✅ {len(to_delete)} Data Berhasil Dihapus!")
                         st.rerun()
-                
-                with c_data:
-                    # Gabungin semua data jadi satu baris HTML biar lurus
-                    html_row = f"""
-                    <table class="custom-table">
-                        <tr>
-                            <td style="width: 15%;"><b>{row['CABANG']}</b></td>
-                            <td style="width: 15%;">{row['SKU']}</td>
-                            <td style="width: 25%;">{row['ARTICLE_NAME']}</td>
-                            <td style="width: 20%; color: #007BFF;">{row['KATEGORI']}</td>
-                            <td style="width: 25%; font-size: 11px; color: #999;">{row['TANGGAL_INPUT']}</td>
-                        </tr>
-                    </table>
-                    """
-                    st.markdown(html_row, unsafe_allow_html=True)
+            else:
+                st.warning("Belum ada data.")
 import streamlit as st
 import sqlite3
 import pandas as pd
