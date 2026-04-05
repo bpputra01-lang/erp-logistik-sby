@@ -2672,7 +2672,32 @@ def clear_all_data():
     conn.commit()
     conn.close()
     st.rerun()
+# --- LOGIKA MATCHING (CROSS-BRANCH) ---
+standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
 
+# 1. Filter barang yang keterangannya TIDAK STANDAR
+df_non_std = df_chart[~df_chart['KATEGORI'].isin(standard_codes)].copy()
+
+def find_matches(row, full_df):
+    # Cari SKU yang sama tapi rowid berbeda (biar nggak deteksi diri sendiri)
+    matches = full_df[
+        (full_df['SKU'] == row['SKU']) & 
+        (full_df.index != row.name)
+    ]
+    if matches.empty:
+        return "TIDAK ADA"
+    
+    # Ambil list cabang mana aja yang ada kembarannya
+    cabang_found = matches['CABANG'].unique().tolist()
+    return ", ".join(cabang_found)
+
+# 2. Jalankan pengecekan
+if not df_non_std.empty:
+    df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
+    # Filter hanya yang beneran ketemu kembarannya
+    df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
+else:
+    df_match_result = pd.DataFrame()
 # --- 2. UI MENU ---
 def menu_reject_defect():
     # --- CSS AREA (FIXED: NO CONFLICT) ---
@@ -2913,7 +2938,52 @@ def menu_reject_defect():
                         <span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span>
                     </div>
                 """, unsafe_allow_html=True)
-                
+    # Tambahkan tab di list tab Lu (misal: tab_input, tab_analytics, tab_match)
+with tab_match:
+    st.subheader("🔍 CROSS-CHECK SKU MATCHING")
+    st.info("Menampilkan barang dengan kode Non-Standar yang ditemukan di lebih dari satu lokasi/inputan.")
+
+    if not df_match_result.empty:
+        # Metrics Khusus Match
+        total_match = len(df_match_result)
+        unique_sku_match = df_match_result['SKU'].nunique()
+        
+        m_col1, m_col2 = st.columns(2)
+        with m_col1:
+            st.markdown(f"""
+                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #6f42c1;">
+                    <p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL MATCH FOUND</p>
+                    <h2 style="color: white; margin: 0; font-weight: 800;">{total_match} Items</h2>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with m_col2:
+            st.markdown(f"""
+                <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #20c997;">
+                    <p style="color: #888; margin: 0; font-size: 0.9rem;">UNIQUE SKU MATCH</p>
+                    <h2 style="color: white; margin: 0; font-weight: 800;">{unique_sku_match} SKU</h2>
+                </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Tampilkan Tabel Hasil Match
+        st.data_editor(
+            df_match_result[['CABANG', 'SKU', 'ARTICLE_NAME', 'KATEGORI', 'MATCH_DI_CABANG', 'TANGGAL_INPUT']],
+            column_config={
+                "MATCH_DI_CABANG": st.column_config.TextColumn(
+                    "DITEMUKAN DI",
+                    help="Cabang mana saja yang punya SKU ini",
+                    width="medium"
+                ),
+                "KATEGORI": "KET (NON-STD)"
+            },
+            use_container_width=True,
+            hide_index=True,
+            key="match_editor"
+        )
+    else:
+        st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")           
             st.markdown("<br>", unsafe_allow_html=True)
             # Judul dengan class CSS baru (Hitam)
             st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
