@@ -5608,36 +5608,70 @@ if menu == "Logistic Schedule":
                             double_day_count[nama] += 1
                         break
 
-        # --- STEP 4: TABLE GENERATION ---
+        # --- STEP 4: TABLE GENERATION (FIXED SUMMARY LOGIC) ---
         final_table = []
+        # Inisialisasi summary hanya untuk nama yang ada di database
         real_summary = {k['nama']: 0 for k in karyawan_list}
+        
         for shf_jam, shf_role in base_roles:
             slot_key = f"{shf_jam} - {shf_role}"
+            # Cari baris terbanyak di slot ini dalam seminggu
             max_r = max([len(storage[d][slot_key]) for d in day_names])
+            
             for r in range(max(1, max_r)):
                 row = {"SHIFT - ROLE": slot_key}
                 for d in day_names:
-                    names = storage[d][slot_key]
-                    val = names[r] if r < len(names) else ""
-                    row[d] = val
-                    clean = val.replace(" (BACKUP)", "").replace(" (SWEEP)", "").replace(" (FIX)", "")
-                    if clean in real_summary: real_summary[clean] += 1
+                    names_in_slot = storage[d][slot_key]
+                    if r < len(names_in_slot):
+                        val = names_in_slot[r]
+                        row[d] = val
+                        
+                        # CLEANING NAMA: Hapus tag status untuk hitung realisasi
+                        clean_name = val.replace(" (BACKUP)", "").replace(" (SWEEP)", "").replace(" (FIX)", "").strip()
+                        
+                        # Hitung hanya jika nama tersebut ada di daftar karyawan
+                        if clean_name in real_summary:
+                            real_summary[clean_name] += 1
+                    else:
+                        row[d] = ""
                 final_table.append(row)
+
+        # Simpan ke session state biar gak ilang pas interact
         st.session_state.res_df = pd.DataFrame(final_table)
         st.session_state.summary_shift = real_summary
-        # --- TAMPILAN TETAP DARK MODE ---
-        if 'res_df' in st.session_state:
-            st.divider()
-            col_v1, col_v2 = st.columns([5, 2])
-            with col_v1:
-                def style_dark_green(val):
-                    if not val: return 'background-color: #1E1E1E;'
-                    return 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 1px solid #000;'
-                st.dataframe(st.session_state.res_df.style.applymap(style_dark_green), use_container_width=True, height=800)
-            with col_v2:
-                st.write("**📈 REALISASI (WAJIB 9/6)**")
-                sum_list = [{"NAMA": k, "TOTAL": v} for k, v in st.session_state.summary_shift.items() if v > 0]
-                st.table(pd.DataFrame(sum_list).sort_values(by="TOTAL", ascending=False))
+
+    # --- TAMPILAN OUTPUT (DI LUAR IF BUTTON BIAR TETAP MUNCUL) ---
+    if 'res_df' in st.session_state:
+        st.divider()
+        col_v1, col_v2 = st.columns([5, 2])
+        
+        with col_v1:
+            st.markdown("### 📋 JADWAL MINGGUAN")
+            def style_dark_green(val):
+                if not val or val == "": 
+                    return 'background-color: #1E1E1E; color: #1E1E1E;'
+                return 'color: #00FF00; background-color: #0B3D2E; font-weight: bold; border: 1px solid #1a1c27;'
+            
+            st.dataframe(
+                st.session_state.res_df.style.applymap(style_dark_green), 
+                use_container_width=True, 
+                height=800,
+                hide_index=True
+            )
+            
+        with col_v2:
+            st.markdown("### 📈 REALISASI (9/6)")
+            # Konversi summary ke DataFrame untuk tabel yang rapi
+            summary_data = [
+                {"NAMA": k, "SHIFT": v, "STATUS": "✅ OK" if v >= (9 if next(item['tipe'] for item in karyawan_list if item['nama'] == k) == "Part-Full" else 6) else "⚠️ KURANG"} 
+                for k, v in st.session_state.summary_shift.items()
+            ]
+            
+            if summary_data:
+                df_sum = pd.DataFrame(summary_data).sort_values(by="SHIFT", ascending=False)
+                st.table(df_sum)
+            else:
+                st.info("Belum ada data realisasi.")
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
