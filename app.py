@@ -2484,12 +2484,10 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     return df_res, df_draft
 
-
+    
 import sqlite3
 import pandas as pd
 import streamlit as st
-from datetime import datetime
-import pytz
 
 # --- 1. INITIALIZE DATABASE (FISIK & AUTO-PATCH) ---
 def init_db():
@@ -2504,7 +2502,7 @@ def init_db():
             item_name TEXT, variant TEXT, sub_kategori TEXT,
             harga_beli REAL, harga_jual REAL, 
             qty_system INTEGER, qty_so INTEGER,
-            upload_at TEXT
+            tanggal TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -2516,8 +2514,7 @@ def init_db():
     required_db_cols = {
         'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
         'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
-        'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 
-        'qty_so': 'INTEGER', 'upload_at': 'TEXT'
+        'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 'qty_so': 'INTEGER'
     }
     
     for col, dtype in required_db_cols.items():
@@ -2528,9 +2525,6 @@ def init_db():
     return conn
 
 def menu_retur_out_system():
-    # Setting Jam Surabaya
-    tz_sub = pytz.timezone('Asia/Jakarta')
-
     # --- 2. CSS DASHBOARD PREMIUM (GAYA SURABAYA BRANCH) ---
     st.markdown("""
         <style>
@@ -2624,14 +2618,9 @@ def menu_retur_out_system():
                 df_to_save = df_upload[list(required_cols.keys())].copy()
                 df_to_save.rename(columns=required_cols, inplace=True)
                 
-                # --- TAMBAH JAM DI SINI ---
-                df_to_save['upload_at'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
-                
                 file_key = f"up_{uploaded_file.name}_{len(df_upload)}"
                 if st.session_state.get('last_file_key') != file_key:
-                    # SIMPAN KE SQL
                     df_to_save.to_sql('retur_out', conn, if_exists='append', index=False)
-                    conn.commit() # PAKSA SAVE
                     st.session_state['last_file_key'] = file_key
                     st.success(f"✅ Berhasil! {len(df_to_save)} Baris masuk database.")
                     st.rerun()
@@ -2642,56 +2631,90 @@ def menu_retur_out_system():
 
     # --- 4. DATA VIEW & METRICS ---
     try:
+        # Pastikan variabel conn sudah didefinisikan sebelumnya
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out", conn)
 
         if not df_db.empty:
+            # 1. Kalkulasi Dashboard
             total_sku = df_db['sku'].nunique()
             total_qty_system = df_db['qty_system'].sum()
             total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
+            # 2. Tampilan Metrik Box
             m1, m2, m3 = st.columns(3)
             with m1:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #8b5cf6;"><div class="metric-label">🗄️ TOTAL SKU</div><div class="metric-value">{total_sku:,}</div><div class="metric-delta">↑ IN DATABASE</div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
+                        <div class="metric-label">🗄️ TOTAL SKU</div>
+                        <div class="metric-value">{total_sku:,}</div>
+                        <div class="metric-delta">↑ IN DATABASE</div>
+                    </div>
+                ''', unsafe_allow_html=True)
             with m2:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #10b981;"><div class="metric-label">📦 TOTAL QTY</div><div class="metric-value">{int(total_qty_system):,}</div><div class="metric-delta">↑ TOTAL QTY</div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #10b981;">
+                        <div class="metric-label">📦 TOTAL QTY</div>
+                        <div class="metric-value">{int(total_qty_system):,}</div>
+                        <div class="metric-delta">↑ TOTAL QTY</div>
+                    </div>
+                ''', unsafe_allow_html=True)
             with m3:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #f59e0b;"><div class="metric-label">💰 TOTAL VALUE</div><div class="metric-value">Rp {total_value:,.0f}</div><div class="metric-delta">↑ TOTAL VALUE</div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #f59e0b;">
+                        <div class="metric-label">💰 TOTAL VALUE</div>
+                        <div class="metric-value">Rp {total_value:,.0f}</div>
+                        <div class="metric-delta">↑ TOTAL VALUE</div>
+                    </div>
+                ''', unsafe_allow_html=True)
 
-            st.markdown("### 📜 Database History")
-            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang di sini...")
+            # --- 4. DATA VIEW & SEARCH ---
+        st.markdown("### 📜 Database History")
+        
+        # SEARCH BAR (Filter by SKU atau Item Name)
+        search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang di sini...")
 
-            df_display = df_db.sort_values(by='rowid', ascending=False)
-            if search_query:
-                df_display = df_display[df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
-                                        df_display['item_name'].str.contains(search_query, case=False, na=False)]
+        # Ambil data asli
+        df_display = df_db.sort_values(by='rowid', ascending=False)
 
-            cols_to_show = [col for col in df_display.columns if col not in ['rowid', 'id']]
+        # LOGIKA FILTER
+        # --- LOGIKA FILTER ---
+        if search_query:
+            df_display = df_display[
+                df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
+                df_display['item_name'].str.contains(search_query, case=False, na=False)
+            ]
 
-            event = st.dataframe(
-                df_display[cols_to_show],
-                use_container_width=True, 
-                hide_index=True, 
-                on_select="rerun", 
-                selection_mode="single-row",
-                column_config={
-                    "upload_at": st.column_config.DatetimeColumn("WAKTU UPLOAD", format="D MMM YYYY, HH:mm")
-                }
-            )
+        # TAMPILKAN SEMUA DATA (TANPA BATAS 500)
+        df_final = df_display # <--- Cukup hapus .head(500) nya cok
 
-            if event.selection.rows:
-                row_idx = event.selection.rows[0]
-                target_id = df_display.iloc[row_idx]['rowid']
-                target_sku = df_display.iloc[row_idx]['sku']
-                
-                st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
-                if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                    conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
-                    conn.commit()
-                    st.rerun()
+        # Kolom yang mau ditampilkan (Sembunyikan rowid)
+        cols_to_show = [col for col in df_final.columns if col != 'rowid']
+
+        event = st.dataframe(
+            df_final[cols_to_show],
+            use_container_width=True, 
+            hide_index=True, 
+            on_select="rerun", 
+            selection_mode="single-row" 
+        )
+
+        # LOGIKA HAPUS (Tetap pakai df_final agar index match)
+        if event.selection.rows:
+            row_idx = event.selection.rows[0]
+            target_id = df_final.iloc[row_idx]['rowid']
+            target_sku = df_final.iloc[row_idx]['sku']
+            
+            st.warning(f"⚠️ Hapus SKU: **{target_sku}**?")
+            if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
+                conn.execute("DELETE FROM retur_out WHERE rowid = ?", (int(target_id),))
+                conn.commit()
+                st.success("Data berhasil dihapus!")
+                st.rerun()
 
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Database: {e}")
     finally:
+        # Menutup koneksi dengan aman
         conn.close()
 
 
