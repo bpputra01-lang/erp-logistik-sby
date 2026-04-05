@@ -2569,7 +2569,6 @@ def menu_retur_out_system():
     conn = init_db()
 
     # --- 3. UPLOAD & AUTO-SAVE ---
-    with st.expander("📥 UPLOAD DATA BARU (EXCEL/CSV)", expanded=True):
         uploaded_file = st.file_uploader("Seret file lu kemari", type=['xlsx', 'csv'], key="retur_up")
         
         if uploaded_file:
