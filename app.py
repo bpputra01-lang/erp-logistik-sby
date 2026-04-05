@@ -5548,15 +5548,10 @@ if not df_monitor_s3.empty:
                 st.rerun()
 else:
     st.info("Belum ada tim yang di-plot ke Shift 3.")
-# --- 3. GENERATOR JADWAL JEZ SBY (LOGIC V-FINAL: STRICT, CONSECUTIVE, & S3 LINK) ---
+# --- 3. GENERATOR JADWAL JEZ SBY (LOGIC V-HYPER: SHIFT 3 ALL-IN SO) ---
 st.subheader("🚀 3. Generator Jadwal Otomatis")
 
-# --- KONEKSI TABEL MANUAL SHIFT 3 ---
-cursor = conn.cursor()
-cursor.execute('''CREATE TABLE IF NOT EXISTS plot_shift3 (nama TEXT, tanggal TEXT, posisi TEXT, tipe TEXT)''')
-conn.commit()
-
-start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_final")
+start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v_hyper")
 df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
 karyawan_list = df_staff_master.to_dict('records')
 
@@ -5564,15 +5559,14 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
     dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
     day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
     df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
-    # Ambil plot manual S3 biar gak bentrok
     df_manual_s3 = pd.read_sql_query("SELECT * FROM plot_shift3", conn)
 
-    # Definisi Role Utama
+    # SHIFT 3 SEKARANG CUMA SATU ROLE: SO
     base_roles = [
         ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
         ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
         ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV"),
-        ("SHIFT 3", "SO")
+        ("SHIFT 3", "SO") # Satu baris buat semua anak Shift 3
     ]
 
     storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
@@ -5583,46 +5577,39 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
     def get_active_shifts(nama, day_name):
         return [slot.split(" - ")[0] for slot in storage[day_name] if any(nama in n for n in storage[day_name][slot])]
 
-    # --- ENGINE START ---
+    # --- ENGINE FILLING ---
     for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
         for day_name in day_names:
-            idx_hari = day_names.index(day_name)
-            tgl_ini = dates_real[idx_hari]
-            
+            tgl_ini = dates_real[day_names.index(day_name)]
             for shf_jam, shf_role in base_roles:
                 slot_key = f"{shf_jam} - {shf_role}"
-                
-                # S3 diisi lewat logic khusus atau manual nanti
-                if shf_jam == "SHIFT 3": continue 
-                
+                if shf_jam == "SHIFT 3": continue # Diisi otomatis dari S2 atau manual
+
                 if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
                 if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
 
                 potential = []
                 for k in karyawan_list:
                     nama = k['nama']
-                    # Cek Libur & Jatah
                     if weekly_counter[nama] >= k['target_fix']: continue
                     if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                     
                     active_shifts = get_active_shifts(nama, day_name)
                     if shf_jam in active_shifts: continue 
                     
-                    # --- RULE NO BACKUP ---
+                    # No Backup Roles
                     if shf_role in ["SPV", "LOG-ADMIN", "LOG-STORE"] and k['posisi'] != shf_role: continue
                     
-                    # --- RULE BERURUTAN ---
+                    # Consecutive Check
                     if k['tipe'] == "Part-Full" and active_shifts:
                         if "SHIFT 0" in active_shifts and shf_jam != "SHIFT 1": continue
                         if "SHIFT 1" in active_shifts and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
                     
                     is_match = (k['posisi'] == shf_role)
-                    current_daily = len(active_shifts)
-                    
                     if k['tipe'] == "Part-Full":
-                        if current_daily >= 2 or (current_daily == 1 and double_day_count[nama] >= 3): continue
+                        if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
                     else:
-                        if current_daily >= 1: continue
+                        if len(active_shifts) >= 1: continue
                     
                     potential.append({'k': k, 'match': is_match})
 
@@ -5635,25 +5622,24 @@ if st.button("▶️ RUN GENERATOR JADWAL", use_container_width=True):
                     storage[day_name][slot_key].append(nm)
                     weekly_counter[nm] += 1
                     
-                    # --- AUTO-LINK SHIFT 2 KE SHIFT 3 (UNTUK PART-FULL) ---
+                    # AUTO-LINK KE SHIFT 3 - SO
                     if p['k']['tipe'] == "Part-Full" and shf_jam == "SHIFT 2":
-                        s3_key = f"SHIFT 3 - {shf_role}"
-                        if s3_key in storage[day_name] and weekly_counter[nm] < p['k']['target_fix']:
-                            storage[day_name][s3_key].append(nm)
+                        s3_so = "SHIFT 3 - SO"
+                        if weekly_counter[nm] < p['k']['target_fix']:
+                            storage[day_name][s3_so].append(nm)
                             weekly_counter[nm] += 1
                             double_day_count[nm] += 1
 
-    # --- INSERT PLOT MANUAL SHIFT 3 KE TABEL UTAMA ---
+    # --- MERGE PLOT MANUAL (SEMUA MASUK KE SHIFT 3 - SO) ---
     for _, row_m in df_manual_s3.iterrows():
         for d_n, d_t in zip(day_names, dates_real):
             if row_m['tanggal'] == d_t:
-                s3_key_manual = f"SHIFT 3 - {row_m['posisi']}"
-                if s3_key_manual in storage[d_n]:
-                    if row_m['nama'] not in storage[d_n][s3_key_manual]:
-                        storage[d_n][s3_key_manual].append(row_m['nama'])
-                        if row_m['nama'] in weekly_counter: weekly_counter[row_m['nama']] += 1
+                s3_so_key = "SHIFT 3 - SO"
+                if row_m['nama'] not in storage[d_n][s3_so_key]:
+                    storage[d_n][s3_so_key].append(row_m['nama'])
+                    if row_m['nama'] in weekly_counter: weekly_counter[row_m['nama']] += 1
 
-    # --- BUILD FINAL TABLE ---
+    # Build Table
     final_table = []
     for shf_jam, shf_role in base_roles:
         slot_key = f"{shf_jam} - {shf_role}"
