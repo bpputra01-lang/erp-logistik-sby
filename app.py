@@ -2649,12 +2649,6 @@ def menu_retur_out_system():
                     conn.commit()
                     st.success("Data dihapus!")
                     st.rerun()
-            
-            with st.expander("🛠️ ADVANCED SETTINGS"):
-                if st.button("🔴 RESET / KOSONGKAN DATABASE", use_container_width=True):
-                    conn.execute("DELETE FROM retur_out")
-                    conn.commit()
-                    st.rerun()
 
         else:
             st.info("Database masih kosong. Silakan upload file di atas.")
