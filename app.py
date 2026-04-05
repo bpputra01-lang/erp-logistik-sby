@@ -5474,7 +5474,7 @@ if menu == "Logistic Schedule":
                 st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
-    # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
+   # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
 with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
     df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
     if not df_cek.empty:
@@ -5495,7 +5495,7 @@ with st.expander("🔍 LIHAT DAFTAR TIM & TIPE", expanded=True):
                     conn.commit()
                     st.rerun()
     else:
-        st.info("Belum ada data tim.")
+        st.info("Belum ada data tim di database.") # Indentasi bener (sejajar IF)
 
 st.divider()
 
@@ -5504,7 +5504,7 @@ st.subheader("🚫 2. Plot Libur & Monitoring")
 col_l1, col_l2 = st.columns([1, 2])
 
 with col_l1:
-    df_k = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
+    df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
     with st.form("form_libur_komplit", clear_on_submit=True):
         target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
         tgl_off = st.date_input("Tanggal Off")
@@ -5534,11 +5534,8 @@ with col_l2:
                     conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
                     conn.commit()
                     st.rerun()
-
-    # Lanjut ke bagian Generator Jadwal lu...
-    # (Kode generator lu sudah benar logic-nya, tinggal pastikan query SELECT-nya merujuk ke conn ini)
-        else:
-            st.info("Belum ada data tim.")
+    else:
+        st.info("Belum ada data pengajuan libur.")
 
     st.divider()
 
