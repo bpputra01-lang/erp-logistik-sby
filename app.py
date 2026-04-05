@@ -2981,14 +2981,25 @@ def menu_reject_defect():
                     st.success("Seluruh database telah dikosongkan!")
                     st.rerun()
     with tab_match:
-        # --- FIX JUDUL: PAKSA HITAM & GEDE ---
+        # PAKSA JUDUL JADI HITAM PEKAT
         st.markdown("""
-            <h1 style="color: #31333F !important; font-weight: 800; font-size: 32px; margin-bottom: 25px; display: flex; align-items: center;">
-                🔍 CROSS-CHECK SKU MATCHING
-            </h1>
+            <div style="background-color: rgba(255,255,255,0); padding: 10px 0px;">
+                <h1 style="
+                    color: #000000 !important; 
+                    font-family: 'Source Sans Pro', sans-serif; 
+                    font-weight: 800; 
+                    font-size: 2.2rem;
+                    letter-spacing: -0.02em;
+                    margin: 0;
+                    padding: 0;
+                    display: block !important;
+                    opacity: 1 !important;
+                ">
+                    🔍 CROSS-CHECK SKU MATCHING
+                </h1>
+            </div>
+            <hr style="margin-top: 5px; margin-bottom: 20px; border: 0; border-top: 2px solid #eee;">
         """, unsafe_allow_html=True)
-        
-        st.info("Menampilkan rangkuman barang Non-Standar yang ditemukan di lebih dari satu inputan/cabang.")
         
         # Pastikan data ada
         if 'df_match_result' in locals() and not df_match_result.empty:
