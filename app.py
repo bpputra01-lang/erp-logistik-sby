@@ -5811,14 +5811,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR MENU ---
-with st.sidebar:
-    st.header("Menu Utama")
-    # Menu tunggal yang menggabungkan segalanya
-    menu = st.radio("Navigasi:", ["📊 Reporting & PIC", "⚙️ Settings"])
-    st.divider()
-    st.write(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
-
 # --- LOGIKA MENU ---
 
 if menu == "📊 Reporting & PIC":
