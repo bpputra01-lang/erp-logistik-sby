@@ -5800,9 +5800,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- CONFIG ---
-st.set_page_config(page_title="Ops Dashboard", layout="wide")
-
 # --- CUSTOM CSS (Biar tabel & text lebih enak dilihat) ---
 st.markdown("""
     <style>
