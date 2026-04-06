@@ -5795,3 +5795,80 @@ elif menu == "Pengajuan Reject/Defect":
 
 elif menu == "List Retur Out":
     menu_retur_out_system()
+
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+
+# --- CONFIG ---
+st.set_page_config(page_title="Ops Dashboard", layout="wide")
+
+# --- CUSTOM CSS (Biar tabel & text lebih enak dilihat) ---
+st.markdown("""
+    <style>
+    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
+    .main-header { font-size: 28px; font-weight: bold; color: #1E3A8A; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- SIDEBAR MENU ---
+with st.sidebar:
+    st.header("Menu Utama")
+    # Menu tunggal yang menggabungkan segalanya
+    menu = st.radio("Navigasi:", ["📊 Reporting & PIC", "⚙️ Settings"])
+    st.divider()
+    st.write(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
+
+# --- LOGIKA MENU ---
+
+if menu == "📊 Reporting & PIC":
+    st.markdown('<p class="main-header">Reporting & PIC Daily Monitoring</p>', unsafe_allow_html=True)
+    
+    # 1. Dashboard Metrics (Ringkasan Cepat)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Laporan", "10", "Target")
+    m2.metric("Selesai", "6", "60%")
+    m3.metric("Belum Lapor", "4", "-2", delta_color="inverse")
+    m4.metric("PIC On-Duty", "5 Orang", "Aktif")
+
+    st.divider()
+
+    # 2. Main Layout (Tabel PIC & Reporting di Kiri, To-Do di Kanan)
+    col_tabel, col_todo = st.columns([2, 1])
+
+    with col_tabel:
+        st.subheader("📋 Jadwal Kewajiban & Status PIC")
+        
+        # Data yang menggabungkan Kewajiban, Waktu, dan PIC
+        data_ops = pd.DataFrame([
+            {"Jam": "08:00", "Laporan": "Absensi & Briefing", "PIC": "Budi", "Status": "✅ Selesai"},
+            {"Jam": "10:00", "Laporan": "Update Stock Gudang", "PIC": "Siska", "Status": "✅ Selesai"},
+            {"Jam": "13:00", "Laporan": "Progress Produksi", "PIC": "Andi", "Status": "⏳ In Progress"},
+            {"Jam": "15:00", "Laporan": "Quality Control Check", "PIC": "Rina", "Status": "❌ Pending"},
+            {"Jam": "17:00", "Laporan": "End of Day Report", "PIC": "Budi", "Status": "❌ Pending"},
+        ])
+        
+        # Nampilin tabel (Dataframe) yang interaktif
+        st.dataframe(data_ops, use_container_width=True, hide_index=True)
+        
+        st.warning("⚠️ **Note:** PIC Rina belum submit laporan QC. Tolong di-follow up.")
+
+    with col_todo:
+        st.subheader("✅ To-Do List Hari Ini")
+        st.write("Tugas tambahan di luar reporting rutin:")
+        
+        # To-do list interaktif
+        st.checkbox("Cek stok packing material", value=True)
+        st.checkbox("Meeting mingguan jam 14:00")
+        st.checkbox("Kirim invoice ke Finance")
+        st.checkbox("Follow up complain customer X")
+        
+        st.divider()
+        st.subheader("📝 Catatan Lapangan")
+        catatan = st.text_area("Ada kendala operasional?", placeholder="Tulis di sini...")
+        if st.button("Simpan Catatan"):
+            st.success("Catatan berhasil disimpan ke log.")
+
+elif menu == "⚙️ Settings":
+    st.subheader("Pengaturan Dashboard")
+    st.write("Di sini lu bisa atur nama PIC, shift kerja, atau ganti template laporan.")
