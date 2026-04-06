@@ -4276,7 +4276,7 @@ with st.sidebar:
     # --- KELOMPOK 5: EXTRAS ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
     
-    m5_list = ["Logistic Schedule", "Balancing Stock"]
+    m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC"]
     idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else 0
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
 
@@ -5813,7 +5813,7 @@ st.markdown("""
 
 # --- LOGIKA MENU ---
 
-if menu == "📊 Reporting & PIC":
+if menu == "Reporting & PIC":
     st.markdown('<p class="main-header">Reporting & PIC Daily Monitoring</p>', unsafe_allow_html=True)
     
     # 1. Dashboard Metrics (Ringkasan Cepat)
@@ -5860,7 +5860,3 @@ if menu == "📊 Reporting & PIC":
         catatan = st.text_area("Ada kendala operasional?", placeholder="Tulis di sini...")
         if st.button("Simpan Catatan"):
             st.success("Catatan berhasil disimpan ke log.")
-
-elif menu == "⚙️ Settings":
-    st.subheader("Pengaturan Dashboard")
-    st.write("Di sini lu bisa atur nama PIC, shift kerja, atau ganti template laporan.")
