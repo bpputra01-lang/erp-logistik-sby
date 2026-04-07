@@ -5812,117 +5812,122 @@ if 'db_report' not in st.session_state:
 if 'todo_list' not in st.session_state:
     st.session_state.todo_list = []
 
-# --- 2. CSS STYLING (SUPER CLEAN & TRANSPARENT INPUT) ---
+# --- 2. CSS DARK THEME (Suntikan langsung ke elemen) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    /* Compact Header */
+    
+    /* Background Utama Gelap */
+    .main { background-color: #0e1117; color: #ffffff; font-family: 'Inter', sans-serif; }
+    
+    /* Header Compact Dark */
     .top-header {
-        background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
-        color: white; padding: 12px 25px; border-radius: 12px; margin-bottom: 15px;
+        background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
+        color: white; padding: 10px 20px; border-radius: 10px; margin-bottom: 20px;
+        border: 1px solid #3b82f6;
     }
-    .top-header h2 { margin: 0; font-size: 1.4rem; letter-spacing: -0.5px; }
+    .top-header h2 { margin: 0; font-size: 1.2rem; }
 
-    /* Report Card - Lebih Tipis & Elegan */
+    /* Card Laporan Dark Mode */
     .report-card {
-        background-color: white; padding: 18px; border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 10px;
-        border-left: 4px solid #1E3A8A;
+        background-color: #1f2937; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 10px;
+        border-left: 5px solid #3b82f6; color: #f3f4f6;
     }
 
-    /* TO-DO CONTAINER (Soft Pastel) */
+    /* Box Tambah Tugas (Ala Reject/Defect) - Dark Version */
     .todo-container {
-        background-color: #f4f8ff; 
-        padding: 20px;
-        border-radius: 15px;
-        border: 1px dashed #3B82F6;
-    }
-
-    /* TRANSPARENT INPUT BOX - Ini yang lu minta */
-    div[data-baseweb="input"] {
-        background-color: transparent !important;
-        border-radius: 8px !important;
-    }
-    input[data-baseweb="input"] {
-        background-color: transparent !important;
-        color: #1E3A8A !important;
+        background-color: #111827; padding: 20px; border-radius: 15px;
+        border: 1px solid #374151; margin-bottom: 20px;
     }
     
-    /* Button Styling ala Modern App */
-    .stButton>button {
-        border-radius: 8px;
-        font-weight: 600;
+    /* Styling Tombol + Tambah ke List */
+    .stButton > button {
+        width: 100%; border-radius: 10px; background-color: #1f2937;
+        color: #ffffff; border: 1px solid #374151; height: 3em;
         transition: 0.3s;
     }
+    .stButton > button:hover {
+        border-color: #3b82f6; color: #3b82f6; background-color: #111827;
+    }
+
+    /* Override Streamlit Inputs for Dark Mode */
+    input { background-color: #1f2937 !important; color: white !important; border-radius: 8px !important; }
+    .stSelectbox div[data-baseweb="select"] { background-color: #1f2937 !important; }
+    
+    /* Divider & Tab Color */
+    hr { border-color: #374151; }
+    .stTabs [data-baseweb="tab"] { color: #9ca3af; }
+    .stTabs [aria-selected="true"] { color: #3b82f6 !important; border-bottom-color: #3b82f6 !important; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIKA ROUTING ---
-# (Pastikan variabel 'menu' ini ditarik dari selectbox navigasi utama lu)
+# (Pastikan variabel 'menu' ini dari navigasi utama lu)
 if menu == "Reporting & PIC":
     
-    # 1. Compact Header
+    # Header Compact
     st.markdown('<div class="top-header"><h2>🚀 Jezpro Digital Logistik</h2></div>', unsafe_allow_html=True)
 
-    # 2. Info Row
-    c1, c2 = st.columns([1, 1])
+    # Navigasi & Jam
+    c1, c2 = st.columns([1.2, 1])
     with c1:
-        current_user = st.selectbox("👤 Pilih PIC (Login):", ["Andi", "Budi", "Siska", "Maya"], key="pic_final")
+        current_user = st.selectbox("👤 Masuk Sebagai PIC:", ["Andi", "Budi", "Siska", "Maya"], key="pic_dark")
     with c2:
         st.write("")
-        st.info(f"📅 **Tanggal:** {datetime.now().strftime('%d %B %Y')}")
+        st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
 
     st.divider()
 
-    # 3. Layout Utama
-    col_kiri, col_kanan = st.columns([1.7, 1])
+    col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
-        st.subheader(f"🎯 Laporan: {current_user}")
+        st.subheader(f"🎯 List Laporan: {current_user}")
         tab_me, tab_all = st.tabs(["Dashboard Saya", "Overview Tim"])
         
         with tab_me:
             for idx, task in enumerate(st.session_state.db_report):
                 if task['PIC'] == current_user:
-                    with st.container():
-                        ck1, ck2 = st.columns([4, 1.2])
-                        with ck1:
-                            st.markdown(f"""
-                            <div class="report-card">
-                                <h4 style="margin:0; font-size: 1.1rem; color: #1e293b;">{task['Laporan']}</h4>
-                                <small style="color:gray;">Target: {task['Jam']} | Status: {task['Status']}</small>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        with ck2:
-                            st.write("") # Spacer
-                            if task['Status'] == "❌ Belum":
-                                if st.button(f"Update", key=f"up_{idx}", use_container_width=True):
-                                    st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                    st.rerun()
-                            else:
-                                st.button("Selesai", disabled=True, key=f"don_{idx}", use_container_width=True)
+                    ck1, ck2 = st.columns([4, 1.2])
+                    with ck1:
+                        st.markdown(f"""
+                        <div class="report-card">
+                            <h4 style="margin:0;">{task['Laporan']}</h4>
+                            <small style="color:#9ca3af;">Jam: {task['Jam']} | Status: {task['Status']}</small>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with ck2:
+                        st.write("") # Spacer
+                        if task['Status'] == "❌ Belum":
+                            if st.button(f"Update", key=f"up_dark_{idx}"):
+                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
+                                st.rerun()
+                        else:
+                            st.button("Selesai", disabled=True, key=f"don_dark_{idx}")
 
     with col_kanan:
-        # TO-DO BOX DENGAN INPUT TRANSPARAN
+        # BOX TAMBAH TUGAS (DARK & REJECT STYLE)
         st.markdown('<div class="todo-container">', unsafe_allow_html=True)
-        st.subheader("📝 Daily To-Do")
+        st.markdown("<b style='color:#3b82f6;'>Tugas Baru</b>", unsafe_allow_html=True)
         
-        with st.form("todo_form", clear_on_submit=True):
-            # Input tanpa background putih (Transparent via CSS di atas)
-            tugas_input = st.text_input("Tugas Baru", placeholder="Apa yang mau dikerjakan?")
-            submit = st.form_submit_button("➕ Tambah ke List", use_container_width=True)
-            if submit and tugas_input:
-                st.session_state.todo_list.append({"task": tugas_input, "done": False})
+        # Form tanpa border bawaan karena sudah dibungkus div
+        tugas_baru = st.text_input("", placeholder="Apa yang mau dikerjakan?", key="input_todo_dark", label_visibility="collapsed")
+        
+        st.write("") # Spacer
+        if st.button("➕ Tambah ke List", key="btn_add_dark"):
+            if tugas_baru:
+                st.session_state.todo_list.append({"task": tugas_baru, "done": False})
                 st.rerun()
         
-        st.write("---")
+        st.write("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
+        
+        # List To-Do
         if not st.session_state.todo_list:
-            st.caption("Belum ada tugas tambahan.")
+            st.caption("Tidak ada tugas tambahan.")
         else:
             for i, item in enumerate(st.session_state.todo_list):
-                checked = st.checkbox(item['task'], key=f"chk_{i}", value=item['done'])
+                # Checkbox dengan logic update
+                checked = st.checkbox(item['task'], key=f"chk_dark_{i}", value=item['done'])
                 if checked != item['done']:
                     st.session_state.todo_list[i]['done'] = checked
                     st.rerun()
