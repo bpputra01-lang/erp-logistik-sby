@@ -5905,58 +5905,59 @@ if menu == "Reporting & PIC":
     col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
-    st.subheader(f"📋 PIC: {current_user}")
-    tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
-    
-    # --- TAB 1: PERSONAL (Hanya tugas user yang login) ---
-    with tab_me:
-        for idx, task in enumerate(st.session_state.db_report):
-            if task['PIC'] == current_user:
-                ck1, ck2 = st.columns([4, 1.2])
-                with ck1:
-                    st.markdown(f"""
-                    <div class="report-card">
-                        <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
-                        <small style="color:#9ca3af;">Status: {task['Status']}</small>
-                    </div>
-                    """, unsafe_allow_html=True)
-                with ck2:
-                    st.write("") 
-                    if task['Status'] == "❌ Belum":
-                        if st.button(f"Update", key=f"up_dark_{idx}"):
-                            st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                            st.rerun()
-                    else:
-                        st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
+        # 1. Baris ini HARUS menjorok 4 spasi ke dalam dari 'with'
+        st.subheader(f"📋 PIC: {current_user}")
+        tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
+        
+        # --- TAB 1: PERSONAL ---
+        with tab_me:
+            for idx, task in enumerate(st.session_state.db_report):
+                if task['PIC'] == current_user:
+                    ck1, ck2 = st.columns([4, 1.2])
+                    with ck1:
+                        st.markdown(f"""
+                        <div class="report-card">
+                            <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
+                            <small style="color:#9ca3af;">Status: {task['Status']}</small>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with ck2:
+                        st.write("") 
+                        if task['Status'] == "❌ Belum":
+                            if st.button(f"Update", key=f"up_dark_{idx}"):
+                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
+                                st.rerun()
+                        else:
+                            st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
-    # --- TAB 2: SUMMARY (Total semua tim, ditaruh DI LUAR tab_me) ---
-    with tab_all:
-        st.markdown("### 📊 Team Progress Summary")
-        
-        # 1. Hitung Statistik (Logic tetap sama)
-        pic_stats = {}
-        for t in st.session_state.db_report:
-            pic = t['PIC']
-            if pic not in pic_stats:
-                pic_stats[pic] = {"total": 0, "selesai": 0}
-            pic_stats[pic]["total"] += 1
-            if t['Status'] == "✅ Selesai":
-                pic_stats[pic]["selesai"] += 1
-        
-        # 2. Render Card Progress per Orang
-        for pic, stats in pic_stats.items():
-            progress = (stats['selesai'] / stats['total']) * 100
-            st.markdown(f"""
-            <div class="report-card" style="border-left: 5px solid #10b981;">
-                <div style="display: flex; justify-content: space-between;">
-                    <b>👤 {pic}</b>
-                    <span>{stats['selesai']}/{stats['total']} Task</span>
+        # --- TAB 2: SUMMARY (DI LUAR tab_me tapi TETAP DI DALAM col_kiri) ---
+        with tab_all:
+            st.markdown("### 📊 Team Progress Summary")
+            
+            # Hitung Statistik
+            pic_stats = {}
+            for t in st.session_state.db_report:
+                pic = t['PIC']
+                if pic not in pic_stats:
+                    pic_stats[pic] = {"total": 0, "selesai": 0}
+                pic_stats[pic]["total"] += 1
+                if t['Status'] == "✅ Selesai":
+                    pic_stats[pic]["selesai"] += 1
+            
+            # Render Progress Card
+            for pic, stats in pic_stats.items():
+                progress = (stats['selesai'] / stats['total']) * 100
+                st.markdown(f"""
+                <div class="report-card" style="border-left: 5px solid #10b981;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b>👤 {pic}</b>
+                        <span>{stats['selesai']}/{stats['total']} Task</span>
+                    </div>
+                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
+                        <div style="background-color: #10b981; width: {progress}%; height: 8px; border-radius: 5px;"></div>
+                    </div>
                 </div>
-                <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
-                    <div style="background-color: #10b981; width: {progress}%; height: 8px; border-radius: 5px;"></div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
     with col_kanan:
         # 1. Header (Dibuat rata tengah dengan text-align: center)
