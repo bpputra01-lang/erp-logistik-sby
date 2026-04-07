@@ -5854,11 +5854,4 @@ if menu == "Reporting & PIC":
                         st.session_state.db_report[idx]['Status'] = "✅ Selesai"
                         st.rerun()
 
-elif menu == "Stock Minus Clearance":
-    # --- DI SINI BERSIH DARI INPUTAN PIC ---
-    st.header("📦 Stock Minus Clearance")
-    uploaded_file = st.file_uploader("Upload File ALL DATA STOCK", type=["xlsx", "xlsm"])
-    if uploaded_file:
-        st.success("File terupload! Kerjakan logic stock minus di sini.")
-
 
