@@ -5906,7 +5906,7 @@ if menu == "Reporting & PIC":
 
     with col_kanan:
         # --- BOX TAMBAH TUGAS (FIXED VISIBILITY) ---
-        st.markdown("<h4 style='margin-bottom:15px; color:#3b82f6;'>📝 Daily To-Do</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-bottom:15px; color:#3b82f6;'>📝 INPUT TO DO LIST</h4>", unsafe_allow_html=True)
         
         # Pakai form biar input dan tombol menyatu dan nggak ada 'kotak kosong' hantu
         with st.form("todo_form_v3", clear_on_submit=True):
