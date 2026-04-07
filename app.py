@@ -5960,7 +5960,7 @@ if menu == "Reporting & PIC":
         todo_html = f"""
         <div class="todo-container" style="
             background-color: #1a1c27; 
-            padding: 20px; 
+            padding: 10px; 
             border-radius: 10px; 
             border-left: 5px solid #3b82f6;
             margin-top: 10px;
