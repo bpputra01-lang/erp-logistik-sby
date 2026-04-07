@@ -5930,11 +5930,11 @@ if menu == "Reporting & PIC":
                         else:
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
-        # --- TAB 2: SUMMARY (DI LUAR tab_me tapi TETAP DI DALAM col_kiri) ---
+        # --- TAB 2: SUMMARY (Gabungan Laporan & To Do List) ---
         with tab_all:
             st.markdown("### 📊 Team Progress Summary")
             
-            # Hitung Statistik
+            # 1. Hitung Statistik Laporan (db_report)
             pic_stats = {}
             for t in st.session_state.db_report:
                 pic = t['PIC']
@@ -5943,21 +5943,48 @@ if menu == "Reporting & PIC":
                 pic_stats[pic]["total"] += 1
                 if t['Status'] == "✅ Selesai":
                     pic_stats[pic]["selesai"] += 1
-            
-            # Render Progress Card
+
+            # 2. Render Card Progress Laporan per PIC
+            st.write("**📈 Laporan Operasional**")
             for pic, stats in pic_stats.items():
                 progress = (stats['selesai'] / stats['total']) * 100
                 st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #10b981;">
+                <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
                     <div style="display: flex; justify-content: space-between;">
                         <b>👤 {pic}</b>
-                        <span>{stats['selesai']}/{stats['total']} Task</span>
+                        <span>{stats['selesai']}/{stats['total']} Selesai</span>
                     </div>
                     <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
-                        <div style="background-color: #10b981; width: {progress}%; height: 8px; border-radius: 5px;"></div>
+                        <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+            st.write("---")
+
+            # 3. Hitung Statistik TO DO LIST (Khusus User Login/Global)
+            st.write("**📝 To Do List Summary**")
+            if "todo_list" in st.session_state and st.session_state.todo_list:
+                td_total = len(st.session_state.todo_list)
+                td_selesai = sum(1 for item in st.session_state.todo_list if item['done'])
+                td_progress = (td_selesai / td_total) * 100
+                
+                st.markdown(f"""
+                <div class="report-card" style="border-left: 5px solid #10b981; background-color: #111827;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b>📋 Total Tugas</b>
+                        <span>{td_selesai}/{td_total} Item</span>
+                    </div>
+                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 12px;">
+                        <div style="background-color: #10b981; width: {td_progress}%; height: 12px; border-radius: 5px;"></div>
+                    </div>
+                    <p style="margin-top:10px; font-size:0.8rem; color:#9ca3af;">
+                        Status: {f"Mantap! {td_selesai} tugas beres" if td_progress == 100 else "Ayo gas dikit lagi!"}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.info("Belum ada To Do List yang dibuat.")
 
     with col_kanan:
         # 1. Header (Dibuat rata tengah dengan text-align: center)
