@@ -5661,45 +5661,39 @@ if menu == "Logistic Schedule":
                     for k in karyawan_list:
                         nama = k['nama']
                         
+                        # --- 1. DEFINISIKAN DULU DI ATAS BIAR GAK ERROR ---
+                        active_shifts = get_active_shifts(nama, day_name) # <--- PINDAH KE SINI
+                        
                         # A. CEK JATAH & LIBUR
                         if weekly_counter[nama] >= k['target_fix']: continue
                         if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                         
-                        # B. LOGIKA RECOVERY & LIBUR (REQUEST LU)
+                        # B. LOGIKA RECOVERY & LIBUR
                         tgl_besok = (datetime.strptime(tgl_ini, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
                         tgl_kemarin = (datetime.strptime(tgl_ini, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
                         
                         is_libur_besok = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_besok)].empty
                         is_libur_kemarin = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_kemarin)].empty
                         
-                        # H-1 Libur -> Wajib SHIFT 1
                         if is_libur_besok and shf_jam != "SHIFT 1": continue
-                        # H+1 Libur -> Wajib SHIFT 2
                         if is_libur_kemarin and shf_jam != "SHIFT 2": continue
 
-                        # --- 2. CEK STATUS SHIFT 3 (RECOVERY) ---
+                        # Cek Shift 3 Kemarin
                         day_index = day_names.index(day_name)
                         if day_index > 0:
                             day_kemarin = day_names[day_index - 1]
-                            shift_kemarin = get_active_shifts(nama, day_kemarin)
-                            
-                            if "SHIFT 3" in shift_kemarin:
-                                # Jika kemarin SHIFT 3, dia HARUS di SHIFT 2.
-                                # Jadi kalau slot sekarang BUKAN SHIFT 2, kita lewati orang ini.
-                                if shf_jam != "SHIFT 2":
-                                    continue
-                                # Tambahan: Jika dia Part-Full, pastikan dia belum ada shift hari ini (Anti-Full)
-                                if k['tipe'] == "Part-Full" and active_shifts:
-                                    continue
+                            if "SHIFT 3" in get_active_shifts(nama, day_kemarin) and shf_jam != "SHIFT 2":
+                                continue
 
-                        # C. FILTER POSISI (WAJIB ADA BIAR GAK ACAK)
+                        # C. FILTER POSISI & DOUBLE SHIFT
                         if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
                         if k['posisi'] == "SPV" and shf_role != "SPV": continue
+                        
+                        # Sekarang 'active_shifts' aman dipanggil di sini
                         if shf_jam in active_shifts: continue 
 
-                        # D. ATURAN PART-FULL (ANTI-NGEFULL SAAT RECOVERY)
+                        # D. ATURAN PART-FULL (ANTI-NGEFULL)
                         if k['tipe'] == "Part-Full":
-                            # Jika kondisi khusus, dilarang double shift
                             if is_libur_besok or is_libur_kemarin or (day_index > 0 and "SHIFT 3" in get_active_shifts(nama, day_names[day_index-1])):
                                 if active_shifts: continue 
                             
