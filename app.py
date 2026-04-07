@@ -5677,13 +5677,20 @@ if menu == "Logistic Schedule":
                         # H+1 Libur -> Wajib SHIFT 2
                         if is_libur_kemarin and shf_jam != "SHIFT 2": continue
 
-                        # Cek Shift 3 Kemarin
+                        # --- 2. CEK STATUS SHIFT 3 (RECOVERY) ---
                         day_index = day_names.index(day_name)
-                        active_shifts = get_active_shifts(nama, day_name)
                         if day_index > 0:
                             day_kemarin = day_names[day_index - 1]
-                            if "SHIFT 3" in get_active_shifts(nama, day_kemarin) and shf_jam != "SHIFT 2":
-                                continue
+                            shift_kemarin = get_active_shifts(nama, day_kemarin)
+                            
+                            if "SHIFT 3" in shift_kemarin:
+                                # Jika kemarin SHIFT 3, dia HARUS di SHIFT 2.
+                                # Jadi kalau slot sekarang BUKAN SHIFT 2, kita lewati orang ini.
+                                if shf_jam != "SHIFT 2":
+                                    continue
+                                # Tambahan: Jika dia Part-Full, pastikan dia belum ada shift hari ini (Anti-Full)
+                                if k['tipe'] == "Part-Full" and active_shifts:
+                                    continue
 
                         # C. FILTER POSISI (WAJIB ADA BIAR GAK ACAK)
                         if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
