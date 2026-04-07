@@ -5358,105 +5358,73 @@ def init_db_logistic():
 # Panggil di paling atas biar gak error "no such table"
 conn = init_db_logistic()
 
-# Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
-    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
+    # 1. CSS DIBUNGKUS DALAM .logistic-container
     st.markdown("""
         <style>
-            /* 1. Header Utama - Efek Gradient Glass */
-            .hero-header {
-                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
-                color: white;
-                padding: 25px;
-                border-radius: 12px;
-                text-align: center;
-                margin-bottom: 35px;
-                font-weight: 800;
-                font-size: 26px;
-                letter-spacing: 0.5px;
-                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+            /* Selector hanya bekerja di dalam div .logistic-container */
+            
+            .logistic-container .hero-header {
+                background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+                color: white; padding: 25px; border-radius: 12px;
+                text-align: center; margin-bottom: 35px; font-weight: 800;
+                font-size: 26px; letter-spacing: 0.5px;
+                box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
                 border: 1px solid rgba(255, 255, 255, 0.1);
             }
 
-            /* 1.5 Sub-Header Stylings */
-            div[data-testid="stVerticalBlock"] h3 {
-                color: #000000 !important;
-                border-left: 5px solid #0062E6;
-                padding-left: 15px;
-                font-weight: 700;
+            /* Sub-Header hanya di halaman ini */
+            .logistic-container div[data-testid="stVerticalBlock"] h3 {
+                color: #FFFFFF !important;
+                border-left: 5px solid #3b82f6;
+                padding-left: 15px; font-weight: 700;
                 text-transform: uppercase;
-                letter-spacing: 1px;
             }
 
-            /* 2. Input Fields - Modern Dark Glass */
-            [data-testid="stForm"] { 
-                border: none !important; 
-                padding: 0 !important; 
-            }
-            
-            div[data-testid="stTextInput"] > div > div, 
-            div[data-testid="stTextArea"] > div > div,
-            div[data-testid="stDateInput"] > div > div,
-            div[data-testid="stSelectbox"] > div > div {
+            /* Input & Form hanya di halaman ini */
+            .logistic-container div[data-testid="stTextInput"] > div > div, 
+            .logistic-container div[data-testid="stDateInput"] > div > div,
+            .logistic-container div[data-testid="stSelectbox"] > div > div {
                 background-color: #12141d !important; 
                 border: 1px solid #2d3142 !important;
                 border-radius: 10px !important;
-                transition: all 0.3s ease-in-out !important;
-                padding: 2px !important;
             }
 
-            /* Efek Focus Pas Diklik */
-            div[data-testid="stTextInput"] > div > div:focus-within, 
-            div[data-testid="stDateInput"] > div > div:focus-within {
-                border-color: #007BFF !important;
-                box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
-            }
-
-            /* 3. Button - Premium Glow Effect */
-            div.stButton > button {
-                background: linear-gradient(90deg, #007BFF 0%, #0056b3 100%) !important;
-                color: white !important;
-                border-radius: 10px !important;
-                border: none !important;
-                padding: 12px 24px !important;
-                font-weight: 700 !important;
-                text-transform: uppercase !important;
-                letter-spacing: 1px !important;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
-            }
-
-            /* 4. Font & Labels - Soft Neutral */
-            label { 
+            /* Input Text & Label (PENTING: Biar sidebar gak ikutan abu-abu) */
+            .logistic-container label { 
                 color: #B0B3B8 !important; 
                 font-size: 14px !important;
-                font-weight: 500 !important;
-                margin-bottom: 8px !important;
             }
 
-            input, textarea { 
-                background-color: transparent !important; 
+            .logistic-container input { 
                 color: #ffffff !important; 
-                font-family: 'Inter', sans-serif !important;
                 -webkit-text-fill-color: #ffffff !important; 
             }
 
-            .custom-card {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                background-color: #1a1c27;
-                border-radius: 8px;
-                padding: 12px 18px;
-                margin-bottom: 10px;
-                border-left: 5px solid #00FF00;
+            /* Button Premium hanya di halaman ini */
+            .logistic-container div.stButton > button {
+                background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%) !important;
+                color: white !important; border-radius: 10px !important;
+                border: none !important; font-weight: 700 !important;
+                transition: 0.3s ease-in-out !important;
+            }
+            
+            .logistic-container div.stButton > button:hover {
+                box-shadow: 0 0 15px rgba(59, 130, 246, 0.5) !important;
+                transform: scale(1.02);
+            }
+
+            /* Card Style */
+            .logistic-container .custom-card {
+                background-color: #1a1c27; border-radius: 8px;
+                padding: 12px 18px; margin-bottom: 10px;
+                border-left: 5px solid #3b82f6;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             }
-            .card-text { color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 14px; }
-            .card-subtext { color: #888888; font-size: 12px; }
         </style>
     """, unsafe_allow_html=True)
-
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
     # --- 1. DATABASE TIM ---
