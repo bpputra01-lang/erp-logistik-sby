@@ -5814,7 +5814,7 @@ st.markdown("""
     <style>
     .top-header {
         background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
-        color: white; padding: 5px; border-radius: 15px; margin-bottom: 20px;
+        color: white; padding: 5px; border-radius: 10px; margin-bottom: 20px;
     }
     .report-card {
         background-color: white; padding: 20px; border-radius: 15px;
