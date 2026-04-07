@@ -5800,20 +5800,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- 1. DATABASE INITIALIZATION (Tetap di paling atas) ---
-if 'db_report' not in st.session_state:
-    st.session_state.db_report = [
-        {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
-        {"Jam": "10:00", "Laporan": "Stock Opname Surabaya", "PIC": "Budi", "Status": "❌ Belum"},
-        {"Jam": "13:00", "Laporan": "Input Data Reject", "PIC": "Siska", "Status": "❌ Belum"},
-        {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
-    ]
-
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-
-# --- 1. INITIAL DATA (Session State agar data tidak reset) ---
+# --- 1. INITIAL DATA ---
 if 'db_report' not in st.session_state:
     st.session_state.db_report = [
         {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
@@ -5823,110 +5810,120 @@ if 'db_report' not in st.session_state:
     ]
 
 if 'todo_list' not in st.session_state:
-    st.session_state.todo_list = [
-        {"Tugas": "Cek Forklift Gudang A", "Selesai": False},
-        {"Tugas": "Briefing Tim Loader", "Selesai": False}
-    ]
+    st.session_state.todo_list = []
 
-# --- 2. CSS STYLING LENGKAP (Elegan & Mahal) ---
+# --- 2. CSS STYLING (Compact Header & Reject-Style Box) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
+    /* Hero Header - Dibuat Slim/Compact */
     .top-header {
         background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
-        color: white; padding: 25px; border-radius: 15px; margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        color: white; 
+        padding: 12px 25px; /* Padding dikecilkan */
+        border-radius: 12px; 
+        margin-bottom: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-    
-    .report-card {
-        background-color: white; padding: 20px; border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 12px;
-        border-left: 6px solid #1E3A8A;
-        transition: transform 0.2s;
-    }
-    
-    .report-card:hover { transform: scale(1.01); }
+    .top-header h2 { margin: 0; font-size: 1.5rem; }
 
-    .todo-section {
-        background-color: #ffffff; padding: 20px; border-radius: 15px;
-        border: 1px solid #eef2f6; box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    /* Report Card */
+    .report-card {
+        background-color: white; padding: 15px; border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 10px;
+        border-left: 5px solid #1E3A8A;
     }
+
+    /* TO-DO BOX (Styling ala Reject/Defect Menu) */
+    .todo-container {
+        background-color: #f0f7ff; /* Soft Pastel Blue */
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px dashed #3B82F6;
+        margin-bottom: 20px;
+    }
+    
+    /* Input field styling */
+    .stTextInput input {
+        border-radius: 10px !important;
+        border: 1px solid #d1d5db !important;
+    }
+    
+    /* Done/Selesai Text Styling */
+    .done-text { color: #94a3b8; text-decoration: line-through; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIKA ROUTING ---
-# Pastikan variabel 'menu' ini sesuai dengan navigasi utama di app lu
+# (Pastikan variabel 'menu' didefinisikan dari navigasi utama lu)
 if menu == "Reporting & PIC":
     
-    # Header Biru
-    st.markdown('<div class="top-header"><h1>🚀 Jezpro Digital Logistik</h1></div>', unsafe_allow_html=True)
+    # 1. Compact Hero Header
+    st.markdown('<div class="top-header"><h2>🚀 Jezpro Digital Logistik</h2></div>', unsafe_allow_html=True)
 
-    # Navigasi PIC & Jam
+    # 2. Control Row
     c1, c2 = st.columns([1, 1])
     with c1:
-        current_user = st.selectbox("👤 Pilih PIC (Login):", ["Andi", "Budi", "Siska", "Maya"], key="sel_pic_rep_final")
+        current_user = st.selectbox("👤 Pilih PIC (Login):", ["Andi", "Budi", "Siska", "Maya"], key="pic_final")
     with c2:
         st.write("")
-        st.write(f"📅 **Tanggal:** {datetime.now().strftime('%A, %d %B %Y')}")
+        st.info(f"📅 **Tanggal:** {datetime.now().strftime('%d %B %Y')}")
 
     st.divider()
 
-    # Konten Utama (Reporting & To-Do)
-    col_kiri, col_kanan = st.columns([2, 1])
+    # 3. Main Content
+    col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
-        st.subheader(f"🎯 Reporting Tugas: {current_user}")
-        tab_personal, tab_global = st.tabs(["My Dashboard", "Global Overview"])
+        st.subheader(f"🎯 Laporan: {current_user}")
+        tab_me, tab_all = st.tabs(["Dashboard Saya", "Overview Tim"])
         
-        with tab_personal:
+        with tab_me:
             my_tasks = [t for t in st.session_state.db_report if t['PIC'] == current_user]
-            if not my_tasks:
-                st.info("Tidak ada jadwal laporan untuk Anda.")
-            else:
-                for idx, task in enumerate(st.session_state.db_report):
-                    if task['PIC'] == current_user:
-                        with st.container():
-                            ck1, ck2 = st.columns([4, 1])
-                            with ck1:
-                                status_txt = f"<span style='color:green;'>{task['Status']}</span>" if task['Status'] == "✅ Selesai" else f"<span style='color:red;'>{task['Status']}</span>"
-                                st.markdown(f"""
-                                <div class="report-card">
-                                    <h4 style="margin:0; color:#1e293b;">{task['Laporan']}</h4>
-                                    <p style="margin:0; color:gray; font-size: 0.9rem;">Jam Target: {task['Jam']} | Status: {status_txt}</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            with ck2:
-                                st.write("") # Spacer
-                                if task['Status'] == "❌ Belum":
-                                    if st.button(f"Update", key=f"btn_upd_{idx}"):
-                                        st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                        st.rerun()
-                                else:
-                                    st.button("Done", disabled=True, key=f"btn_done_{idx}")
-
-        with tab_global:
-            st.dataframe(pd.DataFrame(st.session_state.db_report), use_container_width=True, hide_index=True)
+            for idx, task in enumerate(st.session_state.db_report):
+                if task['PIC'] == current_user:
+                    with st.container():
+                        ck1, ck2 = st.columns([4, 1.2])
+                        with ck1:
+                            st.markdown(f"""
+                            <div class="report-card">
+                                <h4 style="margin:0;">{task['Laporan']}</h4>
+                                <small style="color:gray;">Jam: {task['Jam']} | Status: {task['Status']}</small>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        with ck2:
+                            st.write("") # Spacer
+                            if task['Status'] == "❌ Belum":
+                                if st.button(f"Update", key=f"up_{idx}"):
+                                    st.session_state.db_report[idx]['Status'] = "✅ Selesai"
+                                    st.rerun()
+                            else:
+                                st.button("Selesai", disabled=True, key=f"don_{idx}")
 
     with col_kanan:
-        st.markdown('<div class="todo-section">', unsafe_allow_html=True)
-        st.subheader("✅ Daily To-Do")
+        # TO-DO BOX DENGAN STYLE REJECT/DEFECT
+        st.markdown('<div class="todo-container">', unsafe_allow_html=True)
+        st.subheader("📝 Daily To-Do")
         
-        # Form tambah To-Do
-        with st.form("add_todo", clear_on_submit=True):
-            new_tugas = st.text_input("Tambah tugas baru...")
-            if st.form_submit_button("Tambah"):
-                if new_tugas:
-                    st.session_state.todo_list.append({"Tugas": new_tugas, "Selesai": False})
+        with st.form("todo_form", clear_on_submit=True):
+            tugas_input = st.text_input("Tugas Baru", placeholder="Contoh: Cek stok di rack A1...")
+            submit = st.form_submit_button("➕ Tambah ke List")
+            if submit and tugas_input:
+                st.session_state.todo_list.append({"task": tugas_input, "done": False})
+                st.rerun()
+        
+        st.write("---")
+        # Render List To-Do
+        if not st.session_state.todo_list:
+            st.caption("Belum ada tugas tambahan.")
+        else:
+            for i, item in enumerate(st.session_state.todo_list):
+                checked = st.checkbox(item['task'], key=f"chk_{i}", value=item['done'])
+                if checked != item['done']:
+                    st.session_state.todo_list[i]['done'] = checked
                     st.rerun()
-
-        st.write("")
-        # List To-Do
-        for i, item in enumerate(st.session_state.todo_list):
-            st.checkbox(item['Tugas'], key=f"todo_{i}", value=item['Selesai'])
-        
         st.markdown('</div>', unsafe_allow_html=True)
 
-
+# --- FINISH ---
