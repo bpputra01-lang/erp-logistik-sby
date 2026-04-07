@@ -5813,8 +5813,8 @@ if 'db_report' not in st.session_state:
 st.markdown("""
     <style>
     .top-header {
-        background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 50%);
-        color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px;
+        background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
+        color: white; padding: 10px; border-radius: 15px; margin-bottom: 20px;
     }
     .report-card {
         background-color: white; padding: 20px; border-radius: 15px;
