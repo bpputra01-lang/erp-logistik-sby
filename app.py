@@ -5800,7 +5800,16 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# CSS (Tetap sama)
+# --- 1. DATABASE INITIALIZATION (Tetap di paling atas) ---
+if 'db_report' not in st.session_state:
+    st.session_state.db_report = [
+        {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
+        {"Jam": "10:00", "Laporan": "Stock Opname Surabaya", "PIC": "Budi", "Status": "❌ Belum"},
+        {"Jam": "13:00", "Laporan": "Input Data Reject", "PIC": "Siska", "Status": "❌ Belum"},
+        {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
+    ]
+
+# --- 2. CSS STYLING (Tetap di atas agar ter-load) ---
 st.markdown("""
     <style>
     .top-header {
@@ -5815,43 +5824,57 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- DATABASE SIMULATION ---
-if 'db_report' not in st.session_state:
-    st.session_state.db_report = [
-        {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
-        {"Jam": "10:00", "Laporan": "Stock Opname Surabaya", "PIC": "Budi", "Status": "❌ Belum"},
-        {"Jam": "13:00", "Laporan": "Input Data Reject", "PIC": "Siska", "Status": "❌ Belum"},
-        {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
-    ]
-
-# --- 1. HEADER TETAP (Muncul di semua menu) ---
-st.markdown('<div class="top-header"><h1>Jezpro Digital Logistik</h1></div>', unsafe_allow_html=True)
-
-# --- 2. NAVIGASI UTAMA (Muncul di semua menu) ---
-menu = st.selectbox("📂 Pilih Menu Dashboard:", ["Reporting & PIC", "Stock Minus Clearance", "Settings"])
+# --- 3. NAVIGASI UTAMA (HANYA INI YANG DI LUAR) ---
+# Gunakan navigasi ini untuk pindah antar fitur ERP lu
+menu_utama = st.selectbox(
+    "📂 Pilih Menu Dashboard:", 
+    ["Reporting & PIC", "Stock Minus Clearance", "Justification Adjustment"],
+    key="navigasi_erp_sby"
+)
 
 st.divider()
 
-# --- 3. LOGIKA ROUTING (PEMBATAS KONTEN) ---
+# --- 4. LOGIKA ROUTING (PEMBATASAN KONTEN) ---
 
-if menu == "Reporting & PIC":
-    # --- SEMUA INPUTAN INI HANYA MUNCUL DI MENU REPORTING ---
+if menu_utama == "Reporting & PIC":
+    # --- SEMUA KODE DI BAWAH INI HANYA AKAN MUNCUL DI MENU REPORTING ---
+    
+    # Header Biru (Sekarang di dalam IF, jadi gak bakal ganggu menu lain)
+    st.markdown('<div class="top-header"><h1>Jezpro Digital Logistik</h1></div>', unsafe_allow_html=True)
+
+    # Inputan PIC & Jam
     c1, c2 = st.columns([1, 1])
     with c1:
-        current_user = st.selectbox("👤 Pilih PIC (Login):", ["Andi", "Budi", "Siska", "Maya"])
+        # Tambahkan KEY unik agar tidak bentrok dengan widget lain di file ribuan baris lu
+        current_user = st.selectbox("👤 Pilih PIC (Login):", ["Andi", "Budi", "Siska", "Maya"], key="sel_pic_reporting")
     with c2:
         st.write("")
         st.write(f"📅 **Update:** {datetime.now().strftime('%A, %d %B %Y')}")
 
-    # Konten Dashboard Reporting
-    t1, t2 = st.tabs(["🎯 My Tasks", "🌍 Team Overview"])
-    with t1:
+    # Konten Dashboard
+    tab_personal, tab_global = st.tabs(["🎯 My Tasks", "🌍 Team Overview"])
+    
+    with tab_personal:
+        st.subheader(f"Tugas Hari Ini: {current_user}")
         for idx, task in enumerate(st.session_state.db_report):
             if task['PIC'] == current_user:
-                st.markdown(f'<div class="report-card"><h3>{task["Laporan"]}</h3><p>{task["Jam"]} | {task["Status"]}</p></div>', unsafe_allow_html=True)
+                # Tampilan Card
+                st.markdown(f"""
+                <div class="report-card">
+                    <h3 style="margin:0;">{task['Laporan']}</h3>
+                    <p style="margin:0; color:gray;">Target: {task['Jam']} | Status: {task['Status']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Button Aksi
                 if task['Status'] == "❌ Belum":
-                    if st.button(f"Selesaikan {idx}", key=f"btn_{idx}"):
+                    if st.button(f"Selesaikan Tugas {idx}", key=f"btn_done_{idx}"):
                         st.session_state.db_report[idx]['Status'] = "✅ Selesai"
+                        st.toast(f"Laporan {task['Laporan']} Berhasil!")
                         st.rerun()
+
+    with tab_global:
+        st.subheader("🌐 Monitoring Seluruh Tim")
+        st.dataframe(pd.DataFrame(st.session_state.db_report), use_container_width=True, hide_index=True)
 
 
