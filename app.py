@@ -5862,16 +5862,15 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIKA ROUTING ---
-# Ganti 'menu' sesuai variabel navigasi sidebar/utama lu
 if menu == "Reporting & PIC":
     
-    # 1. Header
+    # 1. Header (Compact Style)
     st.markdown('<div class="top-header"><h2>🚀 Jezpro Digital Logistik</h2></div>', unsafe_allow_html=True)
 
-    # 2. Control Panel Row
+    # 2. Control Panel
     c1, c2 = st.columns([1.2, 1])
     with c1:
-        current_user = st.selectbox("👤 Masuk Sebagai PIC:", ["Andi", "Budi", "Siska", "Maya"], key="pic_fix_dark")
+        current_user = st.selectbox("👤 Masuk Sebagai PIC:", ["Andi", "Budi", "Siska", "Maya"], key="pic_fix_dark_v2")
     with c2:
         st.write("")
         st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
@@ -5899,38 +5898,41 @@ if menu == "Reporting & PIC":
                     with ck2:
                         st.write("") 
                         if task['Status'] == "❌ Belum":
-                            if st.button(f"Update", key=f"up_btn_{idx}"):
+                            if st.button(f"Update", key=f"up_v2_{idx}"):
                                 st.session_state.db_report[idx]['Status'] = "✅ Selesai"
                                 st.rerun()
                         else:
-                            st.button("Selesai", disabled=True, key=f"done_btn_{idx}")
+                            st.button("Selesai", disabled=True, key=f"done_v2_{idx}")
 
     with col_kanan:
-        # --- BOX TAMBAH TUGAS (DARK REJECT STYLE) ---
+        # --- BOX TAMBAH TUGAS (REVISI DARK MODE) ---
         st.markdown('<div class="todo-container">', unsafe_allow_html=True)
-        st.markdown("<b style='color:#3b82f6;'>Tugas Baru</b>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-bottom:15px; color:#3b82f6;'>📝 Daily To-Do</h4>", unsafe_allow_html=True)
         
-        tugas_baru = st.text_input("", placeholder="Apa yang mau dikerjakan?", key="input_todo_final", label_visibility="collapsed")
-        
-        st.write("")
-        if st.button("➕ Tambah ke List", key="btn_add_final"):
-            if tugas_baru:
+        # Menggunakan FORM agar input dan tombol menyatu dengan estetik
+        with st.form("todo_form_v2", clear_on_submit=True):
+            # Hilangkan collapsed agar label terlihat sebagai panduan
+            tugas_baru = st.text_input("Tugas Baru", placeholder="Ketik apa yang mau dikerjakan...", key="input_todo_v2")
+            
+            st.write("") # Spacer kecil
+            submit_todo = st.form_submit_button("➕ Tambah ke List")
+            
+            if submit_todo and tugas_baru:
                 st.session_state.todo_list.append({"task": tugas_baru, "done": False})
                 st.rerun()
         
-        st.write("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
+        st.write("<hr style='margin:20px 0; border-color:#374151;'>", unsafe_allow_html=True)
         
-        # --- RENDER LIST (Anti KeyError) ---
+        # --- RENDER LIST ---
         if not st.session_state.todo_list:
             st.caption("Tidak ada tugas tambahan.")
         else:
             for i, item in enumerate(st.session_state.todo_list):
-                # Proteksi: Ambil data pakai .get() biar gak crash kalau key beda
                 task_label = item.get('task', item.get('Tugas', 'Tugas Tanpa Nama'))
                 is_checked = item.get('done', item.get('Selesai', False))
                 
-                # Checkbox Logic
-                res = st.checkbox(task_label, key=f"chk_final_{i}", value=is_checked)
+                # Checkbox dengan gaya Dark Mode
+                res = st.checkbox(task_label, key=f"chk_v2_{i}", value=is_checked)
                 if res != is_checked:
                     st.session_state.todo_list[i]['done'] = res
                     st.rerun()
