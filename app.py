@@ -5955,25 +5955,25 @@ if menu == "Reporting & PIC":
                         else:
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
-    with col_kanan:
-    # Baris di bawah ini HARUS menjorok ke dalam
-    todo_html = f"""
-    <div class="todo-container" style="
-        background-color: #1a1c27; 
-        padding: 20px; 
-        border-radius: 10px; 
-        border-left: 5px solid #3b82f6;
-        margin-top: 10px;
-    ">
-        <h4 style='margin-bottom:15px; color:#3b82f6; margin-top:0; font-family: sans-serif;'>
-            📝 TO DO LIST
-        </h4>
-        <div style='color: #888; font-size: 13px;'>
-            Belum ada tugas hari ini...
+        with col_kanan:
+        # Baris di bawah ini HARUS menjorok ke dalam
+        todo_html = f"""
+        <div class="todo-container" style="
+            background-color: #1a1c27; 
+            padding: 20px; 
+            border-radius: 10px; 
+            border-left: 5px solid #3b82f6;
+            margin-top: 10px;
+        ">
+            <h4 style='margin-bottom:15px; color:#3b82f6; margin-top:0; font-family: sans-serif;'>
+                📝 TO DO LIST
+            </h4>
+            <div style='color: #888; font-size: 13px;'>
+                Belum ada tugas hari ini...
+            </div>
         </div>
-    </div>
-    """
-    st.markdown(todo_html, unsafe_allow_html=True)
+        """
+        st.markdown(todo_html, unsafe_allow_html=True)
         
         with st.form("form_todo_dark", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
