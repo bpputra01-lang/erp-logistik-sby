@@ -5475,7 +5475,7 @@ if menu == "Logistic Schedule":
                 st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
-    # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
+# --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
 with st.expander("🔍 Staff Database", expanded=True):
     df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
     if not df_cek.empty:
@@ -5491,7 +5491,7 @@ with st.expander("🔍 Staff Database", expanded=True):
                     </div>
                 """, unsafe_allow_html=True)
             with cc2:
-                # Perbaikan: Key menggunakan prefix 'staff_' + nama + index agar unik
+                # Key unik agar tidak bentrok dengan daftar libur
                 if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
                     conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
                     conn.commit()
@@ -5511,6 +5511,7 @@ with col_l1:
         target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
         tgl_off = st.date_input("Tanggal Off")
         jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
+        
         if st.form_submit_button("SUBMIT OFF"):
             if target:
                 conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
@@ -5533,8 +5534,7 @@ with col_l2:
                     </div>
                 """, unsafe_allow_html=True)
             with m2:
-                # Perbaikan: Key menggunakan prefix 'libur_' + nama + tanggal agar unik
-                # Ini mencegah bentrok dengan tombol hapus karyawan
+                # Key unik menggunakan kombinasi nama dan tanggal
                 if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
                     conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
                     conn.commit()
@@ -5544,7 +5544,8 @@ with col_l2:
 
 st.divider()
 
-# --- 1. PASTIKAN TABEL ADA DULU ---
+# --- 3. PASTIKAN TABEL ADA DULU ---
+# Kode ini harus sejajar dengan st.divider() di luar blok "with"
 cursor = conn.cursor()
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS plot_shift3 (
