@@ -5747,7 +5747,7 @@ if menu == "Logistic Schedule":
         col_v1, col_v2 = st.columns([5, 2])
         
         with col_v1:
-            st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
+            st.markdown("### 📋 WEEKLY SCHEDULE LOGISTIC SBY")
 
             def color_by_shift(row):
                 shift_type = str(row['SHIFT - ROLE'])
@@ -5772,7 +5772,7 @@ if menu == "Logistic Schedule":
             )
 
         with col_v2:
-            st.markdown("### 📈 REALISASI")
+            st.markdown("### 📈 TOTAL SHIFT")
             sum_data = []
             df_staff_master = pd.read_sql_query("SELECT nama, tipe FROM karyawan", conn)
             
@@ -5781,7 +5781,7 @@ if menu == "Logistic Schedule":
                 t = st.session_state.summary_shift.get(n, 0)
                 if t > 0:
                     target = 9 if k['tipe'] == "Part-Full" else 6
-                    status = "✅ OK" if t >= target else "⚠️ KURANG"
+                    status = "✅ OK" if t >= target else "⚠️ KURANG SHIFT"
                     sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": status})
             
             if sum_data:
