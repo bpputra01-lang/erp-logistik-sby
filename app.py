@@ -5392,12 +5392,6 @@ if menu == "Logistic Schedule":
                 border-radius: 10px !important;
             }
 
-            /* Input Text & Label (PENTING: Biar sidebar gak ikutan abu-abu) */
-            .logistic-container label { 
-                color: #B0B3B8 !important; 
-                font-size: 14px !important;
-            }
-
             .logistic-container input { 
                 color: #ffffff !important; 
                 -webkit-text-fill-color: #ffffff !important; 
@@ -5425,6 +5419,20 @@ if menu == "Logistic Schedule":
             }
         </style>
     """, unsafe_allow_html=True)
+
+    # 2. BUNGKUS SELURUH KONTEN HALAMAN DENGAN DIV INI
+    st.markdown('<div class="logistic-container">', unsafe_allow_html=True)
+
+    # --- SEMUA KODE HALAMAN LU TARUH DISINI ---
+    st.markdown('<div class="hero-header">📝 LOGISTIC SCHEDULE SURABAYA</div>', unsafe_allow_html=True)
+    
+    # Contoh penggunaan subheader (Gak bakal ngerusak sidebar)
+    st.subheader(f"Dashboard: {current_user}")
+    
+    # ... taruh sisa kode lu (form, table, dll) ...
+
+    # 3. TUTUP CONTAINER (WAJIB ADA DI PALING BAWAH HALAMAN)
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
     # --- 1. DATABASE TIM ---
