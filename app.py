@@ -5800,7 +5800,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- 1. INITIAL DATA ---
+# --- 1. INITIAL DATA (Proteksi Data Lama) ---
 if 'db_report' not in st.session_state:
     st.session_state.db_report = [
         {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
@@ -5812,73 +5812,73 @@ if 'db_report' not in st.session_state:
 if 'todo_list' not in st.session_state:
     st.session_state.todo_list = []
 
-# --- 2. CSS DARK THEME (Suntikan langsung ke elemen) ---
+# --- 2. CSS DARK THEME (Solid Dark & Reject Style) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     
-    /* Background Utama Gelap */
+    /* Background & Font */
     .main { background-color: #0e1117; color: #ffffff; font-family: 'Inter', sans-serif; }
     
-    /* Header Compact Dark */
+    /* Header Compact */
     .top-header {
         background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
-        color: white; padding: 10px 20px; border-radius: 10px; margin-bottom: 20px;
-        border: 1px solid #3b82f6;
+        color: white; padding: 12px 20px; border-radius: 10px; margin-bottom: 20px;
+        border: 1px solid #3b82f6; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
-    .top-header h2 { margin: 0; font-size: 1.2rem; }
+    .top-header h2 { margin: 0; font-size: 1.3rem; font-weight: 700; }
 
-    /* Card Laporan Dark Mode */
+    /* Card Laporan */
     .report-card {
         background-color: #1f2937; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 10px;
         border-left: 5px solid #3b82f6; color: #f3f4f6;
     }
 
-    /* Box Tambah Tugas (Ala Reject/Defect) - Dark Version */
+    /* Box To-Do (Style Reject/Defect Dark) */
     .todo-container {
         background-color: #111827; padding: 20px; border-radius: 15px;
         border: 1px solid #374151; margin-bottom: 20px;
     }
     
-    /* Styling Tombol + Tambah ke List */
-    .stButton > button {
-        width: 100%; border-radius: 10px; background-color: #1f2937;
-        color: #ffffff; border: 1px solid #374151; height: 3em;
-        transition: 0.3s;
+    /* Input Styling */
+    .stTextInput input {
+        background-color: #1f2937 !important; color: white !important;
+        border: 1px solid #374151 !important; border-radius: 8px !important;
     }
-    .stButton > button:hover {
-        border-color: #3b82f6; color: #3b82f6; background-color: #111827;
-    }
-
-    /* Override Streamlit Inputs for Dark Mode */
-    input { background-color: #1f2937 !important; color: white !important; border-radius: 8px !important; }
-    .stSelectbox div[data-baseweb="select"] { background-color: #1f2937 !important; }
     
-    /* Divider & Tab Color */
-    hr { border-color: #374151; }
+    /* Button Styling */
+    .stButton > button {
+        width: 100%; border-radius: 8px; background-color: #1f2937;
+        color: #ffffff; border: 1px solid #374151; transition: 0.3s;
+    }
+    .stButton > button:hover { border-color: #3b82f6; color: #3b82f6; background-color: #0e1117; }
+    
+    /* Tabs & Divider */
     .stTabs [data-baseweb="tab"] { color: #9ca3af; }
     .stTabs [aria-selected="true"] { color: #3b82f6 !important; border-bottom-color: #3b82f6 !important; }
+    hr { border-color: #374151; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIKA ROUTING ---
-# (Pastikan variabel 'menu' ini dari navigasi utama lu)
+# Ganti 'menu' sesuai variabel navigasi sidebar/utama lu
 if menu == "Reporting & PIC":
     
-    # Header Compact
+    # 1. Header
     st.markdown('<div class="top-header"><h2>🚀 Jezpro Digital Logistik</h2></div>', unsafe_allow_html=True)
 
-    # Navigasi & Jam
+    # 2. Control Panel Row
     c1, c2 = st.columns([1.2, 1])
     with c1:
-        current_user = st.selectbox("👤 Masuk Sebagai PIC:", ["Andi", "Budi", "Siska", "Maya"], key="pic_dark")
+        current_user = st.selectbox("👤 Masuk Sebagai PIC:", ["Andi", "Budi", "Siska", "Maya"], key="pic_fix_dark")
     with c2:
         st.write("")
         st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
 
     st.divider()
 
+    # 3. Main Layout
     col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
@@ -5892,45 +5892,46 @@ if menu == "Reporting & PIC":
                     with ck1:
                         st.markdown(f"""
                         <div class="report-card">
-                            <h4 style="margin:0;">{task['Laporan']}</h4>
+                            <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
                             <small style="color:#9ca3af;">Jam: {task['Jam']} | Status: {task['Status']}</small>
                         </div>
                         """, unsafe_allow_html=True)
                     with ck2:
-                        st.write("") # Spacer
+                        st.write("") 
                         if task['Status'] == "❌ Belum":
-                            if st.button(f"Update", key=f"up_dark_{idx}"):
+                            if st.button(f"Update", key=f"up_btn_{idx}"):
                                 st.session_state.db_report[idx]['Status'] = "✅ Selesai"
                                 st.rerun()
                         else:
-                            st.button("Selesai", disabled=True, key=f"don_dark_{idx}")
+                            st.button("Selesai", disabled=True, key=f"done_btn_{idx}")
 
     with col_kanan:
-        # BOX TAMBAH TUGAS (DARK & REJECT STYLE)
+        # --- BOX TAMBAH TUGAS (DARK REJECT STYLE) ---
         st.markdown('<div class="todo-container">', unsafe_allow_html=True)
         st.markdown("<b style='color:#3b82f6;'>Tugas Baru</b>", unsafe_allow_html=True)
         
-        # Form tanpa border bawaan karena sudah dibungkus div
-        tugas_baru = st.text_input("", placeholder="Apa yang mau dikerjakan?", key="input_todo_dark", label_visibility="collapsed")
+        tugas_baru = st.text_input("", placeholder="Apa yang mau dikerjakan?", key="input_todo_final", label_visibility="collapsed")
         
-        st.write("") # Spacer
-        if st.button("➕ Tambah ke List", key="btn_add_dark"):
+        st.write("")
+        if st.button("➕ Tambah ke List", key="btn_add_final"):
             if tugas_baru:
                 st.session_state.todo_list.append({"task": tugas_baru, "done": False})
                 st.rerun()
         
         st.write("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
         
-        # List To-Do
+        # --- RENDER LIST (Anti KeyError) ---
         if not st.session_state.todo_list:
             st.caption("Tidak ada tugas tambahan.")
         else:
             for i, item in enumerate(st.session_state.todo_list):
-                # Checkbox dengan logic update
-                checked = st.checkbox(item['task'], key=f"chk_dark_{i}", value=item['done'])
-                if checked != item['done']:
-                    st.session_state.todo_list[i]['done'] = checked
+                # Proteksi: Ambil data pakai .get() biar gak crash kalau key beda
+                task_label = item.get('task', item.get('Tugas', 'Tugas Tanpa Nama'))
+                is_checked = item.get('done', item.get('Selesai', False))
+                
+                # Checkbox Logic
+                res = st.checkbox(task_label, key=f"chk_final_{i}", value=is_checked)
+                if res != is_checked:
+                    st.session_state.todo_list[i]['done'] = res
                     st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-
-# --- FINISH ---
