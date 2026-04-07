@@ -5476,81 +5476,85 @@ if menu == "Logistic Schedule":
                 st.rerun()
 
     # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
-    with st.expander("🔍 Staff Database", expanded=True):
-        df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
-        if not df_cek.empty:
-            for i, row in df_cek.iterrows():
-                cc1, cc2 = st.columns([6, 1])
-                with cc1:
-                    st.markdown(f"""
-                        <div class="custom-card" style="border-left-color: #007BFF;">
-                            <div>
-                                <div class="card-text">{row['nama']}</div>
-                                <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
-                            </div>
+with st.expander("🔍 Staff Database", expanded=True):
+    df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
+    if not df_cek.empty:
+        for i, row in df_cek.iterrows():
+            cc1, cc2 = st.columns([6, 1])
+            with cc1:
+                st.markdown(f"""
+                    <div class="custom-card" style="border-left-color: #007BFF;">
+                        <div>
+                            <div class="card-text">{row['nama']}</div>
+                            <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
                         </div>
-                    """, unsafe_allow_html=True)
-                with cc2:
-                    if st.button("🗑️", key=f"del_staff_{i}", use_container_width=True):
-                        conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
-                        conn.commit()
-                        st.rerun()
-        else:
-            st.info("Belum ada data tim di database.") 
-
-    st.divider()
-
-    # --- 2. PLOT LIBUR (MODEL KARTU) ---
-    st.subheader("🚫 2. Day Off Request")
-    col_l1, col_l2 = st.columns([1, 2])
-
-    with col_l1:
-        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        with st.form("form_libur_komplit", clear_on_submit=True):
-            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
-            tgl_off = st.date_input("Tanggal Off")
-            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
-            if st.form_submit_button("SUBMIT OFF"):
-                if target:
-                    conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
+                    </div>
+                """, unsafe_allow_html=True)
+            with cc2:
+                # Perbaikan: Key menggunakan prefix 'staff_' + nama + index agar unik
+                if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
+                    conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
                     conn.commit()
                     st.rerun()
+    else:
+        st.info("Belum ada data tim di database.") 
 
-    with col_l2:
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
-        if not df_off_view.empty:
-            for i, row in df_off_view.iterrows():
-                m1, m2 = st.columns([6, 1])
-                with m1:
-                    st.markdown(f"""
-                        <div class="custom-card" style="border-left-color: #FF4B4B;">
-                            <div>
-                                <div class="card-text">{row['nama']}</div>
-                                <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
-                            </div>
+st.divider()
+
+# --- 2. PLOT LIBUR (MODEL KARTU) ---
+st.subheader("🚫 2. Day Off Request")
+col_l1, col_l2 = st.columns([1, 2])
+
+with col_l1:
+    df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+    with st.form("form_libur_komplit", clear_on_submit=True):
+        target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
+        tgl_off = st.date_input("Tanggal Off")
+        jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
+        if st.form_submit_button("SUBMIT OFF"):
+            if target:
+                conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
+                conn.commit()
+                st.rerun()
+
+with col_l2:
+    # Mengambil data libur terbaru
+    df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
+    if not df_off_view.empty:
+        for i, row in df_off_view.iterrows():
+            m1, m2 = st.columns([6, 1])
+            with m1:
+                st.markdown(f"""
+                    <div class="custom-card" style="border-left-color: #FF4B4B;">
+                        <div>
+                            <div class="card-text">{row['nama']}</div>
+                            <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
                         </div>
-                    """, unsafe_allow_html=True)
-                with m2:
-                    if st.button("🗑️", key=f"del_libur_{i}", use_container_width=True):
-                        conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                        conn.commit()
-                        st.rerun()
-        else:
-            st.info("Belum ada data pengajuan libur.")
+                    </div>
+                """, unsafe_allow_html=True)
+            with m2:
+                # Perbaikan: Key menggunakan prefix 'libur_' + nama + tanggal agar unik
+                # Ini mencegah bentrok dengan tombol hapus karyawan
+                if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
+                    conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
+                    conn.commit()
+                    st.rerun()
+    else:
+        st.info("Belum ada data pengajuan libur.")
 
-    st.divider()
+st.divider()
 
-    # --- 1. PASTIKAN TABEL ADA DULU ---
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS plot_shift3 (
-            nama TEXT,
-            tanggal TEXT,
-            posisi TEXT,
-            tipe TEXT
-        )
-    ''')
-    conn.commit()
+# --- 1. PASTIKAN TABEL ADA DULU ---
+cursor = conn.cursor()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS plot_shift3 (
+        nama TEXT,
+        tanggal TEXT,
+        posisi TEXT,
+        tipe TEXT
+    )
+''')
+conn.commit()
 
     # --- 2. BARU BOLEH READ DATA ---
     try:
