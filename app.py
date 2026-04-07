@@ -5816,16 +5816,20 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 
-# --- 1. SQLITE LOGIC (Tetap Sama) ---
+# --- 1. SQLITE CORE LOGIC (Hanya Tambahan) ---
 def get_db_connection():
     return sqlite3.connect('jez_reporting.db', check_same_thread=False)
 
 def init_db():
     conn = get_db_connection()
-    conn.execute('CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY, laporan TEXT, pic TEXT, status TEXT)')
-    conn.execute('CREATE TABLE IF NOT EXISTS todo (id INTEGER PRIMARY KEY, task TEXT, done INTEGER)')
+    # Tabel Laporan
+    conn.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
+    # Tabel Todo
+    conn.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
+    # Tracker Hari
     conn.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
     
+    # Isi data awal ke DB kalau masih kosong
     if not conn.execute('SELECT * FROM reports').fetchone():
         data_awal = [
             ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"), ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
@@ -5837,59 +5841,129 @@ def init_db():
             ("MANIFEST", "HAMZAH", "❌ Belum"), ("REFUND", "HAMZAH", "❌ Belum"),
             ("REFILL & OVERSTOCK", "KRISNA", "❌ Belum"), ("ZERO PUTAWAY", "WAREHOUSE FULLFILLMENT", "❌ Belum")
         ]
-        conn.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', data_awal)
+        conn.executemany('INSERT INTO reports VALUES (?, ?, ?)', data_awal)
     conn.commit()
     conn.close()
 
-def sync_daily_reset():
+def sync_data():
+    """Sinkronisasi DB ke Session State & Handle Reset Harian"""
     conn = get_db_connection()
     today = datetime.now().strftime('%Y-%m-%d')
     res = conn.execute('SELECT last_date FROM reset_tracker').fetchone()
+    
+    # Logic Auto Reset Harian
     if not res or res[0] != today:
         conn.execute('UPDATE reports SET status = "❌ Belum"')
         conn.execute('DELETE FROM todo')
-        if not res: conn.execute('INSERT INTO reset_tracker VALUES (?)', (today,))
-        else: conn.execute('UPDATE reset_tracker SET last_date = ?', (today,))
+        conn.execute('DELETE FROM reset_tracker')
+        conn.execute('INSERT INTO reset_tracker VALUES (?)', (today,))
         conn.commit()
+    
+    # Tarik data dari DB ke Session State lu
+    reports_db = conn.execute('SELECT laporan, pic, status FROM reports').fetchall()
+    st.session_state.db_report = [{"Laporan": r[0], "PIC": r[1], "Status": r[2]} for r in reports_db]
+    
+    todo_db = conn.execute('SELECT task, done FROM todo').fetchall()
+    st.session_state.todo_list = [{"task": t[0], "done": bool(t[1])} for t in todo_db]
     conn.close()
 
+# Jalankan Database
 init_db()
-sync_daily_reset()
+sync_data()
 
-# --- 2. CSS DARK THEME (Gue Balikin Persis Punya Lu) ---
+# --- 2. INITIAL DATA (Lu punya, tetep ada buat jaga-jaga) ---
+if 'db_report' not in st.session_state:
+    # (Sudah dihandle sync_data di atas)
+    pass
+
+if 'todo_list' not in st.session_state:
+    st.session_state.todo_list = []
+
+# --- 3. CSS DARK THEME (Gue Balikin & Gue Perkuat - PERSIS PUNYA LU) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+    /* Global Font */
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    /* 1. Header Utama - Efek Gradient Glass (Mirip Gambar 2) */
     .hero-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 25px; border-radius: 12px; text-align: center;
-        margin-bottom: 35px; font-weight: 800; font-size: 26px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        padding: 25px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 35px;
+        font-weight: 800;
+        font-size: 26px;
+        letter-spacing: 0.5px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
+
+    /* 2. Card Laporan (Gaya Kolom Kiri) */
     .report-card {
-        background-color: #1f2937; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; color: #f3f4f6;
+        background-color: #1f2937; 
+        padding: 15px; 
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2); 
+        margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; 
+        color: #f3f4f6;
+        transition: transform 0.2s ease;
     }
+    .report-card:hover { transform: translateY(-2px); }
+
+    /* 3. Box To-Do Container */
+    .todo-container {
+        background-color: #111827; 
+        padding: 20px; 
+        border-radius: 15px;
+        border: 1px solid #374151; 
+        margin-bottom: 20px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    /* 4. Checkbox Dark Mode */
     div[data-testid="stCheckbox"] div[role="checkbox"] {
-        background-color: #1f2937 !important; border: 2px solid #3b82f6 !important;
+        background-color: #1f2937 !important;
+        border: 2px solid #3b82f6 !important;
     }
     div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
         background-color: #3b82f6 !important;
     }
+    div[data-testid="stCheckbox"] p {
+        color: #e5e7eb !important;
+        font-weight: 500 !important;
+    }
+    
+    /* 5. Input & Button Styling */
+    .stTextInput input { 
+        background-color: #1f2937 !important; 
+        color: white !important; 
+        border: 1px solid #374151 !important;
+        border-radius: 8px !important;
+    }
+    .stButton > button { 
+        width: 100%; 
+        border-radius: 8px; 
+        background-color: #1e3a8a; 
+        color: white;
+        border: 1px solid #3b82f6;
+        font-weight: 600;
+        transition: 0.3s ease; 
+    }
+    .stButton > button:hover { 
+        background-color: #3b82f6; 
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
     </style>
     """, unsafe_allow_html=True)
-
-# --- 3. LOGIKA ROUTING ---
+    
+# --- 4. LOGIKA ROUTING ---
 if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
-    
-    conn = get_db_connection()
-    # TARIK DATA DARI SQLITE (Bukan session_state)
-    db_report_df = pd.read_sql('SELECT * FROM reports', conn)
-    todo_list_df = pd.read_sql('SELECT * FROM todo', conn)
-
     c1, c2 = st.columns([1.2, 1])
     with c1:
         list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
@@ -5899,6 +5973,7 @@ if menu == "Reporting & PIC":
         st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
 
     st.divider()
+
     col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
@@ -5906,56 +5981,109 @@ if menu == "Reporting & PIC":
         tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
         
         with tab_me:
-            # Loop dari hasil database
-            for _, task in db_report_df.iterrows():
-                if task['pic'] == current_user:
+            for idx, task in enumerate(st.session_state.db_report):
+                if task['PIC'] == current_user:
                     ck1, ck2 = st.columns([4, 1.2])
                     with ck1:
-                        st.markdown(f'<div class="report-card"><h4 style="margin:0;">{task["laporan"]}</h4><small>Status: {task["status"]}</small></div>', unsafe_allow_html=True)
+                        st.markdown(f"""
+                        <div class="report-card">
+                            <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
+                            <small style="color:#9ca3af;">Status: {task['Status']}</small>
+                        </div>
+                        """, unsafe_allow_html=True)
                     with ck2:
                         st.write("") 
-                        if task['status'] == "❌ Belum":
-                            if st.button("Update", key=f"up_{task['id']}"):
-                                conn.execute('UPDATE reports SET status = "✅ Selesai" WHERE id = ?', (task['id'],))
+                        if task['Status'] == "❌ Belum":
+                            if st.button(f"Update", key=f"up_dark_{idx}"):
+                                # Update Session
+                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
+                                # Update SQLite
+                                conn = get_db_connection()
+                                conn.execute('UPDATE reports SET status = "✅ Selesai" WHERE laporan = ?', (task['Laporan'],))
                                 conn.commit()
+                                conn.close()
                                 st.rerun()
                         else:
-                            st.button("Selesai", disabled=True, key=f"done_{task['id']}")
+                            st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
         with tab_all:
             st.markdown("### 📊 Team Progress Summary")
-            for pic in list_pic:
-                pic_data = db_report_df[db_report_df['pic'] == pic]
-                total = len(pic_data)
-                selesai = len(pic_data[pic_data['status'] == "✅ Selesai"])
-                progress = (selesai / total) * 100 if total > 0 else 0
+            pic_stats = {}
+            for t in st.session_state.db_report:
+                pic = t['PIC']
+                if pic not in pic_stats:
+                    pic_stats[pic] = {"total": 0, "selesai": 0}
+                pic_stats[pic]["total"] += 1
+                if t['Status'] == "✅ Selesai":
+                    pic_stats[pic]["selesai"] += 1
+
+            st.write("**📈 Laporan Operasional**")
+            for pic, stats in pic_stats.items():
+                progress = (stats['selesai'] / stats['total']) * 100
                 st.markdown(f"""
-                <div class="report-card">
-                    <div style="display: flex; justify-content: space-between;"><b>👤 {pic}</b><span>{selesai}/{total} Selesai</span></div>
+                <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b>👤 {pic}</b>
+                        <span>{stats['selesai']}/{stats['total']} Selesai</span>
+                    </div>
                     <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
                         <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
+            st.write("---")
+            st.write("**📝 To Do List Summary**")
+            if "todo_list" in st.session_state and st.session_state.todo_list:
+                td_total = len(st.session_state.todo_list)
+                td_selesai = sum(1 for item in st.session_state.todo_list if item['done'])
+                td_progress = (td_selesai / td_total) * 100
+                
+                st.markdown(f"""
+                <div class="report-card" style="border-left: 5px solid #10b981; background-color: #111827;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b>📋 Total Tugas</b>
+                        <span>{td_selesai}/{td_total} Item</span>
+                    </div>
+                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 12px;">
+                        <div style="background-color: #10b981; width: {td_progress}%; height: 12px; border-radius: 5px;"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
     with col_kanan:
-        st.markdown("<div style='text-align: center;'><h4>📝 TO DO LIST</h4></div>", unsafe_allow_html=True)
+        st.markdown("""<div style="background-color: #1a1c27; padding: 10px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px; text-align: center;"><h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4></div>""", unsafe_allow_html=True)
+
         with st.form("form_todo_dark", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:")
-            if st.form_submit_button("➕ Tambah") and tugas_baru:
-                conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
+            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
+            submit = st.form_submit_button("➕ Tambah")
+            
+            if submit and tugas_baru:
+                # Simpan ke Session
+                st.session_state.todo_list.append({"task": tugas_baru, "done": False})
+                # Simpan ke SQLite
+                conn = get_db_connection()
+                conn.execute('INSERT INTO todo VALUES (?, 0)', (tugas_baru,))
                 conn.commit()
+                conn.close()
                 st.rerun()
 
-        for _, item in todo_list_df.iterrows():
-            c1, c2 = st.columns([4, 1])
-            with c1:
-                color = '#10b981' if item['done'] else '#3b82f6'
-                st.markdown(f'<div class="report-card" style="border-left:5px solid {color}">{item["task"]}</div>', unsafe_allow_html=True)
-            with c2:
-                res = st.checkbox("", value=bool(item['done']), key=f"td_{item['id']}")
-                if res != bool(item['done']):
-                    conn.execute('UPDATE todo SET done = ? WHERE id = ?', (int(res), item['id']))
-                    conn.commit()
-                    st.rerun()
-    conn.close()
+        if "todo_list" in st.session_state:
+            for i, item in enumerate(st.session_state.todo_list):
+                c1, c2 = st.columns([4, 1])
+                with c1:
+                    color_border = '#10b981' if item['done'] else '#3b82f6'
+                    st.markdown(f"""<div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"><h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4><small style="color:{color_border};">Status: {'✅ Selesai' if item['done'] else '❌ Belum'}</small></div>""", unsafe_allow_html=True)
+                
+                with c2:
+                    st.write("")
+                    res = st.checkbox("", key=f"chk_dark_{i}", value=item['done'], label_visibility="collapsed")
+                    if res != item['done']:
+                        # Update Session
+                        st.session_state.todo_list[i]['done'] = res
+                        # Update SQLite
+                        conn = get_db_connection()
+                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
+                        conn.commit()
+                        conn.close()
+                        st.rerun()
