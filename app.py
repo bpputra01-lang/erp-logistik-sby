@@ -5636,83 +5636,111 @@ if menu == "Logistic Schedule":
                     if nm in weekly_counter: weekly_counter[nm] += 1
 
         # --- 2. ENGINE GENERATOR ---
-        for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
-            for day_name in day_names:
-                tgl_ini = dates_real[day_names.index(day_name)]
-                
-                def count_s0(day):
-                    count = 0
-                    for k_slot in storage[day]:
-                        if "SHIFT 0" in k_slot:
-                            count += len(storage[day][k_slot])
-                    return count
+for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
+    for day_name in day_names:
+        tgl_ini = dates_real[day_names.index(day_name)]
+        
+        def count_s0(day):
+            count = 0
+            for k_slot in storage[day]:
+                if "SHIFT 0" in k_slot:
+                    count += len(storage[day][k_slot])
+            return count
 
-                for shf_jam, shf_role in base_roles:
-                    if shf_jam == "SHIFT 3": continue 
-                    
-                    if shf_jam == "SHIFT 0" and count_s0(day_name) >= 2:
+        for shf_jam, shf_role in base_roles:
+            if shf_jam == "SHIFT 3": continue 
+            
+            slot_key = f"{shf_jam} - {shf_role}"
+
+            # --- [PRIORITAS 1: JALUR VIP RECOVERY] ---
+            # Jika memproses SHIFT 2, cek siapa yang kemarin SHIFT 3 untuk diprioritaskan
+            if shf_jam == "SHIFT 2":
+                day_index = day_names.index(day_name)
+                if day_index > 0:
+                    day_kemarin = day_names[day_index - 1]
+                    for k_rec in karyawan_list:
+                        n_rec = k_rec['nama']
+                        # Cek jatah & status libur
+                        if weekly_counter[n_rec] >= k_rec['target_fix']: continue
+                        if not df_libur[(df_libur['nama'] == n_rec) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+                        
+                        # Jika kemarin SHIFT 3 dan posisinya COCOK dengan slot ini
+                        if "SHIFT 3" in get_active_shifts(n_rec, day_kemarin) and k_rec['posisi'] == shf_role:
+                            # Pastikan dia belum ditaruh di shift manapun hari ini
+                            if not get_active_shifts(n_rec, day_name):
+                                current_fill = len(storage[day_name][slot_key])
+                                # Masukkan berdasarkan batasan phase
+                                if (phase == "TARGET_1_ORANG" and current_fill < 1) or \
+                                   (phase == "TARGET_2_ORANG" and shf_role != "SPV" and current_fill < 2) or \
+                                   (phase == "SISA_JATAH"):
+                                    
+                                    storage[day_name][slot_key].append(n_rec)
+                                    weekly_counter[n_rec] += 1
+                                    # Lanjut ke slot role berikutnya karena sudah terisi orang recovery
+                                    continue 
+
+            # --- [PRIORITAS 2: LOGIKA STANDAR POTENTIAL] ---
+            if shf_jam == "SHIFT 0" and count_s0(day_name) >= 2:
+                continue
+
+            # Cek apakah slot sudah penuh sesuai phase agar tidak overwrite orang recovery
+            if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
+            if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
+
+            potential = []
+            for k in karyawan_list:
+                nama = k['nama']
+                
+                # Mendefinisikan active_shifts di awal loop k agar tidak NameError
+                active_shifts = get_active_shifts(nama, day_name)
+                
+                # A. CEK JATAH & LIBUR
+                if weekly_counter[nama] >= k['target_fix']: continue
+                if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+                
+                # B. LOGIKA RECOVERY & LIBUR
+                tgl_besok = (datetime.strptime(tgl_ini, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                tgl_kemarin = (datetime.strptime(tgl_ini, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+                
+                is_libur_besok = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_besok)].empty
+                is_libur_kemarin = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_kemarin)].empty
+                
+                if is_libur_besok and shf_jam != "SHIFT 1": continue
+                if is_libur_kemarin and shf_jam != "SHIFT 2": continue
+
+                # Cek Shift 3 Kemarin (Untuk memblokir orang recovery masuk ke selain SHIFT 2)
+                day_index = day_names.index(day_name)
+                if day_index > 0:
+                    day_kemarin = day_names[day_index - 1]
+                    if "SHIFT 3" in get_active_shifts(nama, day_kemarin) and shf_jam != "SHIFT 2":
                         continue
 
-                    slot_key = f"{shf_jam} - {shf_role}"
-                    if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
-                    if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
+                # C. FILTER POSISI & DOUBLE SHIFT
+                if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
+                if k['posisi'] == "SPV" and shf_role != "SPV": continue
+                if shf_jam in active_shifts: continue 
 
-                    potential = []
-                    for k in karyawan_list:
-                        nama = k['nama']
-                        
-                        # --- 1. DEFINISIKAN DULU DI ATAS BIAR GAK ERROR ---
-                        active_shifts = get_active_shifts(nama, day_name) # <--- PINDAH KE SINI
-                        
-                        # A. CEK JATAH & LIBUR
-                        if weekly_counter[nama] >= k['target_fix']: continue
-                        if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                        
-                        # B. LOGIKA RECOVERY & LIBUR
-                        tgl_besok = (datetime.strptime(tgl_ini, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
-                        tgl_kemarin = (datetime.strptime(tgl_ini, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
-                        
-                        is_libur_besok = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_besok)].empty
-                        is_libur_kemarin = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_kemarin)].empty
-                        
-                        if is_libur_besok and shf_jam != "SHIFT 1": continue
-                        if is_libur_kemarin and shf_jam != "SHIFT 2": continue
+                # D. ATURAN PART-FULL (ANTI-NGEFULL)
+                if k['tipe'] == "Part-Full":
+                    if is_libur_besok or is_libur_kemarin or (day_index > 0 and "SHIFT 3" in get_active_shifts(nama, day_names[day_index-1])):
+                        if active_shifts: continue 
+                    
+                    if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
+                else:
+                    if active_shifts: continue
 
-                        # Cek Shift 3 Kemarin
-                        day_index = day_names.index(day_name)
-                        if day_index > 0:
-                            day_kemarin = day_names[day_index - 1]
-                            if "SHIFT 3" in get_active_shifts(nama, day_kemarin) and shf_jam != "SHIFT 2":
-                                continue
+                is_match = (k['posisi'] == shf_role)
+                potential.append({'k': k, 'match': is_match})
 
-                        # C. FILTER POSISI & DOUBLE SHIFT
-                        if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
-                        if k['posisi'] == "SPV" and shf_role != "SPV": continue
-                        
-                        # Sekarang 'active_shifts' aman dipanggil di sini
-                        if shf_jam in active_shifts: continue 
-
-                        # D. ATURAN PART-FULL (ANTI-NGEFULL)
-                        if k['tipe'] == "Part-Full":
-                            if is_libur_besok or is_libur_kemarin or (day_index > 0 and "SHIFT 3" in get_active_shifts(nama, day_names[day_index-1])):
-                                if active_shifts: continue 
-                            
-                            if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
-                        else:
-                            if active_shifts: continue
-
-                        is_match = (k['posisi'] == shf_role)
-                        potential.append({'k': k, 'match': is_match})
-
-                    if potential:
-                        random.shuffle(potential)
-                        potential = sorted(potential, key=lambda x: x['match'], reverse=True)
-                        p = potential[0]
-                        nm_fix = p['k']['nama']
-                        storage[day_name][slot_key].append(nm_fix)
-                        weekly_counter[nm_fix] += 1
-                        if len(get_active_shifts(nm_fix, day_name)) == 2:
-                            double_day_count[nm_fix] += 1
+            if potential:
+                random.shuffle(potential)
+                potential = sorted(potential, key=lambda x: x['match'], reverse=True)
+                p = potential[0]
+                nm_fix = p['k']['nama']
+                storage[day_name][slot_key].append(nm_fix)
+                weekly_counter[nm_fix] += 1
+                if len(get_active_shifts(nm_fix, day_name)) == 2:
+                    double_day_count[nm_fix] += 1
         # --- 3. SIMPAN HASIL ---
         final_table = []
         for shf_jam, shf_role in base_roles:
