@@ -6009,6 +6009,3 @@ if menu == "Reporting & PIC":
                 if res != item['done']:
                     st.session_state.todo_list[i]['done'] = res
                     st.rerun()
-
-        # 5. Penutup Div
-        st.markdown('</div>', unsafe_allow_html=True)
