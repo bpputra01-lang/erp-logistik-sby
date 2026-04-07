@@ -5800,7 +5800,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- 1. INITIAL DATA (Proteksi Data Lama) ---
+# --- 1. INITIAL DATA (Tanpa Jam, Nama Disamakan Caps Lock) ---
 if 'db_report' not in st.session_state:
     st.session_state.db_report = [
         {"Laporan": "REJECT & DEFECT", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
@@ -5808,7 +5808,6 @@ if 'db_report' not in st.session_state:
         {"Laporan": "STOCK MINUS", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
         {"Laporan": "BALANCING STOCK", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
         {"Laporan": "RTO", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
-        {"Laporan": "BALANCING STOCK", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
         {"Laporan": "OUTBOUND PROCESS", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
         {"Laporan": "COMPARE SCAN OUT", "PIC": "BAKCLINER", "Status": "❌ Belum"},
         {"Laporan": "COMPARE BARANG DATANG", "PIC": "BAKCLINER", "Status": "❌ Belum"},
@@ -5822,79 +5821,25 @@ if 'db_report' not in st.session_state:
         {"Laporan": "ZERO PUTAWAY", "PIC": "WAREHOUSE FULLFILLMENT", "Status": "❌ Belum"},
     ]
 
-if 'todo_list' not in st.session_state:
-    st.session_state.todo_list = []
-
-# --- 2. CSS DARK THEME (Solid Dark & Reject Style) ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    
-    /* Background & Font */
-    .main { background-color: #0e1117; color: #ffffff; font-family: 'Inter', sans-serif; }
-    
-    /* Header Compact */
-    .top-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
-        color: white; padding: 12px 20px; border-radius: 10px; margin-bottom: 20px;
-        border: 1px solid #3b82f6; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
-    .top-header h2 { margin: 0; font-size: 1.3rem; font-weight: 700; }
-
-    /* Card Laporan */
-    .report-card {
-        background-color: #1f2937; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 10px;
-        border-left: 5px solid #3b82f6; color: #f3f4f6;
-    }
-
-    /* Box To-Do (Style Reject/Defect Dark) */
-    .todo-container {
-        background-color: #111827; padding: 20px; border-radius: 15px;
-        border: 1px solid #374151; margin-bottom: 20px;
-    }
-    
-    /* Input Styling */
-    .stTextInput input {
-        background-color: #1f2937 !important; color: white !important;
-        border: 1px solid #374151 !important; border-radius: 8px !important;
-    }
-    
-    /* Button Styling */
-    .stButton > button {
-        width: 100%; border-radius: 8px; background-color: #1f2937;
-        color: #ffffff; border: 1px solid #374151; transition: 0.3s;
-    }
-    .stButton > button:hover { border-color: #3b82f6; color: #3b82f6; background-color: #0e1117; }
-    
-    /* Tabs & Divider */
-    .stTabs [data-baseweb="tab"] { color: #9ca3af; }
-    .stTabs [aria-selected="true"] { color: #3b82f6 !important; border-bottom-color: #3b82f6 !important; }
-    hr { border-color: #374151; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 3. LOGIKA ROUTING (REVISI FINAL) ---
+# --- 3. LOGIKA ROUTING (CLEAN VERSION) ---
 if menu == "Reporting & PIC":
-    
-    # 1. Header (Compact Style)
     st.markdown('<div class="top-header"><h2>🚀 Jezpro Digital Logistik</h2></div>', unsafe_allow_html=True)
 
-    # 2. Control Panel Row
     c1, c2 = st.columns([1.2, 1])
     with c1:
-        current_user = st.selectbox("👤 Pilih Nama:", ["Verrel & Galih", "Faril & Yudi", "Backliner", "Vano", "Hamzah", "Warehouse Fullfillment"], key="pic_final_v3")
+        # Nama di sini gue bikin CAPS LOCK biar sinkron sama db_report lu
+        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
+        current_user = st.selectbox("👤 Pilih Nama:", list_pic, key="pic_final_v5")
     with c2:
         st.write("")
         st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
 
     st.divider()
 
-    # 3. Main Layout
     col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
-        st.subheader(f"🎯 List Laporan: {current_user}")
+        st.subheader(f"🎯 Laporan: {current_user}")
         tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
         
         with tab_me:
@@ -5902,32 +5847,29 @@ if menu == "Reporting & PIC":
                 if task['PIC'] == current_user:
                     ck1, ck2 = st.columns([4, 1.2])
                     with ck1:
+                        # Jam dihapus total dari sini
                         st.markdown(f"""
                         <div class="report-card">
                             <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
-                            <small style="color:#9ca3af;">Jam: {task['Jam']} | Status: {task['Status']}</small>
+                            <small style="color:#9ca3af;">Status: {task['Status']}</small>
                         </div>
                         """, unsafe_allow_html=True)
                     with ck2:
                         st.write("") 
                         if task['Status'] == "❌ Belum":
-                            if st.button(f"Update", key=f"up_v3_{idx}"):
+                            if st.button(f"Update", key=f"up_v5_{idx}"):
                                 st.session_state.db_report[idx]['Status'] = "✅ Selesai"
                                 st.rerun()
                         else:
-                            st.button("Selesai", disabled=True, key=f"done_v3_{idx}")
+                            st.button("Selesai", disabled=True, key=f"done_v5_{idx}")
 
     with col_kanan:
-        # --- BOX TAMBAH TUGAS (FIXED VISIBILITY) ---
+        st.markdown('<div class="todo-container">', unsafe_allow_html=True)
         st.markdown("<h4 style='margin-bottom:15px; color:#3b82f6;'>📝 INPUT TO DO LIST</h4>", unsafe_allow_html=True)
         
-        # Pakai form biar input dan tombol menyatu dan nggak ada 'kotak kosong' hantu
-        with st.form("todo_form_v3", clear_on_submit=True):
-            # Label dibuat "visible" biar lu tau itu tempat ngetik
-            tugas_baru = st.text_input("Input Tugas:", placeholder="Ketik di sini...", key="input_todo_v3")
-            
-            st.write("") # Spacer kecil
-            submit_todo = st.form_submit_button("➕ Tambah ke List")
+        with st.form("todo_form_v5", clear_on_submit=True):
+            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik di sini...", key="input_todo_v5")
+            submit_todo = st.form_submit_button("➕ Tambah")
             
             if submit_todo and tugas_baru:
                 st.session_state.todo_list.append({"task": tugas_baru, "done": False})
@@ -5935,16 +5877,14 @@ if menu == "Reporting & PIC":
         
         st.write("<hr style='margin:20px 0; border-color:#374151;'>", unsafe_allow_html=True)
         
-        # --- RENDER LIST TO-DO ---
         if not st.session_state.todo_list:
-            st.caption("Tidak ada tugas tambahan.")
+            st.caption("Kosong.")
         else:
             for i, item in enumerate(st.session_state.todo_list):
-                # Proteksi data lama/campuran
-                task_label = item.get('task', item.get('Tugas', 'Tugas Baru'))
-                is_checked = item.get('done', item.get('Selesai', False))
+                task_label = item.get('task', 'Tugas Baru')
+                is_checked = item.get('done', False)
                 
-                res = st.checkbox(task_label, key=f"chk_v3_{i}", value=is_checked)
+                res = st.checkbox(task_label, key=f"chk_v5_{i}", value=is_checked)
                 if res != is_checked:
                     st.session_state.todo_list[i]['done'] = res
                     st.rerun()
