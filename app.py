@@ -5883,7 +5883,7 @@ if menu == "Reporting & PIC":
     # 2. Control Panel Row
     c1, c2 = st.columns([1.2, 1])
     with c1:
-        current_user = st.selectbox("👤 Pilih Nama:", ["Andi", "Budi", "Siska", "Maya"], key="pic_final_v3")
+        current_user = st.selectbox("👤 Pilih Nama:", ["Verrel & Galih", "Faril & Yudi", "Backliner", "Vano", "Hamzah", "Warehouse Fullfillment"], key="pic_final_v3")
     with c2:
         st.write("")
         st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
