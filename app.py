@@ -5960,7 +5960,7 @@ if menu == "Reporting & PIC":
         # 1. Header (Membuka container agar gaya sama dengan kolom kiri)
         st.markdown("""
             <div style="background-color: #1a1c27; padding: 20px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px;">
-                <h4 style='margin:0; color:#FFFFFF;'>📝 TO DO LIST</h4>
+                <h4 style='margin:15; color:#FFFFFF;'>📝 TO DO LIST</h4>
             </div>
         """, unsafe_allow_html=True)
 
