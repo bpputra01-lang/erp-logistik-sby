@@ -5803,10 +5803,23 @@ from datetime import datetime
 # --- 1. INITIAL DATA (Proteksi Data Lama) ---
 if 'db_report' not in st.session_state:
     st.session_state.db_report = [
-        {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
-        {"Jam": "10:00", "Laporan": "Stock Opname Surabaya", "PIC": "Budi", "Status": "❌ Belum"},
-        {"Jam": "13:00", "Laporan": "Input Data Reject", "PIC": "Siska", "Status": "❌ Belum"},
-        {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
+        {"Laporan": "REJECT & DEFECT", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "KERAPIHAN STOCK", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "STOCK MINUS", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "BALANCING STOCK", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "RTO", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "BALANCING STOCK", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "OUTBOUND PROCESS", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "COMPARE SCAN OUT", "PIC": "BAKCLINER", "Status": "❌ Belum"},
+        {"Laporan": "COMPARE BARANG DATANG", "PIC": "BAKCLINER", "Status": "❌ Belum"},
+        {"Laporan": "DASHBOARD SIDOARJO", "PIC": "VANO", "Status": "❌ Belum"},
+        {"Laporan": "INBOUND PROCESS", "PIC": "VANO", "Status": "❌ Belum"},
+        {"Laporan": "SURABAYA DASHBOARD", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "SEMARANG DASHBOARD", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "MANIFEST", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "REFUND", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "REFILL & OVERSTOCK", "PIC": "KRISNA", "Status": "❌ Belum"},
+        {"Laporan": "ZERO PUTAWAY", "PIC": "WAREHOUSE FULLFILLMENT", "Status": "❌ Belum"},
     ]
 
 if 'todo_list' not in st.session_state:
