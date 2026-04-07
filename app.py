@@ -5807,44 +5807,87 @@ if 'db_report' not in st.session_state:
 # FIX: Inisialisasi todo_list biar nggak AttributeError lagi
 if 'todo_list' not in st.session_state:
     st.session_state.todo_list = []
-
 # --- 2. CSS DARK THEME (Gue Balikin & Gue Perkuat) ---
 st.markdown("""
     <style>
-    /* 1. Header Utama - Efek Gradient Glass */
-            .hero-header {
-                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
-                color: white;
-                padding: 25px;
-                border-radius: 12px;
-                text-align: center;
-                margin-bottom: 35px;
-                font-weight: 800;
-                font-size: 26px;
-                letter-spacing: 0.5px;
-                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+    /* Global Font */
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    /* 1. Header Utama - Efek Gradient Glass (Mirip Gambar 2) */
+    .hero-header {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 35px;
+        font-weight: 800;
+        font-size: 26px;
+        letter-spacing: 0.5px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* Card Laporan */
+    /* 2. Card Laporan (Gaya Kolom Kiri) */
     .report-card {
-        background-color: #1f2937; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 10px;
-        border-left: 5px solid #3b82f6; color: #f3f4f6;
+        background-color: #1f2937; 
+        padding: 15px; 
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2); 
+        margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; 
+        color: #f3f4f6;
+        transition: transform 0.2s ease;
     }
+    .report-card:hover { transform: translateY(-2px); }
 
-    /* Box To-Do Container */
+    /* 3. Box To-Do Container */
     .todo-container {
-        background-color: #111827; padding: 20px; border-radius: 15px;
-        border: 1px solid #374151; margin-bottom: 20px;
+        background-color: #111827; 
+        padding: 20px; 
+        border-radius: 15px;
+        border: 1px solid #374151; 
+        margin-bottom: 20px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
     }
     
-    /* Input & Button Styling */
-    .stTextInput input { background-color: #1f2937 !important; color: white !important; }
-    .stButton > button { width: 100%; border-radius: 8px; transition: 0.3s; }
+    /* 4. Checkbox Dark Mode (PENTING: Biar gak putih lagi) */
+    div[data-testid="stCheckbox"] div[role="checkbox"] {
+        background-color: #1f2937 !important;
+        border: 2px solid #3b82f6 !important;
+    }
+    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
+        background-color: #3b82f6 !important;
+    }
+    div[data-testid="stCheckbox"] p {
+        color: #e5e7eb !important;
+        font-weight: 500 !important;
+    }
+    
+    /* 5. Input & Button Styling */
+    .stTextInput input { 
+        background-color: #1f2937 !important; 
+        color: white !important; 
+        border: 1px solid #374151 !important;
+        border-radius: 8px !important;
+    }
+    .stButton > button { 
+        width: 100%; 
+        border-radius: 8px; 
+        background-color: #1e3a8a; 
+        color: white;
+        border: 1px solid #3b82f6;
+        font-weight: 600;
+        transition: 0.3s ease; 
+    }
+    .stButton > button:hover { 
+        background-color: #3b82f6; 
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
     </style>
     """, unsafe_allow_html=True)
-
 # --- 3. LOGIKA ROUTING ---
 if menu == "Reporting & PIC":
     st.markdown('<div class="top-header"><h2>🚹REPORTING & PIC</h2></div>', unsafe_allow_html=True)
