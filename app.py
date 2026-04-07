@@ -5870,229 +5870,96 @@ def reset_all_data(cursor, today):
 # Inisialisasi DB & Cek Reset
 init_db()
 check_daily_reset()
-# --- 2. CSS DARK THEME (Gue Balikin & Gue Perkuat) ---
+
+# --- 2. CSS DARK THEME (Gue Pertahankan) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-
-    /* Global Font */
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    /* 1. Header Utama - Efek Gradient Glass (Mirip Gambar 2) */
     .hero-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white;
-        padding: 25px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 35px;
-        font-weight: 800;
-        font-size: 26px;
-        letter-spacing: 0.5px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white; padding: 25px; border-radius: 12px; text-align: center;
+        margin-bottom: 35px; font-weight: 800; font-size: 26px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
     }
-
-    /* 2. Card Laporan (Gaya Kolom Kiri) */
     .report-card {
-        background-color: #1f2937; 
-        padding: 15px; 
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2); 
-        margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; 
-        color: #f3f4f6;
-        transition: transform 0.2s ease;
+        background-color: #1f2937; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; color: #f3f4f6;
     }
-    .report-card:hover { transform: translateY(-2px); }
-
-    /* 3. Box To-Do Container */
-    .todo-container {
-        background-color: #111827; 
-        padding: 20px; 
-        border-radius: 15px;
-        border: 1px solid #374151; 
-        margin-bottom: 20px;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    /* 4. Checkbox Dark Mode (PENTING: Biar gak putih lagi) */
     div[data-testid="stCheckbox"] div[role="checkbox"] {
-        background-color: #1f2937 !important;
-        border: 2px solid #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
-        background-color: #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] p {
-        color: #e5e7eb !important;
-        font-weight: 500 !important;
-    }
-    
-    /* 5. Input & Button Styling */
-    .stTextInput input { 
-        background-color: #1f2937 !important; 
-        color: white !important; 
-        border: 1px solid #374151 !important;
-        border-radius: 8px !important;
-    }
-    .stButton > button { 
-        width: 100%; 
-        border-radius: 8px; 
-        background-color: #1e3a8a; 
-        color: white;
-        border: 1px solid #3b82f6;
-        font-weight: 600;
-        transition: 0.3s ease; 
-    }
-    .stButton > button:hover { 
-        background-color: #3b82f6; 
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        background-color: #1f2937 !important; border: 2px solid #3b82f6 !important;
     }
     </style>
     """, unsafe_allow_html=True)
-    
+
 # --- 3. LOGIKA ROUTING ---
+# (Pastikan variabel 'menu' sudah didefinisikan dari sidebar lu)
 if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([1.2, 1])
-    with c1:
-        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
-        current_user = st.selectbox("👤 Pilih Nama:", list_pic, key="pic_v_final")
-    with c2:
-        st.write("")
-        st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
-
-    st.divider()
-
+    
+    conn = sqlite3.connect('logistik_sby.db')
+    
     col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
-        # 1. Baris ini HARUS menjorok 4 spasi ke dalam dari 'with'
-        st.subheader(f"📋 PIC: {current_user}")
+        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
+        current_user = st.selectbox("👤 Pilih Nama:", list_pic)
+        
         tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
         
-        # --- TAB 1: PERSONAL ---
         with tab_me:
-            for idx, task in enumerate(st.session_state.db_report):
-                if task['PIC'] == current_user:
-                    ck1, ck2 = st.columns([4, 1.2])
-                    with ck1:
-                        st.markdown(f"""
-                        <div class="report-card">
-                            <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
-                            <small style="color:#9ca3af;">Status: {task['Status']}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    with ck2:
-                        st.write("") 
-                        if task['Status'] == "❌ Belum":
-                            if st.button(f"Update", key=f"up_dark_{idx}"):
-                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                st.rerun()
-                        else:
-                            st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
+            df_reports = pd.read_sql_query(f"SELECT * FROM reports WHERE pic='{current_user}'", conn)
+            for idx, row in df_reports.iterrows():
+                ck1, ck2 = st.columns([4, 1.2])
+                with ck1:
+                    st.markdown(f'<div class="report-card"><h4 style="margin:0;">{row["laporan"]}</h4><small>Status: {row["status"]}</small></div>', unsafe_allow_html=True)
+                with ck2:
+                    if row['status'] == "❌ Belum":
+                        if st.button("Update", key=f"up_{row['id']}"):
+                            conn.execute("UPDATE reports SET status='✅ Selesai' WHERE id=?", (row['id'],))
+                            conn.commit()
+                            st.rerun()
+                    else:
+                        st.button("Selesai", disabled=True, key=f"done_{row['id']}")
 
-        # --- TAB 2: SUMMARY (Gabungan Laporan & To Do List) ---
         with tab_all:
             st.markdown("### 📊 Team Progress Summary")
-            
-            # 1. Hitung Statistik Laporan (db_report)
-            pic_stats = {}
-            for t in st.session_state.db_report:
-                pic = t['PIC']
-                if pic not in pic_stats:
-                    pic_stats[pic] = {"total": 0, "selesai": 0}
-                pic_stats[pic]["total"] += 1
-                if t['Status'] == "✅ Selesai":
-                    pic_stats[pic]["selesai"] += 1
-
-            # 2. Render Card Progress Laporan per PIC
-            st.write("**📈 Laporan Operasional**")
-            for pic, stats in pic_stats.items():
-                progress = (stats['selesai'] / stats['total']) * 100
+            all_data = pd.read_sql_query("SELECT * FROM reports", conn)
+            for pic in list_pic:
+                pic_data = all_data[all_data['pic'] == pic]
+                total = len(pic_data)
+                selesai = len(pic_data[pic_data['status'] == "✅ Selesai"])
+                progress = (selesai / total) * 100 if total > 0 else 0
                 st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>👤 {pic}</b>
-                        <span>{stats['selesai']}/{stats['total']} Selesai</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
+                <div class="report-card">
+                    <div style="display: flex; justify-content: space-between;"><b>👤 {pic}</b><span>{selesai}/{total} Selesai</span></div>
+                    <div style="background-color: #374151; height: 8px; border-radius: 5px; margin-top: 5px;">
                         <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.write("---")
-
-            # 3. Hitung Statistik TO DO LIST (Khusus User Login/Global)
-            st.write("**📝 To Do List Summary**")
-            if "todo_list" in st.session_state and st.session_state.todo_list:
-                td_total = len(st.session_state.todo_list)
-                td_selesai = sum(1 for item in st.session_state.todo_list if item['done'])
-                td_progress = (td_selesai / td_total) * 100
-                
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #10b981; background-color: #111827;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>📋 Total Tugas</b>
-                        <span>{td_selesai}/{td_total} Item</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 12px;">
-                        <div style="background-color: #10b981; width: {td_progress}%; height: 12px; border-radius: 5px;"></div>
-                    </div>
-                    <p style="margin-top:10px; font-size:0.8rem; color:#9ca3af;">
-                        {f"Selamat! {td_selesai} Telah di Selesaikan" if td_progress == 100 else "Ayo gas dikit lagi!"}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.info("Belum ada To Do List yang dibuat.")
-
     with col_kanan:
-        # 1. Header (Dibuat rata tengah dengan text-align: center)
-        st.markdown("""
-            <div style="
-                background-color: #1a1c27; 
-                padding: 10px; 
-                border-radius: 10px; 
-                border-left: 5px solid #3b82f6; 
-                margin-bottom: 20px;
-                text-align: center;
-            ">
-                <h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # 2. Form Tambah Tugas
-        with st.form("form_todo_dark", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            submit = st.form_submit_button("➕ Tambah")
-            
-            if submit and tugas_baru:
-                if "todo_list" not in st.session_state:
-                    st.session_state.todo_list = []
-                st.session_state.todo_list.append({"task": tugas_baru, "done": False})
+        st.markdown("<h4 style='text-align: center;'>📝 TO DO LIST</h4>", unsafe_allow_html=True)
+        with st.form("todo_form", clear_on_submit=True):
+            tugas_baru = st.text_input("Tugas Baru:")
+            if st.form_submit_button("➕ Tambah") and tugas_baru:
+                conn.execute("INSERT INTO todo (task, done, date) VALUES (?, ?, ?)", 
+                             (tugas_baru, 0, datetime.now().strftime('%Y-%m-%d')))
+                conn.commit()
                 st.rerun()
 
-        # 3. List Tugas dengan Gaya Card (Mirip Kolom Kiri)
-        if "todo_list" in st.session_state:
-            for i, item in enumerate(st.session_state.todo_list):
-                c1, c2 = st.columns([4, 1])
-                
-                with c1:
-                    # Card Hitam, Border Biru/Hijau sesuai status
-                    color_border = '#10b981' if item['done'] else '#3b82f6'
-                    st.markdown(f"""
-                    <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-                        <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
-                        <small style="color:{color_border};">Status: {'✅ Selesai' if item['done'] else '❌ Belum'}</small>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with c2:
-                    st.write("") # Spasi vertikal
-                    res = st.checkbox("", key=f"chk_dark_{i}", value=item['done'], label_visibility="collapsed")
-                    if res != item['done']:
-                        st.session_state.todo_list[i]['done'] = res
-                        st.rerun()
+        todo_df = pd.read_sql_query("SELECT * FROM todo", conn)
+        for idx, row in todo_df.iterrows():
+            c1, c2 = st.columns([4, 1])
+            with c1:
+                color = '#10b981' if row['done'] else '#3b82f6'
+                st.markdown(f'<div class="report-card" style="border-left:5px solid {color}">{row["task"]}</div>', unsafe_allow_html=True)
+            with c2:
+                res = st.checkbox("", value=bool(row['done']), key=f"todo_{row['id']}")
+                if res != bool(row['done']):
+                    conn.execute("UPDATE todo SET done=? WHERE id=?", (int(res), row['id']))
+                    conn.commit()
+                    st.rerun()
+    conn.close()
