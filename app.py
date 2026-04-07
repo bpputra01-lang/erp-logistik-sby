@@ -5813,32 +5813,63 @@ elif menu == "List Retur Out":
 
 import streamlit as st
 import pandas as pd
+import sqlite3
 from datetime import datetime
 
-# --- 1. INITIAL DATA (Anti-Crash & Tanpa Jam) ---
-if 'db_report' not in st.session_state:
-    st.session_state.db_report = [
-        {"Laporan": "REJECT & DEFECT", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
-        {"Laporan": "KERAPIHAN STOCK", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
-        {"Laporan": "STOCK MINUS", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
-        {"Laporan": "BALANCING STOCK", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
-        {"Laporan": "RTO", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
-        {"Laporan": "OUTBOUND PROCESS", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
-        {"Laporan": "COMPARE SCAN OUT", "PIC": "BAKCLINER", "Status": "❌ Belum"},
-        {"Laporan": "COMPARE BARANG DATANG", "PIC": "BAKCLINER", "Status": "❌ Belum"},
-        {"Laporan": "DASHBOARD SIDOARJO", "PIC": "VANO", "Status": "❌ Belum"},
-        {"Laporan": "INBOUND PROCESS", "PIC": "VANO", "Status": "❌ Belum"},
-        {"Laporan": "SURABAYA DASHBOARD", "PIC": "HAMZAH", "Status": "❌ Belum"},
-        {"Laporan": "SEMARANG DASHBOARD", "PIC": "HAMZAH", "Status": "❌ Belum"},
-        {"Laporan": "MANIFEST", "PIC": "HAMZAH", "Status": "❌ Belum"},
-        {"Laporan": "REFUND", "PIC": "HAMZAH", "Status": "❌ Belum"},
-        {"Laporan": "REFILL & OVERSTOCK", "PIC": "KRISNA", "Status": "❌ Belum"},
-        {"Laporan": "ZERO PUTAWAY", "PIC": "WAREHOUSE FULLFILLMENT", "Status": "❌ Belum"},
-    ]
+# --- 1. DATABASE SETUP (SQLite) ---
+def init_db():
+    conn = sqlite3.connect('logistik_sby.db')
+    c = conn.cursor()
+    # Tabel Laporan PIC
+    c.execute('''CREATE TABLE IF NOT EXISTS reports 
+                 (id INTEGER PRIMARY KEY, laporan TEXT, pic TEXT, status TEXT, last_update TEXT)''')
+    # Tabel To Do List
+    c.execute('''CREATE TABLE IF NOT EXISTS todo 
+                 (id INTEGER PRIMARY KEY, task TEXT, done INTEGER, date TEXT)''')
+    # Tabel Tracker Tanggal (Untuk Reset Harian)
+    c.execute('''CREATE TABLE IF NOT EXISTS daily_tracker (last_date TEXT)''')
+    conn.commit()
+    conn.close()
 
-# FIX: Inisialisasi todo_list biar nggak AttributeError lagi
-if 'todo_list' not in st.session_state:
-    st.session_state.todo_list = []
+def check_daily_reset():
+    today = datetime.now().strftime('%Y-%m-%d')
+    conn = sqlite3.connect('logistik_sby.db')
+    c = conn.cursor()
+    c.execute("SELECT last_date FROM daily_tracker")
+    row = c.fetchone()
+    
+    if row is None:
+        c.execute("INSERT INTO daily_tracker VALUES (?)", (today,))
+        reset_all_data(c, today)
+    elif row[0] != today:
+        c.execute("UPDATE daily_tracker SET last_date = ?", (today,))
+        reset_all_data(c, today)
+    
+    conn.commit()
+    conn.close()
+
+def reset_all_data(cursor, today):
+    # Reset Status Laporan ke "Belum" setiap hari baru
+    default_reports = [
+        ("REJECT & DEFECT", "VERREL & GALIH"), ("KERAPIHAN STOCK", "VERREL & GALIH"),
+        ("STOCK MINUS", "VERREL & GALIH"), ("BALANCING STOCK", "FARIL & YUDI"),
+        ("RTO", "FARIL & YUDI"), ("OUTBOUND PROCESS", "FARIL & YUDI"),
+        ("COMPARE SCAN OUT", "BAKCLINER"), ("COMPARE BARANG DATANG", "BAKCLINER"),
+        ("DASHBOARD SIDOARJO", "VANO"), ("INBOUND PROCESS", "VANO"),
+        ("SURABAYA DASHBOARD", "HAMZAH"), ("SEMARANG DASHBOARD", "HAMZAH"),
+        ("MANIFEST", "HAMZAH"), ("REFUND", "HAMZAH"),
+        ("REFILL & OVERSTOCK", "KRISNA"), ("ZERO PUTAWAY", "WAREHOUSE FULLFILLMENT")
+    ]
+    cursor.execute("DELETE FROM reports")
+    for r, p in default_reports:
+        cursor.execute("INSERT INTO reports (laporan, pic, status, last_update) VALUES (?, ?, ?, ?)", 
+                       (r, p, "❌ Belum", today))
+    # Hapus To Do List hari kemarin
+    cursor.execute("DELETE FROM todo")
+
+# Inisialisasi DB & Cek Reset
+init_db()
+check_daily_reset()
 # --- 2. CSS DARK THEME (Gue Balikin & Gue Perkuat) ---
 st.markdown("""
     <style>
