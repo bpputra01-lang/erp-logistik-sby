@@ -5870,7 +5870,7 @@ if menu == "Reporting & PIC":
     # 2. Control Panel Row
     c1, c2 = st.columns([1.2, 1])
     with c1:
-        current_user = st.selectbox("👤 Masuk Sebagai PIC:", ["Andi", "Budi", "Siska", "Maya"], key="pic_final_v3")
+        current_user = st.selectbox("👤 Pilih Nama:", ["Andi", "Budi", "Siska", "Maya"], key="pic_final_v3")
     with c2:
         st.write("")
         st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
@@ -5882,7 +5882,7 @@ if menu == "Reporting & PIC":
 
     with col_kiri:
         st.subheader(f"🎯 List Laporan: {current_user}")
-        tab_me, tab_all = st.tabs(["Dashboard Saya", "Overview Tim"])
+        tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
         
         with tab_me:
             for idx, task in enumerate(st.session_state.db_report):
