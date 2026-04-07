@@ -5969,7 +5969,6 @@ if menu == "Reporting & PIC":
                 📝 TO DO LIST
             </h4>
             <div style='color: #888; font-size: 13px;'>
-                Belum ada tugas hari ini...
             </div>
         </div>
         """
