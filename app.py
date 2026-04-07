@@ -5823,15 +5823,6 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-
-# --- 3. NAVIGASI UTAMA (HANYA INI YANG DI LUAR) ---
-# Gunakan navigasi ini untuk pindah antar fitur ERP lu
-menu_utama = st.selectbox(
-    "📂 Pilih Menu Dashboard:", 
-    ["Reporting & PIC", "Stock Minus Clearance", "Justification Adjustment"],
-    key="navigasi_erp_sby"
-)
-
 st.divider()
 
 # --- 4. LOGIKA ROUTING (PEMBATASAN KONTEN) ---
