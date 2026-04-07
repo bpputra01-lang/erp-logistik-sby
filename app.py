@@ -5888,10 +5888,9 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
+    st.markdown('<div class="top-header"><h2>🚹REPORTING & PIC</h2></div>', unsafe_allow_html=True)
 # --- 3. LOGIKA ROUTING ---
 if menu == "Reporting & PIC":
-    st.markdown('<div class="top-header"><h2>🚹REPORTING & PIC</h2></div>', unsafe_allow_html=True)
-
     c1, c2 = st.columns([1.2, 1])
     with c1:
         list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
