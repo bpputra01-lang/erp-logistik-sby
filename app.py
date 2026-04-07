@@ -5811,15 +5811,20 @@ if 'todo_list' not in st.session_state:
 # --- 2. CSS DARK THEME (Gue Balikin & Gue Perkuat) ---
 st.markdown("""
     <style>
-    /* Background & Font */
-    .main { background-color: #0e1117; color: #ffffff; }
-    
-    /* Header Compact */
-    .top-header {
-        background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
-        color: white; padding: 12px 20px; border-radius: 10px; margin-bottom: 20px;
-        border: 1px solid #3b82f6; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
+    /* 1. Header Utama - Efek Gradient Glass */
+            .hero-header {
+                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
+                color: white;
+                padding: 25px;
+                border-radius: 12px;
+                text-align: center;
+                margin-bottom: 35px;
+                font-weight: 800;
+                font-size: 26px;
+                letter-spacing: 0.5px;
+                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
 
     /* Card Laporan */
     .report-card {
