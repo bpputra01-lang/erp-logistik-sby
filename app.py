@@ -5635,7 +5635,7 @@ if menu == "Logistic Schedule":
                 for nm in names_manual:
                     if nm in weekly_counter: weekly_counter[nm] += 1
 
-        # --- 2. ENGINE GENERATOR ---
+     # --- 2. ENGINE GENERATOR ---
 for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
     for day_name in day_names:
         tgl_ini = dates_real[day_names.index(day_name)]
