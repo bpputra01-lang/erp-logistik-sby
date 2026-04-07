@@ -5854,6 +5854,32 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { color: #9ca3af; }
     .stTabs [aria-selected="true"] { color: #3b82f6 !important; border-bottom-color: #3b82f6 !important; }
     hr { border-color: #374151; }
+    /* --- PERBAIKAN CHECKBOX DARK MODE --- */
+    
+    /* 1. Paksa Kotak Centang Jadi Gelap */
+    div[data-testid="stCheckbox"] div[role="checkbox"] {
+        background-color: #111827 !important; /* Warna sama dengan todo-container */
+        border: 2px solid #374151 !important; /* Border tipis abu-abu */
+        border-radius: 4px !important;
+    }
+
+    /* 2. Warna Saat Dicentang (Biru Jezpro) */
+    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
+        background-color: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+    }
+
+    /* 3. Warna Teks Label di Sampingnya */
+    div[data-testid="stCheckbox"] p {
+        color: #f3f4f6 !important; /* Putih terang biar kebaca */
+        font-weight: 500 !important;
+    }
+
+    /* 4. Hilangkan Efek Glow Putih Saat Diklik */
+    div[data-testid="stCheckbox"] div[role="checkbox"]:focus {
+        box-shadow: none !important;
+        outline: none !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
