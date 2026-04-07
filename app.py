@@ -5948,7 +5948,7 @@ if menu == "Reporting & PIC":
     col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
-        st.subheader(f"🎯 Laporan: {current_user}")
+        st.subheader(f"📋PIC: {current_user}")
         tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
         
         with tab_me:
