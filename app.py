@@ -5364,75 +5364,85 @@ if menu == "Logistic Schedule":
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
-            /* Selector hanya bekerja di dalam div .logistic-container */
-            
+            /* 1. Header Utama - Terkunci di .logistic-container */
             .logistic-container .hero-header {
                 background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-                color: white; padding: 25px; border-radius: 12px;
-                text-align: center; margin-bottom: 35px; font-weight: 800;
-                font-size: 26px; letter-spacing: 0.5px;
+                color: white !important; 
+                padding: 25px; 
+                border-radius: 12px;
+                text-align: center; 
+                margin-bottom: 35px; 
+                font-weight: 800;
+                font-size: 26px; 
+                letter-spacing: 0.5px;
                 box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
                 border: 1px solid rgba(255, 255, 255, 0.1);
             }
 
-            /* Sub-Header hanya di halaman ini */
+            /* 2. Sub-Header (H3) - Hanya dalam container utama, tidak menyentuh Sidebar */
             .logistic-container div[data-testid="stVerticalBlock"] h3 {
                 color: #FFFFFF !important;
                 border-left: 5px solid #3b82f6;
-                padding-left: 15px; font-weight: 700;
+                padding-left: 15px; 
+                font-weight: 700;
                 text-transform: uppercase;
             }
 
-            /* Input & Form hanya di halaman ini */
-            .logistic-container div[data-testid="stTextInput"] > div > div, 
-            .logistic-container div[data-testid="stDateInput"] > div > div,
-            .logistic-container div[data-testid="stSelectbox"] > div > div {
+            /* 3. Input & Form - Perbaikan Selector agar tidak bocor ke Sidebar */
+            .logistic-container div[data-testid="stTextInput"] div[data-baseweb="input"], 
+            .logistic-container div[data-testid="stDateInput"] div[data-baseweb="input"],
+            .logistic-container div[data-testid="stSelectbox"] div[data-baseweb="select"] {
                 background-color: #12141d !important; 
                 border: 1px solid #2d3142 !important;
                 border-radius: 10px !important;
             }
 
+            /* 4. Label - Dikunci spesifik agar label Sidebar tetap default */
+            .logistic-container label[data-testid="stWidgetLabel"] p { 
+                color: #B0B3B8 !important; 
+                font-size: 14px !important;
+                font-weight: 500 !important;
+            }
+
+            /* 5. Input Text - Memaksa warna putih hanya di dalam container */
             .logistic-container input { 
                 color: #ffffff !important; 
                 -webkit-text-fill-color: #ffffff !important; 
             }
 
-            /* Button Premium hanya di halaman ini */
+            /* 6. Button Premium - Efek Glow */
             .logistic-container div.stButton > button {
                 background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%) !important;
-                color: white !important; border-radius: 10px !important;
-                border: none !important; font-weight: 700 !important;
+                color: white !important; 
+                border-radius: 10px !important;
+                border: none !important; 
+                font-weight: 700 !important;
+                padding: 10px 20px !important;
                 transition: 0.3s ease-in-out !important;
             }
             
             .logistic-container div.stButton > button:hover {
                 box-shadow: 0 0 15px rgba(59, 130, 246, 0.5) !important;
                 transform: scale(1.02);
+                color: white !important;
             }
 
-            /* Card Style */
+            /* 7. Card Style - Identitas Jez SBY */
             .logistic-container .custom-card {
-                background-color: #1a1c27; border-radius: 8px;
-                padding: 12px 18px; margin-bottom: 10px;
+                background-color: #1a1c27; 
+                border-radius: 8px;
+                padding: 12px 18px; 
+                margin-bottom: 10px;
                 border-left: 5px solid #3b82f6;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             }
+
+            /* 8. Fix White Space/Padding Dashboard */
+            .logistic-container {
+                padding-top: 0rem;
+            }
         </style>
-    """, unsafe_allow_html=True)
-
-    # 2. BUNGKUS SELURUH KONTEN HALAMAN DENGAN DIV INI
-    st.markdown('<div class="logistic-container">', unsafe_allow_html=True)
-
-    # --- SEMUA KODE HALAMAN LU TARUH DISINI ---
-    st.markdown('<div class="hero-header">📝 LOGISTIC SCHEDULE SURABAYA</div>', unsafe_allow_html=True)
-    
-    # Contoh penggunaan subheader (Gak bakal ngerusak sidebar)
-    st.subheader(f"Dashboard: {current_user}")
-    
-    # ... taruh sisa kode lu (form, table, dll) ...
-
-    # 3. TUTUP CONTAINER (WAJIB ADA DI PALING BAWAH HALAMAN)
-    st.markdown('</div>', unsafe_allow_html=True)
+    """, unsafe_allow_html=True)  
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
     # --- 1. DATABASE TIM ---
