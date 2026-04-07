@@ -5854,32 +5854,7 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { color: #9ca3af; }
     .stTabs [aria-selected="true"] { color: #3b82f6 !important; border-bottom-color: #3b82f6 !important; }
     hr { border-color: #374151; }
-    /* --- PERBAIKAN CHECKBOX DARK MODE --- */
     
-    /* 1. Paksa Kotak Centang Jadi Gelap */
-    div[data-testid="stCheckbox"] div[role="checkbox"] {
-        background-color: #111827 !important; /* Warna sama dengan todo-container */
-        border: 2px solid #374151 !important; /* Border tipis abu-abu */
-        border-radius: 4px !important;
-    }
-
-    /* 2. Warna Saat Dicentang (Biru Jezpro) */
-    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
-        background-color: #3b82f6 !important;
-        border-color: #3b82f6 !important;
-    }
-
-    /* 3. Warna Teks Label di Sampingnya */
-    div[data-testid="stCheckbox"] p {
-        color: #f3f4f6 !important; /* Putih terang biar kebaca */
-        font-weight: 500 !important;
-    }
-
-    /* 4. Hilangkan Efek Glow Putih Saat Diklik */
-    div[data-testid="stCheckbox"] div[role="checkbox"]:focus {
-        box-shadow: none !important;
-        outline: none !important;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -5982,56 +5957,55 @@ if menu == "Reporting & PIC":
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
     with col_kanan:
-        # CSS PAKSA DARK MODE (Targeting spesifik ke kotak checkbox)
-        st.markdown("""
-            <style>
-            /* 1. Target kotak centangnya langsung */
-            div[data-testid="stCheckbox"] div[role="checkbox"] {
-                background-color: #1a1c27 !important;
-                border: 2px solid #3b82f6 !important;
-            }
+    # 1. Header yang konsisten dengan container
+    st.markdown("""
+        <div style="background-color: #1a1c27; padding: 20px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px;">
+            <h4 style='margin:0; color:#3b82f6;'>📝 TO DO LIST</h4>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 2. Form Tambah Tugas
+    with st.form("form_todo_dark", clear_on_submit=True):
+        tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
+        submit = st.form_submit_button("➕ Tambah")
+        
+        if submit and tugas_baru:
+            if "todo_list" not in st.session_state:
+                st.session_state.todo_list = []
+            st.session_state.todo_list.append({"task": tugas_baru, "done": False})
+            st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 3. Render List Tugas (Gaya Kolom Kiri)
+    if "todo_list" in st.session_state:
+        for i, item in enumerate(st.session_state.todo_list):
+            # Membuat container card yang mirip dengan .report-card
+            # Kita gunakan columns untuk memisahkan teks dan checkbox
+            c1, c2 = st.columns([4, 1])
             
-            /* 2. Warna saat sudah dicentang (biru terang) */
-            div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
-                background-color: #3b82f6 !important;
-            }
-
-            /* 3. Warna teks label (Input Standing Briefing, dll) */
-            div[data-testid="stCheckbox"] p {
-                color: #e5e7eb !important;
-                font-weight: 500 !important;
-            }
+            with c1:
+                # Tampilan Card Tugas (Hitam, Border Biru Kiri)
+                st.markdown(f"""
+                <div style="
+                    background-color: #1f2937; 
+                    padding: 15px; 
+                    border-radius: 12px; 
+                    border-left: 5px solid {'#10b981' if item['done'] else '#3b82f6'}; 
+                    margin-bottom: 10px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+                ">
+                    <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
+                    <small style="color:{'#10b981' if item['done'] else '#9ca3af'};">
+                        Status: {'✅ Selesai' if item['done'] else '❌ Belum'}
+                    </small>
+                </div>
+                """, unsafe_allow_html=True)
             
-            /* 4. Ngilangin shadow putih bawaan Streamlit */
-            div[data-testid="stCheckbox"] div[role="checkbox"]:focus {
-                box-shadow: none !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # Container Header
-        st.markdown("""
-            <div style="background-color: #1a1c27; padding: 20px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 10px;">
-                <h4 style='margin:0; color:#3b82f6;'>📝 TO DO LIST</h4>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Form Tambah Tugas
-        with st.form("form_todo_dark", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            submit = st.form_submit_button("➕ Tambah")
-            
-            if submit and tugas_baru:
-                if "todo_list" not in st.session_state:
-                    st.session_state.todo_list = []
-                st.session_state.todo_list.append({"task": tugas_baru, "done": False})
-                st.rerun()
-
-        # Render List Checkbox
-        if "todo_list" in st.session_state:
-            for i, item in enumerate(st.session_state.todo_list):
-                # Ini yang bakal berubah jadi item gelap berkat CSS di atas
-                res = st.checkbox(item['task'], key=f"chk_dark_{i}", value=item['done'])
+            with c2:
+                # Tombol Centang untuk Update Status
+                st.write("") # Spasi agar sejajar tengah
+                res = st.checkbox("", key=f"chk_dark_{i}", value=item['done'], label_visibility="collapsed")
                 if res != item['done']:
                     st.session_state.todo_list[i]['done'] = res
                     st.rerun()
