@@ -5956,8 +5956,15 @@ if menu == "Reporting & PIC":
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
     with col_kanan:
-        st.markdown('<div class="todo-container">', unsafe_allow_html=True)
-        st.markdown("<h4 style='margin-bottom:15px; color:#3b82f6;'>📝 TO DO LIST</h4>", unsafe_allow_html=True)
+    # Gabungkan semua dalam satu string f-string
+    todo_html = f"""
+    <div class="todo-container">
+        <h4 style='margin-bottom:15px; color:#3b82f6; margin-top:0;'>
+            📝 TO DO LIST
+        </h4>
+        </div>
+    """
+    st.markdown(todo_html, unsafe_allow_html=True)
         
         with st.form("form_todo_dark", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
