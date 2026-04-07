@@ -6055,12 +6055,10 @@ if menu == "Reporting & PIC":
     with col_kanan:
         st.markdown("""<div style="background-color: #1a1c27; padding: 10px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px; text-align: center;"><h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4></div>""", unsafe_allow_html=True)
 
-        # Form Input Tetap Sama
+        # 1. Form Input (Tetap di Atas)
         with st.form("form_todo_dark", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            submit = st.form_submit_button("➕ Tambah")
-            
-            if submit and tugas_baru:
+            if st.form_submit_button("➕ Tambah") and tugas_baru:
                 conn = get_db_connection()
                 conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
                 conn.commit()
@@ -6068,40 +6066,25 @@ if menu == "Reporting & PIC":
                 sync_data()
                 st.rerun()
 
-        # --- LOGIC PAGINATION (BAGIAN YANG BERUBAH) ---
+        # 2. Container Scrollable (Ini kuncinya biar ada kursor geser)
+        # Tinggi box gue set 400px, lu bisa ubah sesuai selera
+        st.markdown('<div style="height: 450px; overflow-y: auto; padding-right: 10px; scrollbar-width: thin; scrollbar-color: #3b82f6 #1a1c27;">', unsafe_allow_html=True)
+        
         if "todo_list" in st.session_state and st.session_state.todo_list:
-            # 1. Setup Parameter
-            items_per_page = 5
-            total_items = len(st.session_state.todo_list)
-            total_pages = math.ceil(total_items / items_per_page)
-            
-            # 2. Kontrol Halaman Aktif
-            if 'todo_page' not in st.session_state:
-                st.session_state.todo_page = 1
-            
-            # Reset ke hal 1 jika tiba-tiba data kosong/berkurang drastis
-            if st.session_state.todo_page > total_pages:
-                st.session_state.todo_page = 1
-
-            # 3. Potong Data (Slicing)
-            start_idx = (st.session_state.todo_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            current_items = st.session_state.todo_list[start_idx:end_idx]
-
-            # 4. Tampilkan Item Per Halaman
-            for i, item in enumerate(current_items):
-                # Kita butuh index asli dari list utama untuk checkbox
-                real_idx = start_idx + i 
-                
+            for i, item in enumerate(st.session_state.todo_list):
                 c1, c2 = st.columns([4, 1])
                 with c1:
                     color_border = '#10b981' if item['done'] else '#3b82f6'
-                    st.markdown(f"""<div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"><h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4><small style="color:{color_border};">Status: {'✅ Selesai' if item['done'] else '❌ Belum'}</small></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""
+                        <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                            <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
+                            <small style="color:{color_border};">Status: {'✅ Selesai' if item['done'] else '❌ Belum'}</small>
+                        </div>
+                    """, unsafe_allow_html=True)
                 
                 with c2:
                     st.write("")
-                    # Checkbox tetap mengacu pada real_idx agar tidak tertukar antar halaman
-                    res = st.checkbox("", key=f"chk_dark_{real_idx}", value=item['done'], label_visibility="collapsed")
+                    res = st.checkbox("", key=f"chk_scroll_{i}", value=item['done'], label_visibility="collapsed")
                     if res != item['done']:
                         conn = get_db_connection()
                         conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
@@ -6109,21 +6092,7 @@ if menu == "Reporting & PIC":
                         conn.close()
                         sync_data()
                         st.rerun()
-
-            # 5. Navigasi Halaman (Tombol Prev & Next)
-            st.write("---")
-            nav1, nav2, nav3 = st.columns([1, 2, 1])
-            with nav1:
-                if st.session_state.todo_page > 1:
-                    if st.button("⬅️", key="btn_prev"):
-                        st.session_state.todo_page -= 1
-                        st.rerun()
-            with nav2:
-                st.markdown(f"<p style='text-align:center; color:#9ca3af;'>Hal {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
-            with nav3:
-                if st.session_state.todo_page < total_pages:
-                    if st.button("➡️", key="btn_next"):
-                        st.session_state.todo_page += 1
-                        st.rerun()
         else:
             st.info("Belum ada tugas tambahan.")
+            
+        st.markdown('</div>', unsafe_allow_html=True) # Tutup div scroll
