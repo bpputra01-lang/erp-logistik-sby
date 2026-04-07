@@ -5812,58 +5812,61 @@ if 'db_report' not in st.session_state:
 if 'todo_list' not in st.session_state:
     st.session_state.todo_list = []
 
-# --- 2. CSS STYLING (Compact Header & Reject-Style Box) ---
+# --- 2. CSS STYLING (SUPER CLEAN & TRANSPARENT INPUT) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-    /* Hero Header - Dibuat Slim/Compact */
+    /* Compact Header */
     .top-header {
         background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
-        color: white; 
-        padding: 12px 25px; /* Padding dikecilkan */
-        border-radius: 12px; 
-        margin-bottom: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        color: white; padding: 12px 25px; border-radius: 12px; margin-bottom: 15px;
     }
-    .top-header h2 { margin: 0; font-size: 1.5rem; }
+    .top-header h2 { margin: 0; font-size: 1.4rem; letter-spacing: -0.5px; }
 
-    /* Report Card */
+    /* Report Card - Lebih Tipis & Elegan */
     .report-card {
-        background-color: white; padding: 15px; border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 10px;
-        border-left: 5px solid #1E3A8A;
+        background-color: white; padding: 18px; border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 10px;
+        border-left: 4px solid #1E3A8A;
     }
 
-    /* TO-DO BOX (Styling ala Reject/Defect Menu) */
+    /* TO-DO CONTAINER (Soft Pastel) */
     .todo-container {
-        background-color: #f0f7ff; /* Soft Pastel Blue */
+        background-color: #f4f8ff; 
         padding: 20px;
         border-radius: 15px;
         border: 1px dashed #3B82F6;
-        margin-bottom: 20px;
+    }
+
+    /* TRANSPARENT INPUT BOX - Ini yang lu minta */
+    div[data-baseweb="input"] {
+        background-color: transparent !important;
+        border-radius: 8px !important;
+    }
+    input[data-baseweb="input"] {
+        background-color: transparent !important;
+        color: #1E3A8A !important;
     }
     
-    /* Input field styling */
-    .stTextInput input {
-        border-radius: 10px !important;
-        border: 1px solid #d1d5db !important;
+    /* Button Styling ala Modern App */
+    .stButton>button {
+        border-radius: 8px;
+        font-weight: 600;
+        transition: 0.3s;
     }
-    
-    /* Done/Selesai Text Styling */
-    .done-text { color: #94a3b8; text-decoration: line-through; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. LOGIKA ROUTING ---
-# (Pastikan variabel 'menu' didefinisikan dari navigasi utama lu)
+# (Pastikan variabel 'menu' ini ditarik dari selectbox navigasi utama lu)
 if menu == "Reporting & PIC":
     
-    # 1. Compact Hero Header
-    st.markdown('<div class="top-header"><h2>REPORTING & PIC"/h2></div>', unsafe_allow_html=True)
+    # 1. Compact Header
+    st.markdown('<div class="top-header"><h2>🚀 Jezpro Digital Logistik</h2></div>', unsafe_allow_html=True)
 
-    # 2. Control Row
+    # 2. Info Row
     c1, c2 = st.columns([1, 1])
     with c1:
         current_user = st.selectbox("👤 Pilih PIC (Login):", ["Andi", "Budi", "Siska", "Maya"], key="pic_final")
@@ -5873,15 +5876,14 @@ if menu == "Reporting & PIC":
 
     st.divider()
 
-    # 3. Main Content
-    col_kiri, col_kanan = st.columns([1.8, 1])
+    # 3. Layout Utama
+    col_kiri, col_kanan = st.columns([1.7, 1])
 
     with col_kiri:
         st.subheader(f"🎯 Laporan: {current_user}")
         tab_me, tab_all = st.tabs(["Dashboard Saya", "Overview Tim"])
         
         with tab_me:
-            my_tasks = [t for t in st.session_state.db_report if t['PIC'] == current_user]
             for idx, task in enumerate(st.session_state.db_report):
                 if task['PIC'] == current_user:
                     with st.container():
@@ -5889,33 +5891,33 @@ if menu == "Reporting & PIC":
                         with ck1:
                             st.markdown(f"""
                             <div class="report-card">
-                                <h4 style="margin:0;">{task['Laporan']}</h4>
-                                <small style="color:gray;">Jam: {task['Jam']} | Status: {task['Status']}</small>
+                                <h4 style="margin:0; font-size: 1.1rem; color: #1e293b;">{task['Laporan']}</h4>
+                                <small style="color:gray;">Target: {task['Jam']} | Status: {task['Status']}</small>
                             </div>
                             """, unsafe_allow_html=True)
                         with ck2:
                             st.write("") # Spacer
                             if task['Status'] == "❌ Belum":
-                                if st.button(f"Update", key=f"up_{idx}"):
+                                if st.button(f"Update", key=f"up_{idx}", use_container_width=True):
                                     st.session_state.db_report[idx]['Status'] = "✅ Selesai"
                                     st.rerun()
                             else:
-                                st.button("Selesai", disabled=True, key=f"don_{idx}")
+                                st.button("Selesai", disabled=True, key=f"don_{idx}", use_container_width=True)
 
     with col_kanan:
-        # TO-DO BOX DENGAN STYLE REJECT/DEFECT
+        # TO-DO BOX DENGAN INPUT TRANSPARAN
         st.markdown('<div class="todo-container">', unsafe_allow_html=True)
         st.subheader("📝 Daily To-Do")
         
         with st.form("todo_form", clear_on_submit=True):
-            tugas_input = st.text_input("Tugas Baru", placeholder="Contoh: Cek stok di rack A1...")
-            submit = st.form_submit_button("➕ Tambah ke List")
+            # Input tanpa background putih (Transparent via CSS di atas)
+            tugas_input = st.text_input("Tugas Baru", placeholder="Apa yang mau dikerjakan?")
+            submit = st.form_submit_button("➕ Tambah ke List", use_container_width=True)
             if submit and tugas_input:
                 st.session_state.todo_list.append({"task": tugas_input, "done": False})
                 st.rerun()
         
         st.write("---")
-        # Render List To-Do
         if not st.session_state.todo_list:
             st.caption("Belum ada tugas tambahan.")
         else:
