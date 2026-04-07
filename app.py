@@ -5800,88 +5800,65 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# Custom CSS
+# CSS (Tetap sama)
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .top-header {
+        background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
+        color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px;
+    }
     .report-card {
         background-color: white; padding: 20px; border-radius: 15px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 10px;
         border-left: 5px solid #1E3A8A;
     }
-    .top-header {
-        background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
-        color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- INITIAL DATA ---
+# --- DATABASE SIMULATION ---
 if 'db_report' not in st.session_state:
     st.session_state.db_report = [
         {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
         {"Jam": "10:00", "Laporan": "Stock Opname Surabaya", "PIC": "Budi", "Status": "❌ Belum"},
         {"Jam": "13:00", "Laporan": "Input Data Reject", "PIC": "Siska", "Status": "❌ Belum"},
-        {"Jam": "15:00", "Laporan": "Update WMS Jezpro", "PIC": "Andi", "Status": "❌ Belum"},
         {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
     ]
 
-# --- TOP NAVIGATION (Navigasi Utama) ---
+# --- 1. HEADER TETAP (Muncul di semua menu) ---
 st.markdown('<div class="top-header"><h1>Jezpro Digital Logistik</h1></div>', unsafe_allow_html=True)
 
-# Selector Menu Utama (Cuma ini yang muncul di semua halaman)
-menu = st.selectbox("📂 Pilih Menu Dashboard:", ["Reporting & PIC", "Settings"])
+# --- 2. NAVIGASI UTAMA (Muncul di semua menu) ---
+menu = st.selectbox("📂 Pilih Menu Dashboard:", ["Reporting & PIC", "Stock Minus Clearance", "Settings"])
 
 st.divider()
 
-# --- LOGIKA MENU ---
+# --- 3. LOGIKA ROUTING (PEMBATAS KONTEN) ---
+
 if menu == "Reporting & PIC":
-    
-    # SELEKTOR PIC (Sekarang dibungkus di sini agar tidak muncul di menu lain)
-    col_user, col_time = st.columns([1, 1])
-    with col_user:
-        list_pic = ["Andi", "Budi", "Siska", "Maya"]
-        current_user = st.selectbox("👤 Pilih PIC (Login):", list_pic)
-    with col_time:
-        st.write("") # Spacer
-        st.write(f"🕒 **Update:** {datetime.now().strftime('%A, %d %b %Y')}")
+    # --- SEMUA INPUTAN INI HANYA MUNCUL DI MENU REPORTING ---
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        current_user = st.selectbox("👤 Pilih PIC (Login):", ["Andi", "Budi", "Siska", "Maya"])
+    with c2:
+        st.write("")
+        st.write(f"📅 **Update:** {datetime.now().strftime('%A, %d %B %Y')}")
 
-    # 1. METRICS
-    total_tasks = len(st.session_state.db_report)
-    total_done = len([t for t in st.session_state.db_report if t['Status'] == "✅ Selesai"])
-    
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Total Tugas", f"{total_tasks}")
-    m2.metric("Progres Selesai", f"{total_done}")
-    m3.metric("User Login", current_user)
-
-    # 2. TABS
-    tab_personal, tab_global = st.tabs(["🎯 My Task List", "🌍 Team Overview"])
-
-    with tab_personal:
-        st.subheader(f"Tugas: {current_user}")
+    # Konten Dashboard Reporting
+    t1, t2 = st.tabs(["🎯 My Tasks", "🌍 Team Overview"])
+    with t1:
         for idx, task in enumerate(st.session_state.db_report):
             if task['PIC'] == current_user:
-                with st.container():
-                    col_info, col_action = st.columns([5, 1])
-                    with col_info:
-                        st.markdown(f"""
-                        <div class="report-card">
-                            <h3 style="margin:0;">{task['Laporan']}</h3>
-                            <p style="margin:0; color:gray;">Jam: {task['Jam']} | Status: {task['Status']}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    with col_action:
-                        st.write("")
-                        if task['Status'] == "❌ Belum":
-                            if st.button(f"Selesaikan", key=f"btn_{idx}"):
-                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                st.rerun()
-                        else:
-                            st.button("Selesai", disabled=True, key=f"dis_{idx}")
+                st.markdown(f'<div class="report-card"><h3>{task["Laporan"]}</h3><p>{task["Jam"]} | {task["Status"]}</p></div>', unsafe_allow_html=True)
+                if task['Status'] == "❌ Belum":
+                    if st.button(f"Selesaikan {idx}", key=f"btn_{idx}"):
+                        st.session_state.db_report[idx]['Status'] = "✅ Selesai"
+                        st.rerun()
 
-    with tab_global:
-        st.subheader("🌐 Monitoring Seluruh Tim")
-        st.dataframe(pd.DataFrame(st.session_state.db_report), use_container_width=True, hide_index=True)
+elif menu == "Stock Minus Clearance":
+    # --- DI SINI BERSIH DARI INPUTAN PIC ---
+    st.header("📦 Stock Minus Clearance")
+    uploaded_file = st.file_uploader("Upload File ALL DATA STOCK", type=["xlsx", "xlsm"])
+    if uploaded_file:
+        st.success("File terupload! Kerjakan logic stock minus di sini.")
+
 
