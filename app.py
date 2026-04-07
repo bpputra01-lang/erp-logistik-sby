@@ -5861,7 +5861,7 @@ st.markdown("""
 if menu == "Reporting & PIC":
     
     # 1. Compact Hero Header
-    st.markdown('<div class="top-header"><h2>🚀 Jezpro Digital Logistik</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="top-header"><h2>REPORTING & PIC/h2></div>', unsafe_allow_html=True)
 
     # 2. Control Row
     c1, c2 = st.columns([1, 1])
