@@ -5800,21 +5800,15 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
+# --- CONFIGURASI TAMPILAN ---
+st.set_page_config(page_title="Jezpro Ops - Daily Report", layout="wide")
 
-# Custom CSS untuk UI yang "Mahal" & Clean
+# Custom CSS untuk UI yang "Mahal"
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    
-    html, body, [class*="css"]  {
-        font-family: 'Inter', sans-serif;
-    }
-    
-    .main {
-        background-color: #f4f7f9;
-    }
-    
-    /* Card Styling */
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .main { background-color: #f4f7f9; }
     .report-card {
         background-color: white;
         padding: 20px;
@@ -5823,15 +5817,6 @@ st.markdown("""
         margin-bottom: 10px;
         border-left: 5px solid #0D8ABC;
     }
-    
-    .stMetric {
-        background-color: #ffffff;
-        padding: 15px;
-        border-radius: 15px;
-        border: 1px solid #eef2f6;
-    }
-    
-    /* Elegant Header */
     .user-header {
         background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
         color: white;
@@ -5841,65 +5826,59 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-if menu == "Reporting & PIC":
-# --- INITIAL DATA (Mocking Database) ---
-if 'db_report' not in st.session_state:
-    st.session_state.db_report = [
-        {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
-        {"Jam": "10:00", "Laporan": "Stock Opname Surabaya", "PIC": "Budi", "Status": "❌ Belum"},
-        {"Jam": "13:00", "Laporan": "Input Data Reject", "PIC": "Siska", "Status": "❌ Belum"},
-        {"Jam": "15:00", "Laporan": "Update WMS Jezpro", "PIC": "Andi", "Status": "❌ Belum"},
-        {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
-    ]
 
-# --- SIDEBAR: LOGIN / PILIH USER ---
+# --- SIDEBAR: DEFINISI MENU & USER ---
 with st.sidebar:
     st.image("https://ui-avatars.com/api/?name=Jezpro+Logistik&background=1E3A8A&color=fff", width=100)
-    st.title("👤 Personal Access")
-    list_pic = ["Andi", "Budi", "Siska", "Maya"]
-    current_user = st.selectbox("Masuk Sebagai PIC:", list_pic)
+    st.title("👤 Control Panel")
+    
+    # DEFINISI VARIABEL MENU (Biar ga error)
+    menu = st.radio("Pilih Menu:", ["Reporting & PIC", "Settings"])
     
     st.divider()
-    st.info(f"Halo **{current_user}**, silakan update progres kewajiban reporting Anda hari ini.")
+    list_pic = ["Andi", "Budi", "Siska", "Maya"]
+    current_user = st.selectbox("Masuk Sebagai PIC:", list_pic)
+
+# --- LOGIKA MENU ---
+if menu == "Reporting & PIC":
+    # --- INITIAL DATA (Harus di dalam Indentasi IF) ---
+    if 'db_report' not in st.session_state:
+        st.session_state.db_report = [
+            {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
+            {"Jam": "10:00", "Laporan": "Stock Opname Surabaya", "PIC": "Budi", "Status": "❌ Belum"},
+            {"Jam": "13:00", "Laporan": "Input Data Reject", "PIC": "Siska", "Status": "❌ Belum"},
+            {"Jam": "15:00", "Laporan": "Update WMS Jezpro", "PIC": "Andi", "Status": "❌ Belum"},
+            {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
+        ]
+
+    # --- HEADER DASHBOARD ---
+    st.markdown(f"""
+        <div class="user-header">
+            <h1>Selamat Datang, {current_user} 👋</h1>
+            <p>Monitor & laporkan kewajiban harian Anda dengan satu klik.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # --- METRICS SECTION ---
+    total_tasks = len(st.session_state.db_report)
+    total_done = len([t for t in st.session_state.db_report if t['Status'] == "✅ Selesai"])
     
-    # Quick Progress User
-    user_tasks = [t for t in st.session_state.db_report if t['PIC'] == current_user]
-    done_user = len([t for t in user_tasks if t['Status'] == "✅ Selesai"])
-    st.write(f"Progres Anda: **{done_user}/{len(user_tasks)}**")
-    st.progress(done_user/len(user_tasks) if len(user_tasks) > 0 else 0)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Global Report", f"{total_tasks}", "Target Hari Ini")
+    col2.metric("Sudah Dilaporkan", f"{total_done}", f"{(total_done/total_tasks)*100:.0f}%" if total_tasks > 0 else "0%")
+    col3.metric("PIC Aktif", len(list_pic), "All Standby")
 
-# --- HEADER DASHBOARD ---
-st.markdown(f"""
-    <div class="user-header">
-        <h1>Selamat Datang, {current_user} 👋</h1>
-        <p>Monitor & laporkan kewajiban harian Anda dengan satu klik.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.divider()
 
-# --- METRICS SECTION ---
-total_done = len([t for t in st.session_state.db_report if t['Status'] == "✅ Selesai"])
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Global Report", f"{len(st.session_state.db_report)}", "Target Hari Ini")
-col2.metric("Sudah Dilaporkan", f"{total_done}", f"{total_done/len(st.session_state.db_report)*100:.0f}%")
-col3.metric("PIC Aktif", len(list_pic), "All Standby")
+    # --- MAIN DASHBOARD AREA ---
+    tab_personal, tab_global = st.tabs(["🎯 My Dashboard", "🌍 All PIC Overview"])
 
-st.divider()
-
-# --- MAIN DASHBOARD AREA ---
-tab_personal, tab_global = st.tabs(["🎯 My Dashboard", "🌍 All PIC Overview"])
-
-# TAB 1: DASHBOARD MASING-MASING PIC
-with tab_personal:
-    st.subheader(f"📋 Kewajiban Reporting: {current_user}")
-    
-    my_tasks = [t for t in st.session_state.db_report if t['PIC'] == current_user]
-    
-    if not my_tasks:
-        st.write("Tidak ada jadwal laporan untuk Anda hari ini.")
-    else:
+    with tab_personal:
+        st.subheader(f"📋 Kewajiban Reporting: {current_user}")
+        
+        # Ambil tugas spesifik user ini
         for idx, task in enumerate(st.session_state.db_report):
             if task['PIC'] == current_user:
-                # Membuat container untuk tiap tugas
                 with st.container():
                     col_info, col_action = st.columns([4, 1])
                     with col_info:
@@ -5916,27 +5895,25 @@ with tab_personal:
                         if task['Status'] == "❌ Belum":
                             if st.button(f"Selesaikan", key=f"btn_{idx}"):
                                 st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                st.toast(f"Mantap {current_user}! Laporan berhasil dikirim.")
+                                st.toast(f"Mantap {current_user}! Laporan terkirim.")
                                 st.rerun()
                         else:
                             st.button("✅ Selesai", disabled=True, key=f"dis_{idx}")
 
-# TAB 2: OVERVIEW SEMUA ORANG
-with tab_global:
-    st.subheader("🌐 Status Koordinasi Seluruh PIC")
-    
-    # Kita tampilkan dalam bentuk dataframe yang cantik
-    df_all = pd.DataFrame(st.session_state.db_report)
-    
-    # Styling DataFrame
-    def color_status(val):
-        color = '#d4edda' if val == '✅ Selesai' else '#f8d7da'
-        return f'background-color: {color}'
+    with tab_global:
+        st.subheader("🌐 Status Koordinasi Seluruh PIC")
+        df_all = pd.DataFrame(st.session_state.db_report)
+        
+        def color_status(val):
+            color = '#d4edda' if val == '✅ Selesai' else '#f8d7da'
+            return f'background-color: {color}'
 
-    st.dataframe(
-        df_all.style.applymap(color_status, subset=['Status']),
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    st.info("ℹ️ Anda bisa melihat progres rekan tim lain di sini untuk koordinasi shift.")
+        st.dataframe(
+            df_all.style.applymap(color_status, subset=['Status']),
+            use_container_width=True,
+            hide_index=True
+        )
+
+else:
+    st.title("⚙️ Settings")
+    st.write("Halaman konfigurasi dashboard.")
