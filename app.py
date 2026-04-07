@@ -5947,8 +5947,95 @@ if menu == "Reporting & PIC":
 
     col_kiri, col_kanan = st.columns([1.8, 1])
 
+    # --- 1. INITIAL DATA (Anti-Crash & Case Sync) ---
+if 'db_report' not in st.session_state:
+    st.session_state.db_report = [
+        {"Laporan": "REJECT & DEFECT", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "KERAPIHAN STOCK", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "STOCK MINUS", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "BALANCING STOCK", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "RTO", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "OUTBOUND PROCESS", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "COMPARE SCAN OUT", "PIC": "BAKCLINER", "Status": "❌ Belum"},
+        {"Laporan": "COMPARE BARANG DATANG", "PIC": "BAKCLINER", "Status": "❌ Belum"},
+        {"Laporan": "DASHBOARD SIDOARJO", "PIC": "VANO", "Status": "❌ Belum"},
+        {"Laporan": "INBOUND PROCESS", "PIC": "VANO", "Status": "❌ Belum"},
+        {"Laporan": "SURABAYA DASHBOARD", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "SEMARANG DASHBOARD", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "MANIFEST", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "REFUND", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "REFILL & OVERSTOCK", "PIC": "KRISNA", "Status": "❌ Belum"},
+        {"Laporan": "ZERO PUTAWAY", "PIC": "WAREHOUSE FULLFILLMENT", "Status": "❌ Belum"},
+    ]
+
+# Inisialisasi list to-do (Penting biar gak AttributeError)
+if 'todo_list' not in st.session_state:
+    st.session_state.todo_list = []
+
+# --- 2. FULL DARK MODE CSS (Including Tabs & Subheader) ---
+st.markdown("""
+    <style>
+    /* Global Dark Background */
+    .main { background-color: #0e1117; color: #ffffff; }
+    
+    /* Header & Subheader Styling */
+    .stMarkdown h3, .stSubheader { color: #3b82f6 !important; font-weight: 700 !important; }
+    
+    .top-header {
+        background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
+        color: white; padding: 12px 20px; border-radius: 10px; margin-bottom: 20px;
+        border: 1px solid #3b82f6; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    /* Tabs Styling - Dark Mode */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 10px; }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1f2937 !important; border-radius: 8px 8px 0 0 !important;
+        color: #9ca3af !important; padding: 10px 20px !important; border: none !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #3b82f6 !important; color: white !important; font-weight: bold !important;
+    }
+
+    /* Card Laporan */
+    .report-card {
+        background-color: #1f2937; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 10px;
+        border-left: 5px solid #3b82f6; color: #f3f4f6;
+    }
+
+    /* To-Do Container */
+    .todo-container {
+        background-color: #111827; padding: 20px; border-radius: 15px;
+        border: 1px solid #374151; margin-bottom: 20px;
+    }
+    
+    /* Input & Button */
+    .stTextInput input { background-color: #1f2937 !important; color: white !important; border: 1px solid #374151 !important; }
+    .stButton > button { width: 100%; border-radius: 8px; background-color: #1e3a8a; color: white; border: none; }
+    .stButton > button:hover { background-color: #3b82f6; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 3. LOGIKA ROUTING ---
+if menu == "Reporting & PIC":
+    st.markdown('<div class="top-header"><h2>🚀 Jezpro Digital Logistik</h2></div>', unsafe_allow_html=True)
+
+    c1, c2 = st.columns([1.2, 1])
+    with c1:
+        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
+        current_user = st.selectbox("👤 Pilih Nama:", list_pic, key="pic_final_dark")
+    with c2:
+        st.write("")
+        st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
+
+    st.divider()
+
+    col_kiri, col_kanan = st.columns([1.8, 1])
+
     with col_kiri:
-        st.subheader(f"📋PIC: {current_user}")
+        # Request lu: PIC Subheader Dark Mode
+        st.subheader(f"📋 PIC: {current_user}")
         tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
         
         with tab_me:
@@ -5965,18 +6052,18 @@ if menu == "Reporting & PIC":
                     with ck2:
                         st.write("") 
                         if task['Status'] == "❌ Belum":
-                            if st.button(f"Update", key=f"up_fin_{idx}"):
+                            if st.button(f"Update", key=f"up_dark_{idx}"):
                                 st.session_state.db_report[idx]['Status'] = "✅ Selesai"
                                 st.rerun()
                         else:
-                            st.button("Selesai", disabled=True, key=f"done_fin_{idx}")
+                            st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
     with col_kanan:
-        # Buka container CSS
+        st.markdown('<div class="todo-container">', unsafe_allow_html=True)
         st.markdown("<h4 style='margin-bottom:15px; color:#3b82f6;'>📝 TO DO LIST</h4>", unsafe_allow_html=True)
         
-        with st.form("form_todo_v_final", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik di sini...", key="inp_todo_fin")
+        with st.form("form_todo_dark", clear_on_submit=True):
+            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
             submit = st.form_submit_button("➕ Tambah")
             
             if submit and tugas_baru:
@@ -5985,14 +6072,13 @@ if menu == "Reporting & PIC":
         
         st.write("<hr style='margin:20px 0; border-color:#374151;'>", unsafe_allow_html=True)
         
-        # Render list (Sekarang aman dari AttributeError)
         if not st.session_state.todo_list:
             st.caption("Kosong.")
         else:
             for i, item in enumerate(st.session_state.todo_list):
                 task_label = item.get('task', 'Tugas Baru')
                 is_checked = item.get('done', False)
-                res = st.checkbox(task_label, key=f"chk_fin_{i}", value=is_checked)
+                res = st.checkbox(task_label, key=f"chk_dark_{i}", value=is_checked)
                 if res != is_checked:
                     st.session_state.todo_list[i]['done'] = res
                     st.rerun()
