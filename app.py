@@ -5979,7 +5979,7 @@ if menu == "Reporting & PIC":
                         <div style="background-color: #10b981; width: {td_progress}%; height: 12px; border-radius: 5px;"></div>
                     </div>
                     <p style="margin-top:10px; font-size:0.8rem; color:#9ca3af;">
-                        Status: {f"Mantap! {td_selesai} tugas beres" if td_progress == 100 else "Ayo gas dikit lagi!"}
+                        Status: {f"Selamat! {td_selesai} Telah di Selesaikan" if td_progress == 100 else "Ayo gas dikit lagi!"}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
