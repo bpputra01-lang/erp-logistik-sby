@@ -5920,10 +5920,10 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-    # Pastikan nama class-nya "hero-header" agar nyambung dengan CSS di atas
-st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
+    
 # --- 3. LOGIKA ROUTING ---
 if menu == "Reporting & PIC":
+    st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.2, 1])
     with c1:
         list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
