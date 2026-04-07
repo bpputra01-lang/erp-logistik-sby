@@ -5961,7 +5961,7 @@ if menu == "Reporting & PIC":
         st.markdown("""
             <div style="
                 background-color: #1a1c27; 
-                padding: 20px; 
+                padding: 10px; 
                 border-radius: 10px; 
                 border-left: 5px solid #3b82f6; 
                 margin-bottom: 20px;
