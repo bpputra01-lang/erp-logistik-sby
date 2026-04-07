@@ -5973,8 +5973,7 @@ if menu == "Reporting & PIC":
 
     with col_kanan:
         # Buka container CSS
-        st.markdown('<div class="todo-container">', unsafe_allow_html=True)
-        st.markdown("<h4 style='margin-bottom:15px; color:#3b82f6;'>📝 TO DO LIST</h4>", unsafe_allow_html=True)
+        st.markdown('<div class="todo-container">',"<h4 style='margin-bottom:15px; color:#3b82f6;'>📝 TO DO LIST</h4>", unsafe_allow_html=True)
         
         with st.form("form_todo_v_final", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik di sini...", key="inp_todo_fin")
