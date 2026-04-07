@@ -5358,8 +5358,8 @@ def init_db_logistic():
 # Panggil di paling atas biar gak error "no such table"
 conn = init_db_logistic()
 
+# Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
-    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
     # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
     st.markdown("""
         <style>
@@ -5378,7 +5378,7 @@ if menu == "Logistic Schedule":
                 border: 1px solid rgba(255, 255, 255, 0.1);
             }
 
-            /* 1.5 Sub-Header Stylings (INI YANG BARU) */
+            /* 1.5 Sub-Header Stylings */
             div[data-testid="stVerticalBlock"] h3 {
                 color: #000000 !important;
                 border-left: 5px solid #0062E6;
@@ -5475,91 +5475,80 @@ if menu == "Logistic Schedule":
                 st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
-# --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
-with st.expander("🔍 Staff Database", expanded=True):
-    df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
-    if not df_cek.empty:
-        for i, row in df_cek.iterrows():
-            cc1, cc2 = st.columns([6, 1])
-            with cc1:
-                st.markdown(f"""
-                    <div class="custom-card" style="border-left-color: #007BFF;">
-                        <div>
-                            <div class="card-text">{row['nama']}</div>
-                            <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
+    # --- DAFTAR KARYAWAN AKTIF ---
+    with st.expander("🔍 Staff Database", expanded=True):
+        df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
+        if not df_cek.empty:
+            for i, row in df_cek.iterrows():
+                cc1, cc2 = st.columns([6, 1])
+                with cc1:
+                    st.markdown(f"""
+                        <div class="custom-card" style="border-left-color: #007BFF;">
+                            <div>
+                                <div class="card-text">{row['nama']}</div>
+                                <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
+                            </div>
                         </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            with cc2:
-                if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
-                    conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
+                    """, unsafe_allow_html=True)
+                with cc2:
+                    if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
+                        conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
+                        conn.commit()
+                        st.rerun()
+        else:
+            st.info("Belum ada data tim di database.") 
+
+    st.divider()
+
+    # --- 2. PLOT LIBUR ---
+    st.subheader("🚫 2. Day Off Request")
+    col_l1, col_l2 = st.columns([1, 2])
+
+    with col_l1:
+        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
+        with st.form("form_libur_komplit", clear_on_submit=True):
+            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
+            tgl_off = st.date_input("Tanggal Off")
+            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
+            if st.form_submit_button("SUBMIT OFF"):
+                if target:
+                    conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
                     conn.commit()
                     st.rerun()
-    else:
-        st.info("Belum ada data tim di database.") 
 
-st.divider()
-
-# --- 2. PLOT LIBUR (MODEL KARTU) ---
-st.subheader("🚫 2. Day Off Request")
-col_l1, col_l2 = st.columns([1, 2])
-
-with col_l1:
-    df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-    with st.form("form_libur_komplit", clear_on_submit=True):
-        target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
-        tgl_off = st.date_input("Tanggal Off")
-        jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
-        
-        if st.form_submit_button("SUBMIT OFF"):
-            if target:
-                conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
-                conn.commit()
-                st.rerun()
-
-with col_l2:
-    df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
-    if not df_off_view.empty:
-        for i, row in df_off_view.iterrows():
-            m1, m2 = st.columns([6, 1])
-            with m1:
-                st.markdown(f"""
-                    <div class="custom-card" style="border-left-color: #FF4B4B;">
-                        <div>
-                            <div class="card-text">{row['nama']}</div>
-                            <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
+    with col_l2:
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
+        if not df_off_view.empty:
+            for i, row in df_off_view.iterrows():
+                m1, m2 = st.columns([6, 1])
+                with m1:
+                    st.markdown(f"""
+                        <div class="custom-card" style="border-left-color: #FF4B4B;">
+                            <div>
+                                <div class="card-text">{row['nama']}</div>
+                                <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
+                            </div>
                         </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            with m2:
-                if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
-                    conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                    conn.commit()
-                    st.rerun()
-    else:
-        st.info("Belum ada data pengajuan libur.")
+                    """, unsafe_allow_html=True)
+                with m2:
+                    if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
+                        conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
+                        conn.commit()
+                        st.rerun()
 
-st.divider()
+    st.divider()
 
-# --- 3. PASTIKAN TABEL ADA DULU ---
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS plot_shift3 (
-        nama TEXT,
-        tanggal TEXT,
-        posisi TEXT,
-        tipe TEXT
-    )
-''')
-conn.commit()
+    # --- 3. DATABASE CHECK & MONITORING ---
+    cursor = conn.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS plot_shift3 (nama TEXT, tanggal TEXT, posisi TEXT, tipe TEXT)')
+    conn.commit()
 
-# --- 2. BARU BOLEH READ DATA ---
-try:
-    # Pastikan baris 'try' ini sejajar dengan 'cursor = conn.cursor()' di atas
-    df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
-except Exception:
-    df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
-    # --- 3. TAMPILAN INPUT ---
+    try:
+        df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
+    except Exception:
+        df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
+
+    # --- 3. TAMPILAN INPUT SHIFT 3 ---
     st.subheader("🌙 2. Stock Opname Plot")
 
     df_karyawan = pd.read_sql_query("SELECT nama, tipe, posisi FROM karyawan", conn)
@@ -5577,7 +5566,6 @@ except Exception:
             st.info(f"Posisi: {selected_data['posisi']} | Tipe: {selected_data['tipe']}")
 
     if st.button("SUBMIT PLOT SHIFT 3", use_container_width=True):
-        # Cek duplikat biar gak double input
         check = conn.execute("SELECT * FROM plot_shift3 WHERE nama=? AND tanggal=?", 
                              (nama_s3, tgl_s3.strftime('%Y-%m-%d'))).fetchone()
         
@@ -5729,26 +5717,21 @@ except Exception:
         with col_v1:
             st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
 
-            # Fungsi buat nentuin warna background berdasarkan SHIFT
             def color_by_shift(row):
                 shift_type = str(row['SHIFT - ROLE'])
-                # Default style (Teks putih, background gelap)
                 base_style = 'color: #FFFFFF; font-weight: 600; border: 0.5px solid #222;'
-                
                 if "SHIFT 0" in shift_type:
-                    bg = "background-color: #004e92;" # Biru Deep
+                    bg = "background-color: #004e92;"
                 elif "SHIFT 1" in shift_type:
-                    bg = "background-color: #1b4d3e;" # Hijau Forest
+                    bg = "background-color: #1b4d3e;"
                 elif "SHIFT 2" in shift_type:
-                    bg = "background-color: #4b0082;" # Ungu Indigo
+                    bg = "background-color: #4b0082;"
                 elif "SHIFT 3" in shift_type:
-                    bg = "background-color: #b45f06;" # Orange Bata
+                    bg = "background-color: #b45f06;"
                 else:
                     bg = "background-color: #1a1c27;"
-                
                 return [bg + base_style for _ in row]
 
-            # Tampilkan dengan warna per baris (Shift)
             st.dataframe(
                 st.session_state.res_df.style.apply(color_by_shift, axis=1),
                 use_container_width=True,
@@ -5770,7 +5753,6 @@ except Exception:
                     sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": status})
             
             if sum_data:
-                # Pakai dataframe biar stylenya seragam sama sebelah
                 st.dataframe(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False), use_container_width=True, hide_index=True)
             else:
                 st.info("Belum ada data realisasi.")
