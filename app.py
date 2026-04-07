@@ -5962,10 +5962,10 @@ if menu == "Reporting & PIC":
             background-color: #1a1c27; 
             padding: 20px; 
             border-radius: 10px; 
-            border-left: 0px solid #3b82f6;
+            border-left: 5px solid #3b82f6;
             margin-top: 10px;
         ">
-            <h4 style='margin-bottom:15px; color:#3b82f6; margin-top:0; font-family: sans-serif;'>
+            <h4 style='margin-bottom:5px; color:#3b82f6; margin-top:0; font-family: sans-serif;'>
                 📝 TO DO LIST
             </h4>
             <div style='color: #888; font-size: 13px;'>
