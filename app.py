@@ -5827,7 +5827,7 @@ st.divider()
 
 # --- 4. LOGIKA ROUTING (PEMBATASAN KONTEN) ---
 
-if menu_utama == "Reporting & PIC":
+if menu == "Reporting & PIC":
     # --- SEMUA KODE DI BAWAH INI HANYA AKAN MUNCUL DI MENU REPORTING ---
     
     # Header Biru (Sekarang di dalam IF, jadi gak bakal ganggu menu lain)
