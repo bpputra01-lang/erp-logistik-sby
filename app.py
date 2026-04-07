@@ -5800,60 +5800,143 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- CUSTOM CSS (Biar tabel & text lebih enak dilihat) ---
+
+# Custom CSS untuk UI yang "Mahal" & Clean
 st.markdown("""
     <style>
-    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
-    .main-header { font-size: 28px; font-weight: bold; color: #1E3A8A; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .main {
+        background-color: #f4f7f9;
+    }
+    
+    /* Card Styling */
+    .report-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        margin-bottom: 10px;
+        border-left: 5px solid #0D8ABC;
+    }
+    
+    .stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 15px;
+        border: 1px solid #eef2f6;
+    }
+    
+    /* Elegant Header */
+    .user-header {
+        background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 20px;
+        margin-bottom: 2rem;
+    }
     </style>
     """, unsafe_allow_html=True)
-
-# --- LOGIKA MENU ---
-
 if menu == "Reporting & PIC":
-    st.markdown('<p class="main-header">Reporting & PIC Daily Monitoring</p>', unsafe_allow_html=True)
+# --- INITIAL DATA (Mocking Database) ---
+if 'db_report' not in st.session_state:
+    st.session_state.db_report = [
+        {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
+        {"Jam": "10:00", "Laporan": "Stock Opname Surabaya", "PIC": "Budi", "Status": "❌ Belum"},
+        {"Jam": "13:00", "Laporan": "Input Data Reject", "PIC": "Siska", "Status": "❌ Belum"},
+        {"Jam": "15:00", "Laporan": "Update WMS Jezpro", "PIC": "Andi", "Status": "❌ Belum"},
+        {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
+    ]
+
+# --- SIDEBAR: LOGIN / PILIH USER ---
+with st.sidebar:
+    st.image("https://ui-avatars.com/api/?name=Jezpro+Logistik&background=1E3A8A&color=fff", width=100)
+    st.title("👤 Personal Access")
+    list_pic = ["Andi", "Budi", "Siska", "Maya"]
+    current_user = st.selectbox("Masuk Sebagai PIC:", list_pic)
     
-    # 1. Dashboard Metrics (Ringkasan Cepat)
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Laporan", "10", "Target")
-    m2.metric("Selesai", "6", "60%")
-    m3.metric("Belum Lapor", "4", "-2", delta_color="inverse")
-    m4.metric("PIC On-Duty", "5 Orang", "Aktif")
-
     st.divider()
+    st.info(f"Halo **{current_user}**, silakan update progres kewajiban reporting Anda hari ini.")
+    
+    # Quick Progress User
+    user_tasks = [t for t in st.session_state.db_report if t['PIC'] == current_user]
+    done_user = len([t for t in user_tasks if t['Status'] == "✅ Selesai"])
+    st.write(f"Progres Anda: **{done_user}/{len(user_tasks)}**")
+    st.progress(done_user/len(user_tasks) if len(user_tasks) > 0 else 0)
 
-    # 2. Main Layout (Tabel PIC & Reporting di Kiri, To-Do di Kanan)
-    col_tabel, col_todo = st.columns([2, 1])
+# --- HEADER DASHBOARD ---
+st.markdown(f"""
+    <div class="user-header">
+        <h1>Selamat Datang, {current_user} 👋</h1>
+        <p>Monitor & laporkan kewajiban harian Anda dengan satu klik.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    with col_tabel:
-        st.subheader("📋 Jadwal Kewajiban & Status PIC")
-        
-        # Data yang menggabungkan Kewajiban, Waktu, dan PIC
-        data_ops = pd.DataFrame([
-            {"Jam": "08:00", "Laporan": "Absensi & Briefing", "PIC": "Budi", "Status": "✅ Selesai"},
-            {"Jam": "10:00", "Laporan": "Update Stock Gudang", "PIC": "Siska", "Status": "✅ Selesai"},
-            {"Jam": "13:00", "Laporan": "Progress Produksi", "PIC": "Andi", "Status": "⏳ In Progress"},
-            {"Jam": "15:00", "Laporan": "Quality Control Check", "PIC": "Rina", "Status": "❌ Pending"},
-            {"Jam": "17:00", "Laporan": "End of Day Report", "PIC": "Budi", "Status": "❌ Pending"},
-        ])
-        
-        # Nampilin tabel (Dataframe) yang interaktif
-        st.dataframe(data_ops, use_container_width=True, hide_index=True)
-        
-        st.warning("⚠️ **Note:** PIC Rina belum submit laporan QC. Tolong di-follow up.")
+# --- METRICS SECTION ---
+total_done = len([t for t in st.session_state.db_report if t['Status'] == "✅ Selesai"])
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Global Report", f"{len(st.session_state.db_report)}", "Target Hari Ini")
+col2.metric("Sudah Dilaporkan", f"{total_done}", f"{total_done/len(st.session_state.db_report)*100:.0f}%")
+col3.metric("PIC Aktif", len(list_pic), "All Standby")
 
-    with col_todo:
-        st.subheader("✅ To-Do List Hari Ini")
-        st.write("Tugas tambahan di luar reporting rutin:")
-        
-        # To-do list interaktif
-        st.checkbox("Cek stok packing material", value=True)
-        st.checkbox("Meeting mingguan jam 14:00")
-        st.checkbox("Kirim invoice ke Finance")
-        st.checkbox("Follow up complain customer X")
-        
-        st.divider()
-        st.subheader("📝 Catatan Lapangan")
-        catatan = st.text_area("Ada kendala operasional?", placeholder="Tulis di sini...")
-        if st.button("Simpan Catatan"):
-            st.success("Catatan berhasil disimpan ke log.")
+st.divider()
+
+# --- MAIN DASHBOARD AREA ---
+tab_personal, tab_global = st.tabs(["🎯 My Dashboard", "🌍 All PIC Overview"])
+
+# TAB 1: DASHBOARD MASING-MASING PIC
+with tab_personal:
+    st.subheader(f"📋 Kewajiban Reporting: {current_user}")
+    
+    my_tasks = [t for t in st.session_state.db_report if t['PIC'] == current_user]
+    
+    if not my_tasks:
+        st.write("Tidak ada jadwal laporan untuk Anda hari ini.")
+    else:
+        for idx, task in enumerate(st.session_state.db_report):
+            if task['PIC'] == current_user:
+                # Membuat container untuk tiap tugas
+                with st.container():
+                    col_info, col_action = st.columns([4, 1])
+                    with col_info:
+                        status_color = "green" if task['Status'] == "✅ Selesai" else "red"
+                        st.markdown(f"""
+                        <div class="report-card">
+                            <h4 style="margin:0;">{task['Laporan']}</h4>
+                            <p style="margin:0; color: gray;">⏰ Jam Target: <b>{task['Jam']}</b> | Status: <span style="color:{status_color};">{task['Status']}</span></p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_action:
+                        st.write("") # Spacer
+                        if task['Status'] == "❌ Belum":
+                            if st.button(f"Selesaikan", key=f"btn_{idx}"):
+                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
+                                st.toast(f"Mantap {current_user}! Laporan berhasil dikirim.")
+                                st.rerun()
+                        else:
+                            st.button("✅ Selesai", disabled=True, key=f"dis_{idx}")
+
+# TAB 2: OVERVIEW SEMUA ORANG
+with tab_global:
+    st.subheader("🌐 Status Koordinasi Seluruh PIC")
+    
+    # Kita tampilkan dalam bentuk dataframe yang cantik
+    df_all = pd.DataFrame(st.session_state.db_report)
+    
+    # Styling DataFrame
+    def color_status(val):
+        color = '#d4edda' if val == '✅ Selesai' else '#f8d7da'
+        return f'background-color: {color}'
+
+    st.dataframe(
+        df_all.style.applymap(color_status, subset=['Status']),
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    st.info("ℹ️ Anda bisa melihat progres rekan tim lain di sini untuk koordinasi shift.")
