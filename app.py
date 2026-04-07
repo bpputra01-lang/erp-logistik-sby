@@ -5491,7 +5491,6 @@ with st.expander("🔍 Staff Database", expanded=True):
                     </div>
                 """, unsafe_allow_html=True)
             with cc2:
-                # Key unik agar tidak bentrok dengan daftar libur
                 if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
                     conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
                     conn.commit()
@@ -5519,7 +5518,6 @@ with col_l1:
                 st.rerun()
 
 with col_l2:
-    # Mengambil data libur terbaru
     df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
     if not df_off_view.empty:
         for i, row in df_off_view.iterrows():
@@ -5534,7 +5532,6 @@ with col_l2:
                     </div>
                 """, unsafe_allow_html=True)
             with m2:
-                # Key unik menggunakan kombinasi nama dan tanggal
                 if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
                     conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
                     conn.commit()
@@ -5545,7 +5542,6 @@ with col_l2:
 st.divider()
 
 # --- 3. PASTIKAN TABEL ADA DULU ---
-# Kode ini harus sejajar dengan st.divider() di luar blok "with"
 cursor = conn.cursor()
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS plot_shift3 (
@@ -5557,12 +5553,12 @@ cursor.execute('''
 ''')
 conn.commit()
 
-    # --- 2. BARU BOLEH READ DATA ---
-    try:
-        df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
-    except Exception:
-        df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
-
+# --- 2. BARU BOLEH READ DATA ---
+try:
+    # Pastikan baris 'try' ini sejajar dengan 'cursor = conn.cursor()' di atas
+    df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
+except Exception:
+    df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
     # --- 3. TAMPILAN INPUT ---
     st.subheader("🌙 2. Stock Opname Plot")
 
