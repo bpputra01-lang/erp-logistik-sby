@@ -6066,25 +6066,35 @@ if menu == "Reporting & PIC":
                 sync_data()
                 st.rerun()
 
-        # 2. Container Scrollable (Ini kuncinya biar ada kursor geser)
-        # Tinggi box gue set 400px, lu bisa ubah sesuai selera
-        st.markdown('<div style="height: 450px; overflow-y: auto; padding-right: 10px; scrollbar-width: thin; scrollbar-color: #3b82f6 #1a1c27;">', unsafe_allow_html=True)
-        
+        # 2. Logic Pagination (5 Item Per Halaman)
         if "todo_list" in st.session_state and st.session_state.todo_list:
-            for i, item in enumerate(st.session_state.todo_list):
+            items_per_page = 5
+            total_items = len(st.session_state.todo_list)
+            total_pages = math.ceil(total_items / items_per_page)
+            
+            # Init session state buat simpan halaman aktif
+            if 'todo_page' not in st.session_state:
+                st.session_state.todo_page = 1
+            
+            # Ambil item sesuai halaman sekarang
+            start_idx = (st.session_state.todo_page - 1) * items_per_page
+            end_idx = start_idx + items_per_page
+            current_items = st.session_state.todo_list[start_idx:end_idx]
+
+            # 3. Tampilkan Item
+            for i, item in enumerate(current_items):
+                real_idx = start_idx + i  # Index asli di DB/List Utama
                 c1, c2 = st.columns([4, 1])
                 with c1:
                     color_border = '#10b981' if item['done'] else '#3b82f6'
                     st.markdown(f"""
-                        <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                        <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
                             <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
-                            <small style="color:{color_border};">Status: {'✅ Selesai' if item['done'] else '❌ Belum'}</small>
                         </div>
                     """, unsafe_allow_html=True)
-                
                 with c2:
                     st.write("")
-                    res = st.checkbox("", key=f"chk_scroll_{i}", value=item['done'], label_visibility="collapsed")
+                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
                     if res != item['done']:
                         conn = get_db_connection()
                         conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
@@ -6092,7 +6102,27 @@ if menu == "Reporting & PIC":
                         conn.close()
                         sync_data()
                         st.rerun()
+
+            # 4. Navigasi Panah (Pindah Halaman)
+            st.divider()
+            nav1, nav2, nav3 = st.columns([1, 2, 1])
+            
+            with nav1:
+                # Tombol Prev (Hanya muncul kalau bukan di hal 1)
+                if st.session_state.todo_page > 1:
+                    if st.button("⬅️ Prev", key="btn_prev_page"):
+                        st.session_state.todo_page -= 1
+                        st.rerun()
+            
+            with nav2:
+                # Indikator Halaman
+                st.markdown(f"<p style='text-align:center; color:#9ca3af; padding-top:10px;'>Halaman {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
+            
+            with nav3:
+                # Tombol Next (Hanya muncul kalau masih ada halaman selanjutnya)
+                if st.session_state.todo_page < total_pages:
+                    if st.button("Next ➡️", key="btn_next_page"):
+                        st.session_state.todo_page += 1
+                        st.rerun()
         else:
             st.info("Belum ada tugas tambahan.")
-            
-        st.markdown('</div>', unsafe_allow_html=True) # Tutup div scroll
