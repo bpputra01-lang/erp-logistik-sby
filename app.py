@@ -5816,7 +5816,7 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 
-# --- 1. SQLITE CORE LOGIC (Hanya Tambahan) ---
+# --- 1. SQLITE CORE LOGIC (Perbaikan Query INSERT) ---
 def get_db_connection():
     return sqlite3.connect('jez_reporting.db', check_same_thread=False)
 
@@ -5841,7 +5841,7 @@ def init_db():
             ("MANIFEST", "HAMZAH", "❌ Belum"), ("REFUND", "HAMZAH", "❌ Belum"),
             ("REFILL & OVERSTOCK", "KRISNA", "❌ Belum"), ("ZERO PUTAWAY", "WAREHOUSE FULLFILLMENT", "❌ Belum")
         ]
-        conn.executemany('INSERT INTO reports VALUES (?, ?, ?)', data_awal)
+        conn.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', data_awal)
     conn.commit()
     conn.close()
 
@@ -5856,7 +5856,7 @@ def sync_data():
         conn.execute('UPDATE reports SET status = "❌ Belum"')
         conn.execute('DELETE FROM todo')
         conn.execute('DELETE FROM reset_tracker')
-        conn.execute('INSERT INTO reset_tracker VALUES (?)', (today,))
+        conn.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
         conn.commit()
     
     # Tarik data dari DB ke Session State lu
@@ -5873,7 +5873,6 @@ sync_data()
 
 # --- 2. INITIAL DATA (Lu punya, tetep ada buat jaga-jaga) ---
 if 'db_report' not in st.session_state:
-    # (Sudah dihandle sync_data di atas)
     pass
 
 if 'todo_list' not in st.session_state:
@@ -5887,7 +5886,7 @@ st.markdown("""
     /* Global Font */
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-    /* 1. Header Utama - Efek Gradient Glass (Mirip Gambar 2) */
+    /* 1. Header Utama - Efek Gradient Glass */
     .hero-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
         color: white;
@@ -5962,6 +5961,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
     
 # --- 4. LOGIKA ROUTING ---
+# (Pastikan variabel 'menu' sudah didefinisikan di sidebar lu sebelum bagian ini)
 if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.2, 1])
@@ -6059,13 +6059,13 @@ if menu == "Reporting & PIC":
             submit = st.form_submit_button("➕ Tambah")
             
             if submit and tugas_baru:
-                # Simpan ke Session
-                st.session_state.todo_list.append({"task": tugas_baru, "done": False})
-                # Simpan ke SQLite
+                # Simpan ke SQLite dengan mendefinisikan kolom eksplisit (Fix OperationalError)
                 conn = get_db_connection()
-                conn.execute('INSERT INTO todo VALUES (?, 0)', (tugas_baru,))
+                conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
                 conn.commit()
                 conn.close()
+                # Sinkronkan ulang session state agar list langsung terupdate
+                sync_data()
                 st.rerun()
 
         if "todo_list" in st.session_state:
@@ -6079,11 +6079,11 @@ if menu == "Reporting & PIC":
                     st.write("")
                     res = st.checkbox("", key=f"chk_dark_{i}", value=item['done'], label_visibility="collapsed")
                     if res != item['done']:
-                        # Update Session
-                        st.session_state.todo_list[i]['done'] = res
                         # Update SQLite
                         conn = get_db_connection()
                         conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
                         conn.commit()
                         conn.close()
+                        # Sinkronkan ulang session state
+                        sync_data()
                         st.rerun()
