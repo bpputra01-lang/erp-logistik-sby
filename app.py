@@ -5660,28 +5660,47 @@ if menu == "Logistic Schedule":
                     potential = []
                     for k in karyawan_list:
                         nama = k['nama']
+                        
+                        # A. CEK JATAH & LIBUR
                         if weekly_counter[nama] >= k['target_fix']: continue
                         if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                         
-                        active_shifts = get_active_shifts(nama, day_name)
-                        if shf_jam in active_shifts: continue 
+                        # B. LOGIKA RECOVERY & LIBUR (REQUEST LU)
+                        tgl_besok = (datetime.strptime(tgl_ini, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                        tgl_kemarin = (datetime.strptime(tgl_ini, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
                         
+                        is_libur_besok = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_besok)].empty
+                        is_libur_kemarin = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_kemarin)].empty
+                        
+                        # H-1 Libur -> Wajib SHIFT 1
+                        if is_libur_besok and shf_jam != "SHIFT 1": continue
+                        # H+1 Libur -> Wajib SHIFT 2
+                        if is_libur_kemarin and shf_jam != "SHIFT 2": continue
+
+                        # Cek Shift 3 Kemarin
+                        day_index = day_names.index(day_name)
+                        active_shifts = get_active_shifts(nama, day_name)
+                        if day_index > 0:
+                            day_kemarin = day_names[day_index - 1]
+                            if "SHIFT 3" in get_active_shifts(nama, day_kemarin) and shf_jam != "SHIFT 2":
+                                continue
+
+                        # C. FILTER POSISI (WAJIB ADA BIAR GAK ACAK)
                         if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
                         if k['posisi'] == "SPV" and shf_role != "SPV": continue
-                        
-                        if k['tipe'] == "Part-Full" and active_shifts:
-                            s_udah = active_shifts[0]
-                            if s_udah == "SHIFT 0" and shf_jam != "SHIFT 1": continue
-                            if s_udah == "SHIFT 1" and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
-                            if s_udah == "SHIFT 2" and shf_jam not in ["SHIFT 1", "SHIFT 3"]: continue
-                            if s_udah == "SHIFT 3" and shf_jam != "SHIFT 2": continue
+                        if shf_jam in active_shifts: continue 
 
-                        is_match = (k['posisi'] == shf_role)
+                        # D. ATURAN PART-FULL (ANTI-NGEFULL SAAT RECOVERY)
                         if k['tipe'] == "Part-Full":
+                            # Jika kondisi khusus, dilarang double shift
+                            if is_libur_besok or is_libur_kemarin or (day_index > 0 and "SHIFT 3" in get_active_shifts(nama, day_names[day_index-1])):
+                                if active_shifts: continue 
+                            
                             if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
                         else:
-                            if len(active_shifts) >= 1: continue
-                        
+                            if active_shifts: continue
+
+                        is_match = (k['posisi'] == shf_role)
                         potential.append({'k': k, 'match': is_match})
 
                     if potential:
@@ -5693,7 +5712,6 @@ if menu == "Logistic Schedule":
                         weekly_counter[nm_fix] += 1
                         if len(get_active_shifts(nm_fix, day_name)) == 2:
                             double_day_count[nm_fix] += 1
-
         # --- 3. SIMPAN HASIL ---
         final_table = []
         for shf_jam, shf_role in base_roles:
