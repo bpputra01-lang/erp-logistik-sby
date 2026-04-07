@@ -6068,7 +6068,7 @@ if menu == "Reporting & PIC":
 
         # 2. Logic Pagination (5 Item Per Halaman)
         if "todo_list" in st.session_state and st.session_state.todo_list:
-            items_per_page = 5
+            items_per_page = 3
             total_items = len(st.session_state.todo_list)
             total_pages = math.ceil(total_items / items_per_page)
             
