@@ -5956,26 +5956,41 @@ if menu == "Reporting & PIC":
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
     with col_kanan:
-        # 1. Pastikan baris ini menjorok 4 spasi ke dalam dari 'with'
+        # CSS PAKSA DARK MODE (Targeting spesifik ke kotak checkbox)
         st.markdown("""
             <style>
+            /* 1. Target kotak centangnya langsung */
+            div[data-testid="stCheckbox"] div[role="checkbox"] {
+                background-color: #1a1c27 !important;
+                border: 2px solid #3b82f6 !important;
+            }
+            
+            /* 2. Warna saat sudah dicentang (biru terang) */
+            div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
+                background-color: #3b82f6 !important;
+            }
+
+            /* 3. Warna teks label (Input Standing Briefing, dll) */
             div[data-testid="stCheckbox"] p {
                 color: #e5e7eb !important;
-                font-size: 15px !important;
+                font-weight: 500 !important;
             }
-            div[data-testid="stCheckbox"] [data-testid="stWidgetLabel"] span {
-                border-color: #3b82f6 !important;
+            
+            /* 4. Ngilangin shadow putih bawaan Streamlit */
+            div[data-testid="stCheckbox"] div[role="checkbox"]:focus {
+                box-shadow: none !important;
             }
             </style>
         """, unsafe_allow_html=True)
 
-        # 2. Header Container
+        # Container Header
         st.markdown("""
-            <div style="background-color: #1a1c27; padding: 20px; border-radius: 10px; border-left: 5px solid #3b82f6;">
-                <h4 style='margin-bottom:15px; color:#3b82f6; margin-top:0;'>📝 TO DO LIST</h4>
+            <div style="background-color: #1a1c27; padding: 20px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 10px;">
+                <h4 style='margin:0; color:#3b82f6;'>📝 TO DO LIST</h4>
+            </div>
         """, unsafe_allow_html=True)
 
-        # 3. Form Input (Sejajar dengan st.markdown di atas)
+        # Form Tambah Tugas
         with st.form("form_todo_dark", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
             submit = st.form_submit_button("➕ Tambah")
@@ -5985,14 +6000,11 @@ if menu == "Reporting & PIC":
                     st.session_state.todo_list = []
                 st.session_state.todo_list.append({"task": tugas_baru, "done": False})
                 st.rerun()
-        
-        st.write("<hr style='margin:15px 0; border-color:#374151;'>", unsafe_allow_html=True)
-        
-        # 4. List Checkbox
-        if not st.session_state.get('todo_list'):
-            st.caption("Belum ada tugas.")
-        else:
+
+        # Render List Checkbox
+        if "todo_list" in st.session_state:
             for i, item in enumerate(st.session_state.todo_list):
+                # Ini yang bakal berubah jadi item gelap berkat CSS di atas
                 res = st.checkbox(item['task'], key=f"chk_dark_{i}", value=item['done'])
                 if res != item['done']:
                     st.session_state.todo_list[i]['done'] = res
