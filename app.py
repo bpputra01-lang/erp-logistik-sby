@@ -5364,79 +5364,77 @@ if menu == "Logistic Schedule":
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
-            /* Wrapper utama agar tidak bocor ke sidebar */
-            .logistic-container { font-family: 'Inter', sans-serif; }
+            /* --- KUNCI DI CONTAINER AGAR SIDEBAR AMAN --- */
+            .logistic-container {
+                font-family: 'Inter', sans-serif;
+            }
 
-            /* Header Gradient (Sesuai Gambar Justification/Reporting) */
+            /* --- 1. HEADER GRADIENT BIRU (JUSTIFICATION/REPORTING) --- */
             .logistic-container .hero-header {
-                background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-                color: white !important; 
-                padding: 25px; 
-                border-radius: 12px;
-                text-align: center; 
-                margin-bottom: 35px; 
+                background: linear-gradient(135deg, #0047AB 0%, #007BFF 100%) !important;
+                color: white !important;
+                padding: 20px;
+                border-radius: 10px;
+                text-align: left;
                 font-weight: 800;
-                font-size: 26px; 
-                letter-spacing: 0.5px;
-                box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                font-size: 22px;
+                margin-bottom: 25px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
             }
 
-            /* Sub-Header dengan Border Biru (Sesuai gaya lu) */
-            .logistic-container div[data-testid="stVerticalBlock"] h3 {
-                color: #FFFFFF !important;
-                border-left: 5px solid #3b82f6;
-                padding-left: 15px; 
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-
-            /* Card Style (Sesuai Gambar Reject & Defect / Staff Database) */
+            /* --- 2. CARD STAFF DARK (YANG TADI ILANG) --- */
             .logistic-container .custom-card {
-                background-color: #1a1c27; 
-                border-radius: 8px;
-                padding: 15px 20px; 
-                margin-bottom: 12px;
-                border-left: 5px solid #3b82f6;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                transition: transform 0.2s ease;
-            }
-            .logistic-container .custom-card:hover {
-                transform: translateY(-3px);
-                border-left: 5px solid #60a5fa;
+                background-color: #1a1c27 !important; /* Biru Gelap Sangar */
+                border-left: 5px solid #007BFF !important; /* Garis Biru Kiri */
+                border-radius: 8px !important;
+                padding: 15px 20px !important;
+                margin-bottom: 12px !important;
+                color: white !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
+                display: flex;
+                flex-direction: column;
             }
 
-            /* Input Fields - Modern Dark Glass (Hanya di Halaman Ini) */
-            .logistic-container div[data-testid="stTextInput"] div[data-baseweb="input"],
-            .logistic-container div[data-testid="stDateInput"] div[data-baseweb="input"],
-            .logistic-container div[data-testid="stSelectbox"] div[data-baseweb="select"] {
-                background-color: #12141d !important; 
-                border: 1px solid #2d3142 !important;
-                border-radius: 10px !important;
-            }
-
-            /* Widget Label (PENTING: Sidebar Aman!) */
-            .logistic-container label[data-testid="stWidgetLabel"] p { 
-                color: #B0B3B8 !important; 
+            /* --- 3. TEKS DI DALAM CARD --- */
+            .logistic-container .card-title {
+                font-weight: 800 !important;
                 font-size: 14px !important;
-                font-weight: 500 !important;
+                text-transform: uppercase !important;
+                color: #FFFFFF !important;
+            }
+            .logistic-container .card-subtitle {
+                font-size: 11px !important;
+                color: #9ca3af !important;
+                margin-top: 4px !important;
             }
 
-            /* Button Glow Effect (Sesuai Gambar Update/Tambah) */
+            /* --- 4. TOMBOL UPDATE & TAMBAH (PREMIUM GLOW) --- */
             .logistic-container div.stButton > button {
-                background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%) !important;
-                color: white !important; 
-                border-radius: 10px !important;
-                border: none !important; 
+                background: linear-gradient(90deg, #003366 0%, #00509E 100%) !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 6px !important;
                 font-weight: 700 !important;
-                text-transform: uppercase !important;
-                padding: 10px 25px !important;
-                transition: all 0.3s ease !important;
+                padding: 8px 20px !important;
+                transition: 0.3s all ease-in-out !important;
             }
             .logistic-container div.stButton > button:hover {
-                box-shadow: 0 0 15px rgba(59, 130, 246, 0.6) !important;
-                transform: scale(1.02);
+                box-shadow: 0 0 12px rgba(0, 123, 255, 0.5) !important;
+                transform: translateY(-2px) !important;
+            }
+
+            /* --- 5. INPUT MODERN DARK --- */
+            .logistic-container div[data-baseweb="input"] {
+                background-color: #12141d !important;
+                border: 1px solid #2d3142 !important;
+                border-radius: 8px !important;
+            }
+            
+            /* --- 6. FIX SIDEBAR (AGAR TETAP DEFAULT) --- */
+            section[data-testid="stSidebar"] label {
+                color: inherit !important;
             }
         </style>
     """, unsafe_allow_html=True)
