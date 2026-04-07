@@ -5956,43 +5956,60 @@ if menu == "Reporting & PIC":
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
     with col_kanan:
-        # HARUS MENJOROK KE DALAM (Gunakan 4 spasi atau 1 TAB dari posisi 'with')
-        todo_html = f"""
-        <div class="todo-container" style="
+    # 1. STYLE: CSS khusus agar Checkbox & Container jadi Dark Mode Sangar
+    st.markdown("""
+        <style>
+        /* Container utama List */
+        .todo-outer {
             background-color: #1a1c27; 
             padding: 20px; 
             border-radius: 10px; 
             border-left: 5px solid #3b82f6;
-            margin-top: 10px;
-        ">
-            <h4 style='margin-bottom:5px; color:#3b82f6; margin-top:0; font-family: sans-serif;'>
-                📝 TO DO LIST
-            </h4>
-            <div style='color: #888; font-size: 13px;'>
-            </div>
-        </div>
-        """
-        st.markdown(todo_html, unsafe_allow_html=True)
+            margin-bottom: 20px;
+        }
+        /* Styling teks checkbox */
+        div[data-testid="stCheckbox"] p {
+            color: #e5e7eb !important;
+            font-size: 15px !important;
+        }
+        /* Warna kotak checkbox saat tidak dicentang */
+        div[data-testid="stCheckbox"] [data-testid="stWidgetLabel"] span {
+            border-color: #3b82f6 !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 2. HEADER: Gabungkan container pembuka dan judul
+    st.markdown("""
+        <div class="todo-outer">
+            <h4 style='margin-bottom:15px; color:#3b82f6; margin-top:0;'>📝 TO DO LIST</h4>
+    """, unsafe_allow_html=True)
+
+    # 3. FORM INPUT
+    with st.form("form_todo_dark", clear_on_submit=True):
+        tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
+        submit = st.form_submit_button("➕ Tambah")
         
-        # Form ini juga harus sejajar dengan st.markdown di atas
-        with st.form("form_todo_dark", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            submit = st.form_submit_button("➕ Tambah")
+        if submit and tugas_baru:
+            if "todo_list" not in st.session_state:
+                st.session_state.todo_list = []
+            st.session_state.todo_list.append({"task": tugas_baru, "done": False})
+            st.rerun()
+    
+    st.write("<hr style='margin:15px 0; border-color:#374151;'>", unsafe_allow_html=True)
+    
+    # 4. RENDER LIST: Looping checkbox
+    if not st.session_state.get('todo_list'):
+        st.caption("Belum ada tugas.")
+    else:
+        for i, item in enumerate(st.session_state.todo_list):
+            # Tampilkan checkbox dengan key unik
+            res = st.checkbox(item['task'], key=f"chk_dark_{i}", value=item['done'])
             
-            if submit and tugas_baru:
-                st.session_state.todo_list.append({"task": tugas_baru, "done": False})
+            # Update status jika dicentang
+            if res != item['done']:
+                st.session_state.todo_list[i]['done'] = res
                 st.rerun()
-        
-        st.write("<hr style='margin:20px 0; border-color:#374151;'>", unsafe_allow_html=True)
-        
-        if not st.session_state.todo_list:
-            st.caption("Kosong.")
-        else:
-            for i, item in enumerate(st.session_state.todo_list):
-                task_label = item.get('task', 'Tugas Baru')
-                is_checked = item.get('done', False)
-                res = st.checkbox(task_label, key=f"chk_dark_{i}", value=is_checked)
-                if res != is_checked:
-                    st.session_state.todo_list[i]['done'] = res
-                    st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+
+    # 5. PENUTUP: Tutup div container di akhir
+    st.markdown('</div>', unsafe_allow_html=True)
