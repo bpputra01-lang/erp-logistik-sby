@@ -5800,37 +5800,24 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# Custom CSS untuk UI Elegan (Tanpa Sidebar)
+# Custom CSS
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-    
-    /* Card Styling */
     .report-card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        margin-bottom: 10px;
+        background-color: white; padding: 20px; border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 10px;
         border-left: 5px solid #1E3A8A;
     }
-    
-    /* Header Gradient */
     .top-header {
         background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 100%);
-        color: white;
-        padding: 25px;
-        border-radius: 15px;
-        margin-bottom: 20px;
+        color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px;
     }
-
-    /* Hilangkan padding default streamlit agar lebih clean */
-    .block-container { padding-top: 2rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- INITIAL DATA (Mocking Database) ---
+# --- INITIAL DATA ---
 if 'db_report' not in st.session_state:
     st.session_state.db_report = [
         {"Jam": "08:00", "Laporan": "Absensi Tim Loader", "PIC": "Andi", "Status": "❌ Belum"},
@@ -5840,90 +5827,61 @@ if 'db_report' not in st.session_state:
         {"Jam": "17:00", "Laporan": "EOD Summary", "PIC": "Maya", "Status": "❌ Belum"},
     ]
 
-# --- TOP NAVIGATION (Gantinya Sidebar) ---
+# --- TOP NAVIGATION (Navigasi Utama) ---
 st.markdown('<div class="top-header"><h1>Jezpro Digital Logistik</h1></div>', unsafe_allow_html=True)
 
-# Baris Navigasi Utama
-nav1, nav2, nav3 = st.columns([1, 1, 1.5])
-
-with nav1:
-    menu = st.selectbox("📂 Pilih Menu Dashboard:", ["Reporting & PIC", "Settings"])
-
-with nav2:
-    list_pic = ["Andi", "Budi", "Siska", "Maya"]
-    current_user = st.selectbox("👤 Pilih PIC (Login):", list_pic)
-
-with nav3:
-    st.write("") # Spacer agar sejajar
-    st.write(f"🕒 **Update:** {datetime.now().strftime('%A, %d %B %Y | %H:%M')}")
+# Selector Menu Utama (Cuma ini yang muncul di semua halaman)
+menu = st.selectbox("📂 Pilih Menu Dashboard:", ["Reporting & PIC", "Settings"])
 
 st.divider()
 
 # --- LOGIKA MENU ---
 if menu == "Reporting & PIC":
     
-    # 1. METRICS SECTION
+    # SELEKTOR PIC (Sekarang dibungkus di sini agar tidak muncul di menu lain)
+    col_user, col_time = st.columns([1, 1])
+    with col_user:
+        list_pic = ["Andi", "Budi", "Siska", "Maya"]
+        current_user = st.selectbox("👤 Pilih PIC (Login):", list_pic)
+    with col_time:
+        st.write("") # Spacer
+        st.write(f"🕒 **Update:** {datetime.now().strftime('%A, %d %b %Y')}")
+
+    # 1. METRICS
     total_tasks = len(st.session_state.db_report)
     total_done = len([t for t in st.session_state.db_report if t['Status'] == "✅ Selesai"])
     
     m1, m2, m3 = st.columns(3)
-    m1.metric("Total Tugas Hari Ini", f"{total_tasks}")
-    m2.metric("Progres Selesai", f"{total_done}", f"{(total_done/total_tasks)*100:.0f}%")
-    m3.metric("User Aktif", current_user)
+    m1.metric("Total Tugas", f"{total_tasks}")
+    m2.metric("Progres Selesai", f"{total_done}")
+    m3.metric("User Login", current_user)
 
-    st.write("")
-
-    # 2. TAB SYSTEM
+    # 2. TABS
     tab_personal, tab_global = st.tabs(["🎯 My Task List", "🌍 Team Overview"])
 
     with tab_personal:
-        st.subheader(f"Tugas yang Harus Dilaporkan: {current_user}")
-        
-        # Filter tugas spesifik PIC yang dipilih
-        my_tasks = [t for t in st.session_state.db_report if t['PIC'] == current_user]
-        
-        if not my_tasks:
-            st.info(f"Tidak ada jadwal laporan untuk {current_user} hari ini.")
-        else:
-            for idx, task in enumerate(st.session_state.db_report):
-                if task['PIC'] == current_user:
-                    with st.container():
-                        col_info, col_action = st.columns([5, 1])
-                        with col_info:
-                            status_color = "#22c55e" if task['Status'] == "✅ Selesai" else "#ef4444"
-                            st.markdown(f"""
-                            <div class="report-card">
-                                <h3 style="margin:0; color:#1e293b;">{task['Laporan']}</h3>
-                                <p style="margin:5px 0; color: #64748b;">
-                                    Jam Target: <b>{task['Jam']}</b> | 
-                                    Status: <span style="color:{status_color}; font-weight:bold;">{task['Status']}</span>
-                                </p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        
-                        with col_action:
-                            st.write("") # Spacer
-                            if task['Status'] == "❌ Belum":
-                                if st.button(f"Selesaikan ✅", key=f"btn_{idx}"):
-                                    st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                    st.toast(f"Berhasil! Laporan {task['Laporan']} terkirim.")
-                                    st.rerun()
-                            else:
-                                st.button("Selesai", disabled=True, key=f"dis_{idx}")
+        st.subheader(f"Tugas: {current_user}")
+        for idx, task in enumerate(st.session_state.db_report):
+            if task['PIC'] == current_user:
+                with st.container():
+                    col_info, col_action = st.columns([5, 1])
+                    with col_info:
+                        st.markdown(f"""
+                        <div class="report-card">
+                            <h3 style="margin:0;">{task['Laporan']}</h3>
+                            <p style="margin:0; color:gray;">Jam: {task['Jam']} | Status: {task['Status']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with col_action:
+                        st.write("")
+                        if task['Status'] == "❌ Belum":
+                            if st.button(f"Selesaikan", key=f"btn_{idx}"):
+                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
+                                st.rerun()
+                        else:
+                            st.button("Selesai", disabled=True, key=f"dis_{idx}")
 
     with tab_global:
-        st.subheader("🌐 Monitoring Progres Seluruh Tim")
-        df_all = pd.DataFrame(st.session_state.db_report)
-        
-        # Tabel yang lebih cantik
-        st.dataframe(
-            df_all,
-            column_config={
-                "Status": st.column_config.TextColumn("Status Pelaporan"),
-                "Jam": "Waktu",
-                "Laporan": "Nama Kewajiban",
-                "PIC": "Penanggung Jawab"
-            },
-            use_container_width=True,
-            hide_index=True
-        )
+        st.subheader("🌐 Monitoring Seluruh Tim")
+        st.dataframe(pd.DataFrame(st.session_state.db_report), use_container_width=True, hide_index=True)
+
