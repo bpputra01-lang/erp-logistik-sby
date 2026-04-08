@@ -218,43 +218,27 @@ st.markdown("""
     }
 
     /* ============================================
-       9. INPUT BOXES - GOLD BORDER
+       9. INPUT BOXES - GOLD BORDER (REVISED)
        ============================================ */
-    div[data-baseweb="select"] > div,
-    [data-testid="stFileUploaderSection"] {
+    div[data-baseweb="select"] > div {
         background-color: #1a1d2e !important;
         border: 1px solid rgba(197, 160, 89, 0.3) !important;
         border-radius: 8px !important;
     }
-    div[data-baseweb="select"] > div:focus-within,
-    [data-testid="stFileUploaderSection"]:focus-within {
+
+    /* HAPUS [data-testid="stFileUploaderSection"] DARI SINI 
+       BIAR GAK NABRAK SAMA SECTION 6 */
+
+    div[data-baseweb="select"] > div:focus-within {
         border-color: #C5A059 !important;
         box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
     }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
-    [data-testid="stFileUploaderText"] > span,
-    [data-testid="stFileUploaderText"] > small {
+
+    /* Kunci warna Selectbox saja, jangan Uploader */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
         color: #e0e0e0 !important;
         -webkit-text-fill-color: #e0e0e0 !important;
     }
-
-    /* Text inputs */
-    div[data-baseweb="input"] {
-        background-color: #1a1d2e !important;
-        border: 1px solid rgba(197, 160, 89, 0.3) !important;
-        border-radius: 8px !important;
-        padding: 10px 14px !important;
-    }
-    div[data-baseweb="input"]:focus-within {
-        border-color: #C5A059 !important;
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
-    }
-    input {
-        color: #ffffff !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 14px !important;
-    }
-
     /* ============================================
        10. BUTTONS LAYOUT
        ============================================ */
