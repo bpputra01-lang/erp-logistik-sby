@@ -1129,14 +1129,6 @@ def menu_Stock_Opname():
                 # Kalo gak milih BIN System, data system dikosongin biar gak muncul SYSTEM + palsu
                 df_t_raw = df_t_raw.iloc[0:0]
 
-            # Filter BIN Coverage / Scan (Partial Match - Hanya yang dipilih)
-            if selected_bin_cov: 
-                pattern_cov = '|'.join([re.escape(c.upper()) for c in selected_bin_cov])
-                df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().str.contains(pattern_cov, na=False)]
-            else:
-                # Kalo gak milih BIN Coverage, data scan dikosongin
-                df_s_raw = df_s_raw.iloc[0:0]
-
             # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
             res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
             res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
