@@ -5414,7 +5414,25 @@ if menu == "Logistic Schedule":
                 text-transform: uppercase;
                 letter-spacing: 1px;
             }
+            /* 1. Kunci ukuran tombol hapus biar GAK BISA kegedean */
+            .small-del-container div.stButton > button {
+                width: 45px !important;
+                height: 35px !important;
+                padding: 0px !important;
+                min-height: 35px !important;
+                min-width: 45px !important;
+                line-height: 1 !important;
+                font-size: 16px !important;
+                background: #1a1d2e !important;
+                border: 1px solid rgba(255,255,255,0.1) !important;
+                border-radius: 6px !important;
+                margin-top: 5px !important; /* Biar sejajar tengah sama card */
+            }
 
+            .small-del-container div.stButton > button:hover {
+                background: #FF4B4B !important;
+                border-color: #FF4B4B !important;
+            }
         
 
             /* Efek Focus Pas Diklik */
