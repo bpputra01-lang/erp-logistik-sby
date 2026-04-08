@@ -1268,6 +1268,15 @@ def menu_Stock_Opname():
             
             with t3:
                 df_r4 = st.session_state.get("df_res4_final", pd.DataFrame())
+                # --- TAMBAHKAN INI SEBELUM BARIS 1271 ---
+                if not df_r4.empty:
+                    # Logic buat deteksi & rename kolom kembar secara otomatis
+                    cols = pd.Series(df_r4.columns)
+                    for dup in cols[cols.duplicated()].unique(): 
+                        cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i in range(cols[cols == dup].count())]
+                    df_r4.columns = cols
+
+                # Baris 1271 lu yang lama:
                 st.dataframe(df_r4, use_container_width=True, hide_index=True)
                 if not df_r4.empty:
                     st.download_button("📥 Download Hasil Cek Adj +", df_r4.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
