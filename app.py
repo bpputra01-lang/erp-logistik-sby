@@ -1130,34 +1130,20 @@ def menu_Stock_Opname():
                 df_t_raw = df_t_raw.iloc[0:0]
 
             # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
-        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
-        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
+            res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
+            res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
             
-        # --- PROSES MAPPING ITEM NAME (ANTI ERROR TYPE) ---
-        try:
-            # 1. Buat Master Map dari Data System (Kolom 2=SKU, 4=Nama)
+            # 5. SMART MAPPING SKU TO ITEM NAME
             item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
             item_map.columns = ['SKU', 'NAME']
+            # Cleaning mapping dict biar gak miss
             item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-
-            # 2. Mapping ke res_scan (REAL +)
-            if not res_scan.empty:
-                # Paksa SKU jadi string biar sinkron sama map_dict
-                sku_clean_scan = res_scan['SKU'].astype(str).str.strip().str.upper()
-                res_scan['ITEM NAME'] = sku_clean_scan.map(map_dict).fillna("UNKNOWN").astype(str)
-
-            # 3. Mapping ke res_stock (SYSTEM +)
-            if not res_stock.empty:
-                # Sesuai catatan lu, SKU di res_stock ada di index 2
-                sku_clean_stock = res_stock.iloc[:, 2].astype(str).str.strip().str.upper()
-                res_stock['ITEM NAME'] = sku_clean_stock.map(map_dict).fillna("UNKNOWN").astype(str)
-
-        except Exception as mapping_err:
-            # Jika gagal total, isi dengan nilai aman agar aplikasi tidak crash
-            st.warning(f"⚠️ Mapping Item Name terkendala: {mapping_err}")
-            if not res_scan.empty: res_scan['ITEM NAME'] = "UNKNOWN"
-            if not res_stock.empty: res_stock['ITEM NAME'] = "UNKNOWN"
+            
+            # Mapping hasil
+            res_scan['ITEM NAME'] = res_scan['SKU'].str.strip().str.upper().map(map_dict)
+            # Pastikan kolom SKU di res_stock konsisten (sesuaikan index jika perlu)
+            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.strip().str.upper().map(map_dict)
 
             # 6. SAVE TO SESSION STATE
             st.session_state.compare_result = {
@@ -1243,23 +1229,14 @@ def menu_Stock_Opname():
         if up_r4 and up_s4 and up_m5:
             if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
                 try:
-                    # 1. Pembacaan file & NORMALISASI LANGSUNG (BIAR GAK MISS)
+                    # 1. Pembacaan file (PASTIKAN NO ILOC GESER DI SINI)
                     df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
                     df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
                     df_m5 = pd.read_excel(up_m5)
 
-                    # --- PROSES CLEANING KERAS ---
-                    # Pastikan BIN (Index 0) dan SKU (Index 1) bersih dari spasi dan huruf kecil
-                    for df in [df_r4, df_s4]:
-                        # Kolom BIN
-                        df.iloc[:, 0] = df.iloc[:, 0].astype(str).str.strip().str.upper()
-                        # Kolom SKU
-                        df.iloc[:, 1] = df.iloc[:, 1].astype(str).str.strip().str.upper()
-                        # Kolom QTY (Pastikan Angka, bukan '0, atau teks)
-                        qty_col_idx = 2 if df is df_r4 else 3 # Sesuaikan index QTY masing-masing file
-                        df.iloc[:, qty_col_idx] = pd.to_numeric(df.iloc[:, qty_col_idx], errors='coerce').fillna(0)
-
-                    # 2. Sinkronisasi Kolom (Sekarang datanya udah bersih, lookup pasti tembus)
+                    # 2. Sinkronisasi Kolom
+                    # Jangan di-iloc potong depan, biar BIN tetep di index 0 dan SKU di index 1
+                    # Sesuai logic_cek_adjustment_final(df_recon, df_stock_adj)
                     res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                     
                     # 3. Jalankan Pivot
@@ -1268,7 +1245,7 @@ def menu_Stock_Opname():
                     # 4. Pembersihan Data (Pastikan hanya QTY > 0)
                     def clean_final_result(df):
                         if df is not None and not df.empty:
-                            last_col = df.columns[-1] 
+                            last_col = df.columns[-1] # Kolom QTY ADJ atau TOTAL_DIFF
                             df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
                             df = df[df[last_col] > 0].reset_index(drop=True)
                         return df
@@ -1279,7 +1256,6 @@ def menu_Stock_Opname():
                     st.session_state.df_res4_final = res4
                     st.session_state.process_done = True
                     
-                    st.success("🔥 Data Berhasil Disinkronkan!")
                     st.rerun()
 
                 except Exception as e:
