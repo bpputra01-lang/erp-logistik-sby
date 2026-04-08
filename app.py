@@ -1064,14 +1064,6 @@ def menu_Stock_Opname():
             - **OPSI 4**
                 - Jika ingin mengetahui value adjusment total dari + dan - secara keseluruhan maka **Gabungkan All Adjusment + & - ** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
         """)
-# --- FUNGSI SANITIZE INTERNAL (Pembersih int64 & .0) ---
-    def sanitize_df(df):
-        if df is None or df.empty: return df
-        df = df.astype(str)
-        for col in df.columns:
-            df[col] = df[col].str.replace(r'\.0$', '', regex=True).str.strip()
-            df[col] = df[col].replace('nan', '')
-        return df
     # --- INITIALIZE ALL SESSION STATES ---
     if 'compare_result' not in st.session_state: st.session_state.compare_result = None
     if 'allocation_result' not in st.session_state: st.session_state.allocation_result = None
@@ -1096,7 +1088,7 @@ def menu_Stock_Opname():
         list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
     with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTN-","GUDANG LT 2"]
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTNADADAD","GUDANG LT 2"]
         selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
@@ -1104,7 +1096,7 @@ def menu_Stock_Opname():
 
     st.markdown("---")
 
-    # STEP 1: UPLOAD & RUN COMPARE
+    # STEP 1
     st.subheader("1️⃣ Upload & Run Compare")
     c1, c2 = st.columns(2)
     with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
@@ -1112,35 +1104,19 @@ def menu_Stock_Opname():
 
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
-            # 1. BACA DATA (Paksa String untuk hindari int64)
-            df_s_raw = pd.read_excel(up_scan, dtype=str) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan, dtype=str)
-            df_t_raw = pd.read_excel(up_stock, dtype=str) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock, dtype=str)
+            df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
+            df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
             
-            # 2. BERSIHKAN DATA (Buat ID matching)
-            df_s_raw = sanitize_df(df_s_raw)
-            df_t_raw = sanitize_df(df_t_raw)
+            if selected_sub: df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+            if selected_bin_sys: df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
+            if selected_bin_cov: df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
 
-            # 3. FILTERING
-            if selected_sub: 
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].str.upper().isin([x.upper() for x in selected_sub])]
-            if selected_bin_sys: 
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
-            if selected_bin_cov: 
-                df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
-
-            # 4. KONVERSI QTY UNTUK LOGIC (Hanya saat mau dihitung)
-            # Pastikan kolom QTY di Scan (index 2) dan Stock (index 9) adalah angka
-            df_s_raw.iloc[:, 2] = pd.to_numeric(df_s_raw.iloc[:, 2], errors='coerce').fillna(0)
-            df_t_raw.iloc[:, 9] = pd.to_numeric(df_t_raw.iloc[:, 9], errors='coerce').fillna(0)
-
-            # 5. JALANKAN LOGIC
             res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
             res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
             
             item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
             item_map.columns = ['SKU', 'NAME']
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-            
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
             res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict)
 
@@ -1152,7 +1128,7 @@ def menu_Stock_Opname():
             }
             st.rerun()
 
-    if st.session_state.get('compare_result') is not None:
+    if st.session_state.compare_result:
         d = st.session_state.compare_result
         st.markdown(f"""
             <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
