@@ -615,17 +615,33 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock.columns = cols
 
     # 🔥 7. SINGLE CHECK - FIXED BOOL ERROR!
+# REPLACE SELURUH BAGIAN INI (line ~1320-1330):
 if st.session_state.get("process_done"):
-    # Cek apakah hasil lookup beneran ada isinya
-    check_data = st.session_state.df_res4_final
+    # 🔥 ULTRA SAFE EMPTY CHECK
+    check_data = st.session_state.get("df_res4_final")
     
-    # ✅ FIX: JANGAN PAKAI PANDAS SERIES DI IF!
-    if check_data is None or check_data.empty:
+    # ✅ SAFE CHECK - Handle semua kemungkinan error
+    if (check_data is None or 
+        not isinstance(check_data, pd.DataFrame) or 
+        check_data.empty or 
+        len(check_data.columns) < 11):
+        st.warning("⚠️ Data belum siap atau kosong!")
         is_empty = True
     else:
-        # Ambil sum sebagai SCALAR NUMBER, bukan Series
-        qty_sum = pd.to_numeric(check_data['QTY SO'].fillna(0), errors='coerce').sum()
-        is_empty = qty_sum == 0  # ✅ SEKARANG BOOLEAN SCALAR!
+        try:
+            # Cek apakah kolom 'QTY SO' ada (index 10)
+            if 'QTY SO' in check_data.columns:
+                qty_col = check_data['QTY SO']
+                qty_sum = pd.to_numeric(qty_col.fillna(0), errors='coerce').sum()
+                is_empty = qty_sum == 0
+            else:
+                # Fallback: pakai kolom index 10
+                qty_col = check_data.iloc[:, 10]
+                qty_sum = pd.to_numeric(qty_col.fillna(0), errors='coerce').sum()
+                is_empty = qty_sum == 0
+        except:
+            # Ultimate fallback
+            is_empty = True
     
     if is_empty:
         st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
@@ -1311,21 +1327,38 @@ def menu_Stock_Opname():
                     st.error(f"❌ Terjadi Kesalahan: {str(e)}")
 
                 # --- AREA TAMPILAN HASIL ---
-        if st.session_state.get("process_done"):
-            # Cek apakah hasil lookup beneran ada isinya
-            check_data = st.session_state.df_res4_final
-            
-            # ✅ FIXED VERSION
-            if check_data is None or check_data.empty:
-                is_empty = True
-            else:
-                qty_sum = pd.to_numeric(check_data['QTY SO'].fillna(0), errors='coerce').sum()
+       # REPLACE SELURUH BAGIAN INI (line ~1320-1330):
+if st.session_state.get("process_done"):
+    # 🔥 ULTRA SAFE EMPTY CHECK
+    check_data = st.session_state.get("df_res4_final")
+    
+    # ✅ SAFE CHECK - Handle semua kemungkinan error
+    if (check_data is None or 
+        not isinstance(check_data, pd.DataFrame) or 
+        check_data.empty or 
+        len(check_data.columns) < 11):
+        st.warning("⚠️ Data belum siap atau kosong!")
+        is_empty = True
+    else:
+        try:
+            # Cek apakah kolom 'QTY SO' ada (index 10)
+            if 'QTY SO' in check_data.columns:
+                qty_col = check_data['QTY SO']
+                qty_sum = pd.to_numeric(qty_col.fillna(0), errors='coerce').sum()
                 is_empty = qty_sum == 0
-            
-            if is_empty:
-                st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
             else:
-                st.success("✅ Analisis Selesai!")
+                # Fallback: pakai kolom index 10
+                qty_col = check_data.iloc[:, 10]
+                qty_sum = pd.to_numeric(qty_col.fillna(0), errors='coerce').sum()
+                is_empty = qty_sum == 0
+        except:
+            # Ultimate fallback
+            is_empty = True
+    
+    if is_empty:
+        st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
+    else:
+        st.success("✅ Analisis Selesai!")
             
             t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "➡️ SET UP REAL +"])
             
