@@ -5390,20 +5390,6 @@ if menu == "Logistic Schedule":
     # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
     st.markdown("""
         <style>
-            /* 1. Header Utama - Efek Gradient Glass */
-            .hero-header {
-                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
-                color: white;
-                padding: 25px;
-                border-radius: 12px;
-                text-align: center;
-                margin-bottom: 35px;
-                font-weight: 800;
-                font-size: 26px;
-                letter-spacing: 0.5px;
-                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            }
 
             /* 1.5 Sub-Header Stylings */
             div[data-testid="stVerticalBlock"] h3 {
@@ -5415,11 +5401,6 @@ if menu == "Logistic Schedule":
                 letter-spacing: 1px;
             }
 
-            /* 2. Input Fields - Modern Dark Glass */
-            [data-testid="stForm"] { 
-                border: none !important; 
-                padding: 0 !important; 
-            }
             
             div[data-testid="stTextInput"] > div > div, 
             div[data-testid="stTextArea"] > div > div,
