@@ -1229,14 +1229,23 @@ def menu_Stock_Opname():
         if up_r4 and up_s4 and up_m5:
             if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
                 try:
-                    # 1. Pembacaan file (PASTIKAN NO ILOC GESER DI SINI)
+                    # 1. Pembacaan file & NORMALISASI LANGSUNG (BIAR GAK MISS)
                     df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
                     df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
                     df_m5 = pd.read_excel(up_m5)
 
-                    # 2. Sinkronisasi Kolom
-                    # Jangan di-iloc potong depan, biar BIN tetep di index 0 dan SKU di index 1
-                    # Sesuai logic_cek_adjustment_final(df_recon, df_stock_adj)
+                    # --- PROSES CLEANING KERAS ---
+                    # Pastikan BIN (Index 0) dan SKU (Index 1) bersih dari spasi dan huruf kecil
+                    for df in [df_r4, df_s4]:
+                        # Kolom BIN
+                        df.iloc[:, 0] = df.iloc[:, 0].astype(str).str.strip().str.upper()
+                        # Kolom SKU
+                        df.iloc[:, 1] = df.iloc[:, 1].astype(str).str.strip().str.upper()
+                        # Kolom QTY (Pastikan Angka, bukan '0, atau teks)
+                        qty_col_idx = 2 if df is df_r4 else 3 # Sesuaikan index QTY masing-masing file
+                        df.iloc[:, qty_col_idx] = pd.to_numeric(df.iloc[:, qty_col_idx], errors='coerce').fillna(0)
+
+                    # 2. Sinkronisasi Kolom (Sekarang datanya udah bersih, lookup pasti tembus)
                     res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                     
                     # 3. Jalankan Pivot
@@ -1245,7 +1254,7 @@ def menu_Stock_Opname():
                     # 4. Pembersihan Data (Pastikan hanya QTY > 0)
                     def clean_final_result(df):
                         if df is not None and not df.empty:
-                            last_col = df.columns[-1] # Kolom QTY ADJ atau TOTAL_DIFF
+                            last_col = df.columns[-1] 
                             df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
                             df = df[df[last_col] > 0].reset_index(drop=True)
                         return df
@@ -1256,6 +1265,7 @@ def menu_Stock_Opname():
                     st.session_state.df_res4_final = res4
                     st.session_state.process_done = True
                     
+                    st.success("🔥 Data Berhasil Disinkronkan!")
                     st.rerun()
 
                 except Exception as e:
