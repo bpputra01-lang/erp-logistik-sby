@@ -4166,90 +4166,8 @@ with st.sidebar:
             box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
         }
 
-        /* --- FILE UPLOADER --- */
-        [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important;
-            border: 2px dashed #C5A059 !important;
-            border-radius: 10px !important;
-        }
-
-        [data-testid="stFileUploaderText"] > span,
-        [data-testid="stFileUploaderText"] > small {
-            color: #FFFFFF !important;
-        }
-
-        [data-testid="stFileUploader"] button {
-            background-color: #C5A059 !important;
-            color: #1a2634 !important;
-            border-radius: 5px !important;
-            font-weight: bold !important;
-            border: none !important;
-            padding: 5px 15px !important;
-        }
-
-        [data-testid="stFileUploader"] button:hover {
-            background-color: #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
-
-        [data-testid="stFileUploader"] svg {
-            fill: #C5A059 !important;
-        }
-    </style>
-    
-    <!-- JUDUL UTAMA DENGAN ICON -->
-    <div class="elegant-header">
-        <span class="header-icon">🚛</span>
-        ERP LOGISTIC<br>SURABAYA
-    </div>
-    
-    <!-- SUBTITLE -->
-    <div class="elegant-subtitle">
-        Warehouse Management System
-    </div>
-    
-    <!-- GARIS DEKORATIF -->
-    <div class="elegant-divider"></div>
-    
-    <!-- VERSION TAG -->
-    <div class="version-tag">v2.1 PRO</div>
 """, unsafe_allow_html=True)
 
-# --- TOMBOL LOGOUT ---
-with st.sidebar:
-    st.markdown("""
-        <style>
-        /* Tombol logout simple elegant */
-        .simple-logout-btn {
-            background: rgba(197, 160, 89, 0.08) !important;
-            border: 1px solid rgba(197, 160, 89, 0.25) !important;
-            border-radius: 8px !important;
-            color: #B8956E !important;
-            font-size: 10px !important;
-            font-weight: 500 !important;
-            letter-spacing: 1px !important;
-            text-transform: uppercase !important;
-            padding: 10px 14px !important;
-            transition: all 0.25s ease !important;
-            margin-top: 10px !important;
-        }
-        
-        .simple-logout-btn:hover {
-            background: rgba(197, 160, 89, 0.15) !important;
-            border-color: #C5A059 !important;
-            color: #C5A059 !important;
-        }
-        
-        .simple-logout-btn::before {
-            content: '🔴  ';
-            font-size: 12px;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    if st.button("🔴Logout", key="simple_logout"):
-        st.session_state.logged_in = False
-        st.rerun()
     
 
 import streamlit as st
@@ -4308,9 +4226,6 @@ with st.sidebar:
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
 
     st.divider()
-
-# Final Menu Variable untuk dipakai di konten utama
-menu = st.session_state.main_menu
 
     
 
