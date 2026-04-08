@@ -5431,7 +5431,7 @@ if menu == "Logistic Schedule":
                 color: #B0B3B8 !important; 
                 font-size: 14px !important;
                 font-weight: 500 !important;
-                margin-bottom: 1px !important;
+                margin-bottom: 8px !important;
             }
 
             input, textarea { 
