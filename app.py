@@ -4024,6 +4024,100 @@ def tampilan_balancing_stock():
     finally:
         conn.close()
     
+with st.sidebar:
+    st.markdown("""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
+        
+        /* --- JUDUL UTAMA 3D ELEGANT --- */
+        .elegant-header {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 900;
+            font-size: 26px;
+            text-align: left;
+            margin-top: -60px; /* Menarik konten ke paling atas */
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(197, 160, 89, 0.3);
+            letter-spacing: -0.5px;
+            line-height: 1.3;
+            
+            /* Efek 3D Gold Gradient */
+            text-shadow: 0 2px 0 rgba(0,0,0,0.2), 0 4px 15px rgba(0,0,0,0.3);
+            background: linear-gradient(180deg, #FFFFFF 0%, #C5A059 60%, #8E6D35 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .elegant-header .header-icon {
+            display: inline-block;
+            font-size: 32px;
+            margin-right: 8px;
+            vertical-align: middle;
+            filter: drop-shadow(0 2px 8px rgba(197, 160, 89, 0.5));
+            animation: truck-bounce 2s ease-in-out infinite;
+        }
+        
+        @keyframes truck-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        
+        .elegant-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(197, 160, 89, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-top: -10px;
+            margin-bottom: 20px;
+        }
+        
+        .version-tag {
+            display: inline-block;
+            background: rgba(197, 160, 89, 0.1);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 9px;
+            font-weight: 600;
+            color: #C5A059;
+            letter-spacing: 1px;
+        }
+
+        /* Tombol Logout Styling */
+        .simple-logout-btn {
+            background: rgba(197, 160, 89, 0.08) !important;
+            border: 1px solid rgba(197, 160, 89, 0.25) !important;
+            border-radius: 8px !important;
+            color: #B8956E !important;
+            font-size: 10px !important;
+            font-weight: 500 !important;
+            text-transform: uppercase !important;
+            padding: 10px 14px !important;
+            margin-top: 10px !important;
+        }
+        </style>
+        
+        <div class="elegant-header">
+            <span class="header-icon">🚛</span>
+            ERP LOGISTIC<br>SURABAYA
+        </div>
+        
+        <div class="elegant-subtitle">
+            Warehouse Management System
+        </div>
+        
+        <div class="version-tag">v2.1 PRO</div>
+        <div style="margin-bottom: 30px;"></div>
+    """, unsafe_allow_html=True)
+
+    # Logika Logout
+    if st.button("🔴 Logout", key="simple_logout"):
+        st.session_state.logged_in = False
+        st.rerun()    
+
 import streamlit as st
 
 # --- INITIALIZATION ---
