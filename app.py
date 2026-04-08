@@ -104,191 +104,176 @@ st.markdown("""
         border-color: #ff4444 !important;
     }
 
-    /* ============================================ 
-       6. FILE UPLOADER 
-       ============================================ */ 
-    [data-testid="stFileUploader"] { 
-        background-color: #f0f2f6; 
-        border: 2px dashed rgba(0, 43, 91, 0.3) !important; 
-        border-radius: 10px; 
-        padding: 12px; 
-    } 
+    /* ============================================
+       6. FILE UPLOADER
+       ============================================ */
+    [data-testid="stFileUploader"] {
+        background-color: #f0f2f6;
+        border: 2px dashed rgba(0, 43, 91, 0.3) !important;
+        border-radius: 10px;
+        padding: 12px;
+    }
+    [data-testid="stFileUploader"] button {
+        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important;
+        color: #1a1d2e !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+    }
 
-    [data-testid="stFileUploader"] button { 
-        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important; 
-        color: #1a1d2e !important; 
-        font-weight: 600 !important; 
-        border-radius: 6px !important; 
-        font-size: 12px !important; 
-    } 
+    /* ============================================
+       7. METRIC BOXES - PREMIUM CARD
+       ============================================ */
+    .m-box {
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+        padding: 18px 20px !important;
+        border-radius: 10px !important;
+        border-left: 4px solid #C5A059 !important;
+        margin-bottom: 10px !important;
+        text-align: left !important;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
+    }
+    .m-lbl {
+        color: rgba(255, 255, 255, 0.65) !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .m-val {
+        color: #C5A059 !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+    }
 
-    /* ============================================ 
-       7. METRIC BOXES - PREMIUM CARD 
-       ============================================ */ 
-    .m-box { 
-        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important; 
-        padding: 18px 20px !important; 
-        border-radius: 10px !important; 
-        border-left: 4px solid #C5A059 !important; 
-        margin-bottom: 10px !important; 
-        text-align: left !important; 
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important; 
-    } 
+    /* ============================================
+       8. RADIO BUTTONS
+       ============================================ */
+    div.row-widget.stRadio > div { background-color: transparent !important; }
+    div.row-widget.stRadio label {
+        color: #a0a5b5 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 13px !important;
+        padding: 8px 14px !important;
+        border-radius: 6px !important;
+        background: rgba(26, 29, 46, 0.5) !important;
+        border: 1px solid rgba(197, 160, 89, 0.15) !important;
+        transition: all 0.2s ease !important;
+    }
+    div.row-widget.stRadio label:hover {
+        background: rgba(197, 160, 89, 0.1) !important;
+        border-color: rgba(197, 160, 89, 0.3) !important;
+        color: #C5A059 !important;
+    }
 
-    .m-lbl { 
-        color: rgba(255, 255, 255, 0.65) !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 10px !important; 
-        font-weight: 600 !important; 
-        text-transform: uppercase !important; 
-        letter-spacing: 1px !important; 
-        display: block; 
-        margin-bottom: 6px; 
-    } 
+    /* ============================================
+       9. INPUT BOXES - GOLD BORDER
+       ============================================ */
+    div[data-baseweb="select"] > div,
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+    }
+    div[data-baseweb="select"] > div:focus-within,
+    [data-testid="stFileUploaderSection"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    [data-testid="stFileUploaderText"] > span,
+    [data-testid="stFileUploaderText"] > small {
+        color: #e0e0e0 !important;
+        -webkit-text-fill-color: #e0e0e0 !important;
+    }
 
-    .m-val { 
-        color: #C5A059 !important; 
-        font-family: 'Poppins', sans-serif !important; 
-        font-size: 24px !important; 
-        font-weight: 700 !important; 
-    } 
+    /* Text inputs */
+    div[data-baseweb="input"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+    }
+    div[data-baseweb="input"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    input {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 14px !important;
+    }
 
-    /* ============================================ 
-       8. RADIO BUTTONS 
-       ============================================ */ 
-    div.row-widget.stRadio > div { 
-        background-color: transparent !important; 
-    } 
+    /* ============================================
+       10. BUTTONS LAYOUT
+       ============================================ */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+    }
+    [data-testid="column"] {
+        flex: 0 1 auto !important;
+        width: auto !important;
+        min-width: fit-content !important;
+        max-width: fit-content !important;
+    }
+    div.stButton > button {
+        width: 170px !important;
+        min-height: 3.3em !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        padding: 10px 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        font-size: 13px !important;
+        line-height: 1.3 !important;
+    }
 
-    div.row-widget.stRadio label { 
-        color: #a0a5b5 !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 13px !important; 
-        padding: 8px 14px !important; 
-        border-radius: 6px !important; 
-        background: rgba(26, 29, 46, 0.5) !important; 
-        border: 1px solid rgba(197, 160, 89, 0.15) !important; 
-        transition: all 0.2s ease !important; 
-    } 
+    /* ============================================
+       11. SIDEBAR BUTTONS - GOLD THEME
+       ============================================ */
+    [data-testid="stSidebar"] div.stButton > button {
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important;
+        color: #C5A059 !important;
+        border: 1px solid rgba(197, 160, 89, 0.25) !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 42px !important;
+        border-radius: 8px !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+        transition: all 0.25s ease !important;
+        margin-bottom: 6px !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button:hover {
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important;
+        border-color: #C5A059 !important;
+        color: #FFD700 !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button p {
+        color: inherit !important;
+        font-family: 'Inter', sans-serif !important;
+    }
 
-    div.row-widget.stRadio label:hover { 
-        background: rgba(197, 160, 89, 0.1) !important; 
-        border-color: rgba(197, 160, 89, 0.3) !important; 
-        color: #C5A059 !important; 
-    } 
-
-    /* ============================================ 
-       9. INPUT BOXES - GOLD BORDER 
-       ============================================ */ 
-    div[data-baseweb="select"] > div, 
-    [data-testid="stFileUploaderSection"] { 
-        background-color: #1a1d2e !important; 
-        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
-        border-radius: 8px !important; 
-    } 
-
-    div[data-baseweb="select"] > div:focus-within, 
-    [data-testid="stFileUploaderSection"]:focus-within { 
-        border-color: #C5A059 !important; 
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
-    } 
-
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
-    [data-testid="stFileUploaderText"] > span, 
-    [data-testid="stFileUploaderText"] > small { 
-        color: #e0e0e0 !important; 
-        -webkit-text-fill-color: #e0e0e0 !important; 
-    } 
-
-    /* Text inputs */ 
-    div[data-baseweb="input"] { 
-        background-color: #1a1d2e !important; 
-        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
-        border-radius: 8px !important; 
-        padding: 10px 14px !important; 
-    } 
-
-    div[data-baseweb="input"]:focus-within { 
-        border-color: #C5A059 !important; 
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
-    } 
-
-    input { 
-        color: #ffffff !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 14px !important; 
-    } 
-
-    /* ============================================ 
-       10. BUTTONS LAYOUT 
-       ============================================ */ 
-    [data-testid="stHorizontalBlock"] { 
-        display: flex !important; 
-        flex-wrap: wrap !important; 
-        gap: 10px !important; 
-        justify-content: flex-start !important; 
-        width: 100% !important; 
-    } 
-
-    [data-testid="column"] { 
-        flex: 0 1 auto !important; 
-        width: auto !important; 
-        min-width: fit-content !important; 
-        max-width: fit-content !important; 
-    } 
-
-    div.stButton > button { 
-        width: 170px !important; 
-        min-height: 3.3em !important; 
-        white-space: normal !important; 
-        word-wrap: break-word !important; 
-        padding: 10px 14px !important; 
-        display: flex !important; 
-        align-items: center !important; 
-        justify-content: center !important; 
-        text-align: center !important; 
-        font-size: 13px !important; 
-        line-height: 1.3 !important; 
-    } 
-
-    /* ============================================ 
-       11. SIDEBAR BUTTONS - GOLD THEME 
-       ============================================ */ 
-    [data-testid="stSidebar"] div.stButton > button { 
-        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important; 
-        color: #C5A059 !important; 
-        border: 1px solid rgba(197, 160, 89, 0.25) !important; 
-        width: 100% !important; 
-        height: auto !important; 
-        min-height: 42px !important; 
-        border-radius: 8px !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-weight: 500 !important; 
-        font-size: 12px !important; 
-        white-space: nowrap !important; 
-        transition: all 0.25s ease !important; 
-        margin-bottom: 6px !important; 
-    } 
-
-    [data-testid="stSidebar"] div.stButton > button:hover { 
-        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important; 
-        border-color: #C5A059 !important; 
-        color: #FFD700 !important; 
-    } 
-
-    [data-testid="stSidebar"] div.stButton > button p { 
-        color: inherit !important; 
-        font-family: 'Inter', sans-serif !important; 
-    } 
-
-    /* ============================================ 
-       12. LABELS 
-       ============================================ */ 
-    [data-testid="stWidgetLabel"] p { 
-        color: #2d3748 !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-weight: 600 !important; 
-        font-size: 13px !important; 
+    /* ============================================
+       12. LABELS
+       ============================================ */
+    [data-testid="stWidgetLabel"] p {
+        color: #2d3748 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -1022,48 +1007,7 @@ def menu_Stock_Opname():
         </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header"><h1> STOCK OPNAME ANALYZER</h1></div>', unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **FILTER**
-            - **SUB KATEGORI**
-                - Untuk Sub Kategori pilih sesuai dengan kategori yang sedang dianalisa
-            - **BIN SYSTEM**
-                - Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa
-            - **BIN COVERAGE**
-                - Untuk BIN COVERAGE sementara non aktifkan dulu dan jangan dipilih
-        - **COMPARE DS VS STOCK SYSTEM**
-            - **DATA SCAN**: Upload data scan SO yang sudah diberi header :
-                - **Kolom A** = BIN
-                - **Kolom B** = SKU
-                - **Kolom C** = QTY SCAN
-            - **STOCK SYSTEM**
-                - Download All stock dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-        - **BIN COVERAGE**
-            - Download Bin Coverage  dari **Multiple Adjusment**
-            - Pilih stocknya **Hanya ada di stock**
-        - **FINAL ADJUSMENT + PROCESS**
-            - **REAL + RECON**
-                - Upload file Recon Real + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
-            - **CEK STOCK ADJ +**
-                - Download Stock System yang terbaru dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-            - **STOCK ADJ + (MASTER)**
-                - Download Stock System dan pilih hanya *BIN STAGGING INBOUND* dan pilih **Termasuk yang sudah habis**
-        - **SET UP KARANTINA GENERATOR**
-            - **SYTEM + RECON**
-                - Upload file Recon System + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
-            - **CEK STOCK ADJ -**
-                - Download Stock System yang terbaru dari *Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-        - **SUMMARY ADJUSMENT REPORT**
-            - **OPSI 1**
-                - Jika ingin mengetahui value adjusment saat proses running bisa langsung klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
-            - **OPSI 2**
-                - Jika ingin mengetahui value adjusment total + dari all bin maka **Gabungkan All Adjusment +** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
-            - **OPSI 3**
-                - Jika ingin mengetahui value adjusment total - dari all bin maka **Gabungkan All Adjusment -** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
-            - **OPSI 4**
-                - Jika ingin mengetahui value adjusment total dari + dan - secara keseluruhan maka **Gabungkan All Adjusment + & - ** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
-        """)
+
     # --- INITIALIZE ALL SESSION STATES ---
     if 'compare_result' not in st.session_state: st.session_state.compare_result = None
     if 'allocation_result' not in st.session_state: st.session_state.allocation_result = None
@@ -1085,10 +1029,10 @@ def menu_Stock_Opname():
     # --- FILTER SECTION ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
-        list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
+        list_sub_kat = ["GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", "NUTRITION", "BAG", "EXTRAS SHOES"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
     with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
         selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
@@ -1306,9 +1250,9 @@ def menu_Stock_Opname():
     # Tambahkan dua uploader agar logic compare BIN|SKU bisa jalan
     col_k1, col_k2 = st.columns(2)
     with col_k1:
-        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
+        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + OUTSTANDING RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
     with col_k2:
-        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
+        up_adj6 = st.file_uploader("📥 2. Upload HASIL CEK ADJUSTMENT (RECON)", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
 
     if up_k6 and up_adj6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
@@ -1420,29 +1364,22 @@ def menu_Stock_Opname():
     up_plus = st.file_uploader("📥 Upload STOCK ADJ +", type=['xlsx','csv'], key="up_plus_final_v3")
 
     if st.button("▶️ SUMMARY ADJUSTMENT", key="btn_gen_adj_v3"):
-        # 1. LOGIC HYBRID CERDAS
-        if up_plus:
-            # Prioritas: Pakai file yang baru di-upload
-            df_p_in = pd.read_excel(up_plus) if up_plus.name.endswith('.xlsx') else pd.read_csv(up_plus)
-        else:
-            # Fallback: Pakai data dari session state (hasil running sebelumnya)
-            df_p_in = st.session_state.get('df_mult_final')
-
-        # 2. Ambil data Minus jika ada upload
-        df_m_in = None
-        if up_minus:
-            df_m_in = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
-
-        # 3. Jalankan Logic jika data tersedia
-        if df_p_in is not None:
-            # Jalankan fungsi logic asli
+        df_p = st.session_state.get('df_mult_final')
+    
+        if df_p is not None:
+        # LOGIC HYBRID: Baca upload jika ada, kalau gak ada baru pake data current aplikasi
+            df_p_in = pd.read_excel(up_plus) if up_plus else df_p
+        
+            df_m_in = None
+            if up_minus:
+                df_m_in = pd.read_excel(up_minus) if up_minus.name.endswith('.xlsx') else pd.read_csv(up_minus)
+        
+        # Panggil fungsi logic dengan data yang sudah difilter
             df_res, df_summary = logic_sum_adjustment_final(df_p_in, df_m_in)
-            
+        
             st.session_state.report_adj = {"data": df_res, "sum": df_summary}
             st.success("✅ Summary Adjustment Berhasil Dibuat!")
             st.rerun()
-        else:
-            st.error("⚠️ Data tidak ditemukan! Upload file 'STOCK ADJ +' atau jalankan proses master data sebelumnya.")
 
 # --- OVERVIEW ADJUSTMENT (SEMUA BOX WARNA DINAMIS) ---
     if "report_adj" in st.session_state:
@@ -1565,42 +1502,21 @@ def menu_Stock_Opname():
 
     download_section()
             
-import math
 import pandas as pd
+import numpy as np
 import streamlit as st
-import requests
+
+import requests # Tambahin ini di paling atas file buat fungsi Upload
+import math
 
 def menu_refill_withdraw():
-    # --- STYLING ---
     st.markdown("""
         <style>
-        div.stButton > button { 
-            width: 100% !important; 
-            background-color: #002b5b !important; 
-            color: white !important; 
-            font-weight: bold !important; 
-            border: 1px solid #ffc107 !important; 
-            border-radius: 8px;
-        }
-        .hero-header {
-            background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
-            padding: 20px;
-            border-radius: 10px;
-            color: white;
-            text-align: center;
-            margin-bottom: 20px;
-        }
+        div.stButton > button { width: 100% !important; background-color: #002b5b !important; color: white !important; font-weight: bold !important; border: 1px solid #ffc107 !important; }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header"><h1>🔄 REFILL & WITHDRAW SYSTEM</h1></div>', unsafe_allow_html=True)
-
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **HANYA ADA DI STOCK**
-        - **STOCK TRACKING**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu pilih rentang waktu **7 HARI SEBELUMNYA**
-        """)
 
     # --- 0. INIT STATE ---
     for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
@@ -1610,29 +1526,24 @@ def menu_refill_withdraw():
     # --- 1. UPLOAD SECTION ---
     col1, col2 = st.columns(2)
     with col1:
-        u_stock = st.file_uploader("📤 Upload ALL STOCK SURABAYA", type=["xlsx"])
+        u_stock = st.file_uploader("📤 Upload All Stock SBY", type=["xlsx"])
         if u_stock:
             try:
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
-                st.success("Stock Ready")
             except:
                 st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name=0)
-                st.warning("Pakai Sheet Pertama")
+            st.success("Stock Ready")
 
     with col2:
-        u_trx = st.file_uploader("📤 Upload STOCK TRACKING", type=["xlsx"])
+        u_trx = st.file_uploader("📤 Upload Data Transaksi", type=["xlsx"])
         if u_trx:
             try:
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name="Data Transaksi")
-                st.success("Trx Ready")
             except:
                 st.session_state.df_trx = pd.read_excel(u_trx, sheet_name=0)
-                st.warning("Pakai Sheet Pertama")
+            st.success("Trx Ready")
 
-    st.divider()
-
-    # --- 2. GENERATE BUTTON ---
-    if st.button("📝 GENERATE SUMMARY"):
+    if st.button("▶️ GENERATE SUMMARY "):
         if st.session_state.df_stock_sby is not None:
             # Setup Dataframe
             df_s = st.session_state.df_stock_sby.copy()
@@ -1642,7 +1553,7 @@ def menu_refill_withdraw():
             if not df_t.empty:
                 df_t.columns = [i for i in range(len(df_t.columns))]
 
-            # Dictionaries (God Mode Memory Processing)
+            # Dictionaries (Mirip Scripting.Dictionary VBA)
             dictDC = {}; dict02 = {}; dictTotDC = {}; dictTot02 = {}
             dictTotDCKLRAK = {}; dictBrand = {}; dictItem = {}; dictVar = {}
             dictBinListDC = {}; dictBinList02 = {}; dictPreTotToko = {}
@@ -1656,10 +1567,6 @@ def menu_refill_withdraw():
 
                 binLoc = str(row[1]).upper().strip()
                 qtySys = pd.to_numeric(row[9], errors='coerce') or 0
-
-                # GLOBAL EXCLUSION (Biar gak ambil dari area Live/Online/Rusak)
-                is_excluded = any(ex in binLoc for ex in ["DEFECT", "REJECT", "ONLINE", "LIVE", "MARKOM", "KARANTINA", "STAGING", "PUTAWAY"])
-                if is_excluded: continue
 
                 if sku not in dictBrand:
                     dictBrand[sku] = str(row[3])
@@ -1678,17 +1585,22 @@ def menu_refill_withdraw():
                 # AREA DC
                 elif any(x in binLoc for x in ["DC", "INBOUND"]):
                     dictPreTotDCInbound[sku] = dictPreTotDCInbound.get(sku, 0) + qtySys
-                    if "KL" not in binLoc and "RAK" not in binLoc:
+                    
+                    # Filter Karantina/Defect/Reject
+                    if any(x in binLoc for x in ["KARANTINA", "DEFECT", "REJECT"]): continue
+
+                    if "KL" not in binLoc:
                         if qtySys > dictBestValDC.get(sku, -1):
                             dictBestValDC[sku] = qtySys
                             dictDC[sku] = binLoc
                         dictTotDC[sku] = dictTotDC.get(sku, 0) + qtySys
                         dictBinListDC[sku] = dictBinListDC.get(sku, "") + binLoc + ", "
+                    
                     dictTotDCKLRAK[sku] = dictTotDCKLRAK.get(sku, 0) + qtySys
 
             outRef = []; outWdr = []
 
-            # --- STEP 2: LOGIC TRANSAKSI (Hanya jalan jika file diupload) ---
+            # --- STEP 2: LOGIKA TRANSAKSI ---
             if not df_t.empty:
                 for _, row in df_t.iterrows():
                     sku_t = str(row[1]).strip()
@@ -1697,16 +1609,17 @@ def menu_refill_withdraw():
                     safeInvoice = str(row[0]).upper()
                     safeLoc = str(row[6]).upper()
 
-                    # Refill Proaktif via INV
+                    # Jalur Refill via INV
                     if "INV" in safeInvoice and not any(x in safeLoc for x in ["02", "TOKO"]):
                         if sku_t not in dictUniqueRef:
+                            # Logic: (Tot02 + TotDC <= 3)
                             if (dictTot02.get(sku_t, 0) + dictTotDC.get(sku_t, 0) <= 3) and sku_t in dictDC:
                                 bestQty = dictBestValDC.get(sku_t, 0)
                                 if bestQty > 1:
                                     outRef.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2]])
                                     dictUniqueRef[sku_t] = True
                     
-                    # Withdraw via Trx
+                    # Jalur Withdraw via Trx
                     elif "INV" not in safeInvoice and any(x in safeLoc for x in ["02", "TOKO"]):
                         if sku_t not in dictUniqueWdr:
                             if dictTotDCKLRAK.get(sku_t, 0) <= 3 and sku_t in dict02:
@@ -1715,23 +1628,172 @@ def menu_refill_withdraw():
                                     outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dict02[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotDCInbound.get(sku_t, 0), dictBinList02.get(sku_t, "")[:-2]])
                                     dictUniqueWdr[sku_t] = True
 
-            # --- STEP 3: AUTO-BALANCE (SAFETY NET) ---
+            # --- STEP 3: AUTO-BALANCE (FORCE) ---
             for sku_k in dictBrand.keys():
-                # Refill Balancing (Toko Kosong)
+                # AUTO REFILL
                 if sku_k not in dictUniqueRef:
-                    if dictTotDC.get(sku_k, 0) > 1 and dictPreTotToko.get(sku_k, 0) == 0 and sku_k in dictDC:
+                    if dictTotDC.get(sku_k, 0) > 3 and dictPreTotToko.get(sku_k, 0) == 0 and sku_k in dictDC:
                         bestQty = dictBestValDC.get(sku_k, 0)
                         outRef.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dictDC[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinListDC.get(sku_k, "")[:-2]])
                         dictUniqueRef[sku_k] = True
 
-                # Withdraw Balancing (DC Kosong)
+                # AUTO WITHDRAW
                 if sku_k not in dictUniqueWdr:
                     if dictTot02.get(sku_k, 0) > 3 and dictPreTotDCInbound.get(sku_k, 0) == 0 and sku_k in dict02:
                         bestQty = dictBestVal02.get(sku_k, 0)
                         outWdr.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dict02[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinList02.get(sku_k, "")[:-2]])
                         dictUniqueWdr[sku_k] = True
 
-            # Save Output
+            # Export to State
+            cols_ref = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN 02", "BIN LAIN"]
+            cols_wdr = ["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN DC", "BIN LAIN"]
+            st.session_state.summary_refill = pd.DataFrame(outRef, columns=cols_ref)
+            st.session_state.summary_withdraw = pd.DataFrame(outWdr, columns=cols_wdr)
+            st.success(f"DONE! Refill: {len(outRef)} | Withdraw: {len(outWdr)}")
+
+    # --- TABS FOR VIEW ---
+    import math
+import pandas as pd
+import streamlit as st
+import requests
+
+def menu_refill_withdraw():
+    st.markdown("""
+        <style>
+        div.stButton > button { width: 100% !important; background-color: #002b5b !important; color: white !important; font-weight: bold !important; border: 1px solid #ffc107 !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="hero-header"><h1>🔄 REFILL & WITHDRAW SYSTEM</h1></div>', unsafe_allow_html=True)
+
+    # --- 0. INIT STATE ---
+    for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
+        if key not in st.session_state: 
+            st.session_state[key] = None
+
+    # --- 1. UPLOAD SECTION ---
+    col1, col2 = st.columns(2)
+    with col1:
+        u_stock = st.file_uploader("📤 Upload All Stock SBY", type=["xlsx"])
+        if u_stock:
+            try:
+                st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name="All Stock SBY")
+                st.success("Stock Loaded: All Stock SBY")
+            except:
+                st.session_state.df_stock_sby = pd.read_excel(u_stock, sheet_name=0)
+                st.warning("Pakai Sheet Pertama")
+
+    with col2:
+        u_trx = st.file_uploader("📤 Upload Data Transaksi", type=["xlsx"])
+        if u_trx:
+            try:
+                st.session_state.df_trx = pd.read_excel(u_trx, sheet_name="Data Transaksi")
+                st.success("Trx Loaded: Data Transaksi")
+            except:
+                st.session_state.df_trx = pd.read_excel(u_trx, sheet_name=0)
+                st.warning("Pakai Sheet Pertama")
+
+    st.divider()
+
+    # --- 2. GENERATE BUTTON ---
+    if st.button(" 📝GENERATE SUMMARY "):
+        if st.session_state.df_stock_sby is not None:
+            # Setup Dataframe & Clean Columns
+            df_s = st.session_state.df_stock_sby.copy()
+            df_s.columns = [i for i in range(len(df_s.columns))]
+            
+            df_t = st.session_state.df_trx.copy() if st.session_state.df_trx is not None else pd.DataFrame()
+            if not df_t.empty:
+                df_t.columns = [i for i in range(len(df_t.columns))]
+
+            # Dictionaries (Samain Persis VBA)
+            dictDC = {}; dict02 = {}; dictTotDC = {}; dictTot02 = {}
+            dictTotDCKLRAK = {}; dictBrand = {}; dictItem = {}; dictVar = {}
+            dictBinListDC = {}; dictBinList02 = {}; dictPreTotToko = {}
+            dictPreTotDCInbound = {}; dictBestValDC = {}; dictBestVal02 = {}
+            dictUniqueRef = {}; dictUniqueWdr = {}
+
+            # --- STEP 1: SCAN STOCK ---
+            for _, row in df_s.iterrows():
+                sku = str(row[2]).strip()
+                if sku == "" or sku == "nan" or sku == "SKU": continue
+
+                binLoc = str(row[1]).upper().strip()
+                qtySys = pd.to_numeric(row[9], errors='coerce') or 0
+
+                if sku not in dictBrand:
+                    dictBrand[sku] = str(row[3])
+                    dictItem[sku] = str(row[4])
+                    dictVar[sku] = str(row[5])
+
+                # AREA TOKO (02, TOKO, STORE, LT.2)
+                if any(x in binLoc for x in ["02", "TOKO", "STORE", "LT.2"]):
+                    dictPreTotToko[sku] = dictPreTotToko.get(sku, 0) + qtySys
+                    if qtySys > dictBestVal02.get(sku, -1):
+                        dictBestVal02[sku] = qtySys
+                        dict02[sku] = binLoc
+                    dictTot02[sku] = dictTot02.get(sku, 0) + qtySys
+                    dictBinList02[sku] = dictBinList02.get(sku, "") + binLoc + ", "
+
+                # AREA DC (DC, INBOUND)
+                elif any(x in binLoc for x in ["DC", "INBOUND"]):
+                    dictPreTotDCInbound[sku] = dictPreTotDCInbound.get(sku, 0) + qtySys
+                    
+                    if any(x in binLoc for x in ["KARANTINA", "DEFECT", "REJECT"]): continue
+
+                    if "KL" not in binLoc:
+                        if qtySys > dictBestValDC.get(sku, -1):
+                            dictBestValDC[sku] = qtySys
+                            dictDC[sku] = binLoc
+                        dictTotDC[sku] = dictTotDC.get(sku, 0) + qtySys
+                        dictBinListDC[sku] = dictBinListDC.get(sku, "") + binLoc + ", "
+                    
+                    dictTotDCKLRAK[sku] = dictTotDCKLRAK.get(sku, 0) + qtySys
+
+            outRef = []; outWdr = []
+
+            # --- STEP 2: LOGIKA TRANSAKSI ---
+            if not df_t.empty:
+                for _, row in df_t.iterrows():
+                    sku_t = str(row[1]).strip()
+                    if sku_t not in dictBrand: continue
+                    
+                    safeInvoice = str(row[0]).upper()
+                    safeLoc = str(row[6]).upper()
+
+                    # Jalur Refill via INV
+                    if "INV" in safeInvoice and not any(x in safeLoc for x in ["02", "TOKO"]):
+                        if sku_t not in dictUniqueRef:
+                            # VBA Logic: (dictTot02(sku) + dictTotDC(sku) <= 3)
+                            if (dictTot02.get(sku_t, 0) + dictTotDC.get(sku_t, 0) <= 3) and sku_t in dictDC:
+                                bestQty = dictBestValDC.get(sku_t, 0)
+                                if bestQty > 1:
+                                    outRef.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2]])
+                                    dictUniqueRef[sku_t] = True
+                    
+                    # Jalur Withdraw via Trx
+                    elif "INV" not in safeInvoice and any(x in safeLoc for x in ["02", "TOKO"]):
+                        if sku_t not in dictUniqueWdr:
+                            if dictTotDCKLRAK.get(sku_t, 0) <= 3 and sku_t in dict02:
+                                bestQty = dictBestVal02.get(sku_t, 0)
+                                if bestQty > 1:
+                                    outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dict02[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotDCInbound.get(sku_t, 0), dictBinList02.get(sku_t, "")[:-2]])
+                                    dictUniqueWdr[sku_t] = True
+
+            # --- STEP 3: AUTO-BALANCE (FORCE) ---
+            for sku_k in dictBrand.keys():
+                if sku_k not in dictUniqueRef:
+                    if dictTotDC.get(sku_k, 0) > 3 and dictPreTotToko.get(sku_k, 0) == 0 and sku_k in dictDC:
+                        bestQty = dictBestValDC.get(sku_k, 0)
+                        outRef.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dictDC[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinListDC.get(sku_k, "")[:-2]])
+                        dictUniqueRef[sku_k] = True
+
+                if sku_k not in dictUniqueWdr:
+                    if dictTot02.get(sku_k, 0) > 3 and dictPreTotDCInbound.get(sku_k, 0) == 0 and sku_k in dict02:
+                        bestQty = dictBestVal02.get(sku_k, 0)
+                        outWdr.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dict02[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinList02.get(sku_k, "")[:-2]])
+                        dictUniqueWdr[sku_k] = True
+
             st.session_state.summary_refill = pd.DataFrame(outRef, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN 02", "BIN LAIN"])
             st.session_state.summary_withdraw = pd.DataFrame(outWdr, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN DC", "BIN LAIN"])
             st.success(f"DONE! Refill: {len(outRef)} | Withdraw: {len(outWdr)}")
@@ -1739,7 +1801,7 @@ def menu_refill_withdraw():
             st.error("Upload Data Stock Dulu!")
 
     # --- 3. TABS SECTION ---
-    t1, t2, t3 = st.tabs(["♻️ Summary Refill", "♻️ Summary Withdraw", "🔺 Upload to Appsheet"])
+    t1, t2, t3= st.tabs(["♻️ Summary Refill", "♻️ Summary Withdraw", "🔺Upload to Appsheet"])
 
     with t1:
         if st.session_state.summary_refill is not None:
@@ -1750,22 +1812,20 @@ def menu_refill_withdraw():
             st.dataframe(st.session_state.summary_withdraw, use_container_width=True)
 
     with t3:
-        col_up1, col_up2 = st.columns(2)
-        with col_up1:
-            if st.session_state.summary_refill is not None:
-                if st.button("🔺 Upload Refill"):
-                    data_json = st.session_state.summary_refill.astype(str).values.tolist()
-                    url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=REFILL%20STOCK"
-                    requests.post(url, json=data_json)
-                    st.toast("REFILL UPLOADED!")
-        
-        with col_up2:
-            if st.session_state.summary_withdraw is not None:
-                if st.button("🔺 Upload Withdraw"):
-                    data_json = st.session_state.summary_withdraw.astype(str).values.tolist()
-                    url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=WITHDRAW%20STOCK"
-                    requests.post(url, json=data_json)
-                    st.toast("WITHDRAW UPLOADED!")
+        if st.session_state.summary_refill is not None:
+            if st.button("🔺 Upload Refill to Appsheet"):
+                data_json = st.session_state.summary_refill.astype(str).values.tolist()
+                url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=REFILL%20STOCK"
+                requests.post(url, json=data_json)
+                st.toast("REFILL UPLOADED!")
+
+        if st.session_state.summary_withdraw is not None:
+            if st.button("🔺Upload Withdraw to Appsheet"):
+                data_json = st.session_state.summary_withdraw.astype(str).values.tolist()
+                url = "https://script.google.com/macros/s/AKfycbzJ0jWLefO8t9s7AO2eloEgHXehjSKAQXPUHzSX6VuZhSWOrbWEyVBi5rjZgUbn7YLQ/exec?sheet=WITHDRAW%20STOCK"
+                requests.post(url, json=data_json)
+                st.toast("WITHDRAW UPLOADED!")
+
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -1778,51 +1838,30 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     if df_ds is None or df_app is None:
         return pd.DataFrame(), pd.DataFrame()
 
-    # 1. Helper Function untuk membersihkan SKU secara total
-    def clean_sku(val):
-        if pd.isna(val): return ""
-        # Hilangkan .0 jika SKU terbaca sebagai float
-        if isinstance(val, float) and val.is_integer():
-            s = str(int(val)).strip().upper()
-        else:
-            s = str(val).strip().upper()
-        
-        if s.endswith('.0'): s = s[:-2]
-        if s in ["NAN", "0", "NONE", ""]: return ""
-        return s
-
     df_a = df_app.copy()
-    # Mengubah nama kolom menjadi string untuk memudahkan akses
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
-    # Filter Status: DONE atau KURANG AMBIL
     mask_status = df_a['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
     df_filtered = df_a[mask_status].copy()
 
-    # 2. Logic Perbaikan: Cek SKU 9+13 DAN 15+17 secara independen
     dict_qty_total = {}
     for _, row in df_filtered.iterrows():
-        # Pasangan 1 (Kolom 9 & 13)
-        sku1 = clean_sku(row.get('9', ''))
-        qty1 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
-        if sku1:
-            dict_qty_total[sku1] = dict_qty_total.get(sku1, 0) + qty1
-            
-        # Pasangan 2 (Kolom 15 & 17)
-        sku2 = clean_sku(row.get('15', ''))
-        qty2 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
-        if sku2:
-            dict_qty_total[sku2] = dict_qty_total.get(sku2, 0) + qty2
+        sku = str(row.get('9', '')).strip().upper()
+        if sku in ["", "NAN", "0", "NONE"]: 
+            sku = str(row.get('15', '')).strip().upper()
+        
+        if sku not in ["", "NAN", "0", "NONE"]:
+            q13 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
+            q17 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
+            dict_qty_total[sku] = dict_qty_total.get(sku, 0) + (q13 + q17)
 
-    # 3. Proses DataFrame DS
     res_ds = df_ds.copy()
     cols = list(res_ds.columns)
     sku_col = cols[0]
     scan_col = cols[1]
     
-    res_ds['SKU_UPPER'] = res_ds[sku_col].apply(clean_sku)
-    # Map ke dict_qty_total yang sudah mencakup kolom 9 dan 15
-    res_ds['QTY AMBIL'] = res_ds['SKU_UPPER'].map(dict_qty_total).fillna(0).astype(int)
+    res_ds['SKU_UPPER'] = res_ds[sku_col].astype(str).str.strip().str.upper()
+    res_ds['QTY AMBIL'] = res_ds['SKU_UPPER'].map(dict_qty_total).fillna(0)
     
     def check_note(row):
         scan = pd.to_numeric(row[scan_col], errors='coerce') or 0
@@ -1833,54 +1872,38 @@ def engine_ds_rto_vba_total(df_ds, df_app):
     
     res_ds['NOTE'] = res_ds.apply(check_note, axis=1)
 
-    # 4. Perhitungan q_del (Status DELETE ITEM)
-    # Menjumlahkan QTY dari kolom 13 dan 17 untuk status DELETE
-    mask_del = df_a['2'].astype(str).str.upper().str.strip() == 'DELETE ITEM'
-    q_del = int(pd.to_numeric(df_a[mask_del]['13'], errors='coerce').sum() + 
-                pd.to_numeric(df_a[mask_del]['17'], errors='coerce').sum())
-
-    # 5. Bangun Hasil Selisih untuk Report
     results_selisih = []
     mismatch_ds = res_ds[res_ds['NOTE'] != 'SESUAI'].copy()
-    
     for _, row in mismatch_ds.iterrows():
         sku = row['SKU_UPPER']
-        # Cari baris yang relevan di AppSheet baik di kolom 9 atau 15
-        mask_app = (df_a['9'].apply(clean_sku) == sku) | (df_a['15'].apply(clean_sku) == sku)
+        mask_app = (df_a['9'].astype(str).str.strip().str.upper() == sku) | \
+                   (df_a['15'].astype(str).str.strip().str.upper() == sku)
         found_rows = df_a[mask_app]
         
         if not found_rows.empty:
             for _, r_app in found_rows.iterrows():
-                # Cek apakah SKU tersebut ada di pasangannya masing-masing
-                if clean_sku(r_app.get('9')) == sku:
-                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('12', '-'), r_app.get('13', 0), 0])
-                if clean_sku(r_app.get('15')) == sku:
-                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('16', '-'), r_app.get('17', 0), 0])
+                if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
+                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('12'), r_app.get('13', 0), 0])
+                if str(r_app.get('16', '')).strip() not in ["", "nan", "0"]:
+                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('16'), r_app.get('17', 0), 0])
         else:
             results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], "-", 0, 0])
 
-    # 6. SKU di AppSheet tapi tidak ada di DS
     skus_in_ds = set(res_ds['SKU_UPPER'].unique())
     for sku_app, total_qty in dict_qty_total.items():
-        if sku_app and sku_app not in skus_in_ds:
-            mask_app = (df_a['9'].apply(clean_sku) == sku_app) | (df_a['15'].apply(clean_sku) == sku_app)
+        if sku_app not in skus_in_ds:
+            mask_app = (df_a['9'].astype(str).str.strip().str.upper() == sku_app) | \
+                       (df_a['15'].astype(str).str.strip().str.upper() == sku_app)
             found_rows = df_a[mask_app]
             for _, r_app in found_rows.iterrows():
                 note_khusus = "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
-                if clean_sku(r_app.get('9')) == sku_app:
-                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('12', '-'), r_app.get('13', 0), 0])
-                if clean_sku(r_app.get('15')) == sku_app:
-                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('16', '-'), r_app.get('17', 0), 0])
+                if str(r_app.get('12', '')).strip() not in ["", "nan", "0"]:
+                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('12'), r_app.get('13', 0), 0])
+                if str(r_app.get('16', '')).strip() not in ["", "nan", "0"]:
+                    results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('16'), r_app.get('17', 0), 0])
 
     res_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
-    
-    # --- PERBAIKAN: Hapus duplikat baris yang sama persis ---
-    res_selisih = res_selisih.drop_duplicates(subset=['SKU', 'BIN', 'QTY AMBIL BIN', 'NOTE'], keep='first')
-    
-    # Final clean-up
-    res_selisih['SKU'] = res_selisih['SKU'].apply(clean_sku)
     res_ds.drop(columns=['SKU_UPPER'], inplace=True)
-    
     return res_ds, res_selisih
 
 def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
@@ -1922,94 +1945,75 @@ def engine_refresh_rto(df_ds, df_app_awal, df_selisih):
 def engine_compare_draft_jezpro(df_app, df_draft):
     df_res = df_draft.copy()
     df_a = df_app.copy()
+    # Mengubah nama kolom menjadi string angka agar mudah diakses seperti index (1-based)
     df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
     
-    def clean_sku(val):
-        if pd.isna(val): return ""
-        s = str(val).strip().upper()
-        if s.endswith('.0'): s = s[:-2]
-        return s if s not in ["NAN", "0", "NONE"] else ""
-
-    # --- 1. REKAP DATA APPSHEET ---
-    app_summary = {} 
+    # --- 1. REKAP SEMUA DATA DARI APPSHEET ---
+    app_summary = {}
+    
     for _, r in df_a.iterrows():
-        # Ambil semua pasangan SKU & BIN dari AppSheet (Kolom 9&12, 15&16)
-        pairs = [(clean_sku(r.get('9')), str(r.get('12','')).strip().upper(), pd.to_numeric(r.get('13',0), errors='coerce') or 0),
-                 (clean_sku(r.get('15')) or clean_sku(r.get('9')), str(r.get('16','')).strip().upper(), pd.to_numeric(r.get('17',0), errors='coerce') or 0)]
+        # Ambil SKU: Cek kolom 9 (I), jika kosong cek kolom 15 (O)
+        sku_1 = str(r.get('9', '')).strip().upper()
+        sku_2 = str(r.get('15', '')).strip().upper()
         
-        for s, b, q in pairs:
-            if s and b not in ["", "0", "NAN"]:
-                app_summary[(s, b)] = app_summary.get((s, b), 0) + q
+        # Proses Pasangan BIN 1 & QTY 1 (Kolom 12 & 13 / L & M)
+        bin_1 = str(r.get('12', '')).strip().upper()
+        if sku_1 not in ["", "NAN", "0"] and bin_1 not in ["", "0", "NAN"]:
+            qty_1 = pd.to_numeric(r.get('13', 0), errors='coerce') or 0
+            key = (sku_1, bin_1)
+            app_summary[key] = app_summary.get(key, 0) + qty_1
+            
+        # Proses Pasangan BIN 2 & QTY 2 (Kolom 16 & 17 / P & Q)
+        # Note: Kita gunakan SKU_2 (kolom O/15) jika ada, jika tidak pakai SKU_1
+        bin_2 = str(r.get('16', '')).strip().upper()
+        final_sku_2 = sku_2 if sku_2 not in ["", "NAN", "0"] else sku_1
+        
+        if final_sku_2 not in ["", "NAN", "0"] and bin_2 not in ["", "0", "NAN"]:
+            qty_2 = pd.to_numeric(r.get('17', 0), errors='coerce') or 0
+            key = (final_sku_2, bin_2)
+            app_summary[key] = app_summary.get(key, 0) + qty_2
 
-    # Kita pakai copy untuk tracking sisa stok yang belum terpakai
-    rem_app = app_summary.copy()
-
-    # --- 2. TAHAP 1: PRIORITAS MATCH SEMPURNA (ANTI BARIS DOUBLE) ---
-    # Kita tandai dulu baris mana yang sudah OK biar nggak kena tabrak logic PINDAH BIN
-    processed_indices = set()
-
+    # --- 2. UPDATE ITEM YANG SUDAH ADA DI DRAFT ---
+    matched_keys = set()
     for idx, row in df_res.iterrows():
-        sku_d = clean_sku(row.iloc[3])
-        bin_d = str(row.iloc[8]).strip().upper()
-        qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
+        sku_d = str(row.iloc[3]).strip().upper()  # Kolom SKU di Draft
+        bin_d = str(row.iloc[8]).strip().upper()  # Kolom BIN di Draft
+        qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0 # QTY Draft
+        
         key_d = (sku_d, bin_d)
-
-        if rem_app.get(key_d, 0) > 0:
-            qty_j = rem_app[key_d]
-            rem_app[key_d] = 0 # Habiskan kuota karena sudah match sempurna
-            
-            note = "DRAFT SESUAI" if qty_j == qty_h else "BEDA QTY"
-            status = "OK" if qty_j == qty_h else "PERLU EDIT QTY DRAFT"
-            
-            df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
-                [qty_j, note, "", 0, status]
-            processed_indices.add(idx)
-
-    # --- 3. TAHAP 2: SISANYA BARU CEK PINDAH BIN / DELETE ---
-    for idx, row in df_res.iterrows():
-        if idx in processed_indices: continue # Lewati yang sudah OK di Tahap 1
-
-        sku_d = clean_sku(row.iloc[3])
-        bin_d = str(row.iloc[8]).strip().upper()
+        qty_j = 0
+        note, status = "HAPUS ITEM INI DARI DRAFT", "DELETE ITEM"
         
-        # Cari apakah SKU ini ada di BIN lain yang MASIH punya sisa stok di rem_app
-        possible_bins = [k for k, v in rem_app.items() if k[0] == sku_d and v > 0]
-        
-        if possible_bins:
-            # Info BIN lain diambil dari sisa stok yang belum ter-match
-            bin_lain = ", ".join([b[1] for b in possible_bins])
-            qty_lain = sum([rem_app[b] for b in possible_bins])
+        if key_d in app_summary:
+            qty_j = app_summary[key_d]
+            matched_keys.add(key_d)
+            if qty_j < qty_h: 
+                note, status = "QTY AMBIL KURANG DARI DRAFT", "PERLU EDIT QTY DRAFT"
+            elif qty_j == qty_h: 
+                note, status = "DRAFT SESUAI", "OK"
+            else: 
+                note, status = "KELEBIHAN AMBIL DARI DRAFT", "PERLU CEK"
             
-            df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
-                [0, "PINDAH BIN", bin_lain, qty_lain, "PERLU EDIT BIN DRAFT"]
-        else:
-            df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \
-                [0, "HAPUS ITEM INI", "", 0, "DELETE ITEM"]
+        df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [qty_j, note, "", "", status]
 
-    # --- 4. TAHAP 3: ADD NEW (Hanya jika SKU bener-bener gak ada di Draft) ---
-    sku_in_draft = set(df_draft.iloc[:, 3].apply(clean_sku).unique())
+    # --- 3. TAMBAHKAN ITEM YANG ADA DI APPSHEET TAPI BELUM ADA DI DRAFT ---
     new_rows = []
-
-    for (sku_a, bin_a), qty_a in rem_app.items():
-        if qty_a > 0 and sku_a not in sku_in_draft:
+    for (sku_a, bin_a), qty_a in app_summary.items():
+        if (sku_a, bin_a) not in matched_keys:
+            # Gunakan "-" atau data default untuk kolom draft yang tidak ada
             new_entry = {col: "" for col in df_res.columns}
-            new_entry[df_res.columns[0]] = "-" 
-            new_entry[df_res.columns[3]] = sku_a 
-            new_entry[df_res.columns[7]] = 0 
-            new_entry[df_res.columns[8]] = bin_a 
+            new_entry[df_res.columns[0]] = "-"           # No TF
+            new_entry[df_res.columns[3]] = sku_a         # SKU
+            new_entry[df_res.columns[7]] = 0             # Qty Draft (0)
+            new_entry[df_res.columns[8]] = bin_a         # Bin
             new_entry['QTY AMBIL'] = qty_a
-            new_entry['NOTE'] = "TAMBAH ITEM BARU"
+            new_entry['NOTE'] = "TAMBAH ITEM DRAFT"
             new_entry['STATUS'] = "ADD NEW"
             new_rows.append(new_entry)
-            rem_app[(sku_a, bin_a)] = 0 # Tandai sudah masuk ADD NEW
 
     if new_rows:
-        df_res = pd.concat([df_res, pd.DataFrame(new_rows)], ignore_index=True)
-
-    # Convert angka .0 jadi integer biar bersih
-    for col in ['QTY AMBIL', 'QTY BIN LAIN', df_res.columns[7]]:
-        if col in df_res.columns:
-            df_res[col] = pd.to_numeric(df_res[col], errors='coerce').fillna(0).astype(int)
+        df_added = pd.DataFrame(new_rows)
+        df_res = pd.concat([df_res, df_added], ignore_index=True)
 
     return df_res
 
@@ -2029,58 +2033,54 @@ def engine_generate_new_draft(df_compared):
     res = pd.DataFrame([{'BIN': k.split('|')[0], 'SKU': k.split('|')[1], 'QUANTITY': v} for k, v in dict_final.items()])
     return res.sort_values(['BIN', 'SKU']).reset_index(drop=True) if not res.empty else res
 
-import pandas as pd
-import math
-
-def process_refill_overstock(df_all_data, df_stock_tracking=None):
-    # Inisialisasi awal agar return tidak error
+def process_refill_overstock(df_all_data, df_stock_tracking):
+    # Inisialisasi sesuai Sheet di VBA
     df_gl3 = pd.DataFrame()
     df_gl4 = pd.DataFrame()
     df_refill_final = pd.DataFrame()
     df_overstock_final = pd.DataFrame()
 
     try:
-        # --- SUB 1: FILTER_ALL_DATA ---
-        if df_all_data is None or df_all_data.empty:
-            return df_gl3, df_gl4, df_refill_final, df_overstock_final
-
+        # --- SUB 1: FILTER_ALL_DATA_TO_GL3_GL4 (Plek Ketiplek VBA) ---
+        # VBA: srcArr = Range("A2:K" & lastRow) -> A=0 sampai K=10
         srcArr = df_all_data.values
-        # AMBIL NAMA KOLOM ASLI
-        header_names = df_all_data.columns.tolist()
-        
         outGL3 = []
         outGL4 = []
 
         for i in range(len(srcArr)):
+            # VBA: binCode = UCase(srcArr(i, 2)) -> Kolom B (Indeks 1)
+            # CATATAN: Kalo di Excel lo Location itu kolom G, ganti [i][1] jadi [i][6]
             binCode = str(srcArr[i][1]).upper() if not pd.isna(srcArr[i][1]) else ""
-            
-            # Logic GL3
+
+            # Logic GL3: InStr(binCode, "GL3") > 0 And InStr(binCode, "LIVE") = 0
             if "GL3" in binCode and "LIVE" not in binCode:
-                outGL3.append(srcArr[i][:11])
-            # Logic GL4
+                outGL3.append(srcArr[i][:11]) # Ambil kolom A-K
+
+            # Logic GL4: InStr(binCode, "GL4") > 0 And No Defect, Reject, Online, Rak
             if "GL4" in binCode and not any(x in binCode for x in ["DEFECT", "REJECT", "ONLINE", "RAK"]):
                 outGL4.append(srcArr[i][:11])
 
-        # PERBAIKAN: Masukkan header_names agar kolom tidak jadi angka
-        df_gl3 = pd.DataFrame(outGL3, columns=header_names[:11])
-        df_gl4 = pd.DataFrame(outGL4, columns=header_names[:11])
+        df_gl3 = pd.DataFrame(outGL3)
+        df_gl4 = pd.DataFrame(outGL4)
 
-        # --- SUB 2: FILTER STOCK TRACKING (Proteksi jika None/Kosong) ---
-        dictTrans = {}
-        # Cek apakah df_stock_tracking ada isinya
-        if df_stock_tracking is not None and not df_stock_tracking.empty:
-            st_data = df_stock_tracking.values
-            for i in range(len(st_data)):
-                col_a = str(st_data[i][0]).upper() if not pd.isna(st_data[i][0]) else ""
-                col_g = str(st_data[i][6]).upper() if not pd.isna(st_data[i][6]) else ""
-                
-                # Sesuai logic VBA: Bukan INV dan ada DC
-                if "INV" not in col_a and "DC" in col_g:
-                    sku_st = str(st_data[i][1]).strip()
-                    qty_st = float(st_data[i][10]) if not pd.isna(st_data[i][10]) else 0
-                    dictTrans[sku_st] = dictTrans.get(sku_st, 0) + qty_st
+        if df_gl3.empty and df_gl4.empty:
+            return df_gl3, df_gl4, df_refill_final, df_overstock_final
 
-        # --- SUB 3: CREATE REFILL SHEET ---
+        # --- SUB 2: FILTER STOCK TRACKING (DeleteRowsNotMatchingCriteria) ---
+        # VBA: data(i, 1) = Col A, data(i, 7) = Col G
+        st_data = df_stock_tracking.values
+        st_result = []
+        for i in range(len(st_data)):
+            col_a = str(st_data[i][0]).upper() if not pd.isna(st_data[i][0]) else ""
+            col_g = str(st_data[i][6]).upper() if not pd.isna(st_data[i][6]) else ""
+            # VBA: InStr(1, data(i, 1), "INV") = 0 And InStr(1, data(i, 7), "DC") > 0
+            if "INV" not in col_a and "DC" in col_g:
+                st_result.append(st_data[i])
+        
+        df_st_filtered = pd.DataFrame(st_result)
+
+     # --- SUB 3: CREATE REFILL SHEET (Logic VBA + Anti-LIVE) ---
+        # SKU = Col C (Indeks 2), QTY = Col J (Indeks 9)
         dictGL3 = {}
         if not df_gl3.empty:
             for row in df_gl3.values:
@@ -2088,6 +2088,7 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
                 qty = int(float(row[9])) if not pd.isna(row[9]) else 0
                 dictGL3[sku] = dictGL3.get(sku, 0) + qty
 
+        # SKU Target Refill (Qty < 3 di GL3 atau ga ada sama sekali)
         dictSKUs_Target = {}
         for sku, total_qty in dictGL3.items():
             if total_qty < 3: dictSKUs_Target[sku] = True
@@ -2104,43 +2105,55 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
                 q_gl3_val = dictGL3.get(sku, 0)
                 sisaLoad = 12
                 for i in range(len(dataGL4)):
+                    # --- TAMBAHAN FILTER LIVE DISINI ---
                     bin_sumber = str(dataGL4[i][1]).upper() if not pd.isna(dataGL4[i][1]) else ""
-                    if "LIVE" in bin_sumber: continue
-                    
+                    if "LIVE" in bin_sumber: 
+                        continue # Kalo ada kata LIVE, skip bin ini, cari bin lain
+                    # ----------------------------------
+
                     if str(dataGL4[i][2]).strip() == sku:
                         q_g4 = int(float(dataGL4[i][9])) if not pd.isna(dataGL4[i][9]) else 0
                         if q_g4 > 0 and sisaLoad > 0:
                             take = min(q_g4, sisaLoad)
+                            # BIN(1), SKU(2), BRAND(3), NAME(4), VAR(5), Q_BIN(9), LOAD, Q_GL3
                             refill_output.append([dataGL4[i][1], sku, dataGL4[i][3], dataGL4[i][4], dataGL4[i][5], q_g4, take, q_gl3_val])
                             sisaLoad -= take
                             if sisaLoad <= 0: break
         
-        if refill_output:
-            df_refill_final = pd.DataFrame(refill_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD", "QTY GL3"])
+        df_refill_final = pd.DataFrame(refill_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD", "QTY GL3"])
 
-        # --- SUB 4: CREATE OVERSTOCK SHEET ---
+        # --- SUB 4: CREATE OVERSTOCK SHEET (Logic VBA + Anti-RAK) ---
+        # Stock Tracking: SKU = Col B (Indeks 1), Qty = Col K (Indeks 10)
+        dictTrans = {}
+        if not df_st_filtered.empty:
+            for row in df_st_filtered.values:
+                sku_st = str(row[1]).strip()
+                qty_st = float(row[10]) if not pd.isna(row[10]) else 0
+                dictTrans[sku_st] = dictTrans.get(sku_st, 0) + qty_st
+
         overstock_output = []
         if not df_gl3.empty:
             for row in df_gl3.values:
+                # --- TAMBAHAN FILTER RAK DISINI ---
                 bin_over = str(row[1]).upper() if not pd.isna(row[1]) else ""
-                if "RAK" in bin_over: continue
+                if "RAK" in bin_over:
+                    continue # Kalo ada kata RAK, skip, jangan masukin ke list Overstock
+                # ----------------------------------
 
                 sku_g3 = str(row[2]).strip()
                 qty_sys = int(float(row[9]))
                 if qty_sys > 24:
                     load_os = qty_sys - 24
-                    # Jika dictTrans kosong (karena file tidak upload), defaultnya dianggap 0
                     if dictTrans.get(sku_g3, 0) >= 7:
                         load_os = math.ceil(load_os / 3)
-                    
                     if load_os > 0:
+                        # Ambil data: BIN(1), SKU(2), BRAND(3), NAME(4), VAR(5), Q_SYS(9), LOAD
                         overstock_output.append([row[1], sku_g3, row[3], row[4], row[5], qty_sys, load_os])
 
-        if overstock_output:
-            df_overstock_final = pd.DataFrame(overstock_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD"])
+        df_overstock_final = pd.DataFrame(overstock_output, columns=["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "QTY BIN AMBIL", "LOAD"])
 
     except Exception as e:
-        print(f"Error caught: {e}")
+        print(f"Error: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
 # ============================================
@@ -2499,235 +2512,6 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     return df_res, df_draft
     
-import sqlite3
-import pandas as pd
-import streamlit as st
-from datetime import datetime
-import pytz
-
-def init_db():
-    conn = sqlite3.connect('jez_reporting.db', check_same_thread=False)
-    cursor = conn.cursor()
-    
-    # 1. BUAT TABEL (Daftar kolom dasar)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS retur_out_v3 (
-            tanggal TEXT,
-            no_retur TEXT,
-            item_name TEXT,
-            qty INTEGER,
-            pic TEXT,
-            keterangan TEXT,
-            status TEXT
-        )
-    ''')
-    conn.commit()
-
-    # 2. LOGIKA AUTO-PATCH: Tambah kolom jika belum ada (Safe Migration)
-    cursor.execute("PRAGMA table_info(retur_out_v3)")
-    existing_cols = [row[1] for row in cursor.fetchall()]
-    
-    # Daftar kolom lengkap yang wajib ada di V3
-    required_db_cols = {
-        'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
-        'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
-        'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 
-        'qty_so': 'INTEGER', 'tanggal': 'TEXT'
-    }
-    
-    for col, dtype in required_db_cols.items():
-        if col not in existing_cols:
-            try:
-                cursor.execute(f"ALTER TABLE retur_out_v3 ADD COLUMN {col} {dtype}")
-            except:
-                pass # Menghindari error jika kolom mendadak ada
-    
-    conn.commit()
-    return conn 
-
-def menu_retur_out_system():
-    # Jam Jakarta/Surabaya
-    tz_sub = pytz.timezone('Asia/Jakarta')
-
-    # --- 2. CSS DASHBOARD PREMIUM ---
-    st.markdown("""
-        <style>
-        .hero-header {
-            background-color: #1d3e7a;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
-            border-left: 8px solid #007BFF;
-        }
-        .hero-text {
-            color: white !important;
-            margin: 0 !important;
-            font-size: 24px !important;
-            font-weight: 800 !important;
-            letter-spacing: 1px;
-        }
-        .metric-card {
-            background-color: #1E1E2E;
-            padding: 18px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            color: white;
-            margin-bottom: 15px;
-        }
-        .metric-label {
-            font-size: 11px;
-            color: #A0A0A0;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        .metric-value {
-            font-size: 26px;
-            font-weight: 800;
-            color: #FFFFFF;
-            margin: 0;
-        }
-        .metric-delta {
-            font-size: 10px;
-            color: #10b981;
-            font-weight: 600;
-            margin-top: 5px;
-        }
-        div[data-baseweb="input"] + div { display: none; }
-        .stTextInput>div>div>input {
-            background-color: #1E1E2E;
-            color: #FFFFFF;
-            border-radius: 10px;
-            border: 1px solid #3d4455;
-            padding: 10px 15px;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="hero-header"><p class="hero-text">RETUR OUT - DATABASE V3</p></div>', unsafe_allow_html=True)
-
-    # Inisialisasi Database
-    conn = init_db()
-
-    # --- 3. UPLOAD & AUTO-SAVE ---
-    uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_v3_perm")
-    
-    if uploaded_file:
-        try:
-            # Baca file
-            df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-            df_upload.columns = [str(c).strip() for c in df_upload.columns]
-            
-            required_cols = {
-                'Identify': 'identify', 'BIN': 'bin', 'SKU': 'sku', 
-                'BRAND': 'brand', 'ITEM NAME': 'item_name', 'VARIANT': 'variant', 
-                'SUB KATEGORI': 'sub_kategori', 'Harga Beli': 'harga_beli', 
-                'Harga Jual': 'harga_jual', 'QTY SYSTEM': 'qty_system', 'QTY SO': 'qty_so'
-            }
-
-            if all(col in df_upload.columns for col in required_cols.keys()):
-                df_to_save = df_upload[list(required_cols.keys())].copy()
-                df_to_save.rename(columns=required_cols, inplace=True)
-                
-                # Tambah timestamp
-                df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
-                
-                # Cek Double Upload via Session State
-                file_key = f"up_v3_{uploaded_file.name}_{len(df_upload)}"
-                if st.session_state.get('last_file_key_v3') != file_key:
-                    df_to_save.to_sql('retur_out_v3', conn, if_exists='append', index=False)
-                    st.session_state['last_file_key_v3'] = file_key
-                    st.success(f"✅ Berhasil! {len(df_to_save)} Baris masuk database V3.")
-                    st.rerun()
-            else:
-                st.error("Gagal: Kolom di file lu gak match sama sistem!")
-        except Exception as e:
-            st.error(f"Error Upload: {e}")
-
-    # --- 4. DATA VIEW & METRICS ---
-    try:
-        # Load Data
-        df_db = pd.read_sql("SELECT rowid, * FROM retur_out_v3", conn)
-
-        if not df_db.empty:
-            # 1. Kalkulasi Dashboard
-            total_sku = df_db['sku'].nunique()
-            total_qty_system = df_db['qty_system'].sum()
-            # Gunakan fillna(0) biar gak meledak kalau ada data kosong
-            total_value = (df_db['qty_system'].fillna(0) * df_db['harga_beli'].fillna(0)).sum()
-
-            # 2. Tampilan Metrik Box
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                st.markdown(f'''
-                    <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
-                        <div class="metric-label">🗄️ TOTAL SKU</div>
-                        <div class="metric-value">{total_sku:,}</div>
-                        <div class="metric-delta">↑ IN DATABASE V3</div>
-                    </div>
-                ''', unsafe_allow_html=True)
-            with m2:
-                st.markdown(f'''
-                    <div class="metric-card" style="border-left: 6px solid #10b981;">
-                        <div class="metric-label">📦 TOTAL QTY</div>
-                        <div class="metric-value">{int(total_qty_system):,}</div>
-                        <div class="metric-delta">↑ TOTAL STOCK</div>
-                    </div>
-                ''', unsafe_allow_html=True)
-            with m3:
-                st.markdown(f'''
-                    <div class="metric-card" style="border-left: 6px solid #f59e0b;">
-                        <div class="metric-label">💰 TOTAL VALUE</div>
-                        <div class="metric-value">Rp {total_value:,.0f}</div>
-                        <div class="metric-delta">↑ ASSET VALUE</div>
-                    </div>
-                ''', unsafe_allow_html=True)
-
-            st.markdown("### 📜 Database History (V3)")
-            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang...", key="search_v3")
-
-            df_display = df_db.sort_values(by='rowid', ascending=False)
-
-            if search_query:
-                df_display = df_display[
-                    df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
-                    df_display['item_name'].str.contains(search_query, case=False, na=False)
-                ]
-
-            # Sembunyikan kolom rowid dari tampilan tabel
-            cols_to_show = [col for col in df_display.columns if col not in ['rowid', 'id']]
-
-            event = st.dataframe(
-                df_display[cols_to_show],
-                use_container_width=True, 
-                hide_index=True, 
-                on_select="rerun", 
-                selection_mode="single-row" 
-            )
-
-            # Logika Hapus Data
-            if event.selection.rows:
-                row_idx = event.selection.rows[0]
-                target_id = df_display.iloc[row_idx]['rowid']
-                target_sku = df_display.iloc[row_idx]['sku']
-                
-                st.warning(f"⚠️ Hapus SKU: **{target_sku}** dari V3?")
-                if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                    # Buka koneksi baru untuk delete agar aman
-                    with sqlite3.connect('jez_reporting.db') as conn_del:
-                        conn_del.execute("DELETE FROM retur_out_v3 WHERE rowid = ?", (int(target_id),))
-                        conn_del.commit()
-                    st.success("Data berhasil dihapus!")
-                    st.rerun()
-        else:
-            st.info("💡 Database V3 masih kosong. Silakan upload file.")
-
-    except Exception as e:
-        st.error(f"Sistem Gagal Memuat Database: {e}")
-    finally:
-        conn.close() # Pastikan ditutup di akhir
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
     res = df_case.copy()
@@ -2794,10 +2578,7 @@ def process_justification(df_case, df_tracking, df_po):
         if t2 == l2 and t2 != 0:
             return "CEK ULANG HASIL REKON"
         
-        # Versi Python / Logic Script
-        if ((t2 == 0 and u2 == 0 and l2 != 0) or 
-            (j2 > k2 and l2 > t2) or 
-            (j2 < k2 and l2 != 0 and t2 != 0)):
+        if (t2 == 0 and u2 <= 0 and l2 > 0) or (j2 > k2 and l2 > t2):
             return "INDIKASI BUG SISTEM"
             
         return "UNDEFINED"
@@ -2875,1158 +2656,9 @@ def process_stock_comparison(file1, file2):
         # Lempar error agar bisa ditangkap oleh UI (st.error)
         raise e
 
-import streamlit as st
-import pandas as pd
-import sqlite3
-import datetime as dt_logic
-from io import BytesIO
-import plotly.express as px
-
-# --- 1. DATABASE ENGINE ---
-def init_db():
-    conn = sqlite3.connect('inventory_logistik.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS reject_list (
-            CABANG TEXT, BIN_AWAL TEXT, BIN TEXT, SKU TEXT, 
-            ARTICLE_NAME TEXT, SIZE TEXT, KATEGORI TEXT, 
-            KETERANGAN TEXT, TANGGAL_INPUT TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-def save_data(df):
-    conn = sqlite3.connect('inventory_logistik.db')
-    df.to_sql('reject_list', conn, if_exists='append', index=False)
-    conn.commit()
-    conn.close()
-
-def delete_reject_item(row_id):
-    conn = sqlite3.connect('inventory_logistik.db')
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM reject_list WHERE rowid = ?", (row_id,))
-    conn.commit()
-    conn.close()
-
-def clear_all_data():
-    conn = sqlite3.connect('inventory_logistik.db')
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM reject_list")
-    conn.commit()
-    conn.close()
-    st.rerun()
-
-# --- 2. UI MENU ---
-def menu_reject_defect():
-    # --- CSS AREA (FIXED: NO CONFLICT) ---
-    st.markdown("""
-        <style>
-        /* Header Hero */
-        .hero-header {
-            background-color: #007BFF;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            margin-bottom: 25px;
-            font-weight: bold;
-            font-size: 20px;
-            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
-        }
-        
-        /* Label Form Atas: Hitam/Gelap biar kontras di bg putih */
-        [data-testid="stWidgetLabel"] p {
-            color: #31333F !important;
-            font-weight: 700 !important;
-        }
-
-        /* Box Input (Navy Gelap) */
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stSelectbox"] > div > div {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            border-radius: 8px !important;
-        }
-        
-        input, textarea, div[data-baseweb="select"] > div { 
-            color: white !important; 
-        }
-
-        /* Button Style */
-        button[kind="primaryFormSubmit"] {
-            background-color: #007BFF !important;
-            color: white !important;
-            border-radius: 8px !important;
-            width: 100% !important;
-            height: 48px !important;
-            font-weight: bold !important;
-        }
-
-        div.stDownloadButton > button {
-            background-color: #D4AF37 !important;
-            color: white !important;
-            border: 1px solid #FFD700 !important;
-            border-radius: 8px !important;
-            font-weight: bold !important;
-        }
-
-        /* --- CSS METRIC BOX: PUTIH, TEBAL, RAPI --- */
-        [data-testid="stMetric"] {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            padding: 20px !important; 
-            border-radius: 12px !important;
-            min-height: 150px !important; 
-        }
-
-        [data-testid="stMetricLabel"] > div {
-            color: #FFFFFF !important;
-            font-weight: 800 !important;
-            font-size: 15px !important;
-        }
-
-        [data-testid="stMetricValue"] > div {
-            color: #FFFFFF !important; 
-            font-weight: 900 !important; 
-            font-size: 38px !important;
-        }
-
-        [data-testid="stMetricDelta"] > div {
-            font-weight: bold !important;
-        }
-
-        /* CSS Tombol Delete */
-        button[key^="del_"] {
-            background-color: #ff4b4b !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 4px !important;
-        }
-
-        /* Judul Mass Adjustment Section */
-        h1, h2, h3, .stMarkdown h3 {
-            color: #FFFFFF !important;
-            font-weight: 800 !important;
-        }
-        /* Fix Judul Detail Database: Hitam & Tebal */
-        .detail-header {
-            color: #31333F !important;
-            font-weight: 800 !important;
-            font-size: 22px !important;
-            margin-top: 30px !important;
-            margin-bottom: 10px !important;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* FIX: Jangan tembak SEMUA p, tapi cuma p yang ada di Main Content */
-        [data-testid="stMain"] .stMarkdown p {
-            color: #E0E0E0 !important;
-        }
-
-        /* Fix Judul Detail Database: Tetap Hitam & Tebal */
-        .detail-header {
-            color: #31333F !important;
-            font-weight: 800 !important;
-            font-size: 22px !important;
-            /* ... sisa kode Lu ... */
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
-    init_db()
-
-    tab_entry, tab_analytics, tab_match = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD", "🔍 MATCH DEFECT/REJECT"])
-
-    with tab_entry:
-        with st.form("form_reject_new", clear_on_submit=True):
-            cabang_input = st.selectbox("📍 LOKASI OPERASIONAL", ["SURABAYA", "SIDOARJO", "SEMARANG"])
-            col1, col2 = st.columns(2)
-            with col1:
-                bin_awal = st.text_input("BIN AWAL")
-                bin_val = st.selectbox("BIN TUJUAN", ["REJECT DC", "DEFECT DC", "DEFECT STORE", "REJECT STORE"])
-                sku = st.text_input("SKU")
-                article = st.text_input("NAMA BARANG")
-            with col2:
-                size = st.text_input("SIZE")
-                kategori = st.selectbox("KATEGORI DEFECT", ["D1", "D2", "D3", "D4", "R1", "R3", "R4", "HANYA SEBELAH KIRI", "HANYA SEBELAH KANAN", "BERBEDA ARTICLE", "BERBEDA SIZE"])
-                keterangan = st.text_area("DETAIL KERUSAKAN")
-
-            btn_submit = st.form_submit_button("📤 UPLOAD SINGLE LIST")
-
-        if btn_submit and sku:
-            jam = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
-            new_data = pd.DataFrame([{
-                'CABANG': cabang_input, 'BIN_AWAL': bin_awal, 'BIN': bin_val, 'SKU': sku, 
-                'ARTICLE_NAME': article, 'SIZE': size, 'KATEGORI': kategori, 
-                'KETERANGAN': keterangan, 'TANGGAL_INPUT': jam
-            }])
-            save_data(new_data)
-            st.success(f"✅ SKU {sku} Berhasil Disimpan!")
-            st.rerun()
-
-        st.markdown("""
-            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;">
-                <h3 style="color: #007BFF; margin: 0; font-size: 18px; font-weight: 900;">📂 MASS ADJUSTMENT - IMPORT EXCEL</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        col_dl, col_up = st.columns([1, 2])
-        with col_dl:
-            template_cols = ['CABANG', 'BIN_AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
-            df_template = pd.DataFrame(columns=template_cols)
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_template.to_excel(writer, index=False)
-            st.download_button("📥 Download Template", output.getvalue(), "template_reject.xlsx")
-
-        with col_up:
-            # 1. Bikin ID dinamis biar file otomatis hilang pasca-import
-            if 'upload_key' not in st.session_state:
-                st.session_state.upload_key = 0
-
-            # 2. Tambahin parameter 'key' yang berubah-ubah
-            uploaded_file = st.file_uploader(
-                "Upload Excel Massal", 
-                type=['xlsx'], 
-                key=f"excel_up_{st.session_state.upload_key}"
-            )
-
-            if uploaded_file:
-                df_upload = pd.read_excel(uploaded_file)
-                if st.button("⤴️ IMPORT DATA KE DATABASE"):
-                    # Logika waktu Lu
-                    df_upload['TANGGAL_INPUT'] = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # Simpan data
-                    save_data(df_upload)
-                    
-                    # 3. Trik reset: Ubah ID key-nya sebelum rerun
-                    st.session_state.upload_key += 1
-                    
-                    st.success("✅ Import Berhasil!")
-                    st.rerun()
-
-    with tab_analytics:
-        # BARIS DI BAWAH INI HARUS MASUK 1 TAB DARI 'WITH'
-        conn = sqlite3.connect('inventory_logistik.db')
-        df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-        conn.close()
-        standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
-        if not df_chart.empty:
-            df_non_std = df_chart[~df_chart['KATEGORI'].isin(standard_codes)].copy()
-            if not df_non_std.empty:
-                def find_matches(row, full_df):
-                    matches = full_df[(full_df['SKU'] == row['SKU']) & (full_df['rowid'] != row['rowid'])]
-                    return ", ".join(matches['CABANG'].unique()) if not matches.empty else "TIDAK ADA"
-                df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
-                df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
-            else:
-                df_match_result = pd.DataFrame()
-        if not df_chart.empty:
-            # 1. Selector Cabang (Masuk lagi 1 tab dari 'if')
-            filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
-            
-            # 2. Filter Data
-            df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
-
-            # 3. Hitung Metrik Berdasarkan kolom BIN
-            total_val = len(df_final)
-            defect_cnt = len(df_final[df_final['BIN'].str.contains('DEFECT', case=False, na=False)])
-            reject_cnt = len(df_final[df_final['BIN'].str.contains('REJECT', case=False, na=False)])
-
-            # --- LOGIKA DELTA (PANAH OTOMATIS) ---
-            if 'last_total' not in st.session_state:
-                st.session_state.last_total = total_val
-                st.session_state.last_defect = defect_cnt
-                st.session_state.last_reject = reject_cnt
-
-            def get_delta(current, last):
-                if current > last:
-                    return "↑", "#28a745", "rgba(40,167,69,0.1)" # Hijau naik
-                elif current < last:
-                    return "↓", "#FF4B4B", "rgba(255,75,75,0.1)" # Merah turun
-                else:
-                    return "•", "#888", "rgba(136,136,136,0.1)"  # Abu-abu tetap
-
-            arr_t, col_t, bg_t = get_delta(total_val, st.session_state.last_total)
-            arr_d, col_d, bg_d = get_delta(defect_cnt, st.session_state.last_defect)
-            arr_r, col_r, bg_r = get_delta(reject_cnt, st.session_state.last_reject)
-
-            # Simpan state untuk perbandingan berikutnya
-            st.session_state.last_total = total_val
-            st.session_state.last_defect = defect_cnt
-            st.session_state.last_reject = reject_cnt
-
-            # 4. Tampilan Box Metrik (Dark Style)
-            m1, m2, m3 = st.columns(3)
-            
-            with m1:
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;">
-                        <p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2>
-                        <span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Total</span>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with m2:
-                p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;">
-                        <p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2>
-                        <span style="color: {col_d}; font-size: 0.8rem; background: {bg_d}; padding: 2px 8px; border-radius: 10px;">{arr_d} {p_d:.1f}%</span>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with m3:
-                p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;">
-                        <p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2>
-                        <span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span>
-                    </div>
-                """, unsafe_allow_html=True)
-               
-            st.markdown("<br>", unsafe_allow_html=True)
-    
-            # Judul dengan class CSS baru (Hitam)
-            st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
-            
-            # Ambil data terbaru
-            conn = sqlite3.connect('inventory_logistik.db')
-            df_editor = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-            conn.close()
-
-            if filter_view != "SEMUA":
-                df_editor = df_editor[df_editor['CABANG'] == filter_view]
-            
-            df_editor = df_editor.sort_values('rowid', ascending=False)
-
-            # TAMBAHKAN KOLOM 'HAPUS' (Default False)
-            df_editor['HAPUS'] = False
-
-            # TAMPILAN TABEL INTERAKTIF
-            event = st.data_editor(
-                df_editor,
-                column_config={
-                    "rowid": None, # Sembunyikan ID
-                    "HAPUS": st.column_config.CheckboxColumn(
-                        "🗑️",
-                        help="Centang untuk hapus",
-                        default=False,
-                    ),
-                    "TANGGAL_INPUT": st.column_config.TextColumn("WAKTU", width="medium"),
-                    "SKU": st.column_config.TextColumn("SKU", width="small"),
-                },
-                use_container_width=True,
-                hide_index=True, # Indeks angka kiri dimatikan biar bersih
-                key="database_editor"
-            )
-# ... (lanjutan setelah st.data_editor)
-            rows_to_delete = event[event['HAPUS'] == True]
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- SMART BUTTON PANEL ---
-            if not rows_to_delete.empty:
-                # Mode 1: Ada yang dicentang (Hapus Selektif)
-                st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
-                if st.button(f"🗑️ HAPUS {len(rows_to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
-                    for rid in rows_to_delete['rowid']:
-                        delete_reject_item(rid)
-                    st.success("Data pilihan berhasil dihapus!")
-                    st.rerun()
-            else:
-                # Mode 2: Gak ada yang dicentang (Hapus Semua)
-                # Pake warna secondary/biasa biar gak gampang kepencet
-                if st.button("🚨 KOSONGKAN SEMUA DATABASE", use_container_width=True):
-                    # Tambahin konfirmasi biar gak nyesel
-                    clear_all_data()
-                    st.success("Seluruh database telah dikosongkan!")
-                    st.rerun()
-    with tab_match:
-        # --- BOX JUDUL MODEL DARK (KONSISTEN & AMAN DARI TEKS PUTIH) ---
-        st.markdown("""
-            <div style="
-                background-color: #1E1E26; 
-                padding: 15px 20px; 
-                border-radius: 5px; 
-                border-left: 5px solid #007BFF; 
-                margin-bottom: 20px;
-            ">
-                <h3 style="
-                    color: white !important; 
-                    margin: 0; 
-                    font-weight: 700; 
-                    font-size: 1.2rem;
-                    display: flex;
-                    align-items: center;
-                ">
-                    🔍 CROSS-CHECK SKU MATCHING
-                </h3>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Pastikan data ada
-        if 'df_match_result' in locals() and not df_match_result.empty:
-            # --- BOX METRICS GELAP ---
-            m_col1, m_col2 = st.columns(2)
-            
-            with m_col1:
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;">
-                        <p style="color: #888; margin: 0; font-size: 0.8rem;">MATCH FOUND</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{len(df_match_result)} Items</h2>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with m_col2:
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #6c757d;">
-                        <p style="color: #888; margin: 0; font-size: 0.8rem;">UNIQUE SKU</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{df_match_result['SKU'].nunique()}</h2>
-                    </div>
-                """, unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- LOGIKA PIVOT (CEK CABANG MANA SAJA) ---
-            df_core = df_match_result[['SKU', 'ARTICLE_NAME']].drop_duplicates()
-            df_temp = df_match_result[['SKU', 'CABANG']].drop_duplicates()
-            
-            # Buat tabel centang per cabang
-            df_pivot = df_temp.pivot(index='SKU', columns='CABANG', values='CABANG').notna()
-            df_pivot = df_pivot.replace({True: '✅', False: ''})
-            
-            df_final_match = df_core.merge(df_pivot, on='SKU', how='left')
-
-            # --- TABEL HASIL ---
-            # --- TABEL HASIL (VERSI ANTI-GAGAL) ---
-            st.markdown("""
-                <div style="margin-bottom: 10px; padding: 5px 0;">
-                    <span style="
-                        color: #000000 !important; 
-                        font-size: 1.1rem !important; 
-                        font-weight: 800 !important;
-                        display: inline-block !important;
-                        -webkit-text-fill-color: #000000 !important;
-                    ">
-                        📋 Summary match SKU
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st.data_editor(
-                df_final_match,
-                column_config={
-                    "SKU": st.column_config.TextColumn("SKU", width="small"),
-                    "ARTICLE_NAME": st.column_config.TextColumn("NAMA BARANG", width="medium"),
-                },
-                use_container_width=True,
-                hide_index=True,
-                key="match_pivot_final"
-            )
-
-        else:
-            st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")
-import streamlit as st
-import sqlite3
-import pandas as pd
-from datetime import datetime
-
-# --- DATABASE SETUP (DENGAN AUTO-PATCH KOLOM) ---
-def init_db():
-    conn = sqlite3.connect('reject_system.db')
-    c = conn.cursor()
-    # 1. Pastikan Tabel Ada
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS submissions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            nama_tim TEXT,
-            bin_asal TEXT,
-            sku TEXT,
-            article_name TEXT,
-            size TEXT,
-            keterangan TEXT,
-            status INTEGER DEFAULT 1
-        )
-    ''')
-    
-    # 2. PATCH: Tambah kolom approved_by & setup_by kalau belum ada (Biar Gak KeyError)
-    try:
-        c.execute("ALTER TABLE submissions ADD COLUMN approved_by TEXT")
-    except:
-        pass # Berarti kolom sudah ada
-    
-    try:
-        c.execute("ALTER TABLE submissions ADD COLUMN setup_by TEXT")
-    except:
-        pass # Berarti kolom sudah ada
-        
-    conn.commit()
-    return conn
-
-conn = init_db()
-
-def project_approval_reject():
-    # --- DATABASE INTERNAL ---
-    conn = sqlite3.connect('reject_system.db', check_same_thread=False)
-    
-    # --- FIX ERROR: TAMBAH KOLOM JIKA BELUM ADA ---
-    try:
-        conn.execute("ALTER TABLE submissions ADD COLUMN additional_note TEXT")
-        conn.commit()
-    except:
-        pass # Abaikan jika kolom sudah ada
-
-    # Tambah kolom Cabang jika belum ada
-    try:
-        conn.execute("ALTER TABLE submissions ADD COLUMN cabang TEXT")
-        conn.commit()
-    except:
-        pass
-
-    # --- CSS LU (Tetap Utuh) ---
-    st.markdown("""
-        <style>
-        .hero-header-custom {
-            background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
-            color: white; padding: 12px 25px; border-radius: 10px;
-            margin-bottom: 25px; font-weight: 800; font-size: 22px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
-        }
-        .detail-card {
-            background-color: #1a1c27; border: 1px solid #3d4156;
-            padding: 20px; border-radius: 12px; margin-bottom: 20px;
-        }
-        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stSelectbox"] > div > div {
-            background-color: #1a1c27 !important;
-            border: 1px solid #3d4156 !important;
-            border-radius: 8px !important;
-        }
-        input, textarea, div[data-baseweb="select"] span { color: white !important; }
-        label { color: #E0E0E0 !important; font-weight: 600 !important; }
-        div.stButton > button {
-            background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
-            color: white !important; border-radius: 10px !important;
-            width: 100% !important; height: 50px !important; font-weight: bold !important;
-            border: none !important;
-        }
-        .gold-btn button {
-            background-color: #D4AF37 !important;
-            color: white !important; border: none !important;
-            border-radius: 8px !important; font-weight: bold !important;
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
-            transition: all 0.3s ease-in-out;
-        }
-        .gold-btn button:hover {
-            background-color: #FFD700 !important;
-            color: #1a1c27 !important;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.4);
-            transform: translateY(-2px);
-        }
-        .timeline-line {
-            height: 4px; background: #3d4156; margin-top: 15px; border-radius: 2px;
-        }
-        .line-active {
-            background: #1E90FF !important; box-shadow: 0 0 8px rgba(30, 144, 255, 0.6);
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
-    tabs = st.tabs(["💻 Input Pengajuan", "📑 History & Approval Status"])
-
-    with tabs[0]:
-        st.markdown("""
-            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;">
-                <h3 style="color: #FFFFFF; margin: 0; font-size: 18px; font-weight: 900;">Form Pengajuan Reject/Defect</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-            <style>
-            div[data-testid="stForm"] button {
-                background: linear-gradient(135deg, #1e468a 0%, #163462 100%) !important;
-                color: white !important;
-                border: 1px solid #3d4156 !important;
-                padding: 0.5rem 1rem !important;
-                font-weight: bold !important;
-                text-transform: uppercase !important;
-                letter-spacing: 1px !important;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
-                transition: all 0.3s ease !important;
-            }
-            div[data-testid="stForm"] button:hover {
-                transform: translateY(-2px) !important;
-                box-shadow: 0 6px 20px rgba(30, 70, 138, 0.5) !important;
-                background: linear-gradient(135deg, #2557ab 0%, #1e468a 100%) !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        with st.form("input_form_reject", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                nama = st.text_input("Nama Tim (Pengaju)")
-                bin_asal = st.text_input("Bin Asal")
-                sku = st.text_input("SKU")
-                cabang_input = st.selectbox("Pilih Cabang", ["SURABAYA", "SIDOARJO", "SEMARANG"])
-            with col2:
-                article = st.text_input("Article Name")
-                size = st.text_input("Size")
-                keterangan = st.text_area("Keterangan Reject/Defect")
-            
-            if st.form_submit_button("▶️ SUBMIT REQUEST"):
-                if nama and sku:
-                    import pytz 
-                    from datetime import datetime
-                    
-                    tz_jakarta = pytz.timezone('Asia/Jakarta')
-                    ts = datetime.now(tz_jakarta).strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    try:
-                        conn.execute(
-                            "INSERT INTO submissions (timestamp, nama_tim, bin_asal, sku, article_name, size, keterangan, status, cabang) VALUES (?,?,?,?,?,?,?,?,?)", 
-                            (ts, nama, bin_asal, sku, article, size, keterangan, 1, cabang_input)
-                        )
-                        conn.commit()
-                        st.success(f"✅ Berhasil! Data tercatat jam {ts} WIB untuk cabang {cabang_input}")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Gagal simpan ke database: {e}")
-                else:
-                    st.warning("⚠️ Nama Tim dan SKU wajib diisi!")
-
-    with tabs[1]:
-        st.markdown("""
-            <style>
-            [data-testid="stMain"] div[data-testid="stRadio"] label p {
-                color: #262730 !important; 
-                font-weight: 500 !important;
-            }
-            [data-testid="stMain"] div[data-testid="stExpander"] summary p {
-                color: #FFFFFF !important;
-                font-weight: bold !important;
-            }
-            [data-testid="stMain"] div[data-testid="stExpander"] {
-                background-color: #1a1c27 !important;
-                border: 1px solid #3d4156 !important;
-                border-radius: 12px !important;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
-            }
-            [data-testid="stMain"] div[data-testid="stExpander"] summary:hover p {
-                color: #00bfff !important;
-            }
-            [data-testid="stMain"] div[data-testid="stTextInput"] input {
-                color: #FFFFFF !important;
-                background-color: #0e1117 !important;
-            }
-            [data-testid="stMain"] .stMarkdown p {
-                color: #31333F !important; 
-            }
-            [data-testid="stMain"] div[data-testid="stExpander"] .stMarkdown p {
-                color: #FFFFFF !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # TAB CABANG DI DALAM HISTORY
-        tab_sby, tab_sda, tab_smg = st.tabs(["📍 SURABAYA", "📍 SIDOARJO", "📍 SEMARANG"])
-        
-        cabang_list = [("SURABAYA", tab_sby), ("SIDOARJO", tab_sda), ("SEMARANG", tab_smg)]
-
-        for cabang_name, tab_obj in cabang_list:
-            with tab_obj:
-                # --- FITUR SEARCH & FILTER ---
-                col_search, col_filter = st.columns([1, 1])
-                
-                with col_search:
-                    search_query = st.text_input(f"🔍 Cari di {cabang_name}:", placeholder="Ketik SKU atau Nama...", key=f"src_{cabang_name}", label_visibility="collapsed").strip()
-                
-                with col_filter:
-                    filter_status = st.radio(
-                        "Pilih Status:",
-                        ["Semua", "Waiting Approval", "Waiting Set Up", "Done Set Up"],
-                        horizontal=True,
-                        key=f"rad_{cabang_name}",
-                        label_visibility="collapsed"
-                    )
-
-                # Logika Query per Cabang
-                query = "SELECT * FROM submissions WHERE cabang = ?"
-                params = [cabang_name]
-
-                if filter_status == "Waiting Approval": query += " AND status = 1"
-                elif filter_status == "Waiting Set Up": query += " AND status = 2"
-                elif filter_status == "Done Set Up": query += " AND status = 3"
-
-                if search_query:
-                    query += " AND (LOWER(sku) LIKE LOWER(?) OR LOWER(bin_asal) LIKE LOWER(?) OR LOWER(nama_tim) LIKE LOWER(?) OR LOWER(article_name) LIKE LOWER(?))"
-                    search_val = f"%{search_query}%"
-                    params.extend([search_val, search_val, search_val, search_val])
-
-                query += " ORDER BY id DESC"
-                
-                try:
-                    df = pd.read_sql_query(query, conn, params=params)
-                except Exception as e:
-                    st.error(f"Database Error: {e}")
-                    df = pd.DataFrame()
-                
-                if df.empty:
-                    st.info(f"📭 Belum ada data pengajuan untuk cabang {cabang_name}.")
-                else:
-                    for index, row in df.iterrows():
-                        with st.expander(f"📦 {row['sku']} - {row['article_name']} | {row['nama_tim']}"):
-                            st.markdown(f"### 📑 Detail [ID: {row['id']}]")
-                            
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.markdown(f"**👤 Pengaju:** `{row['nama_tim']}`")
-                                st.markdown(f"**📍 Bin Asal:** `{row['bin_asal']}`")
-                                st.markdown(f"**🆔 SKU:** `{row['sku']}`")
-                            with c2:
-                                st.markdown(f"**👟 Article:** `{row['article_name']}`")
-                                st.markdown(f"**📏 Size:** `{row['size']}`")
-                                st.markdown(f"**🕒 Waktu:** `{row['timestamp']}`")
-                            
-                            st.info(f"**📝 Keterangan:**\n\n{row['keterangan']}")
-                            st.write("---")
-
-                            # --- TIMELINE PROGRESS ---
-                            st.write("**Progres Status:**")
-                            line1_active = "line-active" if row['status'] >= 2 else ""
-                            line2_active = "line-active" if row['status'] >= 3 else ""
-
-                            tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
-                            
-                            with tcol1:
-                                st.markdown("🟢 **Pengajuan**")
-                                st.caption("Waiting Approval")
-                            with tline1:
-                                st.markdown(f'<div class="timeline-line {line1_active}"></div>', unsafe_allow_html=True)
-                            with tcol2:
-                                if row['status'] >= 2:
-                                    st.markdown("🔵 **Approved**")
-                                    st.caption(f"By: {row.get('approved_by', '-')}")
-                                else:
-                                    st.markdown("🟡 **Purchasing**")
-                                    n_app = st.text_input("Nama Purchasing", key=f"app_{cabang_name}_{row['id']}", label_visibility="collapsed")
-                                    if st.button("Approve", key=f"bt_ap_{cabang_name}_{row['id']}", disabled=not n_app):
-                                        conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (n_app, row['id']))
-                                        conn.commit(); st.rerun()
-                            with tline2:
-                                st.markdown(f'<div class="timeline-line {line2_active}"></div>', unsafe_allow_html=True)
-                            with tcol3:
-                                if row['status'] >= 3:
-                                    st.markdown("🟣 **Done Set Up**")
-                                    st.caption(f"By: {row.get('setup_by', '-')}")
-                                else:
-                                    st.markdown("⚪ **Finalizing**")
-                                    if row['status'] == 2:
-                                        n_set = st.text_input("Nama Set Up", key=f"set_{cabang_name}_{row['id']}", label_visibility="collapsed")
-                                        st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-                                        if st.button("Final Set Up", key=f"bt_set_{cabang_name}_{row['id']}", disabled=not n_set):
-                                            conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (n_set, row['id']))
-                                            conn.commit(); st.rerun()
-                                        st.markdown('</div>', unsafe_allow_html=True)
-
-                            # --- ADDITIONAL NOTE ---
-                            st.write("---")
-                            c_note = row.get('additional_note') if row.get('additional_note') else ""
-                            n_note = st.text_area("📝 Catatan Tambahan:", value=c_note, key=f"n_{cabang_name}_{row['id']}")
-                            if n_note != c_note:
-                                if st.button("💾 Update Note", key=f"sn_{cabang_name}_{row['id']}"):
-                                    conn.execute("UPDATE submissions SET additional_note = ? WHERE id = ?", (n_note, row['id']))
-                                    conn.commit(); st.success("Note tersimpan!"); st.rerun()
-
-                            if row['status'] == 3:
-                                st.success(f"🎯 Selesai diproses oleh {row.get('setup_by')}")
-
-                            with st.expander("🗑️ Hapus"):
-                                if st.button(f"Konfirmasi Hapus {row['sku']}", key=f"d_{cabang_name}_{row['id']}"):
-                                    conn.execute("DELETE FROM submissions WHERE id = ?", (row['id'],))
-                                    conn.commit(); st.rerun()
-
-    conn.close()
-
-import pandas as pd
-import streamlit as st
-from io import BytesIO
-
-# --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="RTO Compare System", layout="wide")
-
-# --- 2. FUNGSI UNTUK CSS & HEADER ---
-def apply_custom_ui():
-    st.markdown("""
-    <style>
-        .stApp { background-color: #f0f7ff !important; }
-        .hero-header {
-            background-color: #007BFF;
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            margin-bottom: 25px;
-            font-weight: bold;
-            font-size: 26px;
-        }
-        div.stButton > button {
-            background-color: #007BFF !important;
-            color: white !important;
-            font-weight: bold !important;
-            height: 50px !important;
-            width: 100% !important;
-            border-radius: 8px !important;
-        }
-    </style>
-    <div class="hero-header">RTO RECEIVING PROCESS</div>
-    """, unsafe_allow_html=True)
-
-# --- 3. LOGIKA ALOKASI (KODE ASLI LU YANG SUDAH GUE WRAP) ---
-def process_allocation(df_scan, df_tf):
-    scan_sku_idx, scan_qty_idx = 0, 1
-    tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
-
-    hasil_alokasi = []
-    
-    # Clean Data
-    df_scan = df_scan.copy()
-    df_tf = df_tf.copy()
-    df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip()
-    df_tf.iloc[:, tf_sku_idx] = df_tf.iloc[:, tf_sku_idx].astype(str).str.strip()
-
-    # Perbaikan Kolom J (Index 9) untuk Sisa Qty
-    while df_tf.shape[1] < 10:
-        df_tf[f"Col_{df_tf.shape[1]}"] = 0
-    
-    cols = list(df_tf.columns)
-    cols[9] = "SISA QTY TF"
-    df_tf.columns = cols
-
-    skus_scan = set(df_scan.iloc[:, scan_sku_idx].unique())
-    skus_tf = set(df_tf.iloc[:, tf_sku_idx].unique())
-    all_skus = skus_scan | skus_tf
-
-    for sku in all_skus:
-        data_s = df_scan[df_scan.iloc[:, scan_sku_idx] == sku].copy()
-        data_t = df_tf[df_tf.iloc[:, tf_sku_idx] == sku].copy()
-
-        if data_s.empty or data_t.empty:
-            continue
-
-        list_s = data_s.to_dict('records')
-        list_t = data_t.to_dict('records')
-        idx_s = 0
-
-        for row_t in list_t:
-            needed = float(row_t.get(df_tf.columns[tf_qty_idx], 0))
-            no_tf = row_t.get(df_tf.columns[tf_no_idx], "N/A")
-            
-            while needed > 0 and idx_s < len(list_s):
-                available = float(list_s[idx_s].get(df_scan.columns[scan_qty_idx], 0))
-                if available <= 0:
-                    idx_s += 1
-                    continue
-                
-                allocated = min(needed, available)
-                hasil_alokasi.append({
-                    'No Transfer': no_tf, 
-                    'SKU': sku, 
-                    'Qty Alokasi': allocated
-                })
-                needed -= allocated
-                list_s[idx_s][df_scan.columns[scan_qty_idx]] -= allocated
-    
-    return pd.DataFrame(hasil_alokasi)
-
-# --- 4. TAMPILAN MENU (MAIN APP) ---
-def main():
-    apply_custom_ui()
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        file_scan = st.file_uploader("Upload Hasil Scan RTO/RTD", type=['xlsx', 'csv'])
-        
-    with col2:
-        file_tf = st.file_uploader("Upload Transfer Stock Jezpro", type=['xlsx', 'csv'])
-
-    if file_scan and file_tf:
-        if st.button("▶️RUN DATA"):
-            try:
-                # Load Data
-                df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
-                df_t = pd.read_excel(file_tf) if file_tf.name.endswith('.xlsx') else pd.read_csv(file_tf)
-                
-                # Proses
-                df_hasil = process_allocation(df_s, df_t)
-                
-                if not df_hasil.empty:
-                    st.success(f"Berhasil mengalokasi {len(df_hasil)} baris data!")
-                    st.dataframe(df_hasil, use_container_width=True)
-                    
-                    # Fitur Download ke Excel
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df_hasil.to_excel(writer, index=False, sheet_name='Hasil Alokasi')
-                    
-                    st.download_button(
-                        label="📥 Download Hasil (.xlsx)",
-                        data=output.getvalue(),
-                        file_name="Hasil_Alokasi_RTO.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                else:
-                    st.warning("Tidak ada SKU yang cocok untuk dialokasikan.")
-                    
-            except Exception as e:
-                st.error(f"Gagal memproses data: {e}")
-    else:
-        st.info("Silakan upload kedua file di atas untuk proses.")
-                
-import streamlit as st
-import pandas as pd
-import sqlite3
-import plotly.express as px
-
-def init_db():
-    # Database fisik biar data aman di Surabaya branch
-    conn = sqlite3.connect('database_sby.db', check_same_thread=False)
-    return conn
-
-def tampilan_balancing_stock():
-    # --- 1. CSS CUSTOM (STYLE DASHBOARD PREMIUM) ---
-    st.markdown("""
-        <style>
-        .metric-label-header {
-            background-color: #f8f9fa;
-            padding: 10px 15px;
-            border-left: 5px solid #007BFF;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            margin-top: 20px;
-        }
-        .metric-card {
-            background-color: #1E1E2E;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
-            text-align: center;
-            color: white;
-            min-height: 140px;
-            margin-bottom: 10px;
-        }
-        .metric-value {
-            font-size: 28px;
-            font-weight: bold;
-            margin: 0;
-            color: #FFFFFF;
-        }
-        .metric-label {
-            font-size: 12px;
-            color: #A0A0A0;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            letter-spacing: 1px;
-        }
-        .metric-arrow {
-            font-size: 12px;
-            margin-top: 8px;
-            font-weight: bold;
-        }
-        .hero-header {
-            background-color: #007BFF; /* Biru Hero */
-            padding: 15px 25px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            box-shadow: 0px 4px 12px rgba(0, 123, 255, 0.3);
-            text-align: left;
-        }
-        .hero-text {
-            color: white !important;
-            margin: 0 !important;
-            font-size: 24px !important;
-            font-weight: 800 !important;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="hero-header"><p class="hero-text">PRECENTAGE DISTRIBUTION STOCK CONTROL</p></div>', unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format File :**
-        - Donwload Multiple Adjusment dan pastikan pilih **Termasuk yang sudah habis**
-        - Data yang dihasilkan adalah data dari total SKU bukan total QTY jadi yang dihitung adalah unique SKU nya
-        - Presentase minimal untuk **GL4 ➡️ GL3 adalah 100%**
-        - Presentase minimal untuk **ALL DC ➡️ Store adalah 98%** 
-        """)
-    conn = init_db()
-    uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
-
-    if uploaded_file:
-        try:
-            df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-            df.columns = [str(c).strip() for c in df.columns]
-            df.to_sql('stock_raw', conn, index=False, if_exists='replace')
-            st.success("Data Berhasil Diperbarui!")
-        except Exception as e:
-            st.error(f"Gagal upload: {e}")
-
-    # --- 2. LOGIKA ANALISIS (REVISED: STOK VS STOK COMPARISON) ---
-    try:
-        df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_raw'", conn)
-        if df_check.empty:
-            st.info("Upload data dulu buat narik metriks.")
-            return
-
-        # Ambil kolom secara dinamis
-        cols = pd.read_sql("SELECT * FROM stock_raw LIMIT 1", conn).columns
-        col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
-        col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
-        col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
-        col_desc_e = cols[4] # Kolom E untuk Deskripsi
-
-        # --- GLOBAL EXCLUSION FILTER SURABAYA BRANCH ---
-        base_excl = f"""
-            UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
-            UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
-            UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
-            UPPER("{col_bin}") NOT LIKE '%STAGING%' AND UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
-            UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND UPPER("{col_bin}") NOT LIKE '%OUT%' AND
-            UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%AMP%'
-        """
-
-        # --- DEFINISI AREA FILTER ---
-        # Target GL3: Kecualikan PUTAWAY & RAK
-        f_target_gl3 = f"UPPER(\"{col_bin}\") LIKE '%GL3%' AND UPPER(\"{col_bin}\") NOT LIKE '%PUTAWAY%' AND UPPER(\"{col_bin}\") NOT LIKE '%RAK%'"
-        
-        # Source GL4: Area asal stok
-        f_source_gl4 = f"""
-            UPPER("{col_bin}") LIKE '%GL4%' 
-            AND UPPER("{col_bin}") NOT LIKE '%REJECT%' AND UPPER("{col_bin}") NOT LIKE '%DEFECT%' 
-            AND UPPER("{col_bin}") NOT LIKE '%LIVE%' AND UPPER("{col_bin}") NOT LIKE '%ONLINE%' 
-            AND UPPER("{col_bin}") NOT LIKE '%RAK%'
-        """
-
-        # Target Store: TOKO, STORE, GUDANG LT.2
-        f_target_store = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%GL2-STORE%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
-        
-        # Source DC: Area pusat
-        f_source_dc = f"UPPER(\"{col_bin}\") LIKE '%DC%' AND {base_excl}"
-
-        # --- 1. LOGIKA MISSING (STOK SOURCE > 0 DAN STOK TARGET <= 0) ---
-        
-        # GL4 to GL3 Tetap (Sesuai Excel 52 SKU)
-        q_logic_gl_missing = f"""
-            SELECT "{col_sku}" FROM stock_raw 
-            WHERE {base_excl}
-            GROUP BY "{col_sku}"
-            HAVING SUM(CASE WHEN {f_source_gl4} THEN "{col_qty}" ELSE 0 END) > 0
-               AND SUM(CASE WHEN {f_target_gl3} THEN "{col_qty}" ELSE 0 END) <= 0
-        """
-
-        # DC to Store (TAMBAHAN FILTER: STOK DC WAJIB > 1)
-        q_logic_dc_missing = f"""
-            SELECT "{col_sku}" FROM stock_raw 
-            WHERE {base_excl}
-            GROUP BY "{col_sku}"
-            HAVING SUM(CASE WHEN {f_source_dc} THEN "{col_qty}" ELSE 0 END) > 1
-               AND SUM(CASE WHEN {f_target_store} THEN "{col_qty}" ELSE 0 END) <= 0
-        """
-
-        # --- 2. QUERY METRIKS ---
-        q_data = pd.read_sql(f"""
-            SELECT  
-                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_raw WHERE {base_excl} AND "{col_qty}" > 0) as Total_SKU_Clean,
-                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE {f_source_dc} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as DC_Clean_Total,
-                (SELECT COUNT(*) FROM ({q_logic_dc_missing})) as DC_Missing_Count,
-                (SELECT COUNT(*) FROM (SELECT "{col_sku}" FROM stock_raw WHERE {f_source_gl4} GROUP BY "{col_sku}" HAVING SUM("{col_qty}") > 0)) as GL4_Clean_Total,
-                (SELECT COUNT(*) FROM ({q_logic_gl_missing})) as GL_Missing_Count
-        """, conn).iloc[0]
-
-        # Kalkulasi Variabel Card
-        dc_total = int(q_data['DC_Clean_Total'])
-        dc_missing = int(q_data['DC_Missing_Count'])
-        gl4_total = int(q_data['GL4_Clean_Total'])
-        gl4_missing = int(q_data['GL_Missing_Count'])
-
-        # --- 3. TAMPILAN DASHBOARD ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK</h4></div>', unsafe_allow_html=True)
-        
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 Total SKU Aktif</p><p class="metric-value">{int(q_data["Total_SKU_Clean"]):,}</p><p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p></div>', unsafe_allow_html=True)
-        with c2:
-            dc_avail = dc_total - dc_missing
-            perc = (dc_avail / dc_total * 100) if dc_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Store</p><p class="metric-value">{dc_avail:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
-        with c3:
-            gl_avail = gl4_total - gl4_missing
-            perc = (gl_avail / gl4_total * 100) if gl4_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl_avail:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
-
-        cc1, cc2 = st.columns(2)
-        with cc1:
-            perc = (dc_missing / dc_total * 100) if dc_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ Not Yet Distributed DC to Store</p><p class="metric-value">{dc_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc:.1f}% Belum Terdistribusi</p></div>', unsafe_allow_html=True)
-        with cc2:
-            perc = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ Not Yet Refill GL4 to GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
-
-        st.divider()
-        st.markdown("### 📋 Detail List SKU Need Distributed")
-        t1, t2 = st.tabs(["DC ➔ Store", "GL4 ➔ GL3"])
-        
-        with t1:
-            # Mengambil deskripsi terbaru untuk SKU yang missing
-            df_dc = pd.read_sql(f"""
-                SELECT "{col_sku}" as SKU, MAX("{col_desc_e}") as Deskripsi 
-                FROM stock_raw 
-                WHERE "{col_sku}" IN ({q_logic_dc_missing}) 
-                GROUP BY "{col_sku}"
-            """, conn)
-            if not df_dc.empty:
-                st.dataframe(df_dc, use_container_width=True)
-            else:
-                st.info("✅ DC sinkron.")
-
-        with t2:
-            # Mengambil deskripsi terbaru untuk SKU yang missing
-            df_gl = pd.read_sql(f"""
-                SELECT "{col_sku}" as SKU, MAX("{col_desc_e}") as Deskripsi 
-                FROM stock_raw 
-                WHERE "{col_sku}" IN ({q_logic_gl_missing}) 
-                GROUP BY "{col_sku}"
-            """, conn)
-            if not df_gl.empty:
-                st.dataframe(df_gl, use_container_width=True)
-            else:
-                st.info("✅ GL4 to GL3 sinkron.")
-
-    except Exception as e:
-        st.error(f"Error pada sistem analisis: {e}")
-    finally:
-        conn.close()
-    
 with st.sidebar:
        st.markdown("""
-        <style>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         
@@ -4265,10 +2897,6 @@ def change_m2():
     st.session_state.main_menu = st.session_state.m2_key
 def change_m3():
     st.session_state.main_menu = st.session_state.m3_key
-def change_m4():
-    st.session_state.main_menu = st.session_state.m4_key
-def change_m5():
-    st.session_state.main_menu = st.session_state.m5_key
 
 with st.sidebar:
     # --- KELOMPOK 1: DASHBOARD SUMMARY ---
@@ -4277,35 +2905,26 @@ with st.sidebar:
     
     m1_list = ["Dashboard Overview", "Database Master"]
     idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
+    
     st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
 
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
     
-    m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
+    m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "FDR Update"]
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
+    
     st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
 
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out"]
+    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System"]
+    
+    # PERBAIKAN DI SINI: Gunakan m3_list dan idx3, jangan pakai m2_list lagi
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
+    
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
-
-    # --- KELOMPOK 4: REJECT/DEFECT ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">REJECT & DEFECT</p>', unsafe_allow_html=True)
-    
-    m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"]
-    idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else 0
-    st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=change_m4, label_visibility="collapsed")
-
-    # --- KELOMPOK 5: EXTRAS ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
-    
-    m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC"]
-    idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else 0
-    st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
 
     st.divider()
 
@@ -4338,13 +2957,6 @@ elif menu == "Putaway System":
         .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
         </style>
     """, unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **DATA SCAN PUTAWAY**: Kolom A = **BIN**, Kolom B = **SKU**, Kolom C = **QTY SCAN**
-        - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro (PASTIKAN AMBIL GL3-DC-PUTAWAY, STAGGING LT.3 DAN STAGGING INBOUND)
-        - **NOTE**: JANGAN LUPA UNTUK REPORT DAN CEK KETIKA ADA SELISIH PUTAWAY
-        """)
     
     c1, c2 = st.columns(2)
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
@@ -4364,11 +2976,7 @@ elif menu == "Putaway System":
                 
                 # --- RINGKASAN (PERBAIKAN: GUNAKAN QTY, BUKAN ROW!) ---
                 st.divider()
-                st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
-                </div>
-                """, unsafe_allow_html=True)
+                st.subheader("📊 RINGKASAN HASIL")
                 
                 # PERBAIKAN: GUNAKAN SUM QTY, BUKAN LEN
                 total_compare_qty = int(df_comp['QTY PUTAWAY'].sum()) if not df_comp.empty else 0
@@ -4434,7 +3042,7 @@ elif menu == "Scan Out Validation":
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **DATA SCAN**: Kolom A = **BIN**, Kolom B = **SKU** (QTY akan dihitung otomatis)
+        - **DATA SCAN**: Kolom A = BIN, Kolom B = SKU (QTY akan dihitung otomatis)
         - **HISTORY SET UP**: Sesuai yang ada pada template Mutasi Set Up Jezpro
         - **STOCK TRACKING**: Sesuai yang ada pada template Stock Tracking Jezpro
         """)
@@ -4476,11 +3084,7 @@ elif menu == "Scan Out Validation":
                 
                 # ========== STATISTIK DENGAN KOTAK CUSTOM ==========
                 st.divider()
-                st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
-                </div>
-                """, unsafe_allow_html=True)
+                st.subheader("📊 Ringkasan Hasil")
                 
                 total_items = len(df_res)
                 terjual_count = df_res['Keterangan'].str.contains('TERJUAL', case=False, na=False).sum()
@@ -4548,7 +3152,7 @@ elif menu == "Scan Out Validation":
                     return 'color: black'
                 
                 st.subheader("📋 DATA SCAN (COMPARED)")
-                styled_df = df_res.style.map(highlight_vba, subset=['Keterangan']).apply(
+                styled_df = df_res.style.applymap(highlight_vba, subset=['Keterangan']).apply(
                     lambda x: ['background-color: #ffcccc' if 'MISSMATCH' in str(x) or 'BELUM' in str(x) else '' for i in x],
                     subset=['Keterangan'], axis=1
                 )
@@ -4569,7 +3173,7 @@ elif menu == "Scan Out Validation":
                             return 'color: red'
                         return 'color: black'
                     
-                    styled_draft = df_draft.style.map(highlight_draft, subset=['NOTES'])
+                    styled_draft = df_draft.style.applymap(highlight_draft, subset=['NOTES'])
                     st.dataframe(styled_draft, use_container_width=True, height=300)
                 else:
                     st.info("ℹ️ Tidak ada data untuk DRAFT SET UP")
@@ -4622,6 +3226,7 @@ elif menu == "Scan Out Validation":
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
     
+    # --- TAMBAHKAN CSS AGAR KOTAK METRICS MUNCUL ---
     st.markdown("""
     <style>
     .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
@@ -4630,72 +3235,48 @@ elif menu == "Refill & Overstock":
     </style>
     """, unsafe_allow_html=True)
 
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **ALL DATA STOCK**: Pilih **HANYA ADA DI STOCK**
-        - **STOCK TRACKING (Opsional)**: Pilih **JEZ SURABAYA**, rentang 7 hari. 
-        """)
-
     c1, c2 = st.columns(2)
-    with c1: up_all = st.file_uploader("📥 Upload ALL DATA STOCK", type=['xlsx'])
-    with c2: up_track = st.file_uploader("📥 Upload STOCK TRACKING (Opsional)", type=['xlsx'])
+    with c1: up_all = st.file_uploader("📥Upload ALL DATA STOCK", type=['xlsx'])
+    with c2: up_track = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'])
     
-    # PERBAIKAN: Hanya ALL DATA yang wajib untuk memunculkan tombol
-    if up_all:
+    if up_all and up_track:
         if st.button("▶️ PROSES REFILL & OVERSTOCK"):
             try:
                 with st.spinner("Processing..."):
-                    # Load file wajib
+                    # --- PERBAIKAN: Ganti engine ke openpyxl ---
                     df_all = pd.read_excel(up_all, engine='openpyxl')
+                    df_track = pd.read_excel(up_track, engine='openpyxl')
                     
-                    # PERBAIKAN: Load file opsional (jika ada)
-                    df_track = None
-                    if up_track:
-                        df_track = pd.read_excel(up_track, engine='openpyxl')
-                    else:
-                        st.warning("⚠️ Berjalan tanpa Stock Tracking. Kalkulasi Overstock mungkin tidak maksimal.")
-                    
-                    # Panggil fungsi yang sudah kita perbaiki tadi
+                    # --- PERBAIKAN: PANGGIL FUNGSI ---
+                    # Pastikan lo punya fungsi process_refill_overstock di file lo!
                     res_gl3, res_gl4, res_refill, res_over = process_refill_overstock(df_all, df_track)
                     
                     st.success("Data Berhasil di Filter!")
                     
                     # Tampilan Metrics
                     m1, m2, m3 = st.columns(3)
-                    # Gunakan len() dengan proteksi jika dataframe kosong
-                    count_refill = len(res_refill) if not res_refill.empty else 0
-                    count_over = len(res_over) if not res_over.empty else 0
-                    count_total = (len(res_gl3) if not res_gl3.empty else 0) + (len(res_gl4) if not res_gl4.empty else 0)
-
-                    m1.markdown(f'<div class="m-box"><span class="m-lbl">REFILL ITEMS</span><span class="m-val">{count_refill}</span></div>', unsafe_allow_html=True)
-                    m2.markdown(f'<div class="m-box"><span class="m-lbl">OVERSTOCK ITEMS</span><span class="m-val">{count_over}</span></div>', unsafe_allow_html=True)
-                    m3.markdown(f'<div class="m-box"><span class="m-lbl">TOTAL GL3/GL4</span><span class="m-val">{count_total}</span></div>', unsafe_allow_html=True)
+                    m1.markdown(f'<div class="m-box"><span class="m-lbl">REFILL ITEMS</span><span class="m-val">{len(res_refill)}</span></div>', unsafe_allow_html=True)
+                    m2.markdown(f'<div class="m-box"><span class="m-lbl">OVERSTOCK ITEMS</span><span class="m-val">{len(res_over)}</span></div>', unsafe_allow_html=True)
+                    m3.markdown(f'<div class="m-box"><span class="m-lbl">GL3/GL4 ROWS</span><span class="m-val">{len(res_gl3)+len(res_gl4)}</span></div>', unsafe_allow_html=True)
                     
-                    # Tabs
+                    # Tabs dan Data
                     t1, t2, t3, t4 = st.tabs(["📦 REFILL", "⚠️ OVERSTOCK", "📑 GL3 DATA", "📑 GL4 DATA"])
                     with t1: st.dataframe(res_refill, use_container_width=True)
                     with t2: st.dataframe(res_over, use_container_width=True)
                     with t3: st.dataframe(res_gl3, use_container_width=True)
                     with t4: st.dataframe(res_gl4, use_container_width=True)
                     
-                    # Download Report
+                    # Download
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                         res_refill.to_excel(writer, sheet_name='REFILL', index=False)
                         res_over.to_excel(writer, sheet_name='OVERSTOCK', index=False)
                         res_gl3.to_excel(writer, sheet_name='GL3', index=False)
                         res_gl4.to_excel(writer, sheet_name='GL4', index=False)
-                    
-                    st.download_button(
-                        label="📥 DOWNLOAD REPORT",
-                        data=output.getvalue(),
-                        file_name=f"REFILL_REPORT_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                    st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REFILL_OVERSTOCK_REPORT.xlsx")
                     
             except Exception as e: 
-                st.error(f"Terjadi kesalahan saat memproses data: {e}")
+                st.error(f"Error: {e}")
 elif menu == "Database Master":
     # Link Google Sheets lo yang sudah dikunci
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
@@ -4746,6 +3327,7 @@ elif menu == "Database Master":
 elif menu == "Stock Minus":
     st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     
+    # CSS UNTUK BOX CUSTOM (Tampilan sesuai gambar Anda)
     st.markdown("""
         <style>
         .m-box {
@@ -4761,13 +3343,14 @@ elif menu == "Stock Minus":
         </style>
     """, unsafe_allow_html=True)
 
-    uploaded_file = st.file_uploader("Upload File ALL DATA STOCK", type=["xlsx", "xlsm"])
+    uploaded_file = st.file_uploader("Upload File dari Jezpro", type=["xlsx", "xlsm"])
     
     if uploaded_file:
         try:
             df = pd.read_excel(uploaded_file, engine="openpyxl")
             df.columns = [str(c).strip().upper() for c in df.columns]
             
+            # Identifikasi Kolom Utama
             col_sku = 'SKU'
             col_bin = 'BIN'
             col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
@@ -4775,120 +3358,85 @@ elif menu == "Stock Minus":
             if col_qty is None:
                 st.error("❌ Kolom 'QTY SYSTEM' tidak ditemukan!")
             else:
-                # TOMBOL PROSES
                 if st.button("🔃 PROSES DATA"):
                     with st.spinner('Memproses...'):
-                        # 1. Persiapan Data
+                        # 1. DATA MINUS AWAL
                         df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
-                        df[col_sku] = df[col_sku].astype(str).str.strip().str.upper()
-                        df[col_bin] = df[col_bin].astype(str).str.strip().str.upper()
-
                         df_minus_awal = df[df[col_qty] < 0].copy()
-                        df_positif = df[df[col_qty] > 0]
                         
-                        inventory = {}
-                        for _, row in df_positif.iterrows():
-                            sku, bn, qt = row[col_sku], row[col_bin], row[col_qty]
-                            if sku not in inventory: inventory[sku] = {}
-                            inventory[sku][bn] = inventory[sku].get(bn, 0) + qt
+                        # [LOGIKA PROSES MUTASI DIMULAI]
+                        qty_arr = df[col_qty].values.copy()
+                        sku_arr = df[col_sku].astype(str).values
+                        bin_arr = df[col_bin].astype(str).values
+                        
+                        # (Logika mapping dan prior_bins tetap di sini)
+                        # ... proses pencarian stock ...
+                        
+                        # [LOGIKA PROSES MUTASI SELESAI]
+                        set_up_results = [] # Anggap ini list hasil proses mutasi Anda
+                        df_final = df.copy()
+                        df_final[col_qty] = qty_arr
+                        df_need_adj = df_final[df_final[col_qty] < 0].copy()
+                        
+                        # --- TAMPILAN BOX CUSTOM ---
+                        st.divider()
+                        st.subheader("📊 RINGKASAN HASIL PROSES")
+                        
+                        val_total_minus = len(df_minus_awal)
+                        val_mutasi = int(sum([x['QUANTITY'] for x in set_up_results])) if set_up_results else 0
+                        val_need_adj = len(df_need_adj)
 
-                        prior_bins = ["RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC",
-                                      "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3",
-                                      "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"]
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">Total Stock Minus</span><span class="m-val">{val_total_minus}</span></div>', unsafe_allow_html=True)
+                        with col2:
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">Mutasi Stock Minus</span><span class="m-val">{val_mutasi}</span></div>', unsafe_allow_html=True)
+                        with col3:
+                            st.markdown(f'<div class="m-box"><span class="m-lbl">Need Justification</span><span class="m-val">{val_need_adj}</span></div>', unsafe_allow_html=True)
 
-                        set_up_results = []
-                        df_need_adj_list = []
+                        # --- TAMPILAN TAB DENGAN KETERANGAN KOSONG ---
+                        tab1, tab2, tab3 = st.tabs(["📄 MINUS AWAL", "🔄 DETAIL MUTASI", "⚠️ JUSTIFIKASI"])
+                        
+                        with tab1:
+                            if not df_minus_awal.empty:
+                                st.dataframe(df_minus_awal, use_container_width=True)
+                            else:
+                                st.info("ℹ️ Tidak ada data stock minus dalam file ini.")
+                                
+                        with tab2:
+                            if set_up_results:
+                                st.dataframe(pd.DataFrame(set_up_results), use_container_width=True)
+                            else:
+                                st.warning("⚠️ Tidak ditemukan stock pendukung. Tidak ada mutasi yang dilakukan.")
+                                
+                        with tab3:
+                            if not df_need_adj.empty:
+                                st.dataframe(df_need_adj, use_container_width=True)
+                            else:
+                                st.success("✅ Semua stock minus berhasil ditutup! Tidak ada item butuh justifikasi.")
 
-                        # 2. Proses Alokasi & Sisa
-                        for _, row in df_minus_awal.iterrows():
-                            sku = row[col_sku]
-                            bin_asal = row[col_bin]
-                            sisa_minus = abs(row[col_qty])
-                            
-                            if sku in inventory and any(v > 0 for v in inventory[sku].values()):
-                                sku_stock = inventory[sku]
-                                while sisa_minus > 0:
-                                    bin_solusi = ""
-                                    if bin_asal == "TOKO":
-                                        if sku_stock.get("STAGGING LT.2", 0) > 0: bin_solusi = "STAGGING LT.2"
-                                        elif sku_stock.get("LT.2", 0) > 0: bin_solusi = "LT.2"
-                                    elif bin_asal in ["STAGGING LT.2", "LT.2"] and sku_stock.get("TOKO", 0) > 0:
-                                        bin_solusi = "TOKO"
-
-                                    if not bin_solusi:
-                                        for b in prior_bins:
-                                            if sku_stock.get(b, 0) > 0: bin_solusi = b; break
-                                    
-                                    if not bin_solusi:
-                                        for b, q in sku_stock.items():
-                                            if b != "REJECT DEFECT" and q > 0: bin_solusi = b; break
-
-                                    if not bin_solusi: break
-                                    else:
-                                        qty_tersedia = sku_stock[bin_solusi]
-                                        ambil = min(sisa_minus, qty_tersedia)
-                                        set_up_results.append({
-                                            "BIN AWAL": bin_solusi, "BIN TUJUAN": bin_asal,
-                                            "SKU": sku, "QUANTITY": ambil, "NOTES": "STOCK MINUS"
-                                        })
-                                        sku_stock[bin_solusi] -= ambil
-                                        sisa_minus -= ambil
-
-                            if sisa_minus > 0:
-                                row_adj = row.to_dict()
-                                row_adj[col_qty] = -sisa_minus 
-                                df_need_adj_list.append(row_adj)
-
-                        # --- SIMPAN KE SESSION STATE AGAR TIDAK HILANG ---
-                        st.session_state['df_minus_awal'] = df_minus_awal
-                        st.session_state['df_set_up'] = pd.DataFrame(set_up_results)
-                        st.session_state['df_need_adj'] = pd.DataFrame(df_need_adj_list)
-                        st.session_state['proses_selesai'] = True
-
-                # Tampilkan hasil JIKA sudah pernah diproses
-                if st.session_state.get('proses_selesai'):
-                    df_m = st.session_state['df_minus_awal']
-                    df_s = st.session_state['df_set_up']
-                    df_n = st.session_state['df_need_adj']
-
-                    # Perbaikan Kolom K di Justifikasi
-                    if not df_n.empty and len(df_n.columns) >= 11:
-                        df_n[df_n.columns[10]] = 0
-
-                    # Dashboard Metrics
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown(f'<div class="m-box"><span class="m-lbl">Total Minus</span><span class="m-val">{len(df_m)}</span></div>', unsafe_allow_html=True)
-                    c2.markdown(f'<div class="m-box"><span class="m-lbl">Tercover</span><span class="m-val">{int(df_s["QUANTITY"].sum()) if not df_s.empty else 0}</span></div>', unsafe_allow_html=True)
-                    c3.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Adj</span><span class="m-val">{len(df_n)}</span></div>', unsafe_allow_html=True)
-
-                    t1, t2, t3 = st.tabs(["📄 MINUS AWAL", "🔄 TEMPLATE SET UP", "⚠️ JUSTIFIKASI"])
-                    with t1: st.dataframe(df_m, use_container_width=True)
-                    with t2: st.dataframe(df_s, use_container_width=True)
-                    with t3: st.dataframe(df_n, use_container_width=True)
-
-                    # Persiapan File Download
-                    output = io.BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df_m.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
-                        df_s.to_excel(writer, sheet_name='SET_UP', index=False)
-                        if not df_n.empty: df_n.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
-                    
-                    st.download_button("📥 DOWNLOAD HASIL", output.getvalue(), "HASIL_STOCK_MINUS.xlsx")
+                        # --- DOWNLOAD DENGAN SHEET KETERANGAN ---
+                        output = io.BytesIO()
+                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                            if not df_minus_awal.empty:
+                                df_minus_awal.to_excel(writer, sheet_name='MINUS_AWAL', index=False)
+                            if set_up_results:
+                                pd.DataFrame(set_up_results).to_excel(writer, sheet_name='SET_UP', index=False)
+                            if not df_need_adj.empty:
+                                df_need_adj.to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
+                            else:
+                                pd.DataFrame({"INFO": ["DATA BERSIH - TIDAK ADA MINUS"]}).to_excel(writer, sheet_name='JUSTIFIKASI', index=False)
+                        
+                        st.download_button("📥 DOWNLOAD HASIL", output.getvalue(), "HASIL_STOCK_MINUS.xlsx")
 
         except Exception as e:
-            st.error(f"Gagal: {e}")
+            st.error(f"Gagal memproses file: {e}")
+
 
 if menu == "Compare RTO":
-    st.markdown('<div class="hero-header"><h1>RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>📦 RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
     st.markdown("""<style>.m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }.m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }.m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }</style>""", unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **DS RTO**: Diisi dengan Kolom A = **SKU** , Kolom B = **QTY SCAN**
-        - **APPSHEET RTO**: Download Spreadsheets Rekap Appsheet sesuai dengan sheet dari RTO yang akan dituju
-        - **UPLOAD HASIL CEK REAL**: Upload hasil rekonsiliasi RTO yang sudah di download dan diisi sesuai real yang ditemukan
-        - **DRAFT RTO**: Download Draft RTO yang sudah di buatkan purchasing di awal
-        """)
+    
     if 'rto_df_ds' not in st.session_state: st.session_state.rto_df_ds = None
     if 'rto_df_selisih' not in st.session_state: st.session_state.rto_df_selisih = None
     if 'rto_df_app' not in st.session_state: st.session_state.rto_df_app = None
@@ -4910,86 +3458,25 @@ if menu == "Compare RTO":
     
     if st.session_state.rto_df_selisih is not None:
         st.divider()
-        st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL DATA SCAN VS APPSHEET</h3>
-                </div>
-                """, unsafe_allow_html=True)
+        st.subheader("📊 Hasil Compare DS & Appsheet")
+        df_ds = st.session_state.rto_df_ds
+        scan_col = df_ds.columns[1]
         
-        # Ambil data lengkap
-        df_full = st.session_state.rto_df_ds
-        scan_col = df_full.columns[1]
+        q_total = int(pd.to_numeric(df_ds[scan_col], errors='coerce').sum())
+        q_sesuai = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
+        q_lebih = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KELEBIHAN AMBIL'][scan_col], errors='coerce').sum())
+        q_kurang = int(pd.to_numeric(df_ds[df_ds['NOTE'] == 'KURANG AMBIL'][scan_col], errors='coerce').sum())
         
-# --- PERHITUNGAN METRIK (WAJIB PAKAI DATA DETAIL BIN AGAR KUMULATIF) ---
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
+        with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
+        with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
+        with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
         
-        # 1. Gunakan data selisih yang sudah dipecah per BIN oleh engine
-        df_detail = st.session_state.rto_df_selisih 
-        
-        # 2. Pastikan numerik agar bisa dijumlahkan
-        v_scan = pd.to_numeric(df_detail['QTY SCAN'], errors='coerce').fillna(0)
-        v_ambil = pd.to_numeric(df_detail['QTY AMBIL BIN'], errors='coerce').fillna(0) # Pakai QTY AMBIL BIN
-        v_notes = df_detail['NOTE'].astype(str).str.strip().str.upper()
+        st.dataframe(st.session_state.rto_df_selisih, use_container_width=True, hide_index=True)
+        st.download_button("📥 Download Sheet Selisih", st.session_state.rto_df_selisih.to_csv(index=False).encode('utf-8'), "SELISIH_RTO.csv", "text/csv", use_container_width=True)
 
-        # 3. Metrik Utama (Tetap pakai df_full untuk total scan gudang)
-        q_total = int(pd.to_numeric(df_full[scan_col], errors='coerce').sum())
-        q_sesuai = int(pd.to_numeric(df_full[df_full['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
-        
-        # 4. QTY KELEBIHAN (Hajar semua baris yang muncul di Tabel Selisih)
-        # Jika satu SKU pecah jadi 3 BIN dan masing-masing selisih, bakal dijumlah semua di sini
-        mask_l = v_notes == 'KELEBIHAN AMBIL'
-        # Logika: Di baris detail, kita hitung selisih per barisnya
-        # Jika QTY SCAN (Total) vs QTY AMBIL BIN (Eceran), 
-        # kita hitung akumulasi selisih yang muncul di tampilan
-        q_lebih = int((v_scan[mask_l] - df_detail.loc[mask_l, 'QTY AMBIL']).sum()) 
-        
-        # 5. QTY KURANG (Kumulatif semua baris selisih di tabel)
-        mask_k = v_notes == 'KURANG AMBIL'
-        mask_m = v_notes == 'DI APPSHEET DIAMBIL DI DS TIDAK ADA'
-        
-        # Hitung selisih dari semua baris yang muncul di tab 2
-        selisih_k = (df_detail.loc[mask_k, 'QTY AMBIL'] - v_scan[mask_k]).sum()
-        total_m = v_ambil[mask_m].sum()
-        
-        q_kurang = int(selisih_k + total_m)
-
-        # Buat Tab
-        tab1, tab2 = st.tabs(["📝 Summary Compare", "⚠️ Item Selisih"])
-
-        with tab1:
-            # Matrix Box
-            mc1, mc2, mc3, mc4 = st.columns(4)
-            with mc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{q_total}</span></div>', unsafe_allow_html=True)
-            with mc2: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sesuai</span><span class="m-val">{q_sesuai}</span></div>', unsafe_allow_html=True)
-            with mc3: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kelebihan</span><span class="m-val">{q_lebih}</span></div>', unsafe_allow_html=True)
-            with mc4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Kurang</span><span class="m-val">{q_kurang}</span></div>', unsafe_allow_html=True)
-            
-            st.write("### 📋 All Data Comparison")
-            # Menampilkan SEMUA data tanpa filter
-            st.dataframe(df_full, use_container_width=True, hide_index=True)
-            st.download_button("📥 Download All Data", df_full.to_csv(index=False).encode('utf-8'), "ALL_DATA_RTO.csv", "text/csv", key="dl_all", use_container_width=True)
-
-        with tab2:
-            st.write("### 🚨 Daftar Item Selisih")
-            
-            # --- PERBAIKAN DI SINI ---
-            # Kita gunakan rto_df_selisih karena variabel ini yang menyimpan detail BIN
-            df_selisih_detail = st.session_state.rto_df_selisih
-            
-            if not df_selisih_detail.empty:
-                # Menampilkan dataframe dengan kolom detail BIN sesuai request
-                st.dataframe(df_selisih_detail, use_container_width=True, hide_index=True)
-                
-                # Tombol download juga menggunakan data detail
-                st.download_button(
-                    "📥 Download Item Selisih (Detail BIN)", 
-                    df_selisih_detail.to_csv(index=False).encode('utf-8'), 
-                    "DETAIL_SELISIH_RTO.csv", 
-                    "text/csv", 
-                    key="dl_selisih_detail", 
-                    use_container_width=True
-                )
-            else:
-                st.success("✨ Aman! Tidak ada item yang selisih.")
+    st.divider()
     st.subheader("🔄 REFRESH DATA (SETELAH CEK REAL)")
     f_cek = st.file_uploader("Upload Hasil Cek Real", type=['xlsx','csv'], key="rto_cek")
     if f_cek and st.session_state.rto_df_app is not None:
@@ -5000,12 +3487,7 @@ if menu == "Compare RTO":
             st.success("✅ Refreshed!")
 
     st.divider()
-    st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL APPSHEET VS DRAFT</h3>
-                </div>
-                """, unsafe_allow_html=True)
-    
+    st.subheader("📝 COMPARE DRAFT JEZPRO")
     f_draft = st.file_uploader("Upload Draft Jezpro", type=['xlsx','csv'], key="rto_draft_jezpro")
     if f_draft and st.session_state.rto_df_app is not None:
         if st.button("🔍 COMPARE DRAFT JEZPRO", use_container_width=True):
@@ -5015,27 +3497,12 @@ if menu == "Compare RTO":
 
     if st.session_state.rto_draft_compared is not None:
         st.divider()
-        st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋FINAL RESULT</h3>
-                </div>
-                """, unsafe_allow_html=True)
+        st.subheader("📊 DASHBOARD DRAFT (QTY AMBIL)")
         df_comp = st.session_state.rto_draft_compared
-        # Pastikan kolom sudah numerik dulu biar gak error saat dijumlah
-        qty_ambil = pd.to_numeric(df_comp['QTY AMBIL'], errors='coerce').fillna(0)
-        qty_lain = pd.to_numeric(df_comp['QTY BIN LAIN'], errors='coerce').fillna(0)
-
-        # 1. QTY DRAFT TOTAL (Menjumlahkan semua qty ambil dan qty bin lain)
-        q_draft_total = int((qty_ambil + qty_lain).sum())
-
-        # 2. QTY OK (Hanya yang statusnya 'OK', menjumlahkan qty ambil + qty bin lain)
-        mask_ok = (df_comp['STATUS'] == 'OK')
-        q_ok = int((qty_ambil[mask_ok] + qty_lain[mask_ok]).sum())
-
-        # 3. QTY PERLU EDIT (Yang statusnya mengandung kata 'EDIT', menjumlahkan qty ambil + qty bin lain)
-        mask_edit = df_comp['STATUS'].str.contains('EDIT', na=False)
-        q_edit = int((qty_ambil[mask_edit] + qty_lain[mask_edit]).sum())
-        q_del = int(pd.to_numeric(df_comp[df_comp['STATUS'] == 'DELETE ITEM']['Qty Transfer'], errors='coerce').sum())
+        q_draft_total = int(pd.to_numeric(df_comp['QTY AMBIL'], errors='coerce').sum())
+        q_ok = int(pd.to_numeric(df_comp[df_comp['STATUS'] == 'OK']['QTY AMBIL'], errors='coerce').sum())
+        q_edit = int(pd.to_numeric(df_comp[df_comp['STATUS'].str.contains('EDIT', na=False)]['QTY AMBIL'], errors='coerce').sum())
+        q_del = int(pd.to_numeric(df_comp[df_comp['STATUS'] == 'DELETE ITEM']['QTY AMBIL'], errors='coerce').sum())
         
         dc1, dc2, dc3, dc4 = st.columns(4)
         with dc1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Ambil</span><span class="m-val">{q_draft_total}</span></div>', unsafe_allow_html=True)
@@ -5070,7 +3537,7 @@ if menu == "Compare RTO":
 # =========================================================
 elif menu == "FDR Update":
     # --- CSS & HEADER ---
-    st.markdown('<div class="hero-header"><h1>FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>🚚 FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
     
     st.markdown("""
         <style>
@@ -5079,11 +3546,7 @@ elif menu == "FDR Update":
         .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
         </style>
     """, unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **FILE MANIFEST**: Download Manifest dari jezpro pada menu **TRANSAKSI ONLINE V2**, pilih Cabang **ONLINE SURABAYA**, pilih Status Jezpro **DONE ONLINE**, dan rentang waktunya pilih **30 HARI TERAKHIR**
-        """)
+    
     # --- INIT STATE ---
     if "ws_manifest_fdr" not in st.session_state: st.session_state.ws_manifest_fdr = None
     if "ws_fu_it_fdr" not in st.session_state: st.session_state.ws_fu_it_fdr = None
@@ -5095,13 +3558,13 @@ elif menu == "FDR Update":
     u_file = st.file_uploader("📂 Upload File Manifest", type=["xlsx"], key="fdr_upload_fix")
 
     # --- TOMBOL RUN UTAMA ---
+    # Hanya aktif jika ada file dan tombol ditekan
     if u_file:
         if st.button("▶️PROCESS DATA", type="primary", use_container_width=True):
             try:
                 with st.spinner("🔄 Processing..."):
                     # 1. Load & Clear Columns
                     df_raw = pd.read_excel(u_file)
-                    # Kolom yang mau dibuang (Index 6, 7, 8, dst)
                     cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
                     existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
                     df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
@@ -5115,37 +3578,26 @@ elif menu == "FDR Update":
                     else:
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
 
-                    # 3. Split Warehouse Logic (Normalisasi UPPERCASE agar Surabaya & surabaya Gabung)
+                    # 3. Split Kurir Logic (Kolom F Index 5 ada, Kolom M Index 12 kosong)
                     if len(df_clean.columns) > 12:
-                        # Ambil data Kolom L (Warehouse) dan M
-                        l_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
+                        f_val = df_clean.iloc[:, 5].astype(str).str.strip().replace(['nan', 'None'], '')
                         m_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
-                        
-                        # Filter: L tidak kosong, M kosong
-                        mask_out = (l_val != "") & (m_val == "")
+                        mask_out = (f_val != "") & (m_val == "")
                         filtered_out = df_clean[mask_out].copy()
                         
                         if not filtered_out.empty:
-                            # --- INI KUNCINYA: Paksa kolom L jadi Huruf Besar Semua ---
-                            filtered_out.iloc[:, 11] = filtered_out.iloc[:, 11].astype(str).str.upper().str.strip()
-                            
-                            # Grouping berdasarkan Kolom L yang sudah "Bersih"
-                            st.session_state.dict_kurir_fdr = {
-                                str(n): g.iloc[:, 0:13] 
-                                for n, g in filtered_out.groupby(filtered_out.iloc[:, 11])
-                            }
+                            st.session_state.dict_kurir_fdr = {str(n): g.iloc[:, 0:13] for n, g in filtered_out.groupby(filtered_out.iloc[:, 5])}
                         else:
                             st.session_state.dict_kurir_fdr = {}
                     
-                    # 4. Metrics Update
+                    # 4. Metrics
                     st.session_state.metrics_data = {
                         'total': len(st.session_state.ws_manifest_fdr),
                         'fu': len(st.session_state.ws_fu_it_fdr) if st.session_state.ws_fu_it_fdr is not None else 0,
                         'kurir': len(st.session_state.dict_kurir_fdr)
                     }
                     
-                    st.rerun()
-
+                st.rerun()
             except Exception as e:
                 st.error(f"❌ Error saat proses: {e}")
 
@@ -5153,16 +3605,11 @@ elif menu == "FDR Update":
     if st.session_state.ws_manifest_fdr is not None:
         m = st.session_state.metrics_data
         
-        # --- LOGIKA SISA DATA (MANIFEST - FU IT) ---
-        total_val = m.get('total', 0)
-        fu_val = m.get('fu', 0)
-        sisa_data = total_val - fu_val # Ini yang lo mau, Bos
-        
         st.markdown(f"""
         <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
-            <div class="m-box" style="flex:1"><span class="m-lbl">TOTAL MANIFEST</span><span class="m-val">{total_val}</span></div>
-            <div class="m-box" style="flex:1"><span class="m-lbl">FU IT</span><span class="m-val" style="color:#FFA500">{fu_val}</span></div>
-            <div class="m-box" style="flex:1"><span class="m-lbl">NEED CHECK BRANCH</span><span class="m-val" style="color:#FF4B4B">{sisa_data}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">TOTAL MANIFEST</span><span class="m-val">{m.get('total', 0)}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">FU IT</span><span class="m-val" style="color:#FFA500">{m.get('fu', 0)}</span></div>
+            <div class="m-box" style="flex:1"><span class="m-lbl">KURIR</span><span class="m-val" style="color:#FF4B4B">{m.get('kurir', 0)}</span></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -5171,7 +3618,7 @@ elif menu == "FDR Update":
             st.session_state.dict_kurir_fdr = {}
             st.rerun()
 
-        t1, t2, t3 = st.tabs(["📥 MANIFEST", "📋 FU IT", "🏭 BRANCH"])
+        t1, t2, t3 = st.tabs(["📥 MANIFEST", "📋 FU IT", "🛵 KURIR"])
 
         with t1:
             st.dataframe(st.session_state.ws_manifest_fdr, use_container_width=True, hide_index=True)
@@ -5186,61 +3633,19 @@ elif menu == "FDR Update":
                 opt = st.selectbox("Pilih Kurir", list(st.session_state.dict_kurir_fdr.keys()))
                 
                 # Download All Excel
-                # --- DOWNLOAD ALL EXCEL (FIX DUPLICATE SHEET NAMES) ---
                 import io
                 buff = io.BytesIO()
                 with pd.ExcelWriter(buff, engine='xlsxwriter') as w:
-                    used_names = set() # Buat nyatet nama sheet yang udah dipake
-                    for n, d in st.session_state.dict_kurir_fdr.items():
-                        # 1. Bersihin nama: max 31 karakter & hapus karakter terlarang [ ] : * ? / \
-                        sheet_name = str(n)[:31].strip()
-                        for char in "[]:*?/\ ": sheet_name = sheet_name.replace(char, "_")
-                        
-                        # 2. Logic Anti-Duplikat
-                        original_name = sheet_name
-                        counter = 1
-                        while sheet_name.lower() in used_names:
-                            suffix = f"_{counter}"
-                            sheet_name = f"{original_name[:31-len(suffix)]}{suffix}"
-                            counter += 1
-                        
-                        used_names.add(sheet_name.lower())
-                        d.to_excel(w, sheet_name=sheet_name, index=False)
-                
-                st.download_button("📊 Download All Excel", buff.getvalue(), "All_Warehouse.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    for n, d in st.session_state.dict_kurir_fdr.items(): d.to_excel(w, sheet_name=str(n)[:31], index=False)
+                st.download_button("📊 Download All Excel", buff.getvalue(), "All.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 
                 # Download Selected
                 if opt:
                     st.download_button(f"📥 {opt}", st.session_state.dict_kurir_fdr[opt].to_csv(index=False).encode('utf-8'), f"{opt}.csv", "text/csv")
                     st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
 elif menu == "Justification SO":
-    st.markdown('<div class="hero-header"><h1>JUSTIFICATION ADJUSTMENT</h1></div>', unsafe_allow_html=True)
-    
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **ADJUSTMENT FILE**: Gabungkan antara Adjustment **(Plus)** dan **(Minus)** dalam 1 File dan **QTY SO** yang telah terisi dengan qty yang akan diadjustment.
-        - **SUMMARY STOCK**: Download **SUMMARY STOCK** dari **POWER BI** (Store: **JEZ SURABAYA**).
-        - **PURCHASE ORDER**: Download **PURCHASE ORDER** dari **POWER BI**, Period Invoice & Receive IN: **ALL TIME** (Store: **JEZ SURABAYA**).
-        """)
+    st.markdown('<div class="hero-header"><h1>JUTIFICATION ADJUSMENT</h1></div>', unsafe_allow_html=True)
 
-    with st.expander("💡 Justification Logic Information"):
-        st.info("""
-        **Logic Justifikasi:**
-        - **Kesalahan Adjustment**
-            - **Kondisi 1:** Jika **QTY System > QTY SO (ADJ -)**, namun **Gap Adjustment bernilai (+)**.
-            - **Kondisi 2:** Jika **QTY System < QTY SO (ADJ +)**, namun **Gap Adjustment bernilai (-)**.
-        - **Perlu Cek Cross Order**
-            - Jika Total Sales > (Total PO IN + Total TF IN).
-        - **Cek Ulang Hasil Rekon**
-            - Jika **Real QTY** [(PO IN + TF IN) - (SALES + TF OUT + DRAFT TF)] hasilnya sama dengan (=) **Current Stock**.
-        - **Indikasi Bug Sistem**
-            - **Kondisi 1:** Jika (Real QTY = 0 AND Gap Adjustment = 0) tapi **Current Stock ≠ 0**.
-            - **Kondisi 2:** Jika QTY System > QTY SO AND Current Stock > Real QTY.
-            - **Kondisi 3:** Jika QTY System < QTY SO AND Current Stock < Real QTY (L2 & T2 ≠ 0).
-        - **UNDEFINED**
-            - **Kondisi dimana ke-4 Logic diatas tidak ada yang sesuai sehingga memerlukan analisa detail secara manual untuk cek justifikasinya.**
-        """)
     # 1. Inisialisasi Session State biar data nggak hilang pas diklik
     if 'result_so' not in st.session_state:
         st.session_state.result_so = None
@@ -5248,15 +3653,15 @@ elif menu == "Justification SO":
     # UI Uploader - Dibagi 3 Kolom
     col1, col2, col3 = st.columns(3)
     with col1: 
-        up_case = st.file_uploader("Upload FILE ADJUSMENT", type=['xlsx'], key="up_case_so")
+        up_case = st.file_uploader("Upload Adjusment File", type=['xlsx'], key="up_case_so")
     with col2: 
-        up_tracking = st.file_uploader("Upload SUMMARY STOCK", type=['xlsx'], key="up_track_so")
+        up_tracking = st.file_uploader("Upload Tracking Stock", type=['xlsx'], key="up_track_so")
     with col3: 
-        up_others = st.file_uploader("Upload PURCHASE ORDER", type=['xlsx'], key="up_po_so")
+        up_others = st.file_uploader("Upload Total PO", type=['xlsx'], key="up_po_so")
 
     # 2. Logika Tombol Run
     if up_case and up_tracking and up_others:
-        if st.button("▶️ RUN COMPARE", use_container_width=True):
+        if st.button("▶️ RUN COMPARISON ANALYSIS", use_container_width=True):
             with st.spinner("Processing Data..."):
                 df_c = pd.read_excel(up_case)
                 df_t = pd.read_excel(up_tracking)
@@ -5288,11 +3693,7 @@ elif menu == "Justification SO":
         
         # --- TAMPILAN TABEL ---
         st.divider()
-        st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
-                </div>
-                """, unsafe_allow_html=True)
+        st.subheader("📋 Summary Report Analysis")
         st.dataframe(result, use_container_width=True, height=450)
         
         # --- DOWNLOAD BUTTON (DI LUAR BUTTON RUN AGAR STAY) ---
@@ -5311,12 +3712,7 @@ elif menu == "Justification SO":
 
 elif menu == "Compare System":
     st.markdown('<div class="hero-header"><h1>STOCK COMPARATION</h1></div>', unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **STOCK SYSTEM 1**: Download ALL DATA STOCK Setelah jam operasional **Shift 2 (22:00)**
-        - **STOCK SYSTEM 2**: Download ALL DATA STOCK Sebelum jam operasional **Shift 0 (07:30)**
-        """)
+    
     col1, col2 = st.columns(2)
     with col1:
         file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
@@ -5353,803 +3749,9 @@ elif menu == "Compare System":
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
 
-import pandas as pd
-import random
-import sqlite3
-from datetime import datetime, timedelta
-import streamlit as st
-
-# --- 1. KONEKSI & AUTO-REPAIR DATABASE ---
-def init_db_logistic():
-    conn = sqlite3.connect('logistic_sby_final.db', check_same_thread=False)
-    c = conn.cursor()
-    # Tabel Karyawan
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS karyawan (
-            nama TEXT, 
-            posisi TEXT, 
-            tipe TEXT
-        )
-    ''')
-    # Tabel Libur Request
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS libur_request (
-            nama TEXT, 
-            tanggal TEXT, 
-            jenis TEXT
-        )
-    ''')
-    conn.commit()
-    return conn
-
-# Panggil di paling atas biar gak error "no such table"
-conn = init_db_logistic()
-
-# Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
-if menu == "Logistic Schedule":
-    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
-    st.markdown("""
-        <style>
-            /* 1. Header Utama - Efek Gradient Glass */
-            .hero-header {
-                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
-                color: white;
-                padding: 25px;
-                border-radius: 12px;
-                text-align: center;
-                margin-bottom: 35px;
-                font-weight: 800;
-                font-size: 26px;
-                letter-spacing: 0.5px;
-                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            }
-
-            /* 1.5 Sub-Header Stylings */
-            div[data-testid="stVerticalBlock"] h3 {
-                color: #000000 !important;
-                border-left: 5px solid #0062E6;
-                padding-left: 15px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-
-            /* 2. Input Fields - Modern Dark Glass */
-            [data-testid="stForm"] { 
-                border: none !important; 
-                padding: 0 !important; 
-            }
-            
-            div[data-testid="stTextInput"] > div > div, 
-            div[data-testid="stTextArea"] > div > div,
-            div[data-testid="stDateInput"] > div > div,
-            div[data-testid="stSelectbox"] > div > div {
-                background-color: #12141d !important; 
-                border: 1px solid #2d3142 !important;
-                border-radius: 10px !important;
-                transition: all 0.3s ease-in-out !important;
-                padding: 2px !important;
-            }
-
-            /* Efek Focus Pas Diklik */
-            div[data-testid="stTextInput"] > div > div:focus-within, 
-            div[data-testid="stDateInput"] > div > div:focus-within {
-                border-color: #007BFF !important;
-                box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
-            }
-
-            /* 3. Button - Premium Glow Effect */
-            div.stButton > button {
-                background: linear-gradient(90deg, #007BFF 0%, #0056b3 100%) !important;
-                color: white !important;
-                border-radius: 10px !important;
-                border: none !important;
-                padding: 12px 24px !important;
-                font-weight: 700 !important;
-                text-transform: uppercase !important;
-                letter-spacing: 1px !important;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
-            }
-
-            /* 4. Font & Labels - Soft Neutral */
-            label { 
-                color: #B0B3B8 !important; 
-                font-size: 14px !important;
-                font-weight: 500 !important;
-                margin-bottom: 8px !important;
-            }
-
-            input, textarea { 
-                background-color: transparent !important; 
-                color: #ffffff !important; 
-                font-family: 'Inter', sans-serif !important;
-                -webkit-text-fill-color: #ffffff !important; 
-            }
-
-            .custom-card {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                background-color: #1a1c27;
-                border-radius: 8px;
-                padding: 12px 18px;
-                margin-bottom: 10px;
-                border-left: 5px solid #00FF00;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            }
-            .card-text { color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 14px; }
-            .card-subtext { color: #888888; font-size: 12px; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
-
-    # --- 1. DATABASE TIM ---
-    st.subheader("👤 1. Database & Input Tim")
-    with st.form("form_tim_komplit", clear_on_submit=True): 
-        c1, c2, c3 = st.columns(3)
-        nama_input = c1.text_input("Nama Lengkap")
-        posisi_input = c2.selectbox("Posisi/Role", 
-            ["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
-        tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
-        
-        if st.form_submit_button("💾 SIMPAN TIM"):
-            if nama_input:
-                conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper().strip(), posisi_input, tipe_input))
-                conn.commit()
-                st.success("✅ Tim Berhasil Terdaftar!")
-                st.rerun()
-
-    # --- DAFTAR KARYAWAN AKTIF ---
-    with st.expander("🔍 Staff Database", expanded=True):
-        df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
-        if not df_cek.empty:
-            for i, row in df_cek.iterrows():
-                cc1, cc2 = st.columns([6, 1])
-                with cc1:
-                    st.markdown(f"""
-                        <div class="custom-card" style="border-left-color: #007BFF;">
-                            <div>
-                                <div class="card-text">{row['nama']}</div>
-                                <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with cc2:
-                    if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
-                        conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
-                        conn.commit()
-                        st.rerun()
-        else:
-            st.info("Belum ada data tim di database.") 
-
-    st.divider()
-
-    # --- 2. PLOT LIBUR ---
-    st.subheader("🚫 2. Day Off Request")
-    col_l1, col_l2 = st.columns([1, 2])
-
-    with col_l1:
-        df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        with st.form("form_libur_komplit", clear_on_submit=True):
-            target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
-            tgl_off = st.date_input("Tanggal Off")
-            jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
-            if st.form_submit_button("SUBMIT OFF"):
-                if target:
-                    conn.execute("INSERT INTO libur_request VALUES (?,?,?)", (target, str(tgl_off), jenis_off))
-                    conn.commit()
-                    st.rerun()
-
-    with col_l2:
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
-        if not df_off_view.empty:
-            for i, row in df_off_view.iterrows():
-                m1, m2 = st.columns([6, 1])
-                with m1:
-                    st.markdown(f"""
-                        <div class="custom-card" style="border-left-color: #FF4B4B;">
-                            <div>
-                                <div class="card-text">{row['nama']}</div>
-                                <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with m2:
-                    if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
-                        conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                        conn.commit()
-                        st.rerun()
-
-    st.divider()
-
-    # --- 3. DATABASE CHECK & MONITORING ---
-    cursor = conn.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS plot_shift3 (nama TEXT, tanggal TEXT, posisi TEXT, tipe TEXT)')
-    conn.commit()
-
-    try:
-        df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
-    except Exception:
-        df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
-
-    # --- 3. TAMPILAN INPUT SHIFT 3 ---
-    st.subheader("🌙 2. Stock Opname Plot")
-
-    df_karyawan = pd.read_sql_query("SELECT nama, tipe, posisi FROM karyawan", conn)
-    karyawan_options = df_karyawan['nama'].tolist()
-
-    col_in1, col_in2 = st.columns(2)
-
-    with col_in1:
-        nama_s3 = st.selectbox("Pilih Nama Tim", karyawan_options, key="s3_name_input")
-        tgl_s3 = st.date_input("Tanggal Masuk Shift 3", datetime.now(), key="s3_date_input")
-
-    with col_in2:
-        if not df_karyawan.empty:
-            selected_data = df_karyawan[df_karyawan['nama'] == nama_s3].iloc[0]
-            st.info(f"Posisi: {selected_data['posisi']} | Tipe: {selected_data['tipe']}")
-
-    if st.button("SUBMIT PLOT SHIFT 3", use_container_width=True):
-        check = conn.execute("SELECT * FROM plot_shift3 WHERE nama=? AND tanggal=?", 
-                             (nama_s3, tgl_s3.strftime('%Y-%m-%d'))).fetchone()
-        
-        if not check:
-            conn.execute("INSERT INTO plot_shift3 (nama, tanggal, posisi, tipe) VALUES (?, ?, ?, ?)", 
-                         (nama_s3, tgl_s3.strftime('%Y-%m-%d'), selected_data['posisi'], selected_data['tipe']))
-            conn.commit()
-            st.success(f"✅ {nama_s3} Masuk Plot Shift 3!")
-            st.rerun()
-        else:
-            st.warning("Nama ini sudah terdaftar di tanggal tersebut!")
-
-    # --- 4. LIST MONITORING ---
-    st.divider()
-    if not df_monitor_s3.empty:
-        for index, row in df_monitor_s3.iterrows():
-            lc1, lc2, lc3 = st.columns([3, 1, 0.5])
-            with lc1:
-                st.markdown(f"""
-                    <div style="background-color: #1a1c27; padding: 10px; border-radius: 5px; border-left: 5px solid #00FF00; margin-bottom: 5px;">
-                        <span style="color: #FFFFFF; font-weight: bold;">{row['nama']}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            with lc2:
-                st.markdown(f"<div style='padding: 10px; color: #888;'>{row['tanggal']}</div>", unsafe_allow_html=True)
-            with lc3:
-                if st.button("🗑️", key=f"del_s3_{index}"):
-                    conn.execute("DELETE FROM plot_shift3 WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                    conn.commit()
-                    st.rerun()
-    else:
-        st.info("Belum ada tim yang di-plot ke Shift 3.")
-
-    # --- 3. GENERATOR JADWAL JEZ SBY ---
-    st.subheader("✅3. Schedule Shift")
-
-    start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v_final_final")
-    df_staff_master = pd.read_sql_query("SELECT * FROM karyawan", conn)
-    karyawan_list = df_staff_master.to_dict('records')
-
-    if st.button("▶️ RUN JADWAL", use_container_width=True):
-        dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-        day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
-        df_libur = pd.read_sql_query("SELECT * FROM libur_request", conn)
-        df_manual_s3 = pd.read_sql_query("SELECT * FROM plot_shift3", conn)
-
-        base_roles = [
-            ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
-            ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
-            ("SHIFT 2", "LOG-ADMIN"), ("SHIFT 2", "LOG-LOADER"), ("SHIFT 2", "LOG-STORE"), ("SHIFT 2", "WF-ADMIN"), ("SHIFT 2", "WF-PICKER"), ("SHIFT 2", "SPV"),
-            ("SHIFT 3", "SO") 
-        ]
-
-        storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
-        weekly_counter = {k['nama']: 0 for k in karyawan_list}
-        double_day_count = {k['nama']: 0 for k in karyawan_list}
-        for k in karyawan_list: k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
-
-        def get_active_shifts(nama, day_name):
-            return [slot.split(" - ")[0] for slot in storage[day_name] if any(nama in n for n in storage[day_name][slot])]
-
-        # --- 1. PLOT MANUAL SHIFT 3 ---
-        for day_name, tgl_str in zip(day_names, dates_real):
-            names_manual = df_manual_s3[df_manual_s3['tanggal'] == tgl_str]['nama'].tolist()
-            if names_manual:
-                storage[day_name]["SHIFT 3 - SO"] = names_manual
-                for nm in names_manual:
-                    if nm in weekly_counter: weekly_counter[nm] += 1
-
-        # --- 2. ENGINE GENERATOR ---
-        for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
-            for day_name in day_names:
-                tgl_ini = dates_real[day_names.index(day_name)]
-                
-                def count_s0(day):
-                    count = 0
-                    for k_slot in storage[day]:
-                        if "SHIFT 0" in k_slot:
-                            count += len(storage[day][k_slot])
-                    return count
-
-                for shf_jam, shf_role in base_roles:
-                    if shf_jam == "SHIFT 3": continue 
-                    
-                    slot_key = f"{shf_jam} - {shf_role}"
-
-                    # --- [PRIORITAS 1: JALUR VIP RECOVERY] ---
-                    if shf_jam == "SHIFT 2":
-                        day_index = day_names.index(day_name)
-                        if day_index > 0:
-                            day_kemarin = day_names[day_index - 1]
-                            for k_rec in karyawan_list:
-                                n_rec = k_rec['nama']
-                                if weekly_counter[n_rec] >= k_rec['target_fix']: continue
-                                if not df_libur[(df_libur['nama'] == n_rec) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                                
-                                if "SHIFT 3" in get_active_shifts(n_rec, day_kemarin) and k_rec['posisi'] == shf_role:
-                                    if not get_active_shifts(n_rec, day_name):
-                                        current_fill = len(storage[day_name][slot_key])
-                                        if (phase == "TARGET_1_ORANG" and current_fill < 1) or \
-                                           (phase == "TARGET_2_ORANG" and shf_role != "SPV" and current_fill < 2) or \
-                                           (phase == "SISA_JATAH"):
-                                            
-                                            if n_rec not in storage[day_name][slot_key]:
-                                                storage[day_name][slot_key].append(n_rec)
-                                                weekly_counter[n_rec] += 1
-
-                    # --- [PRIORITAS 2: LOGIKA STANDAR POTENTIAL] ---
-                    if shf_jam == "SHIFT 0" and count_s0(day_name) >= 2:
-                        continue
-
-                    if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
-                    if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
-
-                    potential = []
-                    for k in karyawan_list:
-                        nama = k['nama']
-                        active_shifts = get_active_shifts(nama, day_name)
-                        
-                        if weekly_counter[nama] >= k['target_fix']: continue
-                        if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                        
-                        tgl_besok = (datetime.strptime(tgl_ini, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
-                        tgl_kemarin = (datetime.strptime(tgl_ini, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
-                        is_libur_besok = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_besok)].empty
-                        is_libur_kemarin = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_kemarin)].empty
-                        
-                        if is_libur_besok and shf_jam != "SHIFT 1": continue
-                        if is_libur_kemarin and shf_jam != "SHIFT 2": continue
-
-                        day_index = day_names.index(day_name)
-                        if day_index > 0:
-                            day_kemarin = day_names[day_index - 1]
-                            if "SHIFT 3" in get_active_shifts(nama, day_kemarin) and shf_jam != "SHIFT 2":
-                                continue
-
-                        if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
-                        if k['posisi'] == "SPV" and shf_role != "SPV": continue
-                        if shf_jam in active_shifts: continue 
-
-                        if k['tipe'] == "Part-Full":
-                            if is_libur_besok or is_libur_kemarin or (day_index > 0 and "SHIFT 3" in get_active_shifts(nama, day_names[day_index-1])):
-                                if active_shifts: continue 
-                            if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
-                        else:
-                            if active_shifts: continue
-
-                        is_match = (k['posisi'] == shf_role)
-                        potential.append({'k': k, 'match': is_match})
-
-                    if potential:
-                        random.shuffle(potential)
-                        potential = sorted(potential, key=lambda x: x['match'], reverse=True)
-                        p = potential[0]
-                        nm_fix = p['k']['nama']
-                        if nm_fix not in storage[day_name][slot_key]:
-                            storage[day_name][slot_key].append(nm_fix)
-                            weekly_counter[nm_fix] += 1
-                            if len(get_active_shifts(nm_fix, day_name)) == 2:
-                                double_day_count[nm_fix] += 1
-        # --- 3. SIMPAN HASIL ---
-        final_table = []
-        for shf_jam, shf_role in base_roles:
-            slot_key = f"{shf_jam} - {shf_role}"
-            max_r = max([len(storage[d][slot_key]) for d in day_names])
-            for r in range(max(1, max_r)):
-                row = {"SHIFT - ROLE": slot_key}
-                for d in day_names:
-                    names = storage[d][slot_key]
-                    row[d] = names[r] if r < len(names) else ""
-                final_table.append(row)
-
-        st.session_state.res_df = pd.DataFrame(final_table)
-        st.session_state.summary_shift = weekly_counter
-        st.rerun()
-
-    if 'res_df' in st.session_state:
-        st.divider()
-        col_v1, col_v2 = st.columns([5, 2])
-        
-        with col_v1:
-            st.markdown("### 📋 WEEKLY SCHEDULE LOGISTIC SBY")
-
-            def color_by_shift(row):
-                shift_type = str(row['SHIFT - ROLE'])
-                base_style = 'color: #FFFFFF; font-weight: 600; border: 0.5px solid #222;'
-                if "SHIFT 0" in shift_type:
-                    bg = "background-color: #004e92;"
-                elif "SHIFT 1" in shift_type:
-                    bg = "background-color: #1b4d3e;"
-                elif "SHIFT 2" in shift_type:
-                    bg = "background-color: #4b0082;"
-                elif "SHIFT 3" in shift_type:
-                    bg = "background-color: #b45f06;"
-                else:
-                    bg = "background-color: #1a1c27;"
-                return [bg + base_style for _ in row]
-
-            st.dataframe(
-                st.session_state.res_df.style.apply(color_by_shift, axis=1),
-                use_container_width=True,
-                height=800,
-                hide_index=True
-            )
-
-        with col_v2:
-            st.markdown("### 📈 TOTAL SHIFT")
-            sum_data = []
-            df_staff_master = pd.read_sql_query("SELECT nama, tipe FROM karyawan", conn)
-            
-            for _, k in df_staff_master.iterrows():
-                n = k['nama']
-                t = st.session_state.summary_shift.get(n, 0)
-                if t > 0:
-                    target = 9 if k['tipe'] == "Part-Full" else 6
-                    status = "✅ OK" if t >= target else "⚠️ KURANG SHIFT"
-                    sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": status})
-            
-            if sum_data:
-                st.dataframe(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False), use_container_width=True, hide_index=True)
-            else:
-                st.info("Belum ada data realisasi.")
-elif menu == "Balancing Stock":
-    tampilan_balancing_stock()
-
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
 # --- Navigasi ---
 elif menu == "Stock Opname":
     menu_Stock_Opname()
-
-# --- Navigasi ---
-elif menu == "Reject/Defect List":
-    menu_reject_defect()
-
-elif menu == "Compare Penerimaan RTO":
-    main()
-
-elif menu == "Pengajuan Reject/Defect":
-    project_approval_reject()
-
-elif menu == "List Retur Out":
-    menu_retur_out_system()
-
-import streamlit as st
-import pandas as pd
-import sqlite3
-from datetime import datetime
-import math
-
-# --- 1. SQLITE CORE LOGIC (Perbaikan Query INSERT) ---
-def get_db_connection():
-    return sqlite3.connect('jez_reporting.db', check_same_thread=False)
-
-def init_db():
-    conn = get_db_connection()
-    # Tabel Laporan
-    conn.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
-    # Tabel Todo
-    conn.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
-    # Tracker Hari
-    conn.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
-    
-    # Isi data awal ke DB kalau masih kosong
-    if not conn.execute('SELECT * FROM reports').fetchone():
-        data_awal = [
-            ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"), ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
-            ("STOCK MINUS", "VERREL & GALIH", "❌ Belum"), ("BALANCING STOCK", "FARIL & YUDI", "❌ Belum"),
-            ("RTO", "FARIL & YUDI", "❌ Belum"), ("OUTBOUND PROCESS", "FARIL & YUDI", "❌ Belum"),
-            ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"), ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
-            ("DASHBOARD SIDOARJO", "VANO", "❌ Belum"), ("INBOUND PROCESS", "VANO", "❌ Belum"),
-            ("SURABAYA DASHBOARD", "HAMZAH", "❌ Belum"), ("SEMARANG DASHBOARD", "HAMZAH", "❌ Belum"),
-            ("MANIFEST", "HAMZAH", "❌ Belum"), ("REFUND", "HAMZAH", "❌ Belum"),
-            ("REFILL & OVERSTOCK", "KRISNA", "❌ Belum"), ("ZERO PUTAWAY", "WAREHOUSE FULLFILLMENT", "❌ Belum")
-        ]
-        conn.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', data_awal)
-    conn.commit()
-    conn.close()
-
-def sync_data():
-    """Sinkronisasi DB ke Session State & Handle Reset Harian"""
-    conn = get_db_connection()
-    today = datetime.now().strftime('%Y-%m-%d')
-    res = conn.execute('SELECT last_date FROM reset_tracker').fetchone()
-    
-    # Logic Auto Reset Harian
-    if not res or res[0] != today:
-        conn.execute('UPDATE reports SET status = "❌ Belum"')
-        conn.execute('DELETE FROM todo')
-        conn.execute('DELETE FROM reset_tracker')
-        conn.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
-        conn.commit()
-    
-    # Tarik data dari DB ke Session State lu
-    reports_db = conn.execute('SELECT laporan, pic, status FROM reports').fetchall()
-    st.session_state.db_report = [{"Laporan": r[0], "PIC": r[1], "Status": r[2]} for r in reports_db]
-    
-    todo_db = conn.execute('SELECT task, done FROM todo').fetchall()
-    st.session_state.todo_list = [{"task": t[0], "done": bool(t[1])} for t in todo_db]
-    conn.close()
-
-# Jalankan Database
-init_db()
-sync_data()
-
-# --- 2. INITIAL DATA (Lu punya, tetep ada buat jaga-jaga) ---
-if 'db_report' not in st.session_state:
-    pass
-
-if 'todo_list' not in st.session_state:
-    st.session_state.todo_list = []
-
-# --- 3. CSS DARK THEME (Gue Balikin & Gue Perkuat - PERSIS PUNYA LU) ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-
-    /* Global Font */
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    /* 1. Header Utama - Efek Gradient Glass */
-    .hero-header {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white;
-        padding: 25px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 35px;
-        font-weight: 800;
-        font-size: 26px;
-        letter-spacing: 0.5px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    /* 2. Card Laporan (Gaya Kolom Kiri) */
-    .report-card {
-        background-color: #1f2937; 
-        padding: 15px; 
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2); 
-        margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; 
-        color: #f3f4f6;
-        transition: transform 0.2s ease;
-    }
-    .report-card:hover { transform: translateY(-2px); }
-
-    /* 3. Box To-Do Container */
-    .todo-container {
-        background-color: #111827; 
-        padding: 20px; 
-        border-radius: 15px;
-        border: 1px solid #374151; 
-        margin-bottom: 20px;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    /* 4. Checkbox Dark Mode */
-    div[data-testid="stCheckbox"] div[role="checkbox"] {
-        background-color: #1f2937 !important;
-        border: 2px solid #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
-        background-color: #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] p {
-        color: #e5e7eb !important;
-        font-weight: 500 !important;
-    }
-    
-    /* 5. Input & Button Styling */
-    .stTextInput input { 
-        background-color: #1f2937 !important; 
-        color: white !important; 
-        border: 1px solid #374151 !important;
-        border-radius: 8px !important;
-    }
-    .stButton > button { 
-        width: 100%; 
-        border-radius: 8px; 
-        background-color: #1e3a8a; 
-        color: white;
-        border: 1px solid #3b82f6;
-        font-weight: 600;
-        transition: 0.3s ease; 
-    }
-    .stButton > button:hover { 
-        background-color: #3b82f6; 
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-# --- 4. LOGIKA ROUTING ---
-# (Pastikan variabel 'menu' sudah didefinisikan di sidebar lu sebelum bagian ini)
-if menu == "Reporting & PIC":
-    st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([1.2, 1])
-    with c1:
-        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
-        current_user = st.selectbox("👤 Pilih Nama:", list_pic, key="pic_v_final")
-    with c2:
-        st.write("")
-        st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
-
-    st.divider()
-
-    col_kiri, col_kanan = st.columns([1.8, 1])
-
-    with col_kiri:
-        st.subheader(f"📋 PIC: {current_user}")
-        tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
-        
-        with tab_me:
-            for idx, task in enumerate(st.session_state.db_report):
-                if task['PIC'] == current_user:
-                    ck1, ck2 = st.columns([4, 1.2])
-                    with ck1:
-                        st.markdown(f"""
-                        <div class="report-card">
-                            <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
-                            <small style="color:#9ca3af;">Status: {task['Status']}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    with ck2:
-                        st.write("") 
-                        if task['Status'] == "❌ Belum":
-                            if st.button(f"Update", key=f"up_dark_{idx}"):
-                                # Update Session
-                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                # Update SQLite
-                                conn = get_db_connection()
-                                conn.execute('UPDATE reports SET status = "✅ Selesai" WHERE laporan = ?', (task['Laporan'],))
-                                conn.commit()
-                                conn.close()
-                                st.rerun()
-                        else:
-                            st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
-
-        with tab_all:
-            st.markdown("### 📊 Team Progress Summary")
-            pic_stats = {}
-            for t in st.session_state.db_report:
-                pic = t['PIC']
-                if pic not in pic_stats:
-                    pic_stats[pic] = {"total": 0, "selesai": 0}
-                pic_stats[pic]["total"] += 1
-                if t['Status'] == "✅ Selesai":
-                    pic_stats[pic]["selesai"] += 1
-
-            st.write("**📈 Laporan Operasional**")
-            for pic, stats in pic_stats.items():
-                progress = (stats['selesai'] / stats['total']) * 100
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>👤 {pic}</b>
-                        <span>{stats['selesai']}/{stats['total']} Selesai</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
-                        <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.write("---")
-            st.write("**📝 To Do List Summary**")
-            if "todo_list" in st.session_state and st.session_state.todo_list:
-                td_total = len(st.session_state.todo_list)
-                td_selesai = sum(1 for item in st.session_state.todo_list if item['done'])
-                td_progress = (td_selesai / td_total) * 100
-                
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #10b981; background-color: #111827;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>📋 Total Tugas</b>
-                        <span>{td_selesai}/{td_total} Item</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 12px;">
-                        <div style="background-color: #10b981; width: {td_progress}%; height: 12px; border-radius: 5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-    with col_kanan:
-        st.markdown("""<div style="background-color: #1a1c27; padding: 10px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px; text-align: center;"><h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4></div>""", unsafe_allow_html=True)
-
-        # 1. Form Input (Tetap di Atas)
-        with st.form("form_todo_dark", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            if st.form_submit_button("➕ Tambah") and tugas_baru:
-                conn = get_db_connection()
-                conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
-                conn.commit()
-                conn.close()
-                sync_data()
-                st.rerun()
-
-        # 2. Logic Pagination (5 Item Per Halaman)
-        if "todo_list" in st.session_state and st.session_state.todo_list:
-            items_per_page = 3
-            total_items = len(st.session_state.todo_list)
-            total_pages = math.ceil(total_items / items_per_page)
-            
-            # Init session state buat simpan halaman aktif
-            if 'todo_page' not in st.session_state:
-                st.session_state.todo_page = 1
-            
-            # Ambil item sesuai halaman sekarang
-            start_idx = (st.session_state.todo_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            current_items = st.session_state.todo_list[start_idx:end_idx]
-
-            # 3. Tampilkan Item
-            for i, item in enumerate(current_items):
-                real_idx = start_idx + i  # Index asli di DB/List Utama
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    color_border = '#10b981' if item['done'] else '#3b82f6'
-                    st.markdown(f"""
-                        <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
-                            <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with c2:
-                    st.write("")
-                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
-                    if res != item['done']:
-                        conn = get_db_connection()
-                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
-                        conn.commit()
-                        conn.close()
-                        sync_data()
-                        st.rerun()
-
-            # 4. Navigasi Panah (Pindah Halaman)
-            st.divider()
-            nav1, nav2, nav3 = st.columns([1, 2, 1])
-            
-            with nav1:
-                # Tombol Prev (Hanya muncul kalau bukan di hal 1)
-                if st.session_state.todo_page > 1:
-                    if st.button("⬅️ Prev", key="btn_prev_page"):
-                        st.session_state.todo_page -= 1
-                        st.rerun()
-            
-            with nav2:
-                # Indikator Halaman
-                st.markdown(f"<p style='text-align:center; color:#9ca3af; padding-top:10px;'>Halaman {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
-            
-            with nav3:
-                # Tombol Next (Hanya muncul kalau masih ada halaman selanjutnya)
-                if st.session_state.todo_page < total_pages:
-                    if st.button("Next ➡️", key="btn_next_page"):
-                        st.session_state.todo_page += 1
-                        st.rerun()
-        else:
-            st.info("Belum ada tugas tambahan.")
