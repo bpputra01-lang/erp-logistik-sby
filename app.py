@@ -2610,7 +2610,6 @@ def menu_retur_out_system():
             border: 1px solid #3d4455;
             padding: 10px 15px;
         }
-        [data-testid="stWidgetLabel"] { display: none; }
         </style>
     """, unsafe_allow_html=True)
 
