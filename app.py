@@ -1088,7 +1088,7 @@ def menu_Stock_Opname():
         list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
     with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTNADADAD","GUDANG LT 2"]
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG-", "GL2-SMG-CTN-","GUDANG LT 2"]
         selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
@@ -1097,6 +1097,7 @@ def menu_Stock_Opname():
     st.markdown("---")
 
     # STEP 1
+    # STEP 1: UPLOAD & RUN COMPARE
     st.subheader("1️⃣ Upload & Run Compare")
     c1, c2 = st.columns(2)
     with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
@@ -1104,28 +1105,55 @@ def menu_Stock_Opname():
 
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
+            # 1. READ DATA
             df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
             df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
             
-            if selected_sub: df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-            if selected_bin_sys: df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
-            if selected_bin_cov: df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
+            # 2. NORMALISASI SKU (BIAR SUMIFS AKURAT)
+            # Kita paksa SKU jadi String, Hapus Spasi, dan Huruf Besar semua
+            # Asumsi: Kolom SKU di Scan ada di index 1, di System ada di index 2
+            df_s_raw.iloc[:, 1] = df_s_raw.iloc[:, 1].astype(str).str.strip().str.upper()
+            df_t_raw.iloc[:, 2] = df_t_raw.iloc[:, 2].astype(str).str.strip().str.upper()
 
+            # 3. APPLY FILTERS (SUB-INV & BIN)
+            # Filter Sub Kategori (Exact Match)
+            if selected_sub: 
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+
+            # Filter BIN System (Partial Match - Hanya yang dipilih)
+            if selected_bin_sys: 
+                # Bikin pattern: (BIN1|BIN2|BIN3)
+                pattern_sys = '|'.join([re.escape(c.upper()) for c in selected_bin_sys])
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().str.contains(pattern_sys, na=False)]
+            else:
+                # Kalo gak milih BIN System, data system dikosongin biar gak muncul SYSTEM + palsu
+                df_t_raw = df_t_raw.iloc[0:0]
+
+            # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
             res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
             res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
             
+            # 5. SMART MAPPING SKU TO ITEM NAME
             item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
             item_map.columns = ['SKU', 'NAME']
+            # Cleaning mapping dict biar gak miss
+            item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
-            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict)
+            
+            # Mapping hasil
+            res_scan['ITEM NAME'] = res_scan['SKU'].str.strip().str.upper().map(map_dict)
+            # Pastikan kolom SKU di res_stock konsisten (sesuaikan index jika perlu)
+            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.strip().str.upper().map(map_dict)
 
+            # 6. SAVE TO SESSION STATE
             st.session_state.compare_result = {
-                'res_scan': res_scan, 'res_stock': res_stock, 
+                'res_scan': res_scan, 
+                'res_stock': res_stock, 
                 'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
                 'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
                 'map_dict': map_dict
             }
+            st.success("✅ Compare Berhasil! Data sudah sinkron.")
             st.rerun()
 
     if st.session_state.compare_result:
@@ -1201,14 +1229,27 @@ def menu_Stock_Opname():
         if up_r4 and up_s4 and up_m5:
             if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
                 try:
-                    # 1. Pembacaan file (PASTIKAN NO ILOC GESER DI SINI)
+                    # 1. Pembacaan file
                     df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
                     df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
                     df_m5 = pd.read_excel(up_m5)
 
+                    # --- TAMBAHAN: CLEANING PAKSA BIAR GAK ERROR FLOAT64 ---
+                    # Kita bersihin kolom QTY di df_r4 dan df_s4 sebelum diproses logic
+                    for df in [df_r4, df_s4]:
+                        # Bersihin BIN (Index 0) & SKU (Index 1) dari spasi tak kasat mata
+                        df.iloc[:, 0] = df.iloc[:, 0].astype(str).str.strip().str.upper()
+                        df.iloc[:, 1] = df.iloc[:, 1].astype(str).str.strip().str.upper()
+                        
+                        # Paksa kolom angka (yang sering bikin error) jadi numeric
+                        # errors='coerce' bakal ngerubah teks kotor jadi NaN, lalu fillna(0) jadiin 0
+                        for col_idx in range(len(df.columns)):
+                            # Cek kolom yang mengandung kata QTY, DIFF, atau RECONCILIATION
+                            col_name = str(df.columns[col_idx]).upper()
+                            if any(x in col_name for x in ['QTY', 'DIFF', 'RECON']):
+                                df.iloc[:, col_idx] = pd.to_numeric(df.iloc[:, col_idx], errors='coerce').fillna(0)
+
                     # 2. Sinkronisasi Kolom
-                    # Jangan di-iloc potong depan, biar BIN tetep di index 0 dan SKU di index 1
-                    # Sesuai logic_cek_adjustment_final(df_recon, df_stock_adj)
                     res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                     
                     # 3. Jalankan Pivot
@@ -1217,7 +1258,7 @@ def menu_Stock_Opname():
                     # 4. Pembersihan Data (Pastikan hanya QTY > 0)
                     def clean_final_result(df):
                         if df is not None and not df.empty:
-                            last_col = df.columns[-1] # Kolom QTY ADJ atau TOTAL_DIFF
+                            last_col = df.columns[-1] 
                             df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
                             df = df[df[last_col] > 0].reset_index(drop=True)
                         return df
