@@ -1234,50 +1234,58 @@ def menu_Stock_Opname():
                     st.error(f"❌ Terjadi Kesalahan: {str(e)}")
 
         # --- AREA TAMPILAN HASIL ---
+        # --- AREA TAMPILAN HASIL (VERSI ANTI-ERROR) ---
         if st.session_state.get("process_done"):
-            # Cek apakah hasil lookup beneran ada isinya
-            check_data = st.session_state.df_res4_final
-            is_empty = check_data['QTY SO'].replace('', 0).astype(float).sum() == 0
+            check_data = st.session_state.get("df_res4_final")
             
-            if is_empty:
+            # PROTEKSI: Paksa cek nilai tunggal dengan .iloc atau sum() yang bersih
+            try:
+                # Kita cek apakah ada angka di QTY SO, kalau gak ada berarti lookup gagal
+                total_qty_so = pd.to_numeric(check_data['QTY SO'], errors='coerce').fillna(0).sum()
+                data_is_really_empty = (total_qty_so == 0)
+            except:
+                data_is_really_empty = True
+
+            if data_is_really_empty:
                 st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
             else:
                 st.success("✅ Analisis Selesai!")
             
+            # --- TABS (Tetap sama, tapi pake get untuk keamanan) ---
             t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "➡️ SET UP REAL +"])
             
             with t1:
-                st.dataframe(st.session_state.df_mult_final, use_container_width=True, hide_index=True)
-                if not st.session_state.df_mult_final.empty:
-                    st.download_button("📥 Download Multiple Adj +", st.session_state.df_mult_final.to_csv(index=False).encode('utf-8'), "final_adj_multiple.csv", "text/csv", key="dl_mult_final")
+                df_m = st.session_state.get("df_mult_final", pd.DataFrame())
+                st.dataframe(df_m, use_container_width=True, hide_index=True)
+                if not df_m.empty:
+                    st.download_button("📥 Download Multiple Adj +", df_m.to_csv(index=False).encode('utf-8'), "final_adj_multiple.csv", "text/csv", key="dl_mult_final")
             
             with t2:
-                st.dataframe(st.session_state.df_sing_final, use_container_width=True, hide_index=True)
-                if not st.session_state.df_sing_final.empty:
-                    st.download_button("📥 Download Single Adj +", st.session_state.df_sing_final.to_csv(index=False).encode('utf-8'), "final_adj_single.csv", "text/csv", key="dl_sing_final")
+                df_s = st.session_state.get("df_sing_final", pd.DataFrame())
+                st.dataframe(df_s, use_container_width=True, hide_index=True)
+                if not df_s.empty:
+                    st.download_button("📥 Download Single Adj +", df_s.to_csv(index=False).encode('utf-8'), "final_adj_single.csv", "text/csv", key="dl_sing_final")
             
             with t3:
-                # Tampilkan hasil lookup biar lu bisa cek kolom K (QTY SO)
-                st.dataframe(st.session_state.df_res4_final, use_container_width=True, hide_index=True)
-                st.download_button("📥 Download Hasil Cek Adj +", st.session_state.df_res4_final.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
+                df_r4 = st.session_state.get("df_res4_final", pd.DataFrame())
+                st.dataframe(df_r4, use_container_width=True, hide_index=True)
+                if not df_r4.empty:
+                    st.download_button("📥 Download Hasil Cek Adj +", df_r4.to_csv(index=False).encode('utf-8'), "hasil_lookup_full.csv", "text/csv", key="dl_res4_final")
 
             with t4:
-                # Ambil data dari session state hasil running sebelumnya
+                # Pake variabel lokal biar gak bentrok
                 df_m_src = st.session_state.get("df_mult_final")
                 df_s_res = st.session_state.get("df_res4_final")
 
                 st.info("➡️ Running Relocation Inbound Setelah Running Process Selesai.")
 
-                # Tombol Terpisah hanya untuk Set Up Real +
                 if st.button("▶️ GENERATE SET UP REAL +", use_container_width=True, key="btn_gen_real_plus"):
                     if df_m_src is not None and df_s_res is not None:
                         try:
-                            # Jalankan fungsi logic yang sudah kita perbaiki tadi
                             df_real = logic_setup_real_plus(df_s_res, df_m_src)
-                            
-                            # Simpan hasil ke session state agar tidak hilang saat pindah tab
                             st.session_state.df_setup_real_final = df_real
                             st.success("✅ Mutasi Berhasil Dibuat!")
+                            st.rerun() # Tambahin rerun biar langsung muncul
                         except Exception as e:
                             st.error(f"❌ Gagal memproses relokasi: {str(e)}")
                     else:
