@@ -1116,22 +1116,16 @@ def menu_Stock_Opname():
             df_t_raw.iloc[:, 2] = df_t_raw.iloc[:, 2].astype(str).str.strip().str.upper()
 
             # --- FILTER SECTION ---
-    # --- FILTER SECTION ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
         list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
-        # TAMBAHKAN KEY UNIK DISINI
-        selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat, key="filter_sub_kat_so") 
-
+        selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
     with col_f2:
         list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG-", "GL2-SMG-CTN-","GUDANG LT 2"]
-        # TAMBAHKAN KEY UNIK DISINI
-        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock, key="filter_bin_sys_so") 
-
+        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
-        # TAMBAHKAN KEY UNIK DISINI
-        selected_bin_cov = st.multiselect("📡 BIN Coverage:", list_bin_cov, key="filter_bin_cov_so")
+        selected_bin_cov = st.multiselect("📡 BIN Coverage:", list_bin_cov)
 
     st.markdown("---")
 
@@ -1155,7 +1149,14 @@ def menu_Stock_Opname():
             df_t_raw.iloc[:, 2] = df_t_raw.iloc[:, 2].astype(str).str.strip().str.upper()
 
             # 3. APPLY FILTERS (SUB-INV & BIN)
-
+            if 'selected_sub' in globals() and selected_sub: 
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+            
+            if 'selected_bin_sys' in globals() and selected_bin_sys: 
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
+                
+            if 'selected_bin_cov' in globals() and selected_bin_cov: 
+                df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
 
             # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
             res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
