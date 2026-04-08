@@ -1115,39 +1115,6 @@ def menu_Stock_Opname():
             df_s_raw.iloc[:, 1] = df_s_raw.iloc[:, 1].astype(str).str.strip().str.upper()
             df_t_raw.iloc[:, 2] = df_t_raw.iloc[:, 2].astype(str).str.strip().str.upper()
 
-            # --- FILTER SECTION ---
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
-        selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
-    with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG-", "GL2-SMG-CTN-","GUDANG LT 2"]
-        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
-    with col_f3:
-        list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
-        selected_bin_cov = st.multiselect("📡 BIN Coverage:", list_bin_cov)
-
-    st.markdown("---")
-
-    # STEP 1
-    # STEP 1: UPLOAD & RUN COMPARE
-    st.subheader("1️⃣ Upload & Run Compare")
-    c1, c2 = st.columns(2)
-    with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
-    with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
-
-    if up_scan and up_stock:
-        if st.button("▶️ RUN COMPARE", use_container_width=True):
-            # 1. READ DATA
-            df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
-            df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
-            
-            # 2. NORMALISASI SKU (BIAR SUMIFS AKURAT)
-            # Kita paksa SKU jadi String, Hapus Spasi, dan Huruf Besar semua
-            # Asumsi: Kolom SKU di Scan ada di index 1, di System ada di index 2
-            df_s_raw.iloc[:, 1] = df_s_raw.iloc[:, 1].astype(str).str.strip().str.upper()
-            df_t_raw.iloc[:, 2] = df_t_raw.iloc[:, 2].astype(str).str.strip().str.upper()
-
             # 3. APPLY FILTERS (SUB-INV & BIN)
             if 'selected_sub' in globals() and selected_sub: 
                 df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
@@ -1157,33 +1124,6 @@ def menu_Stock_Opname():
                 
             if 'selected_bin_cov' in globals() and selected_bin_cov: 
                 df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
-
-            # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
-            res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
-            res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
-            
-            # 5. SMART MAPPING SKU TO ITEM NAME
-            item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
-            item_map.columns = ['SKU', 'NAME']
-            # Cleaning mapping dict biar gak miss
-            item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
-            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-            
-            # Mapping hasil
-            res_scan['ITEM NAME'] = res_scan['SKU'].str.strip().str.upper().map(map_dict)
-            # Pastikan kolom SKU di res_stock konsisten (sesuaikan index jika perlu)
-            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.strip().str.upper().map(map_dict)
-
-            # 6. SAVE TO SESSION STATE
-            st.session_state.compare_result = {
-                'res_scan': res_scan, 
-                'res_stock': res_stock, 
-                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
-                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
-                'map_dict': map_dict
-            }
-            st.success("✅ Compare Berhasil! Data sudah sinkron.")
-            st.rerun()
 
             # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
             res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
