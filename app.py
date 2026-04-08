@@ -5961,10 +5961,10 @@ st.markdown("""
         background-color: #1f2937 !important; 
         color: white !important; 
         border: 1px solid #374151 !important;
-        border-radius: 8px !important;
+        border-radius: 1px !important;
     }
     .stButton > button { 
-        width: 50%; 
+        width: 100%; 
         border-radius: 8px; 
         background-color: #1e3a8a; 
         color: white;
