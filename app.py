@@ -209,6 +209,28 @@ st.markdown("""
     }
 
     /* ============================================
+       9. INPUT BOXES - GOLD BORDER (REVISED)
+       ============================================ */
+    div[data-baseweb="select"] > div {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+    }
+
+    /* HAPUS [data-testid="stFileUploaderSection"] DARI SINI 
+       BIAR GAK NABRAK SAMA SECTION 6 */
+
+    div[data-baseweb="select"] > div:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+
+    /* Kunci warna Selectbox saja, jangan Uploader */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        color: #e0e0e0 !important;
+        -webkit-text-fill-color: #e0e0e0 !important;
+    }
+    /* ============================================
        10. BUTTONS LAYOUT
        ============================================ */
     [data-testid="stHorizontalBlock"] {
