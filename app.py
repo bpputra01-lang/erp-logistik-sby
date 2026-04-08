@@ -5386,12 +5386,7 @@ def init_db_logistic():
 conn = init_db_logistic()
 
 # Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
-if menu == "Staff Database":
-    # ------------------------------------------------------------------
-    # --- CSS AREA: V-PREMIUM STAFF CARDS ---
-    # ------------------------------------------------------------------
-    # Gue pake scoping .staff-container biar CSS ini GAK BOCOR ke menu lain.
-    # Warna: Premium Gold & Navy Blue.
+if menu == "Logistic Schedule":
     st.markdown("""
         <style>
         /* 1. Reset Global Input agar Putih di Area Putih, Gelap di Area Gelap */
