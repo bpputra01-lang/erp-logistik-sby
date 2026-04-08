@@ -4116,7 +4116,8 @@ with st.sidebar:
     # Logika Logout
     if st.button("🔴 Logout", key="simple_logout"):
         st.session_state.logged_in = False
-        st.rerun()    
+        st.rerun()
+    
 
 import streamlit as st
 
@@ -4174,6 +4175,9 @@ with st.sidebar:
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
 
     st.divider()
+
+# Final Menu Variable untuk dipakai di konten utama
+menu = st.session_state.main_menu
 
     
 
