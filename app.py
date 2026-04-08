@@ -2490,22 +2490,25 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
-# --- 1. INITIALIZE DATABASE (VERSI V3 - FRESH RESTART) ---
 def init_db():
-    conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
-    c = conn.cursor()
+    conn = get_db_connection()
+    # ... tabel yang lain (todo, reports, dll) ...
     
-    # Buat tabel V3 jika belum ada
-    c.execute('''
+    # TAMBAHKAN BARIS INI:
+    conn.execute('''
         CREATE TABLE IF NOT EXISTS retur_out_v3 (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
-            item_name TEXT, variant TEXT, sub_kategori TEXT,
-            harga_beli REAL, harga_jual REAL, 
-            qty_system INTEGER, qty_so INTEGER,
-            tanggal TEXT
+            tanggal TEXT,
+            no_retur TEXT,
+            item_name TEXT,
+            qty INTEGER,
+            pic TEXT,
+            keterangan TEXT,
+            status TEXT
         )
     ''')
+    
+    conn.commit()
+    conn.close()
     
     # LOGIKA AUTO-PATCH: Pastikan kolom ada (Safety Check)
     c.execute("PRAGMA table_info(retur_out_v3)")
