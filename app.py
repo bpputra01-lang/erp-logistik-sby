@@ -543,8 +543,9 @@ def get_yellow_skus(file, column_index):
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     import pandas as pd
+    import numpy as np
     
-    # 🔥 AUTO CLEAN KOLOM INDEX - IDENTIK
+    # 🔥 AUTO CLEAN KOLOM INDEX
     def safe_clean_df(df):
         if len(df) == 0 or len(df.columns) == 0: return df
         col0 = df.iloc[:, 0]
@@ -562,13 +563,13 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if pd.isna(x): return ""
         return str(x).strip().upper().rstrip('.0')
 
-    # 1. SKUS IN STOCK - IDENTIK
+    # 1. SKUS IN STOCK
     try:
         skus_in_stock = set(df_stock.iloc[:, 2].astype(str).apply(clean_val))
     except:
         skus_in_stock = set()
 
-    # 2. RECON DICT - IDENTIK
+    # 2. RECON DICT
     recon_dict = {}
     for i in range(min(len(df_recon), 50000)):
         try:
@@ -580,61 +581,62 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
                     sku_val = clean_val(row.iloc[1])
                     if bin_val and sku_val:
                         key = f"{bin_val}|{sku_val}"
-                        recon_dict[key] = qty_so  # SCALAR GUARANTEED
+                        recon_dict[key] = qty_so
         except: 
             continue
 
-    # 3. ENSURE 12 KOLOM - IDENTIK
+    # 3. ENSURE 12 COLUMNS
     for i in range(df_stock.shape[1], 12):
         df_stock[f"col_{i}"] = 0
 
-    # 🔥 4. LOOKUP - PURE LOOP IDENTIK DENGAN CASTING
-    def do_lookup(row_idx):
+    # 🔥 4. LOOKUP - PER CELL ASSIGNMENT
+    for i in range(len(df_stock)):
         try:
-            row = df_stock.iloc[row_idx]
+            row = df_stock.iloc[i]
             bin_val = clean_val(row.iloc[1])
             sku_val = clean_val(row.iloc[2])
             key = f"{bin_val}|{sku_val}"
-            result = recon_dict.get(key, 0)
-            return float(result)  # FORCE SCALAR FLOAT
+            qty_so = float(recon_dict.get(key, 0))
+            df_stock.iloc[i, 10] = qty_so  # SCALAR PER CELL
         except:
-            return 0.0
+            df_stock.iloc[i, 10] = 0.0
 
-    # LOOP IDENTIK - TETAPI ASSIGN SATU-SATU
+    # 5. DIFF - PER CELL ASSIGNMENT  
     for i in range(len(df_stock)):
-        df_stock.iloc[i, 10] = do_lookup(i)  # ASSIGN SCALAR PER CELL
-
-    # 5. DIFF - PURE LOOP IDENTIK
-    def do_diff(row_idx):
         try:
-            row = df_stock.iloc[row_idx]
-            sys_qty = float(row.iloc[9]) if pd.notna(row.iloc[9]) else 0.0
-            so_qty = float(row.iloc[10]) if pd.notna(row.iloc[10]) else 0.0
-            return float(abs(sys_qty - so_qty))  # FORCE FLOAT
+            sys_qty = float(df_stock.iloc[i, 9]) if pd.notna(df_stock.iloc[i, 9]) else 0.0
+            so_qty = float(df_stock.iloc[i, 10]) if pd.notna(df_stock.iloc[i, 10]) else 0.0
+            diff_val = abs(sys_qty - so_qty)
+            df_stock.iloc[i, 11] = float(diff_val)  # SCALAR PER CELL
         except:
-            return 0.0
+            df_stock.iloc[i, 11] = 0.0
 
-    for i in range(len(df_stock)):
-        df_stock.iloc[i, 11] = do_diff(i)  # ASSIGN SCALAR PER CELL
-
-    # 6. RENAME - IDENTIK
+    # 6. RENAME COLUMNS
     cols = list(df_stock.columns)
     cols[10] = "QTY SO"
     cols[11] = "DIFF"
     df_stock.columns = cols
 
-    # 7. SINGLE CHECK - IDENTIK
-    def check_single(row_idx):
-        try:
-            row = df_recon.iloc[row_idx]
-            sku = clean_val(row.iloc[1])
-            qty = float(row.iloc[6]) if len(row) > 6 and pd.notna(row.iloc[6]) else 0
-            return qty > 0 and sku not in skus_in_stock
-        except:
-            return False
-
-    single_mask = [check_single(i) for i in range(len(df_recon))]
-    df_need_single = df_recon[single_mask].copy() if any(single_mask) else pd.DataFrame()
+    # 🔥 7. SINGLE CHECK - FIXED BOOL ERROR!
+    if len(df_recon) == 0:
+        df_need_single = pd.DataFrame()
+    else:
+        single_mask = []
+        for i in range(len(df_recon)):
+            try:
+                row = df_recon.iloc[i]
+                sku = clean_val(row.iloc[1])
+                qty = float(row.iloc[6]) if len(row) > 6 and pd.notna(row.iloc[6]) else 0
+                single_mask.append(qty > 0 and sku not in skus_in_stock)
+            except:
+                single_mask.append(False)
+        
+        # ✅ FIX: Convert list ke numpy array, bukan pandas Series
+        single_mask = np.array(single_mask)
+        if np.any(single_mask):  # ✅ SAFE ANY CHECK
+            df_need_single = df_recon[single_mask].reset_index(drop=True)
+        else:
+            df_need_single = pd.DataFrame()
     
     return df_stock, df_need_single
 
