@@ -104,213 +104,191 @@ st.markdown("""
         border-color: #ff4444 !important;
     }
 
-    /* ============================================
-       6. FILE UPLOADER - GOD MODE VISIBILITY
-       ============================================ */
-    /* Container Utama */
-    [data-testid="stFileUploader"] {
-        background-color: #FFFFFF !important;
-        border: 2px dashed #b08d4a !important; 
-        border-radius: 12px !important;
-        padding: 15px 20px !important;
-        color: #1a1d2e !important; /* Paksa warna konten gelap */
-    }
+    /* ============================================ 
+       6. FILE UPLOADER 
+       ============================================ */ 
+    [data-testid="stFileUploader"] { 
+        background-color: #f0f2f6; 
+        border: 2px dashed rgba(0, 43, 91, 0.3) !important; 
+        border-radius: 10px; 
+        padding: 12px; 
+    } 
 
-    /* Layout: Tombol Kanan, Teks Kiri */
-    [data-testid="stFileUploaderSection"] > div {
-        display: flex !important;
-        flex-direction: row-reverse !important; 
-        align-items: center !important;
-        justify-content: space-between !important;
-        gap: 20px !important;
-    }
+    [data-testid="stFileUploader"] button { 
+        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important; 
+        color: #1a1d2e !important; 
+        font-weight: 600 !important; 
+        border-radius: 6px !important; 
+        font-size: 12px !important; 
+    } 
 
-    /* Tombol 'Browse files' - Paksa Muncul */
-    [data-testid="stFileUploader"] button {
-        background-color: #b08d4a !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 10px 25px !important;
-        min-width: 140px !important;
-        box-shadow: 0 4px 10px rgba(176, 141, 74, 0.4) !important;
-        z-index: 999 !important;
-    }
+    /* ============================================ 
+       7. METRIC BOXES - PREMIUM CARD 
+       ============================================ */ 
+    .m-box { 
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important; 
+        padding: 18px 20px !important; 
+        border-radius: 10px !important; 
+        border-left: 4px solid #C5A059 !important; 
+        margin-bottom: 10px !important; 
+        text-align: left !important; 
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important; 
+    } 
 
-    /* Teks 'Browse files' di dalam Button */
-    [data-testid="stFileUploader"] button div, 
-    [data-testid="stFileUploader"] button span {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        font-weight: 700 !important;
-        opacity: 1 !important;
-    }
+    .m-lbl { 
+        color: rgba(255, 255, 255, 0.65) !important; 
+        font-family: 'Inter', sans-serif !important; 
+        font-size: 10px !important; 
+        font-weight: 600 !important; 
+        text-transform: uppercase !important; 
+        letter-spacing: 1px !important; 
+        display: block; 
+        margin-bottom: 6px; 
+    } 
 
-    /* Area Teks (Drag and Drop) */
-    [data-testid="stFileUploaderText"] {
-        text-align: left !important;
-        opacity: 1 !important;
-    }
+    .m-val { 
+        color: #C5A059 !important; 
+        font-family: 'Poppins', sans-serif !important; 
+        font-size: 24px !important; 
+        font-weight: 700 !important; 
+    } 
 
-    /* Tulisan 'Drag and drop file here' - PAKSA HITAM */
-    [data-testid="stFileUploaderText"] > span {
-        color: #1a1d2e !important;
-        -webkit-text-fill-color: #1a1d2e !important;
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        display: block !important;
-        opacity: 1 !important;
-    }
+    /* ============================================ 
+       8. RADIO BUTTONS 
+       ============================================ */ 
+    div.row-widget.stRadio > div { 
+        background-color: transparent !important; 
+    } 
 
-    /* Tulisan 'Limit 200MB...' - PAKSA ABU TUA */
-    [data-testid="stFileUploaderText"] > small {
-        color: #495057 !important;
-        -webkit-text-fill-color: #495057 !important;
-        font-size: 12px !important;
-        display: block !important;
-        opacity: 1 !important;
-    }
+    div.row-widget.stRadio label { 
+        color: #a0a5b5 !important; 
+        font-family: 'Inter', sans-serif !important; 
+        font-size: 13px !important; 
+        padding: 8px 14px !important; 
+        border-radius: 6px !important; 
+        background: rgba(26, 29, 46, 0.5) !important; 
+        border: 1px solid rgba(197, 160, 89, 0.15) !important; 
+        transition: all 0.2s ease !important; 
+    } 
 
-    /* Hilangkan icon bawaan biar rapi */
-    [data-testid="stFileUploaderIcon"] {
-        display: none !important;
-    }
-    /* ============================================
-       7. METRIC BOXES - PREMIUM CARD
-       ============================================ */
-    .m-box {
-        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
-        padding: 18px 20px !important;
-        border-radius: 10px !important;
-        border-left: 4px solid #C5A059 !important;
-        margin-bottom: 10px !important;
-        text-align: left !important;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
-    }
-    .m-lbl {
-        color: rgba(255, 255, 255, 0.65) !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 10px !important;
-        font-weight: 600 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 1px !important;
-        display: block;
-        margin-bottom: 6px;
-    }
-    .m-val {
-        color: #C5A059 !important;
-        font-family: 'Poppins', sans-serif !important;
-        font-size: 24px !important;
-        font-weight: 700 !important;
-    }
+    div.row-widget.stRadio label:hover { 
+        background: rgba(197, 160, 89, 0.1) !important; 
+        border-color: rgba(197, 160, 89, 0.3) !important; 
+        color: #C5A059 !important; 
+    } 
 
-    /* ============================================
-       8. RADIO BUTTONS
-       ============================================ */
-    div.row-widget.stRadio > div { background-color: transparent !important; }
-    div.row-widget.stRadio label {
-        color: #a0a5b5 !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 13px !important;
-        padding: 8px 14px !important;
-        border-radius: 6px !important;
-        background: rgba(26, 29, 46, 0.5) !important;
-        border: 1px solid rgba(197, 160, 89, 0.15) !important;
-        transition: all 0.2s ease !important;
-    }
-    div.row-widget.stRadio label:hover {
-        background: rgba(197, 160, 89, 0.1) !important;
-        border-color: rgba(197, 160, 89, 0.3) !important;
-        color: #C5A059 !important;
-    }
+    /* ============================================ 
+       9. INPUT BOXES - GOLD BORDER 
+       ============================================ */ 
+    div[data-baseweb="select"] > div, 
+    [data-testid="stFileUploaderSection"] { 
+        background-color: #1a1d2e !important; 
+        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
+        border-radius: 8px !important; 
+    } 
 
-    /* ============================================
-       9. INPUT BOXES - GOLD BORDER (REVISED)
-       ============================================ */
-    div[data-baseweb="select"] > div {
-        background-color: #1a1d2e !important;
-        border: 1px solid rgba(197, 160, 89, 0.3) !important;
-        border-radius: 8px !important;
-    }
+    div[data-baseweb="select"] > div:focus-within, 
+    [data-testid="stFileUploaderSection"]:focus-within { 
+        border-color: #C5A059 !important; 
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
+    } 
 
-    /* HAPUS [data-testid="stFileUploaderSection"] DARI SINI 
-       BIAR GAK NABRAK SAMA SECTION 6 */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
+    [data-testid="stFileUploaderText"] > span, 
+    [data-testid="stFileUploaderText"] > small { 
+        color: #e0e0e0 !important; 
+        -webkit-text-fill-color: #e0e0e0 !important; 
+    } 
 
-    div[data-baseweb="select"] > div:focus-within {
-        border-color: #C5A059 !important;
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
-    }
+    /* Text inputs */ 
+    div[data-baseweb="input"] { 
+        background-color: #1a1d2e !important; 
+        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
+        border-radius: 8px !important; 
+        padding: 10px 14px !important; 
+    } 
 
-    /* Kunci warna Selectbox saja, jangan Uploader */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
-        color: #e0e0e0 !important;
-        -webkit-text-fill-color: #e0e0e0 !important;
-    }
-    /* ============================================
-       10. BUTTONS LAYOUT
-       ============================================ */
-    [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 10px !important;
-        justify-content: flex-start !important;
-        width: 100% !important;
-    }
-    [data-testid="column"] {
-        flex: 0 1 auto !important;
-        width: auto !important;
-        min-width: fit-content !important;
-        max-width: fit-content !important;
-    }
-    div.stButton > button {
-        width: 170px !important;
-        min-height: 3.3em !important;
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        padding: 10px 14px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        text-align: center !important;
-        font-size: 13px !important;
-        line-height: 1.3 !important;
-    }
+    div[data-baseweb="input"]:focus-within { 
+        border-color: #C5A059 !important; 
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
+    } 
 
-    /* ============================================
-       11. SIDEBAR BUTTONS - GOLD THEME
-       ============================================ */
-    [data-testid="stSidebar"] div.stButton > button {
-        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important;
-        color: #C5A059 !important;
-        border: 1px solid rgba(197, 160, 89, 0.25) !important;
-        width: 100% !important;
-        height: auto !important;
-        min-height: 42px !important;
-        border-radius: 8px !important;
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 500 !important;
-        font-size: 12px !important;
-        white-space: nowrap !important;
-        transition: all 0.25s ease !important;
-        margin-bottom: 6px !important;
-    }
-    [data-testid="stSidebar"] div.stButton > button:hover {
-        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important;
-        border-color: #C5A059 !important;
-        color: #FFD700 !important;
-    }
-    [data-testid="stSidebar"] div.stButton > button p {
-        color: inherit !important;
-        font-family: 'Inter', sans-serif !important;
-    }
+    input { 
+        color: #ffffff !important; 
+        font-family: 'Inter', sans-serif !important; 
+        font-size: 14px !important; 
+    } 
 
-    /* ============================================
-       12. LABELS
-       ============================================ */
-    [data-testid="stWidgetLabel"] p {
-        color: #2d3748 !important;
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
+    /* ============================================ 
+       10. BUTTONS LAYOUT 
+       ============================================ */ 
+    [data-testid="stHorizontalBlock"] { 
+        display: flex !important; 
+        flex-wrap: wrap !important; 
+        gap: 10px !important; 
+        justify-content: flex-start !important; 
+        width: 100% !important; 
+    } 
+
+    [data-testid="column"] { 
+        flex: 0 1 auto !important; 
+        width: auto !important; 
+        min-width: fit-content !important; 
+        max-width: fit-content !important; 
+    } 
+
+    div.stButton > button { 
+        width: 170px !important; 
+        min-height: 3.3em !important; 
+        white-space: normal !important; 
+        word-wrap: break-word !important; 
+        padding: 10px 14px !important; 
+        display: flex !important; 
+        align-items: center !important; 
+        justify-content: center !important; 
+        text-align: center !important; 
+        font-size: 13px !important; 
+        line-height: 1.3 !important; 
+    } 
+
+    /* ============================================ 
+       11. SIDEBAR BUTTONS - GOLD THEME 
+       ============================================ */ 
+    [data-testid="stSidebar"] div.stButton > button { 
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important; 
+        color: #C5A059 !important; 
+        border: 1px solid rgba(197, 160, 89, 0.25) !important; 
+        width: 100% !important; 
+        height: auto !important; 
+        min-height: 42px !important; 
+        border-radius: 8px !important; 
+        font-family: 'Inter', sans-serif !important; 
+        font-weight: 500 !important; 
+        font-size: 12px !important; 
+        white-space: nowrap !important; 
+        transition: all 0.25s ease !important; 
+        margin-bottom: 6px !important; 
+    } 
+
+    [data-testid="stSidebar"] div.stButton > button:hover { 
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important; 
+        border-color: #C5A059 !important; 
+        color: #FFD700 !important; 
+    } 
+
+    [data-testid="stSidebar"] div.stButton > button p { 
+        color: inherit !important; 
+        font-family: 'Inter', sans-serif !important; 
+    } 
+
+    /* ============================================ 
+       12. LABELS 
+       ============================================ */ 
+    [data-testid="stWidgetLabel"] p { 
+        color: #2d3748 !important; 
+        font-family: 'Inter', sans-serif !important; 
+        font-weight: 600 !important; 
+        font-size: 13px !important; 
     }
     </style>
 """, unsafe_allow_html=True)
