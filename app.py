@@ -5387,88 +5387,63 @@ conn = init_db_logistic()
 
 # Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
-    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
+    # Kita bungkus pake div khusus supaya CSS-nya nggak bocor ke menu lain
+    st.markdown('<div class="logistic-container">', unsafe_allow_html=True)
+    
     st.markdown("""
         <style>
-            /* 1. Header Utama - Efek Gradient Glass */
-            .hero-header {
-                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
-                color: white;
-                padding: 25px;
-                border-radius: 12px;
-                text-align: center;
-                margin-bottom: 35px;
-                font-weight: 800;
-                font-size: 26px;
-                letter-spacing: 0.5px;
-                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+            /* 1. Header Utama - Hanya berefek di dalam .logistic-container */
+            .logistic-container .hero-header-blue {
+                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%) !important;
+                color: white !important;
+                padding: 25px !important;
+                border-radius: 12px !important;
+                text-align: center !important;
+                margin-bottom: 35px !important;
+                font-weight: 800 !important;
+                font-size: 26px !important;
+                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2) !important;
             }
 
-            /* 1.5 Sub-Header Stylings */
-            div[data-testid="stVerticalBlock"] h3 {
-                color: #000000 !important;
-                border-left: 5px solid #0062E6;
-                padding-left: 15px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 1px;
+            /* 1.5 Sub-Header - Spesifik hanya di modul ini */
+            .logistic-container div[data-testid="stVerticalBlock"] h3 {
+                color: #1a1d2e !important;
+                border-left: 5px solid #0062E6 !important;
+                padding-left: 15px !important;
+                font-weight: 700 !important;
+                text-transform: uppercase !important;
             }
 
-            /* 2. Input Fields - Modern Dark Glass */
-            [data-testid="stForm"] { 
-                border: none !important; 
-                padding: 0 !important; 
-            }
-            
-            div[data-testid="stTextInput"] > div > div, 
-            div[data-testid="stTextArea"] > div > div,
-            div[data-testid="stDateInput"] > div > div,
-            div[data-testid="stSelectbox"] > div > div {
+            /* 2. Input Fields - Cuma ngerubah input di dalam container ini */
+            .logistic-container div[data-testid="stTextInput"] > div > div, 
+            .logistic-container div[data-testid="stTextArea"] > div > div,
+            .logistic-container div[data-testid="stDateInput"] > div > div,
+            .logistic-container div[data-testid="stSelectbox"] > div > div {
                 background-color: #12141d !important; 
                 border: 1px solid #2d3142 !important;
                 border-radius: 10px !important;
-                transition: all 0.3s ease-in-out !important;
-                padding: 2px !important;
             }
 
-            /* Efek Focus Pas Diklik */
-            div[data-testid="stTextInput"] > div > div:focus-within, 
-            div[data-testid="stDateInput"] > div > div:focus-within {
-                border-color: #007BFF !important;
-                box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
-            }
-
-            /* 3. Button - Premium Glow Effect */
-            div.stButton > button {
+            /* 3. Button - Glow Effect Biru (Hanya di modul ini) */
+            .logistic-container div.stButton > button {
                 background: linear-gradient(90deg, #007BFF 0%, #0056b3 100%) !important;
                 color: white !important;
                 border-radius: 10px !important;
-                border: none !important;
-                padding: 12px 24px !important;
                 font-weight: 700 !important;
                 text-transform: uppercase !important;
-                letter-spacing: 1px !important;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
                 box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
+                width: 100% !important;
             }
 
-            /* 4. Font & Labels - Soft Neutral */
-            label { 
-                color: #B0B3B8 !important; 
+            /* 4. Font & Labels - Biar gak ngerusak warna label di menu lain */
+            .logistic-container label p { 
+                color: #4A4A4A !important; 
                 font-size: 14px !important;
-                font-weight: 500 !important;
-                margin-bottom: 8px !important;
+                font-weight: 600 !important;
             }
 
-            input, textarea { 
-                background-color: transparent !important; 
-                color: #ffffff !important; 
-                font-family: 'Inter', sans-serif !important;
-                -webkit-text-fill-color: #ffffff !important; 
-            }
-
-            .custom-card {
+            /* Card Khusus Logistic */
+            .logistic-container .custom-card {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
@@ -5479,11 +5454,8 @@ if menu == "Logistic Schedule":
                 border-left: 5px solid #00FF00;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             }
-            .card-text { color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 14px; }
-            .card-subtext { color: #888888; font-size: 12px; }
         </style>
     """, unsafe_allow_html=True)
-
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
     # --- 1. DATABASE TIM ---
