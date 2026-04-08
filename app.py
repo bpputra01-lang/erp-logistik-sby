@@ -5387,77 +5387,80 @@ conn = init_db_logistic()
 
 # Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
-    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
+    # --- CSS SCOPED: BIAR GAK BOCOR KE MENU LAIN ---
     st.markdown("""
         <style>
-            /* 1. Header Utama - Efek Gradient Glass */
-            .hero-header {
+            /* Container utama untuk scoping */
+            .log-sched-container { padding: 10px; }
+
+            /* 1. Header Utama */
+            .hero-header-blue {
                 background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
-                color: white;
+                color: white !important;
                 padding: 25px;
                 border-radius: 12px;
                 text-align: center;
                 margin-bottom: 35px;
                 font-weight: 800;
                 font-size: 26px;
-                letter-spacing: 0.5px;
                 box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.1);
             }
 
-            /* 1.5 Sub-Header Stylings */
-            div[data-testid="stVerticalBlock"] h3 {
-                color: #000000 !important;
-                border-left: 5px solid #0062E6;
-                padding-left: 15px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-
-        
-
-            /* Efek Focus Pas Diklik */
-            div[data-testid="stTextInput"] > div > div:focus-within, 
-            div[data-testid="stDateInput"] > div > div:focus-within {
-                border-color: #007BFF !important;
-                box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
-            }
-
-            }
-
-            /* 4. Font & Labels - Soft Neutral */
-            label { 
-                color: #B0B3B8 !important; 
-                font-size: 14px !important;
-                font-weight: 500 !important;
-                margin-bottom: 8px !important;
-            }
-
-            input, textarea { 
-                background-color: transparent !important; 
-                color: #ffffff !important; 
-                font-family: 'Inter', sans-serif !important;
-                -webkit-text-fill-color: #ffffff !important; 
-            }
-
-            .custom-card {
+            /* 2. Dark Card Style (Sesuai Gambar Lu) */
+            .staff-card-dark {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                background-color: #1a1c27;
-                border-radius: 8px;
-                padding: 5px 18px;
+                background-color: #1a1d2e; /* Navy Gelap */
+                border-radius: 6px;
+                padding: 12px 20px;
                 margin-bottom: 10px;
-                border-left: 5px solid #00FF00;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+                border-left: 6px solid #00FF00; /* Glow Green */
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             }
-            .card-text { color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 14px; }
-            .card-subtext { color: #888888; font-size: 12px; }
+
+            .card-text-white { 
+                color: #FFFFFF !important; 
+                font-weight: 700; 
+                text-transform: uppercase; 
+                font-size: 14px; 
+            }
+            
+            .card-subtext-gray { 
+                color: #888888; 
+                font-size: 12px; 
+            }
+
+            /* 3. Perkecil Tombol Hapus secara Spesifik */
+            .small-del-btn div.stButton > button {
+                padding: 2px 5px !important;
+                height: 35px !important;
+                width: 100% !important;
+                font-size: 14px !important;
+                background: #1a1d2e !important;
+                color: white !important;
+                border: 1px solid rgba(255,255,255,0.1) !important;
+                border-radius: 6px !important;
+                transition: 0.3s;
+            }
+
+            .small-del-btn div.stButton > button:hover {
+                background: #FF4B4B !important;
+                border-color: #FF4B4B !important;
+            }
+
+            /* 4. Input & Label Styling agar tetap Clean */
+            .log-sched-container label p {
+                color: #4A4A4A !important;
+                font-weight: 600 !important;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
+    # Masukkan semua konten ke dalam div scoping
+    st.markdown('<div class="log-sched-container">', unsafe_allow_html=True)
+    
+    st.markdown('<div class="hero-header-blue">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
     # --- 1. DATABASE TIM ---
     st.subheader("👤 1. Database & Input Tim")
@@ -5480,23 +5483,27 @@ if menu == "Logistic Schedule":
         df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
         if not df_cek.empty:
             for i, row in df_cek.iterrows():
-                cc1, cc2 = st.columns([6, 1])
+                # Rasio [8, 1] biar tombol hapusnya minggir dan kecil
+                cc1, cc2 = st.columns([8, 1])
                 with cc1:
                     st.markdown(f"""
-                        <div class="custom-card" style="border-left-color: #007BFF;">
+                        <div class="staff-card-dark">
                             <div>
-                                <div class="card-text">{row['nama']}</div>
-                                <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
+                                <div class="card-text-white">{row['nama']}</div>
+                                <div class="card-subtext-gray">{row['posisi']} • {row['tipe']}</div>
                             </div>
                         </div>
                     """, unsafe_allow_html=True)
                 with cc2:
+                    # Bungkus dalam class small-del-btn
+                    st.markdown('<div class="small-del-btn">', unsafe_allow_html=True)
                     if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
                         conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
                         conn.commit()
                         st.rerun()
-        else:
-            st.info("Belum ada data tim di database.") 
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True) # Tutup div scopingad
 
     st.divider()
 
