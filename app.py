@@ -105,60 +105,70 @@ st.markdown("""
     }
 
     /* ============================================
-       6. FILE UPLOADER - EXACT IMAGE 1 MATCH
+       6. FILE UPLOADER - FIX VISIBILITY
        ============================================ */
-    /* Container utama uploader */
     [data-testid="stFileUploader"] {
         background-color: white !important;
         border: 2px dashed #b08d4a !important; 
         border-radius: 12px !important;
-        padding: 10px 20px !important;
+        padding: 15px 20px !important;
     }
 
     /* Memaksa layout horizontal: Tombol Kanan, Teks Kiri */
     [data-testid="stFileUploaderSection"] > div {
         display: flex !important;
-        flex-direction: row-reverse !important; /* PAKSA TOMBOL KE KANAN */
+        flex-direction: row-reverse !important; 
         align-items: center !important;
         justify-content: space-between !important;
         gap: 20px !important;
     }
 
-    /* Styling Tombol 'Browse files' agar persis SIGN IN */
+    /* Tombol 'Browse files' */
     [data-testid="stFileUploader"] button {
         background-color: #b08d4a !important;
-        background-image: none !important;
         color: white !important;
-        -webkit-text-fill-color: white !important;
         border: none !important;
         border-radius: 8px !important;
         padding: 10px 25px !important;
         font-weight: 600 !important;
         font-size: 14px !important;
-        min-width: 130px !important;
+        min-width: 140px !important;
         box-shadow: 0 4px 10px rgba(176, 141, 74, 0.2) !important;
     }
 
+    /* PAKSA Teks di dalam tombol muncul (Browse files) */
+    [data-testid="stFileUploader"] button * {
+        color: white !important;
+        -webkit-text-fill-color: white !important;
+        opacity: 1 !important;
+    }
 
     /* Area Teks Instruksi */
     [data-testid="stFileUploaderText"] {
         text-align: left !important;
         flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
     }
 
     /* Tulisan 'Drag and drop file here' */
     [data-testid="stFileUploaderText"] > span {
         color: #1a1d2e !important;
+        -webkit-text-fill-color: #1a1d2e !important; /* Paksa warna gelap */
         font-size: 14px !important;
-        font-weight: 500 !important;
+        font-weight: 600 !important;
+        opacity: 1 !important;
+        display: block !important;
     }
 
     /* Tulisan 'Limit 200MB...' */
     [data-testid="stFileUploaderText"] > small {
         color: #6c757d !important;
+        -webkit-text-fill-color: #6c757d !important;
         font-size: 12px !important;
+        opacity: 1 !important;
+        display: block !important;
     }
-
     /* ============================================
        7. METRIC BOXES - PREMIUM CARD
        ============================================ */
