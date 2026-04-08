@@ -1116,18 +1116,14 @@ def menu_Stock_Opname():
             df_t_raw.iloc[:, 2] = df_t_raw.iloc[:, 2].astype(str).str.strip().str.upper()
 
             # 3. APPLY FILTERS (SUB-INV & BIN)
-            # Filter Sub Kategori (Exact Match)
-            if selected_sub: 
+            if 'selected_sub' in globals() and selected_sub: 
                 df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-
-            # Filter BIN System (Partial Match - Hanya yang dipilih)
-            if selected_bin_sys: 
-                # Bikin pattern: (BIN1|BIN2|BIN3)
-                pattern_sys = '|'.join([re.escape(c.upper()) for c in selected_bin_sys])
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().str.contains(pattern_sys, na=False)]
-            else:
-                # Kalo gak milih BIN System, data system dikosongin biar gak muncul SYSTEM + palsu
-                df_t_raw = df_t_raw.iloc[0:0]
+            
+            if 'selected_bin_sys' in globals() and selected_bin_sys: 
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
+                
+            if 'selected_bin_cov' in globals() and selected_bin_cov: 
+                df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
 
             # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
             res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
@@ -1229,27 +1225,14 @@ def menu_Stock_Opname():
         if up_r4 and up_s4 and up_m5:
             if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
                 try:
-                    # 1. Pembacaan file
+                    # 1. Pembacaan file (PASTIKAN NO ILOC GESER DI SINI)
                     df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
                     df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
                     df_m5 = pd.read_excel(up_m5)
 
-                    # --- TAMBAHAN: CLEANING PAKSA BIAR GAK ERROR FLOAT64 ---
-                    # Kita bersihin kolom QTY di df_r4 dan df_s4 sebelum diproses logic
-                    for df in [df_r4, df_s4]:
-                        # Bersihin BIN (Index 0) & SKU (Index 1) dari spasi tak kasat mata
-                        df.iloc[:, 0] = df.iloc[:, 0].astype(str).str.strip().str.upper()
-                        df.iloc[:, 1] = df.iloc[:, 1].astype(str).str.strip().str.upper()
-                        
-                        # Paksa kolom angka (yang sering bikin error) jadi numeric
-                        # errors='coerce' bakal ngerubah teks kotor jadi NaN, lalu fillna(0) jadiin 0
-                        for col_idx in range(len(df.columns)):
-                            # Cek kolom yang mengandung kata QTY, DIFF, atau RECONCILIATION
-                            col_name = str(df.columns[col_idx]).upper()
-                            if any(x in col_name for x in ['QTY', 'DIFF', 'RECON']):
-                                df.iloc[:, col_idx] = pd.to_numeric(df.iloc[:, col_idx], errors='coerce').fillna(0)
-
                     # 2. Sinkronisasi Kolom
+                    # Jangan di-iloc potong depan, biar BIN tetep di index 0 dan SKU di index 1
+                    # Sesuai logic_cek_adjustment_final(df_recon, df_stock_adj)
                     res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
                     
                     # 3. Jalankan Pivot
@@ -1258,7 +1241,7 @@ def menu_Stock_Opname():
                     # 4. Pembersihan Data (Pastikan hanya QTY > 0)
                     def clean_final_result(df):
                         if df is not None and not df.empty:
-                            last_col = df.columns[-1] 
+                            last_col = df.columns[-1] # Kolom QTY ADJ atau TOTAL_DIFF
                             df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
                             df = df[df[last_col] > 0].reset_index(drop=True)
                         return df
