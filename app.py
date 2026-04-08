@@ -5516,54 +5516,54 @@ if menu == "Logistic Schedule":
                     conn.commit()
                     st.rerun()
 
-    # 1. Tambahkan CSS ini di bagian atas modul lu (di dalam markdown style)
-st.markdown("""
-    <style>
-    /* Mengecilkan tombol hapus secara spesifik agar proporsional */
-    .small-del-btn div.stButton > button {
-        padding: 2px 5px !important;
-        height: 32px !important; /* Tinggi disesuaikan agar tidak narik layout */
-        width: 100% !important;
-        font-size: 14px !important;
-        margin-top: 8px !important; /* Biar sejajar tengah dengan card */
-        background: rgba(255, 75, 75, 0.1) !important; /* Warna merah soft */
-        color: #FF4B4B !important;
-        border: 1px solid rgba(255, 75, 75, 0.2) !important;
-    }
-    
-    .small-del-btn div.stButton > button:hover {
-        background: #FF4B4B !important;
-        color: white !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
+        # 1. Tambahkan CSS ini di bagian atas modul lu (di dalam markdown style)
+    st.markdown("""
+        <style>
+        /* Mengecilkan tombol hapus secara spesifik agar proporsional */
+        .small-del-btn div.stButton > button {
+            padding: 2px 5px !important;
+            height: 32px !important; /* Tinggi disesuaikan agar tidak narik layout */
+            width: 100% !important;
+            font-size: 14px !important;
+            margin-top: 8px !important; /* Biar sejajar tengah dengan card */
+            background: rgba(255, 75, 75, 0.1) !important; /* Warna merah soft */
+            color: #FF4B4B !important;
+            border: 1px solid rgba(255, 75, 75, 0.2) !important;
+        }
+        
+        .small-del-btn div.stButton > button:hover {
+            background: #FF4B4B !important;
+            color: white !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-# 2. Implementasi di dalam loop lu
-with col_l2:
-    df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
-    if not df_off_view.empty:
-        for i, row in df_off_view.iterrows():
-            # Gue ubah rasionya jadi [8, 1] biar tombolnya makin minggir dan kecil
-            m1, m2 = st.columns([8, 1]) 
-            
-            with m1:
-                st.markdown(f"""
-                    <div class="custom-card" style="border-left-color: #FF4B4B; padding: 10px 15px;">
-                        <div>
-                            <div class="card-text" style="font-size: 14px;">{row['nama']}</div>
-                            <div class="card-subtext" style="font-size: 11px;">{row['tanggal']} • {row['jenis']}</div>
+    # 2. Implementasi di dalam loop lu
+    with col_l2:
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
+        if not df_off_view.empty:
+            for i, row in df_off_view.iterrows():
+                # Gue ubah rasionya jadi [8, 1] biar tombolnya makin minggir dan kecil
+                m1, m2 = st.columns([8, 1]) 
+                
+                with m1:
+                    st.markdown(f"""
+                        <div class="custom-card" style="border-left-color: #FF4B4B; padding: 10px 15px;">
+                            <div>
+                                <div class="card-text" style="font-size: 14px;">{row['nama']}</div>
+                                <div class="card-subtext" style="font-size: 11px;">{row['tanggal']} • {row['jenis']}</div>
+                            </div>
                         </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            
-            with m2:
-                # Kita bungkus pake div class 'small-del-btn' yang udah kita bikin di CSS tadi
-                st.markdown('<div class="small-del-btn">', unsafe_allow_html=True)
-                if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
-                    conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                    conn.commit()
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+                
+                with m2:
+                    # Kita bungkus pake div class 'small-del-btn' yang udah kita bikin di CSS tadi
+                    st.markdown('<div class="small-del-btn">', unsafe_allow_html=True)
+                    if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
+                        conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
+                        conn.commit()
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
 
     st.divider()
 
