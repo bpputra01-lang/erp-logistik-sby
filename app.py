@@ -1213,66 +1213,72 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
 # ==========================================================
-        # 🚀 FINAL ADJUSTMENT PROCESSOR (FIX INDEX & LOOKUP)
-        # ==========================================================
-        st.markdown("<br><br><br>---", unsafe_allow_html=True)
-        st.subheader("4️⃣ FINAL ADJUSTMENT + PROCESS")
+# 🚀 FINAL ADJUSTMENT PROCESSOR (FIXED VERSION)
+# ==========================================================
+st.markdown("<br><br><br>---", unsafe_allow_html=True)
+st.subheader("4️⃣ FINAL ADJUSTMENT + PROCESS")
 
-        col_a, col_b, col_c = st.columns(3)
-        with col_a: 
-            up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
-        with col_b: 
-            up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
-        with col_c: 
-            up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
+col_a, col_b, col_c = st.columns(3)
+with col_a: 
+    up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
+with col_b: 
+    up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
+with col_c: 
+    up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
 
-        if up_r4 and up_s4 and up_m5:
-            if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
-                try:
-                    # 1. Pembacaan file
-                    df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
-                    df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
-                    df_m5 = pd.read_excel(up_m5)
+if up_r4 and up_s4 and up_m5:
+    if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
+        try:
+            # 1. PEMBACAAN FILE
+            df_r4 = pd.read_csv(up_r4) if up_r4.name.endswith('.csv') else pd.read_excel(up_r4)
+            df_s4 = pd.read_csv(up_s4) if up_s4.name.endswith('.csv') else pd.read_excel(up_s4)
+            df_m5 = pd.read_excel(up_m5)
 
-                    # --- TAMBAHAN: CLEANING PAKSA BIAR GAK ERROR FLOAT64 ---
-                    # Kita bersihin kolom QTY di df_r4 dan df_s4 sebelum diproses logic
-                    for df in [df_r4, df_s4]:
-                        # Bersihin BIN (Index 0) & SKU (Index 1) dari spasi tak kasat mata
-                        df.iloc[:, 0] = df.iloc[:, 0].astype(str).str.strip().str.upper()
-                        df.iloc[:, 1] = df.iloc[:, 1].astype(str).str.strip().str.upper()
-                        
-                        # Paksa kolom angka (yang sering bikin error) jadi numeric
-                        # errors='coerce' bakal ngerubah teks kotor jadi NaN, lalu fillna(0) jadiin 0
-                        for col_idx in range(len(df.columns)):
-                            # Cek kolom yang mengandung kata QTY, DIFF, atau RECONCILIATION
-                            col_name = str(df.columns[col_idx]).upper()
-                            if any(x in col_name for x in ['QTY', 'DIFF', 'RECON']):
-                                df.iloc[:, col_idx] = pd.to_numeric(df.iloc[:, col_idx], errors='coerce').fillna(0)
+            # 2. HARD CLEANING (Obat Error dtypes & Identify)
+            for df in [df_r4, df_s4]:
+                if df is not None:
+                    # A. Paksa BIN & SKU jadi String bersih (Mencegah miss lookup)
+                    df.iloc[:, 0] = df.iloc[:, 0].astype(str).str.strip().str.upper()
+                    df.iloc[:, 1] = df.iloc[:, 1].astype(str).str.strip().str.upper()
 
-                    # 2. Sinkronisasi Kolom
-                    res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
-                    
-                    # 3. Jalankan Pivot
-                    df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
+                    # B. Fix Error 'Identify' (Paksa jadi string biar gak bentrok int64 vs str)
+                    if 'Identify' in df.columns:
+                        df['Identify'] = df['Identify'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-                    # 4. Pembersihan Data (Pastikan hanya QTY > 0)
-                    def clean_final_result(df):
-                        if df is not None and not df.empty:
-                            last_col = df.columns[-1] 
-                            df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
-                            df = df[df[last_col] > 0].reset_index(drop=True)
-                        return df
+                    # C. Fix Error 'float64' (Paksa semua kolom angka jadi numeric)
+                    # Loop semua kolom, kalau ada nama QTY, DIFF, atau RECON, hajar jadi float
+                    for col in df.columns:
+                        c_upper = str(col).upper()
+                        if any(x in c_upper for x in ['QTY', 'DIFF', 'RECON', 'SO']):
+                            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
-                    # 5. Simpan ke Session State
-                    st.session_state.df_mult_final = clean_final_result(df_mult)
-                    st.session_state.df_sing_final = clean_final_result(df_sing)
-                    st.session_state.df_res4_final = res4
-                    st.session_state.process_done = True
-                    
-                    st.rerun()
+            # 3. SINKRONISASI KOLOM (Panggil Logic Utama)
+            # Pastikan BIN di index 0 dan SKU di index 1 sudah bersih dari proses di atas
+            res4, miss4 = logic_cek_adjustment_final(df_r4, df_s4)
+            
+            # 4. JALANKAN PIVOT
+            df_mult, df_sing = logic_pivot_adjustment(res4, df_m5, miss4)
 
-                except Exception as e:
-                    st.error(f"❌ Terjadi Kesalahan: {str(e)}")
+            # 5. MEMBERSIHKAN HASIL AKHIR (Hanya QTY > 0)
+            def clean_final_result(df):
+                if df is not None and not df.empty:
+                    # Ambil kolom terakhir (biasanya QTY hasil olahan)
+                    last_col = df.columns[-1] 
+                    df[last_col] = pd.to_numeric(df[last_col], errors='coerce').fillna(0)
+                    df = df[df[last_col] > 0].reset_index(drop=True)
+                return df
+
+            # 6. SIMPAN KE SESSION STATE
+            st.session_state.df_mult_final = clean_final_result(df_mult)
+            st.session_state.df_sing_final = clean_final_result(df_sing)
+            st.session_state.df_res4_final = res4
+            st.session_state.process_done = True
+            
+            st.success("✅ Data Berhasil Disinkronkan & Dibersihkan!")
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"❌ Terjadi Kesalahan: {str(e)}")
 
         # --- AREA TAMPILAN HASIL ---
         if st.session_state.get("process_done"):
