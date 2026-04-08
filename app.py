@@ -541,37 +541,24 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
+# 🔥 1. FIX logic_cek_adjustment_final()
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    df_stock = df_stock_adj.copy()
-    
-    # 🔥 FIX UTAMA: AUTO DETECT & HAPUS KOLOM INDEX ANGKA
-    def clean_index_column(df):
-        """Otomatis hapus kolom pertama jika berisi angka index (0,1,2,3...)"""
-        if len(df) == 0:
-            return df
-            
-        first_col_data = df.iloc[:, 0]
-        try:
-            # Coba konversi ke numeric
-            first_numeric = pd.to_numeric(first_col_data, errors='coerce')
-            
-            # Cek apakah: 
-            # 1. Semua bisa jadi angka
-            # 2. Angka berurutan dari 0 sampai len(df)-1
-            if first_numeric.notna().all():
-                expected_range = set(range(len(df)))
-                actual_range = set(first_numeric.astype(int))
-                if expected_range == actual_range:
-                    # ✅ Ini kolom index, HAPUS!
-                    st.warning("🧹 Kolom index angka terdeteksi & dihapus otomatis!")
-                    return df.iloc[:, 1:].reset_index(drop=True)
-        except:
-            pass
+    # AUTO CLEAN KOLOM INDEX DI AWAL
+    def safe_clean_df(df):
+        if len(df) == 0: return df
+        # Cek kolom 0
+        if len(df.columns) > 0:
+            col0 = df.iloc[:, 0]
+            try:
+                nums = pd.to_numeric(col0, errors='coerce')
+                if nums.notna().all() and len(set(nums.dropna().astype(int))) == len(df):
+                    df = df.iloc[:, 1:].reset_index(drop=True)
+            except: pass
         return df
     
-    # Bersihkan kedua dataframe
-    df_recon = clean_index_column(df_recon)
-    df_stock = clean_index_column(df_stock)
+    df_recon = safe_clean_df(df_recon)
+    df_stock_adj = safe_clean_df(df_stock_adj)
+    df_stock = df_stock_adj.copy()
     
     def clean_val(x):
         if pd.isna(x): return ""
@@ -579,86 +566,110 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Ambil daftar SEMUA SKU yang ada di Stock Report
     skus_in_stock = set(df_stock.iloc[:, 2].apply(clean_val))
-
     recon_dict = {}
-    all_recon_keys = set()
-    for _, row in df_recon.iterrows():
+    
+    # SAFE ITERASI
+    for i in range(len(df_recon)):
         try:
-            qty_so = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+            row = df_recon.iloc[i]
+            qty_so = pd.to_numeric(row.iloc[6] if len(row) > 6 else 0, errors='coerce') or 0
             if qty_so > 0:
                 k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
-                recon_dict[k] = row.iloc[6]
-                all_recon_keys.add(k)
+                recon_dict[k] = qty_so
         except: continue
 
+    # ENSURE MINIMUM COLUMNS
     while df_stock.shape[1] < 12:
-        df_stock[f"Extra_{df_stock.shape[1]}"] = ""
+        df_stock[f"col_{df_stock.shape[1]}"] = ""
 
-    used_keys = set()
-    def do_lookup(row):
-        key_stock = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
-        if key_stock in recon_dict:
-            used_keys.add(key_stock)
-            return recon_dict[key_stock]
-        return ""
-
-    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
-
-    def do_diff(row):
+    def safe_lookup(row):
         try:
-            val_sys = row.iloc[9]
-            val_so = row.iloc[10]
-            if val_so != "" and val_so is not None:
-                return abs(float(val_sys) - float(val_so))
-        except: return 0
-        return ""
+            key_stock = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+            return recon_dict.get(key_stock, "")
+        except: return ""
 
-    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
+    df_stock.iloc[:, 10] = [safe_lookup(row) for _, row in df_stock.iterrows()]
+
+    def safe_diff(row):
+        try:
+            val_sys = pd.to_numeric(row.iloc[9], errors='coerce') or 0
+            val_so = pd.to_numeric(row.iloc[10], errors='coerce') or 0
+            return abs(val_sys - val_so)
+        except: return 0
+
+    df_stock.iloc[:, 11] = [safe_diff(row) for _, row in df_stock.iterrows()]
     
     cols = list(df_stock.columns)
-    cols[10] = "QTY SO"
-    cols[11] = "DIFF"
-    df_stock.columns = cols
+    if len(cols) > 10: cols[10] = "QTY SO"
+    if len(cols) > 11: cols[11] = "DIFF"
+    df_stock.columns = cols[:12]
 
-    def check_is_single(row):
-        sku_recon = clean_val(row.iloc[1])
-        qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-        return qty_recon > 0 and sku_recon not in skus_in_stock
+    def is_single(row):
+        try:
+            sku_recon = clean_val(row.iloc[1])
+            qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+            return qty_recon > 0 and sku_recon not in skus_in_stock
+        except: return False
 
-    df_need_single = df_recon[df_recon.apply(check_is_single, axis=1)].copy()
-    
+    df_need_single = df_recon[df_recon.apply(is_single, axis=1)].copy()
     return df_stock, df_need_single
 
+# 🔥 2. FIX logic_pivot_adjustment()
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
-    # Logika Multiple tetap (SO > SYS)
+    # AUTO CLEAN
+    def safe_clean_df(df):
+        if len(df) == 0: return df
+        if len(df.columns) > 0:
+            col0 = df.iloc[:, 0]
+            try:
+                nums = pd.to_numeric(col0, errors='coerce')
+                if nums.notna().all() and len(set(nums.dropna().astype(int))) == len(df):
+                    return df.iloc[:, 1:].reset_index(drop=True)
+            except: pass
+        return df
+    
+    df_stock_final = safe_clean_df(df_stock_final)
+    df_adj_plus_master = safe_clean_df(df_adj_plus_master)
+    df_recon_missing = safe_clean_df(df_recon_missing)
+    
     df_filtered = df_stock_final.copy()
-    df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
-    df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
-    df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
+    
+    # SAFE NUMERIC CONVERSION
+    def safe_numeric(col_idx):
+        return pd.to_numeric(df_filtered.iloc[:, col_idx], errors='coerce').fillna(0)
+    
+    df_filtered.iloc[:, 9] = safe_numeric(9)
+    df_filtered.iloc[:, 10] = safe_numeric(10)
+    df_filtered.iloc[:, 11] = safe_numeric(11)
     
     mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
     df_to_pivot = df_filtered[mask_multiple].copy()
     
-    pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
-    pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
-    
-    master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
-    df_multiple_final = pivot_multiple.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
-    
-    if not df_multiple_final.empty:
-        df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
-        if 'SKU_KEY' in df_multiple_final.columns: 
-            df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
+    if len(df_to_pivot) > 0:
+        sku_col = df_to_pivot.columns[2]
+        diff_col = df_to_pivot.columns[11]
+        pivot_multiple = df_to_pivot.groupby(sku_col)[diff_col].sum().reset_index()
+        pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
+        
+        master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
+        df_multiple_final = pivot_multiple.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
+        
+        if not df_multiple_final.empty and len(df_multiple_final.columns) > 0:
+            df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
+            if 'SKU_KEY' in df_multiple_final.columns: 
+                df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
+    else:
+        df_multiple_final = pd.DataFrame()
 
-    # Logika Single Final
+    # SINGLE LOGIC
     if not df_recon_missing.empty:
         df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
         df_recon_missing = df_recon_missing[df_recon_missing.iloc[:, 6] > 0]
         
         if not df_recon_missing.empty:
-            df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
+            bin_col, sku_col, qty_col = df_recon_missing.columns[0], df_recon_missing.columns[1], df_recon_missing.columns[6]
+            df_single_final = df_recon_missing.groupby([bin_col, sku_col])[qty_col].sum().reset_index()
             df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
         else:
             df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
