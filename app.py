@@ -105,27 +105,26 @@ st.markdown("""
     }
 
  /* ============================================
-       6. FILE UPLOADER - REFIX PREMIUM GOLD
+       6. FILE UPLOADER - GRID FORCE (ANTI-STACKED)
        ============================================ */
     [data-testid="stFileUploader"] {
         background-color: transparent !important;
         border: 1.5px dashed #b08d4a !important; 
         border-radius: 12px !important;
-        padding: 5px !important;
+        padding: 0 !important;
     }
 
-    /* Target area drop file - Paksa layout horizontal */
+    /* Paksa Grid System agar Teks di Kiri, Tombol di Kanan */
     [data-testid="stFileUploaderSection"] {
         background-color: #f8f9fa !important;
-        padding: 8px 15px !important;
-        border: none !important;
-        display: flex !important;
-        flex-direction: row !important; /* Biar tombol & teks sejajar horizontal */
+        padding: 10px 15px !important;
+        display: grid !important;
+        grid-template-columns: 1fr auto !important; /* Teks ambil sisa space, Tombol pas ukuran */
         align-items: center !important;
-        gap: 15px !important;
+        gap: 10px !important;
     }
 
-    /* Tombol Upload - Ukuran pas & warna solid */
+    /* Tombol Upload - Solid & Fixed */
     [data-testid="stFileUploader"] button {
         background-color: #b08d4a !important;
         background-image: none !important;
@@ -134,44 +133,46 @@ st.markdown("""
         font-weight: 700 !important;
         font-size: 11px !important;
         border-radius: 6px !important;
-        padding: 8px 20px !important; /* Padding disesuaikan */
+        padding: 8px 15px !important;
         text-transform: uppercase !important;
-        width: auto !important; /* Jangan full width */
+        width: 100px !important; /* Kunci lebar tombol */
         min-height: unset !important;
-        order: 2 !important; /* Paksa tombol pindah ke kanan */
+        margin: 0 !important;
     }
 
-    /* Area Teks (Drag and drop) */
+    /* Area Teks - Paksa Tetap di Kiri */
     [data-testid="stFileUploaderText"] {
-        order: 1 !important; /* Teks di sebelah kiri */
         text-align: left !important;
-        flex-grow: 1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
     }
 
-    /* Styling Teks Utama */
+    /* Teks 'Drag and drop' */
     [data-testid="stFileUploaderText"] > span {
-        font-size: 13px !important;
+        font-size: 12px !important;
         color: #1a1d2e !important;
         font-weight: 600 !important;
-        display: block !important;
+        line-height: 1.2 !important;
     }
 
-    /* Styling Teks Detail (Limit MB) */
+    /* Teks 'Limit MB' */
     [data-testid="stFileUploaderText"] > small {
         font-size: 10px !important;
         color: #6c757d !important;
-        display: block !important;
+        line-height: 1.2 !important;
     }
 
-    /* Icon Cloud - Sembunyikan jika mengganggu layout kolom sempit */
+    /* Buang Icon Awan karena bikin sempit */
     [data-testid="stFileUploaderIcon"] {
         display: none !important; 
     }
 
-    /* Hover effect */
-    [data-testid="stFileUploader"] button:hover {
-        background-color: #c5a059 !important;
-        box-shadow: 0 4px 8px rgba(176, 141, 74, 0.3) !important;
+    /* Hilangkan overlay default Streamlit yang ganggu layout */
+    [data-testid="stFileUploaderDropzone"] {
+        padding: 0 !important;
     }
     /* ============================================
        7. METRIC BOXES - PREMIUM CARD
