@@ -542,166 +542,101 @@ def get_yellow_skus(file, column_index):
     return yellow_set
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    # 🔥 AUTO CLEAN KOLOM INDEX
-    def safe_clean_df(df):
-        if len(df) == 0 or len(df.columns) == 0: return df
-        col0 = df.iloc[:, 0]
-        try:
-            nums = pd.to_numeric(col0, errors='coerce')
-            if nums.notna().all() and len(set(nums.dropna().astype(int))) >= len(df) * 0.9:
-                return df.iloc[:, 1:].reset_index(drop=True)
-        except: pass
-        return df
-    
-    df_recon = safe_clean_df(df_recon)
-    df_stock = safe_clean_df(df_stock_adj).copy()
+    df_stock = df_stock_adj.copy()
     
     def clean_val(x):
         if pd.isna(x): return ""
-        return str(x).strip().upper().rstrip('.0')
+        s = str(x).strip().upper()
+        if s.endswith('.0'): s = s[:-2]
+        return s
 
-    # 1. SKUS IN STOCK
-    try:
-        skus_in_stock = set(df_stock.iloc[:, 2].astype(str).apply(clean_val))
-    except:
-        skus_in_stock = set()
+    # 1. Ambil daftar SEMUA SKU yang ada di Stock Report
+    # Kita gunakan set SKU agar lookup-nya cepat
+    skus_in_stock = set(df_stock.iloc[:, 2].apply(clean_val))
 
-    # 2. RECON DICT
     recon_dict = {}
-    for i in range(min(len(df_recon), 50000)):
+    all_recon_keys = set()
+    for _, row in df_recon.iterrows():
         try:
-            row = df_recon.iloc[i]
-            if len(row) > 6:
-                qty_so = float(row.iloc[6]) if pd.notna(row.iloc[6]) else 0
-                if qty_so > 0:
-                    bin_val = clean_val(row.iloc[0])
-                    sku_val = clean_val(row.iloc[1])
-                    if bin_val and sku_val:
-                        key = f"{bin_val}|{sku_val}"
-                        recon_dict[key] = qty_so
-        except: 
-            continue
+            qty_so = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+            if qty_so > 0:
+                # Key tetap BIN|SKU untuk keperluan mapping QTY SO ke baris yang spesifik
+                k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
+                recon_dict[k] = row.iloc[6]
+                all_recon_keys.add(k)
+        except: continue
 
-    # 3. ENSURE 12 COLUMNS
-    for i in range(df_stock.shape[1], 12):
-        df_stock[f"col_{i}"] = 0
+    while df_stock.shape[1] < 12:
+        df_stock[f"Extra_{df_stock.shape[1]}"] = ""
 
-    # 🔥 4. LOOKUP - PER CELL ASSIGNMENT
-    for i in range(len(df_stock)):
+    used_keys = set()
+    def do_lookup(row):
+        key_stock = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+        if key_stock in recon_dict:
+            used_keys.add(key_stock)
+            return recon_dict[key_stock]
+        return ""
+
+    # Isi QTY SO ke Kolom K
+    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
+
+    # Hitung DIFF ke Kolom L
+    def do_diff(row):
         try:
-            row = df_stock.iloc[i]
-            bin_val = clean_val(row.iloc[1])
-            sku_val = clean_val(row.iloc[2])
-            key = f"{bin_val}|{sku_val}"
-            qty_so = float(recon_dict.get(key, 0))
-            df_stock.iloc[i, 10] = qty_so  # SCALAR PER CELL
-        except:
-            df_stock.iloc[i, 10] = 0.0
+            val_sys = row.iloc[9]
+            val_so = row.iloc[10]
+            if val_so != "" and val_so is not None:
+                return abs(float(val_sys) - float(val_so))
+        except: return 0
+        return ""
 
-    # 5. DIFF - PER CELL ASSIGNMENT  
-    for i in range(len(df_stock)):
-        try:
-            sys_qty = float(df_stock.iloc[i, 9]) if pd.notna(df_stock.iloc[i, 9]) else 0.0
-            so_qty = float(df_stock.iloc[i, 10]) if pd.notna(df_stock.iloc[i, 10]) else 0.0
-            diff_val = abs(sys_qty - so_qty)
-            df_stock.iloc[i, 11] = float(diff_val)  # SCALAR PER CELL
-        except:
-            df_stock.iloc[i, 11] = 0.0
-
-    # 6. RENAME COLUMNS
+    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
+    
     cols = list(df_stock.columns)
     cols[10] = "QTY SO"
     cols[11] = "DIFF"
     df_stock.columns = cols
 
-    # 🔥 7. SINGLE CHECK - FIXED BOOL ERROR!
-# REPLACE SELURUH BAGIAN INI (line ~1320-1330):
-if st.session_state.get("process_done"):
-    # 🔥 ULTRA SAFE EMPTY CHECK
-    check_data = st.session_state.get("df_res4_final")
+    # --- PERBAIKAN LOGIC SINGLE (BERBASIS SKU) ---
+    # Item masuk Single ADJ HANYA JIKA SKU-nya tidak ada sama sekali di daftar skus_in_stock
+    def check_is_single(row):
+        sku_recon = clean_val(row.iloc[1])
+        qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+        # Syarat: Qty > 0 DAN SKU-nya tidak ada di file Stock
+        return qty_recon > 0 and sku_recon not in skus_in_stock
+
+    df_need_single = df_recon[df_recon.apply(check_is_single, axis=1)].copy()
     
-    # ✅ SAFE CHECK - Handle semua kemungkinan error
-    if (check_data is None or 
-        not isinstance(check_data, pd.DataFrame) or 
-        check_data.empty or 
-        len(check_data.columns) < 11):
-        st.warning("⚠️ Data belum siap atau kosong!")
-        is_empty = True
-    else:
-        try:
-            # Cek apakah kolom 'QTY SO' ada (index 10)
-            if 'QTY SO' in check_data.columns:
-                qty_col = check_data['QTY SO']
-                qty_sum = pd.to_numeric(qty_col.fillna(0), errors='coerce').sum()
-                is_empty = qty_sum == 0
-            else:
-                # Fallback: pakai kolom index 10
-                qty_col = check_data.iloc[:, 10]
-                qty_sum = pd.to_numeric(qty_col.fillna(0), errors='coerce').sum()
-                is_empty = qty_sum == 0
-        except:
-            # Ultimate fallback
-            is_empty = True
-    
-    if is_empty:
-        st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
-    else:
-        st.success("✅ Analisis Selesai!")
-# 🔥 2. FIX logic_pivot_adjustment()
+    return df_stock, df_need_single
+
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
-    # AUTO CLEAN
-    def safe_clean_df(df):
-        if len(df) == 0: return df
-        if len(df.columns) > 0:
-            col0 = df.iloc[:, 0]
-            try:
-                nums = pd.to_numeric(col0, errors='coerce')
-                if nums.notna().all() and len(set(nums.dropna().astype(int))) == len(df):
-                    return df.iloc[:, 1:].reset_index(drop=True)
-            except: pass
-        return df
-    
-    df_stock_final = safe_clean_df(df_stock_final)
-    df_adj_plus_master = safe_clean_df(df_adj_plus_master)
-    df_recon_missing = safe_clean_df(df_recon_missing)
-    
+    # Logika Multiple tetap (SO > SYS)
     df_filtered = df_stock_final.copy()
-    
-    # SAFE NUMERIC CONVERSION
-    def safe_numeric(col_idx):
-        return pd.to_numeric(df_filtered.iloc[:, col_idx], errors='coerce').fillna(0)
-    
-    df_filtered.iloc[:, 9] = safe_numeric(9)
-    df_filtered.iloc[:, 10] = safe_numeric(10)
-    df_filtered.iloc[:, 11] = safe_numeric(11)
+    df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
+    df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
+    df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
     
     mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
     df_to_pivot = df_filtered[mask_multiple].copy()
     
-    if len(df_to_pivot) > 0:
-        sku_col = df_to_pivot.columns[2]
-        diff_col = df_to_pivot.columns[11]
-        pivot_multiple = df_to_pivot.groupby(sku_col)[diff_col].sum().reset_index()
-        pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
-        
-        master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
-        df_multiple_final = pivot_multiple.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
-        
-        if not df_multiple_final.empty and len(df_multiple_final.columns) > 0:
-            df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
-            if 'SKU_KEY' in df_multiple_final.columns: 
-                df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
-    else:
-        df_multiple_final = pd.DataFrame()
+    pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
+    pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
+    
+    master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
+    df_multiple_final = pivot_multiple.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
+    
+    if not df_multiple_final.empty:
+        df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
+        if 'SKU_KEY' in df_multiple_final.columns: 
+            df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
 
-    # SINGLE LOGIC
+    # Logika Single Final
     if not df_recon_missing.empty:
         df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
         df_recon_missing = df_recon_missing[df_recon_missing.iloc[:, 6] > 0]
         
         if not df_recon_missing.empty:
-            bin_col, sku_col, qty_col = df_recon_missing.columns[0], df_recon_missing.columns[1], df_recon_missing.columns[6]
-            df_single_final = df_recon_missing.groupby([bin_col, sku_col])[qty_col].sum().reset_index()
+            df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
             df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
         else:
             df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
@@ -1153,7 +1088,7 @@ def menu_Stock_Opname():
         list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
     with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG-", "GL2-SMG-CTN-","GUDANG LT 2"]
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTN","GUDANG LT 2"]
         selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
@@ -1162,7 +1097,6 @@ def menu_Stock_Opname():
     st.markdown("---")
 
     # STEP 1
-    # STEP 1: UPLOAD & RUN COMPARE
     st.subheader("1️⃣ Upload & Run Compare")
     c1, c2 = st.columns(2)
     with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
@@ -1170,55 +1104,28 @@ def menu_Stock_Opname():
 
     if up_scan and up_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
-            # 1. READ DATA
             df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
             df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
             
-            # 2. NORMALISASI SKU (BIAR SUMIFS AKURAT)
-            # Kita paksa SKU jadi String, Hapus Spasi, dan Huruf Besar semua
-            # Asumsi: Kolom SKU di Scan ada di index 1, di System ada di index 2
-            df_s_raw.iloc[:, 1] = df_s_raw.iloc[:, 1].astype(str).str.strip().str.upper()
-            df_t_raw.iloc[:, 2] = df_t_raw.iloc[:, 2].astype(str).str.strip().str.upper()
+            if selected_sub: df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+            if selected_bin_sys: df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
+            if selected_bin_cov: df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
 
-            # 3. APPLY FILTERS (SUB-INV & BIN)
-            # Filter Sub Kategori (Exact Match)
-            if selected_sub: 
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-
-            # Filter BIN System (Partial Match - Hanya yang dipilih)
-            if selected_bin_sys: 
-                # Bikin pattern: (BIN1|BIN2|BIN3)
-                pattern_sys = '|'.join([re.escape(c.upper()) for c in selected_bin_sys])
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().str.contains(pattern_sys, na=False)]
-            else:
-                # Kalo gak milih BIN System, data system dikosongin biar gak muncul SYSTEM + palsu
-                df_t_raw = df_t_raw.iloc[0:0]
-
-            # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
             res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
             res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
             
-            # 5. SMART MAPPING SKU TO ITEM NAME
             item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
             item_map.columns = ['SKU', 'NAME']
-            # Cleaning mapping dict biar gak miss
-            item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-            
-            # Mapping hasil
-            res_scan['ITEM NAME'] = res_scan['SKU'].str.strip().str.upper().map(map_dict)
-            # Pastikan kolom SKU di res_stock konsisten (sesuaikan index jika perlu)
-            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.strip().str.upper().map(map_dict)
+            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
+            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict)
 
-            # 6. SAVE TO SESSION STATE
             st.session_state.compare_result = {
-                'res_scan': res_scan, 
-                'res_stock': res_stock, 
+                'res_scan': res_scan, 'res_stock': res_stock, 
                 'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
                 'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
                 'map_dict': map_dict
             }
-            st.success("✅ Compare Berhasil! Data sudah sinkron.")
             st.rerun()
 
     if st.session_state.compare_result:
@@ -1326,39 +1233,16 @@ def menu_Stock_Opname():
                 except Exception as e:
                     st.error(f"❌ Terjadi Kesalahan: {str(e)}")
 
-                # --- AREA TAMPILAN HASIL ---
-       # REPLACE SELURUH BAGIAN INI (line ~1320-1330):
-if st.session_state.get("process_done"):
-    # 🔥 ULTRA SAFE EMPTY CHECK
-    check_data = st.session_state.get("df_res4_final")
-    
-    # ✅ SAFE CHECK - Handle semua kemungkinan error
-    if (check_data is None or 
-        not isinstance(check_data, pd.DataFrame) or 
-        check_data.empty or 
-        len(check_data.columns) < 11):
-        st.warning("⚠️ Data belum siap atau kosong!")
-        is_empty = True
-    else:
-        try:
-            # Cek apakah kolom 'QTY SO' ada (index 10)
-            if 'QTY SO' in check_data.columns:
-                qty_col = check_data['QTY SO']
-                qty_sum = pd.to_numeric(qty_col.fillna(0), errors='coerce').sum()
-                is_empty = qty_sum == 0
+        # --- AREA TAMPILAN HASIL ---
+        if st.session_state.get("process_done"):
+            # Cek apakah hasil lookup beneran ada isinya
+            check_data = st.session_state.df_res4_final
+            is_empty = check_data['QTY SO'].replace('', 0).astype(float).sum() == 0
+            
+            if is_empty:
+                st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
             else:
-                # Fallback: pakai kolom index 10
-                qty_col = check_data.iloc[:, 10]
-                qty_sum = pd.to_numeric(qty_col.fillna(0), errors='coerce').sum()
-                is_empty = qty_sum == 0
-        except:
-            # Ultimate fallback
-            is_empty = True
-    
-    if is_empty:
-        st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
-    else:
-        st.success("✅ Analisis Selesai!")
+                st.success("✅ Analisis Selesai!")
             
             t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "➡️ SET UP REAL +"])
             
