@@ -5363,61 +5363,115 @@ import streamlit as st
 def init_db_logistic():
     conn = sqlite3.connect('logistic_sby_final.db', check_same_thread=False)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS karyawan (nama TEXT, posisi TEXT, tipe TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS libur_request (nama TEXT, tanggal TEXT, jenis TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS plot_shift3 (nama TEXT, tanggal TEXT, posisi TEXT, tipe TEXT)''')
+    # Tabel Karyawan
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS karyawan (
+            nama TEXT, 
+            posisi TEXT, 
+            tipe TEXT
+        )
+    ''')
+    # Tabel Libur Request
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS libur_request (
+            nama TEXT, 
+            tanggal TEXT, 
+            jenis TEXT
+        )
+    ''')
     conn.commit()
     return conn
 
+# Panggil di paling atas biar gak error "no such table"
 conn = init_db_logistic()
 
-# Fail-safe buat variabel menu biar nggak NameError pas apps loading
-if 'menu' not in st.session_state:
-    st.session_state.menu = "Logistic Schedule"
-menu = st.session_state.menu
-
+# Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
-    # --- CSS TOTAL FIX: LOCK BUTTON SIZE & PREMIUM DARK CARD ---
+    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
     st.markdown("""
         <style>
+            /* 1. Header Utama - Efek Gradient Glass */
             .hero-header {
                 background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
-                color: white; padding: 25px; border-radius: 12px;
-                text-align: center; margin-bottom: 35px;
-                font-weight: 800; font-size: 26px;
+                color: white;
+                padding: 25px;
+                border-radius: 12px;
+                text-align: center;
+                margin-bottom: 35px;
+                font-weight: 800;
+                font-size: 26px;
+                letter-spacing: 0.5px;
                 box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
             }
-            
-            /* Kunci ukuran tombol hapus biar GAK BISA kegedean */
+
+            /* 1.5 Sub-Header Stylings */
+            div[data-testid="stVerticalBlock"] h3 {
+                color: #000000 !important;
+                border-left: 5px solid #0062E6;
+                padding-left: 15px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            /* 1. Kunci ukuran tombol hapus biar GAK BISA kegedean */
             .small-del-container div.stButton > button {
                 width: 45px !important;
                 height: 35px !important;
                 padding: 0px !important;
                 min-height: 35px !important;
                 min-width: 45px !important;
+                line-height: 1 !important;
                 font-size: 16px !important;
                 background: #1a1d2e !important;
                 border: 1px solid rgba(255,255,255,0.1) !important;
                 border-radius: 6px !important;
-                margin-top: 5px !important;
+                margin-top: 5px !important; /* Biar sejajar tengah sama card */
             }
 
             .small-del-container div.stButton > button:hover {
                 background: #FF4B4B !important;
                 border-color: #FF4B4B !important;
             }
+        
 
-            .staff-card-dark {
-                background-color: #1a1d2e !important;
-                border-radius: 6px !important;
-                padding: 12px 18px !important;
-                margin-bottom: 8px !important;
-                border-left: 6px solid #00FF00 !important;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+            /* Efek Focus Pas Diklik */
+            div[data-testid="stTextInput"] > div > div:focus-within, 
+            div[data-testid="stDateInput"] > div > div:focus-within {
+                border-color: #007BFF !important;
+                box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
             }
 
-            .card-text { color: #FFFFFF !important; font-weight: 700; text-transform: uppercase; font-size: 14px; }
-            .card-subtext { color: #888888 !important; font-size: 11px; }
+            }
+
+            /* 4. Font & Labels - Soft Neutral */
+            label { 
+                color: #B0B3B8 !important; 
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                margin-bottom: 8px !important;
+            }
+
+            input, textarea { 
+                background-color: transparent !important; 
+                color: #ffffff !important; 
+                font-family: 'Inter', sans-serif !important;
+                -webkit-text-fill-color: #ffffff !important; 
+            }
+
+            .custom-card {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background-color: #1a1c27;
+                border-radius: 8px;
+                padding: 12px 18px;
+                margin-bottom: 10px;
+                border-left: 5px solid #00FF00;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            }
+            .card-text { color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 14px; }
+            .card-subtext { color: #888888; font-size: 12px; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -5428,39 +5482,49 @@ if menu == "Logistic Schedule":
     with st.form("form_tim_komplit", clear_on_submit=True): 
         c1, c2, c3 = st.columns(3)
         nama_input = c1.text_input("Nama Lengkap")
-        posisi_input = c2.selectbox("Posisi/Role", ["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "SPV"])
+        posisi_input = c2.selectbox("Posisi/Role", 
+            ["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
         tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
         
         if st.form_submit_button("💾 SIMPAN TIM"):
             if nama_input:
                 conn.execute("INSERT INTO karyawan VALUES (?,?,?)", (nama_input.upper().strip(), posisi_input, tipe_input))
                 conn.commit()
+                st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
+    # --- DAFTAR KARYAWAN AKTIF ---
     with st.expander("🔍 Staff Database", expanded=True):
         df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
         if not df_cek.empty:
             for i, row in df_cek.iterrows():
-                cc1, cc2 = st.columns([9, 1]) # Rasio sempit buat tombol
+                cc1, cc2 = st.columns([6, 1])
                 with cc1:
-                    st.markdown(f"""<div class="staff-card-dark"><div class="card-text">{row['nama']}</div>
-                                <div class="card-subtext">{row['posisi']} • {row['tipe']}</div></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""
+                        <div class="custom-card" style="border-left-color: #007BFF;">
+                            <div>
+                                <div class="card-text">{row['nama']}</div>
+                                <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
                 with cc2:
-                    st.markdown('<div class="small-del-container">', unsafe_allow_html=True)
-                    if st.button("🗑️", key=f"staff_{i}"):
+                    if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
                         conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
                         conn.commit()
                         st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.info("Belum ada data tim di database.") 
 
     st.divider()
 
-    # --- 2. DAY OFF REQUEST ---
+    # --- 2. PLOT LIBUR ---
     st.subheader("🚫 2. Day Off Request")
     col_l1, col_l2 = st.columns([1, 2])
+
     with col_l1:
         df_k = pd.read_sql_query("SELECT nama FROM karyawan", conn)
-        with st.form("form_libur", clear_on_submit=True):
+        with st.form("form_libur_komplit", clear_on_submit=True):
             target = st.selectbox("Pilih Nama", df_k['nama']) if not df_k.empty else None
             tgl_off = st.date_input("Tanggal Off")
             jenis_off = st.radio("Jenis", ["LIBUR", "CUTI", "LPH"], horizontal=True)
@@ -5471,58 +5535,87 @@ if menu == "Logistic Schedule":
                     st.rerun()
 
     with col_l2:
-        df_off = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
-        for i, row in df_off.iterrows():
-            m1, m2 = st.columns([8, 1])
-            with m1:
-                st.markdown(f"""<div class="staff-card-dark" style="border-left-color: #FF4B4B;"><div class="card-text">{row['nama']}</div>
-                            <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div></div>""", unsafe_allow_html=True)
-            with m2:
-                st.markdown('<div class="small-del-container">', unsafe_allow_html=True)
-                if st.button("🗑️", key=f"lib_{i}"):
-                    conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
-                    conn.commit()
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
+        if not df_off_view.empty:
+            for i, row in df_off_view.iterrows():
+                m1, m2 = st.columns([6, 1])
+                with m1:
+                    st.markdown(f"""
+                        <div class="custom-card" style="border-left-color: #FF4B4B;">
+                            <div>
+                                <div class="card-text">{row['nama']}</div>
+                                <div class="card-subtext">{row['tanggal']} • {row['jenis']}</div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with m2:
+                    if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
+                        conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
+                        conn.commit()
+                        st.rerun()
 
     st.divider()
 
-    # --- 3. STOCK OPNAME PLOT (SHIFT 3) ---
-    st.subheader("🌙 3. Stock Opname Plot")
+    # --- 3. DATABASE CHECK & MONITORING ---
+    cursor = conn.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS plot_shift3 (nama TEXT, tanggal TEXT, posisi TEXT, tipe TEXT)')
+    conn.commit()
+
+    try:
+        df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
+    except Exception:
+        df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
+
+    # --- 3. TAMPILAN INPUT SHIFT 3 ---
+    st.subheader("🌙 2. Stock Opname Plot")
+
     df_karyawan = pd.read_sql_query("SELECT nama, tipe, posisi FROM karyawan", conn)
-    karyawan_options = df_karyawan['nama'].tolist() if not df_karyawan.empty else []
+    karyawan_options = df_karyawan['nama'].tolist()
 
     col_in1, col_in2 = st.columns(2)
+
     with col_in1:
-        nama_s3 = st.selectbox("Pilih Nama Tim", karyawan_options, key="s3_name")
-        tgl_s3 = st.date_input("Tanggal Masuk Shift 3", datetime.now(), key="s3_date")
+        nama_s3 = st.selectbox("Pilih Nama Tim", karyawan_options, key="s3_name_input")
+        tgl_s3 = st.date_input("Tanggal Masuk Shift 3", datetime.now(), key="s3_date_input")
+
     with col_in2:
-        if not df_karyawan.empty and nama_s3:
-            sel = df_karyawan[df_karyawan['nama'] == nama_s3].iloc[0]
-            st.info(f"Posisi: {sel['posisi']} | Tipe: {sel['tipe']}")
+        if not df_karyawan.empty:
+            selected_data = df_karyawan[df_karyawan['nama'] == nama_s3].iloc[0]
+            st.info(f"Posisi: {selected_data['posisi']} | Tipe: {selected_data['tipe']}")
 
     if st.button("SUBMIT PLOT SHIFT 3", use_container_width=True):
-        if nama_s3:
-            conn.execute("INSERT INTO plot_shift3 VALUES (?,?,?,?)", (nama_s3, str(tgl_s3), sel['posisi'], sel['tipe']))
+        check = conn.execute("SELECT * FROM plot_shift3 WHERE nama=? AND tanggal=?", 
+                             (nama_s3, tgl_s3.strftime('%Y-%m-%d'))).fetchone()
+        
+        if not check:
+            conn.execute("INSERT INTO plot_shift3 (nama, tanggal, posisi, tipe) VALUES (?, ?, ?, ?)", 
+                         (nama_s3, tgl_s3.strftime('%Y-%m-%d'), selected_data['posisi'], selected_data['tipe']))
             conn.commit()
+            st.success(f"✅ {nama_s3} Masuk Plot Shift 3!")
             st.rerun()
+        else:
+            st.warning("Nama ini sudah terdaftar di tanggal tersebut!")
 
-    # --- MONITORING SHIFT 3 ---
-    df_monitor = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
-    if not df_monitor.empty:
-        for i, row in df_monitor.iterrows():
-            lc1, lc2, lc3 = st.columns([5, 3, 1]) # Di sini tadi yang bikin tombol melar
+    # --- 4. LIST MONITORING ---
+    st.divider()
+    if not df_monitor_s3.empty:
+        for index, row in df_monitor_s3.iterrows():
+            lc1, lc2, lc3 = st.columns([3, 1, 0.5])
             with lc1:
-                st.markdown(f"""<div class="staff-card-dark"><div class="card-text">{row['nama']}</div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div style="background-color: #1a1c27; padding: 10px; border-radius: 5px; border-left: 5px solid #00FF00; margin-bottom: 5px;">
+                        <span style="color: #FFFFFF; font-weight: bold;">{row['nama']}</span>
+                    </div>
+                """, unsafe_allow_html=True)
             with lc2:
-                st.markdown(f"<div style='margin-top:15px; color:#888;'>{row['tanggal']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding: 10px; color: #888;'>{row['tanggal']}</div>", unsafe_allow_html=True)
             with lc3:
-                st.markdown('<div class="small-del-container">', unsafe_allow_html=True)
-                if st.button("🗑️", key=f"s3_{i}"):
+                if st.button("🗑️", key=f"del_s3_{index}"):
                     conn.execute("DELETE FROM plot_shift3 WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
                     conn.commit()
                     st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.info("Belum ada tim yang di-plot ke Shift 3.")
 
     # --- 3. GENERATOR JADWAL JEZ SBY ---
     st.subheader("✅3. Schedule Shift")
