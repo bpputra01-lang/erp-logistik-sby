@@ -5389,16 +5389,7 @@ conn = init_db_logistic()
 if menu == "Logistic Schedule":
     st.markdown("""
         <style>
-        /* 1. Reset Global Input agar Putih di Area Putih, Gelap di Area Gelap */
-        [data-testid="stTextInput"] > div > div, 
-        [data-testid="stDateInput"] > div > div,
-        [data-testid="stSelectbox"] > div > div {
-            background-color: #ffffff !important; 
-            border: 1px solid rgba(0,0,0,0.1) !important;
-            border-radius: 8px !important;
-            color: #1a1d2e !important;
-        }
-
+    
         /* Styling Judul dan Label: Gelap agar mudah dibaca */
         div[data-testid="stVerticalBlock"] h1, h2, h3, label p {
             color: #1a1d2e !important;
