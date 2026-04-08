@@ -105,74 +105,59 @@ st.markdown("""
     }
 
  /* ============================================
-       6. FILE UPLOADER - GRID FORCE (ANTI-STACKED)
+       6. FILE UPLOADER - FIXED IMAGE 1 STYLE
        ============================================ */
     [data-testid="stFileUploader"] {
-        background-color: transparent !important;
-        border: 1.5px dashed #b08d4a !important; 
-        border-radius: 12px !important;
-        padding: 0 !important;
+        background-color: #ffffff !important;
+        border: 2px dashed #b08d4a !important; 
+        border-radius: 15px !important;
+        padding: 5px !important;
     }
 
-    /* Paksa Grid System agar Teks di Kiri, Tombol di Kanan */
-    [data-testid="stFileUploaderSection"] {
-        background-color: #f8f9fa !important;
-        padding: 10px 15px !important;
-        display: grid !important;
-        grid-template-columns: 1fr auto !important; /* Teks ambil sisa space, Tombol pas ukuran */
+    /* INI KUNCINYA: Memaksa isi uploader tetap satu baris (Horizontal) */
+    [data-testid="stFileUploaderSection"] > div {
+        flex-direction: row !important;
+        display: flex !important;
         align-items: center !important;
-        gap: 10px !important;
+        justify-content: space-between !important;
+        width: 100% !important;
+        padding: 10px 20px !important;
     }
 
-    /* Tombol Upload - Solid & Fixed */
+    /* Tombol 'Browse Files' - Paksa ke kanan, warna emas solid, teks putih */
     [data-testid="stFileUploader"] button {
         background-color: #b08d4a !important;
         background-image: none !important;
         color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
         font-weight: 700 !important;
-        font-size: 11px !important;
-        border-radius: 6px !important;
-        padding: 8px 15px !important;
-        text-transform: uppercase !important;
-        width: 100px !important; /* Kunci lebar tombol */
-        min-height: unset !important;
-        margin: 0 !important;
+        font-size: 13px !important;
+        border-radius: 8px !important;
+        border: none !important;
+        padding: 8px 20px !important;
+        order: 2 !important; /* Paksa tombol di kanan */
+        width: auto !important;
+        min-width: 120px !important;
     }
 
-    /* Area Teks - Paksa Tetap di Kiri */
+    /* Area Teks - Paksa di kiri */
     [data-testid="stFileUploaderText"] {
+        order: 1 !important;
         text-align: left !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
+        flex: 1 !important;
     }
 
-    /* Teks 'Drag and drop' */
-    [data-testid="stFileUploaderText"] > span {
-        font-size: 12px !important;
-        color: #1a1d2e !important;
-        font-weight: 600 !important;
-        line-height: 1.2 !important;
-    }
-
-    /* Teks 'Limit MB' */
-    [data-testid="stFileUploaderText"] > small {
-        font-size: 10px !important;
-        color: #6c757d !important;
-        line-height: 1.2 !important;
-    }
-
-    /* Buang Icon Awan karena bikin sempit */
+    /* Icon Cloud - Sesuai gambar 1, pakai warna emas */
     [data-testid="stFileUploaderIcon"] {
-        display: none !important; 
+        color: #b08d4a !important;
+        fill: #b08d4a !important;
+        margin-right: 15px !important;
     }
 
-    /* Hilangkan overlay default Streamlit yang ganggu layout */
-    [data-testid="stFileUploaderDropzone"] {
-        padding: 0 !important;
+    /* Hilangkan background abu-abu internal yang bikin kaku */
+    [data-testid="stFileUploaderSection"] {
+        background-color: transparent !important;
+        border: none !important;
     }
     /* ============================================
        7. METRIC BOXES - PREMIUM CARD
