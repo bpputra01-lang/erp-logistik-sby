@@ -542,9 +542,6 @@ def get_yellow_skus(file, column_index):
     return yellow_set
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    import pandas as pd
-    import numpy as np
-    
     # 🔥 AUTO CLEAN KOLOM INDEX
     def safe_clean_df(df):
         if len(df) == 0 or len(df.columns) == 0: return df
