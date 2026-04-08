@@ -2593,11 +2593,12 @@ def menu_retur_out_system():
 
     conn = init_db()
 
-    # --- 3. UPLOAD & AUTO-SAVE ---
+    ## --- 3. UPLOAD & AUTO-SAVE ---
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_v3_perm")
     
     if uploaded_file:
         try:
+            # Baca file yang diupload
             df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df_upload.columns = [str(c).strip() for c in df_upload.columns]
             
@@ -2612,9 +2613,10 @@ def menu_retur_out_system():
                 df_to_save = df_upload[list(required_cols.keys())].copy()
                 df_to_save.rename(columns=required_cols, inplace=True)
                 
-                # TAMBAHKAN DATE TIME SEKARANG
+                # Tambah waktu input
                 df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
+                # Cek supaya gak double upload file yang sama
                 file_key = f"up_v3_{uploaded_file.name}_{len(df_upload)}"
                 if st.session_state.get('last_file_key_v3') != file_key:
                     df_to_save.to_sql('retur_out_v3', conn, if_exists='append', index=False)
