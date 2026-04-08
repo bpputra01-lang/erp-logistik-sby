@@ -4024,8 +4024,6 @@ def tampilan_balancing_stock():
     finally:
         conn.close()
     
-
-
 import streamlit as st
 
 # --- INITIALIZATION ---
