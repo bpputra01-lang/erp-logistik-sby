@@ -104,191 +104,176 @@ st.markdown("""
         border-color: #ff4444 !important;
     }
 
-    /* ============================================ 
-       6. FILE UPLOADER 
-       ============================================ */ 
-    [data-testid="stFileUploader"] { 
-        background-color: #f0f2f6; 
-        border: 2px dashed rgba(0, 43, 91, 0.3) !important; 
-        border-radius: 10px; 
-        padding: 12px; 
-    } 
+    /* ============================================
+       6. FILE UPLOADER
+       ============================================ */
+    [data-testid="stFileUploader"] {
+        background-color: #f0f2f6;
+        border: 2px dashed rgba(0, 43, 91, 0.3) !important;
+        border-radius: 10px;
+        padding: 12px;
+    }
+    [data-testid="stFileUploader"] button {
+        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important;
+        color: #1a1d2e !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+    }
 
-    [data-testid="stFileUploader"] button { 
-        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important; 
-        color: #1a1d2e !important; 
-        font-weight: 600 !important; 
-        border-radius: 6px !important; 
-        font-size: 12px !important; 
-    } 
+    /* ============================================
+       7. METRIC BOXES - PREMIUM CARD
+       ============================================ */
+    .m-box {
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+        padding: 18px 20px !important;
+        border-radius: 10px !important;
+        border-left: 4px solid #C5A059 !important;
+        margin-bottom: 10px !important;
+        text-align: left !important;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
+    }
+    .m-lbl {
+        color: rgba(255, 255, 255, 0.65) !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .m-val {
+        color: #C5A059 !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+    }
 
-    /* ============================================ 
-       7. METRIC BOXES - PREMIUM CARD 
-       ============================================ */ 
-    .m-box { 
-        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important; 
-        padding: 18px 20px !important; 
-        border-radius: 10px !important; 
-        border-left: 4px solid #C5A059 !important; 
-        margin-bottom: 10px !important; 
-        text-align: left !important; 
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important; 
-    } 
+    /* ============================================
+       8. RADIO BUTTONS
+       ============================================ */
+    div.row-widget.stRadio > div { background-color: transparent !important; }
+    div.row-widget.stRadio label {
+        color: #a0a5b5 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 13px !important;
+        padding: 8px 14px !important;
+        border-radius: 6px !important;
+        background: rgba(26, 29, 46, 0.5) !important;
+        border: 1px solid rgba(197, 160, 89, 0.15) !important;
+        transition: all 0.2s ease !important;
+    }
+    div.row-widget.stRadio label:hover {
+        background: rgba(197, 160, 89, 0.1) !important;
+        border-color: rgba(197, 160, 89, 0.3) !important;
+        color: #C5A059 !important;
+    }
 
-    .m-lbl { 
-        color: rgba(255, 255, 255, 0.65) !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 10px !important; 
-        font-weight: 600 !important; 
-        text-transform: uppercase !important; 
-        letter-spacing: 1px !important; 
-        display: block; 
-        margin-bottom: 6px; 
-    } 
+    /* ============================================
+       9. INPUT BOXES - GOLD BORDER
+       ============================================ */
+    div[data-baseweb="select"] > div,
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+    }
+    div[data-baseweb="select"] > div:focus-within,
+    [data-testid="stFileUploaderSection"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    [data-testid="stFileUploaderText"] > span,
+    [data-testid="stFileUploaderText"] > small {
+        color: #e0e0e0 !important;
+        -webkit-text-fill-color: #e0e0e0 !important;
+    }
 
-    .m-val { 
-        color: #C5A059 !important; 
-        font-family: 'Poppins', sans-serif !important; 
-        font-size: 24px !important; 
-        font-weight: 700 !important; 
-    } 
+    /* Text inputs */
+    div[data-baseweb="input"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+    }
+    div[data-baseweb="input"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    input {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 14px !important;
+    }
 
-    /* ============================================ 
-       8. RADIO BUTTONS 
-       ============================================ */ 
-    div.row-widget.stRadio > div { 
-        background-color: transparent !important; 
-    } 
+    /* ============================================
+       10. BUTTONS LAYOUT
+       ============================================ */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+    }
+    [data-testid="column"] {
+        flex: 0 1 auto !important;
+        width: auto !important;
+        min-width: fit-content !important;
+        max-width: fit-content !important;
+    }
+    div.stButton > button {
+        width: 170px !important;
+        min-height: 3.3em !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        padding: 10px 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        font-size: 13px !important;
+        line-height: 1.3 !important;
+    }
 
-    div.row-widget.stRadio label { 
-        color: #a0a5b5 !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 13px !important; 
-        padding: 8px 14px !important; 
-        border-radius: 6px !important; 
-        background: rgba(26, 29, 46, 0.5) !important; 
-        border: 1px solid rgba(197, 160, 89, 0.15) !important; 
-        transition: all 0.2s ease !important; 
-    } 
+    /* ============================================
+       11. SIDEBAR BUTTONS - GOLD THEME
+       ============================================ */
+    [data-testid="stSidebar"] div.stButton > button {
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important;
+        color: #C5A059 !important;
+        border: 1px solid rgba(197, 160, 89, 0.25) !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 42px !important;
+        border-radius: 8px !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+        transition: all 0.25s ease !important;
+        margin-bottom: 6px !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button:hover {
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important;
+        border-color: #C5A059 !important;
+        color: #FFD700 !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button p {
+        color: inherit !important;
+        font-family: 'Inter', sans-serif !important;
+    }
 
-    div.row-widget.stRadio label:hover { 
-        background: rgba(197, 160, 89, 0.1) !important; 
-        border-color: rgba(197, 160, 89, 0.3) !important; 
-        color: #C5A059 !important; 
-    } 
-
-    /* ============================================ 
-       9. INPUT BOXES - GOLD BORDER 
-       ============================================ */ 
-    div[data-baseweb="select"] > div, 
-    [data-testid="stFileUploaderSection"] { 
-        background-color: #1a1d2e !important; 
-        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
-        border-radius: 8px !important; 
-    } 
-
-    div[data-baseweb="select"] > div:focus-within, 
-    [data-testid="stFileUploaderSection"]:focus-within { 
-        border-color: #C5A059 !important; 
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
-    } 
-
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
-    [data-testid="stFileUploaderText"] > span, 
-    [data-testid="stFileUploaderText"] > small { 
-        color: #e0e0e0 !important; 
-        -webkit-text-fill-color: #e0e0e0 !important; 
-    } 
-
-    /* Text inputs */ 
-    div[data-baseweb="input"] { 
-        background-color: #1a1d2e !important; 
-        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
-        border-radius: 8px !important; 
-        padding: 10px 14px !important; 
-    } 
-
-    div[data-baseweb="input"]:focus-within { 
-        border-color: #C5A059 !important; 
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
-    } 
-
-    input { 
-        color: #ffffff !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 14px !important; 
-    } 
-
-    /* ============================================ 
-       10. BUTTONS LAYOUT 
-       ============================================ */ 
-    [data-testid="stHorizontalBlock"] { 
-        display: flex !important; 
-        flex-wrap: wrap !important; 
-        gap: 10px !important; 
-        justify-content: flex-start !important; 
-        width: 100% !important; 
-    } 
-
-    [data-testid="column"] { 
-        flex: 0 1 auto !important; 
-        width: auto !important; 
-        min-width: fit-content !important; 
-        max-width: fit-content !important; 
-    } 
-
-    div.stButton > button { 
-        width: 170px !important; 
-        min-height: 3.3em !important; 
-        white-space: normal !important; 
-        word-wrap: break-word !important; 
-        padding: 10px 14px !important; 
-        display: flex !important; 
-        align-items: center !important; 
-        justify-content: center !important; 
-        text-align: center !important; 
-        font-size: 13px !important; 
-        line-height: 1.3 !important; 
-    } 
-
-    /* ============================================ 
-       11. SIDEBAR BUTTONS - GOLD THEME 
-       ============================================ */ 
-    [data-testid="stSidebar"] div.stButton > button { 
-        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important; 
-        color: #C5A059 !important; 
-        border: 1px solid rgba(197, 160, 89, 0.25) !important; 
-        width: 100% !important; 
-        height: auto !important; 
-        min-height: 42px !important; 
-        border-radius: 8px !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-weight: 500 !important; 
-        font-size: 12px !important; 
-        white-space: nowrap !important; 
-        transition: all 0.25s ease !important; 
-        margin-bottom: 6px !important; 
-    } 
-
-    [data-testid="stSidebar"] div.stButton > button:hover { 
-        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important; 
-        border-color: #C5A059 !important; 
-        color: #FFD700 !important; 
-    } 
-
-    [data-testid="stSidebar"] div.stButton > button p { 
-        color: inherit !important; 
-        font-family: 'Inter', sans-serif !important; 
-    } 
-
-    /* ============================================ 
-       12. LABELS 
-       ============================================ */ 
-    [data-testid="stWidgetLabel"] p { 
-        color: #2d3748 !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-weight: 600 !important; 
-        font-size: 13px !important; 
+    /* ============================================
+       12. LABELS
+       ============================================ */
+    [data-testid="stWidgetLabel"] p {
+        color: #2d3748 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -1085,10 +1070,10 @@ def menu_Stock_Opname():
     # --- FILTER SECTION ---
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
-        list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
+        list_sub_kat = ["GYM&SWIM", "SZ SOCKS", "SZ EQUIPMENT", "JZ EQUIPMENT", "OTHER ACC", "SOCKS", "OTHER EQP", "SHOES", "LOWER BODY", "UPPER BODY", "BALL", "EQUIPMENT SPORT", "SHIRT", "ALL BASELAYER", "JACKET", "SET APPAREL", "JERSEY", "PANTS", "SANDALS", "BASELAYER", "OTHERS", "UKNOWN SC", "NUTRITION", "BAG", "EXTRAS SHOES"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
     with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
         selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
@@ -2505,29 +2490,27 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
+# --- 1. INITIALIZE DATABASE (VERSI V3 - FRESH RESTART) ---
 def init_db():
-    conn = sqlite3.connect('jez_reporting.db', check_same_thread=False)
-    cursor = conn.cursor()
+    conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
+    c = conn.cursor()
     
-    # 1. BUAT TABEL (Daftar kolom dasar)
-    cursor.execute('''
+    # Buat tabel V3 jika belum ada
+    c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out_v3 (
-            tanggal TEXT,
-            no_retur TEXT,
-            item_name TEXT,
-            qty INTEGER,
-            pic TEXT,
-            keterangan TEXT,
-            status TEXT
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
+            item_name TEXT, variant TEXT, sub_kategori TEXT,
+            harga_beli REAL, harga_jual REAL, 
+            qty_system INTEGER, qty_so INTEGER,
+            tanggal TEXT
         )
     ''')
-    conn.commit()
-
-    # 2. LOGIKA AUTO-PATCH: Tambah kolom jika belum ada (Safe Migration)
-    cursor.execute("PRAGMA table_info(retur_out_v3)")
-    existing_cols = [row[1] for row in cursor.fetchall()]
     
-    # Daftar kolom lengkap yang wajib ada di V3
+    # LOGIKA AUTO-PATCH: Pastikan kolom ada (Safety Check)
+    c.execute("PRAGMA table_info(retur_out_v3)")
+    existing_cols = [row[1] for row in c.fetchall()]
+    
     required_db_cols = {
         'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
         'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
@@ -2537,13 +2520,10 @@ def init_db():
     
     for col, dtype in required_db_cols.items():
         if col not in existing_cols:
-            try:
-                cursor.execute(f"ALTER TABLE retur_out_v3 ADD COLUMN {col} {dtype}")
-            except:
-                pass # Menghindari error jika kolom mendadak ada
-    
+            c.execute(f"ALTER TABLE retur_out_v3 ADD COLUMN {col} {dtype}")
+            
     conn.commit()
-    return conn 
+    return conn
 
 def menu_retur_out_system():
     # Jam Jakarta/Surabaya
@@ -2603,12 +2583,12 @@ def menu_retur_out_system():
             border: 1px solid #3d4455;
             padding: 10px 15px;
         }
+        [data-testid="stWidgetLabel"] { display: none; }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header"><p class="hero-text">RETUR OUT - DATABASE V3</p></div>', unsafe_allow_html=True)
 
-    # Inisialisasi Database
     conn = init_db()
 
     # --- 3. UPLOAD & AUTO-SAVE ---
@@ -2616,7 +2596,6 @@ def menu_retur_out_system():
     
     if uploaded_file:
         try:
-            # Baca file
             df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df_upload.columns = [str(c).strip() for c in df_upload.columns]
             
@@ -2631,10 +2610,9 @@ def menu_retur_out_system():
                 df_to_save = df_upload[list(required_cols.keys())].copy()
                 df_to_save.rename(columns=required_cols, inplace=True)
                 
-                # Tambah timestamp
+                # TAMBAHKAN DATE TIME SEKARANG
                 df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
-                # Cek Double Upload via Session State
                 file_key = f"up_v3_{uploaded_file.name}_{len(df_upload)}"
                 if st.session_state.get('last_file_key_v3') != file_key:
                     df_to_save.to_sql('retur_out_v3', conn, if_exists='append', index=False)
@@ -2648,15 +2626,13 @@ def menu_retur_out_system():
 
     # --- 4. DATA VIEW & METRICS ---
     try:
-        # Load Data
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out_v3", conn)
 
         if not df_db.empty:
             # 1. Kalkulasi Dashboard
             total_sku = df_db['sku'].nunique()
             total_qty_system = df_db['qty_system'].sum()
-            # Gunakan fillna(0) biar gak meledak kalau ada data kosong
-            total_value = (df_db['qty_system'].fillna(0) * df_db['harga_beli'].fillna(0)).sum()
+            total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
             # 2. Tampilan Metrik Box
             m1, m2, m3 = st.columns(3)
@@ -2686,7 +2662,7 @@ def menu_retur_out_system():
                 ''', unsafe_allow_html=True)
 
             st.markdown("### 📜 Database History (V3)")
-            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang...", key="search_v3")
+            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang...")
 
             df_display = df_db.sort_values(by='rowid', ascending=False)
 
@@ -2696,8 +2672,7 @@ def menu_retur_out_system():
                     df_display['item_name'].str.contains(search_query, case=False, na=False)
                 ]
 
-            # Sembunyikan kolom rowid dari tampilan tabel
-            cols_to_show = [col for col in df_display.columns if col not in ['rowid', 'id']]
+            cols_to_show = [col for col in df_display.columns if col != 'rowid' and col != 'id']
 
             event = st.dataframe(
                 df_display[cols_to_show],
@@ -2707,7 +2682,6 @@ def menu_retur_out_system():
                 selection_mode="single-row" 
             )
 
-            # Logika Hapus Data
             if event.selection.rows:
                 row_idx = event.selection.rows[0]
                 target_id = df_display.iloc[row_idx]['rowid']
@@ -2715,10 +2689,8 @@ def menu_retur_out_system():
                 
                 st.warning(f"⚠️ Hapus SKU: **{target_sku}** dari V3?")
                 if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                    # Buka koneksi baru untuk delete agar aman
-                    with sqlite3.connect('jez_reporting.db') as conn_del:
-                        conn_del.execute("DELETE FROM retur_out_v3 WHERE rowid = ?", (int(target_id),))
-                        conn_del.commit()
+                    conn.execute("DELETE FROM retur_out_v3 WHERE rowid = ?", (int(target_id),))
+                    conn.commit()
                     st.success("Data berhasil dihapus!")
                     st.rerun()
         else:
@@ -2727,7 +2699,8 @@ def menu_retur_out_system():
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Database: {e}")
     finally:
-        conn.close() # Pastikan ditutup di akhir
+        conn.close()
+
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
     res = df_case.copy()
@@ -4303,7 +4276,7 @@ with st.sidebar:
     # --- KELOMPOK 5: EXTRAS ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
     
-    m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC"]
+    m5_list = ["Logistic Schedule", "Balancing Stock"]
     idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else 0
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
 
@@ -4548,7 +4521,7 @@ elif menu == "Scan Out Validation":
                     return 'color: black'
                 
                 st.subheader("📋 DATA SCAN (COMPARED)")
-                styled_df = df_res.style.map(highlight_vba, subset=['Keterangan']).apply(
+                styled_df = df_res.style.applymap(highlight_vba, subset=['Keterangan']).apply(
                     lambda x: ['background-color: #ffcccc' if 'MISSMATCH' in str(x) or 'BELUM' in str(x) else '' for i in x],
                     subset=['Keterangan'], axis=1
                 )
@@ -4569,7 +4542,7 @@ elif menu == "Scan Out Validation":
                             return 'color: red'
                         return 'color: black'
                     
-                    styled_draft = df_draft.style.map(highlight_draft, subset=['NOTES'])
+                    styled_draft = df_draft.style.applymap(highlight_draft, subset=['NOTES'])
                     st.dataframe(styled_draft, use_container_width=True, height=300)
                 else:
                     st.info("ℹ️ Tidak ada data untuk DRAFT SET UP")
@@ -5385,8 +5358,8 @@ def init_db_logistic():
 # Panggil di paling atas biar gak error "no such table"
 conn = init_db_logistic()
 
-# Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
+    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
     # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
     st.markdown("""
         <style>
@@ -5405,7 +5378,7 @@ if menu == "Logistic Schedule":
                 border: 1px solid rgba(255, 255, 255, 0.1);
             }
 
-            /* 1.5 Sub-Header Stylings */
+            /* 1.5 Sub-Header Stylings (INI YANG BARU) */
             div[data-testid="stVerticalBlock"] h3 {
                 color: #000000 !important;
                 border-left: 5px solid #0062E6;
@@ -5502,7 +5475,7 @@ if menu == "Logistic Schedule":
                 st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
-    # --- DAFTAR KARYAWAN AKTIF ---
+    # --- DAFTAR KARYAWAN AKTIF (MODEL KARTU) ---
     with st.expander("🔍 Staff Database", expanded=True):
         df_cek = pd.read_sql_query("SELECT nama, posisi, tipe FROM karyawan", conn)
         if not df_cek.empty:
@@ -5518,7 +5491,7 @@ if menu == "Logistic Schedule":
                         </div>
                     """, unsafe_allow_html=True)
                 with cc2:
-                    if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
+                    if st.button("🗑️", key=f"del_staff_{i}", use_container_width=True):
                         conn.execute("DELETE FROM karyawan WHERE nama = ?", (row['nama'],))
                         conn.commit()
                         st.rerun()
@@ -5527,7 +5500,7 @@ if menu == "Logistic Schedule":
 
     st.divider()
 
-    # --- 2. PLOT LIBUR ---
+    # --- 2. PLOT LIBUR (MODEL KARTU) ---
     st.subheader("🚫 2. Day Off Request")
     col_l1, col_l2 = st.columns([1, 2])
 
@@ -5544,7 +5517,7 @@ if menu == "Logistic Schedule":
                     st.rerun()
 
     with col_l2:
-        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC", conn)
+        df_off_view = pd.read_sql_query("SELECT * FROM libur_request ORDER BY tanggal DESC LIMIT 5", conn)
         if not df_off_view.empty:
             for i, row in df_off_view.iterrows():
                 m1, m2 = st.columns([6, 1])
@@ -5558,24 +5531,34 @@ if menu == "Logistic Schedule":
                         </div>
                     """, unsafe_allow_html=True)
                 with m2:
-                    if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
+                    if st.button("🗑️", key=f"del_libur_{i}", use_container_width=True):
                         conn.execute("DELETE FROM libur_request WHERE nama=? AND tanggal=?", (row['nama'], row['tanggal']))
                         conn.commit()
                         st.rerun()
+        else:
+            st.info("Belum ada data pengajuan libur.")
 
     st.divider()
 
-    # --- 3. DATABASE CHECK & MONITORING ---
+    # --- 1. PASTIKAN TABEL ADA DULU ---
     cursor = conn.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS plot_shift3 (nama TEXT, tanggal TEXT, posisi TEXT, tipe TEXT)')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS plot_shift3 (
+            nama TEXT,
+            tanggal TEXT,
+            posisi TEXT,
+            tipe TEXT
+        )
+    ''')
     conn.commit()
 
+    # --- 2. BARU BOLEH READ DATA ---
     try:
         df_monitor_s3 = pd.read_sql_query("SELECT * FROM plot_shift3 ORDER BY tanggal DESC", conn)
     except Exception:
         df_monitor_s3 = pd.DataFrame(columns=['nama', 'tanggal', 'posisi', 'tipe'])
 
-    # --- 3. TAMPILAN INPUT SHIFT 3 ---
+    # --- 3. TAMPILAN INPUT ---
     st.subheader("🌙 2. Stock Opname Plot")
 
     df_karyawan = pd.read_sql_query("SELECT nama, tipe, posisi FROM karyawan", conn)
@@ -5593,6 +5576,7 @@ if menu == "Logistic Schedule":
             st.info(f"Posisi: {selected_data['posisi']} | Tipe: {selected_data['tipe']}")
 
     if st.button("SUBMIT PLOT SHIFT 3", use_container_width=True):
+        # Cek duplikat biar gak double input
         check = conn.execute("SELECT * FROM plot_shift3 WHERE nama=? AND tanggal=?", 
                              (nama_s3, tgl_s3.strftime('%Y-%m-%d'))).fetchone()
         
@@ -5677,70 +5661,38 @@ if menu == "Logistic Schedule":
                 for shf_jam, shf_role in base_roles:
                     if shf_jam == "SHIFT 3": continue 
                     
-                    slot_key = f"{shf_jam} - {shf_role}"
-
-                    # --- [PRIORITAS 1: JALUR VIP RECOVERY] ---
-                    if shf_jam == "SHIFT 2":
-                        day_index = day_names.index(day_name)
-                        if day_index > 0:
-                            day_kemarin = day_names[day_index - 1]
-                            for k_rec in karyawan_list:
-                                n_rec = k_rec['nama']
-                                if weekly_counter[n_rec] >= k_rec['target_fix']: continue
-                                if not df_libur[(df_libur['nama'] == n_rec) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                                
-                                if "SHIFT 3" in get_active_shifts(n_rec, day_kemarin) and k_rec['posisi'] == shf_role:
-                                    if not get_active_shifts(n_rec, day_name):
-                                        current_fill = len(storage[day_name][slot_key])
-                                        if (phase == "TARGET_1_ORANG" and current_fill < 1) or \
-                                           (phase == "TARGET_2_ORANG" and shf_role != "SPV" and current_fill < 2) or \
-                                           (phase == "SISA_JATAH"):
-                                            
-                                            if n_rec not in storage[day_name][slot_key]:
-                                                storage[day_name][slot_key].append(n_rec)
-                                                weekly_counter[n_rec] += 1
-
-                    # --- [PRIORITAS 2: LOGIKA STANDAR POTENTIAL] ---
                     if shf_jam == "SHIFT 0" and count_s0(day_name) >= 2:
                         continue
 
+                    slot_key = f"{shf_jam} - {shf_role}"
                     if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
                     if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
 
                     potential = []
                     for k in karyawan_list:
                         nama = k['nama']
-                        active_shifts = get_active_shifts(nama, day_name)
-                        
                         if weekly_counter[nama] >= k['target_fix']: continue
                         if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                         
-                        tgl_besok = (datetime.strptime(tgl_ini, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
-                        tgl_kemarin = (datetime.strptime(tgl_ini, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
-                        is_libur_besok = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_besok)].empty
-                        is_libur_kemarin = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_kemarin)].empty
+                        active_shifts = get_active_shifts(nama, day_name)
+                        if shf_jam in active_shifts: continue 
                         
-                        if is_libur_besok and shf_jam != "SHIFT 1": continue
-                        if is_libur_kemarin and shf_jam != "SHIFT 2": continue
-
-                        day_index = day_names.index(day_name)
-                        if day_index > 0:
-                            day_kemarin = day_names[day_index - 1]
-                            if "SHIFT 3" in get_active_shifts(nama, day_kemarin) and shf_jam != "SHIFT 2":
-                                continue
-
                         if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
                         if k['posisi'] == "SPV" and shf_role != "SPV": continue
-                        if shf_jam in active_shifts: continue 
-
-                        if k['tipe'] == "Part-Full":
-                            if is_libur_besok or is_libur_kemarin or (day_index > 0 and "SHIFT 3" in get_active_shifts(nama, day_names[day_index-1])):
-                                if active_shifts: continue 
-                            if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
-                        else:
-                            if active_shifts: continue
+                        
+                        if k['tipe'] == "Part-Full" and active_shifts:
+                            s_udah = active_shifts[0]
+                            if s_udah == "SHIFT 0" and shf_jam != "SHIFT 1": continue
+                            if s_udah == "SHIFT 1" and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
+                            if s_udah == "SHIFT 2" and shf_jam not in ["SHIFT 1", "SHIFT 3"]: continue
+                            if s_udah == "SHIFT 3" and shf_jam != "SHIFT 2": continue
 
                         is_match = (k['posisi'] == shf_role)
+                        if k['tipe'] == "Part-Full":
+                            if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
+                        else:
+                            if len(active_shifts) >= 1: continue
+                        
                         potential.append({'k': k, 'match': is_match})
 
                     if potential:
@@ -5748,11 +5700,11 @@ if menu == "Logistic Schedule":
                         potential = sorted(potential, key=lambda x: x['match'], reverse=True)
                         p = potential[0]
                         nm_fix = p['k']['nama']
-                        if nm_fix not in storage[day_name][slot_key]:
-                            storage[day_name][slot_key].append(nm_fix)
-                            weekly_counter[nm_fix] += 1
-                            if len(get_active_shifts(nm_fix, day_name)) == 2:
-                                double_day_count[nm_fix] += 1
+                        storage[day_name][slot_key].append(nm_fix)
+                        weekly_counter[nm_fix] += 1
+                        if len(get_active_shifts(nm_fix, day_name)) == 2:
+                            double_day_count[nm_fix] += 1
+
         # --- 3. SIMPAN HASIL ---
         final_table = []
         for shf_jam, shf_role in base_roles:
@@ -5774,23 +5726,28 @@ if menu == "Logistic Schedule":
         col_v1, col_v2 = st.columns([5, 2])
         
         with col_v1:
-            st.markdown("### 📋 WEEKLY SCHEDULE LOGISTIC SBY")
+            st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
 
+            # Fungsi buat nentuin warna background berdasarkan SHIFT
             def color_by_shift(row):
                 shift_type = str(row['SHIFT - ROLE'])
+                # Default style (Teks putih, background gelap)
                 base_style = 'color: #FFFFFF; font-weight: 600; border: 0.5px solid #222;'
+                
                 if "SHIFT 0" in shift_type:
-                    bg = "background-color: #004e92;"
+                    bg = "background-color: #004e92;" # Biru Deep
                 elif "SHIFT 1" in shift_type:
-                    bg = "background-color: #1b4d3e;"
+                    bg = "background-color: #1b4d3e;" # Hijau Forest
                 elif "SHIFT 2" in shift_type:
-                    bg = "background-color: #4b0082;"
+                    bg = "background-color: #4b0082;" # Ungu Indigo
                 elif "SHIFT 3" in shift_type:
-                    bg = "background-color: #b45f06;"
+                    bg = "background-color: #b45f06;" # Orange Bata
                 else:
                     bg = "background-color: #1a1c27;"
+                
                 return [bg + base_style for _ in row]
 
+            # Tampilkan dengan warna per baris (Shift)
             st.dataframe(
                 st.session_state.res_df.style.apply(color_by_shift, axis=1),
                 use_container_width=True,
@@ -5799,7 +5756,7 @@ if menu == "Logistic Schedule":
             )
 
         with col_v2:
-            st.markdown("### 📈 TOTAL SHIFT")
+            st.markdown("### 📈 REALISASI")
             sum_data = []
             df_staff_master = pd.read_sql_query("SELECT nama, tipe FROM karyawan", conn)
             
@@ -5808,10 +5765,11 @@ if menu == "Logistic Schedule":
                 t = st.session_state.summary_shift.get(n, 0)
                 if t > 0:
                     target = 9 if k['tipe'] == "Part-Full" else 6
-                    status = "✅ OK" if t >= target else "⚠️ KURANG SHIFT"
+                    status = "✅ OK" if t >= target else "⚠️ KURANG"
                     sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": status})
             
             if sum_data:
+                # Pakai dataframe biar stylenya seragam sama sebelah
                 st.dataframe(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False), use_container_width=True, hide_index=True)
             else:
                 st.info("Belum ada data realisasi.")
@@ -5840,316 +5798,69 @@ elif menu == "List Retur Out":
 
 import streamlit as st
 import pandas as pd
-import sqlite3
 from datetime import datetime
-import math
 
-# --- 1. SQLITE CORE LOGIC (Perbaikan Query INSERT) ---
-def get_db_connection():
-    return sqlite3.connect('jez_reporting.db', check_same_thread=False)
+# --- CONFIG ---
+st.set_page_config(page_title="Ops Dashboard", layout="wide")
 
-def init_db():
-    conn = get_db_connection()
-    # Tabel Laporan
-    conn.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
-    # Tabel Todo
-    conn.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
-    # Tracker Hari
-    conn.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
-    
-    # Isi data awal ke DB kalau masih kosong
-    if not conn.execute('SELECT * FROM reports').fetchone():
-        data_awal = [
-            ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"), ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
-            ("STOCK MINUS", "VERREL & GALIH", "❌ Belum"), ("BALANCING STOCK", "FARIL & YUDI", "❌ Belum"),
-            ("RTO", "FARIL & YUDI", "❌ Belum"), ("OUTBOUND PROCESS", "FARIL & YUDI", "❌ Belum"),
-            ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"), ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
-            ("DASHBOARD SIDOARJO", "VANO", "❌ Belum"), ("INBOUND PROCESS", "VANO", "❌ Belum"),
-            ("SURABAYA DASHBOARD", "HAMZAH", "❌ Belum"), ("SEMARANG DASHBOARD", "HAMZAH", "❌ Belum"),
-            ("MANIFEST", "HAMZAH", "❌ Belum"), ("REFUND", "HAMZAH", "❌ Belum"),
-            ("REFILL & OVERSTOCK", "KRISNA", "❌ Belum"), ("ZERO PUTAWAY", "WAREHOUSE FULLFILLMENT", "❌ Belum")
-        ]
-        conn.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', data_awal)
-    conn.commit()
-    conn.close()
-
-def sync_data():
-    """Sinkronisasi DB ke Session State & Handle Reset Harian"""
-    conn = get_db_connection()
-    today = datetime.now().strftime('%Y-%m-%d')
-    res = conn.execute('SELECT last_date FROM reset_tracker').fetchone()
-    
-    # Logic Auto Reset Harian
-    if not res or res[0] != today:
-        conn.execute('UPDATE reports SET status = "❌ Belum"')
-        conn.execute('DELETE FROM todo')
-        conn.execute('DELETE FROM reset_tracker')
-        conn.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
-        conn.commit()
-    
-    # Tarik data dari DB ke Session State lu
-    reports_db = conn.execute('SELECT laporan, pic, status FROM reports').fetchall()
-    st.session_state.db_report = [{"Laporan": r[0], "PIC": r[1], "Status": r[2]} for r in reports_db]
-    
-    todo_db = conn.execute('SELECT task, done FROM todo').fetchall()
-    st.session_state.todo_list = [{"task": t[0], "done": bool(t[1])} for t in todo_db]
-    conn.close()
-
-# Jalankan Database
-init_db()
-sync_data()
-
-# --- 2. INITIAL DATA (Lu punya, tetep ada buat jaga-jaga) ---
-if 'db_report' not in st.session_state:
-    pass
-
-if 'todo_list' not in st.session_state:
-    st.session_state.todo_list = []
-
-# --- 3. CSS DARK THEME (Gue Balikin & Gue Perkuat - PERSIS PUNYA LU) ---
+# --- CUSTOM CSS (Biar tabel & text lebih enak dilihat) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-
-    /* Global Font */
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    /* 1. Header Utama - Efek Gradient Glass */
-    .hero-header {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white;
-        padding: 25px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 35px;
-        font-weight: 800;
-        font-size: 26px;
-        letter-spacing: 0.5px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    /* 2. Card Laporan (Gaya Kolom Kiri) */
-    .report-card {
-        background-color: #1f2937; 
-        padding: 15px; 
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2); 
-        margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; 
-        color: #f3f4f6;
-        transition: transform 0.2s ease;
-    }
-    .report-card:hover { transform: translateY(-2px); }
-
-    /* 3. Box To-Do Container */
-    .todo-container {
-        background-color: #111827; 
-        padding: 20px; 
-        border-radius: 15px;
-        border: 1px solid #374151; 
-        margin-bottom: 20px;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    /* 4. Checkbox Dark Mode */
-    div[data-testid="stCheckbox"] div[role="checkbox"] {
-        background-color: #1f2937 !important;
-        border: 2px solid #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
-        background-color: #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] p {
-        color: #e5e7eb !important;
-        font-weight: 500 !important;
-    }
-    
-    /* 5. Input & Button Styling */
-    .stTextInput input { 
-        background-color: #1f2937 !important; 
-        color: white !important; 
-        border: 1px solid #374151 !important;
-        border-radius: 8px !important;
-    }
-    .stButton > button { 
-        width: 100%; 
-        border-radius: 8px; 
-        background-color: #1e3a8a; 
-        color: white;
-        border: 1px solid #3b82f6;
-        font-weight: 600;
-        transition: 0.3s ease; 
-    }
-    .stButton > button:hover { 
-        background-color: #3b82f6; 
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-    }
+    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
+    .main-header { font-size: 28px; font-weight: bold; color: #1E3A8A; }
     </style>
     """, unsafe_allow_html=True)
+
+# --- LOGIKA MENU ---
+
+if menu == "📊 Reporting & PIC":
+    st.markdown('<p class="main-header">Reporting & PIC Daily Monitoring</p>', unsafe_allow_html=True)
     
-# --- 4. LOGIKA ROUTING ---
-# (Pastikan variabel 'menu' sudah didefinisikan di sidebar lu sebelum bagian ini)
-if menu == "Reporting & PIC":
-    st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([1.2, 1])
-    with c1:
-        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
-        current_user = st.selectbox("👤 Pilih Nama:", list_pic, key="pic_v_final")
-    with c2:
-        st.write("")
-        st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
+    # 1. Dashboard Metrics (Ringkasan Cepat)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Laporan", "10", "Target")
+    m2.metric("Selesai", "6", "60%")
+    m3.metric("Belum Lapor", "4", "-2", delta_color="inverse")
+    m4.metric("PIC On-Duty", "5 Orang", "Aktif")
 
     st.divider()
 
-    col_kiri, col_kanan = st.columns([1.8, 1])
+    # 2. Main Layout (Tabel PIC & Reporting di Kiri, To-Do di Kanan)
+    col_tabel, col_todo = st.columns([2, 1])
 
-    with col_kiri:
-        st.subheader(f"📋 PIC: {current_user}")
-        tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
+    with col_tabel:
+        st.subheader("📋 Jadwal Kewajiban & Status PIC")
         
-        with tab_me:
-            for idx, task in enumerate(st.session_state.db_report):
-                if task['PIC'] == current_user:
-                    ck1, ck2 = st.columns([4, 1.2])
-                    with ck1:
-                        st.markdown(f"""
-                        <div class="report-card">
-                            <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
-                            <small style="color:#9ca3af;">Status: {task['Status']}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    with ck2:
-                        st.write("") 
-                        if task['Status'] == "❌ Belum":
-                            if st.button(f"Update", key=f"up_dark_{idx}"):
-                                # Update Session
-                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                # Update SQLite
-                                conn = get_db_connection()
-                                conn.execute('UPDATE reports SET status = "✅ Selesai" WHERE laporan = ?', (task['Laporan'],))
-                                conn.commit()
-                                conn.close()
-                                st.rerun()
-                        else:
-                            st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
+        # Data yang menggabungkan Kewajiban, Waktu, dan PIC
+        data_ops = pd.DataFrame([
+            {"Jam": "08:00", "Laporan": "Absensi & Briefing", "PIC": "Budi", "Status": "✅ Selesai"},
+            {"Jam": "10:00", "Laporan": "Update Stock Gudang", "PIC": "Siska", "Status": "✅ Selesai"},
+            {"Jam": "13:00", "Laporan": "Progress Produksi", "PIC": "Andi", "Status": "⏳ In Progress"},
+            {"Jam": "15:00", "Laporan": "Quality Control Check", "PIC": "Rina", "Status": "❌ Pending"},
+            {"Jam": "17:00", "Laporan": "End of Day Report", "PIC": "Budi", "Status": "❌ Pending"},
+        ])
+        
+        # Nampilin tabel (Dataframe) yang interaktif
+        st.dataframe(data_ops, use_container_width=True, hide_index=True)
+        
+        st.warning("⚠️ **Note:** PIC Rina belum submit laporan QC. Tolong di-follow up.")
 
-        with tab_all:
-            st.markdown("### 📊 Team Progress Summary")
-            pic_stats = {}
-            for t in st.session_state.db_report:
-                pic = t['PIC']
-                if pic not in pic_stats:
-                    pic_stats[pic] = {"total": 0, "selesai": 0}
-                pic_stats[pic]["total"] += 1
-                if t['Status'] == "✅ Selesai":
-                    pic_stats[pic]["selesai"] += 1
+    with col_todo:
+        st.subheader("✅ To-Do List Hari Ini")
+        st.write("Tugas tambahan di luar reporting rutin:")
+        
+        # To-do list interaktif
+        st.checkbox("Cek stok packing material", value=True)
+        st.checkbox("Meeting mingguan jam 14:00")
+        st.checkbox("Kirim invoice ke Finance")
+        st.checkbox("Follow up complain customer X")
+        
+        st.divider()
+        st.subheader("📝 Catatan Lapangan")
+        catatan = st.text_area("Ada kendala operasional?", placeholder="Tulis di sini...")
+        if st.button("Simpan Catatan"):
+            st.success("Catatan berhasil disimpan ke log.")
 
-            st.write("**📈 Laporan Operasional**")
-            for pic, stats in pic_stats.items():
-                progress = (stats['selesai'] / stats['total']) * 100
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>👤 {pic}</b>
-                        <span>{stats['selesai']}/{stats['total']} Selesai</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
-                        <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.write("---")
-            st.write("**📝 To Do List Summary**")
-            if "todo_list" in st.session_state and st.session_state.todo_list:
-                td_total = len(st.session_state.todo_list)
-                td_selesai = sum(1 for item in st.session_state.todo_list if item['done'])
-                td_progress = (td_selesai / td_total) * 100
-                
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #10b981; background-color: #111827;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>📋 Total Tugas</b>
-                        <span>{td_selesai}/{td_total} Item</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 12px;">
-                        <div style="background-color: #10b981; width: {td_progress}%; height: 12px; border-radius: 5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-    with col_kanan:
-        st.markdown("""<div style="background-color: #1a1c27; padding: 10px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px; text-align: center;"><h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4></div>""", unsafe_allow_html=True)
-
-        # 1. Form Input (Tetap di Atas)
-        with st.form("form_todo_dark", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            if st.form_submit_button("➕ Tambah") and tugas_baru:
-                conn = get_db_connection()
-                conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
-                conn.commit()
-                conn.close()
-                sync_data()
-                st.rerun()
-
-        # 2. Logic Pagination (5 Item Per Halaman)
-        if "todo_list" in st.session_state and st.session_state.todo_list:
-            items_per_page = 3
-            total_items = len(st.session_state.todo_list)
-            total_pages = math.ceil(total_items / items_per_page)
-            
-            # Init session state buat simpan halaman aktif
-            if 'todo_page' not in st.session_state:
-                st.session_state.todo_page = 1
-            
-            # Ambil item sesuai halaman sekarang
-            start_idx = (st.session_state.todo_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            current_items = st.session_state.todo_list[start_idx:end_idx]
-
-            # 3. Tampilkan Item
-            for i, item in enumerate(current_items):
-                real_idx = start_idx + i  # Index asli di DB/List Utama
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    color_border = '#10b981' if item['done'] else '#3b82f6'
-                    st.markdown(f"""
-                        <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
-                            <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with c2:
-                    st.write("")
-                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
-                    if res != item['done']:
-                        conn = get_db_connection()
-                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
-                        conn.commit()
-                        conn.close()
-                        sync_data()
-                        st.rerun()
-
-            # 4. Navigasi Panah (Pindah Halaman)
-            st.divider()
-            nav1, nav2, nav3 = st.columns([1, 2, 1])
-            
-            with nav1:
-                # Tombol Prev (Hanya muncul kalau bukan di hal 1)
-                if st.session_state.todo_page > 1:
-                    if st.button("⬅️ Prev", key="btn_prev_page"):
-                        st.session_state.todo_page -= 1
-                        st.rerun()
-            
-            with nav2:
-                # Indikator Halaman
-                st.markdown(f"<p style='text-align:center; color:#9ca3af; padding-top:10px;'>Halaman {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
-            
-            with nav3:
-                # Tombol Next (Hanya muncul kalau masih ada halaman selanjutnya)
-                if st.session_state.todo_page < total_pages:
-                    if st.button("Next ➡️", key="btn_next_page"):
-                        st.session_state.todo_page += 1
-                        st.rerun()
-        else:
-            st.info("Belum ada tugas tambahan.")
+elif menu == "⚙️ Settings":
+    st.subheader("Pengaturan Dashboard")
+    st.write("Di sini lu bisa atur nama PIC, shift kerja, atau ganti template laporan.")
