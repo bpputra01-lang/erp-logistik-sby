@@ -541,6 +541,74 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
+def logic_cek_adjustment_final(df_recon, df_stock_adj):
+    df_stock = df_stock_adj.copy()
+    
+    def clean_val(x):
+        if pd.isna(x): return ""
+        s = str(x).strip().upper()
+        if s.endswith('.0'): s = s[:-2]
+        return s
+
+    # 1. Ambil daftar SEMUA SKU yang ada di Stock Report
+    # Kita gunakan set SKU agar lookup-nya cepat
+    skus_in_stock = set(df_stock.iloc[:, 2].apply(clean_val))
+
+    recon_dict = {}
+    all_recon_keys = set()
+    for _, row in df_recon.iterrows():
+        try:
+            qty_so = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+            if qty_so > 0:
+                # Key tetap BIN|SKU untuk keperluan mapping QTY SO ke baris yang spesifik
+                k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
+                recon_dict[k] = row.iloc[6]
+                all_recon_keys.add(k)
+        except: continue
+
+    while df_stock.shape[1] < 12:
+        df_stock[f"Extra_{df_stock.shape[1]}"] = ""
+
+    used_keys = set()
+    def do_lookup(row):
+        key_stock = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+        if key_stock in recon_dict:
+            used_keys.add(key_stock)
+            return recon_dict[key_stock]
+        return ""
+
+    # Isi QTY SO ke Kolom K
+    df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
+
+    # Hitung DIFF ke Kolom L
+    def do_diff(row):
+        try:
+            val_sys = row.iloc[9]
+            val_so = row.iloc[10]
+            if val_so != "" and val_so is not None:
+                return abs(float(val_sys) - float(val_so))
+        except: return 0
+        return ""
+
+    df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
+    
+    cols = list(df_stock.columns)
+    cols[10] = "QTY SO"
+    cols[11] = "DIFF"
+    df_stock.columns = cols
+
+    # --- PERBAIKAN LOGIC SINGLE (BERBASIS SKU) ---
+    # Item masuk Single ADJ HANYA JIKA SKU-nya tidak ada sama sekali di daftar skus_in_stock
+    def check_is_single(row):
+        sku_recon = clean_val(row.iloc[1])
+        qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+        # Syarat: Qty > 0 DAN SKU-nya tidak ada di file Stock
+        return qty_recon > 0 and sku_recon not in skus_in_stock
+
+    df_need_single = df_recon[df_recon.apply(check_is_single, axis=1)].copy()
+    
+    return df_stock, df_need_single
+
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
     df_filtered = df_stock_final.copy()
     
@@ -586,41 +654,6 @@ def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing)
         if not df_temp_missing.empty:
             df_single_final = df_temp_missing.groupby([df_temp_missing.columns[0], df_temp_missing.columns[1]])[df_temp_missing.columns[6]].sum().reset_index()
             df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
-        
-    return df_multiple_final, df_single_final
-def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
-    # Logika Multiple tetap (SO > SYS)
-    df_filtered = df_stock_final.copy()
-    df_filtered.iloc[:, 9] = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
-    df_filtered.iloc[:, 10] = pd.to_numeric(df_filtered.iloc[:, 10], errors='coerce').fillna(0)
-    df_filtered.iloc[:, 11] = pd.to_numeric(df_filtered.iloc[:, 11], errors='coerce').fillna(0)
-    
-    mask_multiple = df_filtered.iloc[:, 10] > df_filtered.iloc[:, 9]
-    df_to_pivot = df_filtered[mask_multiple].copy()
-    
-    pivot_multiple = df_to_pivot.groupby(df_to_pivot.columns[2])[df_to_pivot.columns[11]].sum().reset_index()
-    pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
-    
-    master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
-    df_multiple_final = pivot_multiple.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
-    
-    if not df_multiple_final.empty:
-        df_multiple_final.iloc[:, -1] = df_multiple_final['TOTAL_DIFF']
-        if 'SKU_KEY' in df_multiple_final.columns: 
-            df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'])
-
-    # Logika Single Final
-    if not df_recon_missing.empty:
-        df_recon_missing.iloc[:, 6] = pd.to_numeric(df_recon_missing.iloc[:, 6], errors='coerce').fillna(0)
-        df_recon_missing = df_recon_missing[df_recon_missing.iloc[:, 6] > 0]
-        
-        if not df_recon_missing.empty:
-            df_single_final = df_recon_missing.groupby([df_recon_missing.columns[0], df_recon_missing.columns[1]])[df_recon_missing.columns[6]].sum().reset_index()
-            df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
-        else:
-            df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
-    else:
-        df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
         
     return df_multiple_final, df_single_final
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
