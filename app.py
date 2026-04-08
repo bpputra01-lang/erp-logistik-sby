@@ -105,52 +105,59 @@ st.markdown("""
     }
 
  /* ============================================
-       6. FILE UPLOADER - ULTRA CLEAN GOLD
+       6. FILE UPLOADER - COMPACT PREMIUM GOLD
        ============================================ */
     [data-testid="stFileUploader"] {
-        background-color: #ffffff !important; /* Putih bersih biar icon & teks kelihatan */
-        border: 2px dashed #C5A059 !important; 
+        background-color: transparent !important; /* Hapus background abu-abu */
+        border: 1.5px dashed #b08d4a !important; 
         border-radius: 12px !important;
-        padding: 10px !important;
+        padding: 5px !important; /* Kecilin padding biar muat di kolom */
     }
 
-    /* Target tombol Browse Files */
+    /* Target area drop file */
+    [data-testid="stFileUploaderSection"] {
+        background-color: #f8f9fa !important;
+        padding: 10px !important;
+        border: none !important;
+    }
+
+    /* Tombol Upload - Ukuran Compact */
     [data-testid="stFileUploader"] button {
-        background-color: #b08d4a !important; /* Emas solid sesuai gambar login */
+        background-color: #b08d4a !important;
         background-image: none !important;
-        color: #ffffff !important;            /* PAKSA PUTIH */
+        color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
         font-weight: 700 !important;
-        font-size: 14px !important;
-        border-radius: 8px !important;
-        border: none !important;
-        padding: 8px 25px !important;
+        font-size: 11px !important; /* Font dikecilin biar teks gak kepotong */
+        border-radius: 6px !important;
+        padding: 5px 12px !important; /* Padding lebih slim */
         text-transform: uppercase !important;
-        transition: all 0.3s ease !important;
+        width: auto !important;
+        min-height: unset !important;
     }
 
-    /* Hover effect biar gak kaku */
-    [data-testid="stFileUploader"] button:hover {
-        background-color: #c5a059 !important;
-        box-shadow: 0 4px 12px rgba(176, 141, 74, 0.3) !important;
+    /* Icon di dalem tombol (kalo ada) */
+    [data-testid="stFileUploader"] button svg {
+        fill: white !important;
+        transform: scale(0.8);
     }
 
-    /* Icon Cloud Upload - Kita bikin emas juga biar matching */
-    [data-testid="stFileUploaderIcon"] {
-        color: #b08d4a !important;
-        fill: #b08d4a !important;
-    }
-
-    /* Teks Instruksi */
+    /* Teks instruksi (Drag and drop) dikecilin */
     [data-testid="stFileUploaderText"] > span {
-        color: #31333f !important;
-        font-weight: 600 !important;
+        font-size: 12px !important;
+        color: #1a1d2e !important;
     }
 
+    /* Teks detail (Limit MB) dikecilin */
     [data-testid="stFileUploaderText"] > small {
-        color: #808495 !important;
+        font-size: 10px !important;
+        color: #6c757d !important;
     }
 
+    /* Hilangkan border biru default pas di klik */
+    [data-testid="stFileUploaderSection"]:focus-within {
+        box-shadow: 0 0 0 2px rgba(176, 141, 74, 0.2) !important;
+    }
     /* ============================================
        7. METRIC BOXES - PREMIUM CARD
        ============================================ */
