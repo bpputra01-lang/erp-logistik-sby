@@ -5650,70 +5650,38 @@ if menu == "Logistic Schedule":
                 for shf_jam, shf_role in base_roles:
                     if shf_jam == "SHIFT 3": continue 
                     
-                    slot_key = f"{shf_jam} - {shf_role}"
-
-                    # --- [PRIORITAS 1: JALUR VIP RECOVERY] ---
-                    if shf_jam == "SHIFT 2":
-                        day_index = day_names.index(day_name)
-                        if day_index > 0:
-                            day_kemarin = day_names[day_index - 1]
-                            for k_rec in karyawan_list:
-                                n_rec = k_rec['nama']
-                                if weekly_counter[n_rec] >= k_rec['target_fix']: continue
-                                if not df_libur[(df_libur['nama'] == n_rec) & (df_libur['tanggal'] == tgl_ini)].empty: continue
-                                
-                                if "SHIFT 3" in get_active_shifts(n_rec, day_kemarin) and k_rec['posisi'] == shf_role:
-                                    if not get_active_shifts(n_rec, day_name):
-                                        current_fill = len(storage[day_name][slot_key])
-                                        if (phase == "TARGET_1_ORANG" and current_fill < 1) or \
-                                           (phase == "TARGET_2_ORANG" and shf_role != "SPV" and current_fill < 2) or \
-                                           (phase == "SISA_JATAH"):
-                                            
-                                            if n_rec not in storage[day_name][slot_key]:
-                                                storage[day_name][slot_key].append(n_rec)
-                                                weekly_counter[n_rec] += 1
-
-                    # --- [PRIORITAS 2: LOGIKA STANDAR POTENTIAL] ---
                     if shf_jam == "SHIFT 0" and count_s0(day_name) >= 2:
                         continue
 
+                    slot_key = f"{shf_jam} - {shf_role}"
                     if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
                     if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
 
                     potential = []
                     for k in karyawan_list:
                         nama = k['nama']
-                        active_shifts = get_active_shifts(nama, day_name)
-                        
                         if weekly_counter[nama] >= k['target_fix']: continue
                         if not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                         
-                        tgl_besok = (datetime.strptime(tgl_ini, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
-                        tgl_kemarin = (datetime.strptime(tgl_ini, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
-                        is_libur_besok = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_besok)].empty
-                        is_libur_kemarin = not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_kemarin)].empty
+                        active_shifts = get_active_shifts(nama, day_name)
+                        if shf_jam in active_shifts: continue 
                         
-                        if is_libur_besok and shf_jam != "SHIFT 1": continue
-                        if is_libur_kemarin and shf_jam != "SHIFT 2": continue
-
-                        day_index = day_names.index(day_name)
-                        if day_index > 0:
-                            day_kemarin = day_names[day_index - 1]
-                            if "SHIFT 3" in get_active_shifts(nama, day_kemarin) and shf_jam != "SHIFT 2":
-                                continue
-
                         if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
                         if k['posisi'] == "SPV" and shf_role != "SPV": continue
-                        if shf_jam in active_shifts: continue 
-
-                        if k['tipe'] == "Part-Full":
-                            if is_libur_besok or is_libur_kemarin or (day_index > 0 and "SHIFT 3" in get_active_shifts(nama, day_names[day_index-1])):
-                                if active_shifts: continue 
-                            if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
-                        else:
-                            if active_shifts: continue
+                        
+                        if k['tipe'] == "Part-Full" and active_shifts:
+                            s_udah = active_shifts[0]
+                            if s_udah == "SHIFT 0" and shf_jam != "SHIFT 1": continue
+                            if s_udah == "SHIFT 1" and shf_jam not in ["SHIFT 0", "SHIFT 2"]: continue
+                            if s_udah == "SHIFT 2" and shf_jam not in ["SHIFT 1", "SHIFT 3"]: continue
+                            if s_udah == "SHIFT 3" and shf_jam != "SHIFT 2": continue
 
                         is_match = (k['posisi'] == shf_role)
+                        if k['tipe'] == "Part-Full":
+                            if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
+                        else:
+                            if len(active_shifts) >= 1: continue
+                        
                         potential.append({'k': k, 'match': is_match})
 
                     if potential:
@@ -5721,11 +5689,11 @@ if menu == "Logistic Schedule":
                         potential = sorted(potential, key=lambda x: x['match'], reverse=True)
                         p = potential[0]
                         nm_fix = p['k']['nama']
-                        if nm_fix not in storage[day_name][slot_key]:
-                            storage[day_name][slot_key].append(nm_fix)
-                            weekly_counter[nm_fix] += 1
-                            if len(get_active_shifts(nm_fix, day_name)) == 2:
-                                double_day_count[nm_fix] += 1
+                        storage[day_name][slot_key].append(nm_fix)
+                        weekly_counter[nm_fix] += 1
+                        if len(get_active_shifts(nm_fix, day_name)) == 2:
+                            double_day_count[nm_fix] += 1
+
         # --- 3. SIMPAN HASIL ---
         final_table = []
         for shf_jam, shf_role in base_roles:
@@ -5747,7 +5715,7 @@ if menu == "Logistic Schedule":
         col_v1, col_v2 = st.columns([5, 2])
         
         with col_v1:
-            st.markdown("### 📋 WEEKLY SCHEDULE LOGISTIC SBY")
+            st.markdown("### 📋 JADWAL MINGGUAN JEZ SBY")
 
             def color_by_shift(row):
                 shift_type = str(row['SHIFT - ROLE'])
@@ -5772,7 +5740,7 @@ if menu == "Logistic Schedule":
             )
 
         with col_v2:
-            st.markdown("### 📈 TOTAL SHIFT")
+            st.markdown("### 📈 REALISASI")
             sum_data = []
             df_staff_master = pd.read_sql_query("SELECT nama, tipe FROM karyawan", conn)
             
@@ -5781,7 +5749,7 @@ if menu == "Logistic Schedule":
                 t = st.session_state.summary_shift.get(n, 0)
                 if t > 0:
                     target = 9 if k['tipe'] == "Part-Full" else 6
-                    status = "✅ OK" if t >= target else "⚠️ KURANG SHIFT"
+                    status = "✅ OK" if t >= target else "⚠️ KURANG"
                     sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": status})
             
             if sum_data:
@@ -5813,73 +5781,33 @@ elif menu == "List Retur Out":
 
 import streamlit as st
 import pandas as pd
-import sqlite3
 from datetime import datetime
-import math
 
-# --- 1. SQLITE CORE LOGIC (Perbaikan Query INSERT) ---
-def get_db_connection():
-    return sqlite3.connect('jez_reporting.db', check_same_thread=False)
-
-def init_db():
-    conn = get_db_connection()
-    # Tabel Laporan
-    conn.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
-    # Tabel Todo
-    conn.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
-    # Tracker Hari
-    conn.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
-    
-    # Isi data awal ke DB kalau masih kosong
-    if not conn.execute('SELECT * FROM reports').fetchone():
-        data_awal = [
-            ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"), ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
-            ("STOCK MINUS", "VERREL & GALIH", "❌ Belum"), ("BALANCING STOCK", "FARIL & YUDI", "❌ Belum"),
-            ("RTO", "FARIL & YUDI", "❌ Belum"), ("OUTBOUND PROCESS", "FARIL & YUDI", "❌ Belum"),
-            ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"), ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
-            ("DASHBOARD SIDOARJO", "VANO", "❌ Belum"), ("INBOUND PROCESS", "VANO", "❌ Belum"),
-            ("SURABAYA DASHBOARD", "HAMZAH", "❌ Belum"), ("SEMARANG DASHBOARD", "HAMZAH", "❌ Belum"),
-            ("MANIFEST", "HAMZAH", "❌ Belum"), ("REFUND", "HAMZAH", "❌ Belum"),
-            ("REFILL & OVERSTOCK", "KRISNA", "❌ Belum"), ("ZERO PUTAWAY", "WAREHOUSE FULLFILLMENT", "❌ Belum")
-        ]
-        conn.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', data_awal)
-    conn.commit()
-    conn.close()
-
-def sync_data():
-    """Sinkronisasi DB ke Session State & Handle Reset Harian"""
-    conn = get_db_connection()
-    today = datetime.now().strftime('%Y-%m-%d')
-    res = conn.execute('SELECT last_date FROM reset_tracker').fetchone()
-    
-    # Logic Auto Reset Harian
-    if not res or res[0] != today:
-        conn.execute('UPDATE reports SET status = "❌ Belum"')
-        conn.execute('DELETE FROM todo')
-        conn.execute('DELETE FROM reset_tracker')
-        conn.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
-        conn.commit()
-    
-    # Tarik data dari DB ke Session State lu
-    reports_db = conn.execute('SELECT laporan, pic, status FROM reports').fetchall()
-    st.session_state.db_report = [{"Laporan": r[0], "PIC": r[1], "Status": r[2]} for r in reports_db]
-    
-    todo_db = conn.execute('SELECT task, done FROM todo').fetchall()
-    st.session_state.todo_list = [{"task": t[0], "done": bool(t[1])} for t in todo_db]
-    conn.close()
-
-# Jalankan Database
-init_db()
-sync_data()
-
-# --- 2. INITIAL DATA (Lu punya, tetep ada buat jaga-jaga) ---
+# --- 1. INITIAL DATA (Anti-Crash & Tanpa Jam) ---
 if 'db_report' not in st.session_state:
-    pass
+    st.session_state.db_report = [
+        {"Laporan": "REJECT & DEFECT", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "KERAPIHAN STOCK", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "STOCK MINUS", "PIC": "VERREL & GALIH", "Status": "❌ Belum"},
+        {"Laporan": "BALANCING STOCK", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "RTO", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "OUTBOUND PROCESS", "PIC": "FARIL & YUDI", "Status": "❌ Belum"},
+        {"Laporan": "COMPARE SCAN OUT", "PIC": "BAKCLINER", "Status": "❌ Belum"},
+        {"Laporan": "COMPARE BARANG DATANG", "PIC": "BAKCLINER", "Status": "❌ Belum"},
+        {"Laporan": "DASHBOARD SIDOARJO", "PIC": "VANO", "Status": "❌ Belum"},
+        {"Laporan": "INBOUND PROCESS", "PIC": "VANO", "Status": "❌ Belum"},
+        {"Laporan": "SURABAYA DASHBOARD", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "SEMARANG DASHBOARD", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "MANIFEST", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "REFUND", "PIC": "HAMZAH", "Status": "❌ Belum"},
+        {"Laporan": "REFILL & OVERSTOCK", "PIC": "KRISNA", "Status": "❌ Belum"},
+        {"Laporan": "ZERO PUTAWAY", "PIC": "WAREHOUSE FULLFILLMENT", "Status": "❌ Belum"},
+    ]
 
+# FIX: Inisialisasi todo_list biar nggak AttributeError lagi
 if 'todo_list' not in st.session_state:
     st.session_state.todo_list = []
-
-# --- 3. CSS DARK THEME (Gue Balikin & Gue Perkuat - PERSIS PUNYA LU) ---
+# --- 2. CSS DARK THEME (Gue Balikin & Gue Perkuat) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -5887,7 +5815,7 @@ st.markdown("""
     /* Global Font */
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-    /* 1. Header Utama - Efek Gradient Glass */
+    /* 1. Header Utama - Efek Gradient Glass (Mirip Gambar 2) */
     .hero-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
         color: white;
@@ -5925,7 +5853,7 @@ st.markdown("""
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
     }
     
-    /* 4. Checkbox Dark Mode */
+    /* 4. Checkbox Dark Mode (PENTING: Biar gak putih lagi) */
     div[data-testid="stCheckbox"] div[role="checkbox"] {
         background-color: #1f2937 !important;
         border: 2px solid #3b82f6 !important;
@@ -5960,11 +5888,10 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-    
-# --- 4. LOGIKA ROUTING ---
-# (Pastikan variabel 'menu' sudah didefinisikan di sidebar lu sebelum bagian ini)
+    # Pastikan nama class-nya "hero-header" agar nyambung dengan CSS di atas
+st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
+# --- 3. LOGIKA ROUTING ---
 if menu == "Reporting & PIC":
-    st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.2, 1])
     with c1:
         list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA", "WAREHOUSE FULLFILLMENT"]
@@ -5978,6 +5905,7 @@ if menu == "Reporting & PIC":
     col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
+        # Request lu: PIC Subheader Dark Mode
         st.subheader(f"📋 PIC: {current_user}")
         tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
         
@@ -5996,133 +5924,55 @@ if menu == "Reporting & PIC":
                         st.write("") 
                         if task['Status'] == "❌ Belum":
                             if st.button(f"Update", key=f"up_dark_{idx}"):
-                                # Update Session
                                 st.session_state.db_report[idx]['Status'] = "✅ Selesai"
-                                # Update SQLite
-                                conn = get_db_connection()
-                                conn.execute('UPDATE reports SET status = "✅ Selesai" WHERE laporan = ?', (task['Laporan'],))
-                                conn.commit()
-                                conn.close()
                                 st.rerun()
                         else:
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
 
-        with tab_all:
-            st.markdown("### 📊 Team Progress Summary")
-            pic_stats = {}
-            for t in st.session_state.db_report:
-                pic = t['PIC']
-                if pic not in pic_stats:
-                    pic_stats[pic] = {"total": 0, "selesai": 0}
-                pic_stats[pic]["total"] += 1
-                if t['Status'] == "✅ Selesai":
-                    pic_stats[pic]["selesai"] += 1
-
-            st.write("**📈 Laporan Operasional**")
-            for pic, stats in pic_stats.items():
-                progress = (stats['selesai'] / stats['total']) * 100
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>👤 {pic}</b>
-                        <span>{stats['selesai']}/{stats['total']} Selesai</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
-                        <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.write("---")
-            st.write("**📝 To Do List Summary**")
-            if "todo_list" in st.session_state and st.session_state.todo_list:
-                td_total = len(st.session_state.todo_list)
-                td_selesai = sum(1 for item in st.session_state.todo_list if item['done'])
-                td_progress = (td_selesai / td_total) * 100
-                
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #10b981; background-color: #111827;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>📋 Total Tugas</b>
-                        <span>{td_selesai}/{td_total} Item</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 12px;">
-                        <div style="background-color: #10b981; width: {td_progress}%; height: 12px; border-radius: 5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
     with col_kanan:
-        st.markdown("""<div style="background-color: #1a1c27; padding: 10px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px; text-align: center;"><h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4></div>""", unsafe_allow_html=True)
+        # 1. Header (Dibuat rata tengah dengan text-align: center)
+        st.markdown("""
+            <div style="
+                background-color: #1a1c27; 
+                padding: 10px; 
+                border-radius: 10px; 
+                border-left: 5px solid #3b82f6; 
+                margin-bottom: 20px;
+                text-align: center;
+            ">
+                <h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4>
+            </div>
+        """, unsafe_allow_html=True)
 
-        # 1. Form Input (Tetap di Atas)
+        # 2. Form Tambah Tugas
         with st.form("form_todo_dark", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            if st.form_submit_button("➕ Tambah") and tugas_baru:
-                conn = get_db_connection()
-                conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
-                conn.commit()
-                conn.close()
-                sync_data()
+            submit = st.form_submit_button("➕ Tambah")
+            
+            if submit and tugas_baru:
+                if "todo_list" not in st.session_state:
+                    st.session_state.todo_list = []
+                st.session_state.todo_list.append({"task": tugas_baru, "done": False})
                 st.rerun()
 
-        # 2. Logic Pagination (5 Item Per Halaman)
-        if "todo_list" in st.session_state and st.session_state.todo_list:
-            items_per_page = 3
-            total_items = len(st.session_state.todo_list)
-            total_pages = math.ceil(total_items / items_per_page)
-            
-            # Init session state buat simpan halaman aktif
-            if 'todo_page' not in st.session_state:
-                st.session_state.todo_page = 1
-            
-            # Ambil item sesuai halaman sekarang
-            start_idx = (st.session_state.todo_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            current_items = st.session_state.todo_list[start_idx:end_idx]
-
-            # 3. Tampilkan Item
-            for i, item in enumerate(current_items):
-                real_idx = start_idx + i  # Index asli di DB/List Utama
+        # 3. List Tugas dengan Gaya Card (Mirip Kolom Kiri)
+        if "todo_list" in st.session_state:
+            for i, item in enumerate(st.session_state.todo_list):
                 c1, c2 = st.columns([4, 1])
+                
                 with c1:
+                    # Card Hitam, Border Biru/Hijau sesuai status
                     color_border = '#10b981' if item['done'] else '#3b82f6'
                     st.markdown(f"""
-                        <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
-                            <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
-                        </div>
+                    <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                        <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
+                        <small style="color:{color_border};">Status: {'✅ Selesai' if item['done'] else '❌ Belum'}</small>
+                    </div>
                     """, unsafe_allow_html=True)
+                
                 with c2:
-                    st.write("")
-                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
+                    st.write("") # Spasi vertikal
+                    res = st.checkbox("", key=f"chk_dark_{i}", value=item['done'], label_visibility="collapsed")
                     if res != item['done']:
-                        conn = get_db_connection()
-                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
-                        conn.commit()
-                        conn.close()
-                        sync_data()
+                        st.session_state.todo_list[i]['done'] = res
                         st.rerun()
-
-            # 4. Navigasi Panah (Pindah Halaman)
-            st.divider()
-            nav1, nav2, nav3 = st.columns([1, 2, 1])
-            
-            with nav1:
-                # Tombol Prev (Hanya muncul kalau bukan di hal 1)
-                if st.session_state.todo_page > 1:
-                    if st.button("⬅️ Prev", key="btn_prev_page"):
-                        st.session_state.todo_page -= 1
-                        st.rerun()
-            
-            with nav2:
-                # Indikator Halaman
-                st.markdown(f"<p style='text-align:center; color:#9ca3af; padding-top:10px;'>Halaman {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
-            
-            with nav3:
-                # Tombol Next (Hanya muncul kalau masih ada halaman selanjutnya)
-                if st.session_state.todo_page < total_pages:
-                    if st.button("Next ➡️", key="btn_next_page"):
-                        st.session_state.todo_page += 1
-                        st.rerun()
-        else:
-            st.info("Belum ada tugas tambahan.")
