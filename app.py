@@ -615,28 +615,22 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock.columns = cols
 
     # 🔥 7. SINGLE CHECK - FIXED BOOL ERROR!
-    if len(df_recon) == 0:
-        df_need_single = pd.DataFrame()
-    else:
-        single_mask = []
-        for i in range(len(df_recon)):
-            try:
-                row = df_recon.iloc[i]
-                sku = clean_val(row.iloc[1])
-                qty = float(row.iloc[6]) if len(row) > 6 and pd.notna(row.iloc[6]) else 0
-                single_mask.append(qty > 0 and sku not in skus_in_stock)
-            except:
-                single_mask.append(False)
-        
-        # ✅ FIX: Convert list ke numpy array, bukan pandas Series
-        single_mask = np.array(single_mask)
-        if np.any(single_mask):  # ✅ SAFE ANY CHECK
-            df_need_single = df_recon[single_mask].reset_index(drop=True)
-        else:
-            df_need_single = pd.DataFrame()
+if st.session_state.get("process_done"):
+    # Cek apakah hasil lookup beneran ada isinya
+    check_data = st.session_state.df_res4_final
     
-    return df_stock, df_need_single
-
+    # ✅ FIX: JANGAN PAKAI PANDAS SERIES DI IF!
+    if check_data is None or check_data.empty:
+        is_empty = True
+    else:
+        # Ambil sum sebagai SCALAR NUMBER, bukan Series
+        qty_sum = pd.to_numeric(check_data['QTY SO'].fillna(0), errors='coerce').sum()
+        is_empty = qty_sum == 0  # ✅ SEKARANG BOOLEAN SCALAR!
+    
+    if is_empty:
+        st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
+    else:
+        st.success("✅ Analisis Selesai!")
 # 🔥 2. FIX logic_pivot_adjustment()
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
     # AUTO CLEAN
@@ -1316,11 +1310,17 @@ def menu_Stock_Opname():
                 except Exception as e:
                     st.error(f"❌ Terjadi Kesalahan: {str(e)}")
 
-        # --- AREA TAMPILAN HASIL ---
+                # --- AREA TAMPILAN HASIL ---
         if st.session_state.get("process_done"):
             # Cek apakah hasil lookup beneran ada isinya
             check_data = st.session_state.df_res4_final
-            is_empty = check_data['QTY SO'].replace('', 0).astype(float).sum() == 0
+            
+            # ✅ FIXED VERSION
+            if check_data is None or check_data.empty:
+                is_empty = True
+            else:
+                qty_sum = pd.to_numeric(check_data['QTY SO'].fillna(0), errors='coerce').sum()
+                is_empty = qty_sum == 0
             
             if is_empty:
                 st.warning("⚠️ Hasil Lookup Kosong! Pastikan format BIN dan SKU di kedua file sama persis.")
