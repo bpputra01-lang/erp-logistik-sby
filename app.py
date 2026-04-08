@@ -5387,107 +5387,73 @@ conn = init_db_logistic()
 
 # Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
+    # Kita bungkus pake div khusus supaya CSS-nya nggak bocor ke menu lain
+    st.markdown('<div class="logistic-container">', unsafe_allow_html=True)
+    
     st.markdown("""
         <style>
-    
-        /* Styling Judul dan Label: Gelap agar mudah dibaca */
-        div[data-testid="stVerticalBlock"] h1, h2, h3, label p {
-            color: #1a1d2e !important;
-            font-family: 'Inter', sans-serif !important;
-            font-weight: 700 !important;
-            -webkit-text-fill-color: #1a1d2e !important;
-        }
+            /* 1. Header Utama - Hanya berefek di dalam .logistic-container */
+            .logistic-container .hero-header-blue {
+                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%) !important;
+                color: white !important;
+                padding: 25px !important;
+                border-radius: 12px !important;
+                text-align: center !important;
+                margin-bottom: 35px !important;
+                font-weight: 800 !important;
+                font-size: 26px !important;
+                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2) !important;
+            }
 
-        /* ----------------------------------------------------------
-           --- ---
-           ---------------------------------------------------------- */
-        .staff-card {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background-color: #ffffff;
-            border: 1px solid rgba(0,0,0,0.08);
-            border-radius: 12px;
-            padding: 15px 20px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
+            /* 1.5 Sub-Header - Spesifik hanya di modul ini */
+            .logistic-container div[data-testid="stVerticalBlock"] h3 {
+                color: #1a1d2e !important;
+                border-left: 5px solid #0062E6 !important;
+                padding-left: 15px !important;
+                font-weight: 700 !important;
+                text-transform: uppercase !important;
+            }
 
-        /* Efek Hover pas card disentuh kursor */
-        .staff-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.06);
-            border-color: #C5A059; /* Border berubah emas pas dihover */
-        }
+            /* 2. Input Fields - Cuma ngerubah input di dalam container ini */
+            .logistic-container div[data-testid="stTextInput"] > div > div, 
+            .logistic-container div[data-testid="stTextArea"] > div > div,
+            .logistic-container div[data-testid="stDateInput"] > div > div,
+            .logistic-container div[data-testid="stSelectbox"] > div > div {
+                background-color: #12141d !important; 
+                border: 1px solid #2d3142 !important;
+                border-radius: 10px !important;
+            }
 
-        /* Border kiri tipis warna Emas Premium */
-        .staff-card::before {
-            content: '';
-            position: absolute;
-            left: 0; top: 0; bottom: 0;
-            width: 5px;
-            background-color: #C5A059;
-            border-radius: 12px 0 0 12px;
-        }
+            /* 3. Button - Glow Effect Biru (Hanya di modul ini) */
+            .logistic-container div.stButton > button {
+                background: linear-gradient(90deg, #007BFF 0%, #0056b3 100%) !important;
+                color: white !important;
+                border-radius: 10px !important;
+                font-weight: 700 !important;
+                text-transform: uppercase !important;
+                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
+                width: 100% !important;
+            }
 
-        /* Area Teks di dalam Card (Kiri) */
-        .staff-info { display: flex; flex-direction: column; gap: 2px; }
-        
-        /* */
-        .staff-name {
-            color: #1a1d2e;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 800;
-            text-transform: uppercase;
-            font-size: 15px;
-            letter-spacing: 0.5px;
-        }
+            /* 4. Font & Labels - Biar gak ngerusak warna label di menu lain */
+            .logistic-container label p { 
+                color: #4A4A4A !important; 
+                font-size: 14px !important;
+                font-weight: 600 !important;
+            }
 
-        /* */
-        .staff-meta {
-            color: #888888;
-            font-family: 'Inter', sans-serif;
-            font-size: 11px;
-            font-weight: 500;
-            display: flex; align-items: center; gap: 6px;
-        }
-
-        /* Indikator status full-time bulatan kecil */
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; background-color: #C5A059; }
-
-        /* Area Tombol di dalam Card (Kanan) */
-        .staff-action-container { display: flex; align-items: center; }
-
-        /* ----------------------------------------------------------
-           --- ---
-           ---------------------------------------------------------- */
-        /* Kita tembak tombol hapus di dalam container ini biar ukurannya kita kunci */
-        .staff-action-container div.stButton > button {
-            background: linear-gradient(135deg, #002b5b 0%, #001a35 100%) !important;
-            color: white !important;
-            border-radius: 6px !important;
-            border: 1px solid #001a35 !important;
-            font-family: 'Inter', sans-serif !important;
-            font-weight: 600 !important;
-            transition: all 0.25s ease !important;
-            
-            /* */
-            padding: 8px 12px !important; /* Padding dikerutkan */
-            font-size: 12px !important;    /* Ukuran teks/icon dikecilkan */
-            height: auto !important;
-            width: auto !important;
-            box-shadow: 0 2px 6px rgba(0, 43, 91, 0.2) !important;
-        }
-
-        /* Efek Hover Tombol Hapus: Merah Jaga-Jaga */
-        .staff-action-container div.stButton > button:hover {
-            background: linear-gradient(135deg, #a00000 0%, #b50000 100%) !important;
-            border-color: #ff4444 !important;
-            box-shadow: 0 4px 10px rgba(160, 0, 0, 0.3) !important;
-        }
+            /* Card Khusus Logistic */
+            .logistic-container .custom-card {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background-color: #1a1c27;
+                border-radius: 8px;
+                padding: 12px 18px;
+                margin-bottom: 10px;
+                border-left: 5px solid #00FF00;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            }
         </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
