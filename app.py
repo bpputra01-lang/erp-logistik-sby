@@ -5392,68 +5392,63 @@ if menu == "Logistic Schedule":
     
     st.markdown("""
         <style>
-            /* 1. Header Utama - Hanya berefek di dalam .logistic-container */
-            .logistic-container .hero-header-blue {
-                background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%) !important;
-                color: white !important;
-                padding: 25px !important;
-                border-radius: 12px !important;
-                text-align: center !important;
-                margin-bottom: 35px !important;
-                font-weight: 800 !important;
-                font-size: 26px !important;
-                box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2) !important;
-            }
+        /* Container Utama */
+        .staff-container {
+            padding: 10px;
+        }
 
-            /* 1.5 Sub-Header - Spesifik hanya di modul ini */
-            .logistic-container div[data-testid="stVerticalBlock"] h3 {
-                color: #1a1d2e !important;
-                border-left: 5px solid #0062E6 !important;
-                padding-left: 15px !important;
-                font-weight: 700 !important;
-                text-transform: uppercase !important;
-            }
+        /* */
+        .staff-card-dark {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #1a1d2e; /* Warna Navy Gelap sesuai gambar */
+            border-radius: 6px;
+            padding: 12px 20px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            border-left: 6px solid #00FF00; /* GLOW GREEN INDICATOR */
+            transition: all 0.3s ease;
+        }
 
-            /* 2. Input Fields - Cuma ngerubah input di dalam container ini */
-            .logistic-container div[data-testid="stTextInput"] > div > div, 
-            .logistic-container div[data-testid="stTextArea"] > div > div,
-            .logistic-container div[data-testid="stDateInput"] > div > div,
-            .logistic-container div[data-testid="stSelectbox"] > div > div {
-                background-color: #12141d !important; 
-                border: 1px solid #2d3142 !important;
-                border-radius: 10px !important;
-            }
+        .staff-card-dark:hover {
+            transform: scale(1.01);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+        }
 
-            /* 3. Button - Glow Effect Biru (Hanya di modul ini) */
-            .logistic-container div.stButton > button {
-                background: linear-gradient(90deg, #007BFF 0%, #0056b3 100%) !important;
-                color: white !important;
-                border-radius: 10px !important;
-                font-weight: 700 !important;
-                text-transform: uppercase !important;
-                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
-                width: 100% !important;
-            }
+        /* Text Styling di dalam Card */
+        .staff-name-dark {
+            color: #FFFFFF !important;
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+        }
 
-            /* 4. Font & Labels - Biar gak ngerusak warna label di menu lain */
-            .logistic-container label p { 
-                color: #4A4A4A !important; 
-                font-size: 14px !important;
-                font-weight: 600 !important;
-            }
+        .staff-date {
+            color: #888888;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+        }
 
-            /* Card Khusus Logistic */
-            .logistic-container .custom-card {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                background-color: #1a1c27;
-                border-radius: 8px;
-                padding: 12px 18px;
-                margin-bottom: 10px;
-                border-left: 5px solid #00FF00;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            }
+        /* */
+        .stButton > button[kind="primary"] {
+            background: linear-gradient(135deg, #002b5b 0%, #001a35 100%) !important;
+            color: white !important;
+            border-radius: 8px !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            font-weight: 600 !important;
+            padding: 10px 20px !important;
+            transition: all 0.3s ease !important;
+            height: auto !important;
+        }
+
+        .stButton > button[kind="primary"]:hover {
+            background: #a00000 !important;
+            border-color: #ff4444 !important;
+            box-shadow: 0 0 10px rgba(160, 0, 0, 0.5) !important;
+        }
         </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
