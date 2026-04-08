@@ -1236,27 +1236,27 @@ def menu_Stock_Opname():
         # --- AREA TAMPILAN HASIL ---
         if st.session_state.get("process_done"):
     # 1. Ambil data dengan aman
-    df_res4 = st.session_state.get("df_res4_final", pd.DataFrame())
-    
-    # 2. Cek apakah hasil lookup beneran ada isinya (Pake cara paling aman)
-    has_content = False
-    try:
-        if not df_res4.empty:
-            # Ambil kolom QTY SO, paksa jadi angka, lalu jumlahkan
-            total_cek = pd.to_numeric(df_res4['QTY SO'], errors='coerce').sum()
-            if total_cek > 0:
-                has_content = True
-    except:
-        has_content = False
+            df_res4 = st.session_state.get("df_res4_final", pd.DataFrame())
+            
+            # 2. Cek apakah hasil lookup beneran ada isinya (Pake cara paling aman)
+            has_content = False
+            try:
+                if not df_res4.empty:
+                    # Ambil kolom QTY SO, paksa jadi angka, lalu jumlahkan
+                    total_cek = pd.to_numeric(df_res4['QTY SO'], errors='coerce').sum()
+                    if total_cek > 0:
+                        has_content = True
+            except:
+                has_content = False
 
-    # 3. Validasi Tampilan
-    if not has_content:
-        st.warning("⚠️ Hasil Lookup Kosong atau Semua QTY adalah 0! Pastikan BIN/SKU sesuai.")
-    else:
-        st.success(f"✅ Analisis Selesai! (Memproses {len(df_res4):,} baris)")
+            # 3. Validasi Tampilan
+            if not has_content:
+                st.warning("⚠️ Hasil Lookup Kosong atau Semua QTY adalah 0! Pastikan BIN/SKU sesuai.")
+            else:
+                st.success(f"✅ Analisis Selesai! (Memproses {len(df_res4):,} baris)")
 
-    # 4. TAMPILAN TABS (PENTING: Perbaiki Nama Kolom Duplikat di sini)
-    t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "➡️ SET UP REAL +"])
+            # 4. TAMPILAN TABS (PENTING: Perbaiki Nama Kolom Duplikat di sini)
+            t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "➡️ SET UP REAL +"])
             
             with t1:
                 df_m = st.session_state.get("df_mult_final", pd.DataFrame())
