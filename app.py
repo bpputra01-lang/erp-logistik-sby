@@ -4571,7 +4571,7 @@ elif menu == "Scan Out Validation":
                     return 'color: black'
                 
                 st.subheader("📋 DATA SCAN (COMPARED)")
-                styled_df = df_res.style.applymap(highlight_vba, subset=['Keterangan']).apply(
+                styled_df = df_res.style.map(highlight_vba, subset=['Keterangan']).apply(
                     lambda x: ['background-color: #ffcccc' if 'MISSMATCH' in str(x) or 'BELUM' in str(x) else '' for i in x],
                     subset=['Keterangan'], axis=1
                 )
@@ -4592,7 +4592,7 @@ elif menu == "Scan Out Validation":
                             return 'color: red'
                         return 'color: black'
                     
-                    styled_draft = df_draft.style.applymap(highlight_draft, subset=['NOTES'])
+                    styled_draft = df_draft.style.map(highlight_draft, subset=['NOTES'])
                     st.dataframe(styled_draft, use_container_width=True, height=300)
                 else:
                     st.info("ℹ️ Tidak ada data untuk DRAFT SET UP")
