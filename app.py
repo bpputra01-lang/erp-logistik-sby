@@ -5415,22 +5415,7 @@ if menu == "Logistic Schedule":
                 letter-spacing: 1px;
             }
 
-            /* 2. Input Fields - Modern Dark Glass */
-            [data-testid="stForm"] { 
-                border: none !important; 
-                padding: 0 !important; 
-            }
-            
-            div[data-testid="stTextInput"] > div > div, 
-            div[data-testid="stTextArea"] > div > div,
-            div[data-testid="stDateInput"] > div > div,
-            div[data-testid="stSelectbox"] > div > div {
-                background-color: #12141d !important; 
-                border: 1px solid #2d3142 !important;
-                border-radius: 10px !important;
-                transition: all 0.3s ease-in-out !important;
-                padding: 2px !important;
-            }
+        
 
             /* Efek Focus Pas Diklik */
             div[data-testid="stTextInput"] > div > div:focus-within, 
