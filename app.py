@@ -5387,7 +5387,7 @@ conn = init_db_logistic()
 
 # Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 # --- CSS TOTAL LOCK: BIAR GAK SEGEDE GABAN ---
-st.markdown("""
+    st.markdown("""
         <style>
         /* 1. Kunci ukuran tombol hapus secara paksa */
         .small-del-container div.stButton > button {
