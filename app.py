@@ -2485,6 +2485,7 @@ def process_scan_out(df_scan, df_history, df_stock):
     return df_res, df_draft
     
 
+
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
     res = df_case.copy()
