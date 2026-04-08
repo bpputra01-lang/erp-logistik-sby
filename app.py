@@ -5388,50 +5388,50 @@ conn = init_db_logistic()
 # Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 # --- CSS TOTAL LOCK: BIAR GAK SEGEDE GABAN ---
 st.markdown("""
-    <style>
-    /* 1. Kunci ukuran tombol hapus secara paksa */
-    .small-del-container div.stButton > button {
-        width: 40px !important;
-        height: 30px !important;
-        min-height: 30px !important;
-        min-width: 40px !important;
-        padding: 0px !important;
-        line-height: 1 !important;
-        font-size: 14px !important;
-        background-color: #003366 !important; /* Biru gelap sesuai gambar lu */
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        border-radius: 4px !important;
-        margin-top: 12px !important; /* Sejajarin sama card */
-    }
+        <style>
+        /* 1. Kunci ukuran tombol hapus secara paksa */
+        .small-del-container div.stButton > button {
+            width: 40px !important;
+            height: 30px !important;
+            min-height: 30px !important;
+            min-width: 40px !important;
+            padding: 0px !important;
+            line-height: 1 !important;
+            font-size: 14px !important;
+            background-color: #003366 !important; /* Biru gelap sesuai gambar lu */
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            border-radius: 4px !important;
+            margin-top: 12px !important; /* Sejajarin sama card */
+        }
 
-    .small-del-container div.stButton > button:hover {
-        background-color: #FF4B4B !important;
-        color: white !important;
-    }
+        .small-del-container div.stButton > button:hover {
+            background-color: #FF4B4B !important;
+            color: white !important;
+        }
 
-    /* 2. Styling Card sesuai gambar terbaru */
-    .staff-card-dark {
-        background-color: #1a1d2e !important;
-        border-radius: 6px !important;
-        padding: 10px 15px !important;
-        margin-bottom: 8px !important;
-        border-left: 5px solid #00FF00 !important; /* Glow Green Indicator */
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
-    }
+        /* 2. Styling Card sesuai gambar terbaru */
+        .staff-card-dark {
+            background-color: #1a1d2e !important;
+            border-radius: 6px !important;
+            padding: 10px 15px !important;
+            margin-bottom: 8px !important;
+            border-left: 5px solid #00FF00 !important; /* Glow Green Indicator */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+        }
 
-    .card-title {
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        font-size: 14px !important;
-        text-transform: uppercase !important;
-    }
+        .card-title {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            font-size: 14px !important;
+            text-transform: uppercase !important;
+        }
 
-    .card-subtitle {
-        color: #888888 !important;
-        font-size: 11px !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
+        .card-subtitle {
+            color: #888888 !important;
+            font-size: 11px !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
 # --- IMPLEMENTASI DI LOOPING DATA ---
 with st.expander("🔍 Staff Database", expanded=True):
