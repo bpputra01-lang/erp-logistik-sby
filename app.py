@@ -104,191 +104,176 @@ st.markdown("""
         border-color: #ff4444 !important;
     }
 
-    /* ============================================ 
-       6. FILE UPLOADER 
-       ============================================ */ 
-    [data-testid="stFileUploader"] { 
-        background-color: #f0f2f6; 
-        border: 2px dashed rgba(0, 43, 91, 0.3) !important; 
-        border-radius: 10px; 
-        padding: 12px; 
-    } 
+    /* ============================================
+       6. FILE UPLOADER
+       ============================================ */
+    [data-testid="stFileUploader"] {
+        background-color: #f0f2f6;
+        border: 2px dashed rgba(0, 43, 91, 0.3) !important;
+        border-radius: 10px;
+        padding: 12px;
+    }
+    [data-testid="stFileUploader"] button {
+        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important;
+        color: #1a1d2e !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+    }
 
-    [data-testid="stFileUploader"] button { 
-        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important; 
-        color: #1a1d2e !important; 
-        font-weight: 600 !important; 
-        border-radius: 6px !important; 
-        font-size: 12px !important; 
-    } 
+    /* ============================================
+       7. METRIC BOXES - PREMIUM CARD
+       ============================================ */
+    .m-box {
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+        padding: 18px 20px !important;
+        border-radius: 10px !important;
+        border-left: 4px solid #C5A059 !important;
+        margin-bottom: 10px !important;
+        text-align: left !important;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
+    }
+    .m-lbl {
+        color: rgba(255, 255, 255, 0.65) !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        display: block;
+        margin-bottom: 6px;
+    }
+    .m-val {
+        color: #C5A059 !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+    }
 
-    /* ============================================ 
-       7. METRIC BOXES - PREMIUM CARD 
-       ============================================ */ 
-    .m-box { 
-        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important; 
-        padding: 18px 20px !important; 
-        border-radius: 10px !important; 
-        border-left: 4px solid #C5A059 !important; 
-        margin-bottom: 10px !important; 
-        text-align: left !important; 
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important; 
-    } 
+    /* ============================================
+       8. RADIO BUTTONS
+       ============================================ */
+    div.row-widget.stRadio > div { background-color: transparent !important; }
+    div.row-widget.stRadio label {
+        color: #a0a5b5 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 13px !important;
+        padding: 8px 14px !important;
+        border-radius: 6px !important;
+        background: rgba(26, 29, 46, 0.5) !important;
+        border: 1px solid rgba(197, 160, 89, 0.15) !important;
+        transition: all 0.2s ease !important;
+    }
+    div.row-widget.stRadio label:hover {
+        background: rgba(197, 160, 89, 0.1) !important;
+        border-color: rgba(197, 160, 89, 0.3) !important;
+        color: #C5A059 !important;
+    }
 
-    .m-lbl { 
-        color: rgba(255, 255, 255, 0.65) !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 10px !important; 
-        font-weight: 600 !important; 
-        text-transform: uppercase !important; 
-        letter-spacing: 1px !important; 
-        display: block; 
-        margin-bottom: 6px; 
-    } 
+    /* ============================================
+       9. INPUT BOXES - GOLD BORDER
+       ============================================ */
+    div[data-baseweb="select"] > div,
+    [data-testid="stFileUploaderSection"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+    }
+    div[data-baseweb="select"] > div:focus-within,
+    [data-testid="stFileUploaderSection"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    [data-testid="stFileUploaderText"] > span,
+    [data-testid="stFileUploaderText"] > small {
+        color: #e0e0e0 !important;
+        -webkit-text-fill-color: #e0e0e0 !important;
+    }
 
-    .m-val { 
-        color: #C5A059 !important; 
-        font-family: 'Poppins', sans-serif !important; 
-        font-size: 24px !important; 
-        font-weight: 700 !important; 
-    } 
+    /* Text inputs */
+    div[data-baseweb="input"] {
+        background-color: #1a1d2e !important;
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+    }
+    div[data-baseweb="input"]:focus-within {
+        border-color: #C5A059 !important;
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important;
+    }
+    input {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif !important;
+        font-size: 14px !important;
+    }
 
-    /* ============================================ 
-       8. RADIO BUTTONS 
-       ============================================ */ 
-    div.row-widget.stRadio > div { 
-        background-color: transparent !important; 
-    } 
+    /* ============================================
+       10. BUTTONS LAYOUT
+       ============================================ */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+    }
+    [data-testid="column"] {
+        flex: 0 1 auto !important;
+        width: auto !important;
+        min-width: fit-content !important;
+        max-width: fit-content !important;
+    }
+    div.stButton > button {
+        width: 170px !important;
+        min-height: 3.3em !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        padding: 10px 14px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        font-size: 13px !important;
+        line-height: 1.3 !important;
+    }
 
-    div.row-widget.stRadio label { 
-        color: #a0a5b5 !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 13px !important; 
-        padding: 8px 14px !important; 
-        border-radius: 6px !important; 
-        background: rgba(26, 29, 46, 0.5) !important; 
-        border: 1px solid rgba(197, 160, 89, 0.15) !important; 
-        transition: all 0.2s ease !important; 
-    } 
+    /* ============================================
+       11. SIDEBAR BUTTONS - GOLD THEME
+       ============================================ */
+    [data-testid="stSidebar"] div.stButton > button {
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important;
+        color: #C5A059 !important;
+        border: 1px solid rgba(197, 160, 89, 0.25) !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 42px !important;
+        border-radius: 8px !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 500 !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+        transition: all 0.25s ease !important;
+        margin-bottom: 6px !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button:hover {
+        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important;
+        border-color: #C5A059 !important;
+        color: #FFD700 !important;
+    }
+    [data-testid="stSidebar"] div.stButton > button p {
+        color: inherit !important;
+        font-family: 'Inter', sans-serif !important;
+    }
 
-    div.row-widget.stRadio label:hover { 
-        background: rgba(197, 160, 89, 0.1) !important; 
-        border-color: rgba(197, 160, 89, 0.3) !important; 
-        color: #C5A059 !important; 
-    } 
-
-    /* ============================================ 
-       9. INPUT BOXES - GOLD BORDER 
-       ============================================ */ 
-    div[data-baseweb="select"] > div, 
-    [data-testid="stFileUploaderSection"] { 
-        background-color: #1a1d2e !important; 
-        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
-        border-radius: 8px !important; 
-    } 
-
-    div[data-baseweb="select"] > div:focus-within, 
-    [data-testid="stFileUploaderSection"]:focus-within { 
-        border-color: #C5A059 !important; 
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
-    } 
-
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
-    [data-testid="stFileUploaderText"] > span, 
-    [data-testid="stFileUploaderText"] > small { 
-        color: #e0e0e0 !important; 
-        -webkit-text-fill-color: #e0e0e0 !important; 
-    } 
-
-    /* Text inputs */ 
-    div[data-baseweb="input"] { 
-        background-color: #1a1d2e !important; 
-        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
-        border-radius: 8px !important; 
-        padding: 10px 14px !important; 
-    } 
-
-    div[data-baseweb="input"]:focus-within { 
-        border-color: #C5A059 !important; 
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
-    } 
-
-    input { 
-        color: #ffffff !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 14px !important; 
-    } 
-
-    /* ============================================ 
-       10. BUTTONS LAYOUT 
-       ============================================ */ 
-    [data-testid="stHorizontalBlock"] { 
-        display: flex !important; 
-        flex-wrap: wrap !important; 
-        gap: 10px !important; 
-        justify-content: flex-start !important; 
-        width: 100% !important; 
-    } 
-
-    [data-testid="column"] { 
-        flex: 0 1 auto !important; 
-        width: auto !important; 
-        min-width: fit-content !important; 
-        max-width: fit-content !important; 
-    } 
-
-    div.stButton > button { 
-        width: 170px !important; 
-        min-height: 3.3em !important; 
-        white-space: normal !important; 
-        word-wrap: break-word !important; 
-        padding: 10px 14px !important; 
-        display: flex !important; 
-        align-items: center !important; 
-        justify-content: center !important; 
-        text-align: center !important; 
-        font-size: 13px !important; 
-        line-height: 1.3 !important; 
-    } 
-
-    /* ============================================ 
-       11. SIDEBAR BUTTONS - GOLD THEME 
-       ============================================ */ 
-    [data-testid="stSidebar"] div.stButton > button { 
-        background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important; 
-        color: #C5A059 !important; 
-        border: 1px solid rgba(197, 160, 89, 0.25) !important; 
-        width: 100% !important; 
-        height: auto !important; 
-        min-height: 42px !important; 
-        border-radius: 8px !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-weight: 500 !important; 
-        font-size: 12px !important; 
-        white-space: nowrap !important; 
-        transition: all 0.25s ease !important; 
-        margin-bottom: 6px !important; 
-    } 
-
-    [data-testid="stSidebar"] div.stButton > button:hover { 
-        background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important; 
-        border-color: #C5A059 !important; 
-        color: #FFD700 !important; 
-    } 
-
-    [data-testid="stSidebar"] div.stButton > button p { 
-        color: inherit !important; 
-        font-family: 'Inter', sans-serif !important; 
-    } 
-
-    /* ============================================ 
-       12. LABELS 
-       ============================================ */ 
-    [data-testid="stWidgetLabel"] p { 
-        color: #2d3748 !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-weight: 600 !important; 
-        font-size: 13px !important; 
+    /* ============================================
+       12. LABELS
+       ============================================ */
+    [data-testid="stWidgetLabel"] p {
+        color: #2d3748 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -1088,7 +1073,7 @@ def menu_Stock_Opname():
         list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
     with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTN","GUDANG LT 2"]
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "JBR", "GUDANG", "SDA", "SMG"]
         selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE"]
@@ -2505,29 +2490,27 @@ import streamlit as st
 from datetime import datetime
 import pytz
 
+# --- 1. INITIALIZE DATABASE (VERSI V3 - FRESH RESTART) ---
 def init_db():
-    conn = sqlite3.connect('jez_reporting.db', check_same_thread=False)
-    cursor = conn.cursor()
+    conn = sqlite3.connect('inventory_logistics.db', check_same_thread=False)
+    c = conn.cursor()
     
-    # 1. BUAT TABEL (Daftar kolom dasar)
-    cursor.execute('''
+    # Buat tabel V3 jika belum ada
+    c.execute('''
         CREATE TABLE IF NOT EXISTS retur_out_v3 (
-            tanggal TEXT,
-            no_retur TEXT,
-            item_name TEXT,
-            qty INTEGER,
-            pic TEXT,
-            keterangan TEXT,
-            status TEXT
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            identify TEXT, bin TEXT, sku TEXT, brand TEXT, 
+            item_name TEXT, variant TEXT, sub_kategori TEXT,
+            harga_beli REAL, harga_jual REAL, 
+            qty_system INTEGER, qty_so INTEGER,
+            tanggal TEXT
         )
     ''')
-    conn.commit()
-
-    # 2. LOGIKA AUTO-PATCH: Tambah kolom jika belum ada (Safe Migration)
-    cursor.execute("PRAGMA table_info(retur_out_v3)")
-    existing_cols = [row[1] for row in cursor.fetchall()]
     
-    # Daftar kolom lengkap yang wajib ada di V3
+    # LOGIKA AUTO-PATCH: Pastikan kolom ada (Safety Check)
+    c.execute("PRAGMA table_info(retur_out_v3)")
+    existing_cols = [row[1] for row in c.fetchall()]
+    
     required_db_cols = {
         'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
         'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
@@ -2537,13 +2520,10 @@ def init_db():
     
     for col, dtype in required_db_cols.items():
         if col not in existing_cols:
-            try:
-                cursor.execute(f"ALTER TABLE retur_out_v3 ADD COLUMN {col} {dtype}")
-            except:
-                pass # Menghindari error jika kolom mendadak ada
-    
+            c.execute(f"ALTER TABLE retur_out_v3 ADD COLUMN {col} {dtype}")
+            
     conn.commit()
-    return conn 
+    return conn
 
 def menu_retur_out_system():
     # Jam Jakarta/Surabaya
@@ -2603,12 +2583,12 @@ def menu_retur_out_system():
             border: 1px solid #3d4455;
             padding: 10px 15px;
         }
+        [data-testid="stWidgetLabel"] { display: none; }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header"><p class="hero-text">RETUR OUT - DATABASE V3</p></div>', unsafe_allow_html=True)
 
-    # Inisialisasi Database
     conn = init_db()
 
     # --- 3. UPLOAD & AUTO-SAVE ---
@@ -2616,7 +2596,6 @@ def menu_retur_out_system():
     
     if uploaded_file:
         try:
-            # Baca file
             df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df_upload.columns = [str(c).strip() for c in df_upload.columns]
             
@@ -2631,10 +2610,9 @@ def menu_retur_out_system():
                 df_to_save = df_upload[list(required_cols.keys())].copy()
                 df_to_save.rename(columns=required_cols, inplace=True)
                 
-                # Tambah timestamp
+                # TAMBAHKAN DATE TIME SEKARANG
                 df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
-                # Cek Double Upload via Session State
                 file_key = f"up_v3_{uploaded_file.name}_{len(df_upload)}"
                 if st.session_state.get('last_file_key_v3') != file_key:
                     df_to_save.to_sql('retur_out_v3', conn, if_exists='append', index=False)
@@ -2648,15 +2626,13 @@ def menu_retur_out_system():
 
     # --- 4. DATA VIEW & METRICS ---
     try:
-        # Load Data
         df_db = pd.read_sql("SELECT rowid, * FROM retur_out_v3", conn)
 
         if not df_db.empty:
             # 1. Kalkulasi Dashboard
             total_sku = df_db['sku'].nunique()
             total_qty_system = df_db['qty_system'].sum()
-            # Gunakan fillna(0) biar gak meledak kalau ada data kosong
-            total_value = (df_db['qty_system'].fillna(0) * df_db['harga_beli'].fillna(0)).sum()
+            total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
             # 2. Tampilan Metrik Box
             m1, m2, m3 = st.columns(3)
@@ -2686,7 +2662,7 @@ def menu_retur_out_system():
                 ''', unsafe_allow_html=True)
 
             st.markdown("### 📜 Database History (V3)")
-            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang...", key="search_v3")
+            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang...")
 
             df_display = df_db.sort_values(by='rowid', ascending=False)
 
@@ -2696,8 +2672,7 @@ def menu_retur_out_system():
                     df_display['item_name'].str.contains(search_query, case=False, na=False)
                 ]
 
-            # Sembunyikan kolom rowid dari tampilan tabel
-            cols_to_show = [col for col in df_display.columns if col not in ['rowid', 'id']]
+            cols_to_show = [col for col in df_display.columns if col != 'rowid' and col != 'id']
 
             event = st.dataframe(
                 df_display[cols_to_show],
@@ -2707,7 +2682,6 @@ def menu_retur_out_system():
                 selection_mode="single-row" 
             )
 
-            # Logika Hapus Data
             if event.selection.rows:
                 row_idx = event.selection.rows[0]
                 target_id = df_display.iloc[row_idx]['rowid']
@@ -2715,10 +2689,8 @@ def menu_retur_out_system():
                 
                 st.warning(f"⚠️ Hapus SKU: **{target_sku}** dari V3?")
                 if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                    # Buka koneksi baru untuk delete agar aman
-                    with sqlite3.connect('jez_reporting.db') as conn_del:
-                        conn_del.execute("DELETE FROM retur_out_v3 WHERE rowid = ?", (int(target_id),))
-                        conn_del.commit()
+                    conn.execute("DELETE FROM retur_out_v3 WHERE rowid = ?", (int(target_id),))
+                    conn.commit()
                     st.success("Data berhasil dihapus!")
                     st.rerun()
         else:
@@ -2727,7 +2699,8 @@ def menu_retur_out_system():
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Database: {e}")
     finally:
-        conn.close() # Pastikan ditutup di akhir
+        conn.close()
+
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
     res = df_case.copy()
@@ -4548,7 +4521,7 @@ elif menu == "Scan Out Validation":
                     return 'color: black'
                 
                 st.subheader("📋 DATA SCAN (COMPARED)")
-                styled_df = df_res.style.map(highlight_vba, subset=['Keterangan']).apply(
+                styled_df = df_res.style.applymap(highlight_vba, subset=['Keterangan']).apply(
                     lambda x: ['background-color: #ffcccc' if 'MISSMATCH' in str(x) or 'BELUM' in str(x) else '' for i in x],
                     subset=['Keterangan'], axis=1
                 )
@@ -4569,7 +4542,7 @@ elif menu == "Scan Out Validation":
                             return 'color: red'
                         return 'color: black'
                     
-                    styled_draft = df_draft.style.map(highlight_draft, subset=['NOTES'])
+                    styled_draft = df_draft.style.applymap(highlight_draft, subset=['NOTES'])
                     st.dataframe(styled_draft, use_container_width=True, height=300)
                 else:
                     st.info("ℹ️ Tidak ada data untuk DRAFT SET UP")
@@ -5414,26 +5387,23 @@ if menu == "Logistic Schedule":
                 text-transform: uppercase;
                 letter-spacing: 1px;
             }
-            /* 1. Kunci ukuran tombol hapus biar GAK BISA kegedean */
-            .small-del-container div.stButton > button {
-                width: 45px !important;
-                height: 35px !important;
-                padding: 0px !important;
-                min-height: 35px !important;
-                min-width: 45px !important;
-                line-height: 1 !important;
-                font-size: 16px !important;
-                background: #1a1d2e !important;
-                border: 1px solid rgba(255,255,255,0.1) !important;
-                border-radius: 6px !important;
-                margin-top: 5px !important; /* Biar sejajar tengah sama card */
-            }
 
-            .small-del-container div.stButton > button:hover {
-                background: #FF4B4B !important;
-                border-color: #FF4B4B !important;
+            /* 2. Input Fields - Modern Dark Glass */
+            [data-testid="stForm"] { 
+                border: none !important; 
+                padding: 0 !important; 
             }
-        
+            
+            div[data-testid="stTextInput"] > div > div, 
+            div[data-testid="stTextArea"] > div > div,
+            div[data-testid="stDateInput"] > div > div,
+            div[data-testid="stSelectbox"] > div > div {
+                background-color: #12141d !important; 
+                border: 1px solid #2d3142 !important;
+                border-radius: 10px !important;
+                transition: all 0.3s ease-in-out !important;
+                padding: 2px !important;
+            }
 
             /* Efek Focus Pas Diklik */
             div[data-testid="stTextInput"] > div > div:focus-within, 
@@ -5442,6 +5412,18 @@ if menu == "Logistic Schedule":
                 box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
             }
 
+            /* 3. Button - Premium Glow Effect */
+            div.stButton > button {
+                background: linear-gradient(90deg, #007BFF 0%, #0056b3 100%) !important;
+                color: white !important;
+                border-radius: 10px !important;
+                border: none !important;
+                padding: 12px 24px !important;
+                font-weight: 700 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 1px !important;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2) !important;
             }
 
             /* 4. Font & Labels - Soft Neutral */
