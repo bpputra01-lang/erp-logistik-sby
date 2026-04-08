@@ -544,6 +544,35 @@ def get_yellow_skus(file, column_index):
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock = df_stock_adj.copy()
     
+    # 🔥 FIX UTAMA: AUTO DETECT & HAPUS KOLOM INDEX ANGKA
+    def clean_index_column(df):
+        """Otomatis hapus kolom pertama jika berisi angka index (0,1,2,3...)"""
+        if len(df) == 0:
+            return df
+            
+        first_col_data = df.iloc[:, 0]
+        try:
+            # Coba konversi ke numeric
+            first_numeric = pd.to_numeric(first_col_data, errors='coerce')
+            
+            # Cek apakah: 
+            # 1. Semua bisa jadi angka
+            # 2. Angka berurutan dari 0 sampai len(df)-1
+            if first_numeric.notna().all():
+                expected_range = set(range(len(df)))
+                actual_range = set(first_numeric.astype(int))
+                if expected_range == actual_range:
+                    # ✅ Ini kolom index, HAPUS!
+                    st.warning("🧹 Kolom index angka terdeteksi & dihapus otomatis!")
+                    return df.iloc[:, 1:].reset_index(drop=True)
+        except:
+            pass
+        return df
+    
+    # Bersihkan kedua dataframe
+    df_recon = clean_index_column(df_recon)
+    df_stock = clean_index_column(df_stock)
+    
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
@@ -551,7 +580,6 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         return s
 
     # 1. Ambil daftar SEMUA SKU yang ada di Stock Report
-    # Kita gunakan set SKU agar lookup-nya cepat
     skus_in_stock = set(df_stock.iloc[:, 2].apply(clean_val))
 
     recon_dict = {}
@@ -560,7 +588,6 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         try:
             qty_so = pd.to_numeric(row.iloc[6], errors='coerce') or 0
             if qty_so > 0:
-                # Key tetap BIN|SKU untuk keperluan mapping QTY SO ke baris yang spesifik
                 k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
                 recon_dict[k] = row.iloc[6]
                 all_recon_keys.add(k)
@@ -577,10 +604,8 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
             return recon_dict[key_stock]
         return ""
 
-    # Isi QTY SO ke Kolom K
     df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
 
-    # Hitung DIFF ke Kolom L
     def do_diff(row):
         try:
             val_sys = row.iloc[9]
@@ -597,12 +622,9 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     cols[11] = "DIFF"
     df_stock.columns = cols
 
-    # --- PERBAIKAN LOGIC SINGLE (BERBASIS SKU) ---
-    # Item masuk Single ADJ HANYA JIKA SKU-nya tidak ada sama sekali di daftar skus_in_stock
     def check_is_single(row):
         sku_recon = clean_val(row.iloc[1])
         qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-        # Syarat: Qty > 0 DAN SKU-nya tidak ada di file Stock
         return qty_recon > 0 and sku_recon not in skus_in_stock
 
     df_need_single = df_recon[df_recon.apply(check_is_single, axis=1)].copy()
