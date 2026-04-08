@@ -541,78 +541,106 @@ def get_yellow_skus(file, column_index):
     except: pass
     return yellow_set
 
-# 🔥 1. FIX logic_cek_adjustment_final()
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    # AUTO CLEAN KOLOM INDEX DI AWAL
+    # 🔥 AUTO CLEAN KOLOM INDEX
     def safe_clean_df(df):
-        if len(df) == 0: return df
-        # Cek kolom 0
-        if len(df.columns) > 0:
-            col0 = df.iloc[:, 0]
-            try:
-                nums = pd.to_numeric(col0, errors='coerce')
-                if nums.notna().all() and len(set(nums.dropna().astype(int))) == len(df):
-                    df = df.iloc[:, 1:].reset_index(drop=True)
-            except: pass
+        if len(df) == 0 or len(df.columns) == 0: return df
+        col0 = df.iloc[:, 0]
+        try:
+            nums = pd.to_numeric(col0, errors='coerce')
+            if nums.notna().all() and len(set(nums.dropna().astype(int))) >= len(df) * 0.9:
+                return df.iloc[:, 1:].reset_index(drop=True)
+        except: pass
         return df
     
     df_recon = safe_clean_df(df_recon)
-    df_stock_adj = safe_clean_df(df_stock_adj)
-    df_stock = df_stock_adj.copy()
+    df_stock = safe_clean_df(df_stock_adj).copy()
     
     def clean_val(x):
         if pd.isna(x): return ""
-        s = str(x).strip().upper()
-        if s.endswith('.0'): s = s[:-2]
-        return s
+        return str(x).strip().upper().rstrip('.0')
 
-    skus_in_stock = set(df_stock.iloc[:, 2].apply(clean_val))
+    # 1. SKUS IN STOCK
+    try:
+        skus_in_stock = set(df_stock.iloc[:, 2].astype(str).apply(clean_val))
+    except:
+        skus_in_stock = set()
+
+    # 2. RECON DICT - SAFE
     recon_dict = {}
-    
-    # SAFE ITERASI
-    for i in range(len(df_recon)):
+    for i in range(min(len(df_recon), 50000)):  # Limit untuk safety
         try:
             row = df_recon.iloc[i]
-            qty_so = pd.to_numeric(row.iloc[6] if len(row) > 6 else 0, errors='coerce') or 0
-            if qty_so > 0:
-                k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
-                recon_dict[k] = qty_so
+            if len(row) > 6:
+                qty_so = float(row.iloc[6]) if pd.notna(row.iloc[6]) else 0
+                if qty_so > 0:
+                    bin_val = clean_val(row.iloc[0])
+                    sku_val = clean_val(row.iloc[1])
+                    if bin_val and sku_val:
+                        key = f"{bin_val}|{sku_val}"
+                        recon_dict[key] = qty_so
         except: continue
 
-    # ENSURE MINIMUM COLUMNS
-    while df_stock.shape[1] < 12:
-        df_stock[f"col_{df_stock.shape[1]}"] = ""
+    # 3. ENSURE 12 KOLOM
+    for i in range(df_stock.shape[1], 12):
+        df_stock[f"col_{i}"] = 0
 
-    def safe_lookup(row):
+    # 🔥 4. FIX LOOKUP - RETURN SCALAR!
+    def do_lookup(row_idx):
         try:
-            key_stock = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
-            return recon_dict.get(key_stock, "")
-        except: return ""
+            row = df_stock.iloc[row_idx]
+            bin_val = clean_val(row.iloc[1])
+            sku_val = clean_val(row.iloc[2])
+            key = f"{bin_val}|{sku_val}"
+            return recon_dict.get(key, 0)
+        except:
+            return 0
 
-    df_stock.iloc[:, 10] = [safe_lookup(row) for _, row in df_stock.iterrows()]
-
-    def safe_diff(row):
-        try:
-            val_sys = pd.to_numeric(row.iloc[9], errors='coerce') or 0
-            val_so = pd.to_numeric(row.iloc[10], errors='coerce') or 0
-            return abs(val_sys - val_so)
-        except: return 0
-
-    df_stock.iloc[:, 11] = [safe_diff(row) for _, row in df_stock.iterrows()]
+    # APPLY LOOKUP SATU PER SATU (ANTI VECTORIZED ERROR)
+    qty_so_list = []
+    for i in range(len(df_stock)):
+        qty_so_list.append(do_lookup(i))
     
-    cols = list(df_stock.columns)
-    if len(cols) > 10: cols[10] = "QTY SO"
-    if len(cols) > 11: cols[11] = "DIFF"
-    df_stock.columns = cols[:12]
+    df_stock.iloc[:, 10] = qty_so_list
 
-    def is_single(row):
+    # 5. FIX DIFF - SCALAR ONLY
+    def do_diff(row_idx):
         try:
-            sku_recon = clean_val(row.iloc[1])
-            qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-            return qty_recon > 0 and sku_recon not in skus_in_stock
-        except: return False
+            row = df_stock.iloc[row_idx]
+            sys_qty = float(row.iloc[9]) if pd.notna(row.iloc[9]) else 0
+            so_qty = float(row.iloc[10]) if pd.notna(row.iloc[10]) else 0
+            return abs(sys_qty - so_qty)
+        except:
+            return 0
 
-    df_need_single = df_recon[df_recon.apply(is_single, axis=1)].copy()
+    diff_list = []
+    for i in range(len(df_stock)):
+        diff_list.append(do_diff(i))
+    
+    df_stock.iloc[:, 11] = diff_list
+
+    # 6. RENAME COLUMNS
+    cols = list(df_stock.columns)
+    cols[10] = "QTY SO"
+    cols[11] = "DIFF"
+    df_stock.columns = cols
+
+    # 7. SINGLE CHECK
+    def check_single(row_idx):
+        try:
+            row = df_recon.iloc[row_idx]
+            sku = clean_val(row.iloc[1])
+            qty = float(row.iloc[6]) if len(row) > 6 and pd.notna(row.iloc[6]) else 0
+            return qty > 0 and sku not in skus_in_stock
+        except:
+            return False
+
+    single_mask = []
+    for i in range(len(df_recon)):
+        single_mask.append(check_single(i))
+    
+    df_need_single = df_recon[single_mask].copy() if any(single_mask) else pd.DataFrame()
+    
     return df_stock, df_need_single
 
 # 🔥 2. FIX logic_pivot_adjustment()
