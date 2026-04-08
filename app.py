@@ -139,10 +139,6 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(176, 141, 74, 0.2) !important;
     }
 
-    /* Hilangkan icon awan/upload yang mengganggu di gambar 2 */
-    [data-testid="stFileUploaderIcon"] {
-        display: none !important;
-    }
 
     /* Area Teks Instruksi */
     [data-testid="stFileUploaderText"] {
@@ -163,11 +159,6 @@ st.markdown("""
         font-size: 12px !important;
     }
 
-    /* Hilangkan background abu-abu kotak drop */
-    [data-testid="stFileUploaderSection"] {
-        background-color: transparent !important;
-        border: none !important;
-    }
     /* ============================================
        7. METRIC BOXES - PREMIUM CARD
        ============================================ */
