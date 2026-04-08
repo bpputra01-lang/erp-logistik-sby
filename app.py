@@ -543,12 +543,10 @@ def get_yellow_skus(file, column_index):
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     import pandas as pd
-    import numpy as np
     
-    # 🔥 AUTO CLEAN KOLOM INDEX
+    # 🔥 AUTO CLEAN KOLOM INDEX - IDENTIK
     def safe_clean_df(df):
-        if len(df) == 0 or len(df.columns) == 0: 
-            return df
+        if len(df) == 0 or len(df.columns) == 0: return df
         col0 = df.iloc[:, 0]
         try:
             nums = pd.to_numeric(col0, errors='coerce')
@@ -564,104 +562,79 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if pd.isna(x): return ""
         return str(x).strip().upper().rstrip('.0')
 
-    # 1. SKUS IN STOCK - SAFE
+    # 1. SKUS IN STOCK - IDENTIK
     try:
         skus_in_stock = set(df_stock.iloc[:, 2].astype(str).apply(clean_val))
-        skus_in_stock.discard('')
     except:
         skus_in_stock = set()
 
-    # 2. RECON DICT - FIXED SCALAR ONLY!
+    # 2. RECON DICT - IDENTIK
     recon_dict = {}
-    max_rows = min(len(df_recon), 50000)
-    for i in range(max_rows):
+    for i in range(min(len(df_recon), 50000)):
         try:
             row = df_recon.iloc[i]
             if len(row) > 6:
-                qty_so_raw = row.iloc[6]
-                qty_so = float(qty_so_raw) if pd.notna(qty_so_raw) else 0
-                if qty_so > 0:  # SCALAR CHECK
+                qty_so = float(row.iloc[6]) if pd.notna(row.iloc[6]) else 0
+                if qty_so > 0:
                     bin_val = clean_val(row.iloc[0])
                     sku_val = clean_val(row.iloc[1])
                     if bin_val and sku_val:
                         key = f"{bin_val}|{sku_val}"
-                        recon_dict[key] = qty_so  # GUARANTEE SCALAR
-        except:
+                        recon_dict[key] = qty_so  # SCALAR GUARANTEED
+        except: 
             continue
 
-    # 3. PAD TO 12 COLUMNS
+    # 3. ENSURE 12 KOLOM - IDENTIK
     for i in range(df_stock.shape[1], 12):
         df_stock[f"col_{i}"] = 0
 
-    # 🔥 4. SAFE LOOKUP - HYBRID APPROACH
-    def safe_lookup_vectorized(df_stock, recon_dict):
-        """Hybrid: vectorized + fallback loop"""
-        n_rows = len(df_stock)
-        qty_so_list = [0.0] * n_rows
-        
-        # Try vectorized first (fast for most cases)
+    # 🔥 4. LOOKUP - PURE LOOP IDENTIK DENGAN CASTING
+    def do_lookup(row_idx):
         try:
-            bin_col = df_stock.iloc[:, 1].astype(str).apply(clean_val)
-            sku_col = df_stock.iloc[:, 2].astype(str).apply(clean_val)
-            keys = bin_col + '|' + sku_col
-            
-            # Map with error handling
-            valid_mask = (bin_col != '') & (sku_col != '')
-            if valid_mask.any():
-                mapped = keys[valid_mask].map(recon_dict)
-                qty_so_list = [float(x) if pd.notna(x) else 0.0 for x in mapped.fillna(0)]
-                # Fill non-valid positions
-                full_qty = [0.0] * n_rows
-                full_qty[:len(qty_so_list)] = qty_so_list[:len(full_qty)]
-                qty_so_list = full_qty[:n_rows]
+            row = df_stock.iloc[row_idx]
+            bin_val = clean_val(row.iloc[1])
+            sku_val = clean_val(row.iloc[2])
+            key = f"{bin_val}|{sku_val}"
+            result = recon_dict.get(key, 0)
+            return float(result)  # FORCE SCALAR FLOAT
         except:
-            # Fallback to original loop (100% safe)
-            for i in range(n_rows):
-                try:
-                    row = df_stock.iloc[i]
-                    bin_val = clean_val(row.iloc[1])
-                    sku_val = clean_val(row.iloc[2])
-                    key = f"{bin_val}|{sku_val}"
-                    qty_so_list[i] = float(recon_dict.get(key, 0))
-                except:
-                    qty_so_list[i] = 0.0
-        
-        return qty_so_list
+            return 0.0
 
-    # APPLY SAFE LOOKUP
-    qty_so_list = safe_lookup_vectorized(df_stock, recon_dict)
-    df_stock.iloc[:, 10] = qty_so_list
-
-    # 5. SAFE DIFF - PURE LOOP (NO VECTOR ERROR)
-    diff_list = []
+    # LOOP IDENTIK - TETAPI ASSIGN SATU-SATU
     for i in range(len(df_stock)):
-        try:
-            sys_qty = float(df_stock.iloc[i, 9]) if pd.notna(df_stock.iloc[i, 9]) else 0.0
-            so_qty = float(df_stock.iloc[i, 10]) if pd.notna(df_stock.iloc[i, 10]) else 0.0
-            diff_list.append(abs(sys_qty - so_qty))
-        except:
-            diff_list.append(0.0)
-    
-    df_stock.iloc[:, 11] = diff_list
+        df_stock.iloc[i, 10] = do_lookup(i)  # ASSIGN SCALAR PER CELL
 
-    # 6. RENAME
+    # 5. DIFF - PURE LOOP IDENTIK
+    def do_diff(row_idx):
+        try:
+            row = df_stock.iloc[row_idx]
+            sys_qty = float(row.iloc[9]) if pd.notna(row.iloc[9]) else 0.0
+            so_qty = float(row.iloc[10]) if pd.notna(row.iloc[10]) else 0.0
+            return float(abs(sys_qty - so_qty))  # FORCE FLOAT
+        except:
+            return 0.0
+
+    for i in range(len(df_stock)):
+        df_stock.iloc[i, 11] = do_diff(i)  # ASSIGN SCALAR PER CELL
+
+    # 6. RENAME - IDENTIK
     cols = list(df_stock.columns)
     cols[10] = "QTY SO"
     cols[11] = "DIFF"
     df_stock.columns = cols
 
-    # 7. SINGLE CHECK - SAFE LOOP
-    single_mask = [False] * len(df_recon)
-    for i in range(len(df_recon)):
+    # 7. SINGLE CHECK - IDENTIK
+    def check_single(row_idx):
         try:
-            row = df_recon.iloc[i]
+            row = df_recon.iloc[row_idx]
             sku = clean_val(row.iloc[1])
             qty = float(row.iloc[6]) if len(row) > 6 and pd.notna(row.iloc[6]) else 0
-            single_mask[i] = qty > 0 and sku not in skus_in_stock
+            return qty > 0 and sku not in skus_in_stock
         except:
-            continue
-    
-    df_need_single = df_recon[single_mask].reset_index(drop=True) if any(single_mask) else pd.DataFrame()
+            return False
+
+    single_mask = [check_single(i) for i in range(len(df_recon))]
+    df_need_single = df_recon[single_mask].copy() if any(single_mask) else pd.DataFrame()
     
     return df_stock, df_need_single
 
