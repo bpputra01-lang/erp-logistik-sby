@@ -596,40 +596,50 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     return df_stock, df_need_single
 
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
+    # 1. DEFINE AWAL biar gak "Not Defined"
+    df_multiple_final = pd.DataFrame()
+    df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+    
     df_filtered = df_stock_final.copy()
     
-    # Paksa semua kolom perhitungan jadi angka biar gak ValueError
+    # 2. Paksa numeric biar gak error float64
     for col_idx in [9, 10, 11]:
         df_filtered.iloc[:, col_idx] = pd.to_numeric(df_filtered.iloc[:, col_idx], errors='coerce').fillna(0)
     
-    # FILTER UTAMA: Harus ada di recon, selisih bukan nol, dan SO > Sistem
-    # Note: df_filtered.iloc[:, 9] itu kolom QTY Sistem
+    # 3. FILTER: Harus ada di Recon, Diff bukan 0, dan SO > Sistem
     mask_multiple = (df_filtered["QTY SO"] > 0) & \
                     (df_filtered["DIFF"] != 0) & \
                     (df_filtered["QTY SO"] > df_filtered.iloc[:, 9])
     
     df_to_pivot = df_filtered[mask_multiple].copy()
     
-    df_multiple_final = pd.DataFrame()
+    # 4. PROSES MULTIPLE
     if not df_to_pivot.empty:
         sku_col = df_to_pivot.columns[2]
-        # Groupby SKU dan jumlahkan DIFF-nya
         pivot_multiple = df_to_pivot.groupby(sku_col)["DIFF"].sum().reset_index()
         pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
         
-        # Ambil data Master (Vendor, dsb) berdasarkan SKU
         master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
         df_multiple_final = pivot_multiple.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
         
         if not df_multiple_final.empty:
-            # Isi kolom terakhir master dengan angka TOTAL_DIFF
             target_col = df_multiple_final.columns[-1]
             df_multiple_final.loc[:, target_col] = df_multiple_final['TOTAL_DIFF']
-            
-            # Buang kolom sampah hasil merge
             df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'], errors='ignore')
-            
-    return df_multiple_final, df_single_final # df_single tetep dari logic sebelumnya
+
+    # 5. PROSES SINGLE (Data yang SKU-nya gak ada di sistem sama sekali)
+    if df_recon_missing is not None and not df_recon_missing.empty:
+        df_m = df_recon_missing.copy()
+        # Kolom 6 biasanya QTY SO di file recon
+        df_m.iloc[:, 6] = pd.to_numeric(df_m.iloc[:, 6], errors='coerce').fillna(0)
+        df_m = df_m[df_m.iloc[:, 6] > 0]
+        
+        if not df_m.empty:
+            # Groupby BIN & SKU
+            df_single_final = df_m.groupby([df_m.columns[0], df_m.columns[1]])[df_m.columns[6]].sum().reset_index()
+            df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
+        
+    return df_multiple_final, df_single_final
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
     def clean_val(x):
         if pd.isna(x): return ""
