@@ -2491,11 +2491,11 @@ from datetime import datetime
 import pytz
 
 def init_db():
-    conn = get_db_connection()
-    # ... tabel yang lain (todo, reports, dll) ...
+    conn = sqlite3.connect('jez_reporting.db', check_same_thread=False)
+    cursor = conn.cursor()
     
-    # TAMBAHKAN BARIS INI:
-    conn.execute('''
+    # 1. BUAT TABEL (Pastikan ini jalan duluan)
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS retur_out_v3 (
             tanggal TEXT,
             no_retur TEXT,
@@ -2506,13 +2506,11 @@ def init_db():
             status TEXT
         )
     ''')
-    
     conn.commit()
-    conn.close()
-    
-    # LOGIKA AUTO-PATCH: Pastikan kolom ada (Safety Check)
-    c.execute("PRAGMA table_info(retur_out_v3)")
-    existing_cols = [row[1] for row in c.fetchall()]
+
+    # 2. LOGIKA AUTO-PATCH: Cek kolom yang kurang
+    cursor.execute("PRAGMA table_info(retur_out_v3)")
+    existing_cols = [row[1] for row in cursor.fetchall()]
     
     required_db_cols = {
         'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
@@ -2521,12 +2519,13 @@ def init_db():
         'qty_so': 'INTEGER', 'tanggal': 'TEXT'
     }
     
+    # Tambah kolom kalau belum ada di database lama
     for col, dtype in required_db_cols.items():
         if col not in existing_cols:
-            c.execute(f"ALTER TABLE retur_out_v3 ADD COLUMN {col} {dtype}")
-            
+            cursor.execute(f"ALTER TABLE retur_out_v3 ADD COLUMN {col} {dtype}")
+    
     conn.commit()
-    return conn
+    return conn # Balikin koneksi yang aktif
 
 def menu_retur_out_system():
     # Jam Jakarta/Surabaya
