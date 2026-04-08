@@ -105,56 +105,65 @@ st.markdown("""
     }
 
  /* ============================================
-       6. FILE UPLOADER - FIXED IMAGE 1 STYLE
+       6. FILE UPLOADER - EXACT IMAGE 1 MATCH
        ============================================ */
+    /* Container utama uploader */
     [data-testid="stFileUploader"] {
-        background-color: #ffffff !important;
+        background-color: white !important;
         border: 2px dashed #b08d4a !important; 
-        border-radius: 15px !important;
-        padding: 5px !important;
-    }
-
-    /* INI KUNCINYA: Memaksa isi uploader tetap satu baris (Horizontal) */
-    [data-testid="stFileUploaderSection"] > div {
-        flex-direction: row !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        width: 100% !important;
+        border-radius: 12px !important;
         padding: 10px 20px !important;
     }
 
-    /* Tombol 'Browse Files' - Paksa ke kanan, warna emas solid, teks putih */
+    /* Memaksa layout horizontal: Tombol Kanan, Teks Kiri */
+    [data-testid="stFileUploaderSection"] > div {
+        display: flex !important;
+        flex-direction: row-reverse !important; /* PAKSA TOMBOL KE KANAN */
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 20px !important;
+    }
+
+    /* Styling Tombol 'Browse files' agar persis SIGN IN */
     [data-testid="stFileUploader"] button {
         background-color: #b08d4a !important;
         background-image: none !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        font-weight: 700 !important;
-        font-size: 13px !important;
-        border-radius: 8px !important;
+        color: white !important;
+        -webkit-text-fill-color: white !important;
         border: none !important;
-        padding: 8px 20px !important;
-        order: 2 !important; /* Paksa tombol di kanan */
-        width: auto !important;
-        min-width: 120px !important;
+        border-radius: 8px !important;
+        padding: 10px 25px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        min-width: 130px !important;
+        box-shadow: 0 4px 10px rgba(176, 141, 74, 0.2) !important;
     }
 
-    /* Area Teks - Paksa di kiri */
+    /* Hilangkan icon awan/upload yang mengganggu di gambar 2 */
+    [data-testid="stFileUploaderIcon"] {
+        display: none !important;
+    }
+
+    /* Area Teks Instruksi */
     [data-testid="stFileUploaderText"] {
-        order: 1 !important;
         text-align: left !important;
         flex: 1 !important;
     }
 
-    /* Icon Cloud - Sesuai gambar 1, pakai warna emas */
-    [data-testid="stFileUploaderIcon"] {
-        color: #b08d4a !important;
-        fill: #b08d4a !important;
-        margin-right: 15px !important;
+    /* Tulisan 'Drag and drop file here' */
+    [data-testid="stFileUploaderText"] > span {
+        color: #1a1d2e !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
     }
 
-    /* Hilangkan background abu-abu internal yang bikin kaku */
+    /* Tulisan 'Limit 200MB...' */
+    [data-testid="stFileUploaderText"] > small {
+        color: #6c757d !important;
+        font-size: 12px !important;
+    }
+
+    /* Hilangkan background abu-abu kotak drop */
     [data-testid="stFileUploaderSection"] {
         background-color: transparent !important;
         border: none !important;
