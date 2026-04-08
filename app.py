@@ -542,6 +542,24 @@ def get_yellow_skus(file, column_index):
     return yellow_set
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
+    # --- PROTEKSI AWAL: PAKSA SEMUA KOLOM IDENTITAS JADI STRING ---
+    for df in [df_recon, df_stock_adj]:
+        if df is not None:
+            # 1. Cari kolom 'Identify' atau ID dan paksa jadi string
+            for col in df.columns:
+                c_name = str(col).upper()
+                if 'IDENTIFY' in c_name or 'ID' in c_name or 'SKU' in c_name or 'BIN' in c_name:
+                    df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+            
+            # 2. Paksa kolom QTY jadi numeric agar tidak error float64
+            # Di df_recon biasanya QTY ada di index 6 (menurut kode lu)
+            if len(df.columns) > 6:
+                df.iloc[:, 6] = pd.to_numeric(df.iloc[:, 6], errors='coerce').fillna(0)
+            
+            # Di df_stock_adj (Uploader 2), QTY System biasanya di index 9
+            if len(df.columns) > 9:
+                df.iloc[:, 9] = pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0)
+
     df_stock = df_stock_adj.copy()
     
     def clean_val(x):
@@ -551,64 +569,56 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         return s
 
     # 1. Ambil daftar SEMUA SKU yang ada di Stock Report
-    # Kita gunakan set SKU agar lookup-nya cepat
     skus_in_stock = set(df_stock.iloc[:, 2].apply(clean_val))
 
     recon_dict = {}
-    all_recon_keys = set()
     for _, row in df_recon.iterrows():
         try:
+            # Pastikan row.iloc[6] adalah angka murni
             qty_so = pd.to_numeric(row.iloc[6], errors='coerce') or 0
             if qty_so > 0:
-                # Key tetap BIN|SKU untuk keperluan mapping QTY SO ke baris yang spesifik
                 k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
-                recon_dict[k] = row.iloc[6]
-                all_recon_keys.add(k)
+                recon_dict[k] = qty_so # Simpan sebagai numeric
         except: continue
 
+    # Pastikan jumlah kolom df_stock cukup (Minimal 12 kolom untuk K dan L)
     while df_stock.shape[1] < 12:
         df_stock[f"Extra_{df_stock.shape[1]}"] = ""
 
-    used_keys = set()
+    # Isi QTY SO ke Kolom K (Index 10)
     def do_lookup(row):
         key_stock = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
-        if key_stock in recon_dict:
-            used_keys.add(key_stock)
-            return recon_dict[key_stock]
-        return ""
+        return recon_dict.get(key_stock, "")
 
-    # Isi QTY SO ke Kolom K
     df_stock.iloc[:, 10] = df_stock.apply(do_lookup, axis=1)
 
-    # Hitung DIFF ke Kolom L
+    # Hitung DIFF ke Kolom L (Index 11)
     def do_diff(row):
         try:
-            val_sys = row.iloc[9]
-            val_so = row.iloc[10]
-            if val_so != "" and val_so is not None:
+            val_sys = pd.to_numeric(row.iloc[9], errors='coerce') or 0
+            val_so = pd.to_numeric(row.iloc[10], errors='coerce') or 0
+            if val_so > 0:
                 return abs(float(val_sys) - float(val_so))
         except: return 0
         return ""
 
     df_stock.iloc[:, 11] = df_stock.apply(do_diff, axis=1)
     
+    # Update Nama Kolom
     cols = list(df_stock.columns)
     cols[10] = "QTY SO"
     cols[11] = "DIFF"
     df_stock.columns = cols
 
-    # --- PERBAIKAN LOGIC SINGLE (BERBASIS SKU) ---
-    # Item masuk Single ADJ HANYA JIKA SKU-nya tidak ada sama sekali di daftar skus_in_stock
+    # --- LOGIC SINGLE ---
     def check_is_single(row):
         sku_recon = clean_val(row.iloc[1])
         qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-        # Syarat: Qty > 0 DAN SKU-nya tidak ada di file Stock
         return qty_recon > 0 and sku_recon not in skus_in_stock
 
     df_need_single = df_recon[df_recon.apply(check_is_single, axis=1)].copy()
     
     return df_stock, df_need_single
-
 def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
     # Logika Multiple tetap (SO > SYS)
     df_filtered = df_stock_final.copy()
