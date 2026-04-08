@@ -104,21 +104,42 @@ st.markdown("""
         border-color: #ff4444 !important;
     }
 
-    /* ============================================
-       6. FILE UPLOADER
+  /* ============================================
+       6. FILE UPLOADER - MATCHING GOLD THEME
        ============================================ */
     [data-testid="stFileUploader"] {
-        background-color: #f0f2f6;
-        border: 2px dashed rgba(0, 43, 91, 0.3) !important;
-        border-radius: 10px;
-        padding: 12px;
+        background-color: #f8f9fa !important;
+        border: 2px dashed #b08d4a !important; /* Border emas doff */
+        border-radius: 12px !important;
+        padding: 15px !important;
     }
-    [data-testid="stFileUploader"] button {
-        background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important;
+
+    /* Target spesifik ke tombol Browse Files agar warnanya solid sesuai gambar */
+    [data-testid="stFileUploader"] button[kind="secondary"] {
+        background-color: #b08d4a !important; /* Warna Emas Tan sesuai gambar */
+        background-image: none !important;    /* Hapus gradient agar solid */
+        color: white !important;
+        font-weight: 700 !important;
+        border-radius: 10px !important;
+        border: none !important;
+        padding: 10px 20px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 10px rgba(176, 141, 74, 0.2) !important;
+    }
+
+    [data-testid="stFileUploader"] button[kind="secondary"]:hover {
+        background-color: #c5a059 !important; /* Warna sedikit lebih terang saat hover */
+        box-shadow: 0 6px 15px rgba(176, 141, 74, 0.4) !important;
+        transform: translateY(-1px);
+        color: white !important;
+    }
+
+    /* Warna teks 'Drag and drop file here' agar tetap kontras */
+    [data-testid="stFileUploaderText"] > span {
         color: #1a1d2e !important;
-        font-weight: 600 !important;
-        border-radius: 6px !important;
-        font-size: 12px !important;
+        font-weight: 500 !important;
     }
 
     /* ============================================
