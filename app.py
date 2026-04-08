@@ -1130,41 +1130,34 @@ def menu_Stock_Opname():
                 df_t_raw = df_t_raw.iloc[0:0]
 
             # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
-            res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
-            res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
+        res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
+        res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
             
-            # --- PROSES MAPPING ITEM NAME (ANTI ERROR TYPE) ---
+        # --- PROSES MAPPING ITEM NAME (ANTI ERROR TYPE) ---
         try:
-            # 1. Pastikan map_dict isinya string semua biar gak jadi float
+            # 1. Buat Master Map dari Data System (Kolom 2=SKU, 4=Nama)
             item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
             item_map.columns = ['SKU', 'NAME']
             item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
 
             # 2. Mapping ke res_scan (REAL +)
-            if 'ITEM NAME' not in res_scan.columns:
-                res_scan['ITEM NAME'] = ""
-            
-            # Gunakan .map() tapi pastikan hasilnya dipaksa jadi String
-            res_scan['ITEM NAME'] = res_scan['SKU'].str.strip().str.upper().map(map_dict).fillna("UNKNOWN")
-            res_scan['ITEM NAME'] = res_scan['ITEM NAME'].astype(str)
+            if not res_scan.empty:
+                # Paksa SKU jadi string biar sinkron sama map_dict
+                sku_clean_scan = res_scan['SKU'].astype(str).str.strip().str.upper()
+                res_scan['ITEM NAME'] = sku_clean_scan.map(map_dict).fillna("UNKNOWN").astype(str)
 
             # 3. Mapping ke res_stock (SYSTEM +)
-            # Ambil kolom SKU dari res_stock (asumsi index 2 adalah SKU)
-            sku_col_stock = res_stock.iloc[:, 2].astype(str).str.strip().str.upper()
-            res_stock['ITEM NAME'] = sku_col_stock.map(map_dict).fillna("UNKNOWN")
-            res_stock['ITEM NAME'] = res_stock['ITEM NAME'].astype(str)
+            if not res_stock.empty:
+                # Sesuai catatan lu, SKU di res_stock ada di index 2
+                sku_clean_stock = res_stock.iloc[:, 2].astype(str).str.strip().str.upper()
+                res_stock['ITEM NAME'] = sku_clean_stock.map(map_dict).fillna("UNKNOWN").astype(str)
 
         except Exception as mapping_err:
-            # Kalau mapping gagal, jangan bikin aplikasi mati, kasih nilai default aja
-            res_scan['ITEM NAME'] = "Error Mapping"
-            res_stock['ITEM NAME'] = "Error Mapping"
-            print(f"Mapping Error: {mapping_err}")
-            
-            # Mapping hasil
-            res_scan['ITEM NAME'] = res_scan['SKU'].str.strip().str.upper().map(map_dict)
-            # Pastikan kolom SKU di res_stock konsisten (sesuaikan index jika perlu)
-            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.strip().str.upper().map(map_dict)
+            # Jika gagal total, isi dengan nilai aman agar aplikasi tidak crash
+            st.warning(f"⚠️ Mapping Item Name terkendala: {mapping_err}")
+            if not res_scan.empty: res_scan['ITEM NAME'] = "UNKNOWN"
+            if not res_stock.empty: res_stock['ITEM NAME'] = "UNKNOWN"
 
             # 6. SAVE TO SESSION STATE
             st.session_state.compare_result = {
