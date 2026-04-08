@@ -1149,14 +1149,7 @@ def menu_Stock_Opname():
             df_t_raw.iloc[:, 2] = df_t_raw.iloc[:, 2].astype(str).str.strip().str.upper()
 
             # 3. APPLY FILTERS (SUB-INV & BIN)
-            if 'selected_sub' in globals() and selected_sub: 
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-            
-            if 'selected_bin_sys' in globals() and selected_bin_sys: 
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
-                
-            if 'selected_bin_cov' in globals() and selected_bin_cov: 
-                df_s_raw = df_s_raw[df_s_raw.iloc[:, 0].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_cov))]
+
 
             # 4. EXECUTE COMPARE LOGIC (SUMIFS REPLICATION)
             res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
