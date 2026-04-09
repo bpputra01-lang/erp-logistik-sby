@@ -4354,7 +4354,7 @@ if up_ds and up_asal:
             r['df_updated_bin'].to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
         
         st.download_button(
-            label="📥 DOWNLOAD REPORT LENGKAP",
+            label="📥 DOWNLOAD REPORT",
             data=output.getvalue(),
             file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
