@@ -769,85 +769,36 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     return df_karantina, df_check
     
 def logic_compare_scan_to_stock(df_scan, df_stock):
-    # Copy & Clean
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-    
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
     dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-
-    # DEEP CLEAN: Hapus spasi di tengah, depan, belakang
     for df in [ds, dt]:
-        for col in ['BIN', 'SKU']:
-            df[col] = df[col].astype(str).str.replace(r'\s+', '', regex=True).str.strip().str.upper()
-        # Pastikan QTY adalah angka, yang bukan angka jadi 0
-        qty_col = 'QTY_SCAN' if 'QTY_SCAN' in df.columns else 'QTY_SYSTEM'
-        df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce').fillna(0)
-
-    # GROUPING KEDUANYA (SUMIFS manual)
-    ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
-    dt_grouped = dt.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
-
-    # MERGE (Outer join supaya data yang ga match tetep keliatan)
-    merged = pd.merge(ds_grouped, dt_grouped, on=['BIN', 'SKU'], how='outer').fillna(0)
-
-    # HITUNG DIFF
-    merged['DIFF'] = merged['QTY_SCAN'] - merged['QTY_SYSTEM']
-    
-    def get_note(row):
-        if row['QTY_SCAN'] > 0 and row['QTY_SYSTEM'] == 0: return "REAL + (NOT IN SYSTEM)"
-        if row['QTY_SCAN'] == 0 and row['QTY_SYSTEM'] > 0: return "SYSTEM + (NOT SCANNED)"
-        if row['DIFF'] > 0: return "REAL +"
-        if row['DIFF'] < 0: return "SYSTEM +"
-        return "OK"
-
-    merged['NOTE'] = merged.apply(get_note, axis=1)
-    return merged
+        df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
+        df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
+    dt_grouped = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
+    ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
+    ds_merged['DIFF'] = ds_merged['QTY_SCAN'] - ds_merged['QTY_SYSTEM']
+    ds_merged['NOTE'] = ds_merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else "OK")
+    return ds_merged
 
 def logic_compare_stock_to_scan(df_stock, df_scan):
     dt = df_stock.copy()
-    
-    # 1. Siapkan & Group Data Scan
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
     ds['BIN_SCAN'] = ds['BIN_SCAN'].astype(str).str.strip().str.upper()
     ds['SKU_SCAN'] = ds['SKU_SCAN'].astype(str).str.strip().str.upper()
     ds_grouped = ds.groupby(['BIN_SCAN', 'SKU_SCAN'])['QTY_TOTAL_SCAN'].sum().reset_index()
-
-    # 2. Ambil Index Kolom System
     col_bin_sys = dt.columns[1]
     col_sku_sys = dt.columns[2]
     col_qty_sys = dt.columns[9]
     col_qty_so  = dt.columns[10] 
-
-    # 3. Clean Data Stock
     dt[col_bin_sys] = dt[col_bin_sys].astype(str).str.strip().str.upper()
     dt[col_sku_sys] = dt[col_sku_sys].astype(str).str.strip().str.upper()
-
-    # --- PERBAIKAN KRUSIAL: GROUP DATA STOCK ---
-    # Supaya kalau di excel stock ada SKU sama di baris berbeda, dia jadi satu baris dulu.
-    # Kita keep kolom lain (kalau perlu) dengan agg 'first' atau 'sum' pada qty.
-    dt_grouped = dt.groupby([col_bin_sys, col_sku_sys], as_index=False).agg({
-        col_qty_sys: 'sum'
-        # Tambahkan kolom lain di sini kalau lu butuh kolom deskripsi tetap muncul
-    })
-
-    # 4. Merge Stock (Patokan) dengan Scan
-    dt_merged = dt_grouped.merge(
-        ds_grouped, 
-        left_on=[col_bin_sys, col_sku_sys], 
-        right_on=['BIN_SCAN', 'SKU_SCAN'], 
-        how='left'
-    )
-
-    # 5. Kalkulasi Selisih
+    dt_merged = dt.merge(ds_grouped, left_on=[col_bin_sys, col_sku_sys], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
     dt_merged[col_qty_so] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
     dt_merged['DIFF'] = dt_merged[col_qty_sys] - dt_merged[col_qty_so]
-    
-    # NOTE: Disini kita cuma ambil yang "SYSTEM +" (Barang Kurang / Hilang)
     dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
-    
-    # Balikin kolom yang bersih
     return dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'])
 
 
