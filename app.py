@@ -776,19 +776,20 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
     dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
 
-    # 2. Pembersihan Total (Regex hapus semua jenis spasi/karakter hantu)
+    # 2. Pembersihan (Strip ujung & Kecilkan spasi ganda di tengah jadi spasi tunggal)
     for df in [ds, dt]:
-        df['BIN'] = df['BIN'].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
-        df['SKU'] = df['SKU'].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
+        # Ganti regex agar hanya merapikan spasi, bukan menghapus semua
+        df['BIN'] = df['BIN'].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip().str.upper()
+        df['SKU'] = df['SKU'].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip().str.upper()
     
-    # 3. Paksa QTY jadi Angka (Mencegah ArrowTypeError)
+    # 3. Paksa QTY jadi Angka
     ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
     dt['QTY_SYSTEM'] = pd.to_numeric(dt['QTY_SYSTEM'], errors='coerce').fillna(0)
 
     # 4. Grouping Data System (SUMIFS)
     dt_grouped = dt.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
     
-    # 5. Merge (Data Scan sebagai patokan)
+    # 5. Merge
     ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
     
     # 6. Hitung Selisih
@@ -800,29 +801,29 @@ def logic_compare_scan_to_stock(df_scan, df_stock):
 def logic_compare_stock_to_scan(df_stock, df_scan):
     dt = df_stock.copy()
     
-    # 1. Siapkan Data Scan & Grouping (Agar unik per BIN-SKU)
+    # 1. Siapkan Data Scan & Grouping
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
     
-    # Cleaning Data Scan (Regex)
-    ds['BIN_SCAN'] = ds['BIN_SCAN'].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
-    ds['SKU_SCAN'] = ds['SKU_SCAN'].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
+    # Cleaning Data Scan (Merapikan spasi tanpa menghapus spasi tengah)
+    ds['BIN_SCAN'] = ds['BIN_SCAN'].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip().str.upper()
+    ds['SKU_SCAN'] = ds['SKU_SCAN'].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip().str.upper()
     ds['QTY_TOTAL_SCAN'] = pd.to_numeric(ds['QTY_TOTAL_SCAN'], errors='coerce').fillna(0)
     
     ds_grouped = ds.groupby(['BIN_SCAN', 'SKU_SCAN'], as_index=False)['QTY_TOTAL_SCAN'].sum()
 
-    # 2. Ambil Nama Kolom System secara Dinamis
+    # 2. Kolom System
     col_bin_sys = dt.columns[1]
     col_sku_sys = dt.columns[2]
     col_qty_sys = dt.columns[9]
     col_qty_so  = dt.columns[10] 
 
-    # 3. Cleaning Data System (Regex)
-    dt[col_bin_sys] = dt[col_bin_sys].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
-    dt[col_sku_sys] = dt[col_sku_sys].astype(str).str.replace(r'\s+', '', regex=True).str.upper()
+    # 3. Cleaning Data System
+    dt[col_bin_sys] = dt[col_bin_sys].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip().str.upper()
+    dt[col_sku_sys] = dt[col_sku_sys].astype(str).str.replace(r'\s+', ' ', regex=True).str.strip().str.upper()
     dt[col_qty_sys] = pd.to_numeric(dt[col_qty_sys], errors='coerce').fillna(0)
 
-    # 4. Merge (Data Stock sebagai patokan)
+    # 4. Merge
     dt_merged = dt.merge(
         ds_grouped, 
         left_on=[col_bin_sys, col_sku_sys], 
@@ -830,16 +831,12 @@ def logic_compare_stock_to_scan(df_stock, df_scan):
         how='left'
     )
 
-    # 5. Isi Hasil SO & Hitung Selisih
+    # 5. Kalkulasi
     dt_merged[col_qty_so] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
     dt_merged['DIFF'] = dt_merged[col_qty_sys] - dt_merged[col_qty_so]
-    
-    # 6. Note khusus untuk Tabel Stock (Mencari barang hilang)
     dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else "OK")
     
-    # Hapus kolom pembantu merge agar tabel tetap rapi
     return dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'])
-
 def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     # 1. Siapkan data sumber dalam dictionary
     system_dict = {}
