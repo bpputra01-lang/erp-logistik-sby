@@ -2160,107 +2160,115 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
         print(f"Error caught: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
-# ============================================
-# FUNGSI UTAMA PUTAWAY SYSTEM (VBA TO PYTHON)
-# ============================================
+import pandas as pd
+
 def putaway_system(df_ds, df_asal):
+    # Validasi awal: Pastikan dataframe tidak None
+    if df_ds is None or df_asal is None:
+        return [pd.DataFrame()] * 6
+
     try:
-        # Simpan nama asli
-        original_columns = list(df_asal.columns)
-        
-        # Gunakan copy agar tidak merusak dataframe asli di luar fungsi
         df_asal_updated = df_asal.copy()
         
-        # Rename kolom ke angka 0, 1, 2... untuk konsistensi index
-        df_asal_updated.columns = range(df_asal_updated.shape[1])
+        # --- LOGIKA PENENTUAN KOLOM (DINAMIS) ---
+        # Kita cari indeks kolom berdasarkan nama, jika tidak ketemu pakai angka default
+        def get_col_idx(df, keywords, default_idx):
+            for i, col in enumerate(df.columns):
+                if any(k.lower() in str(col).lower() for k in keywords):
+                    return i
+            return default_idx
 
-        # Definisi Index (B=1, C=2, J=9)
-        col_bin_asal, col_sku_asal, col_qty_asal = 1, 2, 9
-        col_bin_ds, col_sku_ds, col_qty_ds = 0, 1, 2
+        # Cari kolom di df_asal (System/Stock)
+        # BIN biasanya di Kolom B (Indeks 1), SKU di Kolom C (Indeks 2), QTY di Kolom J (Indeks 9)
+        c_bin_a = get_col_idx(df_asal, ['bin', 'lokasi'], 1)
+        c_sku_a = get_col_idx(df_asal, ['sku', 'item code'], 2)
+        c_qty_a = get_col_idx(df_asal, ['qty system', 'quantity', 'stok'], 9)
 
-        # 1. BUAT DICTIONARY BIN+SKU
+        # Cari kolom di df_ds (Data Source/Putaway)
+        c_bin_d = get_col_idx(df_ds, ['bin', 'tujuan'], 0)
+        c_sku_d = get_col_idx(df_ds, ['sku', 'item'], 1)
+        c_qty_d = get_col_idx(df_ds, ['qty', 'jumlah'], 2)
+
+        # 1. BUAT DICTIONARY BIN+SKU -> QTY
         bin_qty_dict = {}
-        for idx, row in df_asal_updated.iterrows():
-            # Cek apakah kolom tersedia untuk mencegah IndexError
-            if len(row) > max(col_bin_asal, col_sku_asal, col_qty_asal):
-                key = f"{row[col_bin_asal]}|{row[col_sku_asal]}"
-                qty = pd.to_numeric(row[col_qty_asal], errors='coerce')
+        for _, row in df_asal_updated.iterrows():
+            try:
+                # str(row.iloc[index]) lebih aman daripada row[index]
+                key = f"{str(row.iloc[c_bin_a])}|{str(row.iloc[c_sku_a])}"
+                qty = pd.to_numeric(row.iloc[c_qty_a], errors='coerce')
                 bin_qty_dict[key] = qty if pd.notna(qty) else 0
+            except:
+                continue
 
         # 2. PROCESSING UTAMA
         out_data = []
-        for idx, row in df_ds.iterrows():
-            sku = str(row[col_sku_ds])
-            diff_qty = pd.to_numeric(row[col_qty_ds], errors='coerce')
-            if pd.isna(diff_qty) or diff_qty <= 0: continue
-            
-            bin_asal = str(row[col_bin_ds])
-            original_diff = int(diff_qty)
-            remaining_to_find = original_diff
-            
-            # List kriteria pencarian (Priority 1, 2, 3)
-            priorities = [
-                lambda b: "STAGGING LT.3" in b or "STAGING LT.3" in b,
-                lambda b: ("STAGGING" in b or "STAGING" in b or "KARANTINA" in b) and "LT.3" not in b,
-                lambda b: all(x not in b for x in ["STAGGING", "STAGING", "KARANTINA"])
-            ]
-
-            for condition in priorities:
-                if remaining_to_find <= 0: break
+        for _, row in df_ds.iterrows():
+            try:
+                sku = str(row.iloc[c_sku_d])
+                diff_qty = pd.to_numeric(row.iloc[c_qty_d], errors='coerce')
+                if pd.isna(diff_qty) or diff_qty <= 0: continue
                 
-                for key in list(bin_qty_dict.keys()):
-                    qty_available = bin_qty_dict[key]
-                    if qty_available <= 0: continue
-                    
-                    b_name, s_name = key.split("|")
-                    if s_name != sku: continue
-                    
-                    if condition(b_name.upper()):
-                        take = min(remaining_to_find, qty_available)
-                        bin_qty_dict[key] -= take
-                        remaining_to_find -= take
+                bin_tujuan = str(row.iloc[c_bin_d])
+                orig_diff = int(diff_qty)
+                rem = orig_diff
+                
+                # Urutan Prioritas: LT.3 -> Staging/Karantina Lain -> Normal Bin
+                patterns = ["STAGING LT.3", "STAGGING LT.3", "STAGING", "STAGGING", "KARANTINA", "NORMAL"]
+                
+                for pattern in patterns:
+                    if rem <= 0: break
+                    for key in list(bin_qty_dict.keys()):
+                        qty_avail = bin_qty_dict[key]
+                        if qty_avail <= 0: continue
                         
-                        out_data.append([
-                            bin_asal, sku, original_diff, b_name, take, 
-                            remaining_to_find, "FULLY SETUP" if remaining_to_find == 0 else "PARTIAL SETUP"
-                        ])
-                        if remaining_to_find <= 0: break
+                        b_name, s_name = key.split("|")
+                        if s_name != sku: continue
+                        
+                        # Logika filter pattern
+                        match = False
+                        if pattern == "NORMAL":
+                            if not any(x in b_name.upper() for x in ["STAG", "KARANTINA"]): match = True
+                        else:
+                            if pattern in b_name.upper(): match = True
+                        
+                        if match:
+                            take = min(rem, qty_avail)
+                            bin_qty_dict[key] -= take
+                            rem -= take
+                            out_data.append([bin_tujuan, sku, orig_diff, b_name, take, rem, 
+                                            "FULLY SETUP" if rem == 0 else "PARTIAL SETUP"])
+                            if rem <= 0: break
+                
+                if rem > 0:
+                    out_data.append([bin_tujuan, sku, orig_diff, "(NO BIN)", 0, rem, "PERLU CARI STOCK MANUAL"])
+            except:
+                continue
 
-            if remaining_to_find > 0:
-                out_data.append([bin_asal, sku, original_diff, "(NO BIN)", 0, remaining_to_find, "PERLU CARI STOCK MANUAL"])
-
-        # 3. CONVERT HASIL
+        # 3. SETUP OUTPUT DATAFRAMES
         df_comp = pd.DataFrame(out_data, columns=["BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QUANTITY", "DIFF", "STATUS"])
-
-        # 4. UPDATE QTY DI DF_ASAL
-        for idx, row in df_asal_updated.iterrows():
-            key = f"{row[col_bin_asal]}|{row[col_sku_asal]}"
-            if key in bin_qty_dict:
-                df_asal_updated.iloc[idx, col_qty_asal] = bin_qty_dict[key]
-
-        # 5. PREPARE OUTPUT (Sesuai kebutuhan sistem Anda)
-        df_plist = df_comp[df_comp['STATUS'].isin(['FULLY SETUP', 'PARTIAL SETUP'])].copy()
-        # ... (Logika df_plist & df_kurang tetap sama seperti sebelumnya) ...
-        # (Disingkat untuk fokus pada perbaikan error)
-
-        # 8. PERBAIKAN STAGGING LT.3 (Penyebab Gagal 1)
-        lt3_mask = (
-            (df_asal_updated[col_qty_asal] > 0) & 
-            (df_asal_updated[col_bin_asal].astype(str).str.upper().str.contains("STAG", na=False))
-        )
-        df_lt3 = df_asal_updated[lt3_mask].copy()
         
-        # Kembalikan nama kolom asli agar tidak error saat penamaan ulang
-        if not df_lt3.empty:
-            # Alih-alih rename paksa, kita gunakan kolom yang ada saja
-            df_lt3.columns = [original_columns[i] if i < len(original_columns) else f"COL_{i}" for i in range(df_lt3.shape[1])]
+        # Update df_asal_updated
+        for idx in df_asal_updated.index:
+            key = f"{str(df_asal_updated.iloc[idx, c_bin_a])}|{str(df_asal_updated.iloc[idx, c_sku_a])}"
+            if key in bin_qty_dict:
+                df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
 
-        return df_comp, df_plist, df_comp, df_plist, df_lt3, df_asal_updated
+        # Filter hasil
+        df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
+        df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
+        
+        # LT.3 Outstanding
+        mask_lt3 = (df_asal_updated.iloc[:, c_qty_a] > 0) & \
+                   (df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("STAG", na=False))
+        df_lt3 = df_asal_updated[mask_lt3].copy()
+
+        return df_comp, df_plist, df_kurang, df_comp, df_lt3, df_asal_updated
 
     except Exception as e:
-        # Jika masih gagal, ini akan memunculkan pesan error aslinya di log
-        print(f"Error Detail: {str(e)}")
-        return None, None, None, None, None, None
+        # Jika error, kirim DataFrame kosong agar .empty tidak error
+        print(f"Detail Error: {e}")
+        empty = pd.DataFrame()
+        return empty, empty, empty, empty, empty, empty
 def process_scan_out(df_scan, df_history, df_stock):
     # ========== COPY & NORMALISASI (TETAP SAMA) ==========
     df_scan = df_scan.copy()
