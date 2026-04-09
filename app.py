@@ -4303,8 +4303,11 @@ if menu == "Putaway System":
         st.divider()
         st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
         
-        # HAPUS .unique(), gunakan .sum() langsung
-        total_compare_qty = int(r['df_comp']['QTY PUTAWAY'].sum()) if not r['df_comp'].empty else 0
+        if not df_asal_p.empty:
+    # Menggunakan iloc[:, 9] untuk mengambil kolom J secara konsisten
+    total_compare_qty = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
+else:
+    total_compare_qty = 0
         
         total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
         total_kurang_qty = int(r['df_kurang']['QTY'].sum()) if not r['df_kurang'].empty else 0
