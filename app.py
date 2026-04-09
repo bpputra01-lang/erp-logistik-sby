@@ -4297,14 +4297,15 @@ if up_ds and up_asal:
             res = putaway_system(df_ds_p, df_asal_p)
             
             # Simpan hasil ke Session State (Tambahkan 'total_awal')
+            # Simpan hasil ke Session State
             st.session_state['putaway_results'] = {
-                'df_comp': res[0],
-                'df_plist': res[1],
-                'df_kurang': res[2],
+                'df_comp': res[0],      # Tab Hasil Compare
+                'df_plist': res[1],     # INI TAB LIST SETUP (Harusnya yang kolomnya dikit)
+                'df_kurang': res[2],    
                 'df_sum': res[3],
                 'df_lt3': res[4],
                 'df_updated_bin': res[5],
-                'total_awal': val_total_awal  # <--- Simpan nilai 278 di sini
+                'total_awal': total_awal
             }
             st.success("✅ Proses Putaway Selesai!")
         except Exception as e:
