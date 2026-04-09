@@ -4303,9 +4303,8 @@ if menu == "Putaway System":
         st.divider()
         st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
         
-        # --- HITUNG METRICS ---
-        total_compare_qty = int(r['df_comp']['QTY PUTAWAY'].unique().sum()) if not r['df_comp'].empty else 0 
-        # Catatan: unique() digunakan jika df_comp berisi breakdown bin agar tidak double count total permintaan
+        # HAPUS .unique(), gunakan .sum() langsung
+        total_compare_qty = int(r['df_comp']['QTY PUTAWAY'].sum()) if not r['df_comp'].empty else 0
         
         total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
         total_kurang_qty = int(r['df_kurang']['QTY'].sum()) if not r['df_kurang'].empty else 0
