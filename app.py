@@ -2160,73 +2160,106 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
         print(f"Error caught: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
-import streamlit as st
 import pandas as pd
 
-# --- FUNGSI PUTAWAY SYSTEM ANDA ---
-# (Pastikan fungsi putaway_system yang sudah kita perbaiki tadi ada di sini)
 def putaway_system(df_ds, df_asal):
-    # ... (isi fungsi yang tadi) ...
-    pass 
+    if df_ds is None or df_asal is None:
+        empty = pd.DataFrame()
+        return empty, empty, empty, empty, empty, empty
 
-# --- UI LOGIC ---
-st.title("Putaway System")
+    try:
+        df_asal_updated = df_asal.copy()
+        
+        # Penentuan Kolom Dinamis
+        def get_col_idx(df, keywords, default_idx):
+            for i, col in enumerate(df.columns):
+                if any(k.lower() in str(col).lower() for k in keywords):
+                    return i
+            return default_idx
 
-# 1. Inisialisasi Session State agar data tidak hilang
-if 'hasil_data' not in st.session_state:
-    st.session_state['hasil_data'] = None
+        c_bin_a = get_col_idx(df_asal, ['bin', 'lokasi'], 1)
+        c_sku_a = get_col_idx(df_asal, ['sku', 'item code'], 2)
+        c_qty_a = get_col_idx(df_asal, ['qty system', 'quantity', 'stok'], 9)
 
-# 2. Upload File
-file_ds = st.file_uploader("Upload Data Putaway (df_ds)", type=['xlsx', 'csv'])
-file_asal = st.file_uploader("Upload Data Stock (df_asal)", type=['xlsx', 'csv'])
+        c_bin_d = get_col_idx(df_ds, ['bin', 'tujuan'], 0)
+        c_sku_d = get_col_idx(df_ds, ['sku', 'item'], 1)
+        c_qty_d = get_col_idx(df_ds, ['qty', 'jumlah'], 2)
 
-if file_ds and file_asal:
-    # Load data hanya jika belum ada hasil atau file berubah
-    df_ds = pd.read_excel(file_ds) if file_ds.name.endswith('xlsx') else pd.read_csv(file_ds)
-    df_asal = pd.read_excel(file_asal) if file_asal.name.endswith('xlsx') else pd.read_csv(file_asal)
+        # 1. Dictionary Mapping
+        bin_qty_dict = {}
+        for _, row in df_asal_updated.iterrows():
+            try:
+                key = f"{str(row.iloc[c_bin_a])}|{str(row.iloc[c_sku_a])}"
+                qty = pd.to_numeric(row.iloc[c_qty_a], errors='coerce')
+                bin_qty_dict[key] = qty if pd.notna(qty) else 0
+            except: continue
 
-    # 3. Tombol Proses
-    if st.button("Jalankan Compare"):
-        # Simpan semua output ke dalam Session State
-        res = putaway_system(df_ds, df_asal)
-        st.session_state['hasil_data'] = {
-            'comp': res[0],
-            'plist': res[1],
-            'kurang': res[2],
-            'sum': res[3],
-            'outstanding': res[4],
-            'asal_updated': res[5]
-        }
-        st.success("Proses Selesai!")
+        # 2. Main Logic
+        out_data = []
+        for _, row in df_ds.iterrows():
+            try:
+                sku = str(row.iloc[c_sku_d])
+                diff_qty = pd.to_numeric(row.iloc[c_qty_d], errors='coerce')
+                if pd.isna(diff_qty) or diff_qty <= 0: continue
+                
+                bin_tujuan = str(row.iloc[c_bin_d])
+                rem = int(diff_qty)
+                
+                # Prioritas Pencarian
+                patterns = ["STAGING LT.3", "STAGGING LT.3", "STAGING", "STAGGING", "KARANTINA", "NORMAL"]
+                for pattern in patterns:
+                    if rem <= 0: break
+                    for key in list(bin_qty_dict.keys()):
+                        qty_avail = bin_qty_dict[key]
+                        if qty_avail <= 0: continue
+                        b_name, s_name = key.split("|")
+                        if s_name != sku: continue
+                        
+                        match = False
+                        if pattern == "NORMAL":
+                            if not any(x in b_name.upper() for x in ["STAG", "KARANTINA"]): match = True
+                        else:
+                            if pattern in b_name.upper(): match = True
+                        
+                        if match:
+                            take = min(rem, qty_avail)
+                            bin_qty_dict[key] -= take
+                            rem -= take
+                            out_data.append([bin_tujuan, sku, int(diff_qty), b_name, take, rem, 
+                                            "FULLY SETUP" if rem == 0 else "PARTIAL SETUP"])
+                            if rem <= 0: break
+                
+                if rem > 0:
+                    out_data.append([bin_tujuan, sku, int(diff_qty), "(NO BIN)", 0, rem, "PERLU CARI STOCK MANUAL"])
+            except: continue
 
-# 4. Tampilkan Hasil & Tombol Download (Hanya jika data sudah ada di Session State)
-if st.session_state['hasil_data'] is not None:
-    data = st.session_state['hasil_data']
-    
-    st.divider()
-    st.subheader("Hasil Compare")
-    st.dataframe(data['comp'])
+        # 3. Output Preparation
+        df_comp = pd.DataFrame(out_data, columns=["BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QUANTITY", "DIFF", "STATUS"])
+        
+        for idx in df_asal_updated.index:
+            key = f"{str(df_asal_updated.iloc[idx, c_bin_a])}|{str(df_asal_updated.iloc[idx, c_sku_a])}"
+            if key in bin_qty_dict:
+                df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
 
-    # Tombol Download tidak akan menghilangkan data karena data diambil dari session_state
-    csv = data['comp'].to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="Download Hasil Compare (CSV)",
-        data=csv,
-        file_name="hasil_compare.csv",
-        mime="text/csv",
-    )
-    
-    st.subheader("Stagging & Putaway Outstanding")
-    st.dataframe(data['outstanding'])
-    
-    # Download Outstanding
-    csv_out = data['outstanding'].to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="Download Outstanding (CSV)",
-        data=csv_out,
-        file_name="outstanding.csv",
-        mime="text/csv",
-    )
+        df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
+        df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
+        
+        # --- PERBAIKAN: STAGGING & PUTAWAY OUTSTANDING ---
+        mask_out = (
+            (df_asal_updated.iloc[:, c_qty_a] > 0) & 
+            (
+                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("STAG", na=False) | 
+                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("PUTAWAY", na=False)
+            )
+        )
+        df_outstanding = df_asal_updated[mask_out].copy()
+
+        return df_comp, df_plist, df_kurang, df_comp, df_outstanding, df_asal_updated
+
+    except Exception as e:
+        print(f"Detail Error: {e}")
+        empty = pd.DataFrame()
+        return empty, empty, empty, empty, empty, empty
 def process_scan_out(df_scan, df_history, df_stock):
     # ========== COPY & NORMALISASI (TETAP SAMA) ==========
     df_scan = df_scan.copy()
@@ -4205,110 +4238,119 @@ if menu == "Dashboard Overview":
     dash_links = {"WORKING REPORT": "864743695", "PERSONAL PERFORMANCE": "251294539", "CYCLE COUNT DAN KERAPIHAN": "1743896821", "DASHBOARD MOVING STOCK": "1671817510"}
     st.markdown(f'''<div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"><div style="width: 100%; height: 600px; overflow: auto;"><iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links[pilih]}&single=true&rm=minimal" style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;"></iframe></div></div>''', unsafe_allow_html=True)
 
-# ============================================
-# STREAMLIST APP - PUTAWAY SYSTEM
-# ============================================
+import streamlit as st
+import pandas as pd
+import io
 
-elif menu == "Putaway System":
+# Inisialisasi Session State di awal agar data tidak hilang
+if 'putaway_results' not in st.session_state:
+    st.session_state['putaway_results'] = None
+
+# --- UI APP ---
+if menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     
     # --- CSS ---
     st.markdown("""
         <style>
-        .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }
+        .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; border: 1px solid #e0e0e0; }
         .m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }
         .m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }
         </style>
     """, unsafe_allow_html=True)
+
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
         - **DATA SCAN PUTAWAY**: Kolom A = **BIN**, Kolom B = **SKU**, Kolom C = **QTY SCAN**
-        - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro (PASTIKAN AMBIL GL3-DC-PUTAWAY, STAGGING LT.3 DAN STAGGING INBOUND)
-        - **NOTE**: JANGAN LUPA UNTUK REPORT DAN CEK KETIKA ADA SELISIH PUTAWAY
+        - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro.
+        - **NOTE**: Hasil tidak akan hilang saat Anda mengklik tombol download.
         """)
     
     c1, c2 = st.columns(2)
-    with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'])
-    with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'])
+    with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
+    with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
     
+    # Tombol Proses
     if up_ds and up_asal:
         if st.button("▶️ COMPARE PUTAWAY"):
             try:
                 # --- LOAD DATA ---
-                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds, engine='openpyxl')
-                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal, engine='openpyxl')
+                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
+                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
                 
-                # --- PROSES ---
-                df_comp, df_plist, df_kurang, df_sum, df_lt3, df_updated_bin = putaway_system(df_ds_p, df_asal_p)
+                # --- PROSES FUNGSI ---
+                # Memanggil fungsi yang sudah diperbaiki sebelumnya
+                res = putaway_system(df_ds_p, df_asal_p)
                 
+                # Simpan hasil ke Session State
+                st.session_state['putaway_results'] = {
+                    'df_comp': res[0],
+                    'df_plist': res[1],
+                    'df_kurang': res[2],
+                    'df_sum': res[3],
+                    'df_lt3': res[4],
+                    'df_updated_bin': res[5]
+                }
                 st.success("✅ Proses Putaway Selesai!")
-                
-                # --- RINGKASAN (PERBAIKAN: GUNAKAN QTY, BUKAN ROW!) ---
-                st.divider()
-                st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # PERBAIKAN: GUNAKAN SUM QTY, BUKAN LEN
-                total_compare_qty = int(df_comp['QTY PUTAWAY'].sum()) if not df_comp.empty else 0
-                total_list_qty = int(df_plist['QUANTITY'].sum()) if not df_plist.empty else 0
-                total_kurang_qty = int(df_kurang['QTY'].sum()) if not df_kurang.empty else 0
-                
-                # QTY LT3
-                lt3_total_qty = 0
-                if not df_lt3.empty:
-                    # Cari kolom QTY di df_lt3
-                    for col in df_lt3.columns:
-                        if 'qty' in col.lower():
-                            lt3_total_qty = int(df_lt3[col].sum())
-                            break
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.markdown(f'''<div class="m-box"><span class="m-lbl">Hasil Compare (Qty)</span><span class="m-val">{total_compare_qty}</span></div>''', unsafe_allow_html=True)
-                
-                with col2:
-                    st.markdown(f'''<div class="m-box"><span class="m-lbl">List Item Set Up (Qty)</span><span class="m-val">{total_list_qty}</span></div>''', unsafe_allow_html=True)
-                
-                with col3:
-                    st.markdown(f'''<div class="m-box"><span class="m-lbl">Kurang Setup (Qty)</span><span class="m-val">{total_kurang_qty}</span></div>''', unsafe_allow_html=True)
-                
-                with col4:
-                    st.markdown(f'''<div class="m-box"><span class="m-lbl">STG.LT.3 Outstanding</span><span class="m-val">{lt3_total_qty}</span></div>''', unsafe_allow_html=True)
-                
-                # --- TABS ---
-                t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 STG.LT.3 Outstanding"])
-                
-                with t1: st.dataframe(df_comp, use_container_width=True)
-                with t2: st.dataframe(df_plist, use_container_width=True)
-                with t3: 
-                    if not df_kurang.empty:
-                        st.dataframe(df_kurang, use_container_width=True)
-                    else:
-                        st.success("✅ Semua Tercover!")
-                with t4: 
-                    if not df_lt3.empty:
-                        st.dataframe(df_lt3, use_container_width=True)
-                    else:
-                        st.success("✅ Tidak ada STG.LT.3 Outstanding!")
-                
-                # --- DOWNLOAD ---
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_comp.to_excel(writer, sheet_name='COMPARE', index=False)
-                    df_plist.to_excel(writer, sheet_name='LIST', index=False)
-                    df_kurang.to_excel(writer, sheet_name='KURANG', index=False)
-                    df_sum.to_excel(writer, sheet_name='SUMMARY', index=False)
-                    df_lt3.to_excel(writer, sheet_name='LT3_OUT', index=False)
-                    df_updated_bin.to_excel(writer, sheet_name='UPDATED_BIN', index=False)
-                st.download_button("📥 DOWNLOAD REPORT", data=output.getvalue(), file_name="REPORT_PUTAWAY.xlsx")
-                
-            except Exception as e: 
-                st.error(f"Gagal: {e}")
+            except Exception as e:
+                st.error(f"Gagal saat memproses: {e}")
+
+    # --- TAMPILKAN HASIL (Jika sudah diproses) ---
+    if st.session_state['putaway_results'] is not None:
+        r = st.session_state['putaway_results']
+        
+        st.divider()
+        st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
+        
+        # --- HITUNG METRICS ---
+        total_compare_qty = int(r['df_comp']['QTY PUTAWAY'].unique().sum()) if not r['df_comp'].empty else 0 
+        # Catatan: unique() digunakan jika df_comp berisi breakdown bin agar tidak double count total permintaan
+        
+        total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
+        total_kurang_qty = int(r['df_kurang']['QTY'].sum()) if not r['df_kurang'].empty else 0
+        
+        lt3_total_qty = 0
+        if not r['df_lt3'].empty:
+            # Cari kolom QTY secara dinamis
+            qty_col = [c for c in r['df_lt3'].columns if 'qty' in c.lower()]
+            if qty_col:
+                lt3_total_qty = int(r['df_lt3'][qty_col[0]].sum())
+
+        # --- TAMPILKAN METRICS BOX ---
+        m1, m2, m3, m4 = st.columns(4)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">Hasil Compare (Qty)</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">List Item Set Up (Qty)</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup (Qty)</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box"><span class="m-lbl">STG/PTW Outstanding</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
+
+        # --- TABS HASIL ---
+        t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 Outstanding"])
+        
+        with t1: st.dataframe(r['df_comp'], use_container_width=True)
+        with t2: st.dataframe(r['df_plist'], use_container_width=True)
+        with t3: 
+            if not r['df_kurang'].empty: st.dataframe(r['df_kurang'], use_container_width=True)
+            else: st.success("✅ Semua Tercover!")
+        with t4: 
+            if not r['df_lt3'].empty: st.dataframe(r['df_lt3'], use_container_width=True)
+            else: st.success("✅ Tidak ada Outstanding!")
+
+        # --- TOMBOL DOWNLOAD (Excel) ---
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            r['df_comp'].to_excel(writer, sheet_name='COMPARE', index=False)
+            r['df_plist'].to_excel(writer, sheet_name='PUTAWAY_LIST', index=False)
+            r['df_kurang'].to_excel(writer, sheet_name='KURANG_SETUP', index=False)
+            r['df_lt3'].to_excel(writer, sheet_name='OUTSTANDING', index=False)
+            r['df_updated_bin'].to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
+        
+        st.download_button(
+            label="📥 DOWNLOAD REPORT LENGKAP",
+            data=output.getvalue(),
+            file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
