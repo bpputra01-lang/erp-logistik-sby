@@ -769,18 +769,32 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     return df_karantina, df_check
     
 def logic_compare_scan_to_stock(df_scan, df_stock):
+    # 1. Ambil kolom & Rename agar seragam
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
     dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+    
+    # 2. Cleaning (Strip & Upper)
     for df in [ds, dt]:
         df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
         df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
+    
+    # --- PERBAIKAN DI SINI: GROUP KEDUANYA ---
+    # Group Scan agar tidak ada baris ganda yang bikin data System duplikat
+    ds_grouped = ds.groupby(['BIN', 'SKU'])['QTY_SCAN'].sum().reset_index()
+    # Group System
     dt_grouped = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
-    ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
-    ds_merged['DIFF'] = ds_merged['QTY_SCAN'] - ds_merged['QTY_SYSTEM']
-    ds_merged['NOTE'] = ds_merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else "OK")
-    return ds_merged
+    
+    # 3. Merge (Hasilnya pasti 1 baris per BIN-SKU)
+    merged = ds_grouped.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
+    
+    # 4. Hitung Selisih
+    merged['DIFF'] = merged['QTY_SCAN'] - merged['QTY_SYSTEM']
+    merged['NOTE'] = merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else ("SYSTEM +" if x < 0 else "OK"))
+    
+    return merged
 
 def logic_compare_stock_to_scan(df_stock, df_scan):
     dt = df_stock.copy()
