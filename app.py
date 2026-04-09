@@ -3036,10 +3036,15 @@ def menu_reject_defect():
                     st.rerun()
 
     with tab_analytics:
-        # BARIS DI BAWAH INI HARUS MASUK 1 TAB DARI 'WITH'
-        conn = sqlite3.connect('inventory_logistik.db')
-        df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-        conn.close()
+        # Pastikan nama file ini SAMA dengan yang di init_db()
+        conn = sqlite3.connect('inventory_logistik.db') 
+        try:
+            df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
+        except:
+            # Jika tabel belum ada/error, buat dataframe kosong agar tidak crash
+            df_chart = pd.DataFrame() 
+        finally:
+            conn.close()
         standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
         if not df_chart.empty:
             df_non_std = df_chart[~df_chart['KATEGORI'].isin(standard_codes)].copy()
