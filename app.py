@@ -4282,32 +4282,33 @@ if menu == "Putaway System":
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
     
     # --- Tombol Proses ---
+# Tombol Proses
 if up_ds and up_asal:
     if st.button("▶️ COMPARE PUTAWAY"):
         try:
-            # --- LOAD DATA ---
+            # 1. LOAD DATA
             df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
             df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
             
-            # --- HITUNG TOTAL AWAL DI SINI (Sebelum dikurangi fungsi) ---
-            # Kita ambil dari df_asal_p Kolom J (Index 9)
-            val_total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
+            # 2. DEFINISIKAN TOTAL AWAL (Ambil Kolom J / Index 9)
+            # Taruh baris ini sebelum masuk ke 'res' atau 'session_state'
+            total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
             
-            # --- PROSES FUNGSI ---
+            # 3. PROSES FUNGSI
             res = putaway_system(df_ds_p, df_asal_p)
             
-            # Simpan hasil ke Session State (Tambahkan 'total_awal')
-            # Simpan hasil ke Session State
+            # 4. SIMPAN KE SESSION STATE
             st.session_state['putaway_results'] = {
-                'df_comp': res[0],      # Tab Hasil Compare
-                'df_plist': res[1],     # INI TAB LIST SETUP (Harusnya yang kolomnya dikit)
-                'df_kurang': res[2],    
+                'df_comp': res[0],
+                'df_plist': res[1],  # Ini List Setup yang kolomnya sudah bersih
+                'df_kurang': res[2],
                 'df_sum': res[3],
                 'df_lt3': res[4],
                 'df_updated_bin': res[5],
-                'total_awal': total_awal
+                'total_awal': total_awal  # Sekarang variabel ini sudah dikenal
             }
             st.success("✅ Proses Putaway Selesai!")
+            
         except Exception as e:
             st.error(f"Gagal saat memproses: {e}")
 
