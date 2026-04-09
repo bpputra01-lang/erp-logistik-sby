@@ -4303,11 +4303,6 @@ if menu == "Putaway System":
         st.divider()
         st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
         
-        Error tersebut terjadi karena Python sangat disiplin soal spasi (indentasi). Baris kode di bawah pernyataan if atau else wajib menjorok ke dalam (biasanya 4 spasi atau 1 tab).
-
-Berikut adalah perbaikan posisi kodenya. Pastikan baris total_compare_qty masuk ke dalam satu level setelah if:
-Python
-
 # --- HITUNG METRICS ---
 
         # 1. Total Compare Qty: Diambil dari Kolom J (Index 9) file Asal Bin Putaway
