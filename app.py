@@ -2316,7 +2316,7 @@ def putaway_system(df_ds, df_asal):
     # 7. SUMMARY PUTAWAY
     df_sum = df_plist.copy()
     
-    # 8. STAGGING LT.3 OUTSTANDING (PAKE NAMA KOLOM ASLI)
+    # 8. STAGGING LT.3 OUTSTANDING (Perbaikan agar tidak crash jika jumlah kolom beda)
     lt3_mask = (
         (df_asal_updated[col_qty_asal] > 0) & 
         (df_asal_updated[col_bin_asal].astype(str).str.upper().str.contains("STAGGING LT\\.?3|STAGING LT\\.?3", na=False, regex=True))
@@ -2324,44 +2324,19 @@ def putaway_system(df_ds, df_asal):
     df_lt3 = df_asal_updated[lt3_mask].copy()
     
     if not df_lt3.empty:
-        # AMBIL KOLOM SESUAI POSISI VBA ASLI
-        # Kolom 1 (index 0) = A, Kolom 2 (index 1) = B, dst
-        cols_to_take = []
+        # Mapping nama kolom berdasarkan urutan yang ada saja
+        mapping_names = {
+            0: 'Identify', 1: 'BIN', 2: 'SKU', 3: 'BRAND', 
+            4: 'ITEM NAME', 5: 'VARIANT', 6: 'SUB KATEGORI', 
+            7: 'Harga Beli', 8: 'Harga Jual', 9: 'QTY SYSTEM', 10: 'QTY SO'
+        }
         
-        # Sesuaikan dengan posisi asli (1=BIN, 2=SKU, 4=NAMA, 5=BRAND, 6=CAT, 7=SAT, 10=QTY)
-        for col_idx in df_lt3.columns:
-            if col_idx == 0:  # Kolom A
-                cols_to_take.append('Identify')
-            elif col_idx == 1:  # Kolom B
-                cols_to_take.append('BIN')
-            elif col_idx == 2:  # Kolom E
-                cols_to_take.append('SKU')
-            elif col_idx == 3:  # Kolom F
-                cols_to_take.append('BRAND')
-            elif col_idx == 4:  # Kolom G
-                cols_to_take.append('ITEM NAME')
-            elif col_idx == 5:  # Kolom H
-                cols_to_take.append('VARIANT')
-            elif col_idx == 6:  # Kolom I
-                cols_to_take.append('SUB KATEGORI')
-            elif col_idx == 7:  # Kolom J
-                cols_to_take.append('Harga Beli')
-            elif col_idx == 8:  # Kolom K
-                cols_to_take.append('Harga Jual')
-            elif col_idx == 9:  # Kolom L
-                cols_to_take.append('QTY SYSTEM')
-            elif col_idx == 10:  # Kolom M
-                cols_to_take.append('QTY SO')
-            else:
-                cols_to_take.append(f'COL_{col_idx}')
-        
-        df_lt3.columns = cols_to_take
-        
-    else:
-        df_lt3 = pd.DataFrame(columns=["BIN", "SKU", "NAMA BARANG", "BRAND", "CATEGORY", "SATUAN", "QTY"])
-    
-    return df_comp, df_plist, df_kurang, df_sum, df_lt3, df_asal_updated
-
+        # Buat list nama baru hanya sebanyak kolom yang tersedia
+        new_cols = []
+        for i in range(len(df_lt3.columns)):
+            new_cols.append(mapping_names.get(i, f'COL_{i}'))
+            
+        df_lt3.columns = new_cols
 def process_scan_out(df_scan, df_history, df_stock):
     # ========== COPY & NORMALISASI (TETAP SAMA) ==========
     df_scan = df_scan.copy()
