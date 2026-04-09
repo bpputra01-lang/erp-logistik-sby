@@ -2160,106 +2160,73 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
         print(f"Error caught: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
+import streamlit as st
 import pandas as pd
 
+# --- FUNGSI PUTAWAY SYSTEM ANDA ---
+# (Pastikan fungsi putaway_system yang sudah kita perbaiki tadi ada di sini)
 def putaway_system(df_ds, df_asal):
-    if df_ds is None or df_asal is None:
-        empty = pd.DataFrame()
-        return empty, empty, empty, empty, empty, empty
+    # ... (isi fungsi yang tadi) ...
+    pass 
 
-    try:
-        df_asal_updated = df_asal.copy()
-        
-        # Penentuan Kolom Dinamis
-        def get_col_idx(df, keywords, default_idx):
-            for i, col in enumerate(df.columns):
-                if any(k.lower() in str(col).lower() for k in keywords):
-                    return i
-            return default_idx
+# --- UI LOGIC ---
+st.title("Putaway System")
 
-        c_bin_a = get_col_idx(df_asal, ['bin', 'lokasi'], 1)
-        c_sku_a = get_col_idx(df_asal, ['sku', 'item code'], 2)
-        c_qty_a = get_col_idx(df_asal, ['qty system', 'quantity', 'stok'], 9)
+# 1. Inisialisasi Session State agar data tidak hilang
+if 'hasil_data' not in st.session_state:
+    st.session_state['hasil_data'] = None
 
-        c_bin_d = get_col_idx(df_ds, ['bin', 'tujuan'], 0)
-        c_sku_d = get_col_idx(df_ds, ['sku', 'item'], 1)
-        c_qty_d = get_col_idx(df_ds, ['qty', 'jumlah'], 2)
+# 2. Upload File
+file_ds = st.file_uploader("Upload Data Putaway (df_ds)", type=['xlsx', 'csv'])
+file_asal = st.file_uploader("Upload Data Stock (df_asal)", type=['xlsx', 'csv'])
 
-        # 1. Dictionary Mapping
-        bin_qty_dict = {}
-        for _, row in df_asal_updated.iterrows():
-            try:
-                key = f"{str(row.iloc[c_bin_a])}|{str(row.iloc[c_sku_a])}"
-                qty = pd.to_numeric(row.iloc[c_qty_a], errors='coerce')
-                bin_qty_dict[key] = qty if pd.notna(qty) else 0
-            except: continue
+if file_ds and file_asal:
+    # Load data hanya jika belum ada hasil atau file berubah
+    df_ds = pd.read_excel(file_ds) if file_ds.name.endswith('xlsx') else pd.read_csv(file_ds)
+    df_asal = pd.read_excel(file_asal) if file_asal.name.endswith('xlsx') else pd.read_csv(file_asal)
 
-        # 2. Main Logic
-        out_data = []
-        for _, row in df_ds.iterrows():
-            try:
-                sku = str(row.iloc[c_sku_d])
-                diff_qty = pd.to_numeric(row.iloc[c_qty_d], errors='coerce')
-                if pd.isna(diff_qty) or diff_qty <= 0: continue
-                
-                bin_tujuan = str(row.iloc[c_bin_d])
-                rem = int(diff_qty)
-                
-                # Prioritas Pencarian
-                patterns = ["STAGING LT.3", "STAGGING LT.3", "STAGING", "STAGGING", "KARANTINA", "NORMAL"]
-                for pattern in patterns:
-                    if rem <= 0: break
-                    for key in list(bin_qty_dict.keys()):
-                        qty_avail = bin_qty_dict[key]
-                        if qty_avail <= 0: continue
-                        b_name, s_name = key.split("|")
-                        if s_name != sku: continue
-                        
-                        match = False
-                        if pattern == "NORMAL":
-                            if not any(x in b_name.upper() for x in ["STAG", "KARANTINA"]): match = True
-                        else:
-                            if pattern in b_name.upper(): match = True
-                        
-                        if match:
-                            take = min(rem, qty_avail)
-                            bin_qty_dict[key] -= take
-                            rem -= take
-                            out_data.append([bin_tujuan, sku, int(diff_qty), b_name, take, rem, 
-                                            "FULLY SETUP" if rem == 0 else "PARTIAL SETUP"])
-                            if rem <= 0: break
-                
-                if rem > 0:
-                    out_data.append([bin_tujuan, sku, int(diff_qty), "(NO BIN)", 0, rem, "PERLU CARI STOCK MANUAL"])
-            except: continue
+    # 3. Tombol Proses
+    if st.button("Jalankan Compare"):
+        # Simpan semua output ke dalam Session State
+        res = putaway_system(df_ds, df_asal)
+        st.session_state['hasil_data'] = {
+            'comp': res[0],
+            'plist': res[1],
+            'kurang': res[2],
+            'sum': res[3],
+            'outstanding': res[4],
+            'asal_updated': res[5]
+        }
+        st.success("Proses Selesai!")
 
-        # 3. Output Preparation
-        df_comp = pd.DataFrame(out_data, columns=["BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QUANTITY", "DIFF", "STATUS"])
-        
-        for idx in df_asal_updated.index:
-            key = f"{str(df_asal_updated.iloc[idx, c_bin_a])}|{str(df_asal_updated.iloc[idx, c_sku_a])}"
-            if key in bin_qty_dict:
-                df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
+# 4. Tampilkan Hasil & Tombol Download (Hanya jika data sudah ada di Session State)
+if st.session_state['hasil_data'] is not None:
+    data = st.session_state['hasil_data']
+    
+    st.divider()
+    st.subheader("Hasil Compare")
+    st.dataframe(data['comp'])
 
-        df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
-        df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
-        
-        # --- PERBAIKAN: STAGGING & PUTAWAY OUTSTANDING ---
-        mask_out = (
-            (df_asal_updated.iloc[:, c_qty_a] > 0) & 
-            (
-                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("STAG", na=False) | 
-                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("PUTAWAY", na=False)
-            )
-        )
-        df_outstanding = df_asal_updated[mask_out].copy()
-
-        return df_comp, df_plist, df_kurang, df_comp, df_outstanding, df_asal_updated
-
-    except Exception as e:
-        print(f"Detail Error: {e}")
-        empty = pd.DataFrame()
-        return empty, empty, empty, empty, empty, empty
+    # Tombol Download tidak akan menghilangkan data karena data diambil dari session_state
+    csv = data['comp'].to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download Hasil Compare (CSV)",
+        data=csv,
+        file_name="hasil_compare.csv",
+        mime="text/csv",
+    )
+    
+    st.subheader("Stagging & Putaway Outstanding")
+    st.dataframe(data['outstanding'])
+    
+    # Download Outstanding
+    csv_out = data['outstanding'].to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download Outstanding (CSV)",
+        data=csv_out,
+        file_name="outstanding.csv",
+        mime="text/csv",
+    )
 def process_scan_out(df_scan, df_history, df_stock):
     # ========== COPY & NORMALISASI (TETAP SAMA) ==========
     df_scan = df_scan.copy()
