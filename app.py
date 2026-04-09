@@ -769,18 +769,40 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     return df_karantina, df_check
     
 def logic_compare_scan_to_stock(df_scan, df_stock):
+    # Copy & Clean
     ds = df_scan.iloc[:, [0, 1, 2]].copy()
     ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    
     dt = df_stock.iloc[:, [1, 2, 9]].copy()
     dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+
+    # DEEP CLEAN: Hapus spasi di tengah, depan, belakang
     for df in [ds, dt]:
-        df['BIN'] = df['BIN'].astype(str).str.strip().str.upper()
-        df['SKU'] = df['SKU'].astype(str).str.strip().str.upper()
-    dt_grouped = dt.groupby(['BIN', 'SKU'])['QTY_SYSTEM'].sum().reset_index()
-    ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
-    ds_merged['DIFF'] = ds_merged['QTY_SCAN'] - ds_merged['QTY_SYSTEM']
-    ds_merged['NOTE'] = ds_merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else "OK")
-    return ds_merged
+        for col in ['BIN', 'SKU']:
+            df[col] = df[col].astype(str).str.replace(r'\s+', '', regex=True).str.strip().str.upper()
+        # Pastikan QTY adalah angka, yang bukan angka jadi 0
+        qty_col = 'QTY_SCAN' if 'QTY_SCAN' in df.columns else 'QTY_SYSTEM'
+        df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce').fillna(0)
+
+    # GROUPING KEDUANYA (SUMIFS manual)
+    ds_grouped = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
+    dt_grouped = dt.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
+
+    # MERGE (Outer join supaya data yang ga match tetep keliatan)
+    merged = pd.merge(ds_grouped, dt_grouped, on=['BIN', 'SKU'], how='outer').fillna(0)
+
+    # HITUNG DIFF
+    merged['DIFF'] = merged['QTY_SCAN'] - merged['QTY_SYSTEM']
+    
+    def get_note(row):
+        if row['QTY_SCAN'] > 0 and row['QTY_SYSTEM'] == 0: return "REAL + (NOT IN SYSTEM)"
+        if row['QTY_SCAN'] == 0 and row['QTY_SYSTEM'] > 0: return "SYSTEM + (NOT SCANNED)"
+        if row['DIFF'] > 0: return "REAL +"
+        if row['DIFF'] < 0: return "SYSTEM +"
+        return "OK"
+
+    merged['NOTE'] = merged.apply(get_note, axis=1)
+    return merged
 
 def logic_compare_stock_to_scan(df_stock, df_scan):
     dt = df_stock.copy()
