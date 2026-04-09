@@ -4304,13 +4304,14 @@ if menu == "Putaway System":
         st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
         
 # --- HITUNG METRICS ---
+        # Ambil r dari session state (pastikan baris ini ada di atas hitung metrics)
+        r = st.session_state['putaway_results']
 
-        # 1. Total Compare Qty: Diambil dari Kolom J (Index 9) file Asal Bin Putaway
-        if not df_asal_p.empty:
-            # Pastikan baris di bawah ini menjorok ke dalam (4 spasi)
-            total_compare_qty = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
+        # 1. Total Compare Qty: Diambil dari Kolom J (Index 9) dari data yang sudah disimpan
+        if not r['df_updated_bin'].empty:
+            # Kita gunakan r['df_updated_bin'] karena df_asal_p sudah tidak terbaca oleh sistem
+            total_compare_qty = int(pd.to_numeric(r['df_updated_bin'].iloc[:, 9], errors='coerce').sum())
         else:
-            # Baris ini juga harus menjorok ke dalam
             total_compare_qty = 0
         
         total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
