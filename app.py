@@ -4327,10 +4327,10 @@ if up_ds and up_asal:
 
         # --- TAMPILKAN METRICS BOX ---
         m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty System Awal (J)</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sytem Putaway</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
         m2.markdown(f'<div class="m-box"><span class="m-lbl">Total Tersetup</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
         m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Stok System</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Stok Putaway</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
 
     # ... (Sisa kode Tabs dan Download tetap sama)        # --- TABS HASIL ---
         t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 Outstanding"])
