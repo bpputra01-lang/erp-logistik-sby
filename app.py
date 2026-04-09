@@ -4282,9 +4282,14 @@ if menu == "Putaway System":
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
     
     # --- Tombol Proses ---
-# Tombol Proses
+# HARUS ADA INI DULU DI ATASNYA
+up_ds = st.file_uploader("Upload DS", type=['xlsx', 'csv'])
+up_asal = st.file_uploader("Upload Asal", type=['xlsx', 'csv'])
+
+# BARU MASUK KE BLOK YANG LU TULIS TADI
 if up_ds and up_asal:
     if st.button("▶️ COMPARE PUTAWAY"):
+        # ... kode yang lu kirim tadi ...
         try:
             # 1. LOAD DATA
             df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
