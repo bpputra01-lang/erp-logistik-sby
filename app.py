@@ -2160,8 +2160,6 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
         print(f"Error caught: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
-import pandas as pd
-
 def putaway_system(df_ds, df_asal):
     if df_ds is None or df_asal is None:
         empty = pd.DataFrame()
@@ -2241,10 +2239,22 @@ def putaway_system(df_ds, df_asal):
             if key in bin_qty_dict:
                 df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
 
+        # --- INI BAGIAN YANG TADI HILANG / BERUBAH ---
         df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
+        if not df_plist.empty:
+            df_plist = df_plist.rename(columns={
+                "BIN DITEMUKAN": "BIN AWAL", 
+                "BIN ASAL": "BIN TUJUAN"
+            })
+            df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
+            df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
+            df_plist['NOTES'] = "PUTAWAY"
+        else:
+            df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
+
         df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
         
-        # --- PERBAIKAN: STAGGING & PUTAWAY OUTSTANDING ---
+        # --- STAGGING & PUTAWAY OUTSTANDING ---
         mask_out = (
             (df_asal_updated.iloc[:, c_qty_a] > 0) & 
             (
