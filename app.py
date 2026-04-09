@@ -4271,30 +4271,34 @@ if menu == "Putaway System":
     with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
     with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
     
-    # Tombol Proses
-    if up_ds and up_asal:
-        if st.button("▶️ COMPARE PUTAWAY"):
-            try:
-                # --- LOAD DATA ---
-                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
-                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
-                
-                # --- PROSES FUNGSI ---
-                # Memanggil fungsi yang sudah diperbaiki sebelumnya
-                res = putaway_system(df_ds_p, df_asal_p)
-                
-                # Simpan hasil ke Session State
-                st.session_state['putaway_results'] = {
-                    'df_comp': res[0],
-                    'df_plist': res[1],
-                    'df_kurang': res[2],
-                    'df_sum': res[3],
-                    'df_lt3': res[4],
-                    'df_updated_bin': res[5]
-                }
-                st.success("✅ Proses Putaway Selesai!")
-            except Exception as e:
-                st.error(f"Gagal saat memproses: {e}")
+    # --- Tombol Proses ---
+if up_ds and up_asal:
+    if st.button("▶️ COMPARE PUTAWAY"):
+        try:
+            # --- LOAD DATA ---
+            df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
+            df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
+            
+            # --- HITUNG TOTAL AWAL DI SINI (Sebelum dikurangi fungsi) ---
+            # Kita ambil dari df_asal_p Kolom J (Index 9)
+            val_total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
+            
+            # --- PROSES FUNGSI ---
+            res = putaway_system(df_ds_p, df_asal_p)
+            
+            # Simpan hasil ke Session State (Tambahkan 'total_awal')
+            st.session_state['putaway_results'] = {
+                'df_comp': res[0],
+                'df_plist': res[1],
+                'df_kurang': res[2],
+                'df_sum': res[3],
+                'df_lt3': res[4],
+                'df_updated_bin': res[5],
+                'total_awal': val_total_awal  # <--- Simpan nilai 278 di sini
+            }
+            st.success("✅ Proses Putaway Selesai!")
+        except Exception as e:
+            st.error(f"Gagal saat memproses: {e}")
 
     # --- TAMPILKAN HASIL (Jika sudah diproses) ---
     if st.session_state['putaway_results'] is not None:
@@ -4303,35 +4307,32 @@ if menu == "Putaway System":
         st.divider()
         st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
         
-# --- HITUNG METRICS ---
-        # Ambil r dari session state (pastikan baris ini ada di atas hitung metrics)
-        r = st.session_state['putaway_results']
-
-        # 1. Total Compare Qty: Diambil dari Kolom J (Index 9) dari data yang sudah disimpan
-        if not r['df_updated_bin'].empty:
-            # Kita gunakan r['df_updated_bin'] karena df_asal_p sudah tidak terbaca oleh sistem
-            total_compare_qty = int(pd.to_numeric(r['df_updated_bin'].iloc[:, 9], errors='coerce').sum())
-        else:
-            total_compare_qty = 0
+        # --- HITUNG METRICS ---
         
+        # 1. Gunakan 'total_awal' yang sudah disimpan di session state (Angka 278)
+        total_compare_qty = r.get('total_awal', 0)
+        
+        # 2. Total yang berhasil tersetup
         total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
-        total_kurang_qty = int(r['df_kurang']['QTY'].sum()) if not r['df_kurang'].empty else 0
         
+        # 3. Total yang gagal/kurang setup
+        total_kurang_qty = int(r['df_kurang']['DIFF'].sum()) if not r['df_kurang'].empty else 0
+        
+        # 4. Outstanding (Sisa di Staging/Putaway System)
         lt3_total_qty = 0
         if not r['df_lt3'].empty:
-            # Cari kolom QTY secara dinamis
-            qty_col = [c for c in r['df_lt3'].columns if 'qty' in c.lower()]
+            qty_col = [c for c in r['df_lt3'].columns if 'qty' in str(c).lower()]
             if qty_col:
                 lt3_total_qty = int(r['df_lt3'][qty_col[0]].sum())
 
         # --- TAMPILKAN METRICS BOX ---
         m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">Hasil Compare (Qty)</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">List Item Set Up (Qty)</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup (Qty)</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">STG/PTW Outstanding</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty System Awal (J)</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">Total Tersetup</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Stok System</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
 
-        # --- TABS HASIL ---
+    # ... (Sisa kode Tabs dan Download tetap sama)        # --- TABS HASIL ---
         t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 Outstanding"])
         
         with t1: st.dataframe(r['df_comp'], use_container_width=True)
