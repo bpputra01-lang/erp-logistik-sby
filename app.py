@@ -4303,11 +4303,20 @@ if menu == "Putaway System":
         st.divider()
         st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
         
+        Error tersebut terjadi karena Python sangat disiplin soal spasi (indentasi). Baris kode di bawah pernyataan if atau else wajib menjorok ke dalam (biasanya 4 spasi atau 1 tab).
+
+Berikut adalah perbaikan posisi kodenya. Pastikan baris total_compare_qty masuk ke dalam satu level setelah if:
+Python
+
+# --- HITUNG METRICS ---
+
+        # 1. Total Compare Qty: Diambil dari Kolom J (Index 9) file Asal Bin Putaway
         if not df_asal_p.empty:
-    # Menggunakan iloc[:, 9] untuk mengambil kolom J secara konsisten
-    total_compare_qty = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
-else:
-    total_compare_qty = 0
+            # Pastikan baris di bawah ini menjorok ke dalam (4 spasi)
+            total_compare_qty = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
+        else:
+            # Baris ini juga harus menjorok ke dalam
+            total_compare_qty = 0
         
         total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
         total_kurang_qty = int(r['df_kurang']['QTY'].sum()) if not r['df_kurang'].empty else 0
