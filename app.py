@@ -5844,15 +5844,29 @@ elif menu == "Pengajuan Reject/Defect":
 elif menu == "List Retur Out":
     menu_retur_out_system()
 
+import pandas as pd
+import random
+import sqlite3
+import math  # TAMBAHAN: Biar pagination gak error NameError
+from datetime import datetime, timedelta
+import streamlit as st
+
+# --- 1. KONEKSI DATABASE ---
+def get_db_connection():
+    conn = sqlite3.connect('logistic_sby_final.db', check_same_thread=False)
+    return conn
+
+# --- 2. FUNGSI SINKRONISASI & RESET HARIAN ---
 def sync_data():
     """Sinkronisasi DB ke Session State & Handle Reset Harian"""
     conn = get_db_connection()
     c = conn.cursor()
     
-    # 0. PASTIKAN TABEL ADA (Auto-Repair)
+    # Pastikan tabel-tabel utama sudah ada
     c.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
+    conn.commit()
     
     today = datetime.now().strftime('%Y-%m-%d')
     res = c.execute('SELECT last_date FROM reset_tracker').fetchone()
@@ -5862,31 +5876,34 @@ def sync_data():
         c.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
         conn.commit()
     elif res[0] != today:
-        # Reset data harian
+        # Reset status laporan kerja ke 'Belum'
         c.execute('UPDATE reports SET status = "❌ Belum"')
+        # Reset status centang To Do List (done = 0)
         c.execute('UPDATE todo SET done = 0')
-        # Update tanggal ke hari ini
+        # Update tanggal tracker
         c.execute('UPDATE reset_tracker SET last_date = ?', (today,))
         conn.commit()
-        st.toast(f"Data di-reset ke tanggal {today}", icon="🔄")
     
-    # --- TARIK DATA KE SESSION STATE DENGAN PROTEKSI ---
-    # Gunakan Pandas agar lebih cepat dan rapi
-    reports_df = pd.read_sql_query('SELECT laporan, pic, status FROM reports', conn)
-    st.session_state.db_report = reports_df.to_dict('records')
+    # --- TARIK DATA KE SESSION STATE ---
+    reports_db = c.execute('SELECT laporan, pic, status FROM reports').fetchall()
+    st.session_state.db_report = [{"Laporan": r[0], "PIC": r[1], "Status": r[2]} for r in reports_db]
     
-    todo_df = pd.read_sql_query('SELECT task, done FROM todo', conn)
-    # Konversi integer 0/1 ke boolean untuk checkbox Streamlit
-    st.session_state.todo_list = [
-        {"task": t['task'], "done": bool(t['done'])} for _, t in todo_df.iterrows()
-    ]
+    todo_db = c.execute('SELECT task, done FROM todo').fetchall()
+    st.session_state.todo_list = [{"task": t[0], "done": bool(t[1])} for t in todo_db]
     
     conn.close()
 
-# --- CARA PANGGIL YANG AMAN ---
-if 'db_report' not in st.session_state:
+# --- 3. INISIALISASI SESSION STATE (Panggil di awal) ---
+if 'db_report' not in st.session_state or 'todo_list' not in st.session_state:
     sync_data()
-# --- 3. CSS DARK THEME (Gue Balikin & Gue Perkuat - PERSIS PUNYA LU) ---
+
+# Simulasi variabel menu (karena di potongan kode lu belum ada sidebarnya)
+if 'menu' not in st.session_state:
+    menu = "Reporting & PIC" # Default
+else:
+    menu = st.session_state.menu
+
+# --- 4. CSS DARK THEME (PERSIS PUNYA LU) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -5968,8 +5985,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
     
-# --- 4. LOGIKA ROUTING ---
-# (Pastikan variabel 'menu' sudah didefinisikan di sidebar lu sebelum bagian ini)
+# --- 5. LOGIKA ROUTING ---
+# Sidebar sederhana untuk testing (Bisa lu hapus kalau sudah ada di script utama lu)
+with st.sidebar:
+    menu = st.radio("Navigasi", ["Reporting & PIC", "Lainnya"])
+
 if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.2, 1])
@@ -6003,13 +6023,13 @@ if menu == "Reporting & PIC":
                         st.write("") 
                         if task['Status'] == "❌ Belum":
                             if st.button(f"Update", key=f"up_dark_{idx}"):
-                                # Update Session
-                                st.session_state.db_report[idx]['Status'] = "✅ Selesai"
                                 # Update SQLite
                                 conn = get_db_connection()
                                 conn.execute('UPDATE reports SET status = "✅ Selesai" WHERE laporan = ?', (task['Laporan'],))
                                 conn.commit()
                                 conn.close()
+                                # Refresh session state & UI
+                                sync_data()
                                 st.rerun()
                         else:
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
@@ -6045,7 +6065,7 @@ if menu == "Reporting & PIC":
             if "todo_list" in st.session_state and st.session_state.todo_list:
                 td_total = len(st.session_state.todo_list)
                 td_selesai = sum(1 for item in st.session_state.todo_list if item['done'])
-                td_progress = (td_selesai / td_total) * 100
+                td_progress = (td_selesai / td_total) * 100 if td_total > 0 else 0
                 
                 st.markdown(f"""
                 <div class="report-card" style="border-left: 5px solid #10b981; background-color: #111827;">
@@ -6062,7 +6082,7 @@ if menu == "Reporting & PIC":
     with col_kanan:
         st.markdown("""<div style="background-color: #1a1c27; padding: 10px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px; text-align: center;"><h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4></div>""", unsafe_allow_html=True)
 
-        # 1. Form Input (Tetap di Atas)
+        # 1. Form Input
         with st.form("form_todo_dark", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
             if st.form_submit_button("➕ Tambah") and tugas_baru:
@@ -6073,24 +6093,28 @@ if menu == "Reporting & PIC":
                 sync_data()
                 st.rerun()
 
-        # 2. Logic Pagination (5 Item Per Halaman)
+        # 2. Logic Pagination
         if "todo_list" in st.session_state and st.session_state.todo_list:
             items_per_page = 3
             total_items = len(st.session_state.todo_list)
             total_pages = math.ceil(total_items / items_per_page)
             
-            # Init session state buat simpan halaman aktif
             if 'todo_page' not in st.session_state:
                 st.session_state.todo_page = 1
             
-            # Ambil item sesuai halaman sekarang
+            # Clamp page number
+            if st.session_state.todo_page > total_pages:
+                st.session_state.todo_page = total_pages
+            if st.session_state.todo_page < 1:
+                st.session_state.todo_page = 1
+
             start_idx = (st.session_state.todo_page - 1) * items_per_page
             end_idx = start_idx + items_per_page
             current_items = st.session_state.todo_list[start_idx:end_idx]
 
             # 3. Tampilkan Item
             for i, item in enumerate(current_items):
-                real_idx = start_idx + i  # Index asli di DB/List Utama
+                real_idx = start_idx + i 
                 c1, c2 = st.columns([4, 1])
                 with c1:
                     color_border = '#10b981' if item['done'] else '#3b82f6'
@@ -6098,38 +6122,3 @@ if menu == "Reporting & PIC":
                         <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
                             <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
                         </div>
-                    """, unsafe_allow_html=True)
-                with c2:
-                    st.write("")
-                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
-                    if res != item['done']:
-                        conn = get_db_connection()
-                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
-                        conn.commit()
-                        conn.close()
-                        sync_data()
-                        st.rerun()
-
-            # 4. Navigasi Panah (Pindah Halaman)
-            st.divider()
-            nav1, nav2, nav3 = st.columns([1, 2, 1])
-            
-            with nav1:
-                # Tombol Prev (Hanya muncul kalau bukan di hal 1)
-                if st.session_state.todo_page > 1:
-                    if st.button("⬅️ Prev", key="btn_prev_page"):
-                        st.session_state.todo_page -= 1
-                        st.rerun()
-            
-            with nav2:
-                # Indikator Halaman
-                st.markdown(f"<p style='text-align:center; color:#9ca3af; padding-top:10px;'>Halaman {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
-            
-            with nav3:
-                # Tombol Next (Hanya muncul kalau masih ada halaman selanjutnya)
-                if st.session_state.todo_page < total_pages:
-                    if st.button("Next ➡️", key="btn_next_page"):
-                        st.session_state.todo_page += 1
-                        st.rerun()
-        else:
-            st.info("Belum ada tugas tambahan.")
