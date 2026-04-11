@@ -5349,25 +5349,19 @@ elif menu == "Compare System":
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
 
-import pandas as pd
-import random
-import sqlite3
-from datetime import datetime, timedelta
-import streamlit as st
-
-# --- 1. KONEKSI & AUTO-REPAIR DATABASE ---
 def init_db_logistic():
     conn = sqlite3.connect('logistic_sby_final.db', check_same_thread=False)
     c = conn.cursor()
-    # Tabel Karyawan
+    
+    # Tambahkan UNIQUE pada nama untuk mencegah duplikasi
     c.execute('''
         CREATE TABLE IF NOT EXISTS karyawan (
-            nama TEXT, 
+            nama TEXT UNIQUE, 
             posisi TEXT, 
             tipe TEXT
         )
     ''')
-    # Tabel Libur Request
+    
     c.execute('''
         CREATE TABLE IF NOT EXISTS libur_request (
             nama TEXT, 
@@ -5377,10 +5371,25 @@ def init_db_logistic():
     ''')
     conn.commit()
     return conn
+    # Fungsi untuk ambil data tim (Read)
+def get_karyawan():
+    df = pd.read_sql_query("SELECT * FROM karyawan", conn)
+    return df
 
-# Panggil di paling atas biar gak error "no such table"
-conn = init_db_logistic()
+# Fungsi untuk tambah karyawan (Create)
+def add_karyawan(nama, posisi, tipe):
+    try:
+        c = conn.cursor()
+        c.execute("INSERT INTO karyawan (nama, posisi, tipe) VALUES (?, ?, ?)", (nama, posisi, tipe))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        st.error(f"Nama {nama} sudah ada di database!")
 
+# Fungsi untuk hapus semua data (Hati-hati!)
+def reset_karyawan_table():
+    c = conn.cursor()
+    c.execute("DELETE FROM karyawan")
+    conn.commit()
 # Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
     # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
