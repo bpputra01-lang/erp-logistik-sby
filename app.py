@@ -4627,6 +4627,23 @@ elif menu == "Refill & Overstock":
         - **ALL DATA STOCK**: Pilih **HANYA ADA DI STOCK**
         - **STOCK TRACKING (Opsional)**: Pilih **JEZ SURABAYA**, rentang 7 hari. 
         """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Process Refill & Overstock (With Stock Tracking):**
+        - Melakukan Compare antara SKU yang ada di Gudang Lt.4 dengan SKU di Gudang Lt.3 dan sebaliknya
+        - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang Lt.3 yang < 3 Pcs untuk Refill dan > 12 Pcs untuk overstock
+        - Jika data sudah didapatkan maka selanjutnya adalah compare dengan Stock Tracking
+        - Compare akan dilakukan dengan mempertimbangkan penjualan Online untuk SKU tersebut
+        - Jika penjualan online < 7 pcs maka refill hanya akan mengambil 1/3 dari total stock di GL4 dan akan mengambil 1/3 dari total Diff total stock - 12 Pcs untuk Withdraw
+        - Jika penjualan online > 7 pcs maka refill akan mengambil 1/2 dari total stock di GL4 dan akan mengambil 1/2 dari total Diff total stock - 12 Pcs untuk Withdraw
+        - Maksimal kapasitas untuk tiap SKU di GL3 adalah 12 Pcs jadi tidak akan lebih dari 12 tiap SKU di Gl3
+
+        **Alur Process Refill (Without Stock Tracking):**
+        - elakukan Compare antara SKU yang ada di Gudang Lt.4 dengan SKU di Gudang Lt.3
+        - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang Lt.3 yang < 3 Pcs dan > 12 Pcs untuk Withdraw
+        - Sistem akan memksimalkan tiap SKU untuk mendapatkan total 12 Pcs di Gudang lt.3 
+        - Maksimal kapasitas untuk tiap SKU di GL3 adalah 12 Pcs jadi tidak akan lebih dari 12 tiap SKU di Gl3
+        """)
 
     c1, c2 = st.columns(2)
     with c1: up_all = st.file_uploader("📥 Upload ALL DATA STOCK", type=['xlsx'])
