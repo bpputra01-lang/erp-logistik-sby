@@ -4322,11 +4322,11 @@ if menu == "Putaway System":
         - **DATA SCAN PUTAWAY**: Kolom A = **BIN**, Kolom B = **SKU**, Kolom C = **QTY SCAN**
         - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro.
         - **NOTE**: Hasil tidak akan hilang saat Anda mengklik tombol download.
-        """)    
-        # --- Tombol Proses ---
-    # HARUS ADA INI DULU DI ATASNYA
-    up_ds = st.file_uploader("Upload DS", type=['xlsx', 'csv'])
-    up_asal = st.file_uploader("Upload Asal", type=['xlsx', 'csv'])
+        """)
+    
+    c1, c2 = st.columns(2)
+    with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
+    with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
 
     # BARU MASUK KE BLOK YANG LU TULIS TADI
     if up_ds and up_asal:
