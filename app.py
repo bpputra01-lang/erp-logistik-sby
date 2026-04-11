@@ -6122,3 +6122,32 @@ if menu == "Reporting & PIC":
                         <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
                             <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
                         </div>
+                    """, unsafe_allow_html=True)
+                with c2:
+                    st.write("")
+                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
+                    if res != item['done']:
+                        conn = get_db_connection()
+                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
+                        conn.commit()
+                        conn.close()
+                        sync_data()
+                        st.rerun()
+
+            # 4. Navigasi Panah
+            st.divider()
+            nav1, nav2, nav3 = st.columns([1, 2, 1])
+            with nav1:
+                if st.session_state.todo_page > 1:
+                    if st.button("⬅️ Prev", key="btn_prev_page"):
+                        st.session_state.todo_page -= 1
+                        st.rerun()
+            with nav2:
+                st.markdown(f"<p style='text-align:center; color:#9ca3af; padding-top:10px;'>Halaman {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
+            with nav3:
+                if st.session_state.todo_page < total_pages:
+                    if st.button("Next ➡️", key="btn_next_page"):
+                        st.session_state.todo_page += 1
+                        st.rerun()
+        else:
+            st.info("Belum ada tugas tambahan.")
