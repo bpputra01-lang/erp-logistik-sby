@@ -5886,7 +5886,7 @@ def sync_data():
             ("REFUND", "HAMZAH", "❌ Belum"),
             ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"),
             ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
-            ("STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "WAREHOUSE FULLFILLMENT", "❌ Belum")
+            ("STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "WAREHOUSE FULLFILLMENT", "❌ Belum"),
             ("TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "WAREHOUSE FULLFILLMENT", "❌ Belum")
         ]
         c.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', default_reports)
