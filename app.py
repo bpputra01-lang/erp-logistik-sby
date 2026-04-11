@@ -1671,7 +1671,7 @@ def menu_refill_withdraw():
         - Jika penjualan offline > 7 pcs maka refill akan mengambil 1/2 dari total stock di DC dan akan mengambil 1/2 dari total Diff total stock - 12 Pcs untuk Withdraw
         - Maksimal kapasitas untuk tiap SKU di STORE adalah 6 Pcs jadi tidak akan lebih dari 6 tiap SKU di Gl3
 
-        **Alur Process Refill (Without Stock Tracking):**
+        **Alur Process Refill & Withdraw (Without Stock Tracking):**
         - Melakukan Compare antara SKU yang ada di Gudang DC dengan SKU di Gudang STORE
         - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang DC yang < 3 Pcs dan > 6 Pcs untuk Withdraw
         - Sistem akan memksimalkan tiap SKU untuk mendapatkan total 6 Pcs di Gudang Store 
@@ -4655,7 +4655,7 @@ elif menu == "Refill & Overstock":
         - Jika penjualan online > 7 pcs maka refill akan mengambil 1/2 dari total stock di GL4 dan akan mengambil 1/2 dari total Diff total stock - 12 Pcs untuk Overstock
         - Maksimal kapasitas untuk tiap SKU di GL3 adalah 12 Pcs jadi tidak akan lebih dari 12 tiap SKU di Gl3
 
-        **Alur Process Refill (Without Stock Tracking):**
+        **Alur Process Refill & Overstock (Without Stock Tracking):**
         - Melakukan Compare antara SKU yang ada di Gudang Lt.4 dengan SKU di Gudang Lt.3
         - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang Lt.3 yang < 3 Pcs dan > 12 Pcs untuk Overstock
         - Sistem akan memksimalkan tiap SKU untuk mendapatkan total 12 Pcs di Gudang lt.3 
@@ -4913,6 +4913,19 @@ if menu == "Compare RTO":
         - **APPSHEET RTO**: Download Spreadsheets Rekap Appsheet sesuai dengan sheet dari RTO yang akan dituju
         - **UPLOAD HASIL CEK REAL**: Upload hasil rekonsiliasi RTO yang sudah di download dan diisi sesuai real yang ditemukan
         - **DRAFT RTO**: Download Draft RTO yang sudah di buatkan purchasing di awal
+        """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Process Compare RTO (DS Vs Appsheet):**
+        - Melakukan Compare antara SKU yang ada di DS dan di Appsheet apakah ada SKU yang berbeda dan Qty yang berbeda
+        - Jika ada SKU yang berbeda dan Qty yang berbeda maka akan masuk di process Rekonsiliasi
+        - Note Kelebihan ambil adalah ketika **QTY DI DS > APPSHEET**, dan Note Kurang Ambil adalah ketika **QTY DI DS < APPSHEET**
+        - Hasil rekonsiliasi dimasukkan kedalam kolom tersedia untuk dilakukan running ulang
+        - Lalu selanjutnya adalah compare antara hasil Appsheet dengan Draft RTO
+        - Pengecekan akan dilakukan antara SKU dan BIN yang ada di Appsheet dengan Draft RTO
+        - Jika BIN berbeda namun SKU sama maka akan muncul note **Perlu Edit Draft**
+        - Jika Qty berbeda namun SKU sama maka akan muncul note **Perlu Edit QTY Draft**
+        - Jika ada SKU tambahan yang tidak ada di draft namun di appsheet ada akan ada note **Tambah item Draft**
         """)
     if 'rto_df_ds' not in st.session_state: st.session_state.rto_df_ds = None
     if 'rto_df_selisih' not in st.session_state: st.session_state.rto_df_selisih = None
