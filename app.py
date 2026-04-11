@@ -5844,6 +5844,12 @@ elif menu == "Pengajuan Reject/Defect":
 elif menu == "List Retur Out":
     menu_retur_out_system()
 
+import pandas as pd
+import random
+import sqlite3
+from datetime import datetime, timedelta
+import streamlit as st
+
 def sync_data():
     """Sinkronisasi DB ke Session State & Handle Reset Harian"""
     conn = get_db_connection()
