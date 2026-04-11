@@ -6003,10 +6003,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
     
-# --- 5. LOGIKA ROUTING ---
-with st.sidebar:
-    menu = st.radio("Navigasi", ["Reporting & PIC", "Lainnya"])
-
 if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.2, 1])
