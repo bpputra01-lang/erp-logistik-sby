@@ -5872,13 +5872,22 @@ def sync_data():
     check_reports = c.execute('SELECT COUNT(*) FROM reports').fetchone()[0]
     if check_reports == 0:
         default_reports = [
-            ("Laporan Reject & Defect", "VERREL & GALIH", "❌ Belum"),
-            ("Stock Opname Daily", "FARIL & YUDI", "❌ Belum"),
-            ("Balancing Stock", "VANO", "❌ Belum"),
-            ("Update RTO Gateway", "HAMZAH", "❌ Belum"),
-            ("Input Data Putaway", "KRISNA", "❌ Belum"),
-            ("Laporan Inbound", "BAKCLINER", "❌ Belum"),
-            ("Monitoring Fulfillment", "WAREHOUSE FULLFILLMENT", "❌ Belum")
+            ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"),
+            ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
+            ("CEK STOCK MINUS", "VERREL & GALIH", "❌ Belum"),
+            ("BALANCING STOCK", "FARIL & YUDI", "❌ Belum"),
+            ("CEK RTO", "FARIL & YUDI", "❌ Belum"),
+            ("OUTBOUND PROCESS", "FARIL & YUDI", "❌ Belum"),
+            ("DASHBOARD SIDOARJO", "VANO", "❌ Belum"),
+            ("STORE ACTIVITY", "VANO", "❌ Belum"),
+            ("DASHBOARD SURABAYA", "HAMZAH", "❌ Belum"),
+            ("DASHBOARD SEMARANG", "HAMZAH", "❌ Belum"),
+            ("MANIFEST", "HAMZAH", "❌ Belum"),
+            ("REFUND", "HAMZAH", "❌ Belum"),
+            ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"),
+            ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
+            ("STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "WAREHOUSE FULLFILLMENT", "❌ Belum")
+            ("TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "WAREHOUSE FULLFILLMENT", "❌ Belum")
         ]
         c.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', default_reports)
         conn.commit()
@@ -5913,10 +5922,7 @@ if 'db_report' not in st.session_state or 'todo_list' not in st.session_state:
     sync_data()
 
 # Simulasi variabel menu (karena di potongan kode lu belum ada sidebarnya)
-if 'menu' not in st.session_state:
-    menu = "Reporting & PIC" # Default
-else:
-    menu = st.session_state.menu
+if menu == "Reporting & PIC"
 
 # --- 4. CSS DARK THEME (PERSIS PUNYA LU) ---
 st.markdown("""
