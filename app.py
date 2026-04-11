@@ -5844,39 +5844,48 @@ elif menu == "Pengajuan Reject/Defect":
 elif menu == "List Retur Out":
     menu_retur_out_system()
 
-import pandas as pd
-import random
-import sqlite3
-from datetime import datetime, timedelta
-import streamlit as st
-
 def sync_data():
     """Sinkronisasi DB ke Session State & Handle Reset Harian"""
     conn = get_db_connection()
+    c = conn.cursor()
+    
+    # 0. PASTIKAN TABEL ADA (Auto-Repair)
+    c.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
+    
     today = datetime.now().strftime('%Y-%m-%d')
-    res = conn.execute('SELECT last_date FROM reset_tracker').fetchone()
+    res = c.execute('SELECT last_date FROM reset_tracker').fetchone()
     
     # --- LOGIC RESET HARIAN ---
-    if not res or res[0] != today:
-        # 1. Reset status laporan kerja ke 'Belum'
-        conn.execute('UPDATE reports SET status = "❌ Belum"')
-        
-        # 2. Reset status centang To Do List (done = 0) tapi JANGAN DI-DELETE
-        conn.execute('UPDATE todo SET done = 0')
-        
-        # 3. Update tanggal tracker
-        conn.execute('DELETE FROM reset_tracker')
-        conn.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
+    if not res:
+        c.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
         conn.commit()
+    elif res[0] != today:
+        # Reset data harian
+        c.execute('UPDATE reports SET status = "❌ Belum"')
+        c.execute('UPDATE todo SET done = 0')
+        # Update tanggal ke hari ini
+        c.execute('UPDATE reset_tracker SET last_date = ?', (today,))
+        conn.commit()
+        st.toast(f"Data di-reset ke tanggal {today}", icon="🔄")
     
-    # --- TARIK DATA KE SESSION STATE ---
-    reports_db = conn.execute('SELECT laporan, pic, status FROM reports').fetchall()
-    st.session_state.db_report = [{"Laporan": r[0], "PIC": r[1], "Status": r[2]} for r in reports_db]
+    # --- TARIK DATA KE SESSION STATE DENGAN PROTEKSI ---
+    # Gunakan Pandas agar lebih cepat dan rapi
+    reports_df = pd.read_sql_query('SELECT laporan, pic, status FROM reports', conn)
+    st.session_state.db_report = reports_df.to_dict('records')
     
-    todo_db = conn.execute('SELECT task, done FROM todo').fetchall()
-    st.session_state.todo_list = [{"task": t[0], "done": bool(t[1])} for t in todo_db]
+    todo_df = pd.read_sql_query('SELECT task, done FROM todo', conn)
+    # Konversi integer 0/1 ke boolean untuk checkbox Streamlit
+    st.session_state.todo_list = [
+        {"task": t['task'], "done": bool(t['done'])} for _, t in todo_df.iterrows()
+    ]
+    
     conn.close()
 
+# --- CARA PANGGIL YANG AMAN ---
+if 'db_report' not in st.session_state:
+    sync_data()
 # --- 3. CSS DARK THEME (Gue Balikin & Gue Perkuat - PERSIS PUNYA LU) ---
 st.markdown("""
     <style>
