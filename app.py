@@ -5825,73 +5825,32 @@ elif menu == "Pengajuan Reject/Defect":
 elif menu == "List Retur Out":
     menu_retur_out_system()
 
-import streamlit as st
-import pandas as pd
-import sqlite3
-from datetime import datetime
-import math
-
-# --- 1. SQLITE CORE LOGIC (Perbaikan Query INSERT) ---
-def get_db_connection():
-    return sqlite3.connect('jez_reporting.db', check_same_thread=False)
-
-def init_db():
-    conn = get_db_connection()
-    # Tabel Laporan
-    conn.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
-    # Tabel Todo
-    conn.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
-    # Tracker Hari
-    conn.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
-    
-    # Isi data awal ke DB kalau masih kosong
-    if not conn.execute('SELECT * FROM reports').fetchone():
-        data_awal = [
-            ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"), ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
-            ("STOCK MINUS", "VERREL & GALIH", "❌ Belum"), ("BALANCING STOCK", "FARIL & YUDI", "❌ Belum"),
-            ("RTO", "FARIL & YUDI", "❌ Belum"), ("OUTBOUND PROCESS", "FARIL & YUDI", "❌ Belum"),
-            ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"), ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
-            ("DASHBOARD SIDOARJO", "VANO", "❌ Belum"), ("INBOUND PROCESS", "VANO", "❌ Belum"),
-            ("SURABAYA DASHBOARD", "HAMZAH", "❌ Belum"), ("SEMARANG DASHBOARD", "HAMZAH", "❌ Belum"),
-            ("MANIFEST", "HAMZAH", "❌ Belum"), ("REFUND", "HAMZAH", "❌ Belum"),
-            ("REFILL & OVERSTOCK", "KRISNA", "❌ Belum"), ("ZERO PUTAWAY", "WAREHOUSE FULLFILLMENT", "❌ Belum")
-        ]
-        conn.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', data_awal)
-    conn.commit()
-    conn.close()
-
 def sync_data():
     """Sinkronisasi DB ke Session State & Handle Reset Harian"""
     conn = get_db_connection()
     today = datetime.now().strftime('%Y-%m-%d')
     res = conn.execute('SELECT last_date FROM reset_tracker').fetchone()
     
-    # Logic Auto Reset Harian
+    # --- LOGIC RESET HARIAN ---
     if not res or res[0] != today:
+        # 1. Reset status laporan kerja ke 'Belum'
         conn.execute('UPDATE reports SET status = "❌ Belum"')
-        conn.execute('DELETE FROM todo')
+        
+        # 2. Reset status centang To Do List (done = 0) tapi JANGAN DI-DELETE
+        conn.execute('UPDATE todo SET done = 0')
+        
+        # 3. Update tanggal tracker
         conn.execute('DELETE FROM reset_tracker')
         conn.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
         conn.commit()
     
-    # Tarik data dari DB ke Session State lu
+    # --- TARIK DATA KE SESSION STATE ---
     reports_db = conn.execute('SELECT laporan, pic, status FROM reports').fetchall()
     st.session_state.db_report = [{"Laporan": r[0], "PIC": r[1], "Status": r[2]} for r in reports_db]
     
     todo_db = conn.execute('SELECT task, done FROM todo').fetchall()
     st.session_state.todo_list = [{"task": t[0], "done": bool(t[1])} for t in todo_db]
     conn.close()
-
-# Jalankan Database
-init_db()
-sync_data()
-
-# --- 2. INITIAL DATA (Lu punya, tetep ada buat jaga-jaga) ---
-if 'db_report' not in st.session_state:
-    pass
-
-if 'todo_list' not in st.session_state:
-    st.session_state.todo_list = []
 
 # --- 3. CSS DARK THEME (Gue Balikin & Gue Perkuat - PERSIS PUNYA LU) ---
 st.markdown("""
