@@ -1660,6 +1660,23 @@ def menu_refill_withdraw():
         - **ALL DATA STOCK**: Download All Data Stock di Jezpro dan pilh **HANYA ADA DI STOCK**
         - **STOCK TRACKING**: Download Stock Tracking di Jezpro dan pilih **JEZ SURABAYA** lalu pilih rentang waktu **7 HARI SEBELUMNYA**
         """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Process Refill & Withdraw (With Stock Tracking):**
+        - Melakukan Compare antara SKU yang ada di Gudang DC dengan Store dan sebaliknya
+        - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Store yang < 3 Pcs untuk Refill dan > 6 Pcs untuk Withdraw
+        - Jika data sudah didapatkan maka selanjutnya adalah compare dengan Stock Tracking
+        - Compare akan dilakukan dengan mempertimbangkan penjualan Offline untuk SKU tersebut
+        - Jika penjualan offline < 7 pcs maka refill hanya akan mengambil 1/3 dari total stock di DC dan akan mengambil 1/3 dari total Diff total stock - 12 Pcs untuk Withdraw
+        - Jika penjualan offline > 7 pcs maka refill akan mengambil 1/2 dari total stock di DC dan akan mengambil 1/2 dari total Diff total stock - 12 Pcs untuk Withdraw
+        - Maksimal kapasitas untuk tiap SKU di STORE adalah 6 Pcs jadi tidak akan lebih dari 6 tiap SKU di Gl3
+
+        **Alur Process Refill (Without Stock Tracking):**
+        - Melakukan Compare antara SKU yang ada di Gudang DC dengan SKU di Gudang STORE
+        - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang DC yang < 3 Pcs dan > 6 Pcs untuk Withdraw
+        - Sistem akan memksimalkan tiap SKU untuk mendapatkan total 6 Pcs di Gudang Store 
+        - Maksimal kapasitas untuk tiap SKU di Store adalah 6 Pcs jadi tidak akan lebih dari 6 tiap SKU di Gl3
+        """)
 
     # --- 0. INIT STATE ---
     for key in ["df_stock_sby", "df_trx", "summary_refill", "summary_withdraw"]:
@@ -4634,13 +4651,13 @@ elif menu == "Refill & Overstock":
         - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang Lt.3 yang < 3 Pcs untuk Refill dan > 12 Pcs untuk overstock
         - Jika data sudah didapatkan maka selanjutnya adalah compare dengan Stock Tracking
         - Compare akan dilakukan dengan mempertimbangkan penjualan Online untuk SKU tersebut
-        - Jika penjualan online < 7 pcs maka refill hanya akan mengambil 1/3 dari total stock di GL4 dan akan mengambil 1/3 dari total Diff total stock - 12 Pcs untuk Withdraw
-        - Jika penjualan online > 7 pcs maka refill akan mengambil 1/2 dari total stock di GL4 dan akan mengambil 1/2 dari total Diff total stock - 12 Pcs untuk Withdraw
+        - Jika penjualan online < 7 pcs maka refill hanya akan mengambil 1/3 dari total stock di GL4 dan akan mengambil 1/3 dari total Diff total stock - 12 Pcs untuk Overstock
+        - Jika penjualan online > 7 pcs maka refill akan mengambil 1/2 dari total stock di GL4 dan akan mengambil 1/2 dari total Diff total stock - 12 Pcs untuk Overstock
         - Maksimal kapasitas untuk tiap SKU di GL3 adalah 12 Pcs jadi tidak akan lebih dari 12 tiap SKU di Gl3
 
         **Alur Process Refill (Without Stock Tracking):**
-        - elakukan Compare antara SKU yang ada di Gudang Lt.4 dengan SKU di Gudang Lt.3
-        - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang Lt.3 yang < 3 Pcs dan > 12 Pcs untuk Withdraw
+        - Melakukan Compare antara SKU yang ada di Gudang Lt.4 dengan SKU di Gudang Lt.3
+        - List akan dikumpulkan terlebih dahulu dan akan mengambil SKU dengan Qty di Gudang Lt.3 yang < 3 Pcs dan > 12 Pcs untuk Overstock
         - Sistem akan memksimalkan tiap SKU untuk mendapatkan total 12 Pcs di Gudang lt.3 
         - Maksimal kapasitas untuk tiap SKU di GL3 adalah 12 Pcs jadi tidak akan lebih dari 12 tiap SKU di Gl3
         """)
