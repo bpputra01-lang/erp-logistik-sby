@@ -5868,6 +5868,21 @@ def sync_data():
     c.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
     conn.commit()
     
+    # --- AUTO-POPULATE: ISI DATA JIKA TABEL KOSONG ---
+    check_reports = c.execute('SELECT COUNT(*) FROM reports').fetchone()[0]
+    if check_reports == 0:
+        default_reports = [
+            ("Laporan Reject & Defect", "VERREL & GALIH", "❌ Belum"),
+            ("Stock Opname Daily", "FARIL & YUDI", "❌ Belum"),
+            ("Balancing Stock", "VANO", "❌ Belum"),
+            ("Update RTO Gateway", "HAMZAH", "❌ Belum"),
+            ("Input Data Putaway", "KRISNA", "❌ Belum"),
+            ("Laporan Inbound", "BAKCLINER", "❌ Belum"),
+            ("Monitoring Fulfillment", "WAREHOUSE FULLFILLMENT", "❌ Belum")
+        ]
+        c.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', default_reports)
+        conn.commit()
+
     today = datetime.now().strftime('%Y-%m-%d')
     res = c.execute('SELECT last_date FROM reset_tracker').fetchone()
     
@@ -5986,7 +6001,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
     
 # --- 5. LOGIKA ROUTING ---
-# Sidebar sederhana untuk testing (Bisa lu hapus kalau sudah ada di script utama lu)
 with st.sidebar:
     menu = st.radio("Navigasi", ["Reporting & PIC", "Lainnya"])
 
@@ -6009,8 +6023,11 @@ if menu == "Reporting & PIC":
         tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
         
         with tab_me:
+            # Filter agar user tahu jika datanya memang belum ada di DB
+            has_task = False
             for idx, task in enumerate(st.session_state.db_report):
                 if task['PIC'] == current_user:
+                    has_task = True
                     ck1, ck2 = st.columns([4, 1.2])
                     with ck1:
                         st.markdown(f"""
@@ -6033,6 +6050,9 @@ if menu == "Reporting & PIC":
                                 st.rerun()
                         else:
                             st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
+            
+            if not has_task:
+                st.info(f"Belum ada daftar laporan untuk {current_user}")
 
         with tab_all:
             st.markdown("### 📊 Team Progress Summary")
@@ -6102,7 +6122,6 @@ if menu == "Reporting & PIC":
             if 'todo_page' not in st.session_state:
                 st.session_state.todo_page = 1
             
-            # Clamp page number
             if st.session_state.todo_page > total_pages:
                 st.session_state.todo_page = total_pages
             if st.session_state.todo_page < 1:
