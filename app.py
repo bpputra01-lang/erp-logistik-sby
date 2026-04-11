@@ -5349,6 +5349,12 @@ elif menu == "Compare System":
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
 
+import pandas as pd
+import random
+import sqlite3
+from datetime import datetime, timedelta
+import streamlit as st
+
 def init_db_logistic():
     conn = sqlite3.connect('logistic_sby_final.db', check_same_thread=False)
     c = conn.cursor()
@@ -5390,6 +5396,10 @@ def reset_karyawan_table():
     c = conn.cursor()
     c.execute("DELETE FROM karyawan")
     conn.commit()
+
+# Panggil di paling atas biar gak error "no such table"
+conn = init_db_logistic()
+
 # Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar Anda
 if menu == "Logistic Schedule":
     # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL ---
