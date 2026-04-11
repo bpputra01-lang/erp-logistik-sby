@@ -5868,28 +5868,32 @@ def sync_data():
     c.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
     conn.commit()
     
-    # --check_reports = c.execute('SELECT COUNT(*) FROM reports').fetchone()[0]
-if check_reports == 0:
-    default_reports = [
-        ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"),
-        ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
-        ("CEK STOCK MINUS", "VERREL & GALIH", "❌ Belum"),
-        ("BALANCING STOCK", "FARIL & YUDI", "❌ Belum"),
-        ("CEK RTO", "FARIL & YUDI", "❌ Belum"),
-        ("OUTBOUND PROCESS", "FARIL & YUDI", "❌ Belum"),
-        ("DASHBOARD SIDOARJO", "VANO", "❌ Belum"),
-        ("STORE ACTIVITY", "VANO", "❌ Belum"),
-        ("DASHBOARD SURABAYA", "HAMZAH", "❌ Belum"),
-        ("DASHBOARD SEMARANG", "HAMZAH", "❌ Belum"),
-        ("MANIFEST", "HAMZAH", "❌ Belum"),
-        ("REFUND", "HAMZAH", "❌ Belum"),
-        ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"),
-        ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
-        ("STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "WAREHOUSE FULLFILLMENT", "❌ Belum"),
-        ("TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "WAREHOUSE FULLFILLMENT", "❌ Belum")
-    ]
-    c.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', default_reports)
-    conn.commit()
+    # --- AUTO-POPULATE: ISI DATA JIKA TABEL KOSONG (SUDAH DI DALAM FUNGSI) ---
+    # Mengambil jumlah data saat ini
+    c.execute('SELECT COUNT(*) FROM reports')
+    check_reports = c.fetchone()[0]
+    
+    if check_reports == 0:
+        default_reports = [
+            ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"),
+            ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
+            ("CEK STOCK MINUS", "VERREL & GALIH", "❌ Belum"),
+            ("BALANCING STOCK", "FARIL & YUDI", "❌ Belum"),
+            ("CEK RTO", "FARIL & YUDI", "❌ Belum"),
+            ("OUTBOUND PROCESS", "FARIL & YUDI", "❌ Belum"),
+            ("DASHBOARD SIDOARJO", "VANO", "❌ Belum"),
+            ("STORE ACTIVITY", "VANO", "❌ Belum"),
+            ("DASHBOARD SURABAYA", "HAMZAH", "❌ Belum"),
+            ("DASHBOARD SEMARANG", "HAMZAH", "❌ Belum"),
+            ("MANIFEST", "HAMZAH", "❌ Belum"),
+            ("REFUND", "HAMZAH", "❌ Belum"),
+            ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"),
+            ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
+            ("STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "WAREHOUSE FULLFILLMENT", "❌ Belum"),
+            ("TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "WAREHOUSE FULLFILLMENT", "❌ Belum")
+        ]
+        c.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', default_reports)
+        conn.commit()
 
     today = datetime.now().strftime('%Y-%m-%d')
     res = c.execute('SELECT last_date FROM reset_tracker').fetchone()
