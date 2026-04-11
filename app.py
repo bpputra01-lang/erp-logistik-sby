@@ -5862,14 +5862,20 @@ def sync_data():
     conn = get_db_connection()
     c = conn.cursor()
     
-    # Pastikan tabel-tabel utama sudah ada
+    # 1. Pastikan tabel-tabel utama sudah ada
     c.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
     c.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
     conn.commit()
+
+    # --- TAMBAHKAN DI SINI (FORCE RESET DATA LAMA) ---
+    # Jalankan baris di bawah ini SEKALI SAJA, lalu hapus lagi atau beri komentar (#) 
+    # setelah list laporan baru lu muncul di aplikasi.
+    c.execute('DELETE FROM reports') 
+    conn.commit()
+    # -------------------------------------------------
     
-    # --- AUTO-POPULATE: ISI DATA JIKA TABEL KOSONG (SUDAH DI DALAM FUNGSI) ---
-    # Mengambil jumlah data saat ini
+    # 2. Ambil jumlah data (sekarang pasti 0 karena sudah di-DELETE di atas)
     c.execute('SELECT COUNT(*) FROM reports')
     check_reports = c.fetchone()[0]
     
