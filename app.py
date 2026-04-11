@@ -6100,74 +6100,84 @@ if menu == "Reporting & PIC":
                 </div>
                 """, unsafe_allow_html=True)
 
-    with col_kanan:
-        st.markdown("""<div style="background-color: #1a1c27; padding: 10px; border-radius: 10px; border-left: 5px solid #3b82f6; margin-bottom: 20px; text-align: center;"><h4 style='margin:0; color:#FFFFFF; display: inline-block;'>📝 TO DO LIST</h4></div>""", unsafe_allow_html=True)
+    # --- LANJUTAN DALAM col_kanan ---
+with col_kanan:
+    st.markdown("""
+        <div style="background-color: #1f2937; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #3b82f6; margin-bottom: 20px;">
+            <h3 style="margin:0; color: white;">📝 TO DO LIST</h3>
+        </div>
+    """, unsafe_allow_html=True)
 
-        # 1. Form Input
-        with st.form("form_todo_dark", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            if st.form_submit_button("➕ Tambah") and tugas_baru:
-                conn = get_db_connection()
-                conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
-                conn.commit()
-                conn.close()
-                sync_data()
-                st.rerun()
+    # 1. Form Input Tugas Baru
+    with st.form("form_todo_dark", clear_on_submit=True):
+        tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
+        submit_tugas = st.form_submit_button("➕ Tambah")
+        
+        if submit_tugas and tugas_baru:
+            conn = get_db_connection()
+            conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
+            conn.commit()
+            conn.close()
+            sync_data() # Update session state agar tugas baru muncul
+            st.rerun()
 
-        # 2. Logic Pagination
-        if "todo_list" in st.session_state and st.session_state.todo_list:
-            items_per_page = 3
-            total_items = len(st.session_state.todo_list)
-            total_pages = math.ceil(total_items / items_per_page)
-            
-            if 'todo_page' not in st.session_state:
-                st.session_state.todo_page = 1
-            
-            if st.session_state.todo_page > total_pages:
-                st.session_state.todo_page = total_pages
-            if st.session_state.todo_page < 1:
-                st.session_state.todo_page = 1
+    # 2. Logic Pagination (Membagi list tugas per halaman)
+    if "todo_list" in st.session_state and st.session_state.todo_list:
+        items_per_page = 3
+        total_items = len(st.session_state.todo_list)
+        total_pages = math.ceil(total_items / items_per_page)
+        
+        # Inisialisasi state halaman jika belum ada
+        if 'todo_page' not in st.session_state:
+            st.session_state.todo_page = 1
+        
+        # Keamanan index halaman
+        if st.session_state.todo_page > total_pages:
+            st.session_state.todo_page = total_pages
+        if st.session_state.todo_page < 1:
+            st.session_state.todo_page = 1
 
-            start_idx = (st.session_state.todo_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            current_items = st.session_state.todo_list[start_idx:end_idx]
+        start_idx = (st.session_state.todo_page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        current_items = st.session_state.todo_list[start_idx:end_idx]
 
-            # 3. Tampilkan Item
-            for i, item in enumerate(current_items):
-                real_idx = start_idx + i 
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    color_border = '#10b981' if item['done'] else '#3b82f6'
-                    st.markdown(f"""
-                        <div style="background-color: #1f2937; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
-                            <h4 style="margin:0; font-size:1rem; color: #f3f4f6;">{item['task']}</h4>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with c2:
-                    st.write("")
-                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
-                    if res != item['done']:
-                        conn = get_db_connection()
-                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
-                        conn.commit()
-                        conn.close()
-                        sync_data()
-                        st.rerun()
+        # 3. Tampilkan Item Tugas
+        for i, item in enumerate(current_items):
+            real_idx = start_idx + i 
+            c1, c2 = st.columns([4, 1])
+            with c1:
+                # Warna border berubah hijau jika tugas selesai (done)
+                color_border = '#10b981' if item['done'] else '#3b82f6'
+                st.markdown(f"""
+                    <div style="background-color: #111827; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
+                        <h4 style="margin:0; font-size:0.9rem; color: #f3f4f6;">{item['task']}</h4>
+                    </div>
+                """, unsafe_allow_html=True)
+            with c2:
+                st.write("")
+                # Checkbox untuk tandai selesai/belum
+                res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
+                if res != item['done']:
+                    conn = get_db_connection()
+                    conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
+                    conn.commit()
+                    conn.close()
+                    sync_data() # Update session state
+                    st.rerun()
 
-            # 4. Navigasi Panah
-            st.divider()
-            nav1, nav2, nav3 = st.columns([1, 2, 1])
-            with nav1:
-                if st.session_state.todo_page > 1:
-                    if st.button("⬅️ Prev", key="btn_prev_page"):
-                        st.session_state.todo_page -= 1
-                        st.rerun()
-            with nav2:
-                st.markdown(f"<p style='text-align:center; color:#9ca3af; padding-top:10px;'>Halaman {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
-            with nav3:
-                if st.session_state.todo_page < total_pages:
-                    if st.button("Next ➡️", key="btn_next_page"):
-                        st.session_state.todo_page += 1
-                        st.rerun()
-        else:
-            st.info("Belum ada tugas tambahan.")
+        # 4. Navigasi Halaman (Jika tugas lebih dari 3)
+        if total_pages > 1:
+            st.write("")
+            pc1, pc2, pc3 = st.columns([1, 2, 1])
+            with pc1:
+                if st.button("⬅️", key="prev_todo") and st.session_state.todo_page > 1:
+                    st.session_state.todo_page -= 1
+                    st.rerun()
+            with pc2:
+                st.markdown(f"<p style='text-align:center; color:gray;'>Hal {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
+            with pc3:
+                if st.button("➡️", key="next_todo") and st.session_state.todo_page < total_pages:
+                    st.session_state.todo_page += 1
+                    st.rerun()
+    else:
+        st.info("Belum ada tugas tambahan.")
