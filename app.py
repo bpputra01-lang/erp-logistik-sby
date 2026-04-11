@@ -4786,6 +4786,23 @@ elif menu == "Stock Minus":
         </style>
     """, unsafe_allow_html=True)
 
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **All Data Stock**: Download Multiple Adjusmet dari Jezpro dan pilih **Termasuk yang sudah habis**
+        """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Process Compare Stock Minus:**
+        - Mengambil SKU yang memiliki Qty System minus (-)
+        - Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock
+        - Dimana terdapat Bin prioritas untuk shuffle Covering Stock (All Stagging, Karantina)
+        - Dan jika minus terjadi di Gudang lt.2 maka akan prioritas mengambil BIN Toko begitupun sebaliknya
+        - Lalu jika tidak ditemukan di BIN Prioritas maka akan mengambil random BIN kecuali LIVE, Offline dan Online
+        - Jika sudah ditemukan SKU dan Qty yang bisa covering maka akan dibuatkan list Set up
+        - Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut
+        """)
+
     uploaded_file = st.file_uploader("Upload File ALL DATA STOCK", type=["xlsx", "xlsm"])
     
     if uploaded_file:
