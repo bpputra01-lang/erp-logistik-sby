@@ -5922,7 +5922,7 @@ if 'db_report' not in st.session_state or 'todo_list' not in st.session_state:
     sync_data()
 
 # Simulasi variabel menu (karena di potongan kode lu belum ada sidebarnya)
-if menu == "Reporting & PIC"
+if menu == "Reporting & PIC" :
 
 # --- 4. CSS DARK THEME (PERSIS PUNYA LU) ---
 st.markdown("""
