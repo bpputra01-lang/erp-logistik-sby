@@ -3939,7 +3939,7 @@ def tampilan_balancing_stock():
         gl4_missing = int(q_data['GL_Missing_Count'])
 
         # --- 3. TAMPILAN DASHBOARD ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PERCENTAGE & BALANCING STOCK</h4></div>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-label-header"><h4 style="color: #007BFF; margin: 0; font-size: 16px; font-weight: 900;">📊 PRECENTAGE & BALANCING STOCK</h4></div>', unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns(3)
         with c1:
