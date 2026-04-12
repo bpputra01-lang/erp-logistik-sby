@@ -5216,6 +5216,13 @@ elif menu == "FDR Update":
         **Format yang diharapkan:**
         - **FILE MANIFEST**: Download Manifest dari jezpro pada menu **TRANSAKSI ONLINE V2**, pilih Cabang **ONLINE SURABAYA**, pilih Status Jezpro **DONE ONLINE**, dan rentang waktunya pilih **30 HARI TERAKHIR**
         """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Compare :**
+        - File yang telah diupload hanya akan di split berdasarkan 2 Kategori yaitu **NEED FU IT** dan **BRANCH**
+        - Untuk Need FU IT adalah kondisi dimana ketika kolom No Manifest telah terisi namun status masih **DONE ONLINE**
+        - Untuk Branch adalah disesuaikan dan di split berdasarkan cabang dari masing-masing transaksi yang masih berstatus **DONE ONLINE**
+        """)
     # --- INIT STATE ---
     if "ws_manifest_fdr" not in st.session_state: st.session_state.ws_manifest_fdr = None
     if "ws_fu_it_fdr" not in st.session_state: st.session_state.ws_fu_it_fdr = None
