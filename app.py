@@ -1123,7 +1123,7 @@ def menu_Stock_Opname():
             - Item memiliki note **NO ALLOCATION** maka apabila tidak ditemukan di BIN COVERAGE akan mencari SKU yang cocok di system +
             - Dan jika ditemukan SKU yang cocok maka note akan sama ketika compare dengan BIN COVERAGE
         - **SET UP ALLOCATION**
-            - Item dengan note **FULL ALLOCATION* dan **PARTIAL ALLOCATION** akan dibuatkan list set up dengan note Relocation
+            - Item dengan note **FULL ALLOCATION** dan **PARTIAL ALLOCATION** akan dibuatkan list set up dengan note Relocation
         **RECON REAL + & SYSTEM +**
         - **RECON REAL +**
             - Item yang memiliki note **NO ALLOCATION** akan kembali di lakukan rekonsiliasi apakah item tersebut sesuai dengan total data scan atau hanya double scan
