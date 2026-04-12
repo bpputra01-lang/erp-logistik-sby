@@ -1572,7 +1572,7 @@ def menu_Stock_Opname():
     def download_section():
         if "process_done" in st.session_state and st.session_state.process_done:
             st.markdown("<br>", unsafe_allow_html=True)
-            st.info("💡 **Master Report Ready:** File ini mencakup SEMUA data dari Step 1 sampai Step 5.")
+            st.info("💡 **Master Report Ready:** All data will be saved")
             
             if st.button("🏗️ PREPARE FULL REPORT (ALL TABS)", use_container_width=True):
                 with st.spinner("Processing Data..."):
