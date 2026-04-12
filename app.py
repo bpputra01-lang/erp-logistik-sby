@@ -2769,6 +2769,7 @@ def menu_retur_out_system():
         st.error(f"Sistem Gagal Memuat Database: {e}")
     finally:
         conn.close() # Pastikan ditutup di akhir
+import io
 def process_justification(df_case, df_tracking, df_po):
     # 1. Copy data biar aman
     res = df_case.copy()
