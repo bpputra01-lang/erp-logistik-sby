@@ -1106,7 +1106,7 @@ def menu_Stock_Opname():
     with st.expander("💡Logic Thinking"):
         st.info("""
         **DS VS Stock System:**
-        **REAL +**
+        - **REAL +**
         -
         """)
     # --- INITIALIZE ALL SESSION STATES ---
