@@ -4505,10 +4505,23 @@ elif menu == "Scan Out Validation":
     
     with st.expander("📋 Informasi Format File"):
         st.info("""
-        **Format yang diharapkan:**
+        **Format yang diharapkan :**
         - **DATA SCAN**: Kolom A = **BIN**, Kolom B = **SKU** (QTY akan dihitung otomatis)
         - **HISTORY SET UP**: Sesuai yang ada pada template Mutasi Set Up Jezpro
         - **STOCK TRACKING**: Sesuai yang ada pada template Stock Tracking Jezpro
+        """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Compare Scan Out :**
+        - System akan melakukan compare antara BIN dan SKU yang ada di file data scan dengan file History Set Up dan Stock Tracking
+        - Jika BIN dan SKU akan langsung melakukan double cek di kedua file mana yang cocok dan sesuai dengan BIN dan SKU yang ada di data scan
+        - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking maka akan diberikan note **DONE AND MATCH SET UP**
+        - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking namun BIN tidak sesuai hanya SKUnya saja yang cocok maka akan diberikan note **DONE SETUP (BIN MISSMATCH)**
+        - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking namun QTY tidak sesuai hanya SKU dan BIN saja yang cocok maka akan diberikan note **DONE SET UP (QTY MISSMATCH)**
+        - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi maka akan diberikan note **ITEM TELAH TERJUAL**
+        - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi namun BIN tidak sesuai hanya SKUnya saja yang cocok maka akan diberikan note **ITEM TELAH TERJUAL (BIN MISSMATCH)**
+        - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi namun QTY tidak sesuai hanya SKU dan BIN saja yang cocok maka akan diberikan note **ITEM TELAH TERJUAL (QTY MISSMATCH)**
+        - Jika permintaan item ada > 1 item dan yang terjual hanya 1 maka akan dilakukan split row dimana akan dilakukan pengecekan di kedua file dan akan split note juga menyesuaikan kondisi hasil compare 
         """)
     
     col1, col2, col3 = st.columns(3)
