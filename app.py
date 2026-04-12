@@ -1105,18 +1105,18 @@ def menu_Stock_Opname():
         """)
     with st.expander("💡Logic Thinking"):
         st.info("""
-        **DS VS Stock System:**
+        **DS VS Stock System :**
         - **REAL +**
             - Compare antara SKU dan BIN yang ada di data scan dengan SKU dan BIN yang ada di Stock System dimana logic yang digunakan menggunakan loigc rumus (SUMIFS)
             - Fokus di file Data Scan karena yang akan menjadi acuan untuk Real +
             - Apabila **QTY SCAN > QTY SYSTEM** maka yang akan dijadikan sebagai Real +
-            
-        **Stock Sytem VS DS**
+
+        **Stock Sytem VS DS :**
         - **SYSTEM +**
             - Jika tadi berfokus pada file Data maka untuk system + berfokus pada file Stock System
             - Apabila **QTY SYSTEM > QTY SCAN** maka akan dijadikan sebagai System +
 
-        **ALLOCATION REAL +**
+        **ALLOCATION REAL + :**
         - **BIN COVERAGE**
             - Compare antara SKU yang ada di Real + dengan SKU yang ada BIN Coverage jika SKU ditemukan maka akan diambil untuk cover system di REAL +
             - Jika DIFF real + dapat tercover penuh maka akan diberi note **FULL ALLOCATION**
@@ -1128,7 +1128,7 @@ def menu_Stock_Opname():
         - **SET UP ALLOCATION**
             - Item dengan note **FULL ALLOCATION** dan **PARTIAL ALLOCATION** akan dibuatkan list set up dengan note Relocation
 
-        **RECON REAL + & SYSTEM +**
+        **RECON REAL + & SYSTEM + :**
         - **RECON REAL +**
             - Item yang memiliki note **NO ALLOCATION** akan kembali di lakukan rekonsiliasi apakah item tersebut sesuai dengan total data scan atau hanya double scan
             - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
@@ -1151,11 +1151,11 @@ def menu_Stock_Opname():
         - **SET UP KARANTINA**
             - System akan membuatkan list set up untuk DIFF > 0 dan akan diberikan note **MISS LOCATION**
 
-        **TOTAL MISS LOCATION**
+        **TOTAL MISS LOCATION :**
             - Cek total missloc untuk mengetahui seberapa banyak miss location dari Stock Opname periode tersebut
             - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
 
-        **VALUE ADJUSMENT**
+        **VALUE ADJUSMENT :**
             - Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut
             - Untuk logic Value Adjusment sudah dijelaskan di bagian **INFORMATION FILE**
         """)
