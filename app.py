@@ -1110,6 +1110,7 @@ def menu_Stock_Opname():
             - Compare antara SKU dan BIN yang ada di data scan dengan SKU dan BIN yang ada di Stock System dimana logic yang digunakan menggunakan loigc rumus (SUMIFS)
             - Fokus di file Data Scan karena yang akan menjadi acuan untuk Real +
             - Apabila **QTY SCAN > QTY SYSTEM** maka yang akan dijadikan sebagai Real +
+            
         **Stock Sytem VS DS**
         - **SYSTEM +**
             - Jika tadi berfokus pada file Data maka untuk system + berfokus pada file Stock System
@@ -1153,7 +1154,7 @@ def menu_Stock_Opname():
         **TOTAL MISS LOCATION**
             - Cek total missloc untuk mengetahui seberapa banyak miss location dari Stock Opname periode tersebut
             - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
-            
+
         **VALUE ADJUSMENT**
             - Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut
             - Untuk logic Value Adjusment sudah dijelaskan di bagian **INFORMATION FILE**
