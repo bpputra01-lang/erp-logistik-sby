@@ -1152,12 +1152,12 @@ def menu_Stock_Opname():
             - System akan membuatkan list set up untuk DIFF > 0 dan akan diberikan note **MISS LOCATION**
 
         **TOTAL MISS LOCATION :**
-            - Cek total missloc untuk mengetahui seberapa banyak miss location dari Stock Opname periode tersebut
-            - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
+        - Cek total missloc untuk mengetahui seberapa banyak miss location dari Stock Opname periode tersebut
+        - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
 
         **VALUE ADJUSMENT :**
-            - Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut
-            - Untuk logic Value Adjusment sudah dijelaskan di bagian **INFORMATION FILE**
+        - Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut
+        - Untuk logic Value Adjusment sudah dijelaskan di bagian **INFORMATION FILE**
         """)
 
     # --- INITIALIZE ALL SESSION STATES ---
