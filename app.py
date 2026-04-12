@@ -6044,10 +6044,6 @@ def sync_data():
     c.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
     conn.commit()
 
-# --- TAMBAHKAN BARIS INI UNTUK RESET DATA LAMA ---
-    c.execute('DELETE FROM reports') 
-    conn.commit()
-    # ------------------------------------------------
     # 2. Ambil jumlah data (sekarang pasti 0 karena sudah di-DELETE di atas)
     c.execute('SELECT COUNT(*) FROM reports')
     check_reports = c.fetchone()[0]
