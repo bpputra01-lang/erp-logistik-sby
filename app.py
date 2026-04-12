@@ -2771,97 +2771,102 @@ def menu_retur_out_system():
         conn.close() # Pastikan ditutup di akhir
 import io
 def process_justification(df_case, df_tracking, df_po):
-    # 1. Copy data biar aman
+    # 1. Copy data & Standarisasi Header ke Huruf Besar (Menghindari KeyError 'IDENTIFY' vs 'Identify')
     res = df_case.copy()
+    res.columns = [str(c).upper().strip() for c in res.columns]
+    
     df_tracking = df_tracking.copy()
+    df_tracking.columns = [str(c).upper().strip() for c in df_tracking.columns]
+    
     df_po = df_po.copy()
+    df_po.columns = [str(c).upper().strip() for c in df_po.columns]
 
-    # 2. Aggregasi Tracking (Pastikan nama kolom sesuai urutan Excel lu)
-    sku_col_track = df_tracking.columns[1] # Kolom B (SKU)
+    # 2. Aggregasi Tracking (Gunakan indeks kolom agar fleksibel jika nama berubah sedikit)
+    # Kolom B (SKU), L (Stock), M (Sales), N (Stockin), dst.
+    sku_col_track = df_tracking.columns[1] 
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum',  # L: Current Stock
-        df_tracking.columns[4]: 'sum',  # M: Total Sales
-        df_tracking.columns[5]: 'sum',  # N: Total_Stockin
-        df_tracking.columns[6]: 'sum',  # O: Total_adj_minus
-        df_tracking.columns[7]: 'sum',  # P: Total_adj_plus
-        df_tracking.columns[8]: 'sum',  # Q: Total draft_trf
-        df_tracking.columns[9]: 'sum',  # R: Total trf_in (SESUAI REQUEST LU)
-        df_tracking.columns[10]: 'sum'  # S: Total trf_out
+        df_tracking.columns[3]: 'sum',   # Indeks 3 = L (Current Stock)
+        df_tracking.columns[4]: 'sum',   # Indeks 4 = M (Total Sales)
+        df_tracking.columns[5]: 'sum',   # Indeks 5 = N (Total_Stockin)
+        df_tracking.columns[6]: 'sum',   # Indeks 6 = O (Total_adj_minus)
+        df_tracking.columns[7]: 'sum',   # Indeks 7 = P (Total_adj_plus)
+        df_tracking.columns[8]: 'sum',   # Indeks 8 = Q (Total draft_trf)
+        df_tracking.columns[9]: 'sum',   # Indeks 9 = R (Total trf_in)
+        df_tracking.columns[10]: 'sum'   # Indeks 10 = S (Total trf_out)
     }).reset_index()
 
-    # Nama kolom sementara agar unik
+    # Nama kolom sementara agar unik untuk proses join
     track_agg.columns = ['SKU_KEY', '_L', '_M', '_N', '_O', '_P', '_Q', '_R', '_S']
     
-    # Clean SKU
+    # Clean SKU agar formatnya sama (Tanpa titik desimal)
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
     res['SKU_KEY_JOIN'] = res['SKU'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 3. Merge
+    # 3. Merge Data Case dengan Data Tracking
     res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
 
-    # 4. Pindahkan data ke kolom Final
-    res['Current Stock']   = res['_L']
-    res['Total Sales']     = res['_M']
-    res['Total_Stockin']   = res['_N']
-    res['Total_adj_minus'] = res['_O']
-    res['Total_adj_plus']  = res['_P']
-    res['Total draft_trf'] = res['_Q']
-    res['Total trf_in']    = res['_R']
-    res['Total trf_out']   = res['_S']
+    # 4. Pindahkan data ke kolom Final (Gunakan huruf besar agar sinkron dengan ordered_headers)
+    res['CURRENT STOCK']   = res['_L']
+    res['TOTAL SALES']     = res['_M']
+    res['TOTAL_STOCKIN']   = res['_N']
+    res['TOTAL_ADJ_MINUS'] = res['_O']
+    res['TOTAL_ADJ_PLUS']  = res['_P']
+    res['TOTAL DRAFT_TRF'] = res['_Q']
+    res['TOTAL TRF_IN']    = res['_R']
+    res['TOTAL TRF_OUT']   = res['_S']
 
-    # 5. Hitung REAL QTY (T) & GAP ADJ (U)
-    res['REAL QTY'] = (res['Total_Stockin'] + res['Total trf_in']) - \
-                      (res['Total Sales'] + res['Total trf_out'] + res['Total draft_trf'])
-    res['GAP ADJUSMENT'] = res['Total_adj_plus'] - res['Total_adj_minus']
+    # 5. Hitung REAL QTY & GAP ADJUSMENT
+    res['REAL QTY'] = (res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN']) - \
+                      (res['TOTAL SALES'] + res['TOTAL TRF_OUT'] + res['TOTAL DRAFT_TRF'])
+    res['GAP ADJUSMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    # 6. RUMUS LU (PLEK KETIPLEK SESUAI ABJAD EXCEL)
+    # 6. Rumus Justifikasi
     def run_formula(row):
-        # Konversi ke float & round biar ga selisih koma sama Excel
-        j2 = round(float(row['QTY SYSTEM']), 2)    # J
-        k2 = round(float(row['QTY SO']), 2)        # K
-        l2 = round(float(row['Current Stock']), 2) # L
-        m2 = round(float(row['Total Sales']), 2)   # M
-        n2 = round(float(row['Total_Stockin']), 2) # N
-        r2 = round(float(row['Total trf_in']), 2)  # R (Tadi lu koreksi ini)
-        t2 = round(float(row['REAL QTY']), 2)      # T
-        u2 = round(float(row['GAP ADJUSMENT']), 2) # U
+        try:
+            j2 = round(float(row['QTY SYSTEM']), 2) 
+            k2 = round(float(row['QTY SO']), 2)     
+            l2 = round(float(row['CURRENT STOCK']), 2) 
+            m2 = round(float(row['TOTAL SALES']), 2)   
+            n2 = round(float(row['TOTAL_STOCKIN']), 2) 
+            r2 = round(float(row['TOTAL TRF_IN']), 2)  
+            t2 = round(float(row['REAL QTY']), 2)      
+            u2 = round(float(row['GAP ADJUSMENT']), 2) 
 
-        # Logic Rumus Excel lu:
-        if (j2 > k2 and u2 > 0) or (j2 < k2 and u2 < 0):
-            return "KESALAHAN ADJUSMENT"
-        
-        if (n2 + r2) < m2 or t2 < 0:
-            return "PERLU CEK CROSS ORDER"
-        
-        if t2 == l2 and t2 != 0:
-            return "CEK ULANG HASIL REKON"
-        
-        # Versi Python / Logic Script
-        if ((t2 == 0 and u2 == 0 and l2 != 0) or 
-            (j2 > k2 and l2 > t2) or 
-            (j2 < k2 and l2 != 0 and t2 != 0)):
-            return "INDIKASI BUG SISTEM"
-            
-        return "UNDEFINED"
+            if (j2 > k2 and u2 > 0) or (j2 < k2 and u2 < 0):
+                return "KESALAHAN ADJUSMENT"
+            if (n2 + r2) < m2 or t2 < 0:
+                return "PERLU CEK CROSS ORDER"
+            if t2 == l2 and t2 != 0:
+                return "CEK ULANG HASIL REKON"
+            if ((t2 == 0 and u2 == 0 and l2 != 0) or 
+                (j2 > k2 and l2 > t2) or 
+                (j2 < k2 and l2 != 0 and t2 != 0)):
+                return "INDIKASI BUG SISTEM"
+            return "UNDEFINED"
+        except:
+            return "ERROR DATA"
 
-    # Jalankan fungsi
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
 
-    # 7. PO IN
-    po_counts = df_po[df_po.columns[3]].astype(str).str.split('.').str[0].value_counts().to_dict()
+    # 7. Hitung TOTAL PO IN
+    # Ambil indeks 3 dari file PO (asumsi SKU berada di sana)
+    sku_col_po = df_po.columns[3]
+    po_counts = df_po[sku_col_po].astype(str).str.split('.').str[0].value_counts().to_dict()
     res['TOTAL PO IN'] = res['SKU_KEY_JOIN'].apply(lambda x: po_counts.get(x, 0))
 
-    # 8. Susun Urutan Header (Identify -> TOTAL PO IN)
+    # 8. Susun Urutan Header (HURUF BESAR SEMUA AGAR COCOK)
     ordered_headers = [
-        'Identify', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 
-        'Harga Beli', 'Harga Jual', 'QTY SYSTEM', 'QTY SO', 'Current Stock', 
-        'Total Sales', 'Total_Stockin', 'Total_adj_minus', 'Total_adj_plus', 
-        'Total draft_trf', 'Total trf_in', 'Total trf_out', 'REAL QTY', 
+        'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 
+        'HARGA BELI', 'HARGA JUAL', 'QTY SYSTEM', 'QTY SO', 'CURRENT STOCK', 
+        'TOTAL SALES', 'TOTAL_STOCKIN', 'TOTAL_ADJ_MINUS', 'TOTAL_ADJ_PLUS', 
+        'TOTAL DRAFT_TRF', 'TOTAL TRF_IN', 'TOTAL TRF_OUT', 'REAL QTY', 
         'GAP ADJUSMENT', 'JUSTIFICATION', 'TOTAL PO IN'
     ]
 
-    return res[ordered_headers]
-
+    # Hanya ambil kolom yang benar-benar ada di dataframe 'res'
+    final_cols = [col for col in ordered_headers if col in res.columns]
+    
+    return res[final_cols]
 def load_data(file):
     """Membaca file Excel atau CSV."""
     if file.name.endswith('.csv'):
