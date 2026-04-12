@@ -4395,7 +4395,14 @@ if menu == "Putaway System":
         **Format yang diharapkan:**
         - **DATA SCAN PUTAWAY**: Kolom A = **BIN**, Kolom B = **SKU**, Kolom C = **QTY SCAN**
         - **DATA PUTAWAY**: Sesuai yang ada pada template Jezpro.
-        - **NOTE**: Hasil tidak akan hilang saat Anda mengklik tombol download.
+        """)
+    with st.expander("💡 Logic Thinking"):
+        st.info("""
+        **Alur Compare Putaway:**
+        - SKU di file data scan akan dicompare dengan SKU yang ada di FIle data BIN Putaway
+        - Tiap unique SKU teratas di File data scan akan mendapatkan alokasi penuh
+        - Untuk SKU yang tidak mendapatkan alokasi maka akan ditulis dengan note **PERLU CEK MANUAL** untuk mengetahui apakah ada double data scan atau item belum terset up di BIN PUTAWAY
+        - List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan
         """)
     
     c1, c2 = st.columns(2)
