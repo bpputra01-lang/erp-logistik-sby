@@ -1107,8 +1107,36 @@ def menu_Stock_Opname():
         st.info("""
         **DS VS Stock System:**
         - **REAL +**
-        -
+            - Compare antara SKU dan BIN yang ada di data scan dengan SKU dan BIN yang ada di Stock System dimana logic yang digunakan menggunakan loigc rumus (SUMIFS)
+            - Fokus di file Data Scan karena yang akan menjadi acuan untuk Real +
+            - Apabila **QTY SCAN > QTY SYSTEM** maka yang akan dijadikan sebagai Real +
+        - **SYSTEM +**
+            - Jika tadi berfokus pada file Data maka untuk system + berfokus pada file Stock System
+            - Apabila **QTY SYSTEM > QTY SCAN** maka akan dijadikan sebagai System +
+        **ALLOCATION REAL +**
+        - **BIN COVERAGE**
+            - Compare antara SKU yang ada di Real + dengan SKU yang ada BIN Coverage jika SKU ditemukan maka akan diambil untuk cover system di REAL +
+            - Jika DIFF real + dapat tercover penuh maka akan diberi note **FULL ALLOCATION**
+            - Jika DIFF real + hanya tercover sebagian maka akan diberi note **PARTIAL ALLOCATION**
+            - Dan yang tidak dapat tercover sebagian atau tidak tercover secara total maka akan diberi note **NO ALLOCATION**
+        - **SYSTEM +**
+            - Item memiliki note **NO ALLOCATION** maka apabila tidak ditemukan di BIN COVERAGE akan mencari SKU yang cocok di system +
+            - Dan jika ditemukan SKU yang cocok maka note akan sama ketika compare dengan BIN COVERAGE
+        - **SET UP ALLOCATION**
+            - Item dengan note **FULL ALLOCATION* dan **PARTIAL ALLOCATION** akan dibuatkan list set up dengan note Relocation
+        **RECON REAL + & SYSTEM +**
+        - **REAL +**
+            - Item yang memiliki note **NO ALLOCATION** akan kembali di lakukan rekonsiliasi apakah item tersebut sesuai dengan total data scan atau hanya double scan
+            - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
+        - **CEK STOCK ADJUSMENT**
+            - Download kembali file multiple adjusment All BIN dan **Termasuk yang sudah habis** untuk dilakukan sumifs antara SKU dan bin hasil recon dengan file multiple terbaru
+            - Hal ini dilakukan untuk mendapatkan selisih terupdate untuk dimasukkan ke BIN INBOUND
+        - 
+
+        
+        
         """)
+
     # --- INITIALIZE ALL SESSION STATES ---
     if 'compare_result' not in st.session_state: st.session_state.compare_result = None
     if 'allocation_result' not in st.session_state: st.session_state.allocation_result = None
@@ -1240,7 +1268,7 @@ def menu_Stock_Opname():
         with col_b: 
             up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
         with col_c: 
-            up_m5 = st.file_uploader("3️⃣ STOCK ADJ + (MASTER)", type=['xlsx'], key="u_m_final_fix")
+            up_m5 = st.file_uploader("3️⃣ File STAGGING INBOUND", type=['xlsx'], key="u_m_final_fix")
 
         if up_r4 and up_s4 and up_m5:
             if st.button("▶️ RUNNING PROCESS", use_container_width=True, key="btn_final_proc_v3"):
