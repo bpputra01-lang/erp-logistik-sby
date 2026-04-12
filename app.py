@@ -3932,10 +3932,22 @@ def tampilan_balancing_stock():
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format File :**
-        - Donwload Multiple Adjusment dan pastikan pilih **Termasuk yang sudah habis**
+        - Download Multiple Adjusment dan pastikan pilih **Termasuk yang sudah habis**
         - Data yang dihasilkan adalah data dari total SKU bukan total QTY jadi yang dihitung adalah unique SKU nya
         - Presentase minimal untuk **GL4 ➡️ GL3 adalah 100%**
-        - Presentase minimal untuk **ALL DC ➡️ Store adalah 98%** 
+        - Presentase minimal untuk **ALL DC ➡️ Store adalah 98%**
+        """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **ALur Compare :**
+        - **GL3 ➡️ GL4**
+            - Compare akan dilakukan dengan acuan SKU dan QTY SYSTEM yang ada di GL4
+            - SKU dan QTY SYSTEM yang ada di GL4 namun tidak ada di GL3 akan dilakukan presentase dengan Rumus **(TOTAL STOCK GL4 - TOTAL STOCK BELUM TEREFILL)/TOTAL STOCK GL4
+            - Dan akan mengecualikan BIN REJECT, DEFECT, LIVE, ONLINE, STAGGING, PUTAWAY
+        - **DC ➡️ STORE**
+            - Compare akan dilakukan dengan acuan SKU dan QTY SYSTEM yang ada di Gudang DC
+            - SKU dan QTY SYSTEM yang ada di Gudang DC namun tidak ada di Store akan dilakukan presentase dengan Rumus **(TOTAL STOCK DC - TOTAL STOCK BELUM TEREFILL)/TOTAL STOCK DC
+            - Dan akan mengecualikan BIN REJECT, DEFECT, LIVE, ONLINE, MARKOM, STAGGING, KARANTINA, OUT    
         """)
     conn = init_db()
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="balancer_upload")
