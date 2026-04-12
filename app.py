@@ -5356,7 +5356,7 @@ elif menu == "Justification SO":
         - **PURCHASE ORDER**: Download **PURCHASE ORDER** dari **POWER BI**, Period Invoice & Receive IN: **ALL TIME** (Store: **JEZ SURABAYA**).
         """)
 
-    with st.expander("💡 Justification Logic Information"):
+    with st.expander("💡 Logic Thinking"):
         st.info("""
         **Logic Justifikasi:**
         - **Kesalahan Adjustment**
