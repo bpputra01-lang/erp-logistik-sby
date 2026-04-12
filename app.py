@@ -1125,16 +1125,33 @@ def menu_Stock_Opname():
         - **SET UP ALLOCATION**
             - Item dengan note **FULL ALLOCATION* dan **PARTIAL ALLOCATION** akan dibuatkan list set up dengan note Relocation
         **RECON REAL + & SYSTEM +**
-        - **REAL +**
+        - **RECON REAL +**
             - Item yang memiliki note **NO ALLOCATION** akan kembali di lakukan rekonsiliasi apakah item tersebut sesuai dengan total data scan atau hanya double scan
             - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
+            - Jika **Real yang ditemukan = stock system** maka tidak akan dimasukkan ke list adjusment
+            - Jika **Real yang ditemukan > stock system** maka akan dimasukkan ke list adjusment
         - **CEK STOCK ADJUSMENT**
             - Download kembali file multiple adjusment All BIN dan **Termasuk yang sudah habis** untuk dilakukan sumifs antara SKU dan bin hasil recon dengan file multiple terbaru
             - Hal ini dilakukan untuk mendapatkan selisih terupdate untuk dimasukkan ke BIN INBOUND
-        - 
-
-        
-        
+        - **FILE INBOUND**
+            - Jika sudah upload file multiple adjusment **STAGGING INBOUND** maka selisih dari lookup tadi akan dimasukkan ke dalam file inbound untuk nantinya dilakukan proses adjusment
+        - **RECON SYSTEM +**
+            - System + yang DIFF nya belum teralokasi atau masih memiliki sisa maka akan dilakukan rekonsiliasi apakah item tersebut memang benar systemnya > realnya
+            - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
+            - Jika **Real yang ditemukan = stock system** maka tidak akan dimasukkan ke list adjusment
+            - Jika **Real yang ditemukan < stock system** maka akan dimasukkan ke list adjusment
+        - **CEK STOCK ADJUSMENT**
+            - File Cek adjusment tadi yang sudah di download bisa dimasukkan kembali
+            - Logicnya juga tetap sama yaitu dengan melakukan sumifs kemudian akan mengambil diffnya
+            - Jika DIFF > 0 maka akan dilakuka mutasi ke **BIN KARANTINA**
+        - **SET UP KARANTINA**
+            - System akan membuatkan list set up untuk DIFF > 0 dan akan diberikan note **MISS LOCATION**
+        - **TOTAL MISS LOCATION**
+            - Cek total missloc untuk mengetahui seberapa banyak miss location dari Stock Opname periode tersebut
+            - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
+        - **VALUE ADJUSMENT**
+            - Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut
+            - Untuk logic Value Adjusment sudah dijelaskan di bagian **INFORMATION FILE**
         """)
 
     # --- INITIALIZE ALL SESSION STATES ---
