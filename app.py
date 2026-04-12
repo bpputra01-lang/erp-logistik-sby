@@ -6187,7 +6187,7 @@ if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.2, 1])
     with c1:
-        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & SLAMET", "WAREHOUSE FULLFILLMENT"]
+        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
         current_user = st.selectbox("👤 Pilih Nama:", list_pic, key="pic_v_final")
     with c2:
         st.write("")
