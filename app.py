@@ -5471,6 +5471,12 @@ elif menu == "Compare System":
         - **STOCK SYSTEM 1**: Download ALL DATA STOCK Setelah jam operasional **Shift 2 (22:00)**
         - **STOCK SYSTEM 2**: Download ALL DATA STOCK Sebelum jam operasional **Shift 0 (07:30)**
         """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Compare :**
+        - Untuk Compare hanya menggunakan logic rumus **SUMIFS** dimana akan dilakukan di kedua file sehingga mengetahui apakah terdapat perbedaan QTY saat tidak terjadi transaksi
+        - Untuk item yang berbeda akan dipisahkan dan akan dilakukan follow Up ke tim IT untuk dilakukan perbaikan
+        """)
     col1, col2 = st.columns(2)
     with col1:
         file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
