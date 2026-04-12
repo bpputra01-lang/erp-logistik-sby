@@ -1103,6 +1103,12 @@ def menu_Stock_Opname():
             - **OPSI 4**
                 - Jika ingin mengetahui value adjusment total dari + dan - secara keseluruhan maka **Gabungkan All Adjusment + & - ** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT**
         """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **DS VS Stock System:**
+        **REAL +**
+        -
+        """)
     # --- INITIALIZE ALL SESSION STATES ---
     if 'compare_result' not in st.session_state: st.session_state.compare_result = None
     if 'allocation_result' not in st.session_state: st.session_state.allocation_result = None
