@@ -6334,40 +6334,43 @@ if menu == "Reporting & PIC":
             for i, item in enumerate(current_items):
                 real_idx = start_idx + i 
                 
-                # Ubah rasio kolom: 3 untuk teks, 1.5 untuk status, 0.7 untuk hapus
-                # Ini supaya tombol punya ruang lebih luas
-                c1, c2, c3 = st.columns([3, 1.5, 0.7]) 
-                
-                with c1:
+                # Kita bungkus semuanya dalam satu container biar rapi
+                with st.container():
+                    # Warna border berubah hijau jika tugas selesai (done)
                     color_border = '#10b981' if item['done'] else '#3b82f6'
+                    
+                    # Box Teks Utama
                     st.markdown(f"""
-                        <div style="background-color: #111827; padding: 12px; border-radius: 10px; border-left: 5px solid {color_border}; height: 80px; display: flex; align-items: center;">
-                            <h4 style="margin:0; font-size:0.85rem; color: #f3f4f6; line-height:1.2;">{item['task']}</h4>
+                        <div style="background-color: #111827; padding: 15px; border-radius: 12px 12px 0 0; border-left: 5px solid {color_border}; border-bottom: 1px solid #374151;">
+                            <h4 style="margin:0; font-size:0.9rem; color: #f3f4f6;">{item['task']}</h4>
                         </div>
                     """, unsafe_allow_html=True)
-                
-                with c2:
-                    # Kita taruh di dalam container agar posisi tombol lebih presisi
-                    st.write("##") # Jarak biar sejajar tengah secara vertikal
-                    label_status = "✅ Selesai" if not item['done'] else "⏪ Batal"
-                    if st.button(label_status, key=f"btn_status_{real_idx}", use_container_width=True):
-                        new_status = 1 if not item['done'] else 0
-                        conn = get_db_connection()
-                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (new_status, item['task']))
-                        conn.commit()
-                        conn.close()
-                        sync_data()
-                        st.rerun()
-                
-                with c3:
-                    st.write("##") # Jarak biar sejajar tengah
-                    if st.button("🗑️", key=f"del_todo_{real_idx}", use_container_width=True):
-                        conn = get_db_connection()
-                        conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
-                        conn.commit()
-                        conn.close()
-                        sync_data()
-                        st.rerun()
+                    
+                    # Box Tombol di bawahnya
+                    # Kita bagi 2 kolom saja: Selesai (lebar) dan Hapus (kecil)
+                    c_btn1, c_btn2 = st.columns([3, 1])
+                    
+                    with c_btn1:
+                        label_status = "✅ Selesai" if not item['done'] else "⏪ Batal"
+                        if st.button(label_status, key=f"btn_status_{real_idx}", use_container_width=True):
+                            new_status = 1 if not item['done'] else 0
+                            conn = get_db_connection()
+                            conn.execute('UPDATE todo SET done = ? WHERE task = ?', (new_status, item['task']))
+                            conn.commit()
+                            conn.close()
+                            sync_data()
+                            st.rerun()
+                            
+                    with c_btn2:
+                        if st.button("🗑️", key=f"del_todo_{real_idx}", use_container_width=True):
+                            conn = get_db_connection()
+                            conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
+                            conn.commit()
+                            conn.close()
+                            sync_data()
+                            st.rerun()
+                    
+                    st.write("---") # Garis pemisah antar tugas
             # 4. Navigasi Halaman (Jika tugas lebih dari 3)
             if total_pages > 1:
                 st.write("")
