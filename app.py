@@ -6341,7 +6341,7 @@ if menu == "Reporting & PIC":
                 with c1:
                     color_border = '#10b981' if item['done'] else '#3b82f6'
                     st.markdown(f"""
-                        <div style="background-color: #111827; padding: 2px; border-radius: 10px; border-left: 5px solid {color_border}; height: 80px; display: flex; align-items: center;">
+                        <div style="background-color: #111827; padding: 12px; border-radius: 2px; border-left: 5px solid {color_border}; height: 80px; display: flex; align-items: center;">
                             <h4 style="margin:0; font-size:0.85rem; color: #f3f4f6; line-height:1.2;">{item['task']}</h4>
                         </div>
                     """, unsafe_allow_html=True)
