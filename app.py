@@ -6337,29 +6337,33 @@ if menu == "Reporting & PIC":
                 # Buat border warna berdasarkan status
                 color_border = '#10b981' if item['done'] else '#3b82f6'
                 
+                # --- CSS UNTUK TOMBOL HAPUS ---
+                st.markdown(f"""
+                    <style>
+                    /* Targetkan tombol spesifik berdasarkan key-nya agar lebarnya pas */
+                    div[data-testid="stButton"] button:has(div p:contains("🗑️")) {{
+                        width: 60px !important;
+                        height: 45px !important;
+                        margin-top: 5px !important;
+                    }}
+                    </style>
+                """, unsafe_allow_html=True)
+
                 # Container utama supaya tombol & teks rapat
                 with st.container():
-                    # 1. Teks Tugas (Gunakan Markdown standar agar lebar otomatis pas)
+                    # 1. Teks Tugas
                     st.markdown(f"""
                         <div style="background-color: #111827; padding: 15px; border-radius: 10px 10px 0 0; border-left: 6px solid {color_border}; margin-bottom: -5px;">
                             <p style="margin:0; font-size:0.9rem; color: #f3f4f6; font-weight: bold;">{item['task']}</p>
                         </div>
-    
-                        <style>
-                        /* Menargetkan tombol hapus berdasarkan key yang mengandung 'del_todo_' */
-                        div[data-testid="stButton"] button[kind="secondary"]:has(div[data-testid="stMarkdownContainer"] p:contains("🗑️")) {
-                            width: 50px !important;  /* Atur lebar di sini */
-                            margin-left: auto !important; /* Geser ke kanan jika perlu */
-                            display: block !important;
-                        }
-                        </style>
                     """, unsafe_allow_html=True)
                     
-                    
-                    # 2. Barisan Tombol (Tanpa background HTML agar tidak offset)
+                    # 2. Barisan Tombol
                     c_btn1, c_btn2 = st.columns([3, 1])
                     with c_btn1:
                         label_status = "✅ Selesai" if not item['done'] else "⏪ Batal"
+                        # Kita naikkan sedikit posisi tombol agar rapat ke box atas
+                        st.write(" ") 
                         if st.button(label_status, key=f"btn_status_{real_idx}", use_container_width=True):
                             new_status = 1 if not item['done'] else 0
                             conn = get_db_connection()
@@ -6370,7 +6374,8 @@ if menu == "Reporting & PIC":
                             st.rerun()
                             
                     with c_btn2:
-                        # use_container_width diubah jadi False agar CSS width kita yang menang
+                        st.write(" ")
+                        # use_container_width=False supaya ukuran tombol ikut CSS (60px)
                         if st.button("🗑️", key=f"del_todo_{real_idx}", use_container_width=False):
                             conn = get_db_connection()
                             conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
