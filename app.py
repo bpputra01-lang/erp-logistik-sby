@@ -6,7 +6,11 @@ import math
 
 import pandas as pd
 from collections import defaultdict
+import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
+# Jaga koneksi setiap 5 menit agar tidak timeout/refresh sendiri
+st_autorefresh(interval=300000, key="keepalive_session")
 
 st.set_page_config(
     page_title="LogsbyERP.id",
