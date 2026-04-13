@@ -8,3 +8,5 @@ openpyxl
 altair<5
 plotly
 pytz
+streamlit
+streamlit-autorefresh
