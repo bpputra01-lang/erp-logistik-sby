@@ -6333,58 +6333,37 @@ if menu == "Reporting & PIC":
             # 3. Tampilkan Item Tugas
             for i, item in enumerate(current_items):
                 real_idx = start_idx + i 
-                
-                # Buat border warna berdasarkan status
-                color_border = '#10b981' if item['done'] else '#3b82f6'
-                
-                # --- CSS UNTUK TOMBOL HAPUS ---
-                st.markdown(f"""
-                    <style>
-                    /* Targetkan tombol spesifik berdasarkan key-nya agar lebarnya pas */
-                    div[data-testid="stButton"] button:has(div p:contains("🗑️")) {{
-                        width: 40px !important;
-                        height: 45px !important;
-                        margin-top: 5px !important;
-                    }}
-                    </style>
-                """, unsafe_allow_html=True)
-
-                # Container utama supaya tombol & teks rapat
-                with st.container():
-                    # 1. Teks Tugas
+                c1, c2, c3 = st.columns([4, 1, 1]) # Tambah satu kolom (c3) untuk tombol hapus
+                with c1:
+                    # Warna border berubah hijau jika tugas selesai (done)
+                    color_border = '#10b981' if item['done'] else '#3b82f6'
                     st.markdown(f"""
-                        <div style="background-color: #111827; padding: 15px; border-radius: 10px 10px 0 0; border-left: 6px solid {color_border}; margin-bottom: -5px;">
-                            <p style="margin:0; font-size:0.9rem; color: #f3f4f6; font-weight: bold;">{item['task']}</p>
+                        <div style="background-color: #111827; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
+                            <h4 style="margin:0; font-size:0.9rem; color: #f3f4f6;">{item['task']}</h4>
                         </div>
                     """, unsafe_allow_html=True)
-                    
-                    # 2. Barisan Tombol
-                    c_btn1, c_btn2 = st.columns([3, 1])
-                    with c_btn1:
-                        label_status = "✅ Selesai" if not item['done'] else "⏪ Batal"
-                        # Kita naikkan sedikit posisi tombol agar rapat ke box atas
-                        st.write(" ") 
-                        if st.button(label_status, key=f"btn_status_{real_idx}", use_container_width=True):
-                            new_status = 1 if not item['done'] else 0
-                            conn = get_db_connection()
-                            conn.execute('UPDATE todo SET done = ? WHERE task = ?', (new_status, item['task']))
-                            conn.commit()
-                            conn.close()
-                            sync_data()
-                            st.rerun()
-                            
-                    with c_btn2:
-                        st.write(" ")
-                        # use_container_width=False supaya ukuran tombol ikut CSS (60px)
-                        if st.button("🗑️", key=f"del_todo_{real_idx}", use_container_width=False):
-                            conn = get_db_connection()
-                            conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
-                            conn.commit()
-                            conn.close()
-                            sync_data()
-                            st.rerun()
-                    
-                    st.write("") # Spasi antar card
+                with c2:
+                    st.write("")
+                    # Checkbox untuk tandai selesai/belum
+                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
+                    if res != item['done']:
+                        conn = get_db_connection()
+                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
+                        conn.commit()
+                        conn.close()
+                        sync_data() # Update session state
+                        st.rerun()
+                
+                with c3: # Logika Tombol Hapus
+                    st.write("")
+                    if st.button("🗑️", key=f"del_todo_{real_idx}"):
+                        conn = get_db_connection()
+                        conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
+                        conn.commit()
+                        conn.close()
+                        sync_data()
+                        st.rerun()
+
             # 4. Navigasi Halaman (Jika tugas lebih dari 3)
             if total_pages > 1:
                 st.write("")
