@@ -6333,34 +6333,34 @@ if menu == "Reporting & PIC":
             # 3. Tampilkan Item Tugas
             for i, item in enumerate(current_items):
                 real_idx = start_idx + i 
-                # c1: Teks Tugas, c2: Tombol Status, c3: Tombol Hapus
-                c1, c2, c3 = st.columns([4, 2, 1]) 
+                
+                # Ubah rasio kolom: 3 untuk teks, 1.5 untuk status, 0.7 untuk hapus
+                # Ini supaya tombol punya ruang lebih luas
+                c1, c2, c3 = st.columns([3, 1.5, 0.7]) 
                 
                 with c1:
-                    # Warna border berubah hijau jika tugas selesai (done)
                     color_border = '#10b981' if item['done'] else '#3b82f6'
                     st.markdown(f"""
-                        <div style="background-color: #111827; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
-                            <h4 style="margin:0; font-size:0.9rem; color: #f3f4f6;">{item['task']}</h4>
+                        <div style="background-color: #111827; padding: 12px; border-radius: 10px; border-left: 5px solid {color_border}; height: 80px; display: flex; align-items: center;">
+                            <h4 style="margin:0; font-size:0.85rem; color: #f3f4f6; line-height:1.2;">{item['task']}</h4>
                         </div>
                     """, unsafe_allow_html=True)
                 
                 with c2:
-                    st.write("")
-                    # Menentukan label tombol berdasarkan status 'done'
+                    # Kita taruh di dalam container agar posisi tombol lebih presisi
+                    st.write("##") # Jarak biar sejajar tengah secara vertikal
                     label_status = "✅ Selesai" if not item['done'] else "⏪ Batal"
-                    
                     if st.button(label_status, key=f"btn_status_{real_idx}", use_container_width=True):
                         new_status = 1 if not item['done'] else 0
                         conn = get_db_connection()
                         conn.execute('UPDATE todo SET done = ? WHERE task = ?', (new_status, item['task']))
                         conn.commit()
                         conn.close()
-                        sync_data() # Update session state
+                        sync_data()
                         st.rerun()
                 
                 with c3:
-                    st.write("")
+                    st.write("##") # Jarak biar sejajar tengah
                     if st.button("🗑️", key=f"del_todo_{real_idx}", use_container_width=True):
                         conn = get_db_connection()
                         conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
