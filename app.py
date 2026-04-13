@@ -6333,7 +6333,7 @@ if menu == "Reporting & PIC":
             # 3. Tampilkan Item Tugas
             for i, item in enumerate(current_items):
                 real_idx = start_idx + i 
-                c1, c2, c3 = st.columns([4, 1, 1]) # Tambah satu kolom (c3) untuk tombol hapus
+                c1, c2 = st.columns([4, 1])
                 with c1:
                     # Warna border berubah hijau jika tugas selesai (done)
                     color_border = '#10b981' if item['done'] else '#3b82f6'
@@ -6352,16 +6352,6 @@ if menu == "Reporting & PIC":
                         conn.commit()
                         conn.close()
                         sync_data() # Update session state
-                        st.rerun()
-                
-                with c3: # Logika Tombol Hapus
-                    st.write("")
-                    if st.button("🗑️", key=f"del_todo_{real_idx}"):
-                        conn = get_db_connection()
-                        conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
-                        conn.commit()
-                        conn.close()
-                        sync_data()
                         st.rerun()
 
             # 4. Navigasi Halaman (Jika tugas lebih dari 3)
