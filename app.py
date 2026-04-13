@@ -6344,7 +6344,17 @@ if menu == "Reporting & PIC":
                         <div style="background-color: #111827; padding: 15px; border-radius: 10px 10px 0 0; border-left: 6px solid {color_border}; margin-bottom: -5px;">
                             <p style="margin:0; font-size:0.9rem; color: #f3f4f6; font-weight: bold;">{item['task']}</p>
                         </div>
+    
+                        <style>
+                        /* Menargetkan tombol hapus berdasarkan key yang mengandung 'del_todo_' */
+                        div[data-testid="stButton"] button[kind="secondary"]:has(div[data-testid="stMarkdownContainer"] p:contains("🗑️")) {
+                            width: 50px !important;  /* Atur lebar di sini */
+                            margin-left: auto !important; /* Geser ke kanan jika perlu */
+                            display: block !important;
+                        }
+                        </style>
                     """, unsafe_allow_html=True)
+                    
                     
                     # 2. Barisan Tombol (Tanpa background HTML agar tidak offset)
                     c_btn1, c_btn2 = st.columns([3, 1])
@@ -6360,7 +6370,8 @@ if menu == "Reporting & PIC":
                             st.rerun()
                             
                     with c_btn2:
-                        if st.button("🗑️", key=f"del_todo_{real_idx}", use_container_width=True):
+                        # use_container_width diubah jadi False agar CSS width kita yang menang
+                        if st.button("🗑️", key=f"del_todo_{real_idx}", use_container_width=False):
                             conn = get_db_connection()
                             conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
                             conn.commit()
