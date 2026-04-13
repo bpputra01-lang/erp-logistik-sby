@@ -6333,7 +6333,9 @@ if menu == "Reporting & PIC":
             # 3. Tampilkan Item Tugas
             for i, item in enumerate(current_items):
                 real_idx = start_idx + i 
-                c1, c2, c3 = st.columns([4, 1, 1]) # Tambah satu kolom (c3) untuk tombol hapus
+                # c1: Teks Tugas, c2: Tombol Status, c3: Tombol Hapus
+                c1, c2, c3 = st.columns([4, 2, 1]) 
+                
                 with c1:
                     # Warna border berubah hijau jika tugas selesai (done)
                     color_border = '#10b981' if item['done'] else '#3b82f6'
@@ -6342,28 +6344,30 @@ if menu == "Reporting & PIC":
                             <h4 style="margin:0; font-size:0.9rem; color: #f3f4f6;">{item['task']}</h4>
                         </div>
                     """, unsafe_allow_html=True)
+                
                 with c2:
                     st.write("")
-                    # Checkbox untuk tandai selesai/belum
-                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
-                    if res != item['done']:
+                    # Menentukan label tombol berdasarkan status 'done'
+                    label_status = "✅ Selesai" if not item['done'] else "⏪ Batal"
+                    
+                    if st.button(label_status, key=f"btn_status_{real_idx}", use_container_width=True):
+                        new_status = 1 if not item['done'] else 0
                         conn = get_db_connection()
-                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
+                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (new_status, item['task']))
                         conn.commit()
                         conn.close()
                         sync_data() # Update session state
                         st.rerun()
                 
-                with c3: # Logika Tombol Hapus
+                with c3:
                     st.write("")
-                    if st.button("🗑️", key=f"del_todo_{real_idx}"):
+                    if st.button("🗑️", key=f"del_todo_{real_idx}", use_container_width=True):
                         conn = get_db_connection()
                         conn.execute('DELETE FROM todo WHERE task = ?', (item['task'],))
                         conn.commit()
                         conn.close()
                         sync_data()
                         st.rerun()
-
             # 4. Navigasi Halaman (Jika tugas lebih dari 3)
             if total_pages > 1:
                 st.write("")
