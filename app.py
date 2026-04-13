@@ -6342,7 +6342,7 @@ if menu == "Reporting & PIC":
                     <style>
                     /* Targetkan tombol spesifik berdasarkan key-nya agar lebarnya pas */
                     div[data-testid="stButton"] button:has(div p:contains("🗑️")) {{
-                        width: 60px !important;
+                        width: 40px !important;
                         height: 45px !important;
                         margin-top: 5px !important;
                     }}
