@@ -6334,22 +6334,20 @@ if menu == "Reporting & PIC":
             for i, item in enumerate(current_items):
                 real_idx = start_idx + i 
                 
-                # Kita bungkus semuanya dalam satu container biar rapi
+                # Buat border warna berdasarkan status
+                color_border = '#10b981' if item['done'] else '#3b82f6'
+                
+                # Container utama supaya tombol & teks rapat
                 with st.container():
-                    # Warna border berubah hijau jika tugas selesai (done)
-                    color_border = '#10b981' if item['done'] else '#3b82f6'
-                    
-                    # Box Teks Utama
+                    # 1. Teks Tugas (Gunakan Markdown standar agar lebar otomatis pas)
                     st.markdown(f"""
-                        <div style="background-color: #111827; padding: 15px; border-radius: 12px 12px 0 0; border-left: 5px solid {color_border}; border-bottom: 1px solid #374151;">
-                            <h4 style="margin:0; font-size:0.9rem; color: #f3f4f6;">{item['task']}</h4>
+                        <div style="background-color: #111827; padding: 15px; border-radius: 10px 10px 0 0; border-left: 6px solid {color_border}; margin-bottom: -5px;">
+                            <p style="margin:0; font-size:0.9rem; color: #f3f4f6; font-weight: bold;">{item['task']}</p>
                         </div>
                     """, unsafe_allow_html=True)
                     
-                    # Box Tombol di bawahnya
-                    # Kita bagi 2 kolom saja: Selesai (lebar) dan Hapus (kecil)
+                    # 2. Barisan Tombol (Tanpa background HTML agar tidak offset)
                     c_btn1, c_btn2 = st.columns([3, 1])
-                    
                     with c_btn1:
                         label_status = "✅ Selesai" if not item['done'] else "⏪ Batal"
                         if st.button(label_status, key=f"btn_status_{real_idx}", use_container_width=True):
@@ -6370,7 +6368,7 @@ if menu == "Reporting & PIC":
                             sync_data()
                             st.rerun()
                     
-                    st.write("---") # Garis pemisah antar tugas
+                    st.write("") # Spasi antar card
             # 4. Navigasi Halaman (Jika tugas lebih dari 3)
             if total_pages > 1:
                 st.write("")
