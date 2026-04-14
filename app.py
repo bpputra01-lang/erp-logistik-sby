@@ -6197,11 +6197,15 @@ if menu == "Reporting & PIC":
                 if task['PIC'] == current_user:
                     ck1, ck2 = st.columns([4, 1.2])
                     with ck1:
-                        # Tambah inline style white !important agar teks fix putih
+                        # Ukuran font judul dikecilkan jadi 0.95rem dan status 0.8rem
                         st.markdown(f'''
-                            <div class="report-card">
-                                <h4 style="margin:0; color:white !important;">{task["Laporan"]}</h4>
-                                <small style="color:white !important;">Status: {task["Status"]}</small>
+                            <div class="report-card" style="margin-bottom: 10px; padding: 12px;">
+                                <div style="color: white !important; font-weight: 600; font-size: 0.95rem; line-height: 1.2;">
+                                    {task["Laporan"]}
+                                </div>
+                                <div style="color: #9ca3af !important; font-size: 0.8rem; margin-top: 4px;">
+                                    Status: {task["Status"]}
+                                </div>
                             </div>
                         ''', unsafe_allow_html=True)
                     with ck2:
