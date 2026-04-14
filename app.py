@@ -6254,6 +6254,7 @@ if menu == "Reporting & PIC":
     with col_kanan:
         st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3 style="color:white !important; margin:0;">📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
         
+        # 1. FORM INPUT TUGAS
         with st.form("todo_form", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:")
             if st.form_submit_button("➕ Tambah") and tugas_baru:
@@ -6261,12 +6262,24 @@ if menu == "Reporting & PIC":
                 sync_data()
                 st.rerun()
 
-        # --- Bagian To Do List di dalam col_kanan ---
+        # 2. LOGIKA PAGINATION (Penting biar current_todo kedeteksi)
+        items_per_page = 3
+        total_items = len(st.session_state.get('todo_list', []))
+        total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
+        
+        # Ambil halaman aktif
+        curr_p = st.session_state.get('todo_page', 1)
+        
+        # Hitung data yang tampil di halaman ini
+        start = (curr_p - 1) * items_per_page
+        current_todo = st.session_state.get('todo_list', [])[start : start + items_per_page]
+
+        # 3. RENDER LIST TUGAS
         for item in current_todo:
-            c1, c2 = st.columns([4, 1])  # Baris ini harus menjorok ke dalam (4 spasi/1 tab)
+            c1, c2 = st.columns([4, 1])
             bd_color = "#10b981" if item['done'] else "#3b82f6"
             
-            # Gunakan margin-bottom agar tidak mepet
+            # Card dengan margin-bottom 10px biar gak mepet
             c1.markdown(f'''
                 <div style="background:#111827; padding:12px; border-radius:8px; 
                             border-left:4px solid {bd_color}; color:white; 
@@ -6276,28 +6289,29 @@ if menu == "Reporting & PIC":
             ''', unsafe_allow_html=True)
             
             with c2:
-                st.write("") # Spacer
+                st.write("") # Spacer biar sejajar tengah
                 res = st.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
                 if res != item['done']:
                     supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
                     sync_data()
                     st.rerun()
 
-        # --- Navigasi Halaman (PASTIKAN MENOROK KE KANAN) ---
+        # 4. NAVIGASI HALAMAN (PASTIKAN MENOROK KE KANAN)
         if total_pages > 1:
-            p1, p2, p3 = st.columns([1, 2, 1]) # Harus lebih masuk dari 'if'
+            st.write("") # Jarak tambahan
+            p1, p2, p3 = st.columns([1, 2, 1])
             
-            if p1.button("⬅️") and st.session_state.get('todo_page', 1) > 1:
-                st.session_state.todo_page = st.session_state.get('todo_page', 1) - 1
+            if p1.button("⬅️") and curr_p > 1:
+                st.session_state.todo_page = curr_p - 1
                 st.rerun()
                 
-            # PAKSA WARNA PUTIH & BOLD DI SINI
+            # PAKSA WARNA PUTIH & BOLD
             p2.markdown(f"""
                 <div style="text-align:center; color: #FFFFFF !important; font-weight: 800; font-size: 1.1rem; padding-top: 5px;">
-                    {st.session_state.get('todo_page', 1)} / {total_pages}
+                    {curr_p} / {total_pages}
                 </div>
             """, unsafe_allow_html=True)
             
-            if p3.button("➡️") and st.session_state.get('todo_page', 1) < total_pages:
-                st.session_state.todo_page = st.session_state.get('todo_page', 1) + 1
+            if p3.button("➡️") and curr_p < total_pages:
+                st.session_state.todo_page = curr_p + 1
                 st.rerun()
