@@ -6231,8 +6231,8 @@ with col_kiri:
         st.markdown(f"""
         <div class="report-card" style="border-left-color: #10b981;">
             <b>📝 To-Do Progress</b>
-            <div style="background:#000000; border-radius:5px; margin-top:8px; height:12px;">
-                <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
+            <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px;">
+                <div style="background:#FFFFFF; width:{td_prog}%; height:12px; border-radius:5px;"></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
