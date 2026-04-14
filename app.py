@@ -6067,7 +6067,6 @@ from supabase import create_client, Client
 
 # --- 1. KONEKSI SUPABASE ---
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
-# Gunakan Secret Key lu di sini
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 
 try:
@@ -6078,30 +6077,24 @@ except Exception as e:
 # --- 2. FUNGSI SINKRONISASI & RESET HARIAN ---
 def sync_data():
     """Tarik data dari Supabase ke Session State & Handle Reset Harian"""
-    
-    # A. Cek & Reset Harian (Logika Tambahan)
     today = datetime.now().strftime('%Y-%m-%d')
+    
+    # A. Cek & Reset Harian
     res_date = supabase.table("reset_tracker").select("*").execute()
     
     if not res_date.data:
-        # Jika tabel tracker kosong, masukkan tanggal hari ini
         supabase.table("reset_tracker").insert({"last_date": today}).execute()
     elif res_date.data[0]['last_date'] != today:
-        # JIKA GANTI HARI: Reset semua status laporan
-        # Filter: Update semua yang statusnya bukan 'Belum'
+        # Reset Reports & To-Do (Ganti hari)
         supabase.table("reports").update({"status": "❌ Belum"}).neq("status", "❌ Belum").execute()
-    
-        # Reset To Do List (Beri filter agar tidak APIError)
-        # Filter: Update semua yang done-nya True menjadi False
         supabase.table("todo").update({"done": False}).eq("done", True).execute()
-    
-    # Update tanggal tracker
-    supabase.table("reset_tracker").update({"last_date": today}).eq("id", res_date.data[0]['id']).execute()
+        # Update tanggal
+        supabase.table("reset_tracker").update({"last_date": today}).eq("id", res_date.data[0]['id']).execute()
 
     # B. Tarik data Reports
     res_reports = supabase.table("reports").select("*").order("id").execute()
     
-    # C. Inisialisasi Data Default jika kosong (Cegah Double)
+    # C. Default Data jika kosong
     if not res_reports.data:
         default_reports = [
             {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
@@ -6126,83 +6119,59 @@ def sync_data():
         supabase.table("reports").insert(default_reports).execute()
         res_reports = supabase.table("reports").select("*").order("id").execute()
 
-    # Simpan ke Session State
     st.session_state.db_report = [{"Laporan": r['laporan'], "PIC": r['pic'], "Status": r['status']} for r in res_reports.data]
     
     # D. Tarik Data To Do List
     res_todo = supabase.table("todo").select("*").order("id").execute()
     st.session_state.todo_list = [{"id": t['id'], "task": t['task'], "done": t['done']} for t in res_todo.data]
 
-# Inisialisasi State Awal
 if 'db_report' not in st.session_state:
     sync_data()
 
-# --- 3. CSS DARK THEME (PERSIS PUNYA LU) ---
-
+# --- 3. FULL CSS (GABUNGAN SEMUA STYLE) ---
 st.markdown("""
     <style>
-    /* 1. Global Setup */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    
-    html, body, [class*="css"] { 
-        font-family: 'Inter', sans-serif; 
-    }
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-    /* 2. Header Utama - Gradient Glassmorphism */
     .hero-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; 
-        padding: 25px; 
-        border-radius: 12px;
-        text-align: center; 
-        margin-bottom: 35px; 
-        font-weight: 800; 
-        font-size: 26px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); 
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        letter-spacing: 0.5px;
+        color: white; padding: 25px; border-radius: 12px;
+        text-align: center; margin-bottom: 35px; font-weight: 800; font-size: 26px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* 3. Card Laporan - Dark Mode Style */
     .report-card {
-        background-color: #1f2937; 
-        padding: 15px; 
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); 
-        margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; 
-        color: #f3f4f6;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        background-color: #1f2937; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; color: #f3f4f6;
+        transition: transform 0.2s ease;
     }
-    
-    .report-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    .report-card:hover { transform: translateY(-2px); }
+
+    /* Checkbox Styling */
+    div[data-testid="stCheckbox"] div[role="checkbox"] {
+        background-color: #1f2937 !important;
+        border: 2px solid #3b82f6 !important;
+    }
+    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
+        background-color: #3b82f6 !important;
     }
 
-    /* 4. Tombol / Button - Premium Look */
+    /* Input Styling */
+    .stTextInput input { 
+        background-color: #1f2937 !important; color: white !important; 
+        border: 1px solid #374151 !important; border-radius: 8px !important;
+    }
+
+    /* Button Styling */
     .stButton > button { 
-        width: 100%; 
-        border-radius: 8px; 
-        background-color: #1e3a8a; 
-        color: white; 
-        border: 1px solid #3b82f6; 
-        font-weight: 600; 
-        padding: 0.5rem 1rem;
+        width: 100%; border-radius: 8px; background-color: #1e3a8a; 
+        color: white; border: 1px solid #3b82f6; font-weight: 600; 
         transition: all 0.3s ease;
     }
-
     .stButton > button:hover { 
-        background-color: #3b82f6; 
-        color: white;
-        border-color: #60a5fa;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-    }
-    
-    /* Tambahan: Menghilangkan border merah bawaan streamlit saat focus */
-    .stButton > button:focus {
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-        outline: none;
+        background-color: #3b82f6; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -6236,29 +6205,37 @@ with col_kiri:
 
     with tab_all:
         st.subheader("📊 Team Progress Summary")
-        # --- PERBAIKAN LOGIKA SUMMARY ---
         pic_stats = {}
         for t in st.session_state.db_report:
             pic = t['PIC']
-            if pic not in pic_stats:
-                pic_stats[pic] = {"total": 0, "selesai": 0}
+            if pic not in pic_stats: pic_stats[pic] = {"total": 0, "selesai": 0}
             pic_stats[pic]["total"] += 1
-            if t['Status'] == "✅ Selesai":
-                pic_stats[pic]["selesai"] += 1
+            if t['Status'] == "✅ Selesai": pic_stats[pic]["selesai"] += 1
 
         for pic, stats in pic_stats.items():
-            progress = (stats['selesai'] / stats['total']) * 100
+            prog = (stats['selesai'] / stats['total']) * 100
             st.markdown(f"""
-            <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
-                <div style="display: flex; justify-content: space-between;">
-                    <b>👤 {pic}</b>
-                    <span>{stats['selesai']}/{stats['total']} Selesai</span>
-                </div>
-                <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
-                    <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
+            <div class="report-card">
+                <div style="display: flex; justify-content: space-between;"><b>👤 {pic}</b><span>{stats['selesai']}/{stats['total']}</span></div>
+                <div style="background:#374151; border-radius:5px; margin-top:8px; height:8px;">
+                    <div style="background:#3b82f6; width:{prog}%; height:8px; border-radius:5px;"></div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+        # --- PROGRESS TO DO LIST ---
+        st.divider()
+        td_total = len(st.session_state.todo_list)
+        td_done = sum(1 for i in st.session_state.todo_list if i['done'])
+        td_prog = (td_done / td_total * 100) if td_total > 0 else 0
+        st.markdown(f"""
+        <div class="report-card" style="border-left-color: #10b981;">
+            <b>📝 To-Do Progress</b>
+            <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px;">
+                <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 with col_kanan:
     st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3>📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
@@ -6273,7 +6250,6 @@ with col_kanan:
     items_per_page = 3
     total_items = len(st.session_state.todo_list)
     total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
-    
     if 'todo_page' not in st.session_state: st.session_state.todo_page = 1
     
     start = (st.session_state.todo_page - 1) * items_per_page
@@ -6281,8 +6257,9 @@ with col_kanan:
 
     for item in current_todo:
         c1, c2 = st.columns([4, 1])
-        color_border = '#10b981' if item['done'] else '#3b82f6'
-        c1.markdown(f'<div style="background:#111827;padding:10px;border-radius:8px;border-left:4px solid {color_border};">{item["task"]}</div>', unsafe_allow_html=True)
+        # Warna border berubah kalau done
+        bd_color = "#10b981" if item['done'] else "#3b82f6"
+        c1.markdown(f'<div style="background:#111827;padding:12px;border-radius:8px;border-left:4px solid {bd_color};color:white;">{item["task"]}</div>', unsafe_allow_html=True)
         res = c2.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
         if res != item['done']:
             supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
@@ -6294,7 +6271,7 @@ with col_kanan:
         if p1.button("⬅️") and st.session_state.todo_page > 1:
             st.session_state.todo_page -= 1
             st.rerun()
-        p2.write(f"Hal {st.session_state.todo_page}/{total_pages}")
+        p2.markdown(f"<p style='text-align:center;'>{st.session_state.todo_page}/{total_pages}</p>", unsafe_allow_html=True)
         if p3.button("➡️") and st.session_state.todo_page < total_pages:
             st.session_state.todo_page += 1
             st.rerun()
