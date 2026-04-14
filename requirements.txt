@@ -11,3 +11,5 @@ pytz
 streamlit
 streamlit-autorefresh
 supabase
+sqlalchemy
+psycopg2-binary
