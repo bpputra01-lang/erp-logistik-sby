@@ -3211,7 +3211,7 @@ def menu_reject_defect():
             st.markdown('<div style="margin-bottom: 10px; padding: 5px 0;"><span style="color: #000000 !important; font-size: 1.1rem !important; font-weight: 800 !important;">📋 Summary match SKU</span></div>', unsafe_allow_html=True)
             st.data_editor(df_final_match, use_container_width=True, hide_index=True, key="match_pivot_final")
         else:
-            st.success("✅ Tidak ditemukan duplikasi SKU.")
+            st.success("✅ Tidak ditemukan Reject/Defect Match")
 
 import streamlit as st
 import pandas as pd
