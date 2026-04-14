@@ -6067,11 +6067,15 @@ import streamlit as st
 from supabase import create_client, Client
 
 # --- 1. KONEKSI SUPABASE ---
-# Masukkan data dari Settings > API di Dashboard Supabase lu
-SUPABASE_URL = "ISI_URL_LU_DISINI"
-SUPABASE_KEY = "ISI_ANON_KEY_LU_DISINI"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Masukkan data asli dari dashboard lu (image_618beb.png)
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI" # Ini juga jangan lupa diganti!
 
+# Pastikan URL sudah benar sebelum memanggil fungsi ini
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.error(f"Koneksi Gagal: {e}")
 # --- 2. FUNGSI SINKRONISASI (VERSI CLOUD) ---
 def sync_data():
     """Tarik data dari Supabase ke Session State"""
