@@ -3371,7 +3371,10 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def project_approval_reject():
-    # --- CSS LU (Tetap Utuh) --- 
+    # 1. Inisialisasi Koneksi di awal fungsi
+    conn = get_db_connection() 
+
+    # --- CSS (Tetap Utuh) --- 
     st.markdown(""" 
         <style> 
         .hero-header-custom { 
@@ -3421,7 +3424,7 @@ def project_approval_reject():
             background: #1E90FF !important; box-shadow: 0 0 8px rgba(30, 144, 255, 0.6); 
         } 
         </style> 
-        """, unsafe_allow_html=True) 
+    """, unsafe_allow_html=True) 
 
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True) 
     tabs = st.tabs(["💻 Input Pengajuan", "📑 History & Approval Status"]) 
@@ -3466,13 +3469,11 @@ def project_approval_reject():
                     st.warning("⚠️ Nama Tim dan SKU wajib diisi!") 
 
     with tabs[1]: 
-        # TAB CABANG DI DALAM HISTORY 
         tab_sby, tab_sda, tab_smg = st.tabs(["📍 SURABAYA", "📍 SIDOARJO", "📍 SEMARANG"]) 
         cabang_list = [("SURABAYA", tab_sby), ("SIDOARJO", tab_sda), ("SEMARANG", tab_smg)] 
 
         for cabang_name, tab_obj in cabang_list: 
             with tab_obj: 
-                # --- FITUR SEARCH & FILTER --- 
                 col_search, col_filter = st.columns([1, 1]) 
                 with col_search: 
                     search_query = st.text_input(f"🔍 Cari di {cabang_name}:", placeholder="Ketik SKU atau Nama...", key=f"src_{cabang_name}", label_visibility="collapsed").strip() 
@@ -3480,7 +3481,6 @@ def project_approval_reject():
                 with col_filter: 
                     filter_status = st.radio("Pilih Status:", ["Semua", "Waiting Approval", "Waiting Set Up", "Done Set Up"], horizontal=True, key=f"rad_{cabang_name}", label_visibility="collapsed") 
 
-                # Logika Query per Cabang 
                 query = "SELECT * FROM submissions WHERE cabang = ?" 
                 params = [cabang_name] 
 
@@ -3507,7 +3507,6 @@ def project_approval_reject():
                     for index, row in df.iterrows(): 
                         with st.expander(f"📦 {row['sku']} - {row['article_name']} | {row['nama_tim']}"): 
                             st.markdown(f"### 📑 Detail [ID: {row['id']}]") 
-                            
                             c1, c2 = st.columns(2) 
                             with c1: 
                                 st.markdown(f"**👤 Pengaju:** `{row['nama_tim']}`") 
@@ -3521,13 +3520,12 @@ def project_approval_reject():
                             st.info(f"**📝 Keterangan:**\n\n{row['keterangan']}") 
                             st.write("---") 
 
-                            # --- TIMELINE PROGRESS --- 
+                            # --- TIMELINE ---
                             st.write("**Progres Status:**") 
                             line1_active = "line-active" if row['status'] >= 2 else "" 
                             line2_active = "line-active" if row['status'] >= 3 else "" 
 
                             tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5]) 
-                            
                             with tcol1: 
                                 st.markdown("🟢 **Pengajuan**") 
                                 st.caption("Waiting Approval") 
@@ -3559,7 +3557,7 @@ def project_approval_reject():
                                             conn.commit(); st.rerun() 
                                         st.markdown('</div>', unsafe_allow_html=True) 
 
-                            # --- ADDITIONAL NOTE --- 
+                            # --- NOTE & DELETE ---
                             st.write("---") 
                             c_note = row.get('additional_note') if row.get('additional_note') else "" 
                             n_note = st.text_area("📝 Catatan Tambahan:", value=c_note, key=f"n_{cabang_name}_{row['id']}") 
@@ -3568,14 +3566,12 @@ def project_approval_reject():
                                     conn.execute("UPDATE submissions SET additional_note = ? WHERE id = ?", (n_note, row['id'])) 
                                     conn.commit(); st.success("Note tersimpan!"); st.rerun() 
 
-                            if row['status'] == 3: 
-                                st.success(f"🎯 Selesai diproses oleh {row.get('setup_by')}") 
-
                             with st.expander("🗑️ Hapus"): 
                                 if st.button(f"Konfirmasi Hapus {row['sku']}", key=f"d_{cabang_name}_{row['id']}"): 
                                     conn.execute("DELETE FROM submissions WHERE id = ?", (row['id'],)) 
                                     conn.commit(); st.rerun() 
 
+    # 2. TUTUP KONEKSI DI AKHIR FUNGSI (Sejajar dengan baris pertama fungsi)
     conn.close()
 
 
