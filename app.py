@@ -5542,13 +5542,13 @@ from datetime import datetime, timedelta
 import streamlit as st
 from supabase import create_client # Pastikan sudah install: pip install supabase
 
-# 1. Inisialisasi Supabase (Taruh di sini!)
-# Ganti URL dan KEY dengan punya lu yang ada di Dashboard Supabase (Project Settings > API)
+# 1. Inisialisasi Supabase
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
-# Variabel ini yang dicari sama fungsi get_karyawan()
-supabase = create_client(URL, KEY)
-# --- 1. FUNGSI SINKRONISASI SUPABASE ---
+
+# Panggil pakai nama yang sama persis (Case Sensitive)
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 def get_karyawan():
     res = supabase.table("karyawan").select("*").execute()
     return pd.DataFrame(res.data)
