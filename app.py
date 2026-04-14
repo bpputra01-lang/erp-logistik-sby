@@ -6137,27 +6137,73 @@ def sync_data():
 if 'db_report' not in st.session_state:
     sync_data()
 
-# --- 3. CSS DARK THEME ---
+# --- 3. CSS DARK THEME (PERSIS PUNYA LU) ---
+
 st.markdown("""
     <style>
+    /* 1. Global Setup */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    
+    html, body, [class*="css"] { 
+        font-family: 'Inter', sans-serif; 
+    }
+
+    /* 2. Header Utama - Gradient Glassmorphism */
     .hero-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 25px; border-radius: 12px;
-        text-align: center; margin-bottom: 35px; font-weight: 800; font-size: 26px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white; 
+        padding: 25px; 
+        border-radius: 12px;
+        text-align: center; 
+        margin-bottom: 35px; 
+        font-weight: 800; 
+        font-size: 26px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); 
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        letter-spacing: 0.5px;
     }
+
+    /* 3. Card Laporan - Dark Mode Style */
     .report-card {
-        background-color: #1f2937; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; color: #f3f4f6;
+        background-color: #1f2937; 
+        padding: 15px; 
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); 
+        margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; 
+        color: #f3f4f6;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
+    
+    .report-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    /* 4. Tombol / Button - Premium Look */
     .stButton > button { 
-        width: 100%; border-radius: 8px; background-color: #1e3a8a; 
-        color: white; border: 1px solid #3b82f6; font-weight: 600; 
+        width: 100%; 
+        border-radius: 8px; 
+        background-color: #1e3a8a; 
+        color: white; 
+        border: 1px solid #3b82f6; 
+        font-weight: 600; 
+        padding: 0.5rem 1rem;
+        transition: all 0.3s ease;
     }
-    .stButton > button:hover { background-color: #3b82f6; }
+
+    .stButton > button:hover { 
+        background-color: #3b82f6; 
+        color: white;
+        border-color: #60a5fa;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+    
+    /* Tambahan: Menghilangkan border merah bawaan streamlit saat focus */
+    .stButton > button:focus {
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        outline: none;
+    }
     </style>
 """, unsafe_allow_html=True)
 
