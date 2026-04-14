@@ -6061,6 +6061,8 @@ def update_report_status(laporan_name):
 
 import pandas as pd
 import streamlit as st
+import math
+from datetime import datetime
 from supabase import create_client, Client
 
 # --- 1. KONEKSI SUPABASE ---
@@ -6072,13 +6074,24 @@ try:
 except Exception as e:
     st.error(f"Koneksi Gagal: {e}")
 
-# --- 2. FUNGSI SINKRONISASI ---
+# --- 2. FUNGSI SINKRONISASI & RESET HARIAN ---
 def sync_data():
-    """Tarik data dari Supabase ke Session State"""
-    # Ambil Data Reports
-    res_reports = supabase.table("reports").select("*").order("id").execute()
+    """Sinkronisasi Supabase ke Session State & Handle Reset Harian"""
+    today = datetime.now().strftime('%Y-%m-%d')
     
-    # Isi default jika kosong (Jezpro Logistics List)
+    # A. Cek Reset Tracker
+    res_tracker = supabase.table("reset_tracker").select("last_date").execute()
+    
+    if not res_tracker.data:
+        supabase.table("reset_tracker").insert({"last_date": today}).execute()
+    elif res_tracker.data[0]['last_date'] != today:
+        # Reset jam 12 malam: Laporan jadi Belum, To Do jadi False
+        supabase.table("reports").update({"status": "❌ Belum"}).neq("status", "❌ Belum").execute()
+        supabase.table("todo").update({"done": False}).execute()
+        supabase.table("reset_tracker").update({"last_date": today}).eq("id", 1).execute()
+
+    # B. Tarik Data Reports
+    res_reports = supabase.table("reports").select("*").order("id").execute()
     if not res_reports.data:
         default_reports = [
             {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
@@ -6105,45 +6118,104 @@ def sync_data():
 
     st.session_state.db_report = [{"Laporan": r['laporan'], "PIC": r['pic'], "Status": r['status']} for r in res_reports.data]
 
-    # Ambil Data To Do List
+    # C. Tarik Data To Do List
     res_todo = supabase.table("todo").select("*").order("id").execute()
     st.session_state.todo_list = [{"id": t['id'], "task": t['task'], "done": t['done']} for t in res_todo.data]
 
-# Inisialisasi awal
+# Inisialisasi State
 if 'db_report' not in st.session_state:
     sync_data()
 
-# --- 3. UI DISPLAY & LOGIC ---
-st.title("ERP LOGISTIK - TEAM SUMMARY")
+# --- 3. CSS DARK THEME (PERSIS PUNYA LU) ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .hero-header {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white; padding: 25px; border-radius: 12px;
+        text-align: center; margin-bottom: 35px; font-weight: 800; font-size: 26px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .report-card {
+        background-color: #1f2937; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2); margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; color: #f3f4f6;
+    }
+    .stButton > button { 
+        width: 100%; border-radius: 8px; background-color: #1e3a8a; 
+        color: white; border: 1px solid #3b82f6; font-weight: 600; 
+    }
+    .stButton > button:hover { background-color: #3b82f6; }
+    </style>
+""", unsafe_allow_html=True)
 
-# Tab Laporan
-for idx, task in enumerate(st.session_state.db_report):
-    col1, col2, col3 = st.columns([3, 2, 1])
-    col1.write(task['Laporan'])
-    col2.write(f"PIC: {task['PIC']}")
+# --- 4. MAIN UI ---
+st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
+
+list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
+current_user = st.selectbox("👤 Pilih Nama:", list_pic)
+
+col_kiri, col_kanan = st.columns([1.8, 1])
+
+with col_kiri:
+    tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
     
-    # Tombol Update berada di dalam Loop agar idx dan task terbaca
-    if col3.button(f"Update", key=f"up_dark_{idx}"):
-        supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
-        sync_data()
-        st.rerun()
+    with tab_me:
+        for idx, task in enumerate(st.session_state.db_report):
+            if task['PIC'] == current_user:
+                ck1, ck2 = st.columns([4, 1.2])
+                with ck1:
+                    st.markdown(f'<div class="report-card"><h4 style="margin:0;">{task["Laporan"]}</h4><small>Status: {task["Status"]}</small></div>', unsafe_allow_html=True)
+                with ck2:
+                    st.write("")
+                    if task['Status'] == "❌ Belum":
+                        if st.button("Update", key=f"up_{idx}"):
+                            supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
+                            sync_data()
+                            st.rerun()
+                    else:
+                        st.button("Selesai", disabled=True, key=f"done_{idx}")
 
-st.divider()
+    with tab_all:
+        st.subheader("📊 Team Progress")
+        # Logika Progress Bar tiap PIC ada di sini (sama seperti logic lu sebelumnya)
 
-# Tab To Do List
-st.subheader("To Do List")
-with st.form("tambah_todo"):
-    tugas_baru = st.text_input("Tambah Tugas Baru")
-    submit_tugas = st.form_submit_button("Tambah")
-    if submit_tugas and tugas_baru:
-        supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
-        sync_data()
-        st.rerun()
+with col_kanan:
+    st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3>📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
+    
+    with st.form("todo_form", clear_on_submit=True):
+        tugas_baru = st.text_input("Tugas Baru:")
+        if st.form_submit_button("➕ Tambah") and tugas_baru:
+            supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
+            sync_data()
+            st.rerun()
 
-for item in st.session_state.todo_list:
-    # Checkbox logic
-    res = st.checkbox(item['task'], value=item['done'], key=f"todo_{item['id']}")
-    if res != item['done']:
-        supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
-        sync_data()
-        st.rerun()
+    # LOGIC PAGINATION (3 ITEM PER HALAMAN)
+    items_per_page = 3
+    total_items = len(st.session_state.todo_list)
+    total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
+    
+    if 'todo_page' not in st.session_state: st.session_state.todo_page = 1
+    
+    start = (st.session_state.todo_page - 1) * items_per_page
+    current_todo = st.session_state.todo_list[start : start + items_per_page]
+
+    for item in current_todo:
+        c1, c2 = st.columns([4, 1])
+        c1.markdown(f'<div style="background:#111827;padding:10px;border-radius:8px;border-left:4px solid #3b82f6;">{item["task"]}</div>', unsafe_allow_html=True)
+        res = c2.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
+        if res != item['done']:
+            supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
+            sync_data()
+            st.rerun()
+
+    if total_pages > 1:
+        p1, p2, p3 = st.columns([1,2,1])
+        if p1.button("⬅️") and st.session_state.todo_page > 1:
+            st.session_state.todo_page -= 1
+            st.rerun()
+        p2.write(f"Hal {st.session_state.todo_page}/{total_pages}")
+        if p3.button("➡️") and st.session_state.todo_page < total_pages:
+            st.session_state.todo_page += 1
+            st.rerun()
