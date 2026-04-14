@@ -6261,34 +6261,27 @@ if menu == "Reporting & PIC":
                 sync_data()
                 st.rerun()
 
-        items_per_page = 3
-        total_items = len(st.session_state.todo_list)
-        total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
-        
-        start = (st.session_state.get('todo_page', 1) - 1) * items_per_page
-        current_todo = st.session_state.todo_list[start : start + items_per_page]
-
+        # --- Bagian To Do List di dalam col_kanan ---
         for item in current_todo:
-        c1, c2 = st.columns([4, 1])
-        bd_color = "#10b981" if item['done'] else "#3b82f6"
-        
-        # Tambahan margin-bottom: 10px biar gak mepet
-        c1.markdown(f'''
-            <div style="background:#111827; padding:12px; border-radius:8px; 
-                        border-left:4px solid {bd_color}; color:white; 
-                        margin-bottom:10px; min-height:50px; display:flex; align-items:center;">
-                {item["task"]}
-            </div>
-        ''', unsafe_allow_html=True)
-        
-        with c2:
-            # Kasih spasi dikit biar checkbox sejajar tengah
-            st.write("") 
-            res = st.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
-            if res != item['done']:
-                supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
-                sync_data()
-                st.rerun()
+            c1, c2 = st.columns([4, 1])  # Baris ini harus menjorok ke dalam (4 spasi/1 tab)
+            bd_color = "#10b981" if item['done'] else "#3b82f6"
+            
+            # Gunakan margin-bottom agar tidak mepet
+            c1.markdown(f'''
+                <div style="background:#111827; padding:12px; border-radius:8px; 
+                            border-left:4px solid {bd_color}; color:white; 
+                            margin-bottom:10px; min-height:50px; display:flex; align-items:center;">
+                    {item["task"]}
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            with c2:
+                st.write("") # Spacer
+                res = st.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
+                if res != item['done']:
+                    supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
+                    sync_data()
+                    st.rerun()
 
         if total_pages > 1:
         p1, p2, p3 = st.columns([1, 2, 1])
