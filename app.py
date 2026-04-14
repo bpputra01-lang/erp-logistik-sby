@@ -3428,10 +3428,33 @@ def project_approval_reject():
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
     tabs = st.tabs(["💻 Input Pengajuan", "📑 History & Approval Status"])
 
-    # --- TAB 1 (Gak ada perubahan logic) ---
-    # ... (Gue skip bagian form biar fokus ke UI yang lu komplain) ...
+    # --- TAB 1: INPUT (Tetap Sama) ---
+    with tabs[0]:
+        st.markdown('<div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;"><h3 style="color: #FFFFFF; margin: 0; font-size: 18px; font-weight: 900;">Form Pengajuan Reject/Defect</h3></div>', unsafe_allow_html=True)
+        with st.form("input_form_reject", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                nama = st.text_input("Nama Tim (Pengaju)")
+                bin_asal = st.text_input("Bin Asal")
+                sku = st.text_input("SKU")
+                cabang_input = st.selectbox("Pilih Cabang", ["SURABAYA", "SIDOARJO", "SEMARANG"])
+            with col2:
+                article = st.text_input("Article Name")
+                size = st.text_input("Size")
+                keterangan = st.text_area("Keterangan Reject/Defect")
+            
+            if st.form_submit_button("▶️ SUBMIT REQUEST"):
+                if nama and sku:
+                    tz_jakarta = pytz.timezone('Asia/Jakarta')
+                    ts = datetime.now(tz_jakarta).strftime("%Y-%m-%d %H:%M:%S")
+                    data = {"timestamp": ts, "nama_tim": nama, "bin_asal": bin_asal, "sku": sku, "article_name": article, "size": size, "keterangan": keterangan, "status": 1, "cabang": cabang_input}
+                    try:
+                        supabase.table("submissions").insert(data).execute()
+                        st.success(f"✅ Tersimpan!")
+                        st.rerun()
+                    except Exception as e: st.error(f"Error: {e}")
 
-    # --- TAB 2: HISTORY ---
+    # --- TAB 2: HISTORY (UI RESTORATION) ---
     with tabs[1]:
         tab_sby, tab_sda, tab_smg = st.tabs(["📍 SURABAYA", "📍 SIDOARJO", "📍 SEMARANG"])
         for tab_obj, cabang_name in zip([tab_sby, tab_sda, tab_smg], ["SURABAYA", "SIDOARJO", "SEMARANG"]):
