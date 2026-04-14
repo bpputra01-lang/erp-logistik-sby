@@ -6128,6 +6128,7 @@ def sync_data():
 if 'db_report' not in st.session_state:
     sync_data()
 
+if menu == "Reporting & PIC:
 # --- 3. FULL CSS (GABUNGAN SEMUA STYLE) ---
 st.markdown("""
     <style>
@@ -6232,7 +6233,7 @@ with col_kiri:
         <div class="report-card" style="border-left-color: #10b981;">
             <b>📝 To-Do Progress</b>
             <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px;">
-                <div style="background:#FFFFFF; width:{td_prog}%; height:12px; border-radius:5px;"></div>
+                <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
