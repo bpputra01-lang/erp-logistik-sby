@@ -3095,8 +3095,12 @@ def menu_reject_defect():
 
     with tab_analytics:
         # Fetch data dari Supabase
-        response = conn.table("reject_list").select("*").execute()
-        df_chart = pd.DataFrame(response.data)
+        try:
+            response = conn.table("reject_list").select("*").execute()
+            df_chart = pd.DataFrame(response.data)
+        except Exception as e:
+            st.error(f"Gagal narik data: {e}")
+            df_chart = pd.DataFrame()
         
         standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
         
@@ -3112,10 +3116,25 @@ def menu_reject_defect():
             else:
                 df_match_result = pd.DataFrame()
 
-            # --- DASHBOARD LOGIC ---
-            filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
+            # --- SEARCH & FILTER AREA ---
+            col_f1, col_f2 = st.columns([1, 2])
+            with col_f1:
+                filter_view = st.selectbox("📍 FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
+            with col_f2:
+                # --- TAMBAHAN SEARCH BAR ---
+                search_query = st.text_input("🔍 CARI SKU ATAU NAMA BARANG:", placeholder="Ketik SKU / Nama Barang di sini...", key="search_bar")
+
+            # 1. Filter Cabang dulu
             df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['cabang'] == filter_view]
 
+            # 2. Filter Search Bar (Jika ada input)
+            if search_query:
+                df_final = df_final[
+                    (df_final['sku'].str.contains(search_query, case=False, na=False)) | 
+                    (df_final['article_name'].str.contains(search_query, case=False, na=False))
+                ]
+
+            # --- DASHBOARD LOGIC (METRICS) ---
             total_val = len(df_final)
             defect_cnt = len(df_final[df_final['bin'].str.contains('DEFECT', case=False, na=False)])
             reject_cnt = len(df_final[df_final['bin'].str.contains('REJECT', case=False, na=False)])
@@ -3135,10 +3154,10 @@ def menu_reject_defect():
 
             st.session_state.last_total, st.session_state.last_defect, st.session_state.last_reject = total_val, defect_cnt, reject_cnt
 
-            # BOX METRIC DISPLAY
+            # BOX METRIC DISPLAY (Akan otomatis update sesuai hasil search)
             m1, m2, m3 = st.columns(3)
             with m1:
-                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;"><p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p><h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2><span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Total</span></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;"><p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p><h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2><span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Result</span></div>', unsafe_allow_html=True)
             with m2:
                 p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
                 st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;"><p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p><h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2><span style="color: {col_d}; font-size: 0.8rem; background: {bg_d}; padding: 2px 8px; border-radius: 10px;">{arr_d} {p_d:.1f}%</span></div>', unsafe_allow_html=True)
@@ -3146,6 +3165,7 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;"><p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p><h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2><span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span></div>', unsafe_allow_html=True)
 
+            # Tabel Detail juga akan mengikuti hasil search
             st.markdown('<div class="detail-header">📋 DETAIL DATABASE CLOUD</div>', unsafe_allow_html=True)
             df_editor = df_final.copy().sort_values('id', ascending=False)
             df_editor['HAPUS'] = False
@@ -3156,6 +3176,7 @@ def menu_reject_defect():
                 use_container_width=True, hide_index=True, key="database_editor"
             )
 
+            # Logika hapus tetap sama
             rows_to_delete = event[event['HAPUS'] == True]
             if not rows_to_delete.empty:
                 st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
