@@ -6239,9 +6239,11 @@ with col_kiri:
         td_done = sum(1 for i in st.session_state.todo_list if i['done'])
         td_prog = (td_done / td_total * 100) if td_total > 0 else 0
         st.markdown(f"""
-        <div class="report-card" style="border-left-color: #10b981; color: white !important;">
-            <b style="color: white !important;">📝 To-Do Progress</b>
-            <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px;">
+        <div class="report-card" style="border-left-color: #10b981;">
+            <span style="color: #ffffff !important; font-weight: 800; font-size: 16px; display: block;">
+                📝 To-Do Progress
+            </span>
+            <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px; width: 100%;">
                 <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
             </div>
         </div>
