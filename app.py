@@ -6283,19 +6283,21 @@ if menu == "Reporting & PIC":
                     sync_data()
                     st.rerun()
 
+        # --- Navigasi Halaman (PASTIKAN MENOROK KE KANAN) ---
         if total_pages > 1:
-        p1, p2, p3 = st.columns([1, 2, 1])
-        if p1.button("⬅️") and st.session_state.get('todo_page', 1) > 1:
-            st.session_state.todo_page -= 1
-            st.rerun()
+            p1, p2, p3 = st.columns([1, 2, 1]) # Harus lebih masuk dari 'if'
             
-        # PAKSA WARNA PUTIH & BOLD DI SINI
-        p2.markdown(f"""
-            <div style="text-align:center; color: #FFFFFF !important; font-weight: 800; font-size: 1.1rem; padding-top: 5px;">
-                {st.session_state.get('todo_page', 1)} / {total_pages}
-            </div>
-        """, unsafe_allow_html=True)
-        
-        if p3.button("➡️") and st.session_state.get('todo_page', 1) < total_pages:
-            st.session_state.todo_page = st.session_state.get('todo_page', 1) + 1
-            st.rerun()
+            if p1.button("⬅️") and st.session_state.get('todo_page', 1) > 1:
+                st.session_state.todo_page = st.session_state.get('todo_page', 1) - 1
+                st.rerun()
+                
+            # PAKSA WARNA PUTIH & BOLD DI SINI
+            p2.markdown(f"""
+                <div style="text-align:center; color: #FFFFFF !important; font-weight: 800; font-size: 1.1rem; padding-top: 5px;">
+                    {st.session_state.get('todo_page', 1)} / {total_pages}
+                </div>
+            """, unsafe_allow_html=True)
+            
+            if p3.button("➡️") and st.session_state.get('todo_page', 1) < total_pages:
+                st.session_state.todo_page = st.session_state.get('todo_page', 1) + 1
+                st.rerun()
