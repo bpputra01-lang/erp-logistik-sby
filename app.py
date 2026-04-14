@@ -6269,21 +6269,40 @@ if menu == "Reporting & PIC":
         current_todo = st.session_state.todo_list[start : start + items_per_page]
 
         for item in current_todo:
-            c1, c2 = st.columns([4, 1])
-            bd_color = "#10b981" if item['done'] else "#3b82f6"
-            c1.markdown(f'<div style="background:#111827;padding:12px;border-radius:8px;border-left:4px solid {bd_color};color:white;">{item["task"]}</div>', unsafe_allow_html=True)
-            res = c2.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
+        c1, c2 = st.columns([4, 1])
+        bd_color = "#10b981" if item['done'] else "#3b82f6"
+        
+        # Tambahan margin-bottom: 10px biar gak mepet
+        c1.markdown(f'''
+            <div style="background:#111827; padding:12px; border-radius:8px; 
+                        border-left:4px solid {bd_color}; color:white; 
+                        margin-bottom:10px; min-height:50px; display:flex; align-items:center;">
+                {item["task"]}
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        with c2:
+            # Kasih spasi dikit biar checkbox sejajar tengah
+            st.write("") 
+            res = st.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
             if res != item['done']:
                 supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
                 sync_data()
                 st.rerun()
 
         if total_pages > 1:
-            p1, p2, p3 = st.columns([1,2,1])
-            if p1.button("⬅️") and st.session_state.get('todo_page', 1) > 1:
-                st.session_state.todo_page -= 1
-                st.rerun()
-            p2.markdown(f"<p style='text-align:center; color:white;'>{st.session_state.get('todo_page', 1)}/{total_pages}</p>", unsafe_allow_html=True)
-            if p3.button("➡️") and st.session_state.get('todo_page', 1) < total_pages:
-                st.session_state.todo_page = st.session_state.get('todo_page', 1) + 1
-                st.rerun()
+        p1, p2, p3 = st.columns([1, 2, 1])
+        if p1.button("⬅️") and st.session_state.get('todo_page', 1) > 1:
+            st.session_state.todo_page -= 1
+            st.rerun()
+            
+        # PAKSA WARNA PUTIH & BOLD DI SINI
+        p2.markdown(f"""
+            <div style="text-align:center; color: #FFFFFF !important; font-weight: 800; font-size: 1.1rem; padding-top: 5px;">
+                {st.session_state.get('todo_page', 1)} / {total_pages}
+            </div>
+        """, unsafe_allow_html=True)
+        
+        if p3.button("➡️") and st.session_state.get('todo_page', 1) < total_pages:
+            st.session_state.todo_page = st.session_state.get('todo_page', 1) + 1
+            st.rerun()
