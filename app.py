@@ -6264,7 +6264,11 @@ if menu == "Reporting & PIC":
             """, unsafe_allow_html=True)
 
     with col_kanan:
-        st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3 style="color:white !important; margin:0;">📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
+        st.markdown('''
+        <div style="background-color:#1f2937; padding:15px; border-radius:10px; border:1px solid #3b82f6; text-align:center;">
+            <h3 style="color: white !important; margin:0; font-weight: 800;">📝 TO DO LIST</h3>
+        </div>
+    ''', unsafe_allow_html=True)
         
         # 1. FORM INPUT TUGAS
         with st.form("todo_form", clear_on_submit=True):
