@@ -6132,8 +6132,18 @@ if 'db_report' not in st.session_state:
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
+    .report-card {
+        background-color: #1f2937; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; 
+        color: #ffffff !important; /* Pakai hex putih bersih */
+        transition: transform 0.2s ease;
+    }
+    
+    /* Tambahkan ini biar semua teks di dalem card dipaksa putih */
+    .report-card b, .report-card span, .report-card div, .report-card small, .report-card h4 {
+        color: #ffffff !important;
+    }
     .hero-header {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
         color: white; padding: 25px; border-radius: 12px;
