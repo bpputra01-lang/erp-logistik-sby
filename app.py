@@ -6076,22 +6076,12 @@ except Exception as e:
 
 # --- 2. FUNGSI SINKRONISASI & RESET HARIAN ---
 def sync_data():
-    """Sinkronisasi Supabase ke Session State & Handle Reset Harian"""
-    today = datetime.now().strftime('%Y-%m-%d')
+    """Tarik data dari Supabase ke Session State & Cegah Duplikat"""
     
-    # A. Cek Reset Tracker
-    res_tracker = supabase.table("reset_tracker").select("last_date").execute()
-    
-    if not res_tracker.data:
-        supabase.table("reset_tracker").insert({"last_date": today}).execute()
-    elif res_tracker.data[0]['last_date'] != today:
-        # Reset jam 12 malam: Laporan jadi Belum, To Do jadi False
-        supabase.table("reports").update({"status": "❌ Belum"}).neq("status", "❌ Belum").execute()
-        supabase.table("todo").update({"done": False}).execute()
-        supabase.table("reset_tracker").update({"last_date": today}).eq("id", 1).execute()
-
-    # B. Tarik Data Reports
+    # 1. Tarik data yang sudah ada
     res_reports = supabase.table("reports").select("*").order("id").execute()
+    
+    # 2. HANYA INSERT JIKA TABEL KOSONG (Cegah Double)
     if not res_reports.data:
         default_reports = [
             {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
@@ -6114,10 +6104,11 @@ def sync_data():
             {"laporan": "TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"}
         ]
         supabase.table("reports").insert(default_reports).execute()
+        # Ambil ulang setelah insert
         res_reports = supabase.table("reports").select("*").order("id").execute()
 
+    # 3. Masukkan ke Session State
     st.session_state.db_report = [{"Laporan": r['laporan'], "PIC": r['pic'], "Status": r['status']} for r in res_reports.data]
-
     # C. Tarik Data To Do List
     res_todo = supabase.table("todo").select("*").order("id").execute()
     st.session_state.todo_list = [{"id": t['id'], "task": t['task'], "done": t['done']} for t in res_todo.data]
