@@ -6033,340 +6033,68 @@ elif menu == "List Retur Out":
 
 import pandas as pd
 import random
-import sqlite3
-import math  # TAMBAHAN: Biar pagination gak error NameError
-from datetime import datetime, timedelta
+import math
+from datetime import datetime
 import streamlit as st
+from supabase import create_client, Client
 
-# --- 1. KONEKSI DATABASE ---
-def get_db_connection():
-    conn = sqlite3.connect('logistic_sby_final.db', check_same_thread=False)
-    return conn
+# --- 1. KONEKSI SUPABASE ---
+# Masukkan data dari Settings > API di Dashboard Supabase lu
+SUPABASE_URL = "ISI_URL_LU_DISINI"
+SUPABASE_KEY = "ISI_ANON_KEY_LU_DISINI"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- 2. FUNGSI SINKRONISASI & RESET HARIAN ---
+# --- 2. FUNGSI SINKRONISASI (VERSI CLOUD) ---
 def sync_data():
-    """Sinkronisasi DB ke Session State & Handle Reset Harian"""
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    # 1. Pastikan tabel-tabel utama sudah ada
-    c.execute('CREATE TABLE IF NOT EXISTS reset_tracker (last_date TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS reports (laporan TEXT, pic TEXT, status TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS todo (task TEXT, done INTEGER)')
-    conn.commit()
-
-    # 2. Ambil jumlah data (sekarang pasti 0 karena sudah di-DELETE di atas)
-    c.execute('SELECT COUNT(*) FROM reports')
-    check_reports = c.fetchone()[0]
-    
-    if check_reports == 0:
+    """Tarik data dari Supabase ke Session State"""
+    # A. Tarik Data Reports
+    res_reports = supabase.table("reports").select("*").execute()
+    # Jika tabel masih kosong, isi dengan default
+    if not res_reports.data:
         default_reports = [
-            ("REJECT & DEFECT", "VERREL & GALIH", "❌ Belum"),
-            ("KERAPIHAN STOCK", "VERREL & GALIH", "❌ Belum"),
-            ("CEK STOCK MINUS", "VERREL & GALIH", "❌ Belum"),
-            ("BALANCING STOCK", "FARIL & YUDI", "❌ Belum"),
-            ("CEK RTO", "FARIL & YUDI", "❌ Belum"),
-            ("OUTBOUND PROCESS", "FARIL & YUDI", "❌ Belum"),
-            ("DASHBOARD SIDOARJO", "VANO", "❌ Belum"),
-            ("STORE ACTIVITY", "VANO", "❌ Belum"),
-            ("DASHBOARD SURABAYA", "HAMZAH", "❌ Belum"),
-            ("DASHBOARD SEMARANG", "HAMZAH", "❌ Belum"),
-            ("MANIFEST", "HAMZAH", "❌ Belum"),
-            ("REFUND", "HAMZAH", "❌ Belum"),
-            ("REFILL GL4 TO GL3", "KRISNA & DHIVA", "❌ Belum"),
-            ("COMPARE SYSTEM BEFORE & AFTER", "KRISNA & DHIVA", "❌ Belum"),
-            ("COMPARE SCAN OUT", "BAKCLINER", "❌ Belum"),
-            ("COMPARE BARANG DATANG", "BAKCLINER", "❌ Belum"),
-            ("STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "WAREHOUSE FULLFILLMENT", "❌ Belum"),
-            ("TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "WAREHOUSE FULLFILLMENT", "❌ Belum")
+            {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+            {"laporan": "KERAPIHAN STOCK", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+            {"laporan": "CEK STOCK MINUS", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+            {"laporan": "BALANCING STOCK", "pic": "FARIL & YUDI", "status": "❌ Belum"},
+            {"laporan": "CEK RTO", "pic": "FARIL & YUDI", "status": "❌ Belum"},
+            {"laporan": "OUTBOUND PROCESS", "pic": "FARIL & YUDI", "status": "❌ Belum"},
+            {"laporan": "DASHBOARD SIDOARJO", "pic": "VANO", "status": "❌ Belum"},
+            {"laporan": "STORE ACTIVITY", "pic": "VANO", "status": "❌ Belum"},
+            {"laporan": "DASHBOARD SURABAYA", "pic": "HAMZAH", "status": "❌ Belum"},
+            {"laporan": "DASHBOARD SEMARANG", "pic": "HAMZAH", "status": "❌ Belum"},
+            {"laporan": "MANIFEST", "pic": "HAMZAH", "status": "❌ Belum"},
+            {"laporan": "REFUND", "pic": "HAMZAH", "status": "❌ Belum"},
+            {"laporan": "REFILL GL4 TO GL3", "pic": "KRISNA & DHIVA", "status": "❌ Belum"},
+            {"laporan": "COMPARE SYSTEM BEFORE & AFTER", "pic": "KRISNA & DHIVA", "status": "❌ Belum"},
+            {"laporan": "COMPARE SCAN OUT", "pic": "BAKCLINER", "status": "❌ Belum"},
+            {"laporan": "COMPARE BARANG DATANG", "pic": "BAKCLINER", "status": "❌ Belum"},
+            {"laporan": "STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"},
+            {"laporan": "TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"}
         ]
-        c.executemany('INSERT INTO reports (laporan, pic, status) VALUES (?, ?, ?)', default_reports)
-        conn.commit()
+        supabase.table("reports").insert(default_reports).execute()
+        res_reports = supabase.table("reports").select("*").execute()
 
-    today = datetime.now().strftime('%Y-%m-%d')
-    res = c.execute('SELECT last_date FROM reset_tracker').fetchone()
-    
-    # --- LOGIC RESET HARIAN ---
-    if not res:
-        c.execute('INSERT INTO reset_tracker (last_date) VALUES (?)', (today,))
-        conn.commit()
-    elif res[0] != today:
-        # Reset status laporan kerja ke 'Belum'
-        c.execute('UPDATE reports SET status = "❌ Belum"')
-        # Reset status centang To Do List (done = 0)
-        c.execute('UPDATE todo SET done = 0')
-        # Update tanggal tracker
-        c.execute('UPDATE reset_tracker SET last_date = ?', (today,))
-        conn.commit()
-    
-    # --- TARIK DATA KE SESSION STATE ---
-    reports_db = c.execute('SELECT laporan, pic, status FROM reports').fetchall()
-    st.session_state.db_report = [{"Laporan": r[0], "PIC": r[1], "Status": r[2]} for r in reports_db]
-    
-    todo_db = c.execute('SELECT task, done FROM todo').fetchall()
-    st.session_state.todo_list = [{"task": t[0], "done": bool(t[1])} for t in todo_db]
-    
-    conn.close()
+    st.session_state.db_report = [{"Laporan": r['laporan'], "PIC": r['pic'], "Status": r['status']} for r in res_reports.data]
 
-# --- 3. INISIALISASI SESSION STATE (Panggil di awal) ---
-if 'db_report' not in st.session_state or 'todo_list' not in st.session_state:
+    # B. Tarik Data To Do List
+    res_todo = supabase.table("todo").select("*").order("id").execute()
+    st.session_state.todo_list = [{"task": t['task'], "done": t['done']} for t in res_todo.data]
+
+# --- LOGIC UPDATE STATUS REPORT ---
+# (Ganti bagian button update di tab_me lu jadi ini)
+if st.button(f"Update", key=f"up_dark_{idx}"):
+    supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
     sync_data()
+    st.rerun()
 
-# --- 4. CSS DARK THEME (PERSIS PUNYA LU) ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+# --- LOGIC TAMBAH TODO ---
+if submit_tugas and tugas_baru:
+    supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
+    sync_data()
+    st.rerun()
 
-    /* Global Font */
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    /* 1. Header Utama - Efek Gradient Glass */
-    .hero-header {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white;
-        padding: 25px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 35px;
-        font-weight: 800;
-        font-size: 26px;
-        letter-spacing: 0.5px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    /* 2. Card Laporan (Gaya Kolom Kiri) */
-    .report-card {
-        background-color: #1f2937; 
-        padding: 15px; 
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2); 
-        margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; 
-        color: #f3f4f6;
-        transition: transform 0.2s ease;
-    }
-    .report-card:hover { transform: translateY(-2px); }
-
-    /* 3. Box To-Do Container */
-    .todo-container {
-        background-color: #111827; 
-        padding: 20px; 
-        border-radius: 15px;
-        border: 1px solid #374151; 
-        margin-bottom: 20px;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    /* 4. Checkbox Dark Mode */
-    div[data-testid="stCheckbox"] div[role="checkbox"] {
-        background-color: #1f2937 !important;
-        border: 2px solid #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
-        background-color: #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] p {
-        color: #e5e7eb !important;
-        font-weight: 500 !important;
-    }
-    
-    /* 5. Input & Button Styling */
-    .stTextInput input { 
-        background-color: #1f2937 !important; 
-        color: white !important; 
-        border: 1px solid #374151 !important;
-        border-radius: 8px !important;
-    }
-    .stButton > button { 
-        width: 100%; 
-        border-radius: 8px; 
-        background-color: #1e3a8a; 
-        color: white;
-        border: 1px solid #3b82f6;
-        font-weight: 600;
-        transition: 0.3s ease; 
-    }
-    .stButton > button:hover { 
-        background-color: #3b82f6; 
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-if menu == "Reporting & PIC":
-    st.markdown('<div class="hero-header">🚹 REPORTING & PIC</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([1.2, 1])
-    with c1:
-        list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
-        current_user = st.selectbox("👤 Pilih Nama:", list_pic, key="pic_v_final")
-    with c2:
-        st.write("")
-        st.caption(f"🕒 **Update:** {datetime.now().strftime('%d %B %Y')}")
-
-    st.divider()
-
-    col_kiri, col_kanan = st.columns([1.8, 1])
-
-    with col_kiri:
-        st.subheader(f"📋 PIC: {current_user}")
-        tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
-        
-        with tab_me:
-            # Filter agar user tahu jika datanya memang belum ada di DB
-            has_task = False
-            for idx, task in enumerate(st.session_state.db_report):
-                if task['PIC'] == current_user:
-                    has_task = True
-                    ck1, ck2 = st.columns([4, 1.2])
-                    with ck1:
-                        st.markdown(f"""
-                        <div class="report-card">
-                            <h4 style="margin:0; font-size:1rem;">{task['Laporan']}</h4>
-                            <small style="color:#9ca3af;">Status: {task['Status']}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    with ck2:
-                        st.write("") 
-                        if task['Status'] == "❌ Belum":
-                            if st.button(f"Update", key=f"up_dark_{idx}"):
-                                # Update SQLite
-                                conn = get_db_connection()
-                                conn.execute('UPDATE reports SET status = "✅ Selesai" WHERE laporan = ?', (task['Laporan'],))
-                                conn.commit()
-                                conn.close()
-                                # Refresh session state & UI
-                                sync_data()
-                                st.rerun()
-                        else:
-                            st.button("Selesai", disabled=True, key=f"done_dark_{idx}")
-            
-            if not has_task:
-                st.info(f"Belum ada daftar laporan untuk {current_user}")
-
-        with tab_all:
-            st.markdown("### 📊 Team Progress Summary")
-            pic_stats = {}
-            for t in st.session_state.db_report:
-                pic = t['PIC']
-                if pic not in pic_stats:
-                    pic_stats[pic] = {"total": 0, "selesai": 0}
-                pic_stats[pic]["total"] += 1
-                if t['Status'] == "✅ Selesai":
-                    pic_stats[pic]["selesai"] += 1
-
-            st.write("**📈 Laporan Operasional**")
-            for pic, stats in pic_stats.items():
-                progress = (stats['selesai'] / stats['total']) * 100
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>👤 {pic}</b>
-                        <span>{stats['selesai']}/{stats['total']} Selesai</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
-                        <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.write("---")
-            st.write("**📝 To Do List Summary**")
-            if "todo_list" in st.session_state and st.session_state.todo_list:
-                td_total = len(st.session_state.todo_list)
-                td_selesai = sum(1 for item in st.session_state.todo_list if item['done'])
-                td_progress = (td_selesai / td_total) * 100 if td_total > 0 else 0
-                
-                st.markdown(f"""
-                <div class="report-card" style="border-left: 5px solid #10b981; background-color: #111827;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <b>📋 Total Tugas</b>
-                        <span>{td_selesai}/{td_total} Item</span>
-                    </div>
-                    <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 12px;">
-                        <div style="background-color: #10b981; width: {td_progress}%; height: 12px; border-radius: 5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-    # --- LANJUTAN DALAM col_kanan ---
-    with col_kanan:
-        st.markdown("""
-            <div style="background-color: #1f2937; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #3b82f6; margin-bottom: 20px;">
-                <h3 style="margin:0; color: white;">📝 TO DO LIST</h3>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # 1. Form Input Tugas Baru
-        with st.form("form_todo_dark", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:", placeholder="Ketik tugas...", key="inp_todo_dark")
-            submit_tugas = st.form_submit_button("➕ Tambah")
-            
-            if submit_tugas and tugas_baru:
-                conn = get_db_connection()
-                conn.execute('INSERT INTO todo (task, done) VALUES (?, 0)', (tugas_baru,))
-                conn.commit()
-                conn.close()
-                sync_data() # Update session state agar tugas baru muncul
-                st.rerun()
-
-        # 2. Logic Pagination (Membagi list tugas per halaman)
-        if "todo_list" in st.session_state and st.session_state.todo_list:
-            items_per_page = 3
-            total_items = len(st.session_state.todo_list)
-            total_pages = math.ceil(total_items / items_per_page)
-            
-            # Inisialisasi state halaman jika belum ada
-            if 'todo_page' not in st.session_state:
-                st.session_state.todo_page = 1
-            
-            # Keamanan index halaman
-            if st.session_state.todo_page > total_pages:
-                st.session_state.todo_page = total_pages
-            if st.session_state.todo_page < 1:
-                st.session_state.todo_page = 1
-
-            start_idx = (st.session_state.todo_page - 1) * items_per_page
-            end_idx = start_idx + items_per_page
-            current_items = st.session_state.todo_list[start_idx:end_idx]
-
-            # 3. Tampilkan Item Tugas
-            for i, item in enumerate(current_items):
-                real_idx = start_idx + i 
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    # Warna border berubah hijau jika tugas selesai (done)
-                    color_border = '#10b981' if item['done'] else '#3b82f6'
-                    st.markdown(f"""
-                        <div style="background-color: #111827; padding: 15px; border-radius: 12px; border-left: 5px solid {color_border}; margin-bottom: 10px;">
-                            <h4 style="margin:0; font-size:0.9rem; color: #f3f4f6;">{item['task']}</h4>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with c2:
-                    st.write("")
-                    # Checkbox untuk tandai selesai/belum
-                    res = st.checkbox("", key=f"chk_pagi_{real_idx}", value=item['done'], label_visibility="collapsed")
-                    if res != item['done']:
-                        conn = get_db_connection()
-                        conn.execute('UPDATE todo SET done = ? WHERE task = ?', (int(res), item['task']))
-                        conn.commit()
-                        conn.close()
-                        sync_data() # Update session state
-                        st.rerun()
-
-            # 4. Navigasi Halaman (Jika tugas lebih dari 3)
-            if total_pages > 1:
-                st.write("")
-                pc1, pc2, pc3 = st.columns([1, 2, 1])
-                with pc1:
-                    if st.button("⬅️", key="prev_todo") and st.session_state.todo_page > 1:
-                        st.session_state.todo_page -= 1
-                        st.rerun()
-                with pc2:
-                    st.markdown(f"<p style='text-align:center; color:gray;'>Hal {st.session_state.todo_page} / {total_pages}</p>", unsafe_allow_html=True)
-                with pc3:
-                    if st.button("➡️", key="next_todo") and st.session_state.todo_page < total_pages:
-                        st.session_state.todo_page += 1
-                        st.rerun()
-        else:
-            st.info("Belum ada tugas tambahan.")
+# --- LOGIC CHECKBOX TODO ---
+if res != item['done']:
+    supabase.table("todo").update({"done": res}).eq("task", item['task']).execute()
+    sync_data()
+    st.rerun()

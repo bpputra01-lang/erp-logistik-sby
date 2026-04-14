@@ -10,3 +10,4 @@ plotly
 pytz
 streamlit
 streamlit-autorefresh
+supabase
