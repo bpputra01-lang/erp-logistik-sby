@@ -2544,83 +2544,22 @@ def process_scan_out(df_scan, df_history, df_stock):
     
     return df_res, df_draft
     
-import sqlite3
 import pandas as pd
 import streamlit as st
 from datetime import datetime
 import pytz
-from sqlalchemy import create_engine, text
+from supabase import create_client, Client
 
-# --- CONFIG SUPABASE ---
-# Masukkan detail koneksi Anda di sini atau di .streamlit/secrets.toml
-# Format: postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres
-DB_URL = "postgresql://postgres:PASSWORD_LU@HOST_SUPABASE_LU:5432/postgres"
-
-def init_db():
-    # 1. KONEKSI LOCAL (SQLite) - Tetap dipertahankan sebagai backup/cache
-    conn_local = sqlite3.connect('jez_reporting.db', check_same_thread=False)
-    cursor_local = conn_local.cursor()
-    
-    # 2. KONEKSI SUPABASE (PostgreSQL)
-    engine = create_engine(DB_URL)
-    
-    # 3. BUAT TABEL (Daftar kolom dasar - PostgreSQL Syntax)
-    create_table_query = '''
-        CREATE TABLE IF NOT EXISTS retur_out_v3 (
-            tanggal TEXT,
-            no_retur TEXT,
-            item_name TEXT,
-            qty INTEGER,
-            pic TEXT,
-            keterangan TEXT,
-            status TEXT,
-            identify TEXT,
-            bin TEXT,
-            sku TEXT,
-            brand TEXT,
-            variant TEXT,
-            sub_kategori TEXT,
-            harga_beli REAL,
-            harga_jual REAL,
-            qty_system INTEGER,
-            qty_so INTEGER
-        )
-    '''
-    
-    # Jalankan di Local
-    cursor_local.execute(create_table_query)
-    conn_local.commit()
-    
-    # Jalankan di Supabase
-    with engine.connect() as sn_conn:
-        sn_conn.execute(text(create_table_query))
-        sn_conn.commit()
-
-    # 4. LOGIKA AUTO-PATCH: Tambah kolom jika belum ada (Safe Migration)
-    # (Di Supabase/Postgres, logika check column sedikit berbeda)
-    required_db_cols = {
-        'identify': 'TEXT', 'bin': 'TEXT', 'sku': 'TEXT', 'brand': 'TEXT',
-        'item_name': 'TEXT', 'variant': 'TEXT', 'sub_kategori': 'TEXT',
-        'harga_beli': 'REAL', 'harga_jual': 'REAL', 'qty_system': 'INTEGER', 
-        'qty_so': 'INTEGER', 'tanggal': 'TEXT'
-    }
-    
-    # Patch Local
-    cursor_local.execute("PRAGMA table_info(retur_out_v3)")
-    existing_cols_local = [row[1] for row in cursor_local.fetchall()]
-    for col, dtype in required_db_cols.items():
-        if col not in existing_cols_local:
-            try: cursor_local.execute(f"ALTER TABLE retur_out_v3 ADD COLUMN {col} {dtype}")
-            except: pass
-    conn_local.commit()
-    
-    return engine # Kita return engine Supabase sebagai database utama
+# --- 1. CONFIG SUPABASE (GANTI PAKAI DATA LU) ---
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def menu_retur_out_system():
     # Jam Jakarta/Surabaya
     tz_sub = pytz.timezone('Asia/Jakarta')
 
-    # --- 2. CSS DASHBOARD PREMIUM (TIDAK DIUBAH) ---
+    # --- 2. CSS DASHBOARD PREMIUM (TIDAK DIUBAH SAMA SEKALI) ---
     st.markdown("""
         <style>
         .hero-header {
@@ -2677,16 +2616,14 @@ def menu_retur_out_system():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><p class="hero-text">RETUR OUT - DATABASE V3 (SUPABASE)</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">RETUR OUT - CLOUD V3 (ANON API)</p></div>', unsafe_allow_html=True)
 
-    # Inisialisasi Database Engine
-    engine = init_db()
-
-    # --- 3. UPLOAD & AUTO-SAVE ---
-    uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_v3_perm")
+    # --- 3. UPLOAD & AUTO-SAVE (LOGIC API) ---
+    uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_v3_anon")
     
     if uploaded_file:
         try:
+            # Baca file
             df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df_upload.columns = [str(c).strip() for c in df_upload.columns]
             
@@ -2700,14 +2637,20 @@ def menu_retur_out_system():
             if all(col in df_upload.columns for col in required_cols.keys()):
                 df_to_save = df_upload[list(required_cols.keys())].copy()
                 df_to_save.rename(columns=required_cols, inplace=True)
-                df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
                 
-                file_key = f"up_v3_{uploaded_file.name}_{len(df_upload)}"
+                # Tambah timestamp & bersihkan data
+                df_to_save['tanggal'] = datetime.now(tz_sub).strftime('%Y-%m-%d %H:%M:%S')
+                df_to_save = df_to_save.fillna("") 
+
+                # Cek Double Upload via Session State
+                file_key = f"anon_v3_{uploaded_file.name}_{len(df_upload)}"
                 if st.session_state.get('last_file_key_v3') != file_key:
-                    # Save ke Supabase
-                    df_to_save.to_sql('retur_out_v3', engine, if_exists='append', index=False)
+                    # Insert data ke Supabase lewat jalur API
+                    records = df_to_save.to_dict(orient='records')
+                    supabase.table("retur_out_v3").insert(records).execute()
+                    
                     st.session_state['last_file_key_v3'] = file_key
-                    st.success(f"✅ Berhasil Sync Supabase! {len(df_to_save)} Baris masuk database V3.")
+                    st.success(f"✅ Berhasil! {len(records)} Baris masuk Cloud Database.")
                     st.rerun()
             else:
                 st.error("Gagal: Kolom di file lu gak match sama sistem!")
@@ -2716,64 +2659,85 @@ def menu_retur_out_system():
 
     # --- 4. DATA VIEW & METRICS ---
     try:
-        # Load Data dari Supabase (Postgres menggunakan ctid sebagai pengganti rowid jika tidak ada PK)
-        query = "SELECT ctid as rowid, * FROM retur_out_v3"
-        df_db = pd.read_sql(query, engine)
+        # Ambil data dari Supabase via API
+        response = supabase.table("retur_out_v3").select("*").execute()
+        df_db = pd.DataFrame(response.data)
 
         if not df_db.empty:
+            # Pastikan tipe data benar buat kalkulasi
+            df_db['qty_system'] = pd.to_numeric(df_db['qty_system'], errors='coerce').fillna(0)
+            df_db['harga_beli'] = pd.to_numeric(df_db['harga_beli'], errors='coerce').fillna(0)
+
+            # 1. Kalkulasi Dashboard
             total_sku = df_db['sku'].nunique()
             total_qty_system = df_db['qty_system'].sum()
-            total_value = (df_db['qty_system'].fillna(0) * df_db['harga_beli'].fillna(0)).sum()
+            total_value = (df_db['qty_system'] * df_db['harga_beli']).sum()
 
+            # 2. Tampilan Metrik Box (Sesuai Desain Awal)
             m1, m2, m3 = st.columns(3)
             with m1:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #8b5cf6;"><div class="metric-label">🗄️ TOTAL SKU</div><div class="metric-value">{total_sku:,}</div><div class="metric-delta">↑ IN SUPABASE V3</div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
+                        <div class="metric-label">🗄️ TOTAL SKU</div>
+                        <div class="metric-value">{total_sku:,}</div>
+                        <div class="metric-delta">↑ CLOUD DATA</div>
+                    </div>
+                ''', unsafe_allow_html=True)
             with m2:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #10b981;"><div class="metric-label">📦 TOTAL QTY</div><div class="metric-value">{int(total_qty_system):,}</div><div class="metric-delta">↑ TOTAL STOCK</div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #10b981;">
+                        <div class="metric-label">📦 TOTAL QTY</div>
+                        <div class="metric-value">{int(total_qty_system):,}</div>
+                        <div class="metric-delta">↑ TOTAL UNIT</div>
+                    </div>
+                ''', unsafe_allow_html=True)
             with m3:
-                st.markdown(f'<div class="metric-card" style="border-left: 6px solid #f59e0b;"><div class="metric-label">💰 TOTAL VALUE</div><div class="metric-value">Rp {total_value:,.0f}</div><div class="metric-delta">↑ ASSET VALUE</div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div class="metric-card" style="border-left: 6px solid #f59e0b;">
+                        <div class="metric-label">💰 TOTAL VALUE</div>
+                        <div class="metric-value">Rp {total_value:,.0f}</div>
+                        <div class="metric-delta">↑ ASSET VALUE</div>
+                    </div>
+                ''', unsafe_allow_html=True)
 
             st.markdown("### 📜 Database History (Cloud V3)")
-            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan SKU atau Nama Barang...", key="search_v3")
+            search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan pencarian...", key="search_v3")
 
+            # Sorting data terbaru di atas
             df_display = df_db.sort_values(by='tanggal', ascending=False)
 
             if search_query:
                 df_display = df_display[
                     df_display['sku'].astype(str).str.contains(search_query, case=False, na=False) | 
-                    df_display['item_name'].str.contains(search_query, case=False, na=False)
+                    df_display['item_name'].astype(str).str.contains(search_query, case=False, na=False)
                 ]
 
-            cols_to_show = [col for col in df_display.columns if col not in ['rowid', 'id', 'ctid']]
-
+            # UI Tabel
             event = st.dataframe(
-                df_display[cols_to_show],
+                df_display,
                 use_container_width=True, 
                 hide_index=True, 
                 on_select="rerun", 
                 selection_mode="single-row" 
             )
 
+            # Logika Hapus Data (Berdasarkan Primary Key 'id' di Supabase)
             if event.selection.rows:
                 row_idx = event.selection.rows[0]
-                target_id = df_display.iloc[row_idx]['rowid']
+                target_id = df_display.iloc[row_idx]['id']
                 target_sku = df_display.iloc[row_idx]['sku']
                 
-                st.warning(f"⚠️ Hapus SKU: **{target_sku}** dari Supabase?")
+                st.warning(f"⚠️ Hapus SKU: **{target_sku}** dari Cloud?")
                 if st.button("🗑️ HAPUS PERMANEN", type="primary", use_container_width=True):
-                    with engine.connect() as conn_del:
-                        # Postgres menggunakan ctid untuk identifikasi row unik jika tidak ada primary key
-                        conn_del.execute(text("DELETE FROM retur_out_v3 WHERE ctid = :id"), {"id": target_id})
-                        conn_del.commit()
-                    st.success("Data Cloud berhasil dihapus!")
+                    supabase.table("retur_out_v3").delete().eq("id", target_id).execute()
+                    st.success("Data berhasil dihapus dari Cloud!")
                     st.rerun()
         else:
-            st.info("💡 Database Supabase V3 masih kosong.")
+            st.info("💡 Cloud Database V3 masih kosong. Silakan upload file.")
 
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Cloud Database: {e}")
 
-# Panggil fungsi
 
 import io
 def process_justification(df_case, df_tracking, df_po):
