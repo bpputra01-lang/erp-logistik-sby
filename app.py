@@ -3369,67 +3369,85 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def project_approval_reject():
-    # --- CSS CLEANUP (Layout Lama, Warna Baru) ---
+    # --- DATABASE CONNECTION ---
+    conn = sqlite3.connect('reject_system.db', check_same_thread=False)
+
+    # --- CSS (TAMPILAN LAMA TAPI TERANG) ---
     st.markdown("""
         <style>
-        /* Header Hero */
-        .hero-header-custom {
-            background: linear-gradient(135deg, #1e468a 0%, #163462 100%);
-            color: white; padding: 12px 25px; border-radius: 10px;
-            margin-bottom: 25px; font-weight: 800; font-size: 22px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content; 
+        /* Paksa Header Expander Putih */
+        [data-testid="stExpander"] summary p {
+            color: #FFFFFF !important;
+            font-weight: bold !important;
         }
-
-        /* Expander Box - Paksa Putih */
+        /* Expander Box */
         [data-testid="stExpander"] {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             border-radius: 12px !important;
         }
-        [data-testid="stExpander"] summary p {
+        /* Teks Detail Putih */
+        [data-testid="stExpander"] .stMarkdown p {
             color: #FFFFFF !important;
-            font-weight: bold !important;
         }
-
-        /* Timeline Fix - Biar Lurus Sejajar Bulatan */
+        /* Timeline Line - Biar Gak Melayang */
         .timeline-line {
             height: 4px; 
             background: #3d4156; 
-            margin-top: -10px !important; /* Narik garis ke tengah icon */
+            margin-top: -15px !important; /* Naikin biar lurus */
             border-radius: 2px;
         }
         .line-active {
-            background: #1E90FF !important; 
+            background: #1E90FF !important;
             box-shadow: 0 0 8px rgba(30, 144, 255, 0.6);
         }
-
-        /* Paksa Teks Detail Jadi Putih Terang */
-        [data-testid="stExpander"] .stMarkdown p, 
-        [data-testid="stExpander"] .stMarkdown span,
-        [data-testid="stExpander"] label {
-            color: #FFFFFF !important;
-        }
-        
-        /* Caption/Small Text */
-        .stCaption { color: #A0A0A0 !important; }
+        /* Fix label abu-abu biar kelihatan */
+        label { color: white !important; }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True)
     tabs = st.tabs(["💻 Input Pengajuan", "📑 History & Approval Status"])
 
-    # ... (Bagian Input Lu Lewatin Aja, Langsung ke History) ...
+    # --- TAB 1: INPUT ---
+    with tabs[0]:
+        # ... (Isi Form Input Lu Disini) ...
+        pass
 
+    # --- TAB 2: HISTORY ---
     with tabs[1]:
-        # Pakai layout lama lu (Radio filter, Search, dll)
         tab_sby, tab_sda, tab_smg = st.tabs(["📍 SURABAYA", "📍 SIDOARJO", "📍 SEMARANG"])
-        
-        for cabang_name, tab_obj in [("SURABAYA", tab_sby), ("SIDOARJO", tab_sda), ("SEMARANG", tab_smg)]:
+        cabang_list = [("SURABAYA", tab_sby), ("SIDOARJO", tab_sda), ("SEMARANG", tab_smg)]
+
+        for cabang_name, tab_obj in cabang_list:
             with tab_obj:
-                # Ambil data (Terserah lu pake SQLite atau Supabase, sesuaikan query-nya)
-                # Contoh pake df dari fetch data lu
+                # --- SEARCH & FILTER (Layout Lama Lu) ---
+                col_search, col_filter = st.columns([1, 1])
+                with col_search:
+                    search_query = st.text_input(f"🔍 Cari {cabang_name}", key=f"src_{cabang_name}", label_visibility="collapsed")
+                with col_filter:
+                    filter_status = st.radio("Status", ["Semua", "Waiting Approval", "Waiting Set Up", "Done Set Up"], 
+                                           horizontal=True, key=f"rad_{cabang_name}", label_visibility="collapsed")
+
+                # --- QUERY DATA (BIAR GAK NAMEERROR) ---
+                query = "SELECT * FROM submissions WHERE cabang = ?"
+                params = [cabang_name]
+                
+                # Tambahin filter status ke query
+                if filter_status == "Waiting Approval": query += " AND status = 1"
+                elif filter_status == "Waiting Set Up": query += " AND status = 2"
+                elif filter_status == "Done Set Up": query += " AND status = 3"
+
+                # Jalankan query ke DataFrame
+                df = pd.read_sql_query(query, conn, params=params)
+
                 if not df.empty:
-                    for index, row in df.iterrows():
+                    # Filter pencarian manual (opsional, atau bisa lewat SQL LIKE)
+                    if search_query:
+                        df = df[df['sku'].str.contains(search_query, case=False) | 
+                                df['nama_tim'].str.contains(search_query, case=False)]
+
+                    for _, row in df.iterrows():
                         with st.expander(f"📦 {row['sku']} - {row['article_name']} | {row['nama_tim']}"):
                             st.markdown(f"### 📑 Detail [ID: {row['id']}]")
                             
@@ -3444,36 +3462,49 @@ def project_approval_reject():
                             st.info(f"**Keterangan:** {row['keterangan']}")
                             st.write("---")
 
-                            # --- TIMELINE LAYOUT LAMA (5 KOLOM) ---
+                            # --- TIMELINE (5 KOLOM KODE LAMA) ---
                             st.write("**Progres Status:**")
-                            l1 = "line-active" if row['status'] >= 2 else ""
-                            l2 = "line-active" if row['status'] >= 3 else ""
+                            l1_active = "line-active" if row['status'] >= 2 else ""
+                            l2_active = "line-active" if row['status'] >= 3 else ""
 
-                            # Balik ke perbandingan kolom lama lu
                             tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5])
                             
                             with tcol1:
                                 st.markdown("🟢 **Pengajuan**")
                                 st.caption("Waiting Approval")
                             with tline1:
-                                st.markdown(f'<div class="timeline-line {l1}"></div>', unsafe_allow_html=True)
+                                st.markdown(f'<div class="timeline-line {l1_active}"></div>', unsafe_allow_html=True)
                             with tcol2:
                                 if row['status'] >= 2:
                                     st.markdown("🔵 **Approved**")
                                     st.caption(f"By: {row.get('approved_by', '-')}")
                                 else:
                                     n_app = st.text_input("Nama Purchasing", key=f"ap_{row['id']}", label_visibility="collapsed")
-                                    if st.button("Approve", key=f"btn_{row['id']}"):
-                                        # Update Logic Disini
-                                        pass
+                                    if st.button("Approve", key=f"btn_ap_{row['id']}"):
+                                        if n_app:
+                                            conn.execute("UPDATE submissions SET status = 2, approved_by = ? WHERE id = ?", (n_app, row['id']))
+                                            conn.commit()
+                                            st.rerun()
                             with tline2:
-                                st.markdown(f'<div class="timeline-line {l2}"></div>', unsafe_allow_html=True)
+                                st.markdown(f'<div class="timeline-line {l2_active}"></div>', unsafe_allow_html=True)
                             with tcol3:
                                 if row['status'] >= 3:
                                     st.markdown("🟣 **Done Set Up**")
                                     st.caption(f"By: {row.get('setup_by', '-')}")
                                 else:
                                     st.markdown("⚪ **Finalizing**")
+                                    # Tambah button final setup kalau status sudah 2
+                                    if row['status'] == 2:
+                                        n_set = st.text_input("Nama Set Up", key=f"set_{row['id']}", label_visibility="collapsed")
+                                        if st.button("Final Set Up", key=f"btn_set_{row['id']}"):
+                                            if n_set:
+                                                conn.execute("UPDATE submissions SET status = 3, setup_by = ? WHERE id = ?", (n_set, row['id']))
+                                                conn.commit()
+                                                st.rerun()
+                else:
+                    st.info(f"Belum ada data di {cabang_name}")
+
+    conn.close()
                             
                             # --- NOTE & DELETE ---
                             st.write("---")
