@@ -6132,32 +6132,34 @@ if 'db_report' not in st.session_state:
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    .report-card {
-        background-color: #1f2937; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; 
-        color: #ffffff !important; /* Pakai hex putih bersih */
-        transition: transform 0.2s ease;
-    }
     
-    /* Tambahkan ini biar semua teks di dalem card dipaksa putih */
-    .report-card b, .report-card span, .report-card div, .report-card small, .report-card h4 {
-        color: #ffffff !important;
+    /* Ganti bagian ini: Hapus [class*="css"] */
+    html, body, .stApp { 
+        font-family: 'Inter', sans-serif; 
     }
-    .hero-header {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 25px; border-radius: 12px;
-        text-align: center; margin-bottom: 35px; font-weight: 800; font-size: 26px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
+
+    /* Paksa semua teks di dalam markdown container jadi putih bersih */
+    [data-testid="stMarkdownContainer"] p, 
+    [data-testid="stMarkdownContainer"] span, 
+    [data-testid="stMarkdownContainer"] b,
+    [data-testid="stMarkdownContainer"] h4,
+    [data-testid="stMarkdownContainer"] small {
+        color: #FFFFFF !important;
     }
 
     .report-card {
-        background-color: #1f2937; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; color: #f3f4f6;
-        transition: transform 0.2s ease;
+        background-color: #1f2937 !important; 
+        padding: 15px; 
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); 
+        margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; 
+        color: #FFFFFF !important;
     }
-    .report-card:hover { transform: translateY(-2px); }
+    
+    /* Tambahan buat judul TO DO LIST yang di kanan */
+    h3 { color: white !important; }
+    </style>
 
     /* Checkbox Styling */
     div[data-testid="stCheckbox"] div[role="checkbox"] {
@@ -6239,11 +6241,11 @@ with col_kiri:
         td_done = sum(1 for i in st.session_state.todo_list if i['done'])
         td_prog = (td_done / td_total * 100) if td_total > 0 else 0
         st.markdown(f"""
-        <div class="report-card" style="border-left-color: #10b981;">
-            <span style="color: #ffffff !important; font-weight: 800; font-size: 16px; display: block;">
+        <div class="report-card" style="border-left-color: #10b981; background-color: #1f2937 !important;">
+            <div style="color: #FFFFFF !important; font-weight: 800; font-size: 1.1rem; margin-bottom: 8px;">
                 📝 To-Do Progress
-            </span>
-            <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px; width: 100%;">
+            </div>
+            <div style="background:#374151; border-radius:5px; height:12px; width: 100%; overflow: hidden;">
                 <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
             </div>
         </div>
