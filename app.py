@@ -6030,6 +6030,34 @@ elif menu == "Pengajuan Reject/Defect":
 
 elif menu == "List Retur Out":
     menu_retur_out_system()
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+
+# Trik agar tidak error di laptop meskipun library supabase belum terinstall
+try:
+    from supabase import create_client, Client
+    HAS_SUPABASE = True
+except ImportError:
+    HAS_SUPABASE = False
+
+# Konfigurasi Supabase (Gunakan Secrets di Streamlit Cloud untuk keamanan)
+if HAS_SUPABASE:
+    URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co" # Dari image_618beb.png
+    KEY = "MASUKKAN_ANON_KEY_LU" 
+    supabase: Client = create_client(URL, KEY)
+else:
+    st.warning("Menjalankan mode lokal tanpa Database Cloud (Hanya untuk Testing)")
+
+# --- FUNGSI UPDATE STATUS ---
+def update_report_status(laporan_name):
+    if HAS_SUPABASE:
+        supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", laporan_name).execute()
+    else:
+        # Fallback ke session state saja kalau di lokal
+        for item in st.session_state.db_report:
+            if item['Laporan'] == laporan_name:
+                item['Status'] = "✅ Selesai"
 
 import pandas as pd
 import random
@@ -6098,3 +6126,4 @@ if res != item['done']:
     supabase.table("todo").update({"done": res}).eq("task", item['task']).execute()
     sync_data()
     st.rerun()
+
