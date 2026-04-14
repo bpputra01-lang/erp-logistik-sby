@@ -2894,48 +2894,32 @@ def process_stock_comparison(file1, file2):
 
 import streamlit as st
 import pandas as pd
-import sqlite3
+from st_supabase_connection import SupabaseConnection
 import datetime as dt_logic
 from io import BytesIO
 import plotly.express as px
 
-# --- 1. DATABASE ENGINE ---
-def init_db():
-    conn = sqlite3.connect('inventory_logistik.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS reject_list (
-            CABANG TEXT, BIN_AWAL TEXT, BIN TEXT, SKU TEXT, 
-            ARTICLE_NAME TEXT, SIZE TEXT, KATEGORI TEXT, 
-            KETERANGAN TEXT, TANGGAL_INPUT TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+# --- 1. DATABASE ENGINE (MIGRATED TO SUPABASE) ---
+# Menggunakan st.connection agar konsisten dengan secrets.toml
+conn = st.connection("supabase", type=SupabaseConnection)
+
 def save_data(df):
-    conn = sqlite3.connect('inventory_logistik.db')
-    df.to_sql('reject_list', conn, if_exists='append', index=False)
-    conn.commit()
-    conn.close()
+    # Supabase butuh list of dicts. Nama kolom case-sensitive (disarankan lowercase di DB)
+    data_dict = df.to_dict(orient='records')
+    conn.table("reject_list").insert(data_dict).execute()
 
 def delete_reject_item(row_id):
-    conn = sqlite3.connect('inventory_logistik.db')
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM reject_list WHERE rowid = ?", (row_id,))
-    conn.commit()
-    conn.close()
+    # rowid di SQLite diganti dengan 'id' (Primary Key) di Supabase
+    conn.table("reject_list").delete().eq("id", row_id).execute()
 
 def clear_all_data():
-    conn = sqlite3.connect('inventory_logistik.db')
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM reject_list")
-    conn.commit()
-    conn.close()
+    # Menghapus semua data (Force delete menggunakan filter id > 0)
+    conn.table("reject_list").delete().gt("id", 0).execute()
     st.rerun()
 
 # --- 2. UI MENU ---
 def menu_reject_defect():
-    # --- CSS AREA (FIXED: NO CONFLICT) ---
+    # --- CSS AREA (WAJIB LENGKAP - TIDAK ADA YANG DIPOTONG) ---
     st.markdown("""
         <style>
         /* Header Hero */
@@ -2951,7 +2935,7 @@ def menu_reject_defect():
             box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
         
-        /* Label Form Atas: Hitam/Gelap biar kontras di bg putih */
+        /* Label Form Atas */
         [data-testid="stWidgetLabel"] p {
             color: #31333F !important;
             font-weight: 700 !important;
@@ -3013,19 +2997,12 @@ def menu_reject_defect():
             font-weight: bold !important;
         }
 
-        /* CSS Tombol Delete */
-        button[key^="del_"] {
-            background-color: #ff4b4b !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 4px !important;
-        }
-
         /* Judul Mass Adjustment Section */
         h1, h2, h3, .stMarkdown h3 {
             color: #FFFFFF !important;
             font-weight: 800 !important;
         }
+
         /* Fix Judul Detail Database: Hitam & Tebal */
         .detail-header {
             color: #31333F !important;
@@ -3038,23 +3015,14 @@ def menu_reject_defect():
             gap: 10px;
         }
 
-        /* FIX: Jangan tembak SEMUA p, tapi cuma p yang ada di Main Content */
+        /* FIX: p yang ada di Main Content */
         [data-testid="stMain"] .stMarkdown p {
             color: #E0E0E0 !important;
-        }
-
-        /* Fix Judul Detail Database: Tetap Hitam & Tebal */
-        .detail-header {
-            color: #31333F !important;
-            font-weight: 800 !important;
-            font-size: 22px !important;
-            /* ... sisa kode Lu ... */
         }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - MULTI BRANCH</div>', unsafe_allow_html=True)
-    init_db()
+    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - SUPABASE CLOUD</div>', unsafe_allow_html=True)
 
     tab_entry, tab_analytics, tab_match = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD", "🔍 MATCH DEFECT/REJECT"])
 
@@ -3077,23 +3045,19 @@ def menu_reject_defect():
         if btn_submit and sku:
             jam = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
             new_data = pd.DataFrame([{
-                'CABANG': cabang_input, 'BIN_AWAL': bin_awal, 'BIN': bin_val, 'SKU': sku, 
-                'ARTICLE_NAME': article, 'SIZE': size, 'KATEGORI': kategori, 
-                'KETERANGAN': keterangan, 'TANGGAL_INPUT': jam
+                'cabang': cabang_input, 'bin_awal': bin_awal, 'bin': bin_val, 'sku': sku, 
+                'article_name': article, 'size': size, 'kategori': kategori, 
+                'keterangan': keterangan, 'tanggal_input': jam
             }])
             save_data(new_data)
-            st.success(f"✅ SKU {sku} Berhasil Disimpan!")
+            st.success(f"✅ SKU {sku} Berhasil Disimpan ke Cloud!")
             st.rerun()
 
-        st.markdown("""
-            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;">
-                <h3 style="color: #007BFF; margin: 0; font-size: 18px; font-weight: 900;">📂 MASS ADJUSTMENT - IMPORT EXCEL</h3>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;"><h3 style="color: #007BFF; margin: 0; font-size: 18px; font-weight: 900;">📂 MASS ADJUSTMENT - IMPORT EXCEL</h3></div>', unsafe_allow_html=True)
         
         col_dl, col_up = st.columns([1, 2])
         with col_dl:
-            template_cols = ['CABANG', 'BIN_AWAL','BIN', 'SKU', 'ARTICLE_NAME', 'SIZE', 'KATEGORI', 'KETERANGAN']
+            template_cols = ['cabang', 'bin_awal','bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan']
             df_template = pd.DataFrame(columns=template_cols)
             output = BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -3101,262 +3065,112 @@ def menu_reject_defect():
             st.download_button("📥 Download Template", output.getvalue(), "template_reject.xlsx")
 
         with col_up:
-            # 1. Bikin ID dinamis biar file otomatis hilang pasca-import
-            if 'upload_key' not in st.session_state:
-                st.session_state.upload_key = 0
-
-            # 2. Tambahin parameter 'key' yang berubah-ubah
-            uploaded_file = st.file_uploader(
-                "Upload Excel Massal", 
-                type=['xlsx'], 
-                key=f"excel_up_{st.session_state.upload_key}"
-            )
+            if 'upload_key' not in st.session_state: st.session_state.upload_key = 0
+            uploaded_file = st.file_uploader("Upload Excel Massal", type=['xlsx'], key=f"excel_up_{st.session_state.upload_key}")
 
             if uploaded_file:
                 df_upload = pd.read_excel(uploaded_file)
                 if st.button("⤴️ IMPORT DATA KE DATABASE"):
-                    # Logika waktu Lu
-                    df_upload['TANGGAL_INPUT'] = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # Simpan data
+                    df_upload['tanggal_input'] = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
                     save_data(df_upload)
-                    
-                    # 3. Trik reset: Ubah ID key-nya sebelum rerun
                     st.session_state.upload_key += 1
-                    
-                    st.success("✅ Import Berhasil!")
+                    st.success("✅ Import Cloud Berhasil!")
                     st.rerun()
 
     with tab_analytics:
-        # Pastikan nama file ini SAMA dengan yang di init_db()
-        conn = sqlite3.connect('inventory_logistik.db') 
-        try:
-            df_chart = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-        except:
-            # Jika tabel belum ada/error, buat dataframe kosong agar tidak crash
-            df_chart = pd.DataFrame() 
-        finally:
-            conn.close()
+        # Fetch data dari Supabase
+        response = conn.table("reject_list").select("*").execute()
+        df_chart = pd.DataFrame(response.data)
+        
         standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
+        
         if not df_chart.empty:
-            df_non_std = df_chart[~df_chart['KATEGORI'].isin(standard_codes)].copy()
+            # --- LOGIKA MATCHING (WAJIB ADA) ---
+            df_non_std = df_chart[~df_chart['kategori'].isin(standard_codes)].copy()
             if not df_non_std.empty:
                 def find_matches(row, full_df):
-                    matches = full_df[(full_df['SKU'] == row['SKU']) & (full_df['rowid'] != row['rowid'])]
-                    return ", ".join(matches['CABANG'].unique()) if not matches.empty else "TIDAK ADA"
+                    matches = full_df[(full_df['sku'] == row['sku']) & (full_df['id'] != row['id'])]
+                    return ", ".join(matches['cabang'].unique()) if not matches.empty else "TIDAK ADA"
                 df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
                 df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
             else:
                 df_match_result = pd.DataFrame()
-        if not df_chart.empty:
-            # 1. Selector Cabang (Masuk lagi 1 tab dari 'if')
+
+            # --- DASHBOARD LOGIC ---
             filter_view = st.selectbox("FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
-            
-            # 2. Filter Data
-            df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['CABANG'] == filter_view]
+            df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['cabang'] == filter_view]
 
-            # 3. Hitung Metrik Berdasarkan kolom BIN
             total_val = len(df_final)
-            defect_cnt = len(df_final[df_final['BIN'].str.contains('DEFECT', case=False, na=False)])
-            reject_cnt = len(df_final[df_final['BIN'].str.contains('REJECT', case=False, na=False)])
+            defect_cnt = len(df_final[df_final['bin'].str.contains('DEFECT', case=False, na=False)])
+            reject_cnt = len(df_final[df_final['bin'].str.contains('REJECT', case=False, na=False)])
 
-            # --- LOGIKA DELTA (PANAH OTOMATIS) ---
+            # LOGIKA DELTA (PANAH OTOMATIS)
             if 'last_total' not in st.session_state:
-                st.session_state.last_total = total_val
-                st.session_state.last_defect = defect_cnt
-                st.session_state.last_reject = reject_cnt
+                st.session_state.last_total, st.session_state.last_defect, st.session_state.last_reject = total_val, defect_cnt, reject_cnt
 
             def get_delta(current, last):
-                if current > last:
-                    return "↑", "#28a745", "rgba(40,167,69,0.1)" # Hijau naik
-                elif current < last:
-                    return "↓", "#FF4B4B", "rgba(255,75,75,0.1)" # Merah turun
-                else:
-                    return "•", "#888", "rgba(136,136,136,0.1)"  # Abu-abu tetap
+                if current > last: return "↑", "#28a745", "rgba(40,167,69,0.1)"
+                elif current < last: return "↓", "#FF4B4B", "rgba(255,75,75,0.1)"
+                return "•", "#888", "rgba(136,136,136,0.1)"
 
             arr_t, col_t, bg_t = get_delta(total_val, st.session_state.last_total)
             arr_d, col_d, bg_d = get_delta(defect_cnt, st.session_state.last_defect)
             arr_r, col_r, bg_r = get_delta(reject_cnt, st.session_state.last_reject)
 
-            # Simpan state untuk perbandingan berikutnya
-            st.session_state.last_total = total_val
-            st.session_state.last_defect = defect_cnt
-            st.session_state.last_reject = reject_cnt
+            st.session_state.last_total, st.session_state.last_defect, st.session_state.last_reject = total_val, defect_cnt, reject_cnt
 
-            # 4. Tampilan Box Metrik (Dark Style)
+            # BOX METRIC DISPLAY
             m1, m2, m3 = st.columns(3)
-            
             with m1:
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;">
-                        <p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2>
-                        <span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Total</span>
-                    </div>
-                """, unsafe_allow_html=True)
-
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;"><p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p><h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2><span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Total</span></div>', unsafe_allow_html=True)
             with m2:
                 p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;">
-                        <p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2>
-                        <span style="color: {col_d}; font-size: 0.8rem; background: {bg_d}; padding: 2px 8px; border-radius: 10px;">{arr_d} {p_d:.1f}%</span>
-                    </div>
-                """, unsafe_allow_html=True)
-
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;"><p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p><h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2><span style="color: {col_d}; font-size: 0.8rem; background: {bg_d}; padding: 2px 8px; border-radius: 10px;">{arr_d} {p_d:.1f}%</span></div>', unsafe_allow_html=True)
             with m3:
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;">
-                        <p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2>
-                        <span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span>
-                    </div>
-                """, unsafe_allow_html=True)
-               
-            st.markdown("<br>", unsafe_allow_html=True)
-    
-            # Judul dengan class CSS baru (Hitam)
-            st.markdown('<div class="detail-header">📋 DETAIL DATABASE</div>', unsafe_allow_html=True)
-            
-            # Ambil data terbaru
-            conn = sqlite3.connect('inventory_logistik.db')
-            df_editor = pd.read_sql_query("SELECT rowid, * FROM reject_list", conn)
-            conn.close()
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;"><p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p><h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2><span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span></div>', unsafe_allow_html=True)
 
-            if filter_view != "SEMUA":
-                df_editor = df_editor[df_editor['CABANG'] == filter_view]
-            
-            df_editor = df_editor.sort_values('rowid', ascending=False)
-
-            # TAMBAHKAN KOLOM 'HAPUS' (Default False)
+            st.markdown('<div class="detail-header">📋 DETAIL DATABASE CLOUD</div>', unsafe_allow_html=True)
+            df_editor = df_final.copy().sort_values('id', ascending=False)
             df_editor['HAPUS'] = False
 
-            # TAMPILAN TABEL INTERAKTIF
             event = st.data_editor(
                 df_editor,
-                column_config={
-                    "rowid": None, # Sembunyikan ID
-                    "HAPUS": st.column_config.CheckboxColumn(
-                        "🗑️",
-                        help="Centang untuk hapus",
-                        default=False,
-                    ),
-                    "TANGGAL_INPUT": st.column_config.TextColumn("WAKTU", width="medium"),
-                    "SKU": st.column_config.TextColumn("SKU", width="small"),
-                },
-                use_container_width=True,
-                hide_index=True, # Indeks angka kiri dimatikan biar bersih
-                key="database_editor"
+                column_config={"id": None, "HAPUS": st.column_config.CheckboxColumn("🗑️", default=False)},
+                use_container_width=True, hide_index=True, key="database_editor"
             )
-# ... (lanjutan setelah st.data_editor)
+
             rows_to_delete = event[event['HAPUS'] == True]
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- SMART BUTTON PANEL ---
             if not rows_to_delete.empty:
-                # Mode 1: Ada yang dicentang (Hapus Selektif)
                 st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
                 if st.button(f"🗑️ HAPUS {len(rows_to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
-                    for rid in rows_to_delete['rowid']:
-                        delete_reject_item(rid)
-                    st.success("Data pilihan berhasil dihapus!")
+                    for rid in rows_to_delete['id']: delete_reject_item(rid)
                     st.rerun()
             else:
-                # Mode 2: Gak ada yang dicentang (Hapus Semua)
-                # Pake warna secondary/biasa biar gak gampang kepencet
                 if st.button("🚨 KOSONGKAN SEMUA DATABASE", use_container_width=True):
-                    # Tambahin konfirmasi biar gak nyesel
                     clear_all_data()
-                    st.success("Seluruh database telah dikosongkan!")
-                    st.rerun()
+
     with tab_match:
-        # --- BOX JUDUL MODEL DARK (KONSISTEN & AMAN DARI TEKS PUTIH) ---
-        st.markdown("""
-            <div style="
-                background-color: #1E1E26; 
-                padding: 15px 20px; 
-                border-radius: 5px; 
-                border-left: 5px solid #007BFF; 
-                margin-bottom: 20px;
-            ">
-                <h3 style="
-                    color: white !important; 
-                    margin: 0; 
-                    font-weight: 700; 
-                    font-size: 1.2rem;
-                    display: flex;
-                    align-items: center;
-                ">
-                    🔍 CROSS-CHECK SKU MATCHING
-                </h3>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Pastikan data ada
+        st.markdown('<div style="background-color: #1E1E26; padding: 15px 20px; border-radius: 5px; border-left: 5px solid #007BFF; margin-bottom: 20px;"><h3 style="color: white !important; margin: 0; font-weight: 700; font-size: 1.2rem; display: flex; align-items: center;">🔍 CROSS-CHECK SKU MATCHING</h3></div>', unsafe_allow_html=True)
         if 'df_match_result' in locals() and not df_match_result.empty:
-            # --- BOX METRICS GELAP ---
             m_col1, m_col2 = st.columns(2)
-            
             with m_col1:
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;">
-                        <p style="color: #888; margin: 0; font-size: 0.8rem;">MATCH FOUND</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{len(df_match_result)} Items</h2>
-                    </div>
-                """, unsafe_allow_html=True)
-
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;"><p style="color: #888; margin: 0; font-size: 0.8rem;">MATCH FOUND</p><h2 style="color: white; margin: 0; font-weight: 800;">{len(df_match_result)} Items</h2></div>', unsafe_allow_html=True)
             with m_col2:
-                st.markdown(f"""
-                    <div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #6c757d;">
-                        <p style="color: #888; margin: 0; font-size: 0.8rem;">UNIQUE SKU</p>
-                        <h2 style="color: white; margin: 0; font-weight: 800;">{df_match_result['SKU'].nunique()}</h2>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #6c757d;"><p style="color: #888; margin: 0; font-size: 0.8rem;">UNIQUE SKU</p><h2 style="color: white; margin: 0; font-weight: 800;">{df_match_result["sku"].nunique()}</h2></div>', unsafe_allow_html=True)
             
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- LOGIKA PIVOT (CEK CABANG MANA SAJA) ---
-            df_core = df_match_result[['SKU', 'ARTICLE_NAME']].drop_duplicates()
-            df_temp = df_match_result[['SKU', 'CABANG']].drop_duplicates()
-            
-            # Buat tabel centang per cabang
-            df_pivot = df_temp.pivot(index='SKU', columns='CABANG', values='CABANG').notna()
+            # PIVOT LOGIC
+            df_core = df_match_result[['sku', 'article_name']].drop_duplicates()
+            df_temp = df_match_result[['sku', 'cabang']].drop_duplicates()
+            df_pivot = df_temp.pivot(index='sku', columns='cabang', values='cabang').notna()
             df_pivot = df_pivot.replace({True: '✅', False: ''})
-            
-            df_final_match = df_core.merge(df_pivot, on='SKU', how='left')
+            df_final_match = df_core.merge(df_pivot, on='sku', how='left')
 
-            # --- TABEL HASIL ---
-            # --- TABEL HASIL (VERSI ANTI-GAGAL) ---
-            st.markdown("""
-                <div style="margin-bottom: 10px; padding: 5px 0;">
-                    <span style="
-                        color: #000000 !important; 
-                        font-size: 1.1rem !important; 
-                        font-weight: 800 !important;
-                        display: inline-block !important;
-                        -webkit-text-fill-color: #000000 !important;
-                    ">
-                        📋 Summary match SKU
-                    </span>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st.data_editor(
-                df_final_match,
-                column_config={
-                    "SKU": st.column_config.TextColumn("SKU", width="small"),
-                    "ARTICLE_NAME": st.column_config.TextColumn("NAMA BARANG", width="medium"),
-                },
-                use_container_width=True,
-                hide_index=True,
-                key="match_pivot_final"
-            )
-
+            st.markdown('<div style="margin-bottom: 10px; padding: 5px 0;"><span style="color: #000000 !important; font-size: 1.1rem !important; font-weight: 800 !important;">📋 Summary match SKU</span></div>', unsafe_allow_html=True)
+            st.data_editor(df_final_match, use_container_width=True, hide_index=True, key="match_pivot_final")
         else:
-            st.success("✅ Tidak ditemukan duplikasi SKU untuk kategori Non-Standar.")
+            st.success("✅ Tidak ditemukan duplikasi SKU.")
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
