@@ -6128,7 +6128,6 @@ def sync_data():
 if 'db_report' not in st.session_state:
     sync_data()
 
-if menu == "Reporting & PIC:
 # --- 3. FULL CSS (GABUNGAN SEMUA STYLE) ---
 st.markdown("""
     <style>
@@ -6177,8 +6176,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
+if selected == "Reporting & PIC:
 # --- 4. MAIN UI ---
-st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
 
 list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
 current_user = st.selectbox("👤 Pilih Nama:", list_pic)
