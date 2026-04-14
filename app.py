@@ -6241,15 +6241,23 @@ if menu == "Reporting & PIC":
             td_done = sum(1 for i in st.session_state.todo_list if i['done'])
             td_prog = (td_done / td_total * 100) if td_total > 0 else 0
             
-            # Progress To-Do dengan teks putih paksa
-            st.markdown(f"""
-            <div class="report-card" style="border-left-color: #10b981;">
-                <b style="color: white !important; display: block; margin-bottom: 5px;">📝 To-Do Progress</b>
-                <div style="background:#374151; border-radius:5px; height:12px; width:100%;">
-                    <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
-                </div>
+            # --- PROGRESS TO DO LIST DENGAN ANGKA (1/5) ---
+        st.divider()
+        td_total = len(st.session_state.todo_list)
+        td_done = sum(1 for i in st.session_state.todo_list if i['done'])
+        td_prog = (td_done / td_total * 100) if td_total > 0 else 0
+        
+        st.markdown(f"""
+        <div class="report-card" style="border-left-color: #10b981;">
+            <div style="display: flex; justify-content: space-between; color: white !important; margin-bottom: 5px;">
+                <b>📝 To-Do Progress</b>
+                <span style="font-weight: 800;">{td_done} / {td_total}</span>
             </div>
-            """, unsafe_allow_html=True)
+            <div style="background:#374151; border-radius:5px; height:12px; width:100%;">
+                <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col_kanan:
         st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3 style="color:white !important; margin:0;">📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
