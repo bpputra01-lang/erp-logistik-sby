@@ -6060,28 +6060,25 @@ def update_report_status(laporan_name):
                 item['Status'] = "✅ Selesai"
 
 import pandas as pd
-import random
-import math
-from datetime import datetime
 import streamlit as st
 from supabase import create_client, Client
 
 # --- 1. KONEKSI SUPABASE ---
-# Masukkan data asli dari dashboard lu (image_618beb.png)
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI" # Ini juga jangan lupa diganti!
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 
-# Pastikan URL sudah benar sebelum memanggil fungsi ini
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
     st.error(f"Koneksi Gagal: {e}")
-# --- 2. FUNGSI SINKRONISASI (VERSI CLOUD) ---
+
+# --- 2. FUNGSI SINKRONISASI ---
 def sync_data():
     """Tarik data dari Supabase ke Session State"""
-    # A. Tarik Data Reports
-    res_reports = supabase.table("reports").select("*").execute()
-    # Jika tabel masih kosong, isi dengan default
+    # Ambil Data Reports
+    res_reports = supabase.table("reports").select("*").order("id").execute()
+    
+    # Isi default jika kosong (Jezpro Logistics List)
     if not res_reports.data:
         default_reports = [
             {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
@@ -6104,30 +6101,49 @@ def sync_data():
             {"laporan": "TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"}
         ]
         supabase.table("reports").insert(default_reports).execute()
-        res_reports = supabase.table("reports").select("*").execute()
+        res_reports = supabase.table("reports").select("*").order("id").execute()
 
     st.session_state.db_report = [{"Laporan": r['laporan'], "PIC": r['pic'], "Status": r['status']} for r in res_reports.data]
 
-    # B. Tarik Data To Do List
+    # Ambil Data To Do List
     res_todo = supabase.table("todo").select("*").order("id").execute()
-    st.session_state.todo_list = [{"task": t['task'], "done": t['done']} for t in res_todo.data]
+    st.session_state.todo_list = [{"id": t['id'], "task": t['task'], "done": t['done']} for t in res_todo.data]
 
-# --- LOGIC UPDATE STATUS REPORT ---
-# (Ganti bagian button update di tab_me lu jadi ini)
-if st.button(f"Update", key=f"up_dark_{idx}"):
-    supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
+# Inisialisasi awal
+if 'db_report' not in st.session_state:
     sync_data()
-    st.rerun()
 
-# --- LOGIC TAMBAH TODO ---
-if submit_tugas and tugas_baru:
-    supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
-    sync_data()
-    st.rerun()
+# --- 3. UI DISPLAY & LOGIC ---
+st.title("ERP LOGISTIK - TEAM SUMMARY")
 
-# --- LOGIC CHECKBOX TODO ---
-if res != item['done']:
-    supabase.table("todo").update({"done": res}).eq("task", item['task']).execute()
-    sync_data()
-    st.rerun()
+# Tab Laporan
+for idx, task in enumerate(st.session_state.db_report):
+    col1, col2, col3 = st.columns([3, 2, 1])
+    col1.write(task['Laporan'])
+    col2.write(f"PIC: {task['PIC']}")
+    
+    # Tombol Update berada di dalam Loop agar idx dan task terbaca
+    if col3.button(f"Update", key=f"up_dark_{idx}"):
+        supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
+        sync_data()
+        st.rerun()
 
+st.divider()
+
+# Tab To Do List
+st.subheader("To Do List")
+with st.form("tambah_todo"):
+    tugas_baru = st.text_input("Tambah Tugas Baru")
+    submit_tugas = st.form_submit_button("Tambah")
+    if submit_tugas and tugas_baru:
+        supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
+        sync_data()
+        st.rerun()
+
+for item in st.session_state.todo_list:
+    # Checkbox logic
+    res = st.checkbox(item['task'], value=item['done'], key=f"todo_{item['id']}")
+    if res != item['done']:
+        supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
+        sync_data()
+        st.rerun()
