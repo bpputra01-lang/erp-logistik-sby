@@ -6296,22 +6296,28 @@ if menu == "Reporting & PIC":
                     sync_data()
                     st.rerun()
 
-        # 4. NAVIGASI HALAMAN (PASTIKAN MENOROK KE KANAN)
+        # --- Navigasi Halaman yang Dirapatkan ---
         if total_pages > 1:
-            st.write("") # Jarak tambahan
-            p1, p2, p3 = st.columns([1, 2, 1])
+            # Gunakan perbandingan kolom yang lebih sempit di tengah (0.5)
+            # biar tombol kiri dan kanan lebih mendekat ke angka
+            st.write("") 
+            p1, p2, p3 = st.columns([1, 0.5, 1]) 
             
-            if p1.button("⬅️") and curr_p > 1:
-                st.session_state.todo_page = curr_p - 1
-                st.rerun()
-                
-            # PAKSA WARNA PUTIH & BOLD
-            p2.markdown(f"""
-                <div style="text-align:center; color: #FFFFFF !important; font-weight: 800; font-size: 1.1rem; padding-top: 5px;">
-                    {curr_p} / {total_pages}
-                </div>
-            """, unsafe_allow_html=True)
+            with p1:
+                if st.button("⬅️", key="prev_todo") and curr_p > 1:
+                    st.session_state.todo_page = curr_p - 1
+                    st.rerun()
             
-            if p3.button("➡️") and curr_p < total_pages:
-                st.session_state.todo_page = curr_p + 1
-                st.rerun()
+            with p2:
+                # Teks angka halaman dengan padding atas dikit biar sejajar tombol
+                st.markdown(f"""
+                    <div style="text-align:center; color: white !important; 
+                                font-weight: 800; font-size: 1rem; margin-top: 8px;">
+                        {curr_p}/{total_pages}
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with p3:
+                if st.button("➡️", key="next_todo") and curr_p < total_pages:
+                    st.session_state.todo_page = curr_p + 1
+                    st.rerun()
