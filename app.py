@@ -6266,7 +6266,7 @@ if menu == "Reporting & PIC":
     with col_kanan:
         st.markdown('''
         <div style="background-color:#1f2937; padding:15px; border-radius:10px; border:1px solid #3b82f6; text-align:center;">
-            <h3 style="color: white !important; margin:0; font-weight: 800;">📝 TO DO LIST</h3>
+            <h3 style="color: #000000 !important; margin:0; font-weight: 800;">📝 TO DO LIST</h3>
         </div>
     ''', unsafe_allow_html=True)
         
