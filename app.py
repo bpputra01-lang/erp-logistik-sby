@@ -6177,14 +6177,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-if selected == "Reporting & PIC:
-# --- 4. MAIN UI ---
+# --- 4. MAIN UI (PASTIKAN KUTIPAN DITUTUP & INDENTASI BENAR) ---
+if selected == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
 
-list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
-current_user = st.selectbox("👤 Pilih Nama:", list_pic)
-
-col_kiri, col_kanan = st.columns([1.8, 1])
+    list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
+    current_user = st.selectbox("👤 Pilih Nama:", list_pic)
 
 with col_kiri:
     tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
