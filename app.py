@@ -6178,7 +6178,7 @@ st.markdown("""
 
 
 # --- 4. MAIN UI (PASTIKAN KUTIPAN DITUTUP & INDENTASI BENAR) ---
-if selected == "Reporting & PIC":
+if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
 
     list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
