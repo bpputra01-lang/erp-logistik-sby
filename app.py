@@ -2733,7 +2733,7 @@ def menu_retur_out_system():
                     st.success("Data berhasil dihapus dari Cloud!")
                     st.rerun()
         else:
-            st.info("💡 Cloud Database V3 masih kosong. Silakan upload file.")
+            st.info("❌ Data kosong, Silakan upload file.")
 
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Cloud Database: {e}")
