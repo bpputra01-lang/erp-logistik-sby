@@ -2899,9 +2899,25 @@ import datetime as dt_logic
 from io import BytesIO
 import plotly.express as px
 
-# --- 1. DATABASE ENGINE (MIGRATED TO SUPABASE) ---
-# Menggunakan st.connection agar konsisten dengan secrets.toml
-conn = st.connection("supabase", type=SupabaseConnection)
+import streamlit as st
+import pandas as pd
+from st_supabase_connection import SupabaseConnection
+import datetime as dt_logic
+from io import BytesIO
+import plotly.express as px
+
+# --- 1. DATABASE ENGINE (DIRECT INITIALIZATION) ---
+# Gue ganti logic-nya biar langsung nembak URL & KEY lu biar gak error ConnectionRefused lagi.
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+
+# Inisialisasi koneksi dengan bypass secrets
+conn = st.connection(
+    "supabase",
+    type=SupabaseConnection,
+    url=SUPABASE_URL,
+    key=SUPABASE_KEY
+)
 
 def save_data(df):
     # Supabase butuh list of dicts. Nama kolom case-sensitive (disarankan lowercase di DB)
