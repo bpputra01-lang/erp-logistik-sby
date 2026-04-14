@@ -3383,6 +3383,23 @@ def project_approval_reject():
             background-color: #1a1c27; border: 1px solid #3d4156;
             padding: 20px; border-radius: 12px; margin-bottom: 20px;
         }
+        /* Fix Input Box biar gak item sendirian di Light Mode */
+        div[data-testid="stTextInput"] input, 
+        div[data-testid="stTextArea"] textarea {
+            background-color: #1a1c27 !important;
+            color: white !important;
+            border: 1px solid #3d4156 !important;
+        }
+
+        /* Fix teks label biar gak ilang */
+        label p {
+            color: #E0E0E0 !important;
+        }
+
+        /* Naikin garis timeline biar lurus (di screenshot lu agak turun) */
+        .timeline-line {
+            margin-top: -12px !important; 
+        }
         [data-testid="stForm"] { border: none !important; padding: 0 !important; }
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
