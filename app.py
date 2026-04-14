@@ -6087,10 +6087,16 @@ def sync_data():
         # Jika tabel tracker kosong, masukkan tanggal hari ini
         supabase.table("reset_tracker").insert({"last_date": today}).execute()
     elif res_date.data[0]['last_date'] != today:
-        # JIKA GANTI HARI: Reset semua status laporan & todo
+        # JIKA GANTI HARI: Reset semua status laporan
+        # Filter: Update semua yang statusnya bukan 'Belum'
         supabase.table("reports").update({"status": "❌ Belum"}).neq("status", "❌ Belum").execute()
-        supabase.table("todo").update({"done": False}).execute()
-        supabase.table("reset_tracker").update({"last_date": today}).eq("id", res_date.data[0]['id']).execute()
+    
+        # Reset To Do List (Beri filter agar tidak APIError)
+        # Filter: Update semua yang done-nya True menjadi False
+        supabase.table("todo").update({"done": False}).eq("done", True).execute()
+    
+    # Update tanggal tracker
+    supabase.table("reset_tracker").update({"last_date": today}).eq("id", res_date.data[0]['id']).execute()
 
     # B. Tarik data Reports
     res_reports = supabase.table("reports").select("*").order("id").execute()
