@@ -6067,6 +6067,7 @@ from supabase import create_client, Client
 
 # --- 1. KONEKSI SUPABASE ---
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+# Gunakan Secret Key lu di sini
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 
 try:
@@ -6076,12 +6077,25 @@ except Exception as e:
 
 # --- 2. FUNGSI SINKRONISASI & RESET HARIAN ---
 def sync_data():
-    """Tarik data dari Supabase ke Session State & Cegah Duplikat"""
+    """Tarik data dari Supabase ke Session State & Handle Reset Harian"""
     
-    # 1. Tarik data yang sudah ada
+    # A. Cek & Reset Harian (Logika Tambahan)
+    today = datetime.now().strftime('%Y-%m-%d')
+    res_date = supabase.table("reset_tracker").select("*").execute()
+    
+    if not res_date.data:
+        # Jika tabel tracker kosong, masukkan tanggal hari ini
+        supabase.table("reset_tracker").insert({"last_date": today}).execute()
+    elif res_date.data[0]['last_date'] != today:
+        # JIKA GANTI HARI: Reset semua status laporan & todo
+        supabase.table("reports").update({"status": "❌ Belum"}).neq("status", "❌ Belum").execute()
+        supabase.table("todo").update({"done": False}).execute()
+        supabase.table("reset_tracker").update({"last_date": today}).eq("id", res_date.data[0]['id']).execute()
+
+    # B. Tarik data Reports
     res_reports = supabase.table("reports").select("*").order("id").execute()
     
-    # 2. HANYA INSERT JIKA TABEL KOSONG (Cegah Double)
+    # C. Inisialisasi Data Default jika kosong (Cegah Double)
     if not res_reports.data:
         default_reports = [
             {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
@@ -6104,20 +6118,20 @@ def sync_data():
             {"laporan": "TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"}
         ]
         supabase.table("reports").insert(default_reports).execute()
-        # Ambil ulang setelah insert
         res_reports = supabase.table("reports").select("*").order("id").execute()
 
-    # 3. Masukkan ke Session State
+    # Simpan ke Session State
     st.session_state.db_report = [{"Laporan": r['laporan'], "PIC": r['pic'], "Status": r['status']} for r in res_reports.data]
-    # C. Tarik Data To Do List
+    
+    # D. Tarik Data To Do List
     res_todo = supabase.table("todo").select("*").order("id").execute()
     st.session_state.todo_list = [{"id": t['id'], "task": t['task'], "done": t['done']} for t in res_todo.data]
 
-# Inisialisasi State
+# Inisialisasi State Awal
 if 'db_report' not in st.session_state:
     sync_data()
 
-# --- 3. CSS DARK THEME (PERSIS PUNYA LU) ---
+# --- 3. CSS DARK THEME ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -6169,8 +6183,30 @@ with col_kiri:
                         st.button("Selesai", disabled=True, key=f"done_{idx}")
 
     with tab_all:
-        st.subheader("📊 Team Progress")
-        # Logika Progress Bar tiap PIC ada di sini (sama seperti logic lu sebelumnya)
+        st.subheader("📊 Team Progress Summary")
+        # --- PERBAIKAN LOGIKA SUMMARY ---
+        pic_stats = {}
+        for t in st.session_state.db_report:
+            pic = t['PIC']
+            if pic not in pic_stats:
+                pic_stats[pic] = {"total": 0, "selesai": 0}
+            pic_stats[pic]["total"] += 1
+            if t['Status'] == "✅ Selesai":
+                pic_stats[pic]["selesai"] += 1
+
+        for pic, stats in pic_stats.items():
+            progress = (stats['selesai'] / stats['total']) * 100
+            st.markdown(f"""
+            <div class="report-card" style="border-left: 5px solid #3b82f6; margin-bottom:15px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <b>👤 {pic}</b>
+                    <span>{stats['selesai']}/{stats['total']} Selesai</span>
+                </div>
+                <div style="background-color: #374151; border-radius: 5px; margin-top: 8px; height: 8px;">
+                    <div style="background-color: #3b82f6; width: {progress}%; height: 8px; border-radius: 5px;"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 with col_kanan:
     st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3>📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
@@ -6182,7 +6218,6 @@ with col_kanan:
             sync_data()
             st.rerun()
 
-    # LOGIC PAGINATION (3 ITEM PER HALAMAN)
     items_per_page = 3
     total_items = len(st.session_state.todo_list)
     total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
@@ -6194,7 +6229,8 @@ with col_kanan:
 
     for item in current_todo:
         c1, c2 = st.columns([4, 1])
-        c1.markdown(f'<div style="background:#111827;padding:10px;border-radius:8px;border-left:4px solid #3b82f6;">{item["task"]}</div>', unsafe_allow_html=True)
+        color_border = '#10b981' if item['done'] else '#3b82f6'
+        c1.markdown(f'<div style="background:#111827;padding:10px;border-radius:8px;border-left:4px solid {color_border};">{item["task"]}</div>', unsafe_allow_html=True)
         res = c2.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
         if res != item['done']:
             supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
