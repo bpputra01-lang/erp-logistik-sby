@@ -5544,8 +5544,8 @@ from supabase import create_client # Pastikan sudah install: pip install supabas
 
 # 1. Inisialisasi Supabase (Taruh di sini!)
 # Ganti URL dan KEY dengan punya lu yang ada di Dashboard Supabase (Project Settings > API)
-URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co" # Dari image_618beb.png
-KEY = "MASUKKAN_ANON_KEY_LU" 
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 # Variabel ini yang dicari sama fungsi get_karyawan()
 supabase = create_client(URL, KEY)
 # --- 1. FUNGSI SINKRONISASI SUPABASE ---
