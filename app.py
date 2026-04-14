@@ -3372,7 +3372,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def project_approval_reject():
     # 1. Inisialisasi Koneksi di awal fungsi
-    conn = get_db_connection() 
 
     # --- CSS (Tetap Utuh) --- 
     st.markdown(""" 
@@ -3570,9 +3569,6 @@ def project_approval_reject():
                                 if st.button(f"Konfirmasi Hapus {row['sku']}", key=f"d_{cabang_name}_{row['id']}"): 
                                     conn.execute("DELETE FROM submissions WHERE id = ?", (row['id'],)) 
                                     conn.commit(); st.rerun() 
-
-    # 2. TUTUP KONEKSI DI AKHIR FUNGSI (Sejajar dengan baris pertama fungsi)
-    conn.close()
 
 
 
