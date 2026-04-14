@@ -3576,7 +3576,7 @@ def project_approval_reject():
                                     conn.execute("DELETE FROM submissions WHERE id = ?", (row['id'],)) 
                                     conn.commit(); st.rerun() 
 
-conn.close()
+    conn.close()
 
 
 
