@@ -5579,14 +5579,15 @@ if menu == "Logistic Schedule":
                 border: 1px solid rgba(255, 255, 255, 0.1);
             }
 
-            /* 1.5 Sub-Header Stylings */
-            div[data-testid="stVerticalBlock"] h3 {
+            /* FIX: Gunakan [data-testid="stMain"] agar Sidebar TIDAK IKUT TERGANTI */
+            [data-testid="stMain"] div[data-testid="stVerticalBlock"] h3 {
                 color: #000000 !important;
                 border-left: 5px solid #0062E6;
                 padding-left: 15px;
                 font-weight: 700;
                 text-transform: uppercase;
                 letter-spacing: 1px;
+                margin-top: 20px;
             }
 
             /* Tombol hapus kecil */
@@ -5616,8 +5617,8 @@ if menu == "Logistic Schedule":
                 box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
             }
 
-            /* Font & Labels */
-            label { 
+            /* Font & Labels - Batasi juga ke area Main agar label sidebar aman */
+            [data-testid="stMain"] label { 
                 color: #B0B3B8 !important; 
                 font-size: 14px !important;
                 font-weight: 500 !important;
@@ -5639,7 +5640,7 @@ if menu == "Logistic Schedule":
             .card-subtext { color: #888888 !important; font-size: 12px; }
         </style>
     """, unsafe_allow_html=True)
-
+    
     st.markdown('<div class="hero-header">📅 LOGISTIC SCHEDULE MAKER</div>', unsafe_allow_html=True)
 
     # --- 1. DATABASE TIM ---
