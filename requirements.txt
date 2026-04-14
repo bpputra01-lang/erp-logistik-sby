@@ -13,3 +13,4 @@ streamlit-autorefresh
 supabase
 sqlalchemy
 psycopg2-binary
+st-supabase-connection
