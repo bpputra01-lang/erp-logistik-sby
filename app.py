@@ -5540,7 +5540,14 @@ import pandas as pd
 import random
 from datetime import datetime, timedelta
 import streamlit as st
+from supabase import create_client # Pastikan sudah install: pip install supabase
 
+# 1. Inisialisasi Supabase (Taruh di sini!)
+# Ganti URL dan KEY dengan punya lu yang ada di Dashboard Supabase (Project Settings > API)
+URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co" # Dari image_618beb.png
+KEY = "MASUKKAN_ANON_KEY_LU" 
+# Variabel ini yang dicari sama fungsi get_karyawan()
+supabase = create_client(URL, KEY)
 # --- 1. FUNGSI SINKRONISASI SUPABASE ---
 def get_karyawan():
     res = supabase.table("karyawan").select("*").execute()
@@ -5814,7 +5821,7 @@ if menu == "Logistic Schedule":
             target = 9 if k['tipe'] == "Part-Full" else 6
             sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": "✅ OK" if t >= target else "⚠️ KURANG"})
         st.dataframe(pd.DataFrame(sum_data), use_container_width=True, hide_index=True)
-        
+
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
