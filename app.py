@@ -6178,11 +6178,16 @@ st.markdown("""
 
 
 # --- 4. MAIN UI (PASTIKAN KUTIPAN DITUTUP & INDENTASI BENAR) ---
+# --- 4. MAIN UI ---
+# Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar
 if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
 
     list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
     current_user = st.selectbox("👤 Pilih Nama:", list_pic)
+
+    # Kolom harus didefinisikan DI DALAM blok IF
+    col_kiri, col_kanan = st.columns([1.8, 1])
 
     with col_kiri:
         tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
@@ -6192,7 +6197,13 @@ if menu == "Reporting & PIC":
                 if task['PIC'] == current_user:
                     ck1, ck2 = st.columns([4, 1.2])
                     with ck1:
-                        st.markdown(f'<div class="report-card"><h4 style="margin:0;">{task["Laporan"]}</h4><small>Status: {task["Status"]}</small></div>', unsafe_allow_html=True)
+                        # Tambah inline style white !important agar teks fix putih
+                        st.markdown(f'''
+                            <div class="report-card">
+                                <h4 style="margin:0; color:white !important;">{task["Laporan"]}</h4>
+                                <small style="color:white !important;">Status: {task["Status"]}</small>
+                            </div>
+                        ''', unsafe_allow_html=True)
                     with ck2:
                         st.write("")
                         if task['Status'] == "❌ Belum":
@@ -6216,29 +6227,32 @@ if menu == "Reporting & PIC":
                 prog = (stats['selesai'] / stats['total']) * 100
                 st.markdown(f"""
                 <div class="report-card">
-                    <div style="display: flex; justify-content: space-between;"><b>👤 {pic}</b><span>{stats['selesai']}/{stats['total']}</span></div>
+                    <div style="display: flex; justify-content: space-between; color: white !important;">
+                        <b>👤 {pic}</b><span>{stats['selesai']}/{stats['total']}</span>
+                    </div>
                     <div style="background:#374151; border-radius:5px; margin-top:8px; height:8px;">
                         <div style="background:#3b82f6; width:{prog}%; height:8px; border-radius:5px;"></div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # --- PROGRESS TO DO LIST ---
             st.divider()
             td_total = len(st.session_state.todo_list)
             td_done = sum(1 for i in st.session_state.todo_list if i['done'])
             td_prog = (td_done / td_total * 100) if td_total > 0 else 0
+            
+            # Progress To-Do dengan teks putih paksa
             st.markdown(f"""
             <div class="report-card" style="border-left-color: #10b981;">
-                <b>📝 To-Do Progress</b>
-                <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px;">
+                <b style="color: white !important; display: block; margin-bottom: 5px;">📝 To-Do Progress</b>
+                <div style="background:#374151; border-radius:5px; height:12px; width:100%;">
                     <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
     with col_kanan:
-        st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3>📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
+        st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3 style="color:white !important; margin:0;">📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
         
         with st.form("todo_form", clear_on_submit=True):
             tugas_baru = st.text_input("Tugas Baru:")
@@ -6250,14 +6264,12 @@ if menu == "Reporting & PIC":
         items_per_page = 3
         total_items = len(st.session_state.todo_list)
         total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
-        if 'todo_page' not in st.session_state: st.session_state.todo_page = 1
         
-        start = (st.session_state.todo_page - 1) * items_per_page
+        start = (st.session_state.get('todo_page', 1) - 1) * items_per_page
         current_todo = st.session_state.todo_list[start : start + items_per_page]
 
         for item in current_todo:
             c1, c2 = st.columns([4, 1])
-            # Warna border berubah kalau done
             bd_color = "#10b981" if item['done'] else "#3b82f6"
             c1.markdown(f'<div style="background:#111827;padding:12px;border-radius:8px;border-left:4px solid {bd_color};color:white;">{item["task"]}</div>', unsafe_allow_html=True)
             res = c2.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
@@ -6268,10 +6280,10 @@ if menu == "Reporting & PIC":
 
         if total_pages > 1:
             p1, p2, p3 = st.columns([1,2,1])
-            if p1.button("⬅️") and st.session_state.todo_page > 1:
+            if p1.button("⬅️") and st.session_state.get('todo_page', 1) > 1:
                 st.session_state.todo_page -= 1
                 st.rerun()
-            p2.markdown(f"<p style='text-align:center;'>{st.session_state.todo_page}/{total_pages}</p>", unsafe_allow_html=True)
-            if p3.button("➡️") and st.session_state.todo_page < total_pages:
-                st.session_state.todo_page += 1
+            p2.markdown(f"<p style='text-align:center; color:white;'>{st.session_state.get('todo_page', 1)}/{total_pages}</p>", unsafe_allow_html=True)
+            if p3.button("➡️") and st.session_state.get('todo_page', 1) < total_pages:
+                st.session_state.todo_page = st.session_state.get('todo_page', 1) + 1
                 st.rerun()
