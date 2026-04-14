@@ -6200,7 +6200,7 @@ if menu == "Reporting & PIC":
                         # Ukuran font judul dikecilkan jadi 0.95rem dan status 0.8rem
                         st.markdown(f'''
                             <div class="report-card" style="margin-bottom: 10px; padding: 12px;">
-                                <div style="color: white !important; font-weight: 600; font-size: 2rem; line-height: 1.2;">
+                                <div style="color: white !important; font-weight: 600; font-size: 1.5rem; line-height: 1.2;">
                                     {task["Laporan"]}
                                 </div>
                                 <div style="color: #9ca3af !important; font-size: 0.8rem; margin-top: 4px;">
