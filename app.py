@@ -6184,94 +6184,94 @@ if menu == "Reporting & PIC":
     list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
     current_user = st.selectbox("👤 Pilih Nama:", list_pic)
 
-with col_kiri:
-    tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
-    
-    with tab_me:
-        for idx, task in enumerate(st.session_state.db_report):
-            if task['PIC'] == current_user:
-                ck1, ck2 = st.columns([4, 1.2])
-                with ck1:
-                    st.markdown(f'<div class="report-card"><h4 style="margin:0;">{task["Laporan"]}</h4><small>Status: {task["Status"]}</small></div>', unsafe_allow_html=True)
-                with ck2:
-                    st.write("")
-                    if task['Status'] == "❌ Belum":
-                        if st.button("Update", key=f"up_{idx}"):
-                            supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
-                            sync_data()
-                            st.rerun()
-                    else:
-                        st.button("Selesai", disabled=True, key=f"done_{idx}")
+    with col_kiri:
+        tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
+        
+        with tab_me:
+            for idx, task in enumerate(st.session_state.db_report):
+                if task['PIC'] == current_user:
+                    ck1, ck2 = st.columns([4, 1.2])
+                    with ck1:
+                        st.markdown(f'<div class="report-card"><h4 style="margin:0;">{task["Laporan"]}</h4><small>Status: {task["Status"]}</small></div>', unsafe_allow_html=True)
+                    with ck2:
+                        st.write("")
+                        if task['Status'] == "❌ Belum":
+                            if st.button("Update", key=f"up_{idx}"):
+                                supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
+                                sync_data()
+                                st.rerun()
+                        else:
+                            st.button("Selesai", disabled=True, key=f"done_{idx}")
 
-    with tab_all:
-        st.subheader("📊 Team Progress Summary")
-        pic_stats = {}
-        for t in st.session_state.db_report:
-            pic = t['PIC']
-            if pic not in pic_stats: pic_stats[pic] = {"total": 0, "selesai": 0}
-            pic_stats[pic]["total"] += 1
-            if t['Status'] == "✅ Selesai": pic_stats[pic]["selesai"] += 1
+        with tab_all:
+            st.subheader("📊 Team Progress Summary")
+            pic_stats = {}
+            for t in st.session_state.db_report:
+                pic = t['PIC']
+                if pic not in pic_stats: pic_stats[pic] = {"total": 0, "selesai": 0}
+                pic_stats[pic]["total"] += 1
+                if t['Status'] == "✅ Selesai": pic_stats[pic]["selesai"] += 1
 
-        for pic, stats in pic_stats.items():
-            prog = (stats['selesai'] / stats['total']) * 100
+            for pic, stats in pic_stats.items():
+                prog = (stats['selesai'] / stats['total']) * 100
+                st.markdown(f"""
+                <div class="report-card">
+                    <div style="display: flex; justify-content: space-between;"><b>👤 {pic}</b><span>{stats['selesai']}/{stats['total']}</span></div>
+                    <div style="background:#374151; border-radius:5px; margin-top:8px; height:8px;">
+                        <div style="background:#3b82f6; width:{prog}%; height:8px; border-radius:5px;"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # --- PROGRESS TO DO LIST ---
+            st.divider()
+            td_total = len(st.session_state.todo_list)
+            td_done = sum(1 for i in st.session_state.todo_list if i['done'])
+            td_prog = (td_done / td_total * 100) if td_total > 0 else 0
             st.markdown(f"""
-            <div class="report-card">
-                <div style="display: flex; justify-content: space-between;"><b>👤 {pic}</b><span>{stats['selesai']}/{stats['total']}</span></div>
-                <div style="background:#374151; border-radius:5px; margin-top:8px; height:8px;">
-                    <div style="background:#3b82f6; width:{prog}%; height:8px; border-radius:5px;"></div>
+            <div class="report-card" style="border-left-color: #10b981;">
+                <b>📝 To-Do Progress</b>
+                <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px;">
+                    <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # --- PROGRESS TO DO LIST ---
-        st.divider()
-        td_total = len(st.session_state.todo_list)
-        td_done = sum(1 for i in st.session_state.todo_list if i['done'])
-        td_prog = (td_done / td_total * 100) if td_total > 0 else 0
-        st.markdown(f"""
-        <div class="report-card" style="border-left-color: #10b981;">
-            <b>📝 To-Do Progress</b>
-            <div style="background:#374151; border-radius:5px; margin-top:8px; height:12px;">
-                <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    with col_kanan:
+        st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3>📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
+        
+        with st.form("todo_form", clear_on_submit=True):
+            tugas_baru = st.text_input("Tugas Baru:")
+            if st.form_submit_button("➕ Tambah") and tugas_baru:
+                supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
+                sync_data()
+                st.rerun()
 
-with col_kanan:
-    st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3>📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
-    
-    with st.form("todo_form", clear_on_submit=True):
-        tugas_baru = st.text_input("Tugas Baru:")
-        if st.form_submit_button("➕ Tambah") and tugas_baru:
-            supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
-            sync_data()
-            st.rerun()
+        items_per_page = 3
+        total_items = len(st.session_state.todo_list)
+        total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
+        if 'todo_page' not in st.session_state: st.session_state.todo_page = 1
+        
+        start = (st.session_state.todo_page - 1) * items_per_page
+        current_todo = st.session_state.todo_list[start : start + items_per_page]
 
-    items_per_page = 3
-    total_items = len(st.session_state.todo_list)
-    total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
-    if 'todo_page' not in st.session_state: st.session_state.todo_page = 1
-    
-    start = (st.session_state.todo_page - 1) * items_per_page
-    current_todo = st.session_state.todo_list[start : start + items_per_page]
+        for item in current_todo:
+            c1, c2 = st.columns([4, 1])
+            # Warna border berubah kalau done
+            bd_color = "#10b981" if item['done'] else "#3b82f6"
+            c1.markdown(f'<div style="background:#111827;padding:12px;border-radius:8px;border-left:4px solid {bd_color};color:white;">{item["task"]}</div>', unsafe_allow_html=True)
+            res = c2.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
+            if res != item['done']:
+                supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
+                sync_data()
+                st.rerun()
 
-    for item in current_todo:
-        c1, c2 = st.columns([4, 1])
-        # Warna border berubah kalau done
-        bd_color = "#10b981" if item['done'] else "#3b82f6"
-        c1.markdown(f'<div style="background:#111827;padding:12px;border-radius:8px;border-left:4px solid {bd_color};color:white;">{item["task"]}</div>', unsafe_allow_html=True)
-        res = c2.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
-        if res != item['done']:
-            supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
-            sync_data()
-            st.rerun()
-
-    if total_pages > 1:
-        p1, p2, p3 = st.columns([1,2,1])
-        if p1.button("⬅️") and st.session_state.todo_page > 1:
-            st.session_state.todo_page -= 1
-            st.rerun()
-        p2.markdown(f"<p style='text-align:center;'>{st.session_state.todo_page}/{total_pages}</p>", unsafe_allow_html=True)
-        if p3.button("➡️") and st.session_state.todo_page < total_pages:
-            st.session_state.todo_page += 1
-            st.rerun()
+        if total_pages > 1:
+            p1, p2, p3 = st.columns([1,2,1])
+            if p1.button("⬅️") and st.session_state.todo_page > 1:
+                st.session_state.todo_page -= 1
+                st.rerun()
+            p2.markdown(f"<p style='text-align:center;'>{st.session_state.todo_page}/{total_pages}</p>", unsafe_allow_html=True)
+            if p3.button("➡️") and st.session_state.todo_page < total_pages:
+                st.session_state.todo_page += 1
+                st.rerun()
