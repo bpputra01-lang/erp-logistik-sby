@@ -5540,15 +5540,14 @@ import pandas as pd
 import random
 from datetime import datetime, timedelta
 import streamlit as st
-from supabase import create_client # Pastikan sudah install: pip install supabase
+from supabase import create_client
 
-# 1. Inisialisasi Supabase
+# 1. INISIALISASI SUPABASE
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
-
-# Panggil pakai nama yang sama persis (Case Sensitive)
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# 2. FUNGSI DATABASE (SINKRON SUPABASE)
 def get_karyawan():
     res = supabase.table("karyawan").select("*").execute()
     return pd.DataFrame(res.data)
@@ -5556,18 +5555,16 @@ def get_karyawan():
 def add_karyawan(nama, posisi, tipe):
     try:
         nama_fix = nama.upper().strip()
-        supabase.table("karyawan").insert({
-            "nama": nama_fix, 
-            "posisi": posisi, 
-            "tipe": tipe
-        }).execute()
+        supabase.table("karyawan").insert({"nama": nama_fix, "posisi": posisi, "tipe": tipe}).execute()
     except Exception as e:
-        st.error(f"Gagal tambah karyawan: {e}")
+        st.error(f"Gagal tambah: {e}")
 
+# --- START UI LOGISTIC SCHEDULE ---
 if menu == "Logistic Schedule":
-    # --- CSS V-PREMIUM (Tetap Sama) ---
+    # --- CSS V-PREMIUM: ELEGAN, CLEAN & PROFESIONAL (RESTORASI TOTAL) ---
     st.markdown("""
         <style>
+            /* 1. Header Utama - Efek Gradient Glass */
             .hero-header {
                 background: linear-gradient(135deg, #0062E6 0%, #33AEFF 100%);
                 color: white !important;
@@ -5577,15 +5574,56 @@ if menu == "Logistic Schedule":
                 margin-bottom: 35px;
                 font-weight: 800;
                 font-size: 26px;
+                letter-spacing: 0.5px;
                 box-shadow: 0 10px 20px rgba(0, 123, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
             }
+
+            /* 1.5 Sub-Header Stylings */
             div[data-testid="stVerticalBlock"] h3 {
-                color: white !important;
+                color: #000000 !important;
                 border-left: 5px solid #0062E6;
                 padding-left: 15px;
                 font-weight: 700;
                 text-transform: uppercase;
+                letter-spacing: 1px;
             }
+
+            /* Tombol hapus kecil */
+            .small-del-container div.stButton > button {
+                width: 45px !important;
+                height: 35px !important;
+                padding: 0px !important;
+                min-height: 35px !important;
+                min-width: 45px !important;
+                line-height: 1 !important;
+                font-size: 16px !important;
+                background: #1a1d2e !important;
+                border: 1px solid rgba(255,255,255,0.1) !important;
+                border-radius: 6px !important;
+                margin-top: 5px !important;
+            }
+
+            .small-del-container div.stButton > button:hover {
+                background: #FF4B4B !important;
+                border-color: #FF4B4B !important;
+            }
+
+            /* Efek Focus */
+            div[data-testid="stTextInput"] > div > div:focus-within, 
+            div[data-testid="stDateInput"] > div > div:focus-within {
+                border-color: #007BFF !important;
+                box-shadow: 0 0 12px rgba(0, 123, 255, 0.3) !important;
+            }
+
+            /* Font & Labels */
+            label { 
+                color: #B0B3B8 !important; 
+                font-size: 14px !important;
+                font-weight: 500 !important;
+                margin-bottom: 8px !important;
+            }
+
             .custom-card {
                 display: flex;
                 align-items: center;
@@ -5594,7 +5632,8 @@ if menu == "Logistic Schedule":
                 border-radius: 8px;
                 padding: 12px 18px;
                 margin-bottom: 10px;
-                border-left: 5px solid #007BFF;
+                border-left: 5px solid #00FF00;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             }
             .card-text { color: #FFFFFF !important; font-weight: 700; text-transform: uppercase; font-size: 14px; }
             .card-subtext { color: #888888 !important; font-size: 12px; }
@@ -5608,7 +5647,8 @@ if menu == "Logistic Schedule":
     with st.form("form_tim_komplit", clear_on_submit=True): 
         c1, c2, c3 = st.columns(3)
         nama_input = c1.text_input("Nama Lengkap")
-        posisi_input = c2.selectbox("Posisi/Role", ["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
+        posisi_input = c2.selectbox("Posisi/Role", 
+            ["WF-PICKER", "WF-ADMIN", "LOG-ADMIN", "LOG-LOADER", "LOG-STORE", "LOG-SO", "WF-SO", "SPV"])
         tipe_input = c3.selectbox("Tipe Kontrak", ["Full-Time", "Part-Full", "Part-Time"])
         
         if st.form_submit_button("💾 SIMPAN TIM"):
@@ -5617,6 +5657,7 @@ if menu == "Logistic Schedule":
                 st.success("✅ Tim Berhasil Terdaftar!")
                 st.rerun()
 
+    # --- DAFTAR KARYAWAN AKTIF ---
     with st.expander("🔍 Staff Database", expanded=True):
         df_cek = get_karyawan()
         if not df_cek.empty:
@@ -5624,7 +5665,7 @@ if menu == "Logistic Schedule":
                 cc1, cc2 = st.columns([6, 1])
                 with cc1:
                     st.markdown(f"""
-                        <div class="custom-card">
+                        <div class="custom-card" style="border-left-color: #007BFF;">
                             <div>
                                 <div class="card-text">{row['nama']}</div>
                                 <div class="card-subtext">{row['posisi']} • {row['tipe']}</div>
@@ -5632,9 +5673,11 @@ if menu == "Logistic Schedule":
                         </div>
                     """, unsafe_allow_html=True)
                 with cc2:
-                    if st.button("🗑️", key=f"staff_{row['nama']}_{i}"):
+                    if st.button("🗑️", key=f"staff_{row['nama']}_{i}", use_container_width=True):
                         supabase.table("karyawan").delete().eq("nama", row['nama']).execute()
                         st.rerun()
+        else:
+            st.info("Belum ada data tim di database.") 
 
     st.divider()
 
@@ -5668,31 +5711,35 @@ if menu == "Logistic Schedule":
                         </div>
                     """, unsafe_allow_html=True)
                 with m2:
-                    if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}"):
+                    if st.button("🗑️", key=f"libur_{row['nama']}_{row['tanggal']}_{i}", use_container_width=True):
                         supabase.table("libur_request").delete().eq("nama", row['nama']).eq("tanggal", row['tanggal']).execute()
                         st.rerun()
 
     st.divider()
 
-    # --- 3. SHIFT 3 PLOT ---
+    # --- 3. DATABASE CHECK & MONITORING SHIFT 3 ---
     st.subheader("🌙 2. Stock Opname Plot")
     res_s3 = supabase.table("plot_shift3").select("*").order("tanggal", desc=True).execute()
     df_monitor_s3 = pd.DataFrame(res_s3.data)
 
+    df_karyawan_s3 = get_karyawan()
+    karyawan_options = df_karyawan_s3['nama'].tolist() if not df_karyawan_s3.empty else []
+
     col_in1, col_in2 = st.columns(2)
     with col_in1:
-        nama_s3 = st.selectbox("Pilih Nama Tim", df_k['nama'].tolist() if not df_k.empty else [], key="s3_name_input")
+        nama_s3 = st.selectbox("Pilih Nama Tim", karyawan_options, key="s3_name_input")
         tgl_s3 = st.date_input("Tanggal Masuk Shift 3", datetime.now(), key="s3_date_input")
+
     with col_in2:
-        if not df_k.empty and nama_s3:
-            selected_data = df_k[df_k['nama'] == nama_s3].iloc[0]
+        if not df_karyawan_s3.empty and nama_s3:
+            selected_data = df_karyawan_s3[df_karyawan_s3['nama'] == nama_s3].iloc[0]
             st.info(f"Posisi: {selected_data['posisi']} | Tipe: {selected_data['tipe']}")
 
     if st.button("SUBMIT PLOT SHIFT 3", use_container_width=True):
-        check = supabase.table("plot_shift3").select("*").eq("nama", nama_s3).eq("tanggal", str(tgl_s3)).execute()
+        check = supabase.table("plot_shift3").select("*").eq("nama", nama_s3).eq("tanggal", tgl_s3.strftime('%Y-%m-%d')).execute()
         if not check.data:
             supabase.table("plot_shift3").insert({
-                "nama": nama_s3, "tanggal": str(tgl_s3), 
+                "nama": nama_s3, "tanggal": tgl_s3.strftime('%Y-%m-%d'), 
                 "posisi": selected_data['posisi'], "tipe": selected_data['tipe']
             }).execute()
             st.success(f"✅ {nama_s3} Masuk Plot Shift 3!")
@@ -5704,30 +5751,38 @@ if menu == "Logistic Schedule":
         for index, row in df_monitor_s3.iterrows():
             lc1, lc2, lc3 = st.columns([3, 1, 0.5])
             with lc1:
-                st.markdown(f'<div class="custom-card" style="border-left-color: #00FF00; padding: 10px;"><span class="card-text">{row["nama"]}</span></div>', unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div style="background-color: #1a1c27; padding: 10px; border-radius: 5px; border-left: 5px solid #00FF00; margin-bottom: 5px;">
+                        <span style="color: #FFFFFF; font-weight: bold;">{row['nama']}</span>
+                    </div>
+                """, unsafe_allow_html=True)
             with lc2:
                 st.markdown(f"<div style='padding: 10px; color: #888;'>{row['tanggal']}</div>", unsafe_allow_html=True)
             with lc3:
                 if st.button("🗑️", key=f"del_s3_{index}"):
                     supabase.table("plot_shift3").delete().eq("nama", row['nama']).eq("tanggal", row['tanggal']).execute()
                     st.rerun()
+    else:
+        st.info("Belum ada tim yang di-plot ke Shift 3.")
 
     st.divider()
 
-    # --- 4. GENERATOR JADWAL ---
+    # --- 4. GENERATOR JADWAL JEZ SBY (ENGINE FULL RECOVERY) ---
     st.subheader("✅ 3. Schedule Shift")
-    start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="gen_date")
+    start_date = st.date_input("Pilih Hari Senin", datetime.now(), key="log_gen_date_v_final")
+    df_staff_master = get_karyawan()
+    karyawan_list = df_staff_master.to_dict('records')
 
     if st.button("▶️ RUN JADWAL", use_container_width=True):
         dates_real = [(start_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
         day_names = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU", "MINGGU"]
         
-        # Ambil data untuk Engine
-        staff_master = get_karyawan().to_dict('records')
-        libur_req = pd.DataFrame(supabase.table("libur_request").select("*").execute().data)
-        manual_s3 = pd.DataFrame(supabase.table("plot_shift3").select("*").execute().data)
+        libur_data = supabase.table("libur_request").select("*").execute()
+        df_libur = pd.DataFrame(libur_data.data)
+        
+        manual_s3_data = supabase.table("plot_shift3").select("*").execute()
+        df_manual_s3 = pd.DataFrame(manual_s3_data.data)
 
-        # [LOGIKA ENGINE TETAP SAMA SEPERTI KODE ASLI LU]
         base_roles = [
             ("SHIFT 0", "WF-PICKER"), ("SHIFT 0", "WF-ADMIN"),
             ("SHIFT 1", "LOG-ADMIN"), ("SHIFT 1", "LOG-LOADER"), ("SHIFT 1", "LOG-STORE"), ("SHIFT 1", "WF-ADMIN"), ("SHIFT 1", "WF-PICKER"),
@@ -5736,48 +5791,90 @@ if menu == "Logistic Schedule":
         ]
 
         storage = {d: {f"{s} - {r}": [] for s, r in base_roles} for d in day_names}
-        weekly_counter = {k['nama']: 0 for k in staff_master}
-        double_day_count = {k['nama']: 0 for k in staff_master}
-        for k in staff_master: k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
+        weekly_counter = {k['nama']: 0 for k in karyawan_list}
+        double_day_count = {k['nama']: 0 for k in karyawan_list}
+        for k in karyawan_list: k['target_fix'] = 9 if k['tipe'] == "Part-Full" else 6
 
         def get_active_shifts(nama, day_name):
             return [slot.split(" - ")[0] for slot in storage[day_name] if any(nama in n for n in storage[day_name][slot])]
 
-        # 1. Plot Manual Shift 3
+        # --- 1. PLOT MANUAL SHIFT 3 ---
         for day_name, tgl_str in zip(day_names, dates_real):
-            if not manual_s3.empty:
-                names_manual = manual_s3[manual_s3['tanggal'] == tgl_str]['nama'].tolist()
+            if not df_manual_s3.empty:
+                names_manual = df_manual_s3[df_manual_s3['tanggal'] == tgl_str]['nama'].tolist()
                 if names_manual:
                     storage[day_name]["SHIFT 3 - SO"] = names_manual
                     for nm in names_manual:
                         if nm in weekly_counter: weekly_counter[nm] += 1
 
-        # 2. Engine Generator (Phase Loop)
+        # --- 2. ENGINE GENERATOR (PHASE LOOP) ---
         for phase in ["TARGET_1_ORANG", "TARGET_2_ORANG", "SISA_JATAH"]:
             for day_name in day_names:
                 tgl_ini = dates_real[day_names.index(day_name)]
+                
+                def count_s0(day):
+                    count = 0
+                    for k_slot in storage[day]:
+                        if "SHIFT 0" in k_slot: count += len(storage[day][k_slot])
+                    return count
+
                 for shf_jam, shf_role in base_roles:
                     if shf_jam == "SHIFT 3": continue 
                     slot_key = f"{shf_jam} - {shf_role}"
-                    
+
+                    # --- [PRIORITAS 1: JALUR VIP RECOVERY] ---
+                    if shf_jam == "SHIFT 2":
+                        day_index = day_names.index(day_name)
+                        if day_index > 0:
+                            day_kemarin = day_names[day_index - 1]
+                            for k_rec in karyawan_list:
+                                n_rec = k_rec['nama']
+                                if weekly_counter[n_rec] >= k_rec['target_fix']: continue
+                                if not df_libur.empty and not df_libur[(df_libur['nama'] == n_rec) & (df_libur['tanggal'] == tgl_ini)].empty: continue
+                                if "SHIFT 3" in get_active_shifts(n_rec, day_kemarin) and k_rec['posisi'] == shf_role:
+                                    if not get_active_shifts(n_rec, day_name):
+                                        current_fill = len(storage[day_name][slot_key])
+                                        if (phase == "TARGET_1_ORANG" and current_fill < 1) or \
+                                           (phase == "TARGET_2_ORANG" and shf_role != "SPV" and current_fill < 2) or \
+                                           (phase == "SISA_JATAH"):
+                                            if n_rec not in storage[day_name][slot_key]:
+                                                storage[day_name][slot_key].append(n_rec)
+                                                weekly_counter[n_rec] += 1
+
+                    # --- [PRIORITAS 2: LOGIKA STANDAR] ---
+                    if shf_jam == "SHIFT 0" and count_s0(day_name) >= 2: continue
                     if phase == "TARGET_1_ORANG" and len(storage[day_name][slot_key]) >= 1: continue
                     if phase == "TARGET_2_ORANG" and (shf_role == "SPV" or len(storage[day_name][slot_key]) >= 2): continue
 
                     potential = []
-                    for k in staff_master:
+                    for k in karyawan_list:
                         nama = k['nama']
                         active_shifts = get_active_shifts(nama, day_name)
                         if weekly_counter[nama] >= k['target_fix']: continue
-                        if not libur_req.empty:
-                            if not libur_req[(libur_req['nama'] == nama) & (libur_req['tanggal'] == tgl_ini)].empty: continue
+                        if not df_libur.empty and not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_ini)].empty: continue
                         
-                        # Rule: SPV & Admin Match
+                        tgl_besok = (datetime.strptime(tgl_ini, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                        tgl_kemarin = (datetime.strptime(tgl_ini, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+                        is_libur_besok = not df_libur.empty and not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_besok)].empty
+                        is_libur_kemarin = not df_libur.empty and not df_libur[(df_libur['nama'] == nama) & (df_libur['tanggal'] == tgl_kemarin)].empty
+                        
+                        if is_libur_besok and shf_jam != "SHIFT 1": continue
+                        if is_libur_kemarin and shf_jam != "SHIFT 2": continue
+
+                        day_index = day_names.index(day_name)
+                        if day_index > 0:
+                            if "SHIFT 3" in get_active_shifts(nama, day_names[day_index - 1]) and shf_jam != "SHIFT 2": continue
+
                         if shf_role in ["LOG-ADMIN", "LOG-STORE", "SPV"] and k['posisi'] != shf_role: continue
                         if k['posisi'] == "SPV" and shf_role != "SPV": continue
                         if shf_jam in active_shifts: continue 
 
-                        if k['tipe'] != "Part-Full" and active_shifts: continue
-                        if k['tipe'] == "Part-Full" and len(active_shifts) >= 2: continue
+                        if k['tipe'] == "Part-Full":
+                            if is_libur_besok or is_libur_kemarin or (day_index > 0 and "SHIFT 3" in get_active_shifts(nama, day_names[day_index-1])):
+                                if active_shifts: continue 
+                            if len(active_shifts) >= 2 or (len(active_shifts) == 1 and double_day_count[nama] >= 3): continue
+                        else:
+                            if active_shifts: continue
 
                         potential.append({'k': k, 'match': (k['posisi'] == shf_role)})
 
@@ -5789,8 +5886,9 @@ if menu == "Logistic Schedule":
                         if nm_fix not in storage[day_name][slot_key]:
                             storage[day_name][slot_key].append(nm_fix)
                             weekly_counter[nm_fix] += 1
+                            if len(get_active_shifts(nm_fix, day_name)) == 2: double_day_count[nm_fix] += 1
 
-        # 3. Simpan ke Session State
+        # --- 3. SIMPAN HASIL ---
         final_table = []
         for shf_jam, shf_role in base_roles:
             slot_key = f"{shf_jam} - {shf_role}"
@@ -5806,21 +5904,40 @@ if menu == "Logistic Schedule":
         st.session_state.summary_shift = weekly_counter
         st.rerun()
 
-    # --- DISPLAY HASIL ---
+    # --- 5. TAMPILAN TABEL JADWAL ---
     if 'res_df' in st.session_state:
         st.divider()
-        st.markdown("### 📋 WEEKLY SCHEDULE LOGISTIC SBY")
-        st.dataframe(st.session_state.res_df, use_container_width=True, hide_index=True, height=600)
+        col_v1, col_v2 = st.columns([5, 2])
+        
+        with col_v1:
+            st.markdown("### 📋 WEEKLY SCHEDULE LOGISTIC SBY")
+            def color_by_shift(row):
+                shift_type = str(row['SHIFT - ROLE'])
+                base_style = 'color: #FFFFFF; font-weight: 600; border: 0.5px solid #222;'
+                if "SHIFT 0" in shift_type: bg = "background-color: #004e92;"
+                elif "SHIFT 1" in shift_type: bg = "background-color: #1b4d3e;"
+                elif "SHIFT 2" in shift_type: bg = "background-color: #4b0082;"
+                elif "SHIFT 3" in shift_type: bg = "background-color: #b45f06;"
+                else: bg = "background-color: #1a1c27;"
+                return [bg + base_style for _ in row]
 
-        st.markdown("### 📈 TOTAL SHIFT")
-        sum_data = []
-        df_staff = get_karyawan()
-        for _, k in df_staff.iterrows():
-            n = k['nama']
-            t = st.session_state.summary_shift.get(n, 0)
-            target = 9 if k['tipe'] == "Part-Full" else 6
-            sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": "✅ OK" if t >= target else "⚠️ KURANG"})
-        st.dataframe(pd.DataFrame(sum_data), use_container_width=True, hide_index=True)
+            st.dataframe(st.session_state.res_df.style.apply(color_by_shift, axis=1), 
+                         use_container_width=True, height=800, hide_index=True)
+
+        with col_v2:
+            st.markdown("### 📈 TOTAL SHIFT")
+            sum_data = []
+            df_staff_master = get_karyawan()
+            for _, k in df_staff_master.iterrows():
+                n = k['nama']
+                t = st.session_state.summary_shift.get(n, 0)
+                if t > 0:
+                    target = 9 if k['tipe'] == "Part-Full" else 6
+                    sum_data.append({"NAMA": n, "SHIFT": int(t), "STATUS": "✅ OK" if t >= target else "⚠️ KURANG"})
+            
+            if sum_data:
+                st.dataframe(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False), 
+                             use_container_width=True, hide_index=True)
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
