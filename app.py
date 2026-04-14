@@ -6241,23 +6241,20 @@ if menu == "Reporting & PIC":
             td_done = sum(1 for i in st.session_state.todo_list if i['done'])
             td_prog = (td_done / td_total * 100) if td_total > 0 else 0
             
-            # --- PROGRESS TO DO LIST DENGAN ANGKA (1/5) ---
-        # --- PROGRESS TO DO LIST (DIPERAPAT) ---
-            # Menghapus st.divider() dan menggantinya dengan margin kecil
-            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
-            
-            td_total = len(st.session_state.todo_list)
-            td_done = sum(1 for i in st.session_state.todo_list if i['done'])
+            # --- PROGRESS TO DO LIST (JARAK DISAMAKAN) ---
+            td_total = len(st.session_state.get('todo_list', []))
+            td_done = sum(1 for i in st.session_state.get('todo_list', []) if i['done'])
             td_prog = (td_done / td_total * 100) if td_total > 0 else 0
             
+            # Mengikuti struktur yang lu minta (tanpa divider, margin bawah 12px)
             st.markdown(f"""
-            <div class="report-card" style="border-left-color: #10b981; padding: 12px;">
-                <div style="display: flex; justify-content: space-between; color: white !important;">
-                    <b style="font-size: 0.9rem;">📝 To-Do Progress</b>
-                    <span style="font-weight: 800; font-size: 0.9rem;">{td_done} / {td_total}</span>
+            <div class="report-card" style="border-left-color: #10b981; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; color: white !important; margin-bottom: 5px;">
+                    <b>📝 To-Do Progress</b>
+                    <span style="font-weight: 800;">{td_done} / {td_total}</span>
                 </div>
-                <div style="background:#374151; border-radius:5px; margin-top:6px; height:8px;">
-                    <div style="background:#10b981; width:{td_prog}%; height:8px; border-radius:5px;"></div>
+                <div style="background:#374151; border-radius:5px; height:12px; width:100%;">
+                    <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
