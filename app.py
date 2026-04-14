@@ -3362,11 +3362,10 @@ import streamlit as st
 from datetime import datetime
 import pytz
 from supabase import create_client, Client
-
 # --- KONEKSI SUPABASE ---
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
-supabase: Client = create_client(URL, KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def project_approval_reject():
     # --- CSS LU (Gue Balikin Full, Gak Ada yang Gue Sunat) ---
