@@ -3098,12 +3098,17 @@ def menu_reject_defect():
         try:
             response = conn.table("reject_list").select("*").execute()
             df_chart = pd.DataFrame(response.data)
+            
+            # --- FIX FORMAT TANGGAL DI SINI (SETELAH DATAFRAME TERBENTUK) ---
+            if not df_chart.empty and 'tanggal_input' in df_chart.columns:
+                # Ubah ke datetime, lalu format jadi string yang rapi
+                df_chart['tanggal_input'] = pd.to_datetime(df_chart['tanggal_input'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+        
         except Exception as e:
             st.error(f"Gagal narik data: {e}")
             df_chart = pd.DataFrame()
         
         standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
-        
         if not df_chart.empty:
             # --- LOGIKA MATCHING (WAJIB ADA) ---
             df_non_std = df_chart[~df_chart['kategori'].isin(standard_codes)].copy()
