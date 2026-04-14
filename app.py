@@ -3365,9 +3365,9 @@ from supabase import create_client, Client
 
 # --- SETUP SUPABASE ---
 # Masukin URL dan Key lu di secrets atau ganti langsung di sini
-url: str = st.secrets["SUPABASE_URL"]
-key: str = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(url, key)
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
 
 def project_approval_reject():
     # --- CSS LU (TETAP UTUH 100%) ---
