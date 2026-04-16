@@ -3549,11 +3549,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def project_mutasi_karantina():
     # --- CSS UI ---
-    Ini adalah kode lengkap untuk fungsi mutasi karantina lu, sudah termasuk perbaikan urutan CSS supaya teks Radio Button (Single/Bulk) berwarna hitam pekat, sementara label input lainnya tetap putih elegan.
-Python
-
-def project_mutasi_karantina():
-    # --- CSS UI GLOBAL (DARK MODE + FIX RADIO BUTTON) ---
     st.markdown("""
         <style>
         /* 1. Reset Global untuk Label (Nama PIC, SKU, dkk jadi Putih) */
