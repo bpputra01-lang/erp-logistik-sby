@@ -1336,6 +1336,7 @@ def menu_Stock_Opname():
                     st.session_state.df_mult_final = clean_final_result(df_mult)
                     st.session_state.df_sing_final = clean_final_result(df_sing)
                     st.session_state.df_res4_final = res4
+                    st.session_state.df_miss4_final = miss4
                     st.session_state.process_done = True
                     
                     st.rerun()
@@ -1366,7 +1367,7 @@ def menu_Stock_Opname():
                 st.success(f"✅ Analisis Selesai! (Memproses {len(df_res4):,} baris)")
 
             # 4. TAMPILAN TABS (PENTING: Perbaiki Nama Kolom Duplikat di sini)
-            t1, t2, t3, t4 = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "➡️ SET UP REAL +"])
+            t1, t2, t3, t4, tmissing = st.tabs(["📦 MULTIPLE ADJ +", "⚠️ SINGLE ADJ +", "🔍 CEK ADJ + RESULT", "➡️ SET UP REAL +", "❌Miss Lookup SKU on BIN"])
             
             with t1:
                 df_m = st.session_state.get("df_mult_final", pd.DataFrame())
@@ -1428,6 +1429,24 @@ def menu_Stock_Opname():
                             mime="text/csv", 
                             key="dl_setup_real_final"
                         )
+            with tmissing:
+                df_miss = st.session_state.get("df_miss4_final", pd.DataFrame())
+                if df_miss.empty:
+                    st.info("Tidak ada item missing (Semua BIN|SKU terdaftar di sistem).")
+                else:
+                    st.warning(f"Ditemukan {len(df_miss)} baris barang yang ada di Fisik tapi TIDAK terdaftar di Sistem.")
+                    # Kita ambil kolom BIN, SKU, dan QTY (Biasanya index 0, 1, dan 6 sesuai logic awal lu)
+                    df_miss_display = df_miss.copy()
+                    st.dataframe(df_miss_display, use_container_width=True, hide_index=True)
+                    
+                    csv_miss = df_miss_display.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download Missing Items", 
+                        data=csv_miss, 
+                        file_name="missing_items_recon.csv", 
+                        mime="text/csv", 
+                        key="dl_miss_final"
+                    )
     # =========================================================
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
