@@ -864,8 +864,8 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
         key = (str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper())
         system_dict[key] = system_dict.get(key, 0) + row.get('DIFF', 0)
     
-    # BAGIAN PERBAIKAN: Ambil daftar BIN yang lolos filter UI
-    selected_bins = set(df_bin_coverage.iloc[:, 1].astype(str).strip().str.upper().unique())
+    # Ganti baris yang error tadi dengan ini:
+    selected_bins = set(df_bin_coverage.iloc[:, 1].astype(str).str.strip().str.upper().unique())
 
     coverage_dict = {}
     for _, row in df_bin_coverage.iterrows():
