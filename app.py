@@ -3629,6 +3629,18 @@ def project_mutasi_karantina():
             </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
+    with st.expander("📋 Informasi Format File"):
+            st.info("""
+            **UNTUK BULK/MULTIPLE UPLOAD:**
+            - **Pastikan Formatnya :
+                - BIN AWAL
+                - BIN TUJUAN
+                - SKU
+                - ARTICLE NAME
+                - QUANTITY
+                - NOTES
+                - ALASAN
+            """)
     tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval"])
 
     tz = pytz.timezone('Asia/Jakarta')
@@ -3731,65 +3743,91 @@ def project_mutasi_karantina():
         if df_res.empty:
             st.info("Belum ada data pengajuan.")
         else:
-            # --- 1. SEARCH BAR ---
-            search_sku = st.text_input("🔍 Cari Berdasarkan SKU", placeholder="Ketik SKU di sini...").strip()
+            # --- 1. SEARCH & FILTER UI ---
+            # Dibuat dalam kolom agar rapi
+            col_f1, col_f2 = st.columns([1.5, 1])
+            
+            with col_f1:
+                filter_status = st.radio(
+                    "📌 Filter Status:",
+                    ["Semua", "Belum Approved", "Done Approval", "Final Done"],
+                    horizontal=True,
+                    key="filter_status_radio"
+                )
+            
+            with col_f2:
+                search_sku = st.text_input("🔍 Cari SKU", placeholder="Ketik SKU...").strip()
 
-            # --- 2. LOGIKA FILTER ---
+            # --- 2. LOGIKA FILTERING BERLAPIS ---
+            df_filtered = df_res.copy()
+
+            # A. Filter berdasarkan Status
+            if filter_status == "Belum Approved":
+                df_filtered = df_filtered[df_filtered['status'] == 1]
+            elif filter_status == "Done Approval":
+                df_filtered = df_filtered[df_filtered['status'] == 2]
+            elif filter_status == "Final Done":
+                df_filtered = df_filtered[df_filtered['status'] == 3]
+
+            # B. Filter berdasarkan SKU
             if search_sku:
-                # Cari SKU yang mengandung teks (case-insensitive)
-                mask = df_res['sku'].str.contains(search_sku, case=False, na=False)
-                # Dapatkan list batch_id yang di dalamnya ada SKU tersebut
-                valid_batches = df_res[mask]['batch_id'].unique()
-                # Data yang akan ditampilkan hanya batch yang relevan
-                df_display = df_res[df_res['batch_id'].isin(valid_batches)]
-                
-                if df_display.empty:
-                    st.warning(f"SKU '{search_sku}' tidak ditemukan.")
+                mask = df_filtered['sku'].str.contains(search_sku, case=False, na=False)
+                # Ambil batch_id yang mengandung SKU tersebut
+                valid_batches = df_filtered[mask]['batch_id'].unique()
+                df_display = df_filtered[df_filtered['batch_id'].isin(valid_batches)]
             else:
-                df_display = df_res
+                df_display = df_filtered
 
-            # --- 3. LOOPING DISPLAY (Gunakan df_display) ---
+            # --- 3. LOOPING DISPLAY ---
             batches = df_display['batch_id'].unique()
             
-            for b_id in batches:
-                items = df_display[df_display['batch_id'] == b_id]
-                head = items.iloc[0]
-                stat = int(head['status'])
+            if len(batches) == 0:
+                st.warning("Tidak ada data yang cocok dengan filter.")
+            else:
+                for b_id in batches:
+                    items = df_display[df_display['batch_id'] == b_id]
+                    head = items.iloc[0]
+                    stat = int(head['status'])
 
-                with st.expander(f"📦 {b_id} | {head['nama_tim']} | {len(items)} Item"):
-                    st.write(f"**Waktu:** {head['timestamp']} | **Alasan:** {head['alasan']}")
-                    st.dataframe(items[['bin_awal', 'bin_tujuan', 'sku', 'article_name', 'quantity']], use_container_width=True)
-                    
-                    st.write("---")
-                    c_st1, c_st2, c_st3 = st.columns(3)
-                    
-                    with c_st1: # STEP 1
-                        st.markdown("1️⃣ **Approval**")
-                        if stat == 1:
-                            n_app = st.text_input("Approve By:", key=f"app_{b_id}")
-                            if st.button("Approve Batch", key=f"bt_app_{b_id}", disabled=not n_app):
-                                supabase.table("mutasi_karantina").update({"status": 2, "approved_by": n_app}).eq("batch_id", b_id).execute()
-                                st.rerun()
-                        else: st.success(f"By: {head.get('approved_by')}")
+                    # Penanda warna icon berdasarkan status
+                    icon = "🔴" if stat == 1 else "🟡" if stat == 2 else "🟢"
 
-                    with c_st2: # STEP 2 (LINE)
-                        active = "line-active" if stat >= 2 else ""
-                        st.markdown(f'<div class="timeline-line {active}"></div>', unsafe_allow_html=True)
-                        if stat == 2: st.caption("On Process...")
+                    with st.expander(f"{icon} {b_id} | {head['nama_tim']} | {len(items)} Item"):
+                        st.write(f"**Waktu:** {head['timestamp']} | **Alasan:** {head['alasan']}")
+                        st.dataframe(items[['bin_awal', 'bin_tujuan', 'sku', 'article_name', 'quantity']], use_container_width=True)
+                        
+                        st.write("---")
+                        c_st1, c_st2, c_st3 = st.columns(3)
+                        
+                        with c_st1: # STEP 1
+                            st.markdown("1️⃣ **Approval**")
+                            if stat == 1:
+                                n_app = st.text_input("Approve By:", key=f"app_{b_id}")
+                                if st.button("Approve Batch", key=f"bt_app_{b_id}", disabled=not n_app, type="primary"):
+                                    supabase.table("mutasi_karantina").update({"status": 2, "approved_by": n_app}).eq("batch_id", b_id).execute()
+                                    st.rerun()
+                            else: 
+                                st.success(f"By: {head.get('approved_by')}")
 
-                    with c_st3: # STEP 3
-                        st.markdown("2️⃣ **Final Done**")
-                        if stat == 2:
-                            n_fin = st.text_input("Selesai By:", key=f"fin_{b_id}")
-                            if st.button("Finish Batch", key=f"bt_fin_{b_id}", disabled=not n_fin):
-                                supabase.table("mutasi_karantina").update({"status": 3, "setup_by": n_fin}).eq("batch_id", b_id).execute()
-                                st.rerun()
-                        elif stat == 3: st.success(f"Done: {head.get('setup_by')}")
+                        with c_st2: # STEP 2 (LINE)
+                            active = "line-active" if stat >= 2 else ""
+                            st.markdown(f'<div class="timeline-line {active}"></div>', unsafe_allow_html=True)
+                            if stat == 2: st.caption("On Process...")
 
-                    if st.button(f"🗑️ Hapus Batch {b_id}", key=f"del_{b_id}"):
-                        supabase.table("mutasi_karantina").delete().eq("batch_id", b_id).execute()
-                        st.rerun()
+                        with c_st3: # STEP 3
+                            st.markdown("2️⃣ **Final Done**")
+                            if stat == 2:
+                                n_fin = st.text_input("Selesai By:", key=f"fin_{b_id}")
+                                if st.button("Finish Batch", key=f"bt_fin_{b_id}", disabled=not n_fin, type="primary"):
+                                    supabase.table("mutasi_karantina").update({"status": 3, "setup_by": n_fin}).eq("batch_id", b_id).execute()
+                                    st.rerun()
+                            elif stat == 3: 
+                                st.success(f"Done: {head.get('setup_by')}")
 
+                        # Tombol Hapus (Dibuat kecil di bawah)
+                        if st.button(f"🗑️ Hapus Batch {b_id}", key=f"del_{b_id}"):
+                            supabase.table("mutasi_karantina").delete().eq("batch_id", b_id).execute()
+                            st.rerun()
 
 import pandas as pd
 import streamlit as st
