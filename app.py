@@ -640,70 +640,81 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
 
     return df_mult_res, df_sing_res
-def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
+def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon):
     def clean_val(x):
-        if pd.isna(x) or str(x).strip().lower() == 'nan': return ""
+        if pd.isna(x): return ""
         s = str(x).strip().upper()
         if s.startswith("SPE"): s = s[3:] 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Kumpulin SEMUA SKU yang ada di File Multiple Adj (Hasil Gabungan Normal + Inbound)
-    # Ini kunci biar yang missing tadi mau masuk ke mutasi
-    set_multiple_skus = set()
+    # 1. Dictionary dari MULTIPLE ADJ + (VBA Step 3)
+    dict_multi = {}
     if not df_multiple_adj_plus.empty:
-        # Kita scan kolom SKU di file Multiple (Biasanya kolom index 2 atau 0 setelah merge)
-        # Kita ambil dari semua kolom yang mungkin isinya SKU biar gak meleset
         for _, row in df_multiple_adj_plus.iterrows():
-            # Cek kolom index 0 (karena hasil merge biasanya SKU pindah ke depan)
-            s1 = clean_val(row.iloc[0])
-            if s1: set_multiple_skus.add(s1)
+            sku = clean_val(row.iloc[2]) # SKU Kolom C
+            bin_asal = row.iloc[1]       # BIN Kolom B
+            if sku != "" and sku not in dict_multi:
+                dict_multi[sku] = bin_asal
 
-    # 2. Dictionary buat BIN TUJUAN dari Rekon (Data Missing)
-    dict_tujuan_rekon = {}
-    if df_recon_missing is not None and not df_recon_missing.empty:
-        for _, row in df_recon_missing.iterrows():
-            sku_m = clean_val(row.iloc[1]) 
-            bin_m = row.iloc[0]            
-            qty_m = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-            if sku_m != "" and qty_m > 0:
-                dict_tujuan_rekon[sku_m] = bin_m
-
-    # 3. Proses Stock Final
+    # 2. Proses Running Pertama (Logic Normal Lu)
     df_stock = df_stock_final.copy()
-    q_sys = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
-    q_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
-    q_diff = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
+    qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
+    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
+    diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
 
     setup_real_data = []
-    
+    # Set buat nge-track SKU & BIN yang udah masuk (Anti Double)
+    seen_entry = set()
+
     for i in range(len(df_stock)):
-        # SYARAT: QTY SO > 0 (Barang ada fisiknya)
-        if q_so.iloc[i] > 0:
-            sku_raw = df_stock.iloc[i, 2]
-            sku_key = clean_val(sku_raw)
+        if qty_so.iloc[i] > qty_system.iloc[i]:
+            sku_key = clean_val(df_stock.iloc[i, 2])
+            bin_tujuan = df_stock.iloc[i, 1]
             
-            # CEK: Apakah SKU ini ada di list Multiple (Normal/Missing) atau di Rekon?
-            if sku_key in set_multiple_skus or sku_key in dict_tujuan_rekon:
-                
-                # BIN AWAL: Fix Staging karena barang nambah
-                bin_awal = "STAGING INBOUND"
-                
-                # BIN TUJUAN: Ambil dari Rekon (utamakan catatan rekon biar presisi)
-                bin_tujuan = dict_tujuan_rekon.get(sku_key, df_stock.iloc[i, 1])
-                
+            if sku_key in dict_multi:
+                bin_awal = dict_multi[sku_key]
                 setup_real_data.append({
                     "BIN AWAL": bin_awal,
                     "BIN TUJUAN": bin_tujuan,
-                    "SKU": sku_raw,
-                    "QUANTITY": q_diff.iloc[i] if q_diff.iloc[i] > 0 else q_so.iloc[i], 
+                    "SKU": sku_key,
+                    "QUANTITY": diff_val.iloc[i],
                     "NOTES": "RELOCATION"
                 })
+                # Tandai biar gak didobel
+                seen_entry.add(f"{sku_key}|{bin_tujuan}")
 
-    if not setup_real_data:
+    # 3. SAPU JAGAT: Cari SKU yang ada di Multiple tapi belum masuk di Setup Real
+    # Kita cari BIN-nya dari File Rekon
+    if not df_multiple_adj_plus.empty:
+        for sku_m in dict_multi.keys():
+            # Cek apakah SKU ini sudah masuk di list di atas?
+            # Kita cari di df_stock mana aja yang SKU-nya sama dan statusnya PLUS
+            missing_rows = df_stock[df_stock.iloc[:, 2].apply(clean_val) == sku_m]
+            
+            for idx, row_m in missing_rows.iterrows():
+                q_so_m = pd.to_numeric(row_m.iloc[10], errors='coerce') or 0
+                q_sys_m = pd.to_numeric(row_m.iloc[9], errors='coerce') or 0
+                bin_tujuan_m = row_m.iloc[1]
+                
+                # Syarat: Dia PLUS dan BELUM ada di list entry sebelumnya (Anti Double)
+                if q_so_m > q_sys_m and f"{sku_m}|{bin_tujuan_m}" not in seen_entry:
+                    # Ambil BIN AWAL dari STAGING / RECON
+                    # Karena dia missing, kita paksa asalnya dari STAGING INBOUND
+                    setup_real_data.append({
+                        "BIN AWAL": "STAGING INBOUND", 
+                        "BIN TUJUAN": bin_tujuan_m,
+                        "SKU": sku_m,
+                        "QUANTITY": q_so_m - q_sys_m,
+                        "NOTES": "RELOCATION (MISSING)"
+                    })
+                    seen_entry.add(f"{sku_m}|{bin_tujuan_m}")
+
+    # Final Return
+    result_df = pd.DataFrame(setup_real_data)
+    if result_df.empty:
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
-    result_df = pd.DataFrame(setup_real_data).drop_duplicates()
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
