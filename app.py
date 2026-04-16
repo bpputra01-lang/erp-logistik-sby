@@ -3551,48 +3551,48 @@ def project_mutasi_karantina():
     # --- CSS UI ---
     st.markdown("""
     <style>
-        /* 1. Reset Global untuk Label (Nama PIC, SKU, dkk jadi Putih) */
-        label {
+        /* 1. Targetkan hanya label judul input di area UTAMA (Main), bukan Sidebar */
+        section[data-testid="stMain"] div[data-testid="stWidgetLabel"] label {
             color: #E0E0E0 !important;
             font-weight: 600 !important;
         }
 
-        /* 2. Overwrite Khusus Radio Button (Dibuat Hitam agar kontras di bg putih) */
-        /* Kita pakai selector sangat spesifik agar tidak tertimpa label global */
-        div[data-testid="stRadio"] label p, 
-        div[data-testid="stRadio"] label span {
+        /* 2. Overwrite Khusus Radio Button di area utama agar teks pilihannya Hitam */
+        section[data-testid="stMain"] div[data-testid="stRadio"] label p {
             color: #000000 !important;
             font-weight: 700 !important;
         }
 
-        /* 3. Menggelapkan Box Input: Text, Area, Number, dan Selectbox */
-        div[data-testid="stTextInput"] > div > div, 
-        div[data-testid="stTextArea"] > div > div,
-        div[data-testid="stNumberInput"] > div > div,
-        div[data-testid="stSelectbox"] > div > div {
+        /* 3. Menggelapkan Box Input hanya di area utama */
+        section[data-testid="stMain"] div[data-testid="stTextInput"] > div > div, 
+        section[data-testid="stMain"] div[data-testid="stTextArea"] > div > div,
+        section[data-testid="stMain"] div[data-testid="stNumberInput"] > div > div,
+        section[data-testid="stMain"] div[data-testid="stSelectbox"] > div > div {
             background-color: #1a1c27 !important;
             border: 1px solid #3d4156 !important;
             border-radius: 8px !important;
         }
 
         /* 4. Memastikan teks di dalam kolom input berwarna putih */
-        input, textarea, div[data-baseweb="select"] span {
+        section[data-testid="stMain"] input, 
+        section[data-testid="stMain"] textarea, 
+        section[data-testid="stMain"] div[data-baseweb="select"] span {
             color: white !important;
         }
 
         /* 5. Khusus Number Input (Quantity) & Tombol Plus Minus */
-        div[data-testid="stNumberInput"] input {
+        section[data-testid="stMain"] div[data-testid="stNumberInput"] input {
             color: white !important;
             background-color: #1a1c27 !important;
         }
-        div[data-testid="stNumberInput"] button {
+        section[data-testid="stMain"] div[data-testid="stNumberInput"] button {
             background-color: #1a1c27 !important;
             color: white !important;
             border: 1px solid #3d4156 !important;
         }
 
         /* 6. Spasi antar pilihan radio */
-        div[data-testid="stRadio"] div[role="radiogroup"] {
+        section[data-testid="stMain"] div[data-testid="stRadio"] div[role="radiogroup"] {
             gap: 15px;
         }
 
@@ -3602,8 +3602,8 @@ def project_mutasi_karantina():
             color: white; padding: 15px; border-radius: 10px; font-weight: 800; font-size: 20px;
             margin-bottom: 20px; border-left: 8px solid #cc0000;
         }
-        </style>
-    """, unsafe_allow_html=True) 
+    </style>
+    """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
     tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval"])
 
