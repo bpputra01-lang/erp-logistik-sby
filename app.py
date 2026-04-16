@@ -3626,23 +3626,9 @@ def project_mutasi_karantina():
             border-radius: 10px !important;
             padding: 10px !important;
         }
-        /* Memaksa teks di dalam st.info agar tetap PUTIH dan kontras */
-        div[data-testid="stNotification"] p {
-            color: #FFFFFF !important;
-        }
-
-        /* Memaksa list nomor (1-7) agar tetap PUTIH */
-        div[data-testid="stNotification"] ol li {
-            color: #FFFFFF !important;
-        }
-
-        /* Jika ada teks tebal (bold), pastikan warnanya juga putih */
-        div[data-testid="stNotification"] strong {
-            color: #FFFFFF !important;
-        }
+        <div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>
             </style>
     """, unsafe_allow_html=True)
-    st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
 
     with st.expander("📋 Informasi Format File"):
         st.info("""
@@ -3848,7 +3834,7 @@ def project_mutasi_karantina():
                             st.rerun()
     # --- TAB 3: WORKING LIST (ON PROCESS) ---
     with tabs[2]:
-        st.markdown("### 🟡 Working List (On Process)")
+        st.markdown("### 📋Template Mutasi")
         
         # Ambil data status 2 (Done Approval / Kuning)
         res_working = supabase.table("mutasi_karantina").select("*").eq("status", 2).order("timestamp", desc=True).execute()
