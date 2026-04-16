@@ -642,63 +642,59 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     return df_mult_res, df_sing_res
 
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
-    def clean_val(x):
-        if pd.isna(x) or str(x).strip().lower() in ['nan', '']: return ""
-        s = str(x).strip().upper()
-        # Tetap pake logic hapus SPE biar matching sama list ijin lu
-        if s.startswith("SPE"): s = s[3:] 
+    # PEMBERSIH STANDAR (Tanpa hapus SPE atau karakter penting)
+    def clean_standard(val):
+        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
+        s = str(val).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Ambil SEMUA SKU yang divalidasi masuk Multiple (22 items)
-    # Kita scan SEMUA kolom di df_multiple_adj_plus buat dapetin 'daftar ijin'
+    # 1. BIKIN DAFTAR SKU IJIN (DAFTAR 22 ITEM)
+    # Kita scan SEMUA isi tabel Multiple Adj. Mana yang bentuknya SKU kita masukin ke Set.
     allowed_skus = set()
-    dict_bin_asal = {}
-    
-    if not df_multiple_adj_plus.empty:
-        for _, row in df_multiple_adj_plus.iterrows():
-            # Scan kolom 0 (hasil merge) dan kolom 2 (original)
-            for i in [0, 2]:
-                sku = clean_val(row.iloc[i])
-                if sku:
-                    allowed_skus.add(sku)
-                    dict_bin_asal[sku] = row.iloc[1] # Ambil BIN ASAL (Kolom B)
-                    break
+    for _, row in df_multiple_adj_plus.iterrows():
+        for val in row:
+            c_val = clean_standard(val)
+            if c_val and len(c_val) > 3: # Ambil yang beneran SKU
+                allowed_skus.add(c_val)
 
     setup_real_data = []
-    seen_entry = set() # Biar gak double input antara Stock vs Missing
+    seen_entry = set()
 
-    # --- A. PROSES DATA STOCK (Loop 17 item yang ada di sistem) ---
-    df_stock = df_stock_final.copy()
-    q_sys = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
-    q_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
-    q_diff = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
+    # --- A. PROSES DATA DARI STOCK (17 Item) ---
+    df_s = df_stock_final.copy()
+    # Pastikan index kolom 9, 10, 11 sesuai dengan file Cek Stock Adj + lu
+    q_sys = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
+    q_so = pd.to_numeric(df_s.iloc[:, 10], errors='coerce').fillna(0)
+    q_diff = pd.to_numeric(df_s.iloc[:, 11], errors='coerce').fillna(0)
 
-    for i in range(len(df_stock)):
-        sku_raw = df_stock.iloc[i, 2]
-        sku_key = clean_val(sku_raw)
-        bin_tujuan = df_stock.iloc[i, 1]
+    for i in range(len(df_s)):
+        sku_raw = df_s.iloc[i, 2]
+        sku_c = clean_standard(sku_raw)
+        bin_tujuan = df_s.iloc[i, 1]
         
-        if q_so.iloc[i] > q_sys.iloc[i] and sku_key in allowed_skus:
+        # Jika selisih PLUS dan SKU ada di daftar 22 item
+        if q_so.iloc[i] > q_sys.iloc[i] and sku_c in allowed_skus:
             setup_real_data.append({
-                "BIN AWAL": dict_bin_asal.get(sku_key, "STAGING INBOUND"),
+                "BIN AWAL": "STAGING INBOUND",
                 "BIN TUJUAN": bin_tujuan,
                 "SKU": sku_raw,
                 "QUANTITY": q_diff.iloc[i],
                 "NOTES": "RELOCATION"
             })
-            seen_entry.add(f"{sku_key}|{bin_tujuan}")
+            seen_entry.add(f"{sku_c}|{bin_tujuan}")
 
-    # --- B. PROSES DATA MISSING (Loop 5 item sisa dari tab baru lu!) ---
+    # --- B. PROSES DATA DARI MISSING (5 Item Sisa) ---
     if df_recon_missing is not None and not df_recon_missing.empty:
-        for _, row in df_recon_missing.iterrows():
-            bin_tujuan_m = row.iloc[0] # BIN di Rekon
-            sku_raw_m = row.iloc[1]    # SKU di Rekon
-            sku_key_m = clean_val(sku_raw_m)
-            qty_m = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+        for _, row_m in df_recon_missing.iterrows():
+            bin_tujuan_m = row_m.iloc[0] # BIN di tab missing
+            sku_raw_m = row_m.iloc[1]    # SKU di tab missing
+            sku_c_m = clean_standard(sku_raw_m)
+            # Ambil QTY dari kolom ke-7 (index 6)
+            qty_m = pd.to_numeric(row_m.iloc[6], errors='coerce') or 0
 
-            # Jika SKU ini lolos validasi (ada di 22 item) tapi tadi skip karena stock 0
-            if sku_key_m in allowed_skus and f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry:
+            # Jika SKU ini ada di daftar 22 ijin tapi belum masuk di A (karena stock 0)
+            if sku_c_m in allowed_skus and f"{sku_c_m}|{bin_tujuan_m}" not in seen_entry:
                 setup_real_data.append({
                     "BIN AWAL": "STAGING INBOUND",
                     "BIN TUJUAN": bin_tujuan_m,
@@ -706,13 +702,12 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
                     "QUANTITY": qty_m,
                     "NOTES": "RELOCATION (MISSING)"
                 })
-                seen_entry.add(f"{sku_key_m}|{bin_tujuan_m}")
+                seen_entry.add(f"{sku_c_m}|{bin_tujuan_m}")
 
-    result_df = pd.DataFrame(setup_real_data)
-    if result_df.empty:
+    if not setup_real_data:
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
-    return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
+    return pd.DataFrame(setup_real_data)[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
 
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
