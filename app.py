@@ -3393,7 +3393,7 @@ def project_approval_reject():
         st.markdown(""" 
             <style> 
             [data-testid="stMain"] div[data-testid="stRadio"] label p { 
-                color: #FFFFFF !important;  /* Diubah ke putih agar terlihat di dark mode */
+                color: #000000 !important;  /* Diubah ke putih agar terlihat di dark mode */
                 font-weight: 500 !important; 
             } 
             [data-testid="stMain"] div[data-testid="stExpander"] summary p { 
