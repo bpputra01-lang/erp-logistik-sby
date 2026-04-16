@@ -3535,6 +3535,170 @@ def project_approval_reject():
                                     supabase.table("submissions").delete().eq("id", row['id']).execute()
                                     st.rerun() 
 
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import pytz
+import uuid
+from supabase import create_client, Client
+
+# --- SETUP SUPABASE ---
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "YOUR_SUPABASE_KEY" 
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def project_mutasi_karantina():
+    # --- CSS CUSTOM (Tetap mempertahankan style kebanggaan lu) ---
+    st.markdown("""
+        <style>
+        .hero-header-custom { 
+            background: linear-gradient(135deg, #b82e2e 0%, #7a1f1f 100%); /* Warna Merah Karantina */
+            color: white; padding: 12px 25px; border-radius: 10px; 
+            margin-bottom: 25px; font-weight: 800; font-size: 22px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content;  
+        }
+        .batch-card {
+            background-color: #1a1c27; border: 1px solid #3d4156;
+            padding: 15px; border-radius: 12px; margin-bottom: 15px;
+        }
+        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+        div[data-testid="stTextInput"] > div > div { background-color: #1a1c27 !important; border: 1px solid #3d4156 !important; }
+        label { color: #E0E0E0 !important; font-weight: 600 !important; }
+        
+        /* Timeline Fix */
+        .timeline-line { height: 4px; background: #3d4156; margin-top: 15px; border-radius: 2px; }
+        .line-active { background: #00ff00 !important; box-shadow: 0 0 8px #00ff00; }
+        
+        /* Gold Button untuk Final Set Up */
+        .gold-btn button { 
+            background-color: #D4AF37 !important; color: white !important; border: none !important;
+            border-radius: 8px !important; font-weight: bold !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="hero-header-custom">☣️ APPROVAL MUTASI KARANTINA</div>', unsafe_allow_html=True)
+    tabs = st.tabs(["📤 Bulk Upload Pengajuan", "📑 Monitoring & Approval"])
+
+    # --- TAB 0: MULTIPLE UPLOAD ---
+    with tabs[0]:
+        st.markdown('<p style="color:white;">Silahkan upload file Excel berisi daftar SKU yang akan dimutasi dari Karantina.</p>', unsafe_allow_html=True)
+        
+        with st.form("form_mutasi_bulk", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            with col_a:
+                pic_pengaju = st.text_input("Nama PIC Pengaju")
+                cabang = st.selectbox("Cabang", ["SURABAYA", "SIDOARJO", "SEMARANG"])
+            with col_b:
+                file_xlsx = st.file_uploader("Upload Excel Mutasi", type=['xlsx'])
+                alasan = st.text_input("Alasan Mutasi", placeholder="Contoh: Re-stock Sellable")
+
+            if st.form_submit_button("🚀 SUBMIT BATCH MUTASI"):
+                if pic_pengaju and file_xlsx:
+                    try:
+                        df_input = pd.read_excel(file_xlsx)
+                        # Generate ID unik untuk satu pengajuan ini
+                        batch_id = f"MTS-{uuid.uuid4().hex[:6].upper()}"
+                        tz = pytz.timezone('Asia/Jakarta')
+                        ts = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+
+                        # Iterasi row excel ke list dictionary
+                        data_batch = []
+                        for _, row in df_input.iterrows():
+                            data_batch.append({
+                                "batch_id": batch_id,
+                                "timestamp": ts,
+                                "nama_tim": pic_pengaju,
+                                "cabang": cabang,
+                                "sku": str(row.get('SKU', '')),
+                                "article_name": str(row.get('ARTICLE', '')),
+                                "qty": int(row.get('QTY', 0)),
+                                "keterangan": alasan,
+                                "status": 1
+                            })
+                        
+                        # Bulk Insert ke Supabase
+                        supabase.table("mutasi_karantina").insert(data_batch).execute()
+                        st.success(f"✅ Berhasil! {len(data_batch)} item terdaftar dengan Batch ID: {batch_id}")
+                    except Exception as e:
+                        st.error(f"Gagal Upload: {e}")
+                else:
+                    st.warning("PIC dan File Excel wajib diisi!")
+
+    # --- TAB 1: BATCH MONITORING & APPROVAL ---
+    with tabs[1]:
+        # Filter Cabang
+        t_sby, t_sda, t_smg = st.tabs(["SURABAYA", "SIDOARJO", "SEMARANG"])
+        list_cabang = [("SURABAYA", t_sby), ("SIDOARJO", t_sda), ("SEMARANG", t_smg)]
+
+        for c_name, t_obj in list_cabang:
+            with t_obj:
+                # Ambil data per cabang, urutkan yang terbaru
+                res = supabase.table("mutasi_karantina").select("*").eq("cabang", c_name).order("id", desc=True).execute()
+                df_res = pd.DataFrame(res.data)
+
+                if df_res.empty:
+                    st.info(f"Tidak ada pengajuan mutasi di {c_name}")
+                else:
+                    # GROUPING BY BATCH_ID
+                    batches = df_res['batch_id'].unique()
+
+                    for b_id in batches:
+                        items_in_batch = df_res[df_res['batch_id'] == b_id]
+                        info = items_in_batch.iloc[0] # Ambil info header dari baris pertama
+                        curr_status = int(info['status'])
+
+                        # UI Per Batch
+                        status_text = {1: "⏳ Waiting Approval", 2: "⚙️ In Progress", 3: "✅ Done"}
+                        with st.expander(f"📦 {b_id} | {info['nama_tim']} | {len(items_in_batch)} Item"):
+                            st.write(f"**PIC Pengaju:** {info['nama_tim']} | **Waktu:** {info['timestamp']}")
+                            st.write(f"**Alasan:** {info['keterangan']}")
+                            
+                            # Tampilkan list item dalam batch (Tabel Ringkas)
+                            st.dataframe(items_in_batch[['sku', 'article_name', 'qty']], use_container_width=True)
+
+                            st.write("---")
+                            
+                            # --- LOGIKA APPROVAL PER BATCH ---
+                            col_st1, col_st2, col_st3 = st.columns(3)
+                            
+                            # Step 1: Approval (Purchasing/Lead)
+                            with col_st1:
+                                st.markdown("1️⃣ **Approval**")
+                                if curr_status == 1:
+                                    pic_app = st.text_input("Approve By:", key=f"app_{b_id}")
+                                    if st.button("Approve Batch", key=f"btn_app_{b_id}", disabled=not pic_app):
+                                        supabase.table("mutasi_karantina").update({"status": 2, "approved_by": pic_app}).eq("batch_id", b_id).execute()
+                                        st.rerun()
+                                else:
+                                    st.success(f"Approved: {info.get('approved_by')}")
+
+                            # Step 2: Progress Line
+                            with col_st2:
+                                st.markdown("2️⃣ **Execution**")
+                                active = "line-active" if curr_status >= 2 else ""
+                                st.markdown(f'<div class="timeline-line {active}"></div>', unsafe_allow_html=True)
+                                if curr_status == 2: st.caption("Barang sedang diproses mutasi...")
+
+                            # Step 3: Done (Final Check)
+                            with col_st3:
+                                st.markdown("3️⃣ **Done**")
+                                if curr_status == 2:
+                                    pic_done = st.text_input("Selesai Oleh:", key=f"done_{b_id}")
+                                    st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+                                    if st.button("Finish Batch", key=f"btn_fin_{b_id}", disabled=not pic_done):
+                                        supabase.table("mutasi_karantina").update({"status": 3, "setup_by": pic_done}).eq("batch_id", b_id).execute()
+                                        st.rerun()
+                                    st.markdown('</div>', unsafe_allow_html=True)
+                                elif curr_status == 3:
+                                    st.success(f"Finished: {info.get('setup_by')}")
+
+                            # Tombol Hapus Seluruh Batch
+                            with st.expander("🚨 Bahaya"):
+                                if st.button(f"Hapus Pengajuan {b_id}", key=f"del_{b_id}"):
+                                    supabase.table("mutasi_karantina").delete().eq("batch_id", b_id).execute()
+                                    st.rerun()
+
 
 
 import pandas as pd
@@ -4191,7 +4355,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out"]
+    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina"]
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
 
@@ -5781,6 +5945,9 @@ elif menu == "Pengajuan Reject/Defect":
 
 elif menu == "List Retur Out":
     menu_retur_out_system()
+
+elif menu == "Pengajuan Mutasi Karantina"
+    project_mutasi_karantina()
 
 import streamlit as st
 import pandas as pd
