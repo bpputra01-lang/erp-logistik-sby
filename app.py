@@ -3548,10 +3548,16 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
 
 def project_mutasi_karantina():
-    # --- CSS UI ---
     st.markdown("""
-        <style>
-        /* 1. CSS UTAMA UNTUK INPUT (TETAP DARK) */
+    <style>
+        /* 1. LABEL UMUM (Nama PIC, SKU, dkk) JADI PUTIH */
+        /* Taruh paling atas supaya bisa ditimpa oleh aturan yang lebih spesifik di bawah */
+        label {
+            color: #E0E0E0 !important;
+            font-weight: 600 !important;
+        }
+
+        /* 2. CSS UTAMA UNTUK INPUT BOX (TETAP DARK) */
         div[data-testid="stTextInput"] > div > div, 
         div[data-testid="stTextArea"] > div > div,
         div[data-testid="stNumberInput"] > div > div,
@@ -3565,24 +3571,21 @@ def project_mutasi_karantina():
             color: white !important;
         }
 
-        /* 2. LABEL UMUM JADI PUTIH */
-        label {
-            color: #E0E0E0 !important;
-            font-weight: 600 !important;
+        /* 3. FIX RADIKAL UNTUK RADIO BUTTON (WAJIB HITAM) */
+        /* Kita taruh di bawah agar OVERWRITE label umum di atas */
+        
+        /* Judul Radio ("Pilih Mode Input") */
+        div[data-testid="stRadio"] > label {
+            color: #000000 !important;
+            font-weight: 700 !important;
         }
 
-        /* 3. FIX RADIKAL UNTUK RADIO BUTTON (HITAM) */
-        /* Kita hajar semua elemen teks di dalam radio group agar wajib HITAM */
+        /* Pilihan Radio ("Single Item", "Bulk") */
         div[data-testid="stRadio"] div[role="radiogroup"] label[data-testid="stWidgetLabel"] p,
         div[data-testid="stRadio"] div[role="radiogroup"] label p,
         div[data-testid="stRadio"] label span {
             color: #000000 !important;
             font-weight: 700 !important;
-        }
-
-        /* Target khusus untuk label "Pilih Mode Input" agar hitam */
-        div[data-testid="stRadio"] > label {
-            color: #000000 !important;
         }
 
         /* 4. NUMBER INPUT BUTTONS */
