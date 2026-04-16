@@ -3544,161 +3544,133 @@ from supabase import create_client, Client
 
 # --- SETUP SUPABASE ---
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
-SUPABASE_KEY = "YOUR_SUPABASE_KEY" 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
 
-def project_mutasi_karantina():
-    # --- CSS CUSTOM (Tetap mempertahankan style kebanggaan lu) ---
+def project_mutasi_karantina_global():
+    # --- CSS UI ---
     st.markdown("""
         <style>
-        .hero-header-custom { 
-            background: linear-gradient(135deg, #b82e2e 0%, #7a1f1f 100%); /* Warna Merah Karantina */
-            color: white; padding: 12px 25px; border-radius: 10px; 
-            margin-bottom: 25px; font-weight: 800; font-size: 22px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: fit-content;  
+        .hero-header { 
+            background: linear-gradient(135deg, #b82e2e 0%, #7a1f1f 100%); 
+            color: white; padding: 15px; border-radius: 10px; font-weight: 800; font-size: 22px;
+            margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .batch-card {
-            background-color: #1a1c27; border: 1px solid #3d4156;
-            padding: 15px; border-radius: 12px; margin-bottom: 15px;
-        }
-        [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-        div[data-testid="stTextInput"] > div > div { background-color: #1a1c27 !important; border: 1px solid #3d4156 !important; }
-        label { color: #E0E0E0 !important; font-weight: 600 !important; }
-        
-        /* Timeline Fix */
+        .gold-btn button { background-color: #D4AF37 !important; color: white !important; font-weight: bold !important; }
         .timeline-line { height: 4px; background: #3d4156; margin-top: 15px; border-radius: 2px; }
         .line-active { background: #00ff00 !important; box-shadow: 0 0 8px #00ff00; }
-        
-        /* Gold Button untuk Final Set Up */
-        .gold-btn button { 
-            background-color: #D4AF37 !important; color: white !important; border: none !important;
-            border-radius: 8px !important; font-weight: bold !important;
-        }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header-custom">☣️ APPROVAL MUTASI KARANTINA</div>', unsafe_allow_html=True)
-    tabs = st.tabs(["📤 Bulk Upload Pengajuan", "📑 Monitoring & Approval"])
+    st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
+    tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval"])
 
-    # --- TAB 0: MULTIPLE UPLOAD ---
+    tz = pytz.timezone('Asia/Jakarta')
+    ts = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+
+    # --- TAB 1: INPUT (SINGLE & MULTIPLE) ---
     with tabs[0]:
-        st.markdown('<p style="color:white;">Silahkan upload file Excel berisi daftar SKU yang akan dimutasi dari Karantina.</p>', unsafe_allow_html=True)
+        mode = st.radio("Pilih Mode Input:", ["Single Item", "Bulk Excel (Multiple)"], horizontal=True)
         
-        with st.form("form_mutasi_bulk", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                pic_pengaju = st.text_input("Nama PIC Pengaju")
-                cabang = st.selectbox("Cabang", ["SURABAYA", "SIDOARJO", "SEMARANG"])
-            with col_b:
-                file_xlsx = st.file_uploader("Upload Excel Mutasi", type=['xlsx'])
-                alasan = st.text_input("Alasan Mutasi", placeholder="Contoh: Re-stock Sellable")
+        if mode == "Single Item":
+            with st.form("form_single"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    pengaju = st.text_input("Nama PIC")
+                    bin_awal = st.text_input("Bin Awal")
+                    bin_tujuan = st.text_input("Bin Tujuan")
+                with c2:
+                    sku = st.text_input("SKU")
+                    article = st.text_input("Article Name")
+                    qty = st.number_input("Quantity", min_value=1)
+                
+                alasan = st.selectbox("Alasan", ["Re-stock Sellable", "Salah Putaway", "Order Customer", "Lainnya"])
+                notes = st.text_area("Notes")
 
-            if st.form_submit_button("🚀 SUBMIT BATCH MUTASI"):
-                if pic_pengaju and file_xlsx:
-                    try:
-                        df_input = pd.read_excel(file_xlsx)
-                        # Generate ID unik untuk satu pengajuan ini
-                        batch_id = f"MTS-{uuid.uuid4().hex[:6].upper()}"
-                        tz = pytz.timezone('Asia/Jakarta')
-                        ts = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+                if st.form_submit_button("🚀 SUBMIT"):
+                    if pengaju and sku:
+                        bid = f"SGL-{uuid.uuid4().hex[:4].upper()}"
+                        data = {
+                            "batch_id": bid, "timestamp": ts, "nama_tim": pengaju,
+                            "bin_awal": bin_awal, "bin_tujuan": bin_tujuan, "sku": sku,
+                            "article_name": article, "quantity": qty, "alasan": alasan, 
+                            "notes": notes, "status": 1
+                        }
+                        supabase.table("mutasi_karantina").insert(data).execute()
+                        st.success(f"Berhasil! ID: {bid}")
+                        st.rerun()
 
-                        # Iterasi row excel ke list dictionary
-                        data_batch = []
-                        for _, row in df_input.iterrows():
-                            data_batch.append({
-                                "batch_id": batch_id,
-                                "timestamp": ts,
-                                "nama_tim": pic_pengaju,
-                                "cabang": cabang,
-                                "sku": str(row.get('SKU', '')),
-                                "article_name": str(row.get('ARTICLE', '')),
-                                "qty": int(row.get('QTY', 0)),
-                                "keterangan": alasan,
-                                "status": 1
+        else:
+            with st.form("form_bulk"):
+                pic_m = st.text_input("Nama PIC Pengaju")
+                file_xlsx = st.file_uploader("Upload Excel (BIN AWAL, BIN TUJUAN, SKU, ARTICLE NAME, QUANTITY, NOTES, ALASAN)", type=['xlsx'])
+                if st.form_submit_button("🔥 UPLOAD BATCH"):
+                    if pic_m and file_xlsx:
+                        df = pd.read_excel(file_xlsx)
+                        bid = f"BULK-{uuid.uuid4().hex[:6].upper()}"
+                        bulk_data = []
+                        for _, row in df.iterrows():
+                            bulk_data.append({
+                                "batch_id": bid, "timestamp": ts, "nama_tim": pic_m,
+                                "bin_awal": str(row.get('BIN AWAL', '')), "bin_tujuan": str(row.get('BIN TUJUAN', '')),
+                                "sku": str(row.get('SKU', '')), "article_name": str(row.get('ARTICLE NAME', '')),
+                                "quantity": int(row.get('QUANTITY', 0)), "notes": str(row.get('NOTES', '')),
+                                "alasan": str(row.get('ALASAN', 'Bulk Upload')), "status": 1
                             })
-                        
-                        # Bulk Insert ke Supabase
-                        supabase.table("mutasi_karantina").insert(data_batch).execute()
-                        st.success(f"✅ Berhasil! {len(data_batch)} item terdaftar dengan Batch ID: {batch_id}")
-                    except Exception as e:
-                        st.error(f"Gagal Upload: {e}")
-                else:
-                    st.warning("PIC dan File Excel wajib diisi!")
+                        supabase.table("mutasi_karantina").insert(bulk_data).execute()
+                        st.success(f"Berhasil Upload {len(bulk_data)} Item! Batch: {bid}")
+                        st.rerun()
 
-    # --- TAB 1: BATCH MONITORING & APPROVAL ---
+    # --- TAB 2: MONITORING & BATCH APPROVAL ---
     with tabs[1]:
-        # Filter Cabang
-        t_sby, t_sda, t_smg = st.tabs(["SURABAYA", "SIDOARJO", "SEMARANG"])
-        list_cabang = [("SURABAYA", t_sby), ("SIDOARJO", t_sda), ("SEMARANG", t_smg)]
+        res = supabase.table("mutasi_karantina").select("*").order("id", desc=True).execute()
+        df_res = pd.DataFrame(res.data)
 
-        for c_name, t_obj in list_cabang:
-            with t_obj:
-                # Ambil data per cabang, urutkan yang terbaru
-                res = supabase.table("mutasi_karantina").select("*").eq("cabang", c_name).order("id", desc=True).execute()
-                df_res = pd.DataFrame(res.data)
+        if df_res.empty:
+            st.info("Belum ada data pengajuan.")
+        else:
+            # Grouping by Batch ID agar approval per pengajuan
+            batches = df_res['batch_id'].unique()
+            for b_id in batches:
+                items = df_res[df_res['batch_id'] == b_id]
+                head = items.iloc[0]
+                stat = int(head['status'])
 
-                if df_res.empty:
-                    st.info(f"Tidak ada pengajuan mutasi di {c_name}")
-                else:
-                    # GROUPING BY BATCH_ID
-                    batches = df_res['batch_id'].unique()
+                with st.expander(f"📦 {b_id} | {head['nama_tim']} | {len(items)} Item"):
+                    st.write(f"**Waktu:** {head['timestamp']} | **Alasan:** {head['alasan']}")
+                    st.dataframe(items[['bin_awal', 'bin_tujuan', 'sku', 'article_name', 'quantity']], use_container_width=True)
+                    
+                    st.write("---")
+                    c_st1, c_st2, c_st3 = st.columns(3)
+                    
+                    with c_st1: # STEP 1
+                        st.markdown("1️⃣ **Approval**")
+                        if stat == 1:
+                            n_app = st.text_input("Approve By:", key=f"app_{b_id}")
+                            if st.button("Approve Batch", key=f"bt_app_{b_id}", disabled=not n_app):
+                                supabase.table("mutasi_karantina").update({"status": 2, "approved_by": n_app}).eq("batch_id", b_id).execute()
+                                st.rerun()
+                        else: st.success(f"By: {head.get('approved_by')}")
 
-                    for b_id in batches:
-                        items_in_batch = df_res[df_res['batch_id'] == b_id]
-                        info = items_in_batch.iloc[0] # Ambil info header dari baris pertama
-                        curr_status = int(info['status'])
+                    with c_st2: # STEP 2 (LINE)
+                        active = "line-active" if stat >= 2 else ""
+                        st.markdown(f'<div class="timeline-line {active}"></div>', unsafe_allow_html=True)
+                        if stat == 2: st.caption("On Process...")
 
-                        # UI Per Batch
-                        status_text = {1: "⏳ Waiting Approval", 2: "⚙️ In Progress", 3: "✅ Done"}
-                        with st.expander(f"📦 {b_id} | {info['nama_tim']} | {len(items_in_batch)} Item"):
-                            st.write(f"**PIC Pengaju:** {info['nama_tim']} | **Waktu:** {info['timestamp']}")
-                            st.write(f"**Alasan:** {info['keterangan']}")
-                            
-                            # Tampilkan list item dalam batch (Tabel Ringkas)
-                            st.dataframe(items_in_batch[['sku', 'article_name', 'qty']], use_container_width=True)
+                    with c_st3: # STEP 3
+                        st.markdown("2️⃣ **Final Done**")
+                        if stat == 2:
+                            n_fin = st.text_input("Selesai By:", key=f"fin_{b_id}")
+                            st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
+                            if st.button("Finish Batch", key=f"bt_fin_{b_id}", disabled=not n_fin):
+                                supabase.table("mutasi_karantina").update({"status": 3, "setup_by": n_fin}).eq("batch_id", b_id).execute()
+                                st.rerun()
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        elif stat == 3: st.success(f"Done: {head.get('setup_by')}")
 
-                            st.write("---")
-                            
-                            # --- LOGIKA APPROVAL PER BATCH ---
-                            col_st1, col_st2, col_st3 = st.columns(3)
-                            
-                            # Step 1: Approval (Purchasing/Lead)
-                            with col_st1:
-                                st.markdown("1️⃣ **Approval**")
-                                if curr_status == 1:
-                                    pic_app = st.text_input("Approve By:", key=f"app_{b_id}")
-                                    if st.button("Approve Batch", key=f"btn_app_{b_id}", disabled=not pic_app):
-                                        supabase.table("mutasi_karantina").update({"status": 2, "approved_by": pic_app}).eq("batch_id", b_id).execute()
-                                        st.rerun()
-                                else:
-                                    st.success(f"Approved: {info.get('approved_by')}")
-
-                            # Step 2: Progress Line
-                            with col_st2:
-                                st.markdown("2️⃣ **Execution**")
-                                active = "line-active" if curr_status >= 2 else ""
-                                st.markdown(f'<div class="timeline-line {active}"></div>', unsafe_allow_html=True)
-                                if curr_status == 2: st.caption("Barang sedang diproses mutasi...")
-
-                            # Step 3: Done (Final Check)
-                            with col_st3:
-                                st.markdown("3️⃣ **Done**")
-                                if curr_status == 2:
-                                    pic_done = st.text_input("Selesai Oleh:", key=f"done_{b_id}")
-                                    st.markdown('<div class="gold-btn">', unsafe_allow_html=True)
-                                    if st.button("Finish Batch", key=f"btn_fin_{b_id}", disabled=not pic_done):
-                                        supabase.table("mutasi_karantina").update({"status": 3, "setup_by": pic_done}).eq("batch_id", b_id).execute()
-                                        st.rerun()
-                                    st.markdown('</div>', unsafe_allow_html=True)
-                                elif curr_status == 3:
-                                    st.success(f"Finished: {info.get('setup_by')}")
-
-                            # Tombol Hapus Seluruh Batch
-                            with st.expander("🚨 Bahaya"):
-                                if st.button(f"Hapus Pengajuan {b_id}", key=f"del_{b_id}"):
-                                    supabase.table("mutasi_karantina").delete().eq("batch_id", b_id).execute()
-                                    st.rerun()
-
+                    if st.button(f"🗑️ Hapus Batch {b_id}", key=f"del_{b_id}"):
+                        supabase.table("mutasi_karantina").delete().eq("batch_id", b_id).execute()
+                        st.rerun()
 
 
 import pandas as pd
