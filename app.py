@@ -3832,15 +3832,15 @@ def project_mutasi_karantina():
     with tabs[2]:
         st.markdown("### 🟡 Working List (On Process)")
         
-        # Ambil semua data yang statusnya 2 (Sudah Approve tapi belum Finish)
+        # Ambil data status 2 (Done Approval / Kuning)
         res_working = supabase.table("mutasi_karantina").select("*").eq("status", 2).order("timestamp", desc=True).execute()
         df_working = pd.DataFrame(res_working.data)
 
         if df_working.empty:
             st.info("Tidak ada mutasi yang sedang diproses (Kuning).")
         else:
-            # Filter Pencarian Cepat di Working List
-            search_work = st.text_input("🔍 Filter Cepat (SKU/Batch/PIC):", key="search_work")
+            # Filter Pencarian
+            search_work = st.text_input("🔍 Cari Data di Working List:", key="search_work_v2")
             
             if search_work:
                 mask = df_working.apply(lambda row: row.astype(str).str.contains(search_work, case=False).any(), axis=1)
@@ -3848,31 +3848,31 @@ def project_mutasi_karantina():
             else:
                 df_display_work = df_working
 
-            st.write(f"Terdapat **{len(df_display_work)}** item yang harus segera diselesaikan.")
-
-            # Tampilkan dalam satu tabel gabungan
-            cols_work = [
-                "batch_id", "nama_tim", "sku", "article_name", 
-                "quantity", "bin_awal", "bin_tujuan", "approved_by"
-            ]
+            # Pilih kolom sesuai request
+            cols_final = ["batch_id", "bin_awal", "bin_tujuan", "sku", "quantity", "notes"]
             
+            # Pastikan kolom notes ada, jika tidak ada di DB beri string kosong
+            if 'notes' not in df_display_work.columns:
+                df_display_work['notes'] = ""
+
+            st.write(f"Menampilkan **{len(df_display_work)}** baris data.")
+
+            # Menampilkan tabel dengan konfigurasi header yang rapi
             st.dataframe(
-                df_display_work[cols_work], 
+                df_display_work[cols_final], 
                 use_container_width=True,
                 column_config={
-                    "batch_id": "ID Batch",
-                    "nama_tim": "Pengaju",
+                    "batch_id": "ID BATCH",
+                    "bin_awal": "BIN AWAL",
+                    "bin_tujuan": "BIN TUJUAN",
                     "sku": "SKU",
-                    "bin_awal": "Dari Bin",
-                    "bin_tujuan": "Ke Bin",
-                    "approved_by": "Disetujui Oleh"
-                }
+                    "quantity": st.column_config.NumberColumn("QUANTITY", format="%d"),
+                    "notes": "NOTES"
+                },
+                hide_index=True # Menghilangkan angka index di kiri agar lebih clean
             )
 
-            # Tombol Aksi Cepat
-            st.info("💡 Untuk menyelesaikan (Finish), silakan kembali ke Tab **Monitoring** dan cari ID Batch yang sesuai.")
-            
-            if st.button("🔄 Refresh List"):
+            if st.button("🔄 Refresh Working List", key="btn_refresh_work"):
                 st.rerun()
 import pandas as pd
 import streamlit as st
