@@ -3550,86 +3550,59 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def project_mutasi_karantina():
     # --- CSS UI ---
     st.markdown("""
-
-        <style>
-
-        /* 1. CSS UTAMA UNTUK INPUT (TETAP DARK) */
-
-        div[data-testid="stTextInput"] > div > div,
-
-        div[data-testid="stTextArea"] > div > div,
-
-        div[data-testid="stNumberInput"] > div > div,
-
-        div[data-testid="stSelectbox"] > div > div {
-
-            background-color: #1a1c27 !important;
-
-            border: 1px solid #3d4156 !important;
-
-            border-radius: 8px !important;
-
-        }
-
-
-        input, textarea, div[data-baseweb="select"] span {
-
-            color: white !important;
-
-        }
-
-
-        /* 2. LABEL UMUM JADI PUTIH */
-
+    <style>
+        /* 1. Reset Global untuk Label (Nama PIC, SKU, dkk jadi Putih) */
         label {
-
             color: #E0E0E0 !important;
-
             font-weight: 600 !important;
-
         }
 
-
-        /* 3. FIX RADIKAL UNTUK RADIO BUTTON (HITAM) */
-
-        /* Kita hajar semua elemen teks di dalam radio group agar wajib HITAM */
-
-        div[data-testid="stRadio"] div[role="radiogroup"] label[data-testid="stWidgetLabel"] p,
-
-        div[data-testid="stRadio"] div[role="radiogroup"] label p,
-
+        /* 2. Overwrite Khusus Radio Button (Dibuat Hitam agar kontras di bg putih) */
+        /* Kita pakai selector sangat spesifik agar tidak tertimpa label global */
+        div[data-testid="stRadio"] label p, 
         div[data-testid="stRadio"] label span {
-
             color: #000000 !important;
-
             font-weight: 700 !important;
-
         }
 
-
-        /* Target khusus untuk label "Pilih Mode Input" agar hitam */
-
-        div[data-testid="stRadio"] > label {
-
-            color: #000000 !important;
-
-        }
-
-
-        /* 4. NUMBER INPUT BUTTONS */
-
-        div[data-testid="stNumberInput"] button {
-
+        /* 3. Menggelapkan Box Input: Text, Area, Number, dan Selectbox */
+        div[data-testid="stTextInput"] > div > div, 
+        div[data-testid="stTextArea"] > div > div,
+        div[data-testid="stNumberInput"] > div > div,
+        div[data-testid="stSelectbox"] > div > div {
             background-color: #1a1c27 !important;
-
-            color: white !important;
-
             border: 1px solid #3d4156 !important;
-
+            border-radius: 8px !important;
         }
 
-        </style>
+        /* 4. Memastikan teks di dalam kolom input berwarna putih */
+        input, textarea, div[data-baseweb="select"] span {
+            color: white !important;
+        }
 
+        /* 5. Khusus Number Input (Quantity) & Tombol Plus Minus */
+        div[data-testid="stNumberInput"] input {
+            color: white !important;
+            background-color: #1a1c27 !important;
+        }
+        div[data-testid="stNumberInput"] button {
+            background-color: #1a1c27 !important;
+            color: white !important;
+            border: 1px solid #3d4156 !important;
+        }
+
+        /* 6. Spasi antar pilihan radio */
+        div[data-testid="stRadio"] div[role="radiogroup"] {
+            gap: 15px;
+        }
+
+        /* Header Style */
+        .main-header { 
+            background: linear-gradient(135deg, #1e468a 0%, #0d1b33 100%); 
+            color: white; padding: 15px; border-radius: 10px; font-weight: 800; font-size: 20px;
+            margin-bottom: 20px; border-left: 8px solid #cc0000;
+        }
+        </style>
     """, unsafe_allow_html=True) 
     st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
     tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval"])
