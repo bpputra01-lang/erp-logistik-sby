@@ -3626,6 +3626,20 @@ def project_mutasi_karantina():
             border-radius: 10px !important;
             padding: 10px !important;
         }
+        /* Memaksa teks di dalam st.info agar tetap PUTIH dan kontras */
+        div[data-testid="stNotification"] p {
+            color: #FFFFFF !important;
+        }
+
+        /* Memaksa list nomor (1-7) agar tetap PUTIH */
+        div[data-testid="stNotification"] ol li {
+            color: #FFFFFF !important;
+        }
+
+        /* Jika ada teks tebal (bold), pastikan warnanya juga putih */
+        div[data-testid="stNotification"] strong {
+            color: #FFFFFF !important;
+        }
             </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
