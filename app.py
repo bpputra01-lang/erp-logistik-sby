@@ -642,71 +642,67 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     return df_mult_res, df_sing_res
 
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
-    def clean_val(x):
-        if pd.isna(x) or str(x).strip().lower() in ['nan', '']: return ""
-        s = str(x).strip().upper()
+    def super_clean(val):
+        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
+        s = str(val).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. BIKIN DAFTAR SKU YANG DIIJINKAN (22 ITEMS)
-    # Kita ambil SEMUA SKU yang ada di hasil pivot, mau dia hasil match BIN maupun cuma SKU
+    # 1. Bikin Master Set SKU dari Multiple Adj (22 Items)
+    # Kita cari kolom mana yang isinya SKU di df_multiple_adj_plus
+    # Karena kita gak tahu SKU-nya geser ke mana, kita scan baris per baris
     allowed_skus = set()
-    dict_bin_asal = {} # Buat nyari BIN ASAL kalau ada
-    
-    if not df_multiple_adj_plus.empty:
-        for _, row in df_multiple_adj_plus.iterrows():
-            # Di df_mult_res (hasil pivot), SKU biasanya ada di kolom awal atau hasil merge
-            sku = clean_val(row.iloc[0]) # Cek index 0 hasil merge
-            if not sku: sku = clean_val(row.iloc[2]) # Backup index 2
-            
-            if sku:
-                allowed_skus.add(sku)
-                # Simpan BIN Asal (biasanya kolom index 1)
-                dict_bin_asal[sku] = row.iloc[1]
+    for _, row in df_multiple_adj_plus.iterrows():
+        # Scan semua kolom di baris ini, ambil yang isinya SKU
+        for val in row:
+            c_val = super_clean(val)
+            if c_val and len(c_val) > 3: # Asumsi SKU gak mungkin kependekan
+                allowed_skus.add(c_val)
 
     setup_real_data = []
     seen_entry = set()
 
-    # --- A. PROSES DATA DARI STOCK (17 Item) ---
-    df_stock = df_stock_final.copy()
-    q_sys = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
-    q_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
-    q_diff = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
-
-    for i in range(len(df_stock)):
-        sku_raw = df_stock.iloc[i, 2]
-        sku_key = clean_val(sku_raw)
-        bin_tujuan = df_stock.iloc[i, 1]
+    # --- A. DARI STOCK (17 Items) ---
+    df_s = df_stock_final.copy()
+    # Pake urutan kolom standar lu (Kolom 2=SKU, 9=Sys, 10=SO)
+    q_sys = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
+    q_so = pd.to_numeric(df_s.iloc[:, 10], errors='coerce').fillna(0)
+    
+    for i in range(len(df_s)):
+        sku_raw = df_s.iloc[i, 2]
+        sku_c = super_clean(sku_raw)
+        bin_tujuan = df_s.iloc[i, 1]
         
-        # JIKA SKU ADA DI DAFTAR 22 ITEM
-        if (q_so.iloc[i] > q_sys.iloc[i]) and (sku_key in allowed_skus):
-            setup_real_data.append({
-                "BIN AWAL": dict_bin_asal.get(sku_key, "STAGING INBOUND"),
-                "BIN TUJUAN": bin_tujuan,
-                "SKU": sku_raw,
-                "QUANTITY": q_diff.iloc[i],
-                "NOTES": "RELOCATION"
-            })
-            seen_entry.add(f"{sku_key}|{bin_tujuan}")
-
-    # --- B. PROSES DATA MISSING (5 Item sisa yang nggak ada di Stock) ---
-    if df_recon_missing is not None and not df_recon_missing.empty:
-        for _, row in df_recon_missing.iterrows():
-            bin_tujuan_m = row.iloc[0]
-            sku_raw_m = row.iloc[1]
-            sku_key_m = clean_val(sku_raw_m)
-            qty_m = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-
-            # JIKA SKU MISSING INI LOLOS VALIDASI INBOUND (ADA DI 22 ITEM)
-            if (sku_key_m in allowed_skus) and (f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry):
+        if q_so.iloc[i] > q_sys.iloc[i]:
+            if sku_c in allowed_skus:
                 setup_real_data.append({
-                    "BIN AWAL": "STAGING INBOUND", # 5 item ini pasti dari inbound
+                    "BIN AWAL": "STAGING INBOUND", # Default asal buat temuan
+                    "BIN TUJUAN": bin_tujuan,
+                    "SKU": sku_raw,
+                    "QUANTITY": q_so.iloc[i] - q_sys.iloc[i],
+                    "NOTES": "RELOCATION"
+                })
+                seen_entry.add(f"{sku_c}|{bin_tujuan}")
+
+    # --- B. DARI RECON MISSING (5 Items sisa yang langsung lookup SKU) ---
+    if df_recon_missing is not None and not df_recon_missing.empty:
+        for _, row_m in df_recon_missing.iterrows():
+            bin_tujuan_m = row_m.iloc[0] # Kolom BIN di rekon
+            sku_raw_m = row_m.iloc[1]    # Kolom SKU di rekon
+            sku_c_m = super_clean(sku_raw_m)
+            qty_m = pd.to_numeric(row_m.iloc[6], errors='coerce') or 0
+            
+            # Kuncinya: Kalau SKU ini ada di list 22 barang ijin (allowed_skus)
+            # Dan belum masuk di atas (karena stocknya emang 0/ga ada)
+            if sku_c_m in allowed_skus and f"{sku_c_m}|{bin_tujuan_m}" not in seen_entry:
+                setup_real_data.append({
+                    "BIN AWAL": "STAGING INBOUND",
                     "BIN TUJUAN": bin_tujuan_m,
                     "SKU": sku_raw_m,
                     "QUANTITY": qty_m,
                     "NOTES": "RELOCATION (MISSING)"
                 })
-                seen_entry.add(f"{sku_key_m}|{bin_tujuan_m}")
+                seen_entry.add(f"{sku_c_m}|{bin_tujuan_m}")
 
     if not setup_real_data:
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
