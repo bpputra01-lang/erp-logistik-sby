@@ -549,31 +549,36 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_stock = df_stock_adj.copy()
     
     def clean_val(x):
-        if pd.isna(x): return ""
+        if pd.isna(x) or str(x).strip().lower() == 'nan': return ""
         s = str(x).strip().upper()
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Mapping BIN|SKU dari Recon (Hanya yang presisi)
+    # 1. Mapping BIN|SKU dari Recon
     recon_map = {}
     for _, row in df_recon.iterrows():
         qty_so = pd.to_numeric(row.iloc[6], errors='coerce')
         if qty_so > 0:
+            # Pastikan key bersih dari NaN
             k = f"{clean_val(row.iloc[0])}|{clean_val(row.iloc[1])}"
             recon_map[k] = qty_so
 
     # 2. Isi QTY SO & DIFF di tabel Stock
-    df_stock['JOIN_KEY'] = df_stock.iloc[:, 1].apply(clean_val) + "|" + df_stock.iloc[:, 2].apply(clean_val)
-    df_stock.iloc[:, 10] = df_stock['JOIN_KEY'].map(recon_map) # Pake map biar yang gak ketemu jadi NaN
+    # Gunakan fillna("") sebelum apply clean_val untuk menghindari error dtype
+    bin_col = df_stock.iloc[:, 1].fillna("").apply(clean_val)
+    sku_col = df_stock.iloc[:, 2].fillna("").apply(clean_val)
+    df_stock['JOIN_KEY'] = bin_col + "|" + sku_col
+    
+    # Mapping
+    df_stock.iloc[:, 10] = df_stock['JOIN_KEY'].map(recon_map) 
 
     sys_qty = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
     so_qty = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
     
-    # Jika QTY SO NaN (tidak ketemu BIN|SKU-nya), DIFF juga NaN
+    # Logic: Jika QTY SO kosong (NaN), DIFF juga harus NaN (Kosong di tampilan)
     df_stock.iloc[:, 11] = np.where(df_stock.iloc[:, 10].notna(), (sys_qty - so_qty).abs(), np.nan)
     
-    # 3. Ambil data Recon yang BELUM TERCOVER (Tidak ada pasangan BIN|SKU di stock)
-    # Ini yang nanti bakal dicek cuma lewat SKU aja ke Inbound
+    # 3. Ambil data Recon yang BELUM TERCOVER (Gak ada BIN|SKU di stock)
     matched_keys = set(df_stock['JOIN_KEY'].unique())
     
     def is_uncovered(row):
@@ -591,60 +596,69 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     return df_stock, df_recon_uncovered
 
 def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_uncovered):
-    # --- A. AMBIL SELISIH DARI STOCK (MULTIPLE) ---
+    # --- A. AMBIL SELISIH DARI STOCK ---
     df_filtered = df_stock_final.copy()
-    # Hanya ambil yang BIN|SKU nya cocok DAN ada selisih plus
-    mask_stock_plus = (df_filtered["QTY SO"] > df_filtered.iloc[:, 9]) & (df_filtered["DIFF"] > 0)
+    # Pastikan kolom QTY SO & Sistem adalah numeric
+    qty_so_num = pd.to_numeric(df_filtered["QTY SO"], errors='coerce').fillna(0)
+    qty_sys_num = pd.to_numeric(df_filtered.iloc[:, 9], errors='coerce').fillna(0)
+    diff_num = pd.to_numeric(df_filtered["DIFF"], errors='coerce').fillna(0)
+
+    mask_stock_plus = (qty_so_num > qty_sys_num) & (diff_num > 0)
     
     pivot_final = pd.DataFrame()
-    if any(mask_stock_plus):
+    if mask_stock_plus.any():
         df_plus = df_filtered[mask_stock_plus].copy()
-        pivot_final = df_plus.groupby(df_plus.columns[2])["DIFF"].sum().reset_index()
+        sku_col_name = df_plus.columns[2]
+        # Gunakan diff_num yang sudah dipastikan angka
+        df_plus['TEMP_DIFF'] = pd.to_numeric(df_plus["DIFF"], errors='coerce').fillna(0)
+        pivot_final = df_plus.groupby(sku_col_name)['TEMP_DIFF'].sum().reset_index()
         pivot_final.columns = ['SKU_KEY', 'QTY_TOTAL']
 
-    # --- B. CEK SISANYA KE INBOUND (Hanya cek SKU) ---
+    # --- B. CEK SISANYA KE INBOUND (HANYA SKU) ---
     df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
     
     if df_recon_uncovered is not None and not df_recon_uncovered.empty:
-        # Daftar SKU yang ada di file Inbound (Setiap baris SKU unik)
-        # Asumsi SKU Inbound ada di Kolom Index 2
-        skus_inbound = set(df_staging_inbound.iloc[:, 2].astype(str).str.strip().upper().unique())
+        # PROTEKSI ERROR: fillna('') dulu baru str.upper()
+        s_inbound = df_staging_inbound.iloc[:, 2].fillna('').astype(str).str.strip().str.upper()
+        skus_inbound = set(s_inbound.unique())
         
         def filter_source(row):
             sku_val = str(row.iloc[1]).strip().upper()
+            if sku_val == 'NAN' or not sku_val: return "SINGLE"
             return "INBOUND" if sku_val in skus_inbound else "SINGLE"
 
         df_m = df_recon_uncovered.copy()
         df_m['TARGET'] = df_m.apply(filter_source, axis=1)
 
-        # 1. Jika SKU ketemu di Inbound -> Masukin ke Multiple (Gabung QTY)
+        # 1. Masuk Multiple via Inbound
         df_to_mult = df_m[df_m['TARGET'] == "INBOUND"].copy()
         if not df_to_mult.empty:
+            # Kolom 6 adalah QTY di file recon
             pivot_inb = df_to_mult.groupby(df_to_mult.columns[1])[df_to_mult.columns[6]].sum().reset_index()
             pivot_inb.columns = ['SKU_KEY', 'QTY_TOTAL']
             
-            # Gabungkan dengan hasil dari Stock tadi
             if pivot_final.empty:
                 pivot_final = pivot_inb
             else:
                 pivot_final = pd.concat([pivot_final, pivot_inb]).groupby('SKU_KEY')['QTY_TOTAL'].sum().reset_index()
 
-        # 2. Jika SKU tidak ketemu di Inbound -> Masuk ke Single Adj
+        # 2. Masuk Single Adj
         df_to_sing = df_m[df_m['TARGET'] == "SINGLE"].copy()
         if not df_to_sing.empty:
             df_single_final = df_to_sing.groupby([df_to_sing.columns[0], df_to_sing.columns[1]])[df_to_sing.columns[6]].sum().reset_index()
             df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
 
-    # --- C. MERGE HASIL AKHIR KE FORMAT MASTER INBOUND ---
+    # --- C. FINAL MERGE ---
     df_multiple_final = pd.DataFrame()
     if not pivot_final.empty:
-        master_clean = df_staging_inbound.drop_duplicates(subset=[df_staging_inbound.columns[2]])
-        df_multiple_final = pivot_final.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
+        # Bersihkan Master Inbound dari duplikat SKU
+        m_clean = df_staging_inbound.drop_duplicates(subset=[df_staging_inbound.columns[2]])
+        df_multiple_final = pivot_final.merge(m_clean, left_on='SKU_KEY', right_on=m_clean.columns[2], how='left')
         
         if not df_multiple_final.empty:
-            # Update kolom QTY paling kanan (hasil merge) dengan QTY_TOTAL kita
-            qty_col = df_multiple_final.columns[-1]
-            df_multiple_final[qty_col] = df_multiple_final['QTY_TOTAL']
+            # Ambil kolom terakhir (QTY) untuk diupdate
+            target_qty_col = df_multiple_final.columns[-1]
+            df_multiple_final[target_qty_col] = df_multiple_final['QTY_TOTAL']
             df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'QTY_TOTAL'], errors='ignore')
 
     return df_multiple_final, df_single_final
