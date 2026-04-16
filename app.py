@@ -640,51 +640,61 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
 
     return df_mult_res, df_sing_res
-
-def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
-    def super_clean(val):
-        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
-        s = str(val).strip().upper()
-        # Sesuai aturan: hapus prefix SPE di awal kata untuk matching
+def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing):
+    def clean_val(x):
+        if pd.isna(x) or str(x).strip().lower() == 'nan': return ""
+        s = str(x).strip().upper()
+        # Sesuai preferensi: hapus prefix SPE jika ada agar matching
         if s.startswith("SPE"): s = s[3:] 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Kumpulin SKU yang lolos ke Multiple Adj (Hasil Step Lookup Inbound tadi)
-    # Kita cuma butuh mastiin SKU ini emang ada di list Multiple
-    valid_multiple_skus = set()
-    if not df_multiple_adj_plus.empty:
-        # Kita cari kolom SKU di file Multiple (biasanya kolom ke-3 atau index 2)
-        # Tapi biar aman, kita scan semua barisnya
-        for _, row in df_multiple_adj_plus.iterrows():
-            sku = super_clean(row.iloc[2]) # Sesuaikan index kolom SKU di file Inbound/Multiple
-            if sku:
-                valid_multiple_skus.add(sku)
+    # 1. Dictionary buat nentuin BIN TUJUAN dari Rekon (Missing Data)
+    # Karena barangnya temuan/lookup inbound, kita ambil BIN tujuannya dari file Rekon
+    dict_tujuan_rekon = {}
+    if df_recon_missing is not None and not df_recon_missing.empty:
+        for _, row in df_recon_missing.iterrows():
+            sku_m = clean_val(row.iloc[1]) # SKU di Rekon
+            bin_m = row.iloc[0]            # BIN di Rekon (Lokasi yang seharusnya)
+            qty_m = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+            if sku_m != "" and qty_m > 0:
+                dict_tujuan_rekon[sku_m] = bin_m
 
-    # 2. Proses Stock Final buat cari BIN TUJUAN
-    df_s = df_stock_final.copy()
-    
-    # Ambil data numerik buat perbandingan QTY
-    q_sys = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
-    q_so = pd.to_numeric(df_s.iloc[:, 10], errors='coerce').fillna(0)
-    diff_val = pd.to_numeric(df_s.iloc[:, 11], errors='coerce').fillna(0)
+    # 2. Ambil data dari Multiple Adj (Yang match BIN|SKU di awal)
+    # Ini buat mastiin SKU-nya emang masuk kategori Multiple
+    set_multiple_skus = set()
+    if not df_multiple_adj_plus.empty:
+        for _, row in df_multiple_adj_plus.iterrows():
+            sku_adj = clean_val(row.iloc[2]) # SKU di Kolom C
+            if sku_adj != "":
+                set_multiple_skus.add(sku_adj)
+
+    # 3. Proses Stock Final buat cari QTY DIFF
+    df_stock = df_stock_final.copy()
+    qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
+    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
+    diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
 
     setup_real_data = []
     
-    for i in range(len(df_s)):
-        # SYARAT: QTY SO > QTY SYSTEM (Barang nambah/Plus)
-        if q_so.iloc[i] > q_sys.iloc[i]:
-            sku_raw = df_s.iloc[i, 2]
-            sku_key = super_clean(sku_raw)
+    for i in range(len(df_stock)):
+        # SYARAT: QTY SO > QTY SYSTEM (Barang Plus/Masuk)
+        if qty_so.iloc[i] > qty_system.iloc[i]:
+            sku_raw = df_stock.iloc[i, 2]
+            sku_key = clean_val(sku_raw)
             
-            # CEK: Apakah SKU ini terdaftar di Multiple Adj?
-            if sku_key in valid_multiple_skus:
+            # CEK: Apakah SKU ini ada di list Multiple (Match Stock atau Lookup Inbound)?
+            if sku_key in set_multiple_skus or sku_key in dict_tujuan_rekon:
+                # Tentukan BIN TUJUAN: Utamakan dari Rekon (karena itu lokasi tujuannya)
+                # Kalau gak ada di rekon (berarti match stock), ambil dari BIN Stock (Kolom B)
+                bin_tujuan = dict_tujuan_rekon.get(sku_key, df_stock.iloc[i, 1])
+                
                 setup_real_data.append({
-                    "BIN AWAL": "INBOUND",        # Karena sumbernya dari File Inbound/Lookup
-                    "BIN TUJUAN": df_s.iloc[i, 1], # Kolom B di Stock (Lokasi barang ditemukan)
-                    "SKU": sku_raw,               # Pake SKU asli (biar SPE-nya gak ilang di hasil akhir)
+                    "BIN AWAL": "STAGING INBOUND", # Selalu dari Staging karena barang plus
+                    "BIN TUJUAN": bin_tujuan,       # Lokasi di Rekon/Warehouse
+                    "SKU": sku_raw,                # SKU asli (SPE tidak ilang)
                     "QUANTITY": diff_val.iloc[i], 
-                    "NOTES": "RELOCATION INBOUND" # Penanda ini barang dari staging
+                    "NOTES": "RELOCATION"
                 })
 
     # Return DataFrame
@@ -692,6 +702,7 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
     result_df = pd.DataFrame(setup_real_data)
+    # Pastikan urutan kolom sesuai header dashboard lu
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
     
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
