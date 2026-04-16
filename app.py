@@ -704,7 +704,7 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
     result_df = pd.DataFrame(setup_real_data)
     # Pastikan urutan kolom sesuai header dashboard lu
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
-    
+
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
         if pd.isna(x): return ""
