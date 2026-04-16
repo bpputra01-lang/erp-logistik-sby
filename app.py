@@ -864,6 +864,9 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
         key = (str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper())
         system_dict[key] = system_dict.get(key, 0) + row.get('DIFF', 0)
     
+    # BAGIAN PERBAIKAN: Ambil daftar BIN yang lolos filter UI
+    selected_bins = set(df_bin_coverage.iloc[:, 1].astype(str).strip().str.upper().unique())
+
     coverage_dict = {}
     for _, row in df_bin_coverage.iterrows():
         # Asumsi kolom: index 1=BIN, index 2=SKU, index 9=QTY
@@ -908,11 +911,12 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
                 sys_reduction[(bin_src, sku_src)] += alloc
                 remaining -= alloc
 
-        # --- TAHAP 2: Cari di Coverage Dictionary (Jika masih sisa) ---
+        # --- TAHAP 2: Cari di Coverage Dictionary (DENGAN FILTER BIN) ---
         if remaining > 0:
             for (bin_src, sku_src), qty_avail in coverage_dict.items():
                 if remaining <= 0: break
-                if sku_src == sku and qty_avail > 0:
+                # PERBAIKAN: Tambahkan syarat bin_src harus ada di selected_bins
+                if bin_src in selected_bins and sku_src == sku and qty_avail > 0:
                     alloc = min(qty_avail, remaining)
                     
                     row_alloc = row.to_dict()
