@@ -645,27 +645,29 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
     def clean_val(x):
         if pd.isna(x) or str(x).strip().lower() in ['nan', '']: return ""
         s = str(x).strip().upper()
-        if s.startswith("SPE"): s = s[3:] 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Dictionary dari MULTIPLE ADJ (Dibuat lebih kuat)
-    dict_multi = {}
+    # 1. BIKIN DAFTAR SKU YANG DIIJINKAN (22 ITEMS)
+    # Kita ambil SEMUA SKU yang ada di hasil pivot, mau dia hasil match BIN maupun cuma SKU
+    allowed_skus = set()
+    dict_bin_asal = {} # Buat nyari BIN ASAL kalau ada
+    
     if not df_multiple_adj_plus.empty:
         for _, row in df_multiple_adj_plus.iterrows():
-            # Kita cek dua tempat: Kolom SKU Master (Index 2) DAN Kolom pertama (Index 0)
-            # Karena SKU hasil lookup Inbound seringkali nongol di index 0 setelah merge
-            sku_idx2 = clean_val(row.iloc[2])
-            sku_idx0 = clean_val(row.iloc[0])
-            bin_asal = row.iloc[1] 
+            # Di df_mult_res (hasil pivot), SKU biasanya ada di kolom awal atau hasil merge
+            sku = clean_val(row.iloc[0]) # Cek index 0 hasil merge
+            if not sku: sku = clean_val(row.iloc[2]) # Backup index 2
             
-            if sku_idx2: dict_multi[sku_idx2] = bin_asal
-            if sku_idx0: dict_multi[sku_idx0] = bin_asal
+            if sku:
+                allowed_skus.add(sku)
+                # Simpan BIN Asal (biasanya kolom index 1)
+                dict_bin_asal[sku] = row.iloc[1]
 
     setup_real_data = []
     seen_entry = set()
 
-    # --- A. PROSES DATA NORMAL (Loop dari Stock) ---
+    # --- A. PROSES DATA DARI STOCK (17 Item) ---
     df_stock = df_stock_final.copy()
     q_sys = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
     q_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
@@ -676,19 +678,18 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
         sku_key = clean_val(sku_raw)
         bin_tujuan = df_stock.iloc[i, 1]
         
-        if q_so.iloc[i] > q_sys.iloc[i]:
-            if sku_key in dict_multi:
-                setup_real_data.append({
-                    "BIN AWAL": dict_multi[sku_key],
-                    "BIN TUJUAN": bin_tujuan,
-                    "SKU": sku_raw,
-                    "QUANTITY": q_diff.iloc[i],
-                    "NOTES": "RELOCATION"
-                })
-                seen_entry.add(f"{sku_key}|{bin_tujuan}")
+        # JIKA SKU ADA DI DAFTAR 22 ITEM
+        if (q_so.iloc[i] > q_sys.iloc[i]) and (sku_key in allowed_skus):
+            setup_real_data.append({
+                "BIN AWAL": dict_bin_asal.get(sku_key, "STAGING INBOUND"),
+                "BIN TUJUAN": bin_tujuan,
+                "SKU": sku_raw,
+                "QUANTITY": q_diff.iloc[i],
+                "NOTES": "RELOCATION"
+            })
+            seen_entry.add(f"{sku_key}|{bin_tujuan}")
 
-    # --- B. PROSES DATA MISSING (Loop dari Recon Missing) ---
-    # Ini yang bakal nangkep 5 item sisa tadi!
+    # --- B. PROSES DATA MISSING (5 Item sisa yang nggak ada di Stock) ---
     if df_recon_missing is not None and not df_recon_missing.empty:
         for _, row in df_recon_missing.iterrows():
             bin_tujuan_m = row.iloc[0]
@@ -696,14 +697,14 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
             sku_key_m = clean_val(sku_raw_m)
             qty_m = pd.to_numeric(row.iloc[6], errors='coerce') or 0
 
-            # Kuncinya di sini: kalau dia ada di dict_multi, tarik!
-            if sku_key_m in dict_multi and f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry:
+            # JIKA SKU MISSING INI LOLOS VALIDASI INBOUND (ADA DI 22 ITEM)
+            if (sku_key_m in allowed_skus) and (f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry):
                 setup_real_data.append({
-                    "BIN AWAL": "STAGING INBOUND", # Asal barang lookup inbound
+                    "BIN AWAL": "STAGING INBOUND", # 5 item ini pasti dari inbound
                     "BIN TUJUAN": bin_tujuan_m,
                     "SKU": sku_raw_m,
                     "QUANTITY": qty_m,
-                    "NOTES": "RELOCATION (INBOUND LOOKUP)"
+                    "NOTES": "RELOCATION (MISSING)"
                 })
                 seen_entry.add(f"{sku_key_m}|{bin_tujuan_m}")
 
@@ -711,7 +712,7 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
     return pd.DataFrame(setup_real_data)[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
-    
+
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
         if pd.isna(x): return ""
