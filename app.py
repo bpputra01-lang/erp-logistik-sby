@@ -3647,22 +3647,40 @@ def project_mutasi_karantina():
             with st.form("form_bulk"):
                 pic_m = st.text_input("Nama PIC Pengaju")
                 file_xlsx = st.file_uploader("Upload Excel (BIN AWAL, BIN TUJUAN, SKU, ARTICLE NAME, QUANTITY, NOTES, ALASAN)", type=['xlsx'])
+                
                 if st.form_submit_button("🔥 UPLOAD BATCH"):
                     if pic_m and file_xlsx:
+                        # 1. Ambil waktu sekarang
+                        # Kita buat format YYYY-MM-DD HH:MM:SS
+                        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
                         df = pd.read_excel(file_xlsx)
                         bid = f"BULK-{uuid.uuid4().hex[:6].upper()}"
                         bulk_data = []
+                        
                         for _, row in df.iterrows():
                             bulk_data.append({
-                                "batch_id": bid, "timestamp": ts, "nama_tim": pic_m,
-                                "bin_awal": str(row.get('BIN AWAL', '')), "bin_tujuan": str(row.get('BIN TUJUAN', '')),
-                                "sku": str(row.get('SKU', '')), "article_name": str(row.get('ARTICLE NAME', '')),
-                                "quantity": int(row.get('QUANTITY', 0)), "notes": str(row.get('NOTES', '')),
-                                "alasan": str(row.get('ALASAN', 'Bulk Upload')), "status": 1
+                                "batch_id": bid, 
+                                "timestamp": now, # Menggunakan waktu sekarang yang baru dibuat
+                                "nama_tim": pic_m,
+                                "bin_awal": str(row.get('BIN AWAL', '')), 
+                                "bin_tujuan": str(row.get('BIN TUJUAN', '')),
+                                "sku": str(row.get('SKU', '')), 
+                                "article_name": str(row.get('ARTICLE NAME', '')),
+                                "quantity": int(row.get('QUANTITY', 0)), 
+                                "notes": str(row.get('NOTES', '')),
+                                "alasan": str(row.get('ALASAN', 'Bulk Upload')), 
+                                "status": 1
                             })
-                        supabase.table("mutasi_karantina").insert(bulk_data).execute()
-                        st.success(f"Berhasil Upload {len(bulk_data)} Item! Batch: {bid}")
-                        st.rerun()
+                        
+                        try:
+                            supabase.table("mutasi_karantina").insert(bulk_data).execute()
+                            st.success(f"✅ Berhasil Upload {len(bulk_data)} Item! Batch: {bid}")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Gagal upload ke Database: {e}")
+                    else:
+                        st.warning("Mohon isi Nama PIC dan pilih file Excel terlebih dahulu.")
 
     # --- TAB 2: MONITORING & BATCH APPROVAL ---
     with tabs[1]:
