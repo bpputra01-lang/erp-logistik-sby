@@ -3580,10 +3580,6 @@ def project_mutasi_karantina():
             font-weight: 700 !important;
         }
 
-        /* Target khusus untuk label "Pilih Mode Input" agar tetap PUTIH */
-        div[data-testid="stRadio"] > label {
-            color: #000000 !important;
-        }
 
         /* 4. NUMBER INPUT BUTTONS */
         div[data-testid="stNumberInput"] button {
