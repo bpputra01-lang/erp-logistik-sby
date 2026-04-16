@@ -3595,6 +3595,16 @@ def project_mutasi_karantina():
         color: #E0E0E0 !important;
         font-weight: 600 !important;
     }
+    /* Khusus teks pilihan Radio Button dibuat Hitam agar terlihat di background putih */
+    [data-testid="stMain"] div[data-testid="stRadio"] label p {
+        color: #000000 !important;
+        font-weight: 500 !important;
+    }
+
+    /* Memastikan dot/titik radio tetap berwarna kontras */
+    [data-testid="stMain"] div[data-testid="stRadio"] div[role="radiogroup"] {
+        gap: 10px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
