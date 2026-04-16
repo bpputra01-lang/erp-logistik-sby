@@ -3626,9 +3626,10 @@ def project_mutasi_karantina():
             border-radius: 10px !important;
             padding: 10px !important;
         }
-        <div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>
+        
             </style>
     """, unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
 
     with st.expander("📋 Informasi Format File"):
         st.info("""
