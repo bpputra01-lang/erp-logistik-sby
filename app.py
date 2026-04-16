@@ -3602,7 +3602,31 @@ def project_mutasi_karantina():
             color: white; padding: 15px; border-radius: 10px; font-weight: 800; font-size: 20px;
             margin-bottom: 20px; border-left: 8px solid #cc0000;
         }
-    </style>
+        /* Styling Tombol Upload Batch agar berwarna Orange/Red Gradient */
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"] {
+            background: linear-gradient(135deg, #ff4b2b 0%, #ff416c 100%) !important;
+            color: white !important;
+            border: none !important;
+            padding: 10px 20px !important;
+            border-radius: 8px !important;
+            font-weight: bold !important;
+            transition: 0.3s !important;
+            width: 100% !important;
+        }
+
+        /* Efek Hover (saat kursor di atas tombol) */
+        div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover {
+            transform: scale(1.02) !important;
+            box-shadow: 0px 4px 15px rgba(255, 65, 108, 0.4) !important;
+        }
+
+        /* Memberikan border berwarna pada area upload file */
+        div[data-testid="stFileUploader"] {
+            border: 1px dashed #ff416c !important;
+            border-radius: 10px !important;
+            padding: 10px !important;
+        }
+            </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
     tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval"])
