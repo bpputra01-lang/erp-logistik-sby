@@ -3660,13 +3660,6 @@ def project_mutasi_karantina():
 
     # --- TAB 2: MONITORING & BATCH APPROVAL ---
     with tabs[1]:
-        Bisa banget, Bro. CSS ini bakal bikin tampilan History & Approval lu jadi konsisten dengan gaya Dark Mode yang sudah lu pakai sebelumnya.
-
-Berikut adalah implementasi kode lengkap untuk Tab Approval dengan integrasi CSS tersebut agar tampilan expander dan teksnya tidak berantakan:
-Python
-
-# --- TAB MONITORING & APPROVAL ---
-with tabs[1]:
     # CSS Custom (Input dari lu dimasukkan ke sini)
     st.markdown(""" 
         <style> 
