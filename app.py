@@ -3603,7 +3603,7 @@ def project_mutasi_karantina():
             margin-bottom: 20px; border-left: 8px solid #cc0000;
         }
         </style>
-""", unsafe_allow_html=True) 
+    """, unsafe_allow_html=True) 
     st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
     tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval"])
 
