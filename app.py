@@ -3549,8 +3549,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def project_mutasi_karantina():
     # --- CSS UI ---
-     # --- CSS UI ---
-
     st.markdown("""
 
         <style>
