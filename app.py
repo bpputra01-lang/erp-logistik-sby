@@ -3568,8 +3568,8 @@ def project_mutasi_karantina():
 
     /* Style khusus untuk tombol plus/minus di Number Input agar tidak putih terang */
     div[data-testid="stNumberInput"] button {
-        background-color: #1a1c27 !important;
-        color: #000000 !important;
+        background-color: #000000 !important;
+        color: white !important;
         border: 1px solid #3d4156 !important;
     }
 
