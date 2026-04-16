@@ -640,58 +640,58 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
 
     return df_mult_res, df_sing_res
+
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
-    def clean_val(x):
-        if pd.isna(x): return ""
-        s = str(x).strip().upper()
-        # Sesuai preferensi user: hapus prefix SPE jika ada agar matching
+    def super_clean(val):
+        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
+        s = str(val).strip().upper()
+        # Sesuai aturan: hapus prefix SPE di awal kata untuk matching
         if s.startswith("SPE"): s = s[3:] 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Dictionary dari MULTIPLE ADJ + (VBA Step 3)
-    dict_multi = {}
+    # 1. Kumpulin SKU yang lolos ke Multiple Adj (Hasil Step Lookup Inbound tadi)
+    # Kita cuma butuh mastiin SKU ini emang ada di list Multiple
+    valid_multiple_skus = set()
     if not df_multiple_adj_plus.empty:
+        # Kita cari kolom SKU di file Multiple (biasanya kolom ke-3 atau index 2)
+        # Tapi biar aman, kita scan semua barisnya
         for _, row in df_multiple_adj_plus.iterrows():
-            # VBA: SKU di Kolom C (Index 2), BIN di Kolom B (Index 1)
-            sku = clean_val(row.iloc[2])
-            bin_asal = row.iloc[1]
-            if sku != "" and sku not in dict_multi:
-                dict_multi[sku] = bin_asal
+            sku = super_clean(row.iloc[2]) # Sesuaikan index kolom SKU di file Inbound/Multiple
+            if sku:
+                valid_multiple_skus.add(sku)
 
-    # 2. Ambil Data Stock Final (VBA Step 4 & 5)
-    df_stock = df_stock_final.copy()
+    # 2. Proses Stock Final buat cari BIN TUJUAN
+    df_s = df_stock_final.copy()
     
-    # Pastikan tipe data numerik untuk perbandingan
-    # Kolom 10 (Index 9) = QTY SYSTEM
-    # Kolom 11 (Index 10) = QTY SO
-    # Kolom 12 (Index 11) = DIFF
-    qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
-    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
-    diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
+    # Ambil data numerik buat perbandingan QTY
+    q_sys = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
+    q_so = pd.to_numeric(df_s.iloc[:, 10], errors='coerce').fillna(0)
+    diff_val = pd.to_numeric(df_s.iloc[:, 11], errors='coerce').fillna(0)
 
     setup_real_data = []
     
-    for i in range(len(df_stock)):
-        # SYARAT: QTY SO > QTY SYSTEM
-        if qty_so.iloc[i] > qty_system.iloc[i]:
-            sku_key = clean_val(df_stock.iloc[i, 2]) # SKU Kolom C
+    for i in range(len(df_s)):
+        # SYARAT: QTY SO > QTY SYSTEM (Barang nambah/Plus)
+        if q_so.iloc[i] > q_sys.iloc[i]:
+            sku_raw = df_s.iloc[i, 2]
+            sku_key = super_clean(sku_raw)
             
-            # LOGIC TAMBAHAN: ABAIKAN JIKA SKU TIDAK ADA DI FILE MULTIPLE (TIDAK ADA NOT FOUND)
-            if sku_key in dict_multi:
+            # CEK: Apakah SKU ini terdaftar di Multiple Adj?
+            if sku_key in valid_multiple_skus:
                 setup_real_data.append({
-                    "BIN AWAL": dict_multi[sku_key],
-                    "BIN TUJUAN": df_stock.iloc[i, 1], # Kolom B
-                    "SKU": sku_key,
-                    "QUANTITY": diff_val.iloc[i],     # Kolom L
-                    "NOTES": "RELOCATION"             # Sesuai request
+                    "BIN AWAL": "INBOUND",        # Karena sumbernya dari File Inbound/Lookup
+                    "BIN TUJUAN": df_s.iloc[i, 1], # Kolom B di Stock (Lokasi barang ditemukan)
+                    "SKU": sku_raw,               # Pake SKU asli (biar SPE-nya gak ilang di hasil akhir)
+                    "QUANTITY": diff_val.iloc[i], 
+                    "NOTES": "RELOCATION INBOUND" # Penanda ini barang dari staging
                 })
 
-    # Return DataFrame dengan susunan kolom sesuai Header VBA
-    result_df = pd.DataFrame(setup_real_data)
-    if result_df.empty:
+    # Return DataFrame
+    if not setup_real_data:
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
+    result_df = pd.DataFrame(setup_real_data)
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
     
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
