@@ -3620,8 +3620,9 @@ def project_mutasi_karantina():
                     article = st.text_input("Article Name")
                     qty = st.number_input("Quantity", min_value=1)
                 
-                alasan = st.selectbox("Alasan", ["Re-stock Sellable", "Salah Putaway", "Order Customer", "Lainnya"])
-                notes = st.text_area("Notes")
+                # Urutan dibalik: Notes dulu (jadi selectbox), baru Alasan (jadi text_input/area)
+                notes = st.selectbox("Notes", ["MISS LOCATION"]) 
+                alasan = st.text_area("Alasan Di Mutasi", placeholder="Deskripsikan alasan mutasi di sini...")
 
                 if st.form_submit_button("🚀 SUBMIT"):
                     if pengaju and sku:
