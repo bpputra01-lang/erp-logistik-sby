@@ -3641,7 +3641,7 @@ def project_mutasi_karantina():
                 - NOTES
                 - ALASAN
             """)
-    tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval"])
+    tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval","📦Mutasi Done Approval"])
 
     tz = pytz.timezone('Asia/Jakarta')
     ts = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
