@@ -3828,7 +3828,52 @@ def project_mutasi_karantina():
                         if st.button(f"🗑️ Hapus Batch {b_id}", key=f"del_{b_id}"):
                             supabase.table("mutasi_karantina").delete().eq("batch_id", b_id).execute()
                             st.rerun()
+    # --- TAB 3: WORKING LIST (ON PROCESS) ---
+    with tabs[2]:
+        st.markdown("### 🟡 Working List (On Process)")
+        
+        # Ambil semua data yang statusnya 2 (Sudah Approve tapi belum Finish)
+        res_working = supabase.table("mutasi_karantina").select("*").eq("status", 2).order("timestamp", desc=True).execute()
+        df_working = pd.DataFrame(res_working.data)
 
+        if df_working.empty:
+            st.info("Tidak ada mutasi yang sedang diproses (Kuning).")
+        else:
+            # Filter Pencarian Cepat di Working List
+            search_work = st.text_input("🔍 Filter Cepat (SKU/Batch/PIC):", key="search_work")
+            
+            if search_work:
+                mask = df_working.apply(lambda row: row.astype(str).str.contains(search_work, case=False).any(), axis=1)
+                df_display_work = df_working[mask]
+            else:
+                df_display_work = df_working
+
+            st.write(f"Terdapat **{len(df_display_work)}** item yang harus segera diselesaikan.")
+
+            # Tampilkan dalam satu tabel gabungan
+            cols_work = [
+                "batch_id", "nama_tim", "sku", "article_name", 
+                "quantity", "bin_awal", "bin_tujuan", "approved_by"
+            ]
+            
+            st.dataframe(
+                df_display_work[cols_work], 
+                use_container_width=True,
+                column_config={
+                    "batch_id": "ID Batch",
+                    "nama_tim": "Pengaju",
+                    "sku": "SKU",
+                    "bin_awal": "Dari Bin",
+                    "bin_tujuan": "Ke Bin",
+                    "approved_by": "Disetujui Oleh"
+                }
+            )
+
+            # Tombol Aksi Cepat
+            st.info("💡 Untuk menyelesaikan (Finish), silakan kembali ke Tab **Monitoring** dan cari ID Batch yang sesuai.")
+            
+            if st.button("🔄 Refresh List"):
+                st.rerun()
 import pandas as pd
 import streamlit as st
 from io import BytesIO
