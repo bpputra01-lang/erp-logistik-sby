@@ -5946,7 +5946,7 @@ elif menu == "Pengajuan Reject/Defect":
 elif menu == "List Retur Out":
     menu_retur_out_system()
 
-elif menu == "Pengajuan Mutasi Karantina"
+elif menu == "Pengajuan Mutasi Karantina":
     project_mutasi_karantina()
 
 import streamlit as st
