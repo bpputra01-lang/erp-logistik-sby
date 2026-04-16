@@ -3629,18 +3629,22 @@ def project_mutasi_karantina():
             </style>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
+
     with st.expander("📋 Informasi Format File"):
-            st.info("""
-            **UNTUK BULK/MULTIPLE UPLOAD:**
-            - **Pastikan Formatnya :
-                - BIN AWAL
-                - BIN TUJUAN
-                - SKU
-                - ARTICLE NAME
-                - QUANTITY
-                - NOTES
-                - ALASAN
-            """)
+        st.info("""
+        **UNTUK BULK / MULTIPLE UPLOAD:**
+        
+        Pastikan file Excel memiliki kolom dengan urutan dan nama berikut:
+        1. **BIN AWAL**
+        2. **BIN TUJUAN**
+        3. **SKU**
+        4. **ARTICLE NAME**
+        5. **QUANTITY**
+        6. **NOTES**
+        7. **ALASAN**
+        
+        *Pastikan tidak ada kolom yang kosong atau nama kolom yang typo agar terbaca sistem.*
+        """)
     tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval","📦Mutasi Done Approval"])
 
     tz = pytz.timezone('Asia/Jakarta')
