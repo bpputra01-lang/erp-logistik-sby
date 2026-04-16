@@ -3568,11 +3568,28 @@ def project_mutasi_karantina():
 
     /* Style khusus untuk tombol plus/minus di Number Input agar tidak putih terang */
     div[data-testid="stNumberInput"] button {
-        background-color: #000000 !important;
+        background-color: #1a1c27 !important;
         color: white !important;
         border: 1px solid #3d4156 !important;
     }
+    /* Menargetkan Input Number (Quantity) agar background gelap dan teks putih */
+    div[data-testid="stNumberInput"] > div > div {
+        background-color: #1a1c27 !important;
+        border: 1px solid #3d4156 !important;
+        border-radius: 8px !important;
+    }
 
+    div[data-testid="stNumberInput"] input {
+        color: white !important;
+        background-color: #1a1c27 !important;
+    }
+
+    /* Menyesuaikan tombol plus minus di sampingnya */
+    div[data-testid="stNumberInput"] button {
+        background-color: #1a1c27 !important;
+        color: white !important;
+        border: 1px solid #3d4156 !important;
+    }
     /* Warna label (Nama PIC, SKU, dkk) */
     label {
         color: #E0E0E0 !important;
