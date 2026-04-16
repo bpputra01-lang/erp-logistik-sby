@@ -554,10 +554,7 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Ambil daftar SKU unik di Stock (pake set biar ngebut)
-    skus_in_stock = set(df_stock.iloc[:, 2].apply(clean_val))
-
-    # 2. Bikin mapping dictionary BIN|SKU -> QTY SO
+    # 1. Mapping Dictionary dari Recon (BIN|SKU -> QTY SO)
     recon_map = {}
     for _, row in df_recon.iterrows():
         try:
@@ -567,18 +564,22 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
                 recon_map[k] = qty_so
         except: continue
 
-    # 3. Pastikan kolom cukup (sampai L/kolom 11)
+    # 2. Pastikan kolom cukup
     while df_stock.shape[1] < 12:
         df_stock[f"Extra_{df_stock.shape[1]}"] = 0.0
 
-    # 4. ISI QTY SO (Kolom K / index 10) pake Mapping (Jauh lebih cepet dari apply)
+    # 3. ISI QTY SO (Hanya jika BIN|SKU cocok di recon_map)
     df_stock['JOIN_KEY'] = df_stock.iloc[:, 1].apply(clean_val) + "|" + df_stock.iloc[:, 2].apply(clean_val)
-    df_stock.iloc[:, 10] = df_stock['JOIN_KEY'].map(recon_map).fillna(0)
+    
+    # Gunakan mapping, yang tidak ketemu akan jadi NaN (nanti dihitung sebagai 0)
+    df_stock.iloc[:, 10] = df_stock['JOIN_KEY'].map(recon_map)
 
-    # 5. HITUNG DIFF (Kolom L / index 11) pake Vectorized (Bukan apply)
+    # 4. HITUNG DIFF (Hanya jika QTY SO ada isinya)
     sys_qty = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
     so_qty = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
-    df_stock.iloc[:, 11] = (sys_qty - so_qty).abs()
+    
+    # Logic: Jika QTY SO kosong (NaN), maka DIFF juga kosongin
+    df_stock.iloc[:, 11] = np.where(df_stock.iloc[:, 10].notna(), (sys_qty - so_qty).abs(), np.nan)
     
     # Bersihkan kolom bantu
     df_stock = df_stock.drop(columns=['JOIN_KEY'])
@@ -589,60 +590,71 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     cols[11] = "DIFF"
     df_stock.columns = cols
 
-    # 6. LOGIC SINGLE
-    def check_is_single(row):
+    # 5. Cari SKU yang "Gak Ada di Stock" (untuk diproses Inbound/Single)
+    skus_in_stock = set(df_stock.iloc[:, 2].apply(clean_val))
+    def check_not_in_stock(row):
         sku_recon = clean_val(row.iloc[1])
         qty_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
         return qty_recon > 0 and sku_recon not in skus_in_stock
 
-    df_need_single = df_recon[df_recon.apply(check_is_single, axis=1)].copy()
+    df_recon_missing = df_recon[df_recon.apply(check_not_in_stock, axis=1)].copy()
     
-    return df_stock, df_need_single
+    return df_stock, df_recon_missing
 
-def logic_pivot_adjustment(df_stock_final, df_adj_plus_master, df_recon_missing):
-    # 1. DEFINE AWAL biar gak "Not Defined"
-    df_multiple_final = pd.DataFrame()
-    df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
-    
+def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing):
+    # --- A. PROSES DARI STOCK (MULTIPLE) ---
     df_filtered = df_stock_final.copy()
-    
-    # 2. Paksa numeric biar gak error float64
-    for col_idx in [9, 10, 11]:
-        df_filtered.iloc[:, col_idx] = pd.to_numeric(df_filtered.iloc[:, col_idx], errors='coerce').fillna(0)
-    
-    # 3. FILTER: Harus ada di Recon, Diff bukan 0, dan SO > Sistem
     mask_multiple = (df_filtered["QTY SO"] > 0) & \
-                    (df_filtered["DIFF"] != 0) & \
+                    (df_filtered["DIFF"] > 0) & \
                     (df_filtered["QTY SO"] > df_filtered.iloc[:, 9])
     
-    df_to_pivot = df_filtered[mask_multiple].copy()
+    df_diff_stock = df_filtered[mask_multiple].copy()
+    pivot_stock = pd.DataFrame()
+    if not df_diff_stock.empty:
+        sku_col = df_diff_stock.columns[2]
+        pivot_stock = df_diff_stock.groupby(sku_col)["DIFF"].sum().reset_index()
+        pivot_stock.columns = ['SKU_KEY', 'QTY_DIFF']
+
+    # --- B. PROSES DARI RECON MISSING (INBOUND vs SINGLE) ---
+    df_inbound_res = pd.DataFrame()
+    df_single_final = pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
     
-    # 4. PROSES MULTIPLE
-    if not df_to_pivot.empty:
-        sku_col = df_to_pivot.columns[2]
-        pivot_multiple = df_to_pivot.groupby(sku_col)["DIFF"].sum().reset_index()
-        pivot_multiple.columns = ['SKU_KEY', 'TOTAL_DIFF']
+    if df_recon_missing is not None and not df_recon_missing.empty:
+        # Ambil SKU unik di Inbound untuk pengecekan
+        skus_in_inbound = set(df_staging_inbound.iloc[:, 2].astype(str).str.strip().upper())
         
-        master_clean = df_adj_plus_master.drop_duplicates(subset=[df_adj_plus_master.columns[2]])
-        df_multiple_final = pivot_multiple.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
+        # Pisahkan: Mana yang ada di Inbound, mana yang beneran Single (Gak ada di mana-mana)
+        def check_source(row):
+            sku = str(row.iloc[1]).strip().upper()
+            return "INBOUND" if sku in skus_in_inbound else "SINGLE"
+        
+        df_recon_missing['SOURCE'] = df_recon_missing.apply(check_source, axis=1)
+        
+        # 1. Masuk ke Inbound (Akan dipivot nanti)
+        df_to_inbound = df_recon_missing[df_recon_missing['SOURCE'] == "INBOUND"].copy()
+        if not df_to_inbound.empty:
+            pivot_inbound = df_to_inbound.groupby(df_to_inbound.columns[1])[df_to_inbound.columns[6]].sum().reset_index()
+            pivot_inbound.columns = ['SKU_KEY', 'QTY_DIFF']
+            # Gabung pivot_stock dan pivot_inbound
+            pivot_stock = pd.concat([pivot_stock, pivot_inbound]).groupby('SKU_KEY')['QTY_DIFF'].sum().reset_index()
+
+        # 2. Masuk ke Single (Beneran gak ada di Master Stock & Inbound)
+        df_to_single = df_recon_missing[df_recon_missing['SOURCE'] == "SINGLE"].copy()
+        if not df_to_single.empty:
+            df_single_final = df_to_single.groupby([df_to_single.columns[0], df_to_single.columns[1]])[df_to_single.columns[6]].sum().reset_index()
+            df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
+
+    # --- C. FINAL MERGE KE MASTER INBOUND (MULTIPLE) ---
+    df_multiple_final = pd.DataFrame()
+    if not pivot_stock.empty:
+        master_clean = df_staging_inbound.drop_duplicates(subset=[df_staging_inbound.columns[2]])
+        df_multiple_final = pivot_stock.merge(master_clean, left_on='SKU_KEY', right_on=master_clean.columns[2], how='left')
         
         if not df_multiple_final.empty:
             target_col = df_multiple_final.columns[-1]
-            df_multiple_final.loc[:, target_col] = df_multiple_final['TOTAL_DIFF']
-            df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'TOTAL_DIFF'], errors='ignore')
+            df_multiple_final.loc[:, target_col] = df_multiple_final['QTY_DIFF']
+            df_multiple_final = df_multiple_final.drop(columns=['SKU_KEY', 'QTY_DIFF'], errors='ignore')
 
-    # 5. PROSES SINGLE (Data yang SKU-nya gak ada di sistem sama sekali)
-    if df_recon_missing is not None and not df_recon_missing.empty:
-        df_m = df_recon_missing.copy()
-        # Kolom 6 biasanya QTY SO di file recon
-        df_m.iloc[:, 6] = pd.to_numeric(df_m.iloc[:, 6], errors='coerce').fillna(0)
-        df_m = df_m[df_m.iloc[:, 6] > 0]
-        
-        if not df_m.empty:
-            # Groupby BIN & SKU
-            df_single_final = df_m.groupby([df_m.columns[0], df_m.columns[1]])[df_m.columns[6]].sum().reset_index()
-            df_single_final.columns = ['BIN', 'SKU', 'QTY ADJ']
-        
     return df_multiple_final, df_single_final
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus):
     def clean_val(x):
