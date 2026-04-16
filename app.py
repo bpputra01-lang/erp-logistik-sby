@@ -3560,7 +3560,16 @@ def project_mutasi_karantina():
         border: 1px solid #3d4156 !important;
         border-radius: 8px !important;
     }
+    /* Khusus teks pilihan Radio Button dibuat Hitam agar terlihat di background putih */
+    [data-testid="stMain"] div[data-testid="stRadio"] label p {
+        color: #000000 !important;
+        font-weight: 500 !important;
+    }
 
+    /* Memastikan dot/titik radio tetap berwarna kontras */
+    [data-testid="stMain"] div[data-testid="stRadio"] div[role="radiogroup"] {
+        gap: 10px;
+    }
     /* Memastikan teks di dalam input berwarna putih */
     input, textarea, div[data-baseweb="select"] span {
         color: white !important;
@@ -3595,16 +3604,7 @@ def project_mutasi_karantina():
         color: #E0E0E0 !important;
         font-weight: 600 !important;
     }
-    /* Khusus teks pilihan Radio Button dibuat Hitam agar terlihat di background putih */
-    [data-testid="stMain"] div[data-testid="stRadio"] label p {
-        color: #000000 !important;
-        font-weight: 500 !important;
-    }
-
-    /* Memastikan dot/titik radio tetap berwarna kontras */
-    [data-testid="stMain"] div[data-testid="stRadio"] div[role="radiogroup"] {
-        gap: 10px;
-    }
+    
     </style>
 """, unsafe_allow_html=True)
 
