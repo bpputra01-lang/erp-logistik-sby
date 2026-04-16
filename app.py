@@ -956,7 +956,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
             df_sys_updated.loc[mask, 'DIFF'] -= q
 
     return df_result, df_sys_updated
-    
+
 def generate_set_up_real_plus(allocated_data):
     filtered = allocated_data[allocated_data['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
     if not filtered.empty:
@@ -1262,12 +1262,24 @@ def menu_Stock_Opname():
         up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="step2_cov")
         if up_bin_cov:
             if st.button("▶️ RUN ALLOCATION", use_container_width=True):
-                df_cov = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+                # 1. Baca data original
+                df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+                
+                # 2. FILTER DATA BERDASARKAN PILIHAN USER (TAMBAHKAN INI)
+                if selected_bin_cov:
+                    # Asumsi BIN ada di kolom index 1 sesuai logic fungsi lu
+                    df_cov = df_cov_raw[df_cov_raw.iloc[:, 1].astype(str).str.strip().str.upper().isin(selected_bin_cov)]
+                else:
+                    df_cov = df_cov_raw # Kalau gak pilih apa-apa, hajar semua (atau kasih warning)
+
+                # 3. Jalankan logic dengan data yang SUDAH DIFILTER
                 allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov)
+                
                 allocated['ITEM NAME'] = allocated['SKU'].map(d['map_dict'])
                 st.session_state.allocation_result = allocated
                 st.session_state.sys_updated_result = sys_upd
                 st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated)
+                st.success(f"✅ Berhasil! Menggunakan {len(selected_bin_cov)} BIN yang difilter.")
                 st.rerun()
 
     if st.session_state.allocation_result is not None:
