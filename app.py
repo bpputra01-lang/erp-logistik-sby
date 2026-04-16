@@ -641,7 +641,7 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
 
     return df_mult_res, df_sing_res
 
-def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon=None):
+def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
@@ -649,69 +649,60 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon=None):
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Dictionary dari MULTIPLE ADJ + (VBA Step 3)
+    # 1. Dictionary dari MULTIPLE ADJ (Data Normal yang match BIN|SKU)
     dict_multi = {}
     if not df_multiple_adj_plus.empty:
+        # Kita ambil SKU dari hasil merge Inbound (biasanya kolom ke-3/index 2)
         for _, row in df_multiple_adj_plus.iterrows():
-            sku = clean_val(row.iloc[2]) # Kolom C
-            bin_asal = row.iloc[1]       # Kolom B
-            if sku != "" and sku not in dict_multi:
+            sku = clean_val(row.iloc[2]) 
+            bin_asal = row.iloc[1] # BIN dari Master Inbound
+            if sku != "":
                 dict_multi[sku] = bin_asal
 
-    # 2. Dictionary Backup dari File Rekon (Handle Missing)
-    dict_recon_bin = {}
-    if df_recon is not None:
-        for _, row in df_recon.iterrows():
-            s_rec = clean_val(row.iloc[1])
-            b_rec = row.iloc[0]
-            if s_rec != "":
-                dict_recon_bin[s_rec] = b_rec
-
-    # 3. Proses Logic
-    df_stock = df_stock_final.copy()
-    qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
-    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
-    diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
-
     setup_real_data = []
-    seen_entry = set() # Anti Double Data
+    seen_entry = set()
 
-    # --- JALANIN LOGIC NORMAL DULU ---
+    # --- A. PROSES DATA NORMAL (Ada di Stock) ---
+    df_stock = df_stock_final.copy()
+    q_sys = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
+    q_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
+    q_diff = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
+
     for i in range(len(df_stock)):
-        if qty_so.iloc[i] > qty_system.iloc[i]:
+        if q_so.iloc[i] > q_sys.iloc[i]:
             sku_raw = df_stock.iloc[i, 2]
             sku_key = clean_val(sku_raw)
             bin_tujuan = df_stock.iloc[i, 1]
             
             if sku_key in dict_multi:
-                bin_awal = dict_multi[sku_key]
                 setup_real_data.append({
-                    "BIN AWAL": bin_awal,
+                    "BIN AWAL": dict_multi[sku_key],
                     "BIN TUJUAN": bin_tujuan,
                     "SKU": sku_raw,
-                    "QUANTITY": diff_val.iloc[i],
+                    "QUANTITY": q_diff.iloc[i],
                     "NOTES": "RELOCATION"
                 })
                 seen_entry.add(f"{sku_key}|{bin_tujuan}")
 
-    # --- SAPU JAGAT (BARANG YANG ADA DI MULTIPLE TAPI BELUM MASUK) ---
-    for i in range(len(df_stock)):
-        sku_raw = df_stock.iloc[i, 2]
-        sku_key = clean_val(sku_raw)
-        bin_tujuan = df_stock.iloc[i, 1]
-        
-        # Cek apakah dia bagian dari Multiple/Recon tapi belum ada di list seen_entry
-        if (sku_key in dict_multi or sku_key in dict_recon_bin) and f"{sku_key}|{bin_tujuan}" not in seen_entry:
-            q_plus = qty_so.iloc[i] - qty_system.iloc[i]
-            if q_plus > 0:
+    # --- B. PROSES DATA MISSING (Sapu Jagat dari df_recon_missing) ---
+    # Ini yang bikin beneran nyambung sama fungsi pertama!
+    if df_recon_missing is not None and not df_recon_missing.empty:
+        for _, row in df_recon_missing.iterrows():
+            bin_tujuan_m = row.iloc[0] # BIN di Rekon
+            sku_raw_m = row.iloc[1]    # SKU di Rekon
+            sku_key_m = clean_val(sku_raw_m)
+            qty_m = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+
+            # Cek apakah SKU missing ini sudah divalidasi masuk Multiple (Inbound)
+            if sku_key_m in dict_multi and f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry:
                 setup_real_data.append({
-                    "BIN AWAL": "STAGING INBOUND", 
-                    "BIN TUJUAN": bin_tujuan,
-                    "SKU": sku_raw,
-                    "QUANTITY": q_plus,
+                    "BIN AWAL": "STAGING INBOUND", # Asal barang missing
+                    "BIN TUJUAN": bin_tujuan_m,
+                    "SKU": sku_raw_m,
+                    "QUANTITY": qty_m,
                     "NOTES": "RELOCATION (MISSING)"
                 })
-                seen_entry.add(f"{sku_key}|{bin_tujuan}")
+                seen_entry.add(f"{sku_key_m}|{bin_tujuan_m}")
 
     if not setup_real_data:
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
