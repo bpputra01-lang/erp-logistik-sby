@@ -1265,22 +1265,34 @@ def menu_Stock_Opname():
                 # 1. Baca data original
                 df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
                 
-                # 2. FILTER DATA BERDASARKAN PILIHAN USER (TAMBAHKAN INI)
+                # 2. FILTER DATA BERDASARKAN PILIHAN USER (Logic "Mengandung")
                 if selected_bin_cov:
-                    # Asumsi BIN ada di kolom index 1 sesuai logic fungsi lu
-                    df_cov = df_cov_raw[df_cov_raw.iloc[:, 1].astype(str).str.strip().str.upper().isin(selected_bin_cov)]
+                    import re
+                    # Gabungkan pilihan user jadi pattern regex (contoh: "KARANTINA|GL3-DC|GL4-DC")
+                    # re.escape gunanya biar karakter spesial kayak titik (.) gak bikin error regex
+                    pattern = "|".join([re.escape(str(b).strip().upper()) for b in selected_bin_cov])
+                    
+                    # Filter: Cari yang mengandung (contains) salah satu pattern di atas
+                    # Kolom index 1 (BIN) dipaksa UPPER agar matching-nya akurat
+                    mask = df_cov_raw.iloc[:, 1].astype(str).str.strip().str.upper().str.contains(pattern, na=False)
+                    df_cov = df_cov_raw[mask].copy()
                 else:
-                    df_cov = df_cov_raw # Kalau gak pilih apa-apa, hajar semua (atau kasih warning)
+                    df_cov = df_cov_raw # Kalau gak pilih apa-apa, hajar semua
 
-                # 3. Jalankan logic dengan data yang SUDAH DIFILTER
-                allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov)
-                
-                allocated['ITEM NAME'] = allocated['SKU'].map(d['map_dict'])
-                st.session_state.allocation_result = allocated
-                st.session_state.sys_updated_result = sys_upd
-                st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated)
-                st.success(f"✅ Berhasil! Menggunakan {len(selected_bin_cov)} BIN yang difilter.")
-                st.rerun()
+                # --- VALIDASI: Kasih peringatan kalau hasil filter kosong ---
+                if df_cov.empty and selected_bin_cov:
+                    st.error("❌ Data BIN Coverage kosong setelah difilter! Cek lagi pilihan BIN lu.")
+                else:
+                    # 3. Jalankan logic dengan data yang SUDAH DIFILTER
+                    allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov)
+                    
+                    allocated['ITEM NAME'] = allocated['SKU'].map(d['map_dict'])
+                    st.session_state.allocation_result = allocated
+                    st.session_state.sys_updated_result = sys_upd
+                    st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated)
+                    
+                    st.success(f"✅ Berhasil! Terfilter {len(df_cov)} baris dari {len(selected_bin_cov)} kriteria BIN.")
+                    st.rerun()
 
     if st.session_state.allocation_result is not None:
         st.markdown("### ✅ HASIL ALOKASI")
