@@ -3660,6 +3660,47 @@ def project_mutasi_karantina():
 
     # --- TAB 2: MONITORING & BATCH APPROVAL ---
     with tabs[1]:
+        Bisa banget, Bro. CSS ini bakal bikin tampilan History & Approval lu jadi konsisten dengan gaya Dark Mode yang sudah lu pakai sebelumnya.
+
+Berikut adalah implementasi kode lengkap untuk Tab Approval dengan integrasi CSS tersebut agar tampilan expander dan teksnya tidak berantakan:
+Python
+
+# --- TAB MONITORING & APPROVAL ---
+with tabs[1]:
+    # CSS Custom (Input dari lu dimasukkan ke sini)
+    st.markdown(""" 
+        <style> 
+        [data-testid="stMain"] div[data-testid="stRadio"] label p { 
+            color: #FFFFFF !important;  /* Fix: Diubah ke putih agar terlihat di dark mode */
+            font-weight: 500 !important; 
+        } 
+        [data-testid="stMain"] div[data-testid="stExpander"] summary p { 
+            color: #FFFFFF !important; 
+            font-weight: bold !important; 
+        } 
+        [data-testid="stMain"] div[data-testid="stExpander"] { 
+            background-color: #1a1c27 !important; 
+            border: 1px solid #3d4156 !important; 
+            border-radius: 12px !important; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; 
+            margin-bottom: 10px;
+        } 
+        /* CSS UNTUK GARIS TIMELINE */
+        .timeline-line {
+            height: 4px;
+            background: #3d4156;
+            margin-top: 15px;
+            border-radius: 2px;
+        }
+        .line-active {
+            background: #00ff00 !important;
+            box-shadow: 0 0 8px #00ff00;
+        }
+        [data-testid="stMain"] .stMarkdown p { 
+            color: #FFFFFF !important; 
+        } 
+        </style> 
+    """, unsafe_allow_html=True)
         res = supabase.table("mutasi_karantina").select("*").order("id", desc=True).execute()
         df_res = pd.DataFrame(res.data)
 
