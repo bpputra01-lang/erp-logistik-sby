@@ -3550,17 +3550,36 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def project_mutasi_karantina():
     # --- CSS UI ---
     st.markdown("""
-        <style>
-        .hero-header { 
-            background: linear-gradient(135deg, #b82e2e 0%, #7a1f1f 100%); 
-            color: white; padding: 15px; border-radius: 10px; font-weight: 800; font-size: 22px;
-            margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        .gold-btn button { background-color: #D4AF37 !important; color: white !important; font-weight: bold !important; }
-        .timeline-line { height: 4px; background: #3d4156; margin-top: 15px; border-radius: 2px; }
-        .line-active { background: #00ff00 !important; box-shadow: 0 0 8px #00ff00; }
-        </style>
-    """, unsafe_allow_html=True)
+    <style>
+    /* Menggelapkan semua input: Text, Area, Number, dan Selectbox */
+    div[data-testid="stTextInput"] > div > div, 
+    div[data-testid="stTextArea"] > div > div,
+    div[data-testid="stNumberInput"] > div > div,
+    div[data-testid="stSelectbox"] > div > div {
+        background-color: #1a1c27 !important;
+        border: 1px solid #3d4156 !important;
+        border-radius: 8px !important;
+    }
+
+    /* Memastikan teks di dalam input berwarna putih */
+    input, textarea, div[data-baseweb="select"] span {
+        color: white !important;
+    }
+
+    /* Style khusus untuk tombol plus/minus di Number Input agar tidak putih terang */
+    div[data-testid="stNumberInput"] button {
+        background-color: #1a1c27 !important;
+        color: white !important;
+        border: 1px solid #3d4156 !important;
+    }
+
+    /* Warna label (Nama PIC, SKU, dkk) */
+    label {
+        color: #E0E0E0 !important;
+        font-weight: 600 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header">☣️ MUTASI KARANTINA SYSTEM</div>', unsafe_allow_html=True)
     tabs = st.tabs(["📥 Input Mutasi", "📑 Monitoring & Approval"])
