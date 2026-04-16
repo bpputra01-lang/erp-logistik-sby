@@ -864,16 +864,21 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
         key = (str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper())
         system_dict[key] = system_dict.get(key, 0) + row.get('DIFF', 0)
     
-    # Ganti baris yang error tadi dengan ini:
+    # Ambil daftar BIN yang lolos filter UI (Benerin chaining .str)
     selected_bins = set(df_bin_coverage.iloc[:, 1].astype(str).str.strip().str.upper().unique())
 
     coverage_dict = {}
     for _, row in df_bin_coverage.iterrows():
-        # Asumsi kolom: index 1=BIN, index 2=SKU, index 9=QTY
-        key = (str(row.iloc[1]).strip().upper(), str(row.iloc[2]).strip().upper())
-        try: val = float(row.iloc[9])
-        except: val = 0
-        coverage_dict[key] = coverage_dict.get(key, 0) + val
+        # Kolom: index 1=BIN, index 2=SKU, index 9=QTY
+        bin_val = str(row.iloc[1]).strip().upper()
+        sku_val = str(row.iloc[2]).strip().upper()
+        
+        # PERBAIKAN TOTAL: Cuma masukin ke dict kalau BIN-nya ada di list filter
+        if bin_val in selected_bins:
+            key = (bin_val, sku_val)
+            try: val = float(row.iloc[9])
+            except: val = 0
+            coverage_dict[key] = coverage_dict.get(key, 0) + val
 
     # 2. List untuk menampung baris baru
     new_rows = []
@@ -898,7 +903,6 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
             if sku_src == sku and qty_avail > 0:
                 alloc = min(qty_avail, remaining)
                 
-                # Buat baris baru untuk alokasi ini
                 row_alloc = row.to_dict()
                 row_alloc.update({
                     'BIN ALOKASI': bin_src,
@@ -911,11 +915,11 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
                 sys_reduction[(bin_src, sku_src)] += alloc
                 remaining -= alloc
 
-        # --- TAHAP 2: Cari di Coverage Dictionary (DENGAN FILTER BIN) ---
+        # --- TAHAP 2: Cari di Coverage Dictionary (DENGAN FILTER BIN KETAT) ---
         if remaining > 0:
             for (bin_src, sku_src), qty_avail in coverage_dict.items():
                 if remaining <= 0: break
-                # PERBAIKAN: Tambahkan syarat bin_src harus ada di selected_bins
+                # Karena dict sudah difilter di awal, ini buat double safety
                 if bin_src in selected_bins and sku_src == sku and qty_avail > 0:
                     alloc = min(qty_avail, remaining)
                     
@@ -934,7 +938,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
         if remaining > 0:
             row_no = row.to_dict()
             row_no.update({
-                'DIFF': remaining, # Sisa yang tidak teralokasi
+                'DIFF': remaining,
                 'BIN ALOKASI': '',
                 'QTY ALLOCATION': 0,
                 'STATUS': 'NO ALLOCATION'
@@ -944,7 +948,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
     # 3. Convert kembali ke DataFrame
     df_result = pd.DataFrame(new_rows)
 
-    # 4. Update df_sys_updated (Logika pengurangan DIFF di system)
+    # 4. Update df_sys_updated
     for (b, s), q in sys_reduction.items():
         mask = (df_sys_updated['BIN'].astype(str).str.upper() == b) & \
                (df_sys_updated['SKU'].astype(str).str.upper() == s)
@@ -952,7 +956,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
             df_sys_updated.loc[mask, 'DIFF'] -= q
 
     return df_result, df_sys_updated
-
+    
 def generate_set_up_real_plus(allocated_data):
     filtered = allocated_data[allocated_data['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
     if not filtered.empty:
