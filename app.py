@@ -3726,6 +3726,32 @@ def project_mutasi_karantina():
         """, unsafe_allow_html=True)
         res = supabase.table("mutasi_karantina").select("*").order("id", desc=True).execute()
         df_res = pd.DataFrame(res.data)
+        # --- BAGIAN FILTER SKU ---
+        st.markdown("### 🔍 Cari Berdasarkan SKU")
+        search_sku = st.text_input("Masukkan SKU untuk memfilter data...", placeholder="Contoh: SKU123...").strip()
+
+        if df_res.empty:
+            st.info("Belum ada data pengajuan.")
+        else:
+            # Jika user mengetik sesuatu, filter dataframe-nya
+            if search_sku:
+                # Mencari SKU yang mengandung kata kunci (case-insensitive)
+                mask = df_res['sku'].str.contains(search_sku, case=False, na=False)
+                # Ambil daftar Batch ID yang memiliki SKU tersebut
+                valid_batches = df_res[mask]['batch_id'].unique()
+                # Filter dataframe utama hanya untuk batch yang relevan
+                df_display = df_res[df_res['batch_id'].isin(valid_batches)]
+                
+                if df_display.empty:
+                    st.warning(f"SKU '{search_sku}' tidak ditemukan.")
+            else:
+                df_display = df_res
+
+            # Grouping menggunakan df_display (bukan df_res lagi)
+            batches = df_display['batch_id'].unique()
+            
+            for b_id in batches:
+                items = df_display[df_display['batch_id'] == b_id]
 
         if df_res.empty:
             st.info("Belum ada data pengajuan.")
