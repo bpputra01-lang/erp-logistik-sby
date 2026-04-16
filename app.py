@@ -640,36 +640,34 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
 
     return df_mult_res, df_sing_res
-def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing):
+def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
     def clean_val(x):
         if pd.isna(x) or str(x).strip().lower() == 'nan': return ""
         s = str(x).strip().upper()
-        # Sesuai preferensi: hapus prefix SPE jika ada agar matching
         if s.startswith("SPE"): s = s[3:] 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Dictionary buat nentuin BIN TUJUAN dari Rekon (Missing Data)
-    # Karena barangnya temuan/lookup inbound, kita ambil BIN tujuannya dari file Rekon
+    # 1. Dictionary BIN TUJUAN dari Rekon (Data Missing)
     dict_tujuan_rekon = {}
+    # Pake pengecekan None biar gak error pas dipanggil
     if df_recon_missing is not None and not df_recon_missing.empty:
         for _, row in df_recon_missing.iterrows():
-            sku_m = clean_val(row.iloc[1]) # SKU di Rekon
-            bin_m = row.iloc[0]            # BIN di Rekon (Lokasi yang seharusnya)
+            sku_m = clean_val(row.iloc[1]) 
+            bin_m = row.iloc[0]            
             qty_m = pd.to_numeric(row.iloc[6], errors='coerce') or 0
             if sku_m != "" and qty_m > 0:
                 dict_tujuan_rekon[sku_m] = bin_m
 
-    # 2. Ambil data dari Multiple Adj (Yang match BIN|SKU di awal)
-    # Ini buat mastiin SKU-nya emang masuk kategori Multiple
+    # 2. Set SKU dari Multiple Adj
     set_multiple_skus = set()
     if not df_multiple_adj_plus.empty:
         for _, row in df_multiple_adj_plus.iterrows():
-            sku_adj = clean_val(row.iloc[2]) # SKU di Kolom C
+            sku_adj = clean_val(row.iloc[2])
             if sku_adj != "":
                 set_multiple_skus.add(sku_adj)
 
-    # 3. Proses Stock Final buat cari QTY DIFF
+    # 3. Proses Stock Final
     df_stock = df_stock_final.copy()
     qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
     qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
@@ -678,33 +676,28 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
     setup_real_data = []
     
     for i in range(len(df_stock)):
-        # SYARAT: QTY SO > QTY SYSTEM (Barang Plus/Masuk)
         if qty_so.iloc[i] > qty_system.iloc[i]:
             sku_raw = df_stock.iloc[i, 2]
             sku_key = clean_val(sku_raw)
             
-            # CEK: Apakah SKU ini ada di list Multiple (Match Stock atau Lookup Inbound)?
+            # Cek apakah masuk kategori Multiple
             if sku_key in set_multiple_skus or sku_key in dict_tujuan_rekon:
-                # Tentukan BIN TUJUAN: Utamakan dari Rekon (karena itu lokasi tujuannya)
-                # Kalau gak ada di rekon (berarti match stock), ambil dari BIN Stock (Kolom B)
+                # Ambil BIN TUJUAN dari Rekon, kalau gak ada ambil dari Stock (Kolom B)
                 bin_tujuan = dict_tujuan_rekon.get(sku_key, df_stock.iloc[i, 1])
                 
                 setup_real_data.append({
-                    "BIN AWAL": "STAGING INBOUND", # Selalu dari Staging karena barang plus
-                    "BIN TUJUAN": bin_tujuan,       # Lokasi di Rekon/Warehouse
-                    "SKU": sku_raw,                # SKU asli (SPE tidak ilang)
+                    "BIN AWAL": "STAGING INBOUND",
+                    "BIN TUJUAN": bin_tujuan,
+                    "SKU": sku_raw,
                     "QUANTITY": diff_val.iloc[i], 
                     "NOTES": "RELOCATION"
                 })
 
-    # Return DataFrame
     if not setup_real_data:
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
     result_df = pd.DataFrame(setup_real_data)
-    # Pastikan urutan kolom sesuai header dashboard lu
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
-
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
         if pd.isna(x): return ""
