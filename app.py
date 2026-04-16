@@ -3654,7 +3654,7 @@ def project_mutasi_karantina():
                 notes = st.selectbox("Notes", ["MISS LOCATION"]) 
                 alasan = st.text_area("Alasan Di Mutasi", placeholder="Deskripsikan alasan mutasi di sini...")
 
-                if st.form_submit_button("⤴️Upload Pengajuan"):
+                if st.form_submit_button("⤴️ Upload Pengajuan", type="primary"):
                     if pengaju and sku:
                         bid = f"SGL-{uuid.uuid4().hex[:4].upper()}"
                         data = {
@@ -3671,7 +3671,7 @@ def project_mutasi_karantina():
             with st.form("form_bulk"):
                 pic_m = st.text_input("Nama PIC Pengaju")
                 file_xlsx = st.file_uploader("Upload Excel (BIN AWAL, BIN TUJUAN, SKU, ARTICLE NAME, QUANTITY, NOTES, ALASAN)", type=['xlsx'])
-                if st.form_submit_button("⤴️Upload Pengajuan"):
+                if st.form_submit_button("⤴️ Upload Pengajuan", type="primary"):
                     if pic_m and file_xlsx:
                         df = pd.read_excel(file_xlsx)
                         bid = f"BULK-{uuid.uuid4().hex[:6].upper()}"
