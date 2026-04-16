@@ -3580,6 +3580,9 @@ def project_mutasi_karantina():
             font-weight: 700 !important;
         }
 
+        /* 2. Isi Pilihannya (Single / Bulk) (HITAM) */
+        div[data-testid="stRadio"] div[role="radiogroup"] label p {
+            color: #000000 !important; 
 
         /* 4. NUMBER INPUT BUTTONS */
         div[data-testid="stNumberInput"] button {
