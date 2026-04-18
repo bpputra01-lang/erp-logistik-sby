@@ -5615,7 +5615,7 @@ elif menu == "Justification SO":
         c_undef = len(result[result['JUSTIFICATION'] == "UNDEFINED"])
         c_bug   = len(result[result['JUSTIFICATION'] == "INDIKASI BUG SISTEM"])
         c_adj   = len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"])
-        c_sales = len(result[result['JUSTIFICATION'] == "CEK SALAES/RTO"])
+        c_sales = len(result[result['JUSTIFICATION'] == "CEK SALES/RTO"])
         c_rekon = len(result[result['JUSTIFICATION'] == "CEK ULANG HASIL REKON"])
 
         m1.markdown(f'<div class="m-box"><span class="m-lbl">❓UNDEFINED</span><span class="m-val">{c_undef}</span></div>', unsafe_allow_html=True)
