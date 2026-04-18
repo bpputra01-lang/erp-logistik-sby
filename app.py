@@ -5568,7 +5568,7 @@ elif menu == "Justification SO":
         - **Kesalahan Adjustment**
             - **Kondisi 1:** Jika **QTY System > QTY SO (ADJ -)**, namun **Gap Adjustment bernilai (+)**.
             - **Kondisi 2:** Jika **QTY System < QTY SO (ADJ +)**, namun **Gap Adjustment bernilai (-)**.
-        - **Perlu Cek Cross Order**
+        - **Perlu Cek Sales/RTO**
             - Jika Total Sales > (Total PO IN + Total TF IN).
         - **Cek Ulang Hasil Rekon**
             - Jika **Real QTY** [(PO IN + TF IN) - (SALES + TF OUT + DRAFT TF)] hasilnya sama dengan (=) **Current Stock**.
@@ -5615,13 +5615,13 @@ elif menu == "Justification SO":
         c_undef = len(result[result['JUSTIFICATION'] == "UNDEFINED"])
         c_bug   = len(result[result['JUSTIFICATION'] == "INDIKASI BUG SISTEM"])
         c_adj   = len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"])
-        c_cross = len(result[result['JUSTIFICATION'] == "CEK SALAES/RTO"])
+        c_sales = len(result[result['JUSTIFICATION'] == "CEK SALAES/RTO"])
         c_rekon = len(result[result['JUSTIFICATION'] == "CEK ULANG HASIL REKON"])
 
         m1.markdown(f'<div class="m-box"><span class="m-lbl">❓UNDEFINED</span><span class="m-val">{c_undef}</span></div>', unsafe_allow_html=True)
         m2.markdown(f'<div class="m-box"><span class="m-lbl">💻BUG SISTEM</span><span class="m-val">{c_bug}</span></div>', unsafe_allow_html=True)
         m3.markdown(f'<div class="m-box"><span class="m-lbl">❌KESALAHAN ADJ</span><span class="m-val">{c_adj}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">🗳️CEK SALES/RTO</span><span class="m-val">{c_cross}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box"><span class="m-lbl">🗳️CEK SALES/RTO</span><span class="m-val">{c_sales}</span></div>', unsafe_allow_html=True)
         m5.markdown(f'<div class="m-box"><span class="m-lbl">🔁CEK ULANG HASIL REKON</span><span class="m-val">{c_rekon}</span></div>', unsafe_allow_html=True)
         
         # --- TAMPILAN TABEL ---
