@@ -2865,7 +2865,7 @@ def process_justification(df_case, df_tracking, df_po):
             if (j2 > k2 and u2 > 0) or (j2 < k2 and u2 < 0):
                 return "KESALAHAN ADJUSMENT"
             if (n2 + r2) < m2 or t2 < 0:
-                return "PERLU CEK CROSS ORDER"
+                return "CEK SALES/RTO"
             if t2 == l2 and t2 != 0:
                 return "CEK ULANG HASIL REKON"
             if ((t2 == 0 and u2 == 0 and l2 != 0) or 
