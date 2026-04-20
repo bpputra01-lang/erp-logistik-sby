@@ -6523,9 +6523,9 @@ elif menu == "Picking Audit":
     
     with st.expander("📋 Informasi Format File"):
         st.info("""
-        - **STOCK SYSTEM 1**: Data Akhir Shift 2 (22:00)
-        - **STOCK SYSTEM 2**: Data Awal Shift 0 (07:30)
-        - **STOCK TRACKING**: File pendukung (A: Invoice, B: SKU, G: BIN, K: QTY)
+        - **STOCK SYSTEM 1**: Data Awal Shift 0 (07.:30)
+        - **STOCK SYSTEM 2**: Data End Shift 2 (21:30 - 22.00)
+        - **STOCK TRACKING**: Download Stock Tracking **(TODAY)**, Pilih Statusnya **DONE**
         """)
 
     # --- 1. INISIALISASI (Taruh di paling atas menu) ---
