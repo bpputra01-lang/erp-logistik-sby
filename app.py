@@ -4267,7 +4267,84 @@ def tampilan_balancing_stock():
         st.error(f"Error pada sistem analisis: {e}")
     finally:
         conn.close()
-    
+
+import pandas as pd
+import streamlit as st
+
+def process_picking_audit(file1, file2, file_tracking=None):
+    try:
+        df1 = load_data(file1)
+        df2 = load_data(file2)
+
+        data1 = prepare_columns(df1)
+        data2 = prepare_columns(df2)
+
+        # 1. Gabungkan data System 1 & System 2
+        comparison = pd.merge(
+            data1, 
+            data2, 
+            on=['BIN', 'SKU'], 
+            how='outer', 
+            suffixes=('_Sys1', '_Sys2')
+        ).fillna(0)
+
+        comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
+        discrepancies = comparison[comparison['DIFF'] != 0].copy()
+
+        # 2. Jika ada file tracking, lakukan investigasi selisih
+        if file_tracking is not None and not discrepancies.empty:
+            # Load tracking dengan asumsi kolom spesifik
+            # Kolom A=0(Inv), B=1(SKU), G=6(BIN), K=10(QTY)
+            df_track = pd.read_excel(file_tracking) # atau load_data disesuaikan
+            
+            # Mapping kolom sesuai permintaan (Indeks kolom mulai dari 0)
+            # A=Invoice, B=SKU, G=BIN, K=QTY_Track
+            track_cols = {
+                df_track.columns[0]: 'INVOICE',
+                df_track.columns[1]: 'SKU',
+                df_track.columns[6]: 'BIN',
+                df_track.columns[10]: 'QTY_TRACK'
+            }
+            df_track = df_track.rename(columns=track_cols)[['INVOICE', 'SKU', 'BIN', 'QTY_TRACK']]
+
+            # Gabungkan selisih dengan tracking berdasarkan SKU saja dulu untuk pengecekan BIN/QTY
+            resolved_list = []
+            
+            for idx, row in discrepancies.iterrows():
+                # Cari di tracking yang SKU-nya sama
+                match_track = df_track[df_track['SKU'] == row['SKU']]
+                
+                if not match_track.empty:
+                    # Ambil transaksi terakhir/pertama yang relevan
+                    match = match_track.iloc[0] 
+                    inv = match['INVOICE']
+                    
+                    # Logika Pengecekan
+                    bin_match = (str(match['BIN']) == str(row['BIN']))
+                    qty_match = (abs(match['QTY_TRACK']) == abs(row['DIFF']))
+                    
+                    if bin_match and qty_match:
+                        status = "Terjual (Match)"
+                    elif bin_match and not qty_match:
+                        status = "Terjual tapi QTY masih selisih"
+                    elif not bin_match and qty_match:
+                        status = "Terjual tapi BIN berbeda"
+                    else:
+                        status = "Terjual tapi BIN & QTY tidak sesuai"
+                else:
+                    inv = "-"
+                    status = "Tidak ditemukan di Tracking"
+                
+                resolved_list.append({'INVOICE': inv, 'KETERANGAN': status})
+            
+            # Gabungkan hasil investigasi ke dataframe selisih
+            res_df = pd.DataFrame(resolved_list)
+            discrepancies['INVOICE'] = res_df['INVOICE'].values
+            discrepancies['KETERANGAN'] = res_df['KETERANGAN'].values
+
+        return comparison, discrepancies
+    except Exception as e:
+        raise e   
 with st.sidebar:
        st.markdown("""
         <style>
@@ -4533,7 +4610,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina"]
+    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
 
@@ -6430,3 +6507,58 @@ if menu == "Reporting & PIC":
                 if st.button("➡️", key="next_todo") and curr_p < total_pages:
                     st.session_state.todo_page = curr_p + 1
                     st.rerun()
+
+elif menu == "Picking Audit":
+    st.markdown('<div class="hero-header"><h1>STOCK COMPARISON + TRACKING</h1></div>', unsafe_allow_html=True)
+    
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        - **STOCK SYSTEM 1**: Data Akhir Shift 2 (22:00)
+        - **STOCK SYSTEM 2**: Data Awal Shift 0 (07:30)
+        - **STOCK TRACKING**: File pendukung (A: Invoice, B: SKU, G: BIN, K: QTY)
+        """)
+
+    # Layout 3 Kolom Uploader
+    u1, u2, u3 = st.columns(3)
+    with u1:
+        file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
+    with u2:
+        file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
+    with u3:
+        file_tracking = st.file_uploader("Upload Stock Tracking (Optional)", type=['xlsx', 'csv'])
+
+    if file_sys1 and file_sys2:
+        if st.button("▶️ RUN COMPARE & TRACK"):
+            try:
+                # Panggil fungsi yang sudah di-update
+                result_all, diff_only = process_stock_comparison(file_sys1, file_sys2, file_tracking)
+                
+                st.divider()
+
+                # Summary Metrics
+                m1, m2, m3 = st.columns(3)
+                m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
+                m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
+                
+                # Hitung yang sudah 'terdeteksi' terjual dari tracking
+                if 'KETERANGAN' in diff_only.columns:
+                    sold_count = len(diff_only[diff_only['KETERANGAN'].str.contains("Terjual", na=False)])
+                    m3.markdown(f'<div class="m-box"><span class="m-lbl">📑 TERJUAL (TRACKING)</span><span class="m-val">{sold_count}</span></div>', unsafe_allow_html=True)
+
+                if not diff_only.empty:
+                    st.warning("Hasil Analisis Perbedaan Stok:")
+                    # Menampilkan dataframe dengan kolom Invoice dan Keterangan
+                    st.dataframe(diff_only, use_container_width=True)
+                    
+                    csv = diff_only.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download Laporan Selisih & Invoice",
+                        data=csv,
+                        file_name='hasil_investigasi_stok.csv',
+                        mime='text/csv',
+                    )
+                else:
+                    st.success("✅ Tidak ada perbedaan stok!")
+            
+            except Exception as e:
+                st.error(f"Terjadi Kesalahan: {e}")
