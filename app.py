@@ -6528,15 +6528,6 @@ elif menu == "Picking Audit":
         - **STOCK TRACKING**: File pendukung (A: Invoice, B: SKU, G: BIN, K: QTY)
         """)
 
-    # Layout 3 Kolom Uploader
-    u1, u2, u3 = st.columns(3)
-    with u1:
-        file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
-    with u2:
-        file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
-    with u3:
-        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
-
     # --- 1. INISIALISASI (Taruh di paling atas menu) ---
     if 'audit_results' not in st.session_state:
         st.session_state.audit_results = None
