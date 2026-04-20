@@ -4273,6 +4273,7 @@ import streamlit as st
 
 def process_picking_audit(file1, file2, file_tracking=None):
     try:
+        # Load data utama
         df1 = load_data(file1)
         df2 = load_data(file2)
 
@@ -4293,42 +4294,44 @@ def process_picking_audit(file1, file2, file_tracking=None):
 
         # 2. Jika ada file tracking, lakukan investigasi selisih
         if file_tracking is not None and not discrepancies.empty:
-            # Load tracking dengan asumsi kolom spesifik
-            # Kolom A=0(Inv), B=1(SKU), G=6(BIN), K=10(QTY)
-            df_track = pd.read_excel(file_tracking) # atau load_data disesuaikan
+            # PENTING: Pakai header=0 untuk memastikan baris pertama jadi nama kolom
+            df_track = pd.read_excel(file_tracking) 
             
-            # Mapping kolom sesuai permintaan (Indeks kolom mulai dari 0)
-            # A=Invoice, B=SKU, G=BIN, K=QTY_Track
-            track_cols = {
-                df_track.columns[0]: 'INVOICE',
-                df_track.columns[1]: 'SKU',
-                df_track.columns[6]: 'BIN',
-                df_track.columns[10]: 'QTY_TRACK'
-            }
-            df_track = df_track.rename(columns=track_cols)[['INVOICE', 'SKU', 'BIN', 'QTY_TRACK']]
+            # Ambil kolom berdasarkan indeks posisi (A=0, B=1, G=6, K=10)
+            # Ini lebih aman daripada manggil nama kolom yang sering typo
+            df_track_clean = pd.DataFrame({
+                'INVOICE': df_track.iloc[:, 0],   # Kolom A
+                'SKU': df_track.iloc[:, 1],       # Kolom B
+                'BIN': df_track.iloc[:, 6],       # Kolom G
+                'QTY_TRACK': df_track.iloc[:, 10] # Kolom K
+            })
 
-            # Gabungkan selisih dengan tracking berdasarkan SKU saja dulu untuk pengecekan BIN/QTY
             resolved_list = []
             
             for idx, row in discrepancies.iterrows():
-                # Cari di tracking yang SKU-nya sama
-                match_track = df_track[df_track['SKU'] == row['SKU']]
+                # Cari di tracking yang SKU-nya sama (Case-insensitive & strip spasi)
+                sku_val = str(row['SKU']).strip().upper()
+                match_track = df_track_clean[df_track_clean['SKU'].astype(str).str.strip().str.upper() == sku_val]
                 
                 if not match_track.empty:
-                    # Ambil transaksi terakhir/pertama yang relevan
+                    # Ambil baris pertama yang cocok sebagai referensi
                     match = match_track.iloc[0] 
                     inv = match['INVOICE']
                     
-                    # Logika Pengecekan
-                    bin_match = (str(match['BIN']) == str(row['BIN']))
-                    qty_match = (abs(match['QTY_TRACK']) == abs(row['DIFF']))
+                    # Logika Pengecekan (Normalize string untuk BIN)
+                    bin_sys = str(row['BIN']).strip().upper()
+                    bin_track = str(match['BIN']).strip().upper()
+                    
+                    bin_match = (bin_sys == bin_track)
+                    # Absolutkan QTY karena DIFF bisa plus/minus tergantung posisi file
+                    qty_match = (abs(float(match['QTY_TRACK'])) == abs(float(row['DIFF'])))
                     
                     if bin_match and qty_match:
                         status = "Terjual (Match)"
                     elif bin_match and not qty_match:
-                        status = "Terjual tapi QTY masih selisih"
+                        status = "Terjual tapi qty masih selisih"
                     elif not bin_match and qty_match:
-                        status = "Terjual tapi BIN berbeda"
+                        status = "Terjual tapi BIN masih selisih"
                     else:
                         status = "Terjual tapi BIN & QTY tidak sesuai"
                 else:
@@ -4337,14 +4340,23 @@ def process_picking_audit(file1, file2, file_tracking=None):
                 
                 resolved_list.append({'INVOICE': inv, 'KETERANGAN': status})
             
-            # Gabungkan hasil investigasi ke dataframe selisih
+            # Masukkan hasil investigasi ke dataframe selisih
             res_df = pd.DataFrame(resolved_list)
             discrepancies['INVOICE'] = res_df['INVOICE'].values
             discrepancies['KETERANGAN'] = res_df['KETERANGAN'].values
+        
+        # Jika tidak ada file tracking, buat kolom kosong agar UI tidak error
+        elif file_tracking is None and not discrepancies.empty:
+            discrepancies['INVOICE'] = "-"
+            discrepancies['KETERANGAN'] = "File Tracking tidak diupload"
 
         return comparison, discrepancies
+
     except Exception as e:
-        raise e   
+        # Menampilkan pesan error yang lebih spesifik ke user
+        raise Exception(f"Gagal memproses data: {str(e)}")
+
+        
 with st.sidebar:
        st.markdown("""
         <style>
