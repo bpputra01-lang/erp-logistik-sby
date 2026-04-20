@@ -6537,6 +6537,11 @@ elif menu == "Picking Audit":
     with u3:
         file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
 
+    if 'audit_results' not in st.session_state:
+        st.session_state.audit_results = None
+    if 'audit_diff' not in st.session_state:
+        st.session_state.audit_diff = None
+        
     if file_sys1 and file_sys2:
         if st.button("▶️ RUN COMPARE"):
             try:
