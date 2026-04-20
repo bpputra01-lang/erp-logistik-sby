@@ -6569,7 +6569,7 @@ elif menu == "Picking Audit":
         
         if 'KETERANGAN' in diff_only.columns:
             sold_count = len(diff_only[diff_only['KETERANGAN'].str.contains("Terjual", na=False)])
-            m3.markdown(f'<div class="m-box"><span class="m-lbl">📑 TERJUAL (TRACKING)</span><span class="m-val">{sold_count}</span></div>', unsafe_allow_html=True)
+            m3.markdown(f'<div class="m-box"><span class="m-lbl">📑 ITEM TERJUAL</span><span class="m-val">{sold_count}</span></div>', unsafe_allow_html=True)
 
         if not diff_only.empty:
             st.warning("Hasil Analisis Perbedaan Stok:")
@@ -6578,9 +6578,9 @@ elif menu == "Picking Audit":
             # Button download ditaruh di sini
             csv = diff_only.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="📥 Download Laporan Selisih & Invoice",
+                label="📥 Download Report Selisih",
                 data=csv,
-                file_name='hasil_investigasi_stok.csv',
+                file_name='hasil_Pick_stok.csv',
                 mime='text/csv',
                 key="download_audit_final" # Tambah key unik
             )
