@@ -6509,7 +6509,7 @@ if menu == "Reporting & PIC":
                     st.rerun()
 
 elif menu == "Picking Audit":
-    st.markdown('<div class="hero-header"><h1>STOCK COMPARISON + TRACKING</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>PICKING AUDIT</h1></div>', unsafe_allow_html=True)
     
     with st.expander("📋 Informasi Format File"):
         st.info("""
@@ -6525,10 +6525,10 @@ elif menu == "Picking Audit":
     with u2:
         file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
     with u3:
-        file_tracking = st.file_uploader("Upload Stock Tracking (Optional)", type=['xlsx', 'csv'])
+        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
 
     if file_sys1 and file_sys2:
-        if st.button("▶️ RUN COMPARE & TRACK"):
+        if st.button("▶️ RUN COMPARE"):
             try:
                 # Panggil fungsi yang sudah di-update
                 result_all, diff_only = process_stock_comparison(file_sys1, file_sys2, file_tracking)
