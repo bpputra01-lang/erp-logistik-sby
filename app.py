@@ -6537,43 +6537,61 @@ elif menu == "Picking Audit":
     with u3:
         file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
 
+    # --- 1. INISIALISASI (Taruh di paling atas menu) ---
     if 'audit_results' not in st.session_state:
         st.session_state.audit_results = None
     if 'audit_diff' not in st.session_state:
         st.session_state.audit_diff = None
-        
+
+    # --- 2. LAYOUT UPLOADER ---
+    u1, u2, u3 = st.columns(3)
+    with u1:
+        file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
+    with u2:
+        file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
+    with u3:
+        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
+
+    # --- 3. PROSES DATA (Hanya untuk simpan ke memory) ---
     if file_sys1 and file_sys2:
         if st.button("▶️ RUN COMPARE"):
             try:
-                # Panggil fungsi yang sudah di-update
-                result_all, diff_only = process_picking_audit(file_sys1, file_sys2, file_tracking)
-                
-                st.divider()
-
-                # Summary Metrics
-                m1, m2, m3 = st.columns(3)
-                m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
-                m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
-                
-                # Hitung yang sudah 'terdeteksi' terjual dari tracking
-                if 'KETERANGAN' in diff_only.columns:
-                    sold_count = len(diff_only[diff_only['KETERANGAN'].str.contains("Terjual", na=False)])
-                    m3.markdown(f'<div class="m-box"><span class="m-lbl">📑 TERJUAL (TRACKING)</span><span class="m-val">{sold_count}</span></div>', unsafe_allow_html=True)
-
-                if not diff_only.empty:
-                    st.warning("Hasil Analisis Perbedaan Stok:")
-                    # Menampilkan dataframe dengan kolom Invoice dan Keterangan
-                    st.dataframe(diff_only, use_container_width=True)
-                    
-                    csv = diff_only.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Download Laporan Selisih & Invoice",
-                        data=csv,
-                        file_name='hasil_investigasi_stok.csv',
-                        mime='text/csv',
-                    )
-                else:
-                    st.success("✅ Tidak ada perbedaan stok!")
-            
+                # Simpan hasil ke session_state agar tidak hilang
+                all_data, diff_data = process_picking_audit(file_sys1, file_sys2, file_tracking)
+                st.session_state.audit_results = all_data
+                st.session_state.audit_diff = diff_data
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
+
+    # --- 4. TAMPILKAN HASIL (DI LUAR BLOK BUTTON) ---
+    # Ini kuncinya! Selama session_state ada isinya, data bakal tetap muncul di layar
+    if st.session_state.audit_results is not None:
+        result_all = st.session_state.audit_results
+        diff_only = st.session_state.audit_diff
+
+        st.divider()
+
+        # Summary Metrics
+        m1, m2, m3 = st.columns(3)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
+        
+        if 'KETERANGAN' in diff_only.columns:
+            sold_count = len(diff_only[diff_only['KETERANGAN'].str.contains("Terjual", na=False)])
+            m3.markdown(f'<div class="m-box"><span class="m-lbl">📑 TERJUAL (TRACKING)</span><span class="m-val">{sold_count}</span></div>', unsafe_allow_html=True)
+
+        if not diff_only.empty:
+            st.warning("Hasil Analisis Perbedaan Stok:")
+            st.dataframe(diff_only, use_container_width=True)
+            
+            # Button download ditaruh di sini
+            csv = diff_only.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Laporan Selisih & Invoice",
+                data=csv,
+                file_name='hasil_investigasi_stok.csv',
+                mime='text/csv',
+                key="download_audit_final" # Tambah key unik
+            )
+        else:
+            st.success("✅ Tidak ada perbedaan stok!")
