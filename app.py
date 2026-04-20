@@ -4268,9 +4268,6 @@ def tampilan_balancing_stock():
     finally:
         conn.close()
 
-import pandas as pd
-import streamlit as st
-
 def process_picking_audit(file1, file2, file_tracking=None):
     try:
         # Load data utama
@@ -4294,58 +4291,61 @@ def process_picking_audit(file1, file2, file_tracking=None):
 
         # 2. Jika ada file tracking, lakukan investigasi selisih
         if file_tracking is not None and not discrepancies.empty:
-            # PENTING: Pakai header=0 untuk memastikan baris pertama jadi nama kolom
             df_track = pd.read_excel(file_tracking) 
             
-            # Ambil kolom berdasarkan indeks posisi (A=0, B=1, G=6, K=10)
-            # Ini lebih aman daripada manggil nama kolom yang sering typo
+            # Ambil kolom berdasarkan posisi (A=0, B=1, G=6, K=10)
             df_track_clean = pd.DataFrame({
-                'INVOICE': df_track.iloc[:, 0],   # Kolom A
-                'SKU': df_track.iloc[:, 1],       # Kolom B
-                'BIN': df_track.iloc[:, 6],       # Kolom G
-                'QTY_TRACK': df_track.iloc[:, 10] # Kolom K
+                'INVOICE': df_track.iloc[:, 0].astype(str),
+                'SKU': df_track.iloc[:, 1].astype(str).str.strip().upper(),
+                'BIN': df_track.iloc[:, 6].astype(str).str.strip().upper(),
+                'QTY_TRACK': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
             })
 
             resolved_list = []
             
             for idx, row in discrepancies.iterrows():
-                # Cari di tracking yang SKU-nya sama (Case-insensitive & strip spasi)
                 sku_val = str(row['SKU']).strip().upper()
-                match_track = df_track_clean[df_track_clean['SKU'].astype(str).str.strip().str.upper() == sku_val]
+                bin_sys = str(row['BIN']).strip().upper()
+                diff_val = abs(float(row['DIFF']))
                 
-                if not match_track.empty:
-                    # Ambil baris pertama yang cocok sebagai referensi
-                    match = match_track.iloc[0] 
-                    inv = match['INVOICE']
+                # Filter tracking berdasarkan SKU
+                match_sku = df_track_clean[df_track_clean['SKU'] == sku_val]
+                
+                if not match_sku.empty:
+                    # 1. Kumpulkan semua Invoice unik untuk SKU ini
+                    all_inv = ", ".join(match_sku['INVOICE'].unique())
                     
-                    # Logika Pengecekan (Normalize string untuk BIN)
-                    bin_sys = str(row['BIN']).strip().upper()
-                    bin_track = str(match['BIN']).strip().upper()
+                    # 2. Cek apakah ada baris yang BIN-nya cocok
+                    match_bin = match_sku[match_sku['BIN'] == bin_sys]
                     
-                    bin_match = (bin_sys == bin_track)
-                    # Absolutkan QTY karena DIFF bisa plus/minus tergantung posisi file
-                    qty_match = (abs(float(match['QTY_TRACK'])) == abs(float(row['DIFF'])))
+                    # 3. Hitung TOTAL QTY di tracking untuk SKU & BIN tersebut
+                    total_qty_track = abs(match_sku['QTY_TRACK'].sum())
                     
-                    if bin_match and qty_match:
+                    bin_exists = not match_bin.empty
+                    qty_matches = (total_qty_track == diff_val)
+                    
+                    # Penentuan Status
+                    if bin_exists and qty_matches:
                         status = "Terjual (Match)"
-                    elif bin_match and not qty_match:
-                        status = "Terjual tapi qty masih selisih"
-                    elif not bin_match and qty_match:
+                    elif bin_exists and not qty_matches:
+                        status = f"Terjual tapi qty masih selisih (Track: {total_qty_track})"
+                    elif not bin_exists and qty_matches:
                         status = "Terjual tapi BIN masih selisih"
                     else:
                         status = "Terjual tapi BIN & QTY tidak sesuai"
+                    
+                    inv_display = all_inv
                 else:
-                    inv = "-"
+                    inv_display = "-"
                     status = "Tidak ditemukan di Tracking"
                 
-                resolved_list.append({'INVOICE': inv, 'KETERANGAN': status})
+                resolved_list.append({'INVOICE': inv_display, 'KETERANGAN': status})
             
             # Masukkan hasil investigasi ke dataframe selisih
             res_df = pd.DataFrame(resolved_list)
             discrepancies['INVOICE'] = res_df['INVOICE'].values
             discrepancies['KETERANGAN'] = res_df['KETERANGAN'].values
         
-        # Jika tidak ada file tracking, buat kolom kosong agar UI tidak error
         elif file_tracking is None and not discrepancies.empty:
             discrepancies['INVOICE'] = "-"
             discrepancies['KETERANGAN'] = "File Tracking tidak diupload"
@@ -4353,7 +4353,6 @@ def process_picking_audit(file1, file2, file_tracking=None):
         return comparison, discrepancies
 
     except Exception as e:
-        # Menampilkan pesan error yang lebih spesifik ke user
         raise Exception(f"Gagal memproses data: {str(e)}")
 
 
