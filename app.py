@@ -4293,17 +4293,18 @@ def process_picking_audit(file1, file2, file_tracking=None):
         if file_tracking is not None and not discrepancies.empty:
             df_track = pd.read_excel(file_tracking) 
             
-            # Ambil kolom berdasarkan posisi (A=0, B=1, G=6, K=10)
+            # AMANKAN DISINI: Paksa astype(str) sebelum di-upper
             df_track_clean = pd.DataFrame({
                 'INVOICE': df_track.iloc[:, 0].astype(str),
-                'SKU': df_track.iloc[:, 1].astype(str).str.strip().upper(),
-                'BIN': df_track.iloc[:, 6].astype(str).str.strip().upper(),
+                'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.upper(),
+                'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.upper(),
                 'QTY_TRACK': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
             })
 
             resolved_list = []
             
             for idx, row in discrepancies.iterrows():
+                # Pastikan data pembanding juga dipaksa jadi string & upper
                 sku_val = str(row['SKU']).strip().upper()
                 bin_sys = str(row['BIN']).strip().upper()
                 diff_val = abs(float(row['DIFF']))
@@ -4312,23 +4313,22 @@ def process_picking_audit(file1, file2, file_tracking=None):
                 match_sku = df_track_clean[df_track_clean['SKU'] == sku_val]
                 
                 if not match_sku.empty:
-                    # 1. Kumpulkan semua Invoice unik untuk SKU ini
+                    # 1. Kumpulkan semua Invoice unik
                     all_inv = ", ".join(match_sku['INVOICE'].unique())
                     
                     # 2. Cek apakah ada baris yang BIN-nya cocok
                     match_bin = match_sku[match_sku['BIN'] == bin_sys]
                     
-                    # 3. Hitung TOTAL QTY di tracking untuk SKU & BIN tersebut
+                    # 3. TOTAL QTY di tracking untuk SKU tersebut
                     total_qty_track = abs(match_sku['QTY_TRACK'].sum())
                     
                     bin_exists = not match_bin.empty
                     qty_matches = (total_qty_track == diff_val)
                     
-                    # Penentuan Status
                     if bin_exists and qty_matches:
                         status = "Terjual (Match)"
                     elif bin_exists and not qty_matches:
-                        status = f"Terjual tapi qty masih selisih (Track: {total_qty_track})"
+                        status = f"Terjual tapi qty masih selisih (Track Total: {total_qty_track})"
                     elif not bin_exists and qty_matches:
                         status = "Terjual tapi BIN masih selisih"
                     else:
@@ -4341,7 +4341,6 @@ def process_picking_audit(file1, file2, file_tracking=None):
                 
                 resolved_list.append({'INVOICE': inv_display, 'KETERANGAN': status})
             
-            # Masukkan hasil investigasi ke dataframe selisih
             res_df = pd.DataFrame(resolved_list)
             discrepancies['INVOICE'] = res_df['INVOICE'].values
             discrepancies['KETERANGAN'] = res_df['KETERANGAN'].values
