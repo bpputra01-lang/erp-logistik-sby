@@ -4356,7 +4356,7 @@ def process_picking_audit(file1, file2, file_tracking=None):
         # Menampilkan pesan error yang lebih spesifik ke user
         raise Exception(f"Gagal memproses data: {str(e)}")
 
-        
+
 with st.sidebar:
        st.markdown("""
         <style>
@@ -6543,7 +6543,7 @@ elif menu == "Picking Audit":
         if st.button("▶️ RUN COMPARE"):
             try:
                 # Panggil fungsi yang sudah di-update
-                result_all, diff_only = process_stock_comparison(file_sys1, file_sys2, file_tracking)
+                result_all, diff_only = process_picking_audit(file_sys1, file_sys2, file_tracking)
                 
                 st.divider()
 
