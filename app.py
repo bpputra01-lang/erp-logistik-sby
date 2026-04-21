@@ -5567,9 +5567,6 @@ elif menu == "FDR Update":
                         
                         st.rerun()
 
-            except Exception as e:
-                st.error(f"❌ Error saat proses: {e}")
-
     # --- TAMPILKAN HASIL & METRICS ---
     if st.session_state.ws_manifest_fdr is not None:
         m = st.session_state.metrics_data
