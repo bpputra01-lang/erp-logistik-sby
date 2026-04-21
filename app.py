@@ -5524,27 +5524,28 @@ elif menu == "FDR Update":
                     
                     st.session_state.ws_manifest_fdr = df_clean
 
-                   # 2. FU IT Logic (Dilakukan SETELAH kolom dibuang, cek Kolom 13 / Index 12)
+                   # --- SATU LOGIKA UNTUK SEMUA (BIAR GAK BENTROK) ---
                     if len(df_clean.columns) > 12:
-                        # Ambil nilai kolom 13 (Index 12) & kolom 12 (Index 11)
-                        col_12_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
-                        col_13_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+                        # 1. Definisikan dulu isinya secara bersih
+                        col_branch = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None', 'nan '], '')
+                        col_it = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None', 'nan '], '')
 
-                        # --- FILTER 1: FU IT (KOLOM 13 TIDAK KOSONG) ---
-                        mask_fu = col_13_val != ""
+                        # 2. LOGIKA FU IT: Pokoknya kalau Kolom 13 ADA ISI
+                        mask_fu = col_it != ""
                         st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
 
-                        # --- FILTER 2: BRANCH (KOLOM 13 WAJIB KOSONG & KOLOM 12 ADA ISI) ---
-                        mask_branch = (col_13_val == "") & (col_12_val != "")
-                        filtered_branch = df_clean[mask_branch].copy()
+                        # 3. LOGIKA BRANCH: Kolom 13 HARUS KOSONG dan Kolom 12 HARUS ADA ISI
+                        mask_branch = (col_it == "") & (col_branch != "")
+                        filtered_out = df_clean[mask_branch].copy()
 
-                        if not filtered_branch.empty:
-                            # Normalisasi: Paksa nama Branch jadi UPPERCASE biar gak split Surabaya vs SURABAYA
-                            filtered_branch.iloc[:, 11] = filtered_branch.iloc[:, 11].str.upper().str.strip()
+                        if not filtered_out.empty:
+                            # Paksa Branch jadi UPPERCASE
+                            filtered_out.iloc[:, 11] = filtered_out.iloc[:, 11].str.upper().str.strip()
                             
-                            # Grouping ke dictionary
+                            # Grouping
                             st.session_state.dict_kurir_fdr = {
-                                str(n): g for n, g in filtered_branch.groupby(filtered_branch.iloc[:, 11])
+                                str(n): g.iloc[:, 0:13] 
+                                for n, g in filtered_out.groupby(filtered_out.iloc[:, 11])
                             }
                         else:
                             st.session_state.dict_kurir_fdr = {}
