@@ -1864,7 +1864,7 @@ def menu_refill_withdraw():
                     dictVar[sku] = str(row[5])
 
                 # AREA TOKO
-                if any(x in binLoc for x in ["02", "TOKO", "STORE", "LT.2"]):
+                if any(x in binLoc for x in ["02", "TOKO", "STORE", "LT.2", "STR"]):
                     dictPreTotToko[sku] = dictPreTotToko.get(sku, 0) + qtySys
                     if qtySys > dictBestVal02.get(sku, -1):
                         dictBestVal02[sku] = qtySys
@@ -1873,7 +1873,7 @@ def menu_refill_withdraw():
                     dictBinList02[sku] = dictBinList02.get(sku, "") + binLoc + ", "
 
                 # AREA DC
-                elif any(x in binLoc for x in ["DC", "INBOUND"]):
+                elif any(x in binLoc for x in ["DC", "INBOUND", "KL", "RAK"]):
                     dictPreTotDCInbound[sku] = dictPreTotDCInbound.get(sku, 0) + qtySys
                     if "KL" not in binLoc and "RAK" not in binLoc:
                         if qtySys > dictBestValDC.get(sku, -1):
