@@ -5510,33 +5510,60 @@ elif menu == "FDR Update":
     # --- FILE UPLOAD ---
     u_file = st.file_uploader("📂 Upload File Manifest", type=["xlsx"], key="fdr_upload_fix")
 
-    # --- 2. FU IT Logic (Baris yang kolom 13-nya ADA ISINYA) ---
-    if len(df_clean.columns) > 12:
-        # Ambil nilai kolom 13 (Index 12) & kolom 12 (Index 11)
-        col_12_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
-        col_13_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+    # --- TOMBOL RUN UTAMA ---
+    if u_file:
+        if st.button("▶️PROCESS DATA", type="primary", use_container_width=True):
+            try:
+                with st.spinner("🔄 Processing..."):
+                    # 1. Load & Clear Columns
+                    df_raw = pd.read_excel(u_file)
+                    # Kolom yang mau dibuang (Index 6, 7, 8, dst)
+                    cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+                    existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
+                    df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
+                    
+                    st.session_state.ws_manifest_fdr = df_clean
 
-        # --- FILTER 1: FU IT (KOLOM 13 TIDAK KOSONG) ---
-        mask_fu = col_13_val != ""
-        st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
+                   # 2. FU IT Logic (Dilakukan SETELAH kolom dibuang, cek Kolom 13 / Index 12)
+                    if len(df_clean.columns) > 12:
+                        # Ambil nilai kolom 13 (Index 12) & kolom 12 (Index 11)
+                        col_12_val = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
+                        col_13_val = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
 
-        # --- FILTER 2: BRANCH (KOLOM 13 WAJIB KOSONG & KOLOM 12 ADA ISI) ---
-        mask_branch = (col_13_val == "") & (col_12_val != "")
-        filtered_branch = df_clean[mask_branch].copy()
+                        # --- FILTER 1: FU IT (KOLOM 13 TIDAK KOSONG) ---
+                        mask_fu = col_13_val != ""
+                        st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
 
-        if not filtered_branch.empty:
-            # Normalisasi: Paksa nama Branch jadi UPPERCASE biar gak split Surabaya vs SURABAYA
-            filtered_branch.iloc[:, 11] = filtered_branch.iloc[:, 11].str.upper().str.strip()
-            
-            # Grouping ke dictionary
-            st.session_state.dict_kurir_fdr = {
-                str(n): g for n, g in filtered_branch.groupby(filtered_branch.iloc[:, 11])
-            }
-        else:
-            st.session_state.dict_kurir_fdr = {}
-    else:
-        st.session_state.ws_fu_it_fdr = pd.DataFrame()
-        st.session_state.dict_kurir_fdr = {}
+                        # --- FILTER 2: BRANCH (KOLOM 13 WAJIB KOSONG & KOLOM 12 ADA ISI) ---
+                        mask_branch = (col_13_val == "") & (col_12_val != "")
+                        filtered_branch = df_clean[mask_branch].copy()
+
+                        if not filtered_branch.empty:
+                            # Normalisasi: Paksa nama Branch jadi UPPERCASE biar gak split Surabaya vs SURABAYA
+                            filtered_branch.iloc[:, 11] = filtered_branch.iloc[:, 11].str.upper().str.strip()
+                            
+                            # Grouping ke dictionary
+                            st.session_state.dict_kurir_fdr = {
+                                str(n): g for n, g in filtered_branch.groupby(filtered_branch.iloc[:, 11])
+                            }
+                        else:
+                            st.session_state.dict_kurir_fdr = {}
+                    else:
+                        st.session_state.ws_fu_it_fdr = pd.DataFrame()
+                        st.session_state.dict_kurir_fdr = {}
+                    
+                    # 4. Metrics Update
+                    st.session_state.metrics_data = {
+                        'total': len(st.session_state.ws_manifest_fdr),
+                        'fu': len(st.session_state.ws_fu_it_fdr) if st.session_state.ws_fu_it_fdr is not None else 0,
+                        'kurir': len(st.session_state.dict_kurir_fdr)
+                    }
+                    
+                    st.rerun()
+
+            except Exception as e:
+                st.error(f"❌ Error saat proses: {e}")
+
     # --- TAMPILKAN HASIL & METRICS ---
     if st.session_state.ws_manifest_fdr is not None:
         m = st.session_state.metrics_data
