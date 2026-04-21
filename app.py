@@ -5518,39 +5518,40 @@ elif menu == "FDR Update":
                     # 1. LOAD DATA
                     df_raw = pd.read_excel(u_file)
                     
-                    # 2. HAPUS DULU (Buang kolom sampah yang lu sebut)
+                    # 2. HAPUS DULU KOLOM SAMPAH
                     cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
                     existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
                     df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
                     
-                    # SIMPAN DATA HASIL HAPUS KE MANIFEST
                     st.session_state.ws_manifest_fdr = df_clean
 
-                    # 3. BARU CEK LOGIKANYA DI DF_CLEAN (Data yang udah dilit)
-                    # Pastikan kolomnya cukup buat dicek sampe index 12
+                    # 3. CEK DI KOLOM 13 (INDEX 12) HASIL OLAHAN
                     if len(df_clean.columns) > 12:
-                        # Ambil nilai Kolom 12 (Index 11) dan Kolom 13 (Index 12) dari HASIL OLAHAN
-                        c_branch = df_clean.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None', 'nan ', '0', '0.0'], '')
-                        c_it = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None', 'nan ', '0', '0.0'], '')
+                        # --- KUNCINYA DI SINI ---
+                        # Kita konversi ke string, strip, lalu paksa 'None' dan 'nan' jadi beneran kosong
+                        def clean_logic(series):
+                            return series.astype(str).str.strip().replace(['None', 'nan', 'NaN', 'nan ', 'None '], '')
 
-                        # --- LOGIKA FU IT: KOLOM 13 HASIL OLAHAN ADA ISI ---
+                        c_branch = clean_logic(df_clean.iloc[:, 11])
+                        c_it = clean_logic(df_clean.iloc[:, 12])
+
+                        # 4. LOGIKA FU IT: Ambil yang SETELAH DICLEAN TIDAK KOSONG
                         mask_fu = c_it != ""
                         st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
 
-                        # --- LOGIKA BRANCH: KOLOM 13 HASIL OLAHAN KOSONG ---
+                        # 5. LOGIKA BRANCH: Kolom 13 Kosong, Kolom 12 Ada Isi
                         mask_br = (c_it == "") & (c_branch != "")
                         df_br = df_clean[mask_br].copy()
 
                         if not df_br.empty:
-                            # Normalisasi Branch Name (Huruf Besar)
-                            df_br.iloc[:, 11] = df_br.iloc[:, 11].str.upper().str.strip()
+                            # Grouping berdasarkan kolom 12 (Branch)
+                            df_br.iloc[:, 11] = df_br.iloc[:, 11].astype(str).str.upper().str.strip()
                             st.session_state.dict_kurir_fdr = {
                                 str(n): g for n, g in df_br.groupby(df_br.iloc[:, 11])
                             }
                         else:
                             st.session_state.dict_kurir_fdr = {}
                     else:
-                        # Kalau ternyata hasil hapus kolomnya sisa dikit (gak sampe 13 kolom)
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
                         st.session_state.dict_kurir_fdr = {}
                     
