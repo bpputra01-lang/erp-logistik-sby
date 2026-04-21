@@ -1873,14 +1873,20 @@ def menu_refill_withdraw():
                     dictBinList02[sku] = dictBinList02.get(sku, "") + binLoc + ", "
 
                 # AREA DC
+                # AREA DC (KL & RAK Sekarang Dianggap Lokasi Ambil Valid)
                 elif any(x in binLoc for x in ["DC", "INBOUND", "KL", "RAK"]):
                     dictPreTotDCInbound[sku] = dictPreTotDCInbound.get(sku, 0) + qtySys
-                    if "KL" not in binLoc and "RAK" not in binLoc:
-                        if qtySys > dictBestValDC.get(sku, -1):
-                            dictBestValDC[sku] = qtySys
-                            dictDC[sku] = binLoc
-                        dictTotDC[sku] = dictTotDC.get(sku, 0) + qtySys
-                        dictBinListDC[sku] = dictBinListDC.get(sku, "") + binLoc + ", "
+                    
+                    # Logika pencarian BIN terbaik sekarang mencakup KL & RAK
+                    if qtySys > dictBestValDC.get(sku, -1):
+                        dictBestValDC[sku] = qtySys
+                        dictDC[sku] = binLoc
+                    
+                    # Semua QTY di area ini masuk ke total DC
+                    dictTotDC[sku] = dictTotDC.get(sku, 0) + qtySys
+                    dictBinListDC[sku] = dictBinListDC.get(sku, "") + binLoc + ", "
+                    
+                    # Indikator total tetap dihitung untuk konsistensi
                     dictTotDCKLRAK[sku] = dictTotDCKLRAK.get(sku, 0) + qtySys
 
             outRef = []; outWdr = []
