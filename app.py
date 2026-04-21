@@ -5523,33 +5523,42 @@ elif menu == "FDR Update":
                     existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
                     df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
                     
-                    # SIMPAN KE MANIFEST (TAB MANIFEST)
+                    # SIMPAN KE MANIFEST
                     st.session_state.ws_manifest_fdr = df_clean
 
-                    # 3. AMBIL DARI TAB MANIFEST (df_clean) - INDEX DARI 1
-                    # Kolom 12 (Index 11) dan Kolom 13 (Index 12)
+                    # 3. LOGIKA FILTER (KOLOM 12 & 13 SETELAH DILIT)
                     if len(df_clean.columns) >= 13:
-                        def clean_val(series):
-                            # Sikat None, nan, NaN, dan spasi
-                            return series.astype(str).str.strip().replace(['None', 'nan', 'NaN', 'nan ', 'None ', '0', '0.0'], '')
+                        # Ambil series asli
+                        s_12 = df_clean.iloc[:, 11] # Kolom 12
+                        s_13 = df_clean.iloc[:, 12] # Kolom 13
 
-                        c_branch = clean_val(df_clean.iloc[:, 11]) # Kolom 12
-                        c_it = clean_val(df_clean.iloc[:, 12])     # Kolom 13
+                        # --- NUCLEAR CLEANING ---
+                        # Paksa jadi string, bersihin spasi, ganti tulisan sampah jadi kosong beneran
+                        def hardcore_clean(s):
+                            s = s.astype(str).str.strip()
+                            # Daftar kata bangsat yang bikin FU IT penuh
+                            banned = ['None', 'nan', 'NaN', '0', '0.0', 'nan ', 'None ', 'null', '']
+                            return s.replace(banned, '')
 
-                        # 4. LOGIKA FU IT: Kolom 13 ADA ISI
-                        mask_fu = c_it != ""
+                        c_12 = hardcore_clean(s_12)
+                        c_13 = hardcore_clean(s_13)
+
+                        # 4. PEMBAGIAN DATA
+                        # FU IT: Kolom 13 beneran ada isinya (bukan None/nan)
+                        mask_fu = c_13 != ""
                         st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
 
-                        # 5. LOGIKA BRANCH: Kolom 13 KOSONG & Kolom 12 ADA ISI
-                        mask_br = (c_it == "") & (c_branch != "")
+                        # BRANCH: Kolom 13 Kosong DAN Kolom 12 Ada Isinya
+                        mask_br = (c_13 == "") & (c_12 != "")
                         df_br = df_clean[mask_br].copy()
 
                         if not df_br.empty:
-                            # Grouping pake data Kolom 12
-                            df_br['GROUP_BR'] = c_branch[mask_br].str.upper()
+                            # Pakai isi Kolom 12 (Branch) buat grouping
+                            group_names = c_12[mask_br].str.upper()
+                            df_br['TEMP_GRP'] = group_names.values
                             st.session_state.dict_kurir_fdr = {
-                                str(n): g.drop(columns=['GROUP_BR']) 
-                                for n, g in df_br.groupby('GROUP_BR')
+                                str(n): g.drop(columns=['TEMP_GRP']) 
+                                for n, g in df_br.groupby('TEMP_GRP')
                             }
                         else:
                             st.session_state.dict_kurir_fdr = {}
