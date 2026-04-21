@@ -5515,47 +5515,40 @@ elif menu == "FDR Update":
         if st.button("▶️PROCESS DATA", type="primary", use_container_width=True):
             try:
                 with st.spinner("🔄 Processing..."):
-                    # 1. Load Data Asli
+                    # 1. Load Data
                     df_raw = pd.read_excel(u_file)
                     
-                    # Cek apakah kolom tersedia sebelum lanjut
+                    # 2. HAPUS KOLOM (Dilit kolom sampah)
+                    cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+                    existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
+                    df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
+                    st.session_state.ws_manifest_fdr = df_clean
+
+                    # 3. AMBIL DATA PENENTU (Pakai df_raw biar indeks gak geser)
+                    # Pastikan file ada kolom minimal sampai indeks 12
                     if len(df_raw.columns) > 12:
-                        # --- STEP 2: TENTUKAN NASIB BARIS ---
-                        raw_branch = df_raw.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None', 'nan '], '')
-                        raw_it = df_raw.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None', 'nan '], '')
+                        c_l = df_raw.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
+                        c_m = df_raw.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
 
-                        # --- STEP 3: BUANG KOLOM ---
-                        cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
-                        existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
-                        df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
-                        
-                        st.session_state.ws_manifest_fdr = df_clean
-
-                        # --- STEP 4: DISTRIBUSI DATA ---
-                        # FU IT: Kolom M tidak kosong
-                        mask_fu = raw_it != ""
+                        # 4. LOGIKA FU IT (Jika M TIDAK Kosong)
+                        mask_fu = c_m != ""
                         st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
 
-                        # BRANCH: Kolom M kosong DAN Kolom L isi
-                        mask_branch = (raw_it == "") & (raw_branch != "")
-                        filtered_out = df_clean[mask_branch].copy()
+                        # 5. LOGIKA BRANCH (Jika M Kosong & L Ada Isi)
+                        mask_br = (c_m == "") & (c_l != "")
+                        df_br = df_clean[mask_br].copy()
 
-                        if not filtered_out.empty:
-                            temp_branch_names = raw_branch[mask_branch].str.upper()
-                            filtered_out['TEMP_BRANCH'] = temp_branch_names.values
-                            
+                        if not df_br.empty:
+                            # Kasih kolom sementara buat grouping
+                            df_br['BR_NAME'] = c_l[mask_br].str.upper()
                             st.session_state.dict_kurir_fdr = {
-                                str(n): g.drop(columns=['TEMP_BRANCH']) 
-                                for n, g in filtered_out.groupby('TEMP_BRANCH')
+                                str(n): g.drop(columns=['BR_NAME']) 
+                                for n, g in df_br.groupby('BR_NAME')
                             }
                         else:
-                            # ELSE 1: Milik if not filtered_out.empty
                             st.session_state.dict_kurir_fdr = {}
-                    
                     else:
-                        # ELSE 2: Milik if len(df_raw.columns) > 12
-                        # Kalau kolom kurang dari 13, set default kosong
-                        st.session_state.ws_manifest_fdr = df_raw
+                        # ELSE ini pasangannya if len(df_raw.columns) > 12
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
                         st.session_state.dict_kurir_fdr = {}
                     
