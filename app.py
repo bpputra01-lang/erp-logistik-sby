@@ -5518,47 +5518,44 @@ elif menu == "FDR Update":
                     # 1. Load Data Asli
                     df_raw = pd.read_excel(u_file)
                     
-                    # --- STEP 2: TENTUKAN NASIB BARIS (SEBELUM KOLOM DIBUANG) ---
-                    # Kita kunci baris mana yang IT dan mana yang Branch pakai data RAW
-                    # Asumsi: Kolom L (Branch) = Index 11, Kolom M (IT) = Index 12
-                    raw_branch = df_raw.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None', 'nan '], '')
-                    raw_it = df_raw.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None', 'nan '], '')
+                    # Cek apakah kolom tersedia sebelum lanjut
+                    if len(df_raw.columns) > 12:
+                        # --- STEP 2: TENTUKAN NASIB BARIS ---
+                        raw_branch = df_raw.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None', 'nan '], '')
+                        raw_it = df_raw.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None', 'nan '], '')
 
-                    # --- STEP 3: BUANG KOLOM (CLEANING) ---
-                    cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
-                    existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
-                    df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
+                        # --- STEP 3: BUANG KOLOM ---
+                        cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+                        existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
+                        df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
+                        
+                        st.session_state.ws_manifest_fdr = df_clean
+
+                        # --- STEP 4: DISTRIBUSI DATA ---
+                        # FU IT: Kolom M tidak kosong
+                        mask_fu = raw_it != ""
+                        st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
+
+                        # BRANCH: Kolom M kosong DAN Kolom L isi
+                        mask_branch = (raw_it == "") & (raw_branch != "")
+                        filtered_out = df_clean[mask_branch].copy()
+
+                        if not filtered_out.empty:
+                            temp_branch_names = raw_branch[mask_branch].str.upper()
+                            filtered_out['TEMP_BRANCH'] = temp_branch_names.values
+                            
+                            st.session_state.dict_kurir_fdr = {
+                                str(n): g.drop(columns=['TEMP_BRANCH']) 
+                                for n, g in filtered_out.groupby('TEMP_BRANCH')
+                            }
+                        else:
+                            # ELSE 1: Milik if not filtered_out.empty
+                            st.session_state.dict_kurir_fdr = {}
                     
-                    st.session_state.ws_manifest_fdr = df_clean
-
-                    # --- STEP 4: DISTRIBUSI DATA KE SESSION STATE ---
-                    # FU IT: Kolom M (raw_it) tidak kosong
-                    mask_fu = raw_it != ""
-                    st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
-
-                    # BRANCH: Kolom M (raw_it) kosong DAN Kolom L (raw_branch) isi
-                    mask_branch = (raw_it == "") & (raw_branch != "")
-                    filtered_out = df_clean[mask_branch].copy()
-
-                    if not filtered_out.empty:
-                        # CARI KOLOM BRANCH DI DF_CLEAN
-                        # Karena index 11 sudah dibuang, kita cari kolom 'Warehouse' atau 
-                        # pakai sisa kolom yang ada. Kita asumsikan kolom Branch 
-                        # sekarang ada di index 5 setelah pemotongan.
-                        
-                        # Supaya aman, kita pakai data raw_branch yang sudah di-filter
-                        temp_branch_names = raw_branch[mask_branch].str.upper()
-                        
-                        # Tambahkan kolom sementara buat grouping biar gak pusing nyari index
-                        filtered_out['TEMP_BRANCH'] = temp_branch_names.values
-                        
-                        st.session_state.dict_kurir_fdr = {
-                            str(n): g.drop(columns=['TEMP_BRANCH']) 
-                            for n, g in filtered_out.groupby('TEMP_BRANCH')
-                        }
                     else:
-                        st.session_state.dict_kurir_fdr = {}
-                    else:
+                        # ELSE 2: Milik if len(df_raw.columns) > 12
+                        # Kalau kolom kurang dari 13, set default kosong
+                        st.session_state.ws_manifest_fdr = df_raw
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
                         st.session_state.dict_kurir_fdr = {}
                     
