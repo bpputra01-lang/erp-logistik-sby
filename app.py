@@ -5518,47 +5518,39 @@ elif menu == "FDR Update":
                     # 1. LOAD DATA
                     df_raw = pd.read_excel(u_file)
                     
-                    # 2. HAPUS DULU KOLOM SAMPAH
-                    cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
-                    existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
+                    # 2. HAPUS KOLOM (G,H,I,K,L,M,R,S,T,U,V,W)
+                    # Ini urutan kolom Excel: 7,8,9,11,12,13,18,19,20,21,22,23
+                    # Di Python (0-indexed): 6,7,8,10,11,12,17,18,19,20,21,22
+                    cols_to_drop = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
+                    existing_cols = [df_raw.columns[i] for i in cols_to_drop if i < len(df_raw.columns)]
                     df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
                     
-                    # SIMPAN KE MANIFEST
+                    # 3. BERSIHKAN "NONE/NAN" (Biar nggak ada tulisan babi di dashboard)
+                    df_clean = df_clean.fillna("")
+                    for col in df_clean.columns:
+                        df_clean[col] = df_clean[col].astype(str).replace(['None', 'nan', 'NaN', '0', '0.0'], '').str.strip()
+                    
                     st.session_state.ws_manifest_fdr = df_clean
 
-                    # 3. LOGIKA FILTER (KOLOM 12 & 13 SETELAH DILIT)
+                    # 4. LOGIKA COPY-PASTE MACRO (AutoFilter Field 13 & 12)
+                    # Field 13 VBA = Index 12 Python (Kolom M) -> PERLU FU IT
+                    # Field 12 VBA = Index 11 Python (Kolom L) -> BRANCH
+                    
                     if len(df_clean.columns) >= 13:
-                        # Ambil series asli
-                        s_12 = df_clean.iloc[:, 11] # Kolom 12
-                        s_13 = df_clean.iloc[:, 12] # Kolom 13
+                        c_it = df_clean.iloc[:, 12]     # Kolom M (Field 13)
+                        c_branch = df_clean.iloc[:, 11] # Kolom L (Field 12)
 
-                        # --- NUCLEAR CLEANING ---
-                        # Paksa jadi string, bersihin spasi, ganti tulisan sampah jadi kosong beneran
-                        def hardcore_clean(s):
-                            s = s.astype(str).str.strip()
-                            # Daftar kata bangsat yang bikin FU IT penuh
-                            banned = ['None', 'nan', 'NaN', '0', '0.0', 'nan ', 'None ', 'null', '']
-                            return s.replace(banned, '')
-
-                        c_12 = hardcore_clean(s_12)
-                        c_13 = hardcore_clean(s_13)
-
-                        # 4. PEMBAGIAN DATA
-                        # FU IT: Kolom 13 beneran ada isinya (bukan None/nan)
-                        mask_fu = c_13 != ""
+                        # FU IT: Kolom M (Field 13) TIDAK KOSONG ("<>")
+                        mask_fu = c_it != ""
                         st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
 
-                        # BRANCH: Kolom 13 Kosong DAN Kolom 12 Ada Isinya
-                        mask_br = (c_13 == "") & (c_12 != "")
+                        # BRANCH: Kolom M KOSONG & Kolom L ADA ISI
+                        mask_br = (c_it == "") & (c_branch != "")
                         df_br = df_clean[mask_br].copy()
 
                         if not df_br.empty:
-                            # Pakai isi Kolom 12 (Branch) buat grouping
-                            group_names = c_12[mask_br].str.upper()
-                            df_br['TEMP_GRP'] = group_names.values
                             st.session_state.dict_kurir_fdr = {
-                                str(n): g.drop(columns=['TEMP_GRP']) 
-                                for n, g in df_br.groupby('TEMP_GRP')
+                                str(n): g for n, g in df_br.groupby(c_branch[mask_br].str.upper())
                             }
                         else:
                             st.session_state.dict_kurir_fdr = {}
@@ -5566,7 +5558,7 @@ elif menu == "FDR Update":
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
                         st.session_state.dict_kurir_fdr = {}
                     
-                    # 4. Metrics Update
+                    # 5. Metrics Update
                     st.session_state.metrics_data = {
                         'total': len(st.session_state.ws_manifest_fdr),
                         'fu': len(st.session_state.ws_fu_it_fdr),
