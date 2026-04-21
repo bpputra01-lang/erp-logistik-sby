@@ -5515,31 +5515,28 @@ elif menu == "FDR Update":
         if st.button("▶️PROCESS DATA", type="primary", use_container_width=True):
             try:
                 with st.spinner("🔄 Processing..."):
-                    # 1. Load Data
                     df_raw = pd.read_excel(u_file)
                     
-                    # 2. HAPUS KOLOM (Dilit kolom sampah)
+                    # 1. HAPUS KOLOM (Dilit sampah)
                     cols_idx = [6, 7, 8, 10, 11, 12, 17, 18, 19, 20, 21, 22]
                     existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
                     df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
                     st.session_state.ws_manifest_fdr = df_clean
 
-                    # 3. AMBIL DATA PENENTU (Pakai df_raw biar indeks gak geser)
-                    # Pastikan file ada kolom minimal sampai indeks 12
                     if len(df_raw.columns) > 12:
-                        c_l = df_raw.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None'], '')
-                        c_m = df_raw.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '')
+                        # --- KUNCINYA DI SINI: Tambahin 'None' dan 'none' ke daftar replace ---
+                        c_l = df_raw.iloc[:, 11].astype(str).str.strip().replace(['nan', 'None', 'none', 'nan '], '')
+                        c_m = df_raw.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None', 'none', 'nan '], '')
 
-                        # 4. LOGIKA FU IT (Jika M TIDAK Kosong)
+                        # 2. LOGIKA FU IT: Jika kolom M (Manifest Number) beneran ada isinya (bukan None)
                         mask_fu = c_m != ""
                         st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
 
-                        # 5. LOGIKA BRANCH (Jika M Kosong & L Ada Isi)
+                        # 3. LOGIKA BRANCH: Jika Manifest Number KOSONG & Warehouse ADA ISI
                         mask_br = (c_m == "") & (c_l != "")
                         df_br = df_clean[mask_br].copy()
 
                         if not df_br.empty:
-                            # Kasih kolom sementara buat grouping
                             df_br['BR_NAME'] = c_l[mask_br].str.upper()
                             st.session_state.dict_kurir_fdr = {
                                 str(n): g.drop(columns=['BR_NAME']) 
@@ -5548,7 +5545,6 @@ elif menu == "FDR Update":
                         else:
                             st.session_state.dict_kurir_fdr = {}
                     else:
-                        # ELSE ini pasangannya if len(df_raw.columns) > 12
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
                         st.session_state.dict_kurir_fdr = {}
                     
