@@ -5524,11 +5524,16 @@ elif menu == "FDR Update":
                     
                     st.session_state.ws_manifest_fdr = df_clean
 
-                    # 2. FU IT Logic (Kolom M Index 12 tidak kosong)
-                    if len(df_clean.columns) > 13:
-                        mask_fu = df_clean.iloc[:, 13].astype(str).str.strip().replace(['nan', 'None'], '') != ""
-                        st.session_state.ws_fu_it_fdr = df_clean[mask_fu].iloc[:, 0:13]
+                   # 2. FU IT Logic (Dilakukan SETELAH kolom dibuang, cek Kolom 13 / Index 12)
+                    if len(df_clean.columns) > 12:
+                        # Kita gunakan df_clean karena kolom sudah difilter/dibuang sebelumnya
+                        # Index 12 adalah kolom ke-13
+                        mask_fu = df_clean.iloc[:, 12].astype(str).str.strip().replace(['nan', 'None'], '') != ""
+                        
+                        # Ambil baris yang lolos filter mask_fu
+                        st.session_state.ws_fu_it_fdr = df_clean[mask_fu]
                     else:
+                        # Jika kolom setelah difilter tidak sampai 13 kolom
                         st.session_state.ws_fu_it_fdr = pd.DataFrame()
 
                     # 3. Split Warehouse Logic (Normalisasi UPPERCASE agar Surabaya & surabaya Gabung)
