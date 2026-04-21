@@ -5514,6 +5514,7 @@ elif menu == "FDR Update":
     if u_file:
         if st.button("▶️PROCESS DATA", type="primary", use_container_width=True):
             try:
+                try:
                 with st.spinner("🔄 Processing..."):
                     # 1. LOAD DATA
                     df_raw = pd.read_excel(u_file)
@@ -5523,31 +5524,33 @@ elif menu == "FDR Update":
                     existing_cols = [df_raw.columns[i] for i in cols_idx if i < len(df_raw.columns)]
                     df_clean = df_raw.drop(columns=existing_cols) if existing_cols else df_raw.copy()
                     
+                    # SIMPAN KE MANIFEST (TAB MANIFEST)
                     st.session_state.ws_manifest_fdr = df_clean
 
-                    # 3. CEK DI KOLOM 13 (INDEX 12) HASIL OLAHAN
-                    if len(df_clean.columns) > 12:
-                        # --- KUNCINYA DI SINI ---
-                        # Kita konversi ke string, strip, lalu paksa 'None' dan 'nan' jadi beneran kosong
-                        def clean_logic(series):
-                            return series.astype(str).str.strip().replace(['None', 'nan', 'NaN', 'nan ', 'None '], '')
+                    # 3. AMBIL DARI TAB MANIFEST (df_clean) - INDEX DARI 1
+                    # Kolom 12 (Index 11) dan Kolom 13 (Index 12)
+                    if len(df_clean.columns) >= 13:
+                        def clean_val(series):
+                            # Sikat None, nan, NaN, dan spasi
+                            return series.astype(str).str.strip().replace(['None', 'nan', 'NaN', 'nan ', 'None ', '0', '0.0'], '')
 
-                        c_branch = clean_logic(df_clean.iloc[:, 12])
-                        c_it = clean_logic(df_clean.iloc[:, 13])
+                        c_branch = clean_val(df_clean.iloc[:, 11]) # Kolom 12
+                        c_it = clean_val(df_clean.iloc[:, 12])     # Kolom 13
 
-                        # 4. LOGIKA FU IT: Ambil yang SETELAH DICLEAN TIDAK KOSONG
+                        # 4. LOGIKA FU IT: Kolom 13 ADA ISI
                         mask_fu = c_it != ""
                         st.session_state.ws_fu_it_fdr = df_clean[mask_fu].copy()
 
-                        # 5. LOGIKA BRANCH: Kolom 13 Kosong, Kolom 12 Ada Isi
+                        # 5. LOGIKA BRANCH: Kolom 13 KOSONG & Kolom 12 ADA ISI
                         mask_br = (c_it == "") & (c_branch != "")
                         df_br = df_clean[mask_br].copy()
 
                         if not df_br.empty:
-                            # Grouping berdasarkan kolom 12 (Branch)
-                            df_br.iloc[:, 11] = df_br.iloc[:, 11].astype(str).str.upper().str.strip()
+                            # Grouping pake data Kolom 12
+                            df_br['GROUP_BR'] = c_branch[mask_br].str.upper()
                             st.session_state.dict_kurir_fdr = {
-                                str(n): g for n, g in df_br.groupby(df_br.iloc[:, 11])
+                                str(n): g.drop(columns=['GROUP_BR']) 
+                                for n, g in df_br.groupby('GROUP_BR')
                             }
                         else:
                             st.session_state.dict_kurir_fdr = {}
@@ -5558,7 +5561,7 @@ elif menu == "FDR Update":
                     # 4. Metrics Update
                     st.session_state.metrics_data = {
                         'total': len(st.session_state.ws_manifest_fdr),
-                        'fu': len(st.session_state.ws_fu_it_fdr) if st.session_state.ws_fu_it_fdr is not None else 0,
+                        'fu': len(st.session_state.ws_fu_it_fdr),
                         'kurir': len(st.session_state.dict_kurir_fdr)
                     }
                     
