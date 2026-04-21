@@ -5532,8 +5532,8 @@ elif menu == "FDR Update":
                         def clean_logic(series):
                             return series.astype(str).str.strip().replace(['None', 'nan', 'NaN', 'nan ', 'None '], '')
 
-                        c_branch = clean_logic(df_clean.iloc[:, 11])
-                        c_it = clean_logic(df_clean.iloc[:, 12])
+                        c_branch = clean_logic(df_clean.iloc[:, 12])
+                        c_it = clean_logic(df_clean.iloc[:, 13])
 
                         # 4. LOGIKA FU IT: Ambil yang SETELAH DICLEAN TIDAK KOSONG
                         mask_fu = c_it != ""
