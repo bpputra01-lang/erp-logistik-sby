@@ -2799,9 +2799,11 @@ def menu_retur_out_system():
         st.error(f"Sistem Gagal Memuat Cloud Database: {e}")
 
 
+import pandas as pd
 import io
+
 def process_justification(df_case, df_tracking, df_po):
-    # 1. Copy data & Standarisasi Header ke Huruf Besar (Menghindari KeyError 'IDENTIFY' vs 'Identify')
+    # 1. Copy data & Standarisasi Header ke Huruf Besar
     res = df_case.copy()
     res.columns = [str(c).upper().strip() for c in res.columns]
     
@@ -2811,46 +2813,52 @@ def process_justification(df_case, df_tracking, df_po):
     df_po = df_po.copy()
     df_po.columns = [str(c).upper().strip() for c in df_po.columns]
 
-    # 2. Aggregasi Tracking (Gunakan indeks kolom agar fleksibel jika nama berubah sedikit)
-    # Kolom B (SKU), L (Stock), M (Sales), N (Stockin), dst.
-    sku_col_track = df_tracking.columns[1] 
+    # 2. Aggregasi Tracking Berdasarkan Kolom Baru (A-M)
+    # Kolom C (Index 2) = SKU
+    sku_col_track = df_tracking.columns[2] 
+    
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[3]: 'sum',   # Indeks 3 = L (Current Stock)
-        df_tracking.columns[4]: 'sum',   # Indeks 4 = M (Total Sales)
-        df_tracking.columns[5]: 'sum',   # Indeks 5 = N (Total_Stockin)
-        df_tracking.columns[6]: 'sum',   # Indeks 6 = O (Total_adj_minus)
-        df_tracking.columns[7]: 'sum',   # Indeks 7 = P (Total_adj_plus)
-        df_tracking.columns[8]: 'sum',   # Indeks 8 = Q (Total draft_trf)
-        df_tracking.columns[9]: 'sum',   # Indeks 9 = R (Total trf_in)
-        df_tracking.columns[10]: 'sum'   # Indeks 10 = S (Total trf_out)
+        df_tracking.columns[4]: 'sum',   # E: Current Stock
+        df_tracking.columns[5]: 'sum',   # F: Total_Stockin
+        df_tracking.columns[6]: 'sum',   # G: Total_adj_plus
+        df_tracking.columns[7]: 'sum',   # H: Total trf_in
+        df_tracking.columns[8]: 'sum',   # I: Total draft_trf_in
+        df_tracking.columns[9]: 'sum',   # J: Total Sales
+        df_tracking.columns[10]: 'sum',  # K: Total_adj_minus
+        df_tracking.columns[11]: 'sum',  # L: Total draft_trf_out
+        df_tracking.columns[12]: 'sum'   # M: Total trf_out
     }).reset_index()
 
-    # Nama kolom sementara agar unik untuk proses join
-    track_agg.columns = ['SKU_KEY', '_L', '_M', '_N', '_O', '_P', '_Q', '_R', '_S']
+    # Nama kolom sementara untuk proses join dan perhitungan
+    track_agg.columns = ['SKU_KEY', '_E_CURR', '_F_IN', '_G_ADJ_P', '_H_TRF_IN', '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_M', '_L_DRAFT_OUT', '_M_TRF_OUT']
     
-    # Clean SKU agar formatnya sama (Tanpa titik desimal)
+    # Clean SKU agar formatnya sama
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
     res['SKU_KEY_JOIN'] = res['SKU'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
     # 3. Merge Data Case dengan Data Tracking
     res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
 
-    # 4. Pindahkan data ke kolom Final (Gunakan huruf besar agar sinkron dengan ordered_headers)
-    res['CURRENT STOCK']   = res['_L']
-    res['TOTAL SALES']     = res['_M']
-    res['TOTAL_STOCKIN']   = res['_N']
-    res['TOTAL_ADJ_MINUS'] = res['_O']
-    res['TOTAL_ADJ_PLUS']  = res['_P']
-    res['TOTAL DRAFT_TRF'] = res['_Q']
-    res['TOTAL TRF_IN']    = res['_R']
-    res['TOTAL TRF_OUT']   = res['_S']
+    # 4. Pemetaan ke Kolom Final
+    res['CURRENT STOCK']      = res['_E_CURR']
+    res['TOTAL SALES']        = res['_J_SALES']
+    res['TOTAL_STOCKIN']      = res['_F_IN']
+    res['TOTAL_ADJ_MINUS']    = res['_K_ADJ_M']
+    res['TOTAL_ADJ_PLUS']     = res['_G_ADJ_P']
+    res['TOTAL DRAFT_TRF_IN'] = res['_I_DRAFT_IN']
+    res['TOTAL DRAFT_TRF_OUT']= res['_L_DRAFT_OUT']
+    res['TOTAL TRF_IN']       = res['_H_TRF_IN']
+    res['TOTAL TRF_OUT']      = res['_M_TRF_OUT']
 
-    # 5. Hitung REAL QTY & GAP ADJUSMENT
-    res['REAL QTY'] = (res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN']) - \
-                      (res['TOTAL SALES'] + res['TOTAL TRF_OUT'] + res['TOTAL DRAFT_TRF'])
+    # 5. Rumus Baru Sesuai Instruksi
+    # REAL QTY = (F + H + I) - (J + L + M)
+    res['REAL QTY'] = (res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN'] + res['TOTAL DRAFT_TRF_IN']) - \
+                      (res['TOTAL SALES'] + res['TOTAL DRAFT_TRF_OUT'] + res['TOTAL TRF_OUT'])
+    
+    # GAP ADJUSMENT = G - K
     res['GAP ADJUSMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    # 6. Rumus Justifikasi
+    # 6. Update Logika Justifikasi
     def run_formula(row):
         try:
             j2 = round(float(row['QTY SYSTEM']), 2) 
@@ -2858,20 +2866,27 @@ def process_justification(df_case, df_tracking, df_po):
             l2 = round(float(row['CURRENT STOCK']), 2) 
             m2 = round(float(row['TOTAL SALES']), 2)   
             n2 = round(float(row['TOTAL_STOCKIN']), 2) 
-            r2 = round(float(row['TOTAL TRF_IN']), 2)  
+            r2 = round(float(row['TOTAL TRF_IN']), 2)
+            i2 = round(float(row['TOTAL DRAFT_TRF_IN']), 2) # Tambahan I2
             t2 = round(float(row['REAL QTY']), 2)      
             u2 = round(float(row['GAP ADJUSMENT']), 2) 
 
+            # Logika Justifikasi
             if (j2 > k2 and u2 > 0) or (j2 < k2 and u2 < 0):
                 return "KESALAHAN ADJUSMENT"
-            if (n2 + r2) < m2 or t2 < 0:
+            
+            # Update: Memasukkan unsur Stockin Baru (F+H+I)
+            if (n2 + r2 + i2) < m2 or t2 < 0:
                 return "CEK SALES/RTO"
+            
             if t2 == l2 and t2 != 0:
                 return "CEK ULANG HASIL REKON"
+            
             if ((t2 == 0 and u2 == 0 and l2 != 0) or 
                 (j2 > k2 and l2 > t2) or 
                 (j2 < k2 and l2 != 0 and t2 != 0)):
                 return "INDIKASI BUG SISTEM"
+            
             return "UNDEFINED"
         except:
             return "ERROR DATA"
@@ -2879,50 +2894,21 @@ def process_justification(df_case, df_tracking, df_po):
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
 
     # 7. Hitung TOTAL PO IN
-    # Ambil indeks 3 dari file PO (asumsi SKU berada di sana)
     sku_col_po = df_po.columns[3]
     po_counts = df_po[sku_col_po].astype(str).str.split('.').str[0].value_counts().to_dict()
     res['TOTAL PO IN'] = res['SKU_KEY_JOIN'].apply(lambda x: po_counts.get(x, 0))
 
-    # 8. Susun Urutan Header (HURUF BESAR SEMUA AGAR COCOK)
+    # 8. Susun Urutan Header Final
     ordered_headers = [
         'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 
         'HARGA BELI', 'HARGA JUAL', 'QTY SYSTEM', 'QTY SO', 'CURRENT STOCK', 
         'TOTAL SALES', 'TOTAL_STOCKIN', 'TOTAL_ADJ_MINUS', 'TOTAL_ADJ_PLUS', 
-        'TOTAL DRAFT_TRF', 'TOTAL TRF_IN', 'TOTAL TRF_OUT', 'REAL QTY', 
-        'GAP ADJUSMENT', 'JUSTIFICATION', 'TOTAL PO IN'
+        'TOTAL DRAFT_TRF_IN', 'TOTAL DRAFT_TRF_OUT', 'TOTAL TRF_IN', 'TOTAL TRF_OUT', 
+        'REAL QTY', 'GAP ADJUSMENT', 'JUSTIFICATION', 'TOTAL PO IN'
     ]
 
-    # Hanya ambil kolom yang benar-benar ada di dataframe 'res'
     final_cols = [col for col in ordered_headers if col in res.columns]
-    
     return res[final_cols]
-def load_data(file):
-    """Membaca file Excel atau CSV."""
-    if file.name.endswith('.csv'):
-        return pd.read_csv(file)
-    return pd.read_excel(file)
-
-def prepare_columns(df):
-    """Mengambil kolom B, C, J dan membersihkan data."""
-    # Validasi jumlah kolom minimal sampai indeks 9 (Kolom J)
-    if df.shape[1] < 10:
-        raise ValueError("File tidak memiliki kolom yang cukup (Minimal sampai kolom J).")
-        
-    # Ambil kolom B(1), C(2), J(9)
-    new_df = df.iloc[:, [1, 2, 9]].copy()
-    new_df.columns = ['BIN', 'SKU', 'QTY']
-    
-    # Sanitasi data: Hilangkan spasi dan pastikan tipe data benar
-    new_df['BIN'] = new_df['BIN'].astype(str).str.strip()
-    new_df['SKU'] = new_df['SKU'].astype(str).str.strip()
-    new_df['QTY'] = pd.to_numeric(new_df['QTY'], errors='coerce').fillna(0)
-    
-    # PENTING: Grouping supaya jika ada SKU+BIN yang sama di baris berbeda, QTY-nya dijumlahkan dulu
-    new_df = new_df.groupby(['BIN', 'SKU'], as_index=False)['QTY'].sum()
-    
-    return new_df
-
 def process_stock_comparison(file1, file2):
     """Fungsi utama untuk memproses perbandingan."""
     try:
