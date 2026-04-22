@@ -3513,7 +3513,7 @@ def project_approval_reject():
                     if not df_waiting.empty:
                         all_excel_data = convert_all_to_excel(df)
                         st.download_button(
-                            label=f"📥 Download Excel ({cabang_name})",
+                            label=f"📥 Download All ({cabang_name})",
                             data=all_excel_data,
                             file_name=f"MASS_SET_UP_{cabang_name}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
