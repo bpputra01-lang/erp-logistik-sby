@@ -3311,13 +3311,23 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- 1. TARUH DI BAGIAN PALING ATAS (Luar semua fungsi/tabs) ---
 @st.cache_data
-def convert_df_to_excel(df_row):
+def convert_all_to_excel(df):
     import io
     output = io.BytesIO()
-    # Pastikan pd (pandas) sudah di-import di awal app.py
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        download_df = pd.DataFrame([df_row])
-        download_df.to_excel(writer, index=False, sheet_name='Request_Setup')
+    # Ambil hanya Status 2, lalu ambil kolom yang diminta saja
+    # Tambahkan kolom QTY secara manual atau pastikan ada di DB
+    df_download = df[df['status'] == 2].copy()
+    
+    if not df_download.empty:
+        # Filter kolom sesuai request: SKU, BIN ASAL, dan QTY
+        # Note: Jika di database belum ada kolom 'qty', kita buat default 1
+        if 'qty' not in df_download.columns:
+            df_download['qty'] = 1 
+            
+        final_df = df_download[['sku', 'bin_asal', 'qty']]
+        
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            final_df.to_excel(writer, index=False, sheet_name='Mass_Request_Setup')
     return output.getvalue()
 
 def project_approval_reject():
@@ -3494,27 +3504,32 @@ def project_approval_reject():
                         df['article_name'].str.lower().str.contains(search_query, na=False)
                     ]
 
+                # --- BAGIAN LOGIKA TAMPILAN (YANG TADI SALAH INDENTASI) ---
                 if df.empty: 
                     st.info(f"📭 Belum ada data pengajuan untuk cabang {cabang_name}.") 
                 else: 
-                    for index, row in df.iterrows(): 
-                        with st.expander(f"📦 {row['sku']} - {row['article_name']} | {row['nama_tim']}"): 
-                            # --- TOMBOL DOWNLOAD KHUSUS STATUS 2 (Waiting Set Up) ---
-                            if row['status'] == 2:
-                                st.markdown("### 📥 Download Request")
-                                # Siapkan data untuk Excel
-                                excel_data = convert_df_to_excel(row.to_dict())
-                                
-                                st.download_button(
-                                    label=f"📊 Download Data Set Up ({row['sku']})",
-                                    data=excel_data,
-                                    file_name=f"SET_UP_{row['sku']}_{cabang_name}.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    key=f"dl_{row['id']}"
-                                )
-                                st.write("---")
+                    # 1. TOMBOL DOWNLOAD MASSAL (Harus di luar loop biar muncul sekali di atas)
+                    df_waiting = df[df['status'] == 2]
+                    if not df_waiting.empty:
+                        st.markdown(f"### 📥 Download Massal ({len(df_waiting)} Data)")
+                        # Pastikan fungsi convert_all_to_excel sudah didefinisikan di atas
+                        all_excel_data = convert_all_to_excel(df)
+                        
+                        st.download_button(
+                            label=f"🔥 DOWNLOAD SEMUA DATA SET UP ({cabang_name})",
+                            data=all_excel_data,
+                            file_name=f"MASS_SET_UP_{cabang_name}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"dl_all_{cabang_name}" 
+                        )
+                        st.write("---")
 
+                    # 2. LOOP DATA (Baru masuk ke detail satu per satu)
+                    for index, row in df.iterrows(): 
+                        with st.expander(f"📦 {row['sku']} - {row['article_name']} | {row['nama_tim']}"):
                             st.markdown(f"### 📑 Detail [ID: {row['id']}]")
+                            
+                            # --- Detail Kolom ---
                             c1, c2 = st.columns(2) 
                             with c1: 
                                 st.markdown(f"**👤 Pengaju:** `{row['nama_tim']}`") 
@@ -3528,8 +3543,8 @@ def project_approval_reject():
                             st.info(f"**📝 Keterangan:**\n\n{row['keterangan']}") 
                             st.write("---") 
 
-                            # --- TIMELINE ---
-                            st.write("**Progres Status:**") 
+                            # --- Progres Timeline ---
+                            st.write("**Progres Status:**")
                             line1_active = "line-active" if row['status'] >= 2 else "" 
                             line2_active = "line-active" if row['status'] >= 3 else "" 
 
