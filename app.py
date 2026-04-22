@@ -3509,25 +3509,25 @@ def project_approval_reject():
                     st.info(f"📭 Belum ada data pengajuan untuk cabang {cabang_name}.") 
                 else: 
                     # --- TOMBOL DOWNLOAD MASSAL (VERSI RAPI & KECIL) ---
-                df_waiting = df[df['status'] == 2]
-                if not df_waiting.empty:
-                    # Buat kolom agar teks dan tombol sejajar
-                    col_dl1, col_dl2 = st.columns([1, 1])
-                    
-                    with col_dl1:
-                        st.markdown(f"📦 **Ready to Set Up:** `{len(df_waiting)} SKU`")
-                    
-                    with col_dl2:
-                        all_excel_data = convert_all_to_excel(df)
-                        st.download_button(
-                            label=f"📥 Download Excel ({cabang_name})",
-                            data=all_excel_data,
-                            file_name=f"MASS_SET_UP_{cabang_name}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"dl_all_{cabang_name}",
-                            use_container_width=True # Biar pas di kolomnya
-                        )
-                    st.divider() # Garis tipis biar rapi
+                    df_waiting = df[df['status'] == 2]
+                    if not df_waiting.empty:
+                        # Buat kolom agar teks dan tombol sejajar
+                        col_dl1, col_dl2 = st.columns([1, 1])
+                        
+                        with col_dl1:
+                            st.markdown(f"📦 **Ready to Set Up:** `{len(df_waiting)} SKU`")
+                        
+                        with col_dl2:
+                            all_excel_data = convert_all_to_excel(df)
+                            st.download_button(
+                                label=f"📥 Download Excel ({cabang_name})",
+                                data=all_excel_data,
+                                file_name=f"MASS_SET_UP_{cabang_name}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"dl_all_{cabang_name}",
+                                use_container_width=True # Biar pas di kolomnya
+                            )
+                        st.divider() # Garis tipis biar rapi
 
                     # 2. LOOP DATA (Baru masuk ke detail satu per satu)
                     for index, row in df.iterrows(): 
