@@ -3522,7 +3522,6 @@ def project_approval_reject():
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"dl_all_{cabang_name}" 
                         )
-                        st.write("---")
 
                     # 2. LOOP DATA (Baru masuk ke detail satu per satu)
                     for index, row in df.iterrows(): 
