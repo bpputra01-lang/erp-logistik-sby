@@ -3508,20 +3508,26 @@ def project_approval_reject():
                 if df.empty: 
                     st.info(f"📭 Belum ada data pengajuan untuk cabang {cabang_name}.") 
                 else: 
-                    # 1. TOMBOL DOWNLOAD MASSAL (Harus di luar loop biar muncul sekali di atas)
-                    df_waiting = df[df['status'] == 2]
-                    if not df_waiting.empty:
-                        st.markdown(f"### 📥 Download Massal ({len(df_waiting)} Data)")
-                        # Pastikan fungsi convert_all_to_excel sudah didefinisikan di atas
+                    # --- TOMBOL DOWNLOAD MASSAL (VERSI RAPI & KECIL) ---
+                df_waiting = df[df['status'] == 2]
+                if not df_waiting.empty:
+                    # Buat kolom agar teks dan tombol sejajar
+                    col_dl1, col_dl2 = st.columns([1, 1])
+                    
+                    with col_dl1:
+                        st.markdown(f"📦 **Ready to Set Up:** `{len(df_waiting)} SKU`")
+                    
+                    with col_dl2:
                         all_excel_data = convert_all_to_excel(df)
-                        
                         st.download_button(
-                            label=f"🔥 DOWNLOAD SEMUA DATA SET UP ({cabang_name})",
+                            label=f"📥 Download Excel ({cabang_name})",
                             data=all_excel_data,
                             file_name=f"MASS_SET_UP_{cabang_name}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"dl_all_{cabang_name}" 
+                            key=f"dl_all_{cabang_name}",
+                            use_container_width=True # Biar pas di kolomnya
                         )
+                    st.divider() # Garis tipis biar rapi
 
                     # 2. LOOP DATA (Baru masuk ke detail satu per satu)
                     for index, row in df.iterrows(): 
