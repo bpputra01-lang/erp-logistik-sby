@@ -3293,7 +3293,7 @@ def menu_reject_defect():
                 cols = ['sku', 'article_name', 'Match Route'] + [c for c in df_temp['cabang'].unique() if c in df_final_match.columns]
                 st.data_editor(df_final_match[cols], use_container_width=True, hide_index=True, key="match_pivot_final")
             else:
-                st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori Kiri & Kanan yang cocok.")
+                st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori yang cocok.")
         else:
             st.success("✅ Tidak ditemukan Reject/Defect Match")
 
