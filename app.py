@@ -3090,7 +3090,7 @@ def menu_reject_defect():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY - SUPABASE CLOUD</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
 
     tab_entry, tab_analytics, tab_match = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD", "🔍 MATCH DEFECT/REJECT"])
 
