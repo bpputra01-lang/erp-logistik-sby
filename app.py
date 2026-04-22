@@ -3362,8 +3362,8 @@ def project_approval_reject():
         </style> 
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True) 
-    tabs = st.tabs(["💻 Input Pengajuan", "📑 History & Approval Status"]) 
+st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True) 
+tabs = st.tabs(["💻 Input Pengajuan", "📑 History & Approval Status"]) 
 
 # --- 1. TARUH DI BAGIAN PALING ATAS (Luar semua fungsi/tabs) ---
 @st.cache_data
