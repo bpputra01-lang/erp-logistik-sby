@@ -3365,199 +3365,226 @@ def project_approval_reject():
     st.markdown('<div class="hero-header-custom">📋 PENGAJUAN REJECT / DEFECT</div>', unsafe_allow_html=True) 
     tabs = st.tabs(["💻 Input Pengajuan", "📑 History & Approval Status"]) 
 
-    # --- TAB 0: INPUT DATA ---
-    with tabs[0]: 
-        st.markdown(""" 
-            <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;"> 
-                <h3 style="color: #FFFFFF; margin: 0; font-size: 18px; font-weight: 900;">Form Pengajuan Reject/Defect</h3> 
-            </div> 
-        """, unsafe_allow_html=True) 
+# --- 1. TARUH DI BAGIAN PALING ATAS (Luar semua fungsi/tabs) ---
+@st.cache_data
+def convert_df_to_excel(df_row):
+    import io
+    output = io.BytesIO()
+    # Pastikan pd (pandas) sudah di-import di awal app.py
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        download_df = pd.DataFrame([df_row])
+        download_df.to_excel(writer, index=False, sheet_name='Request_Setup')
+    return output.getvalue()
+
+# --- TAB 0: INPUT DATA ---
+with tabs[0]: 
+    st.markdown(""" 
+        <div style="background-color: #1a1c27; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-top: 20px; margin-bottom: 20px;"> 
+            <h3 style="color: #FFFFFF; margin: 0; font-size: 18px; font-weight: 900;">Form Pengajuan Reject/Defect</h3> 
+        </div> 
+    """, unsafe_allow_html=True) 
+    
+    with st.form("input_form_reject", clear_on_submit=True): 
+        col1, col2 = st.columns(2) 
+        with col1: 
+            nama = st.text_input("Nama Tim (Pengaju)") 
+            bin_asal = st.text_input("Bin Asal") 
+            sku = st.text_input("SKU") 
+            cabang_input = st.selectbox("Pilih Cabang", ["SURABAYA", "SIDOARJO", "SEMARANG"]) 
+        with col2: 
+            article = st.text_input("Article Name") 
+            size = st.text_input("Size") 
+            keterangan = st.text_area("Keterangan Reject/Defect") 
         
-        with st.form("input_form_reject", clear_on_submit=True): 
-            col1, col2 = st.columns(2) 
-            with col1: 
-                nama = st.text_input("Nama Tim (Pengaju)") 
-                bin_asal = st.text_input("Bin Asal") 
-                sku = st.text_input("SKU") 
-                cabang_input = st.selectbox("Pilih Cabang", ["SURABAYA", "SIDOARJO", "SEMARANG"]) 
-            with col2: 
-                article = st.text_input("Article Name") 
-                size = st.text_input("Size") 
-                keterangan = st.text_area("Keterangan Reject/Defect") 
-            
-            if st.form_submit_button("▶️ SUBMIT REQUEST"): 
-                if nama and sku: 
-                    tz_jakarta = pytz.timezone('Asia/Jakarta') 
-                    ts = datetime.now(tz_jakarta).strftime("%Y-%m-%d %H:%M:%S") 
-                    
-                    data_insert = {
-                        "timestamp": ts, 
-                        "nama_tim": nama, 
-                        "bin_asal": bin_asal, 
-                        "sku": sku, 
-                        "article_name": article, 
-                        "size": size, 
-                        "keterangan": keterangan, 
-                        "status": 1, 
-                        "cabang": cabang_input
-                    }
-                    
-                    try: 
-                        supabase.table("submissions").insert(data_insert).execute()
-                        st.success(f"✅ Berhasil! Data tercatat jam {ts} WIB") 
-                        st.rerun() 
-                    except Exception as e: 
-                        st.error(f"Gagal simpan ke Supabase: {e}") 
-                else: 
-                    st.warning("⚠️ Nama Tim dan SKU wajib diisi!") 
-
-    # --- TAB 1: HISTORY & APPROVAL ---
-    with tabs[1]:
-    # --- TAB 1: HISTORY & APPROVAL (VERSI SUPABASE + CSS FIX) ---
-        st.markdown(""" 
-            <style> 
-            [data-testid="stMain"] div[data-testid="stRadio"] label p { 
-                color: #000000 !important;  /* Diubah ke putih agar terlihat di dark mode */
-                font-weight: 500 !important; 
-            } 
-            [data-testid="stMain"] div[data-testid="stExpander"] summary p { 
-                color: #FFFFFF !important; 
-                font-weight: bold !important; 
-            } 
-            [data-testid="stMain"] div[data-testid="stExpander"] { 
-                background-color: #1a1c27 !important; 
-                border: 1px solid #3d4156 !important; 
-                border-radius: 12px !important; 
-                box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; 
-            } 
-            /* CSS UNTUK GARIS TIMELINE */
-            .timeline-line {
-                height: 4px;
-                background: #3d4156;
-                margin-top: 15px;
-                border-radius: 2px;
-            }
-            .line-active {
-                background: #00ff00 !important;
-                box-shadow: 0 0 8px #00ff00;
-            }
-            [data-testid="stMain"] .stMarkdown p { 
-                color: #FFFFFF !important;  /* Pastikan teks markdown umum jadi putih */
-            } 
-            </style> 
-        """, unsafe_allow_html=True)
-        tab_sby, tab_sda, tab_smg = st.tabs(["📍 SURABAYA", "📍 SIDOARJO", "📍 SEMARANG"]) 
-        cabang_list = [("SURABAYA", tab_sby), ("SIDOARJO", tab_sda), ("SEMARANG", tab_smg)] 
-
-        for cabang_name, tab_obj in cabang_list: 
-            with tab_obj: 
-                col_search, col_filter = st.columns([1, 1]) 
-                with col_search: 
-                    search_query = st.text_input(f"🔍 Cari di {cabang_name}:", placeholder="Ketik SKU atau Nama...", key=f"src_{cabang_name}", label_visibility="collapsed").strip() 
+        if st.form_submit_button("▶️ SUBMIT REQUEST"): 
+            if nama and sku: 
+                tz_jakarta = pytz.timezone('Asia/Jakarta') 
+                ts = datetime.now(tz_jakarta).strftime("%Y-%m-%d %H:%M:%S") 
                 
-                with col_filter: 
-                    filter_status = st.radio("Pilih Status:", ["Semua", "Waiting Approval", "Waiting Set Up", "Done Set Up"], horizontal=True, key=f"rad_{cabang_name}", label_visibility="collapsed") 
-
-                # Building Query Supabase
-                query = supabase.table("submissions").select("*").eq("cabang", cabang_name)
-
-                # Status Mapping
-                status_map = {"Waiting Approval": 1, "Waiting Set Up": 2, "Done Set Up": 3}
-                if filter_status in status_map:
-                    query = query.eq("status", status_map[filter_status])
-
+                data_insert = {
+                    "timestamp": ts, 
+                    "nama_tim": nama, 
+                    "bin_asal": bin_asal, 
+                    "sku": sku, 
+                    "article_name": article, 
+                    "size": size, 
+                    "keterangan": keterangan, 
+                    "status": 1, 
+                    "cabang": cabang_input
+                }
+                
                 try: 
-                    response = query.order("id", desc=True).execute()
-                    df = pd.DataFrame(response.data)
+                    supabase.table("submissions").insert(data_insert).execute()
+                    st.success(f"✅ Berhasil! Data tercatat jam {ts} WIB") 
+                    st.rerun() 
                 except Exception as e: 
-                    st.error(f"Database Error: {e}") 
-                    df = pd.DataFrame() 
-                
-                # Filter Search di sisi Client (Pandas) agar lebih fleksibel
-                if not df.empty and search_query:
-                    search_query = search_query.lower()
-                    df = df[
-                        df['sku'].str.lower().str.contains(search_query, na=False) | 
-                        df['nama_tim'].str.lower().str.contains(search_query, na=False) |
-                        df['article_name'].str.lower().str.contains(search_query, na=False)
-                    ]
+                    st.error(f"Gagal simpan ke Supabase: {e}") 
+            else: 
+                st.warning("⚠️ Nama Tim dan SKU wajib diisi!") 
 
-                if df.empty: 
-                    st.info(f"📭 Belum ada data pengajuan untuk cabang {cabang_name}.") 
-                else: 
-                    for index, row in df.iterrows(): 
-                        with st.expander(f"📦 {row['sku']} - {row['article_name']} | {row['nama_tim']}"): 
-                            st.markdown(f"### 📑 Detail [ID: {row['id']}]") 
-                            c1, c2 = st.columns(2) 
-                            with c1: 
-                                st.markdown(f"**👤 Pengaju:** `{row['nama_tim']}`") 
-                                st.markdown(f"**📍 Bin Asal:** `{row['bin_asal']}`") 
-                                st.markdown(f"**🆔 SKU:** `{row['sku']}`") 
-                            with c2: 
-                                st.markdown(f"**👟 Article:** `{row['article_name']}`") 
-                                st.markdown(f"**📏 Size:** `{row['size']}`") 
-                                st.markdown(f"**🕒 Waktu:** `{row['timestamp']}`") 
-                            
-                            st.info(f"**📝 Keterangan:**\n\n{row['keterangan']}") 
-                            st.write("---") 
 
-                            # --- TIMELINE ---
-                            st.write("**Progres Status:**") 
-                            line1_active = "line-active" if row['status'] >= 2 else "" 
-                            line2_active = "line-active" if row['status'] >= 3 else "" 
+# --- TAB 1: HISTORY & APPROVAL ---
+with tabs[1]:
+# --- TAB 1: HISTORY & APPROVAL (VERSI SUPABASE + CSS FIX) ---
+    st.markdown(""" 
+        <style> 
+        [data-testid="stMain"] div[data-testid="stRadio"] label p { 
+            color: #000000 !important;  /* Diubah ke putih agar terlihat di dark mode */
+            font-weight: 500 !important; 
+        } 
+        [data-testid="stMain"] div[data-testid="stExpander"] summary p { 
+            color: #FFFFFF !important; 
+            font-weight: bold !important; 
+        } 
+        [data-testid="stMain"] div[data-testid="stExpander"] { 
+            background-color: #1a1c27 !important; 
+            border: 1px solid #3d4156 !important; 
+            border-radius: 12px !important; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; 
+        } 
+        /* CSS UNTUK GARIS TIMELINE */
+        .timeline-line {
+            height: 4px;
+            background: #3d4156;
+            margin-top: 15px;
+            border-radius: 2px;
+        }
+        .line-active {
+            background: #00ff00 !important;
+            box-shadow: 0 0 8px #00ff00;
+        }
+        [data-testid="stMain"] .stMarkdown p { 
+            color: #FFFFFF !important;  /* Pastikan teks markdown umum jadi putih */
+        } 
+        </style> 
+    """, unsafe_allow_html=True)
+    tab_sby, tab_sda, tab_smg = st.tabs(["📍 SURABAYA", "📍 SIDOARJO", "📍 SEMARANG"]) 
+    cabang_list = [("SURABAYA", tab_sby), ("SIDOARJO", tab_sda), ("SEMARANG", tab_smg)] 
 
-                            tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5]) 
+    for cabang_name, tab_obj in cabang_list: 
+        with tab_obj: 
+            col_search, col_filter = st.columns([1, 1]) 
+            with col_search: 
+                search_query = st.text_input(f"🔍 Cari di {cabang_name}:", placeholder="Ketik SKU atau Nama...", key=f"src_{cabang_name}", label_visibility="collapsed").strip() 
+            
+            with col_filter: 
+                filter_status = st.radio("Pilih Status:", ["Semua", "Waiting Approval", "Waiting Set Up", "Done Set Up"], horizontal=True, key=f"rad_{cabang_name}", label_visibility="collapsed") 
+
+            # Building Query Supabase
+            query = supabase.table("submissions").select("*").eq("cabang", cabang_name)
+
+            # Status Mapping
+            status_map = {"Waiting Approval": 1, "Waiting Set Up": 2, "Done Set Up": 3}
+            if filter_status in status_map:
+                query = query.eq("status", status_map[filter_status])
+
+            try: 
+                response = query.order("id", desc=True).execute()
+                df = pd.DataFrame(response.data)
+            except Exception as e: 
+                st.error(f"Database Error: {e}") 
+                df = pd.DataFrame() 
+            
+            # Filter Search di sisi Client (Pandas) agar lebih fleksibel
+            if not df.empty and search_query:
+                search_query = search_query.lower()
+                df = df[
+                    df['sku'].str.lower().str.contains(search_query, na=False) | 
+                    df['nama_tim'].str.lower().str.contains(search_query, na=False) |
+                    df['article_name'].str.lower().str.contains(search_query, na=False)
+                ]
+
+            if df.empty: 
+                st.info(f"📭 Belum ada data pengajuan untuk cabang {cabang_name}.") 
+            else: 
+                for index, row in df.iterrows(): 
+                    with st.expander(f"📦 {row['sku']} - {row['article_name']} | {row['nama_tim']}"): 
+                        # --- TOMBOL DOWNLOAD KHUSUS STATUS 2 (Waiting Set Up) ---
+                        if row['status'] == 2:
+                            st.markdown("### 📥 Download Request")
+                            # Siapkan data untuk Excel
+                            excel_data = convert_df_to_excel(row.to_dict())
                             
-                            with tcol1: 
-                                st.markdown("🟢 **Pengajuan**") 
-                                st.caption("Waiting Approval") 
-                            
-                            with tline1: 
-                                st.markdown(f'<div class="timeline-line {line1_active}"></div>', unsafe_allow_html=True) 
-                            
-                            with tcol2: 
-                                if row['status'] >= 2: 
-                                    st.markdown("🔵 **Approved**") 
-                                    st.caption(f"By: {row.get('approved_by') or '-'}") 
-                                else: 
-                                    st.markdown("🟡 **Purchasing**") 
-                                    n_app = st.text_input("Nama Purchasing", key=f"app_inp_{row['id']}", label_visibility="collapsed") 
-                                    if st.button("Approve", key=f"bt_ap_{row['id']}", disabled=not n_app): 
-                                        supabase.table("submissions").update({"status": 2, "approved_by": n_app}).eq("id", row['id']).execute()
+                            st.download_button(
+                                label=f"📊 Download Data Set Up ({row['sku']})",
+                                data=excel_data,
+                                file_name=f"SET_UP_{row['sku']}_{cabang_name}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"dl_{row['id']}"
+                            )
+                            st.write("---")
+
+                        st.markdown(f"### 📑 Detail [ID: {row['id']}]")
+                        c1, c2 = st.columns(2) 
+                        with c1: 
+                            st.markdown(f"**👤 Pengaju:** `{row['nama_tim']}`") 
+                            st.markdown(f"**📍 Bin Asal:** `{row['bin_asal']}`") 
+                            st.markdown(f"**🆔 SKU:** `{row['sku']}`") 
+                        with c2: 
+                            st.markdown(f"**👟 Article:** `{row['article_name']}`") 
+                            st.markdown(f"**📏 Size:** `{row['size']}`") 
+                            st.markdown(f"**🕒 Waktu:** `{row['timestamp']}`") 
+                        
+                        st.info(f"**📝 Keterangan:**\n\n{row['keterangan']}") 
+                        st.write("---") 
+
+                        # --- TIMELINE ---
+                        st.write("**Progres Status:**") 
+                        line1_active = "line-active" if row['status'] >= 2 else "" 
+                        line2_active = "line-active" if row['status'] >= 3 else "" 
+
+                        tcol1, tline1, tcol2, tline2, tcol3 = st.columns([1.5, 2, 1.5, 2, 1.5]) 
+                        
+                        with tcol1: 
+                            st.markdown("🟢 **Pengajuan**") 
+                            st.caption("Waiting Approval") 
+                        
+                        with tline1: 
+                            st.markdown(f'<div class="timeline-line {line1_active}"></div>', unsafe_allow_html=True) 
+                        
+                        with tcol2: 
+                            if row['status'] >= 2: 
+                                st.markdown("🔵 **Approved**") 
+                                st.caption(f"By: {row.get('approved_by') or '-'}") 
+                            else: 
+                                st.markdown("🟡 **Purchasing**") 
+                                n_app = st.text_input("Nama Purchasing", key=f"app_inp_{row['id']}", label_visibility="collapsed") 
+                                if st.button("Approve", key=f"bt_ap_{row['id']}", disabled=not n_app): 
+                                    supabase.table("submissions").update({"status": 2, "approved_by": n_app}).eq("id", row['id']).execute()
+                                    st.rerun() 
+                        
+                        with tline2: 
+                            st.markdown(f'<div class="timeline-line {line2_active}"></div>', unsafe_allow_html=True) 
+                        
+                        with tcol3: 
+                            if row['status'] >= 3: 
+                                st.markdown("🟣 **Done Set Up**") 
+                                st.caption(f"By: {row.get('setup_by') or '-'}") 
+                            else: 
+                                st.markdown("⚪ **Finalizing**") 
+                                if row['status'] == 2: 
+                                    n_set = st.text_input("Nama Set Up", key=f"set_inp_{row['id']}", label_visibility="collapsed") 
+                                    st.markdown('<div class="gold-btn">', unsafe_allow_html=True) 
+                                    if st.button("Final Set Up", key=f"bt_set_{row['id']}", disabled=not n_set): 
+                                        supabase.table("submissions").update({"status": 3, "setup_by": n_set}).eq("id", row['id']).execute()
                                         st.rerun() 
-                            
-                            with tline2: 
-                                st.markdown(f'<div class="timeline-line {line2_active}"></div>', unsafe_allow_html=True) 
-                            
-                            with tcol3: 
-                                if row['status'] >= 3: 
-                                    st.markdown("🟣 **Done Set Up**") 
-                                    st.caption(f"By: {row.get('setup_by') or '-'}") 
-                                else: 
-                                    st.markdown("⚪ **Finalizing**") 
-                                    if row['status'] == 2: 
-                                        n_set = st.text_input("Nama Set Up", key=f"set_inp_{row['id']}", label_visibility="collapsed") 
-                                        st.markdown('<div class="gold-btn">', unsafe_allow_html=True) 
-                                        if st.button("Final Set Up", key=f"bt_set_{row['id']}", disabled=not n_set): 
-                                            supabase.table("submissions").update({"status": 3, "setup_by": n_set}).eq("id", row['id']).execute()
-                                            st.rerun() 
-                                        st.markdown('</div>', unsafe_allow_html=True) 
+                                    st.markdown('</div>', unsafe_allow_html=True) 
 
-                            # --- NOTE & DELETE ---
-                            st.write("---") 
-                            c_note = row.get('additional_note') or "" 
-                            n_note = st.text_area("📝 Catatan Tambahan:", value=c_note, key=f"note_area_{row['id']}") 
-                            
-                            if n_note != c_note: 
-                                if st.button("💾 Update Note", key=f"sn_btn_{row['id']}"): 
-                                    supabase.table("submissions").update({"additional_note": n_note}).eq("id", row['id']).execute()
-                                    st.success("Note tersimpan!")
-                                    st.rerun() 
+                        # --- NOTE & DELETE ---
+                        st.write("---") 
+                        c_note = row.get('additional_note') or "" 
+                        n_note = st.text_area("📝 Catatan Tambahan:", value=c_note, key=f"note_area_{row['id']}") 
+                        
+                        if n_note != c_note: 
+                            if st.button("💾 Update Note", key=f"sn_btn_{row['id']}"): 
+                                supabase.table("submissions").update({"additional_note": n_note}).eq("id", row['id']).execute()
+                                st.success("Note tersimpan!")
+                                st.rerun() 
 
-                            with st.expander("🗑️ Hapus"): 
-                                if st.button(f"Konfirmasi Hapus {row['sku']}", key=f"del_btn_{row['id']}"): 
-                                    supabase.table("submissions").delete().eq("id", row['id']).execute()
-                                    st.rerun() 
+                        with st.expander("🗑️ Hapus"): 
+                            if st.button(f"Konfirmasi Hapus {row['sku']}", key=f"del_btn_{row['id']}"): 
+                                supabase.table("submissions").delete().eq("id", row['id']).execute()
+                                st.rerun() 
 
 import streamlit as st
 import pandas as pd
