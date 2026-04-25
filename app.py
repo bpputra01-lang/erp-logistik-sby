@@ -5318,7 +5318,12 @@ elif menu == "Stock Minus":
                     df_s = st.session_state['df_set_up']
                     df_n = st.session_state['df_need_adj']
 
-                    total_qty = abs(df_m.iloc[:, 10].sum()) if not df_m.empty else 0
+                    if not df_m.empty:
+                        # Kita paksa konversi ke float dulu, baru di-sum, baru di-abs
+                        nilai_total = pd.to_numeric(df_m[col_qty], errors='coerce').sum()
+                        total_qty = abs(nilai_total)
+                    else:
+                        total_qty = 0
                     # Dashboard Metrics
                     c1, c2, c3 = st.columns(3)
                     c1.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Minus</span><span class="m-val">{int(total_qty)}</span></div>', unsafe_allow_html=True)
