@@ -1915,8 +1915,8 @@ def menu_refill_withdraw():
                             if dictTotDCKLRAK.get(sku_t, 0) <= 3 and sku_t in dict02:
                                 bestQty = dictBestVal02.get(sku_t, 0)
                                 if bestQty > 1:
-                                    outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dict02[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotDCInbound.get(sku_t, 0), dictBinList02.get(sku_t, "")[:-2]])
-                                    dictUniqueWdr[sku_t] = True
+                                    outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2], str(row[10])])
+                                    dictUniqueRef[sku_t] = True
 
             # --- STEP 3: AUTO-BALANCE (SAFETY NET) ---
             for sku_k in dictBrand.keys():
