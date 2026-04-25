@@ -5316,15 +5316,12 @@ elif menu == "Stock Minus":
                 if st.session_state.get('proses_selesai'):
                     df_m = st.session_state['df_minus_awal']
                     df_s = st.session_state['df_set_up']
-                    df_n = st.session_state['df_need_adj']
-
-                    # Perbaikan Kolom K di Justifikasi
-                    if not df_n.empty and len(df_n.columns) >= 11:
-                        df_n[df_n.columns[10]] = 0
+                    df_n = st.session_state['df_need_adj']  
 
                     # Dashboard Metrics
                     c1, c2, c3 = st.columns(3)
-                    c1.markdown(f'<div class="m-box"><span class="m-lbl">Total Minus</span><span class="m-val">{len(df_m)}</span></div>', unsafe_allow_html=True)
+                    total_qty_minus = abs(df_m.iloc[:, 10].sum()) if not df_m.empty else 0
+                    c1.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Minus</span><span class="m-val">{int(total_qty_minus)}</span></div>', unsafe_allow_html=True)
                     c2.markdown(f'<div class="m-box"><span class="m-lbl">Tercover</span><span class="m-val">{int(df_s["QUANTITY"].sum()) if not df_s.empty else 0}</span></div>', unsafe_allow_html=True)
                     c3.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Adj</span><span class="m-val">{len(df_n)}</span></div>', unsafe_allow_html=True)
 
