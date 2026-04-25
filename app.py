@@ -4214,7 +4214,8 @@ def tampilan_balancing_stock():
             UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
             UPPER("{col_bin}") NOT LIKE '%STAGING%' AND UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
             UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND UPPER("{col_bin}") NOT LIKE '%OUT%' AND
-            UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%AMP%'
+            UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%AMP%' AND
+            UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%RAK%'
         """
 
         # --- DEFINISI AREA FILTER ---
