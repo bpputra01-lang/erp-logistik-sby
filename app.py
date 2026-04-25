@@ -1844,7 +1844,7 @@ def menu_refill_withdraw():
             dictTotDCKLRAK = {}; dictBrand = {}; dictItem = {}; dictVar = {}
             dictBinListDC = {}; dictBinList02 = {}; dictPreTotToko = {}
             dictPreTotDCInbound = {}; dictBestValDC = {}; dictBestVal02 = {}
-            dictUniqueRef = {}; dictUniqueWdr = {}
+            dictUniqueRef = {}; dictUniqueWdr = {}; dictSubKat = {} # TAMBAHAN
 
             # --- STEP 1: SCAN STOCK ---
             for _, row in df_s.iterrows():
@@ -1862,6 +1862,7 @@ def menu_refill_withdraw():
                     dictBrand[sku] = str(row[3])
                     dictItem[sku] = str(row[4])
                     dictVar[sku] = str(row[5])
+                    dictSubKat[sku] = str(row[10]) # SIMPAN SUB KATEGORI (Index 10)
 
                 # AREA TOKO
                 if any(x in binLoc for x in ["02", "TOKO", "STORE", "LT.2", "STR"]):
@@ -1873,25 +1874,18 @@ def menu_refill_withdraw():
                     dictBinList02[sku] = dictBinList02.get(sku, "") + binLoc + ", "
 
                 # AREA DC
-                # AREA DC (KL & RAK Sekarang Dianggap Lokasi Ambil Valid)
                 elif any(x in binLoc for x in ["DC", "INBOUND", "KL", "RAK"]):
                     dictPreTotDCInbound[sku] = dictPreTotDCInbound.get(sku, 0) + qtySys
-                    
-                    # Logika pencarian BIN terbaik sekarang mencakup KL & RAK
                     if qtySys > dictBestValDC.get(sku, -1):
                         dictBestValDC[sku] = qtySys
                         dictDC[sku] = binLoc
-                    
-                    # Semua QTY di area ini masuk ke total DC
                     dictTotDC[sku] = dictTotDC.get(sku, 0) + qtySys
                     dictBinListDC[sku] = dictBinListDC.get(sku, "") + binLoc + ", "
-                    
-                    # Indikator total tetap dihitung untuk konsistensi
                     dictTotDCKLRAK[sku] = dictTotDCKLRAK.get(sku, 0) + qtySys
 
             outRef = []; outWdr = []
 
-            # --- STEP 2: LOGIC TRANSAKSI (Hanya jalan jika file diupload) ---
+            # --- STEP 2: LOGIC TRANSAKSI ---
             if not df_t.empty:
                 for _, row in df_t.iterrows():
                     sku_t = str(row[1]).strip()
@@ -1906,7 +1900,8 @@ def menu_refill_withdraw():
                             if (dictTot02.get(sku_t, 0) + dictTotDC.get(sku_t, 0) <= 3) and sku_t in dictDC:
                                 bestQty = dictBestValDC.get(sku_t, 0)
                                 if bestQty > 1:
-                                    outRef.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2], str(row[10])])
+                                    # PASTIKAN 10 ELEMEN
+                                    outRef.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2], dictSubKat.get(sku_t, "")])
                                     dictUniqueRef[sku_t] = True
                     
                     # Withdraw via Trx
@@ -1915,26 +1910,29 @@ def menu_refill_withdraw():
                             if dictTotDCKLRAK.get(sku_t, 0) <= 3 and sku_t in dict02:
                                 bestQty = dictBestVal02.get(sku_t, 0)
                                 if bestQty > 1:
-                                    outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dictDC[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotToko.get(sku_t, 0), dictBinListDC.get(sku_t, "")[:-2], str(row[10])])
-                                    dictUniqueRef[sku_t] = True
+                                    # PASTIKAN 10 ELEMEN (Perbaikan: Pakai dict02 & dictPreTotDCInbound)
+                                    outWdr.append([sku_t, dictBrand[sku_t], dictItem[sku_t], dictVar[sku_t], dict02[sku_t], bestQty, math.ceil(bestQty/2), dictPreTotDCInbound.get(sku_t, 0), dictBinList02.get(sku_t, "")[:-2], dictSubKat.get(sku_t, "")])
+                                    dictUniqueWdr[sku_t] = True
 
-            # --- STEP 3: AUTO-BALANCE (SAFETY NET) ---
+            # --- STEP 3: AUTO-BALANCE ---
             for sku_k in dictBrand.keys():
                 # Refill Balancing (Toko Kosong)
                 if sku_k not in dictUniqueRef:
                     if dictTotDC.get(sku_k, 0) > 1 and dictPreTotToko.get(sku_k, 0) == 0 and sku_k in dictDC:
                         bestQty = dictBestValDC.get(sku_k, 0)
-                        outRef.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dictDC[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinListDC.get(sku_k, "")[:-2]])
+                        # TAMBAHKAN ELEMEN KE-10
+                        outRef.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dictDC[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinListDC.get(sku_k, "")[:-2], dictSubKat.get(sku_k, "")])
                         dictUniqueRef[sku_k] = True
 
                 # Withdraw Balancing (DC Kosong)
                 if sku_k not in dictUniqueWdr:
                     if dictTot02.get(sku_k, 0) > 3 and dictPreTotDCInbound.get(sku_k, 0) == 0 and sku_k in dict02:
                         bestQty = dictBestVal02.get(sku_k, 0)
-                        outWdr.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dict02[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinList02.get(sku_k, "")[:-2]])
+                        # TAMBAHKAN ELEMEN KE-10
+                        outWdr.append([sku_k, dictBrand[sku_k], dictItem[sku_k], dictVar[sku_k], dict02[sku_k], bestQty, math.ceil(bestQty/2), 0, dictBinList02.get(sku_k, "")[:-2], dictSubKat.get(sku_k, "")])
                         dictUniqueWdr[sku_k] = True
 
-            # Save Output
+            # Save Output (Sekarang kolom klop 10 vs 10)
             st.session_state.summary_refill = pd.DataFrame(outRef, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN 02", "BIN LAIN","SUB KATEGORI"])
             st.session_state.summary_withdraw = pd.DataFrame(outWdr, columns=["SKU", "BRAND", "ITEM NAME", "VARIANT", "BIN AMBIL", "QTY BIN AMBIL", "LOAD", "QTY BIN DC", "BIN LAIN","SUB KATEGORI"])
             st.success(f"DONE! Refill: {len(outRef)} | Withdraw: {len(outWdr)}")
