@@ -96,16 +96,30 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0, 43, 91, 0.3) !important;
     }
 
-    /* Clear/Reset Buttons - Red */
-    div.stButton > button[key*="reset"],
-    div.stButton > button[key*="clear"] {
-        background: linear-gradient(135deg, #8b0000 0%, #a00000 100%) !important;
-        border-color: #4a0000 !important;
+    /* 1. Reset semua tombol sidebar jadi warna standar */
+    [data-testid="stSidebar"] div.stButton > button {
+        background: transparent !important;
+        color: #a0a5b5 !important;
+        border: none !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+        transition: none !important;
     }
-    div.stButton > button[key*="reset"]:hover,
-    div.stButton > button[key*="clear"]:hover {
-        background: linear-gradient(135deg, #a00000 0%, #b50000 100%) !important;
-        border-color: #ff4444 !important;
+
+    /* 2. CUMA yang diklik/difokuskan yang jadi MERAH */
+    [data-testid="stSidebar"] div.stButton > button:focus,
+    [data-testid="stSidebar"] div.stButton > button:active {
+        background: linear-gradient(135deg, #FF4B4B 0%, #D32F2F 100%) !important;
+        color: white !important;
+        border: 1px solid #FF8A8A !important;
+        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.3) !important;
+    }
+
+    /* 3. Efek titik putih di depan teks (opsional, biar mirip gambar) */
+    [data-testid="stSidebar"] div.stButton > button:focus p::before {
+        content: "● ";
+        margin-right: 8px;
     }
 
     /* ============================================ 
