@@ -75,28 +75,10 @@ st.markdown("""
     }
 
     /* ============================================
-       5. MAIN BUTTONS - NAVY BLUE
+       5. FIX SIDEBAR - CUMA 1 YANG MERAH
        ============================================ */
-    div.stButton > button {
-        background: linear-gradient(135deg, #002b5b 0%, #003874 100%) !important;
-        color: white !important;
-        border-radius: 8px !important;
-        border: 1px solid #001a35 !important;
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
-        height: 3em !important;
-        transition: all 0.25s ease !important;
-        box-shadow: 0 2px 8px rgba(0, 43, 91, 0.2) !important;
-    }
-    div.stButton > button:hover {
-        background: linear-gradient(135deg, #003874 0%, #004a9e 100%) !important;
-        border-color: #ffc107 !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(0, 43, 91, 0.3) !important;
-    }
-
-    /* 1. Reset semua tombol sidebar jadi warna standar */
+    
+    /* Reset: Paksa semua tombol sidebar jadi transparan & teks abu-abu */
     [data-testid="stSidebar"] div.stButton > button {
         background: transparent !important;
         color: #a0a5b5 !important;
@@ -104,22 +86,29 @@ st.markdown("""
         text-align: left !important;
         justify-content: flex-start !important;
         width: 100% !important;
-        transition: none !important;
+        box-shadow: none !important;
+        transform: none !important;
     }
 
-    /* 2. CUMA yang diklik/difokuskan yang jadi MERAH */
-    [data-testid="stSidebar"] div.stButton > button:focus,
-    [data-testid="stSidebar"] div.stButton > button:active {
+    /* Active: Cuma tombol yang lagi di-KLIK/FOKUS yang jadi MERAH */
+    [data-testid="stSidebar"] div.stButton > button:focus {
         background: linear-gradient(135deg, #FF4B4B 0%, #D32F2F 100%) !important;
         color: white !important;
         border: 1px solid #FF8A8A !important;
         box-shadow: 0 4px 12px rgba(255, 75, 75, 0.3) !important;
     }
 
-    /* 3. Efek titik putih di depan teks (opsional, biar mirip gambar) */
+    /* Indikator: Tambah titik cuma di tombol yang fokus */
     [data-testid="stSidebar"] div.stButton > button:focus p::before {
         content: "● ";
         margin-right: 8px;
+    }
+
+    /* Matikan warna merah bawaan key reset/clear biar gak ngerusak */
+    div.stButton > button[key*="reset"], 
+    div.stButton > button[key*="clear"] {
+        background: transparent !important;
+        border: none !important;
     }
 
     /* ============================================ 
