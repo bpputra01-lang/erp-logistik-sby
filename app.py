@@ -2744,7 +2744,7 @@ def menu_retur_out_system():
                     <div class="metric-card" style="border-left: 6px solid #8b5cf6;">
                         <div class="metric-label">🗄️ TOTAL SKU</div>
                         <div class="metric-value">{total_sku:,}</div>
-                        <div class="metric-delta">↑ CLOUD DATA</div>
+                        <div class="metric-delta">↑ TOTAL DATA</div>
                     </div>
                 ''', unsafe_allow_html=True)
             with m2:
@@ -2764,7 +2764,7 @@ def menu_retur_out_system():
                     </div>
                 ''', unsafe_allow_html=True)
 
-            st.markdown("### 📜 Database History (Cloud V3)")
+            st.markdown("### 📜 Database History")
             search_query = st.text_input("🔍 Cari SKU / Nama Barang...", placeholder="Masukkan pencarian...", key="search_v3")
 
             # Sorting data terbaru di atas
