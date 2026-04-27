@@ -4693,15 +4693,15 @@ def show_database_ongkir():
             st.markdown("""
                 <div style="
                     background-color: #1e2227; 
-                    padding: 15px; 
-                    border-radius: 10px; 
+                    padding: 10px 15px; 
+                    border-radius: 8px; 
                     border-left: 5px solid #FFD700;
-                    margin-bottom: 20px;
-                    box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+                    margin-bottom: 15px;
+                    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
                 ">
-                    <h2 style="color: white; margin: 0; font-family: 'Inter', sans-serif;">
+                    <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">
                         💲 TOTAL BIAYA ONGKIR
-                    </h2>
+                    </h4>
                 </div>
             """, unsafe_allow_html=True)
             st.markdown("---")
