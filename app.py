@@ -4420,6 +4420,15 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 
+    # --- 1. DEFINISIKAN FUNGSI DI ATAS (SEBELUM DIPANGGIL) ---
+def fetch_data():
+    try:
+        # Mengambil data dari tabel shipping_costs di Supabase
+        res = supabase.table("shipping_costs").select("*").execute()
+        return pd.DataFrame(res.data)
+    except Exception:
+        return pd.DataFrame()
+
 def show_database_ongkir():
     # --- 1. CSS CUSTOM (Sesuai Request: Samakan Style Input & Hero Header) ---
     st.markdown("""
@@ -4490,14 +4499,6 @@ def show_database_ongkir():
             st.error(f"Gagal menyimpan data: {e}")
             return False
 
-    # --- 1. DEFINISIKAN FUNGSI DI ATAS (SEBELUM DIPANGGIL) ---
-    def fetch_data():
-        try:
-            # Mengambil data dari tabel shipping_costs di Supabase
-            res = supabase.table("shipping_costs").select("*").execute()
-            return pd.DataFrame(res.data)
-        except Exception:
-            return pd.DataFrame()
 
     # --- 2. HERO HEADER ---
     st.markdown("""
