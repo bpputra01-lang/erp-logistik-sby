@@ -4420,13 +4420,7 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 
-# --- 1. NAVIGASI (Pastikan variabel 'menu' sudah didefinisikan sebelumnya) ---
-# Ganti 'selected' menjadi 'menu' atau apa pun nama variabel navigasimu
-if menu == "DATABASE ONGKIR IN/OUT": 
-    # ... sisa kode di bawahnya (pastikan menjorok ke dalam)
-    # SEMUA KODE DI BAWAH INI HARUS MASUK KE DALAM IF (ADA JARAK/INDENTASI)
-    
-    # Custom CSS untuk tampilan Dark Gold (Solid Dark)
+def show_database_ongkir():
     st.markdown("""
         <style>
         .main { background-color: #0e1117; color: #ffffff; }
@@ -4470,7 +4464,7 @@ if menu == "DATABASE ONGKIR IN/OUT":
             return pd.DataFrame()
 
     # --- 4. INTERFACE (UI) ---
-    st.title("📦 DATABASE ONGKIR IN/OUT")
+    st.title("DATABASE ONGKIR IN/OUT")
 
     # FORM INPUT DI HALAMAN UTAMA
     with st.expander("➕ INPUT DATA ONGKIR BARU", expanded=True):
@@ -6397,6 +6391,9 @@ elif menu == "List Retur Out":
 elif menu == "Pengajuan Mutasi Karantina":
     project_mutasi_karantina()
 
+elif menu == "Database Ongkir In/Out"
+    show_database_ongkir()
+    
 import streamlit as st
 import pandas as pd
 from datetime import datetime
