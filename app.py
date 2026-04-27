@@ -4537,6 +4537,16 @@ def show_database_ongkir():
             padding: 10px 15px !important;
             transition: 0.3s !important;
         }
+        /* Style Tombol Hapus (Warna Merah Reject) */
+        .stButton button.btn-hapus {
+            background-color: #2a1a1a !important;
+            color: #ff4b4b !important;
+            border: 2px solid #ff4b4b !important;
+        }
+        .stButton button.btn-hapus:hover {
+            background-color: #ff4b4b !important;
+            color: #ffffff !important;
+        }
         /* Style Tabel & Metric */
         div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
         .stTable { background-color: #1e2227; border-radius: 5px; }
@@ -4601,8 +4611,49 @@ def show_database_ongkir():
 
     st.divider()
 
-    # --- 6. DASHBOARD & MASS UPLOAD ---
-    df = fetch_data()
+    # --- 6. DASHBOARD & FILTERING ---
+    df_raw = fetch_data()
+
+    # FILTER BOX
+    st.markdown("### 🔍 FILTER & KONTROL DATA")
+    f_col1, f_col2 = st.columns([2, 1])
+
+    with f_col1:
+        # Filter Rentang Tanggal (Daily, Weekly, Monthly tinggal tarik kalender)
+        if not df_raw.empty:
+            df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
+            min_date = df_raw['created_at'].min().date()
+            max_date = df_raw['created_at'].max().date()
+            
+            date_range = st.date_input(
+                "Pilih Rentang Tanggal (Daily/Weekly/Monthly)",
+                value=(min_date, max_date),
+                min_value=min_date,
+                max_value=max_date
+            )
+            
+            # Logika Filter Tanggal
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                start_date, end_date = date_range
+                mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
+                df = df_raw.loc[mask]
+            else:
+                df = df_raw
+        else:
+            df = df_raw
+
+    with f_col2:
+        # FITUR HAPUS DATA
+        if not df.empty:
+            st.markdown("🗑️ **Hapus Baris**")
+            id_to_delete = st.selectbox("Pilih ID Data", df['id'].tolist())
+            if st.button("HAPUS PERMANEN", type="secondary"):
+                try:
+                    supabase.table("shipping_costs").delete().eq("id", id_to_delete).execute()
+                    st.warning(f"Data ID {id_to_delete} Terhapus!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Gagal hapus: {e}")
 
     # --- MASS UPLOAD (Ditaruh di luar IF EMPTY agar selalu muncul) ---
     with st.expander("📁 BATCH OPS: UPLOAD MASSAL", expanded=False):
