@@ -4421,8 +4421,9 @@ from supabase import create_client, Client
 import pandas as pd
 
 # --- 1. NAVIGASI (Pastikan variabel 'menu' sudah didefinisikan sebelumnya) ---
-
-if selected == "DATABASE ONGKIR IN/OUT":
+# Ganti 'selected' menjadi 'menu' atau apa pun nama variabel navigasimu
+if menu == "DATABASE ONGKIR IN/OUT": 
+    # ... sisa kode di bawahnya (pastikan menjorok ke dalam)
     # SEMUA KODE DI BAWAH INI HARUS MASUK KE DALAM IF (ADA JARAK/INDENTASI)
     
     # Custom CSS untuk tampilan Dark Gold (Solid Dark)
