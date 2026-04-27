@@ -4433,7 +4433,7 @@ def show_database_ongkir():
     # --- 1. CSS CUSTOM (Sesuai Request: Samakan Style Input & Hero Header) ---
     st.markdown("""
         <style>
-        /* 1. HERO HEADER: Mewah & Elit */
+        /* Style untuk Hero Header Utama */
         .hero-header {
             background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
             padding: 2rem;
@@ -4443,80 +4443,95 @@ def show_database_ongkir():
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         .hero-header h1 {
-            color: #ffffff !important;
+            color: #ffffff;
             margin: 0;
             font-size: 2.2rem;
             letter-spacing: 1px;
-            font-weight: 900;
         }
 
-        /* 2. INPUT FIELDS: Gelap & Garang (Anti Putih) */
-        div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="base-input"] {
+        /* Style Input (Nama Supplier, Total Koli, Total Ongkir) agar Seragam */
+        div[data-baseweb="input"], div[data-baseweb="select"] {
             background-color: #0e1117 !important;
             border: 1px solid #3e444d !important;
             border-radius: 5px !important;
         }
         
-        /* Fix khusus teks input angka agar putih bersih */
-        input[type="number"], input[type="text"], input[data-testid="stNumberInputInput"] {
-            color: #ffffff !important;
-            background-color: #0e1117 !important;
-            -webkit-text-fill-color: #ffffff !important;
-        }
-
-        /* Gold Border saat Focus */
+        /* Gold Border saat Focus/Klik */
         div[data-baseweb="input"]:focus-within {
             border-color: #FFD700 !important;
             box-shadow: 0 0 0 1px #FFD700 !important;
         }
-
-        /* 3. SOLID GOLD HEADERS (1. DOWNLOAD & 2. UPLOAD) */
+        /* 3. Style Subheader (1. DOWNLOAD & 2. UPLOAD) */
+        /* Kita bungkus pakai div khusus untuk background solid Gold */
         .solid-header {
-            background-color: #FFD700 !important;
-            color: #0e1117 !important;
+            background-color: #FFD700 !important; /* Background Emas Solid */
+            color: #0e1117 !important; /* Teks Hitam biar kontras */
             padding: 10px 15px !important;
             border-radius: 5px !important;
             font-weight: 900 !important;
             text-transform: uppercase;
             letter-spacing: 1.5px;
             margin-bottom: 15px !important;
-            display: inline-block;
+            display: inline-block; /* Agar background pas sama teks */
         }
-
-        /* 4. PREMIUM BUTTONS: Navy Gold Style */
+        /* 5. Style Tombol Utama (SIMPAN & UPLOAD) */
+        /* Background Navy Tua, Border & Text Gold */
         .stButton button, .stDownloadButton button {
-            background-color: #1a1e24 !important;
+            background-color: #1e2227 !important;
             color: #FFD700 !important;
-            border: 3px solid #FFD700 !important;
-            border-radius: 12px !important;
-            padding: 12px 24px !important;
-            font-size: 1.1rem !important;
-            font-weight: 800 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 1.5px;
-            transition: all 0.3s ease-in-out;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border: 2px solid #FFD700 !important;
+            font-weight: bold !important;
+            text-transform: uppercase;
         }
-
-        /* Hover Effect: Jadi Emas Menyala */
         .stButton button:hover, .stDownloadButton button:hover {
             background-color: #FFD700 !important;
             color: #0e1117 !important;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4);
+        }
+        /* Mencari semua tombol di form maupun tombol download */
+        .stButton button, .stDownloadButton button {
+            background-color: #1a1e24 !important; /* Background Navy Tua Gelap */
+            color: #FFD700 !important; /* Tulisan warna Emas */
+            border: 3px solid #FFD700 !important; /* Bingkai Emas Tebal */
+            border-radius: 12px !important; /* Sudut melengkung premium */
+            padding: 12px 24px !important;
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important; /* Huruf besar semua */
+            letter-spacing: 1.5px; /* Spasi antar huruf biar gagah */
+            transition: all 0.3s ease-in-out; /* Efek transisi halus */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); /* Shadow biar timbul */
         }
 
-        /* 5. METRICS & TABLES */
-        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: 900; }
-        div[data-testid="stMetricLabel"] { color: #FFD700 !important; font-weight: bold !important; text-transform: uppercase; }
+        /* Efek pas kursor diarahkan ke tombol (Hover) */
+        .stButton button:hover, .stDownloadButton button:hover {
+            background-color: #FFD700 !important; /* Background berubah jadi Emas Solid */
+            color: #0e1117 !important; /* Tulisan berubah jadi Hitam biar kontras parah */
+            transform: translateY(-3px); /* Tombol sedikit terangkat */
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4); /* Efek glow emas */
+        }
+        
+        /* Menghilangkan border default yang jelek di sekitar tombol saat fokus */
+        .stButton button:focus, .stDownloadButton button:focus {
+            box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.5) !important;
+            outline: none !important;
+        }
+
+        /* Memperbaiki alignment icon roket agar sejajar teks */
+        .stButton button span {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* Samakan warna teks input number (Koli & Ongkir) agar putih */
+        input[type="number"] {
+            color: #ffffff !important;
+            background-color: #0e1117 !important;
+        }
+
+        /* Style Tabel & Metric */
+        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
         .stTable { background-color: #1e2227; border-radius: 5px; }
         
-        /* Divider Emas Transparan */
-        hr {
-            border: 0;
-            height: 1px;
-            background-image: linear-gradient(to right, rgba(255, 215, 0, 0), rgba(255, 215, 0, 0.75), rgba(255, 215, 0, 0));
-        }
         </style>
         """, unsafe_allow_html=True)
 
