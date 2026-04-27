@@ -4704,7 +4704,6 @@ def show_database_ongkir():
                     </h4>
                 </div>
             """, unsafe_allow_html=True)
-            st.markdown("---")
 
             # --- MATRIX ---
             m1, m2, m3 = st.columns(3)
