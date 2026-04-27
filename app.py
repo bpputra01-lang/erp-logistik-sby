@@ -4427,6 +4427,8 @@ st.markdown("""
     .main { background-color: #0e1117; color: #ffffff; }
     div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
     .stTable { background-color: #1e2227; }
+    /* Menghilangkan padding berlebih agar lebih compact */
+    .block-container { padding-top: 2rem; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -4434,17 +4436,17 @@ st.markdown("""
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 
-# Inisialisasi client dengan nama variabel yang benar
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-except Exception as e:
-    st.error(f"Gagal koneksi ke Supabase: {e}")
+@st.cache_resource
+def init_connection():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+supabase = init_connection()
 
 # --- 3. FUNGSI CRUD ---
 def save_data(supplier, ekspedisi, koli, ongkir):
     try:
         data = {
-            "supplier": supplier,
+            "supplier": supplier.upper(), # Auto Caps agar seragam
             "ekspedisi": ekspedisi,
             "total_koli": koli,
             "total_ongkir": ongkir
@@ -4459,71 +4461,69 @@ def fetch_data():
     try:
         res = supabase.table("shipping_costs").select("*").execute()
         return pd.DataFrame(res.data)
-    except Exception as e:
-        # Jika error karena tabel belum ada, kita kembalikan DataFrame kosong
+    except Exception:
         return pd.DataFrame()
 
 # --- 4. INTERFACE (UI) ---
 st.title("DATABASE ONGKIR IN/OUT")
 
-# SIDEBAR UNTUK INPUT
-with st.sidebar:
-    st.header("Form Input")
+# FORM INPUT DI HALAMAN UTAMA
+with st.expander("➕ INPUT DATA ONGKIR BARU", expanded=True):
     with st.form("form_ongkir", clear_on_submit=True):
-        supplier_input = st.text_input("Nama Supplier")
-        ekspedisi_input = st.selectbox("Pilih Ekspedisi", ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo", "Sentral Cargo"])
-        koli_input = st.number_input("Total Koli (Pcs/Box)", min_value=1, step=1)
-        ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
+        col_a, col_b = st.columns(2)
+        with col_a:
+            supplier_input = st.text_input("Nama Supplier", placeholder="Contoh: PT. MAJU JAYA")
+            ekspedisi_input = st.selectbox("Pilih Ekspedisi", 
+                                          ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo", "Sentral Cargo", "Lion Parcel"])
+        with col_b:
+            koli_input = st.number_input("Total Koli", min_value=1, step=1)
+            ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
         
-        submitted = st.form_submit_button("🚀 Simpan Ke Supabase")
-        
+        submitted = st.form_submit_button("🚀 SIMPAN DATA KE SUPABASE")
         if submitted:
             if supplier_input:
-                success = save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input)
-                if success:
-                    st.success(f"Data {supplier_input} berhasil masuk!")
+                if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input):
+                    st.success(f"Data {supplier_input.upper()} Berhasil Disimpan!")
                     st.rerun()
             else:
-                st.warning("Nama Supplier tidak boleh kosong!")
+                st.error("Nama Supplier wajib diisi cok!")
 
-# --- 5. DASHBOARD & SUMMARY ---
+st.divider()
+
+# --- 5. DASHBOARD SUMMARY & MATRIX ---
 df = fetch_data()
 
 if not df.empty:
     # --- MATRIX BOX ---
-    st.subheader("Quick Stats")
     m1, m2, m3 = st.columns(3)
-    
     total_biaya = df['total_ongkir'].sum()
     total_koli = df['total_koli'].sum()
-    avg_per_koli = total_biaya / total_koli if total_koli > 0 else 0
+    
+    m1.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
+    m2.metric("TOTAL KOLI", f"{total_koli} Pcs")
+    m3.metric("AVG COST/KOLI", f"Rp {total_biaya/total_koli:,.0f}" if total_koli > 0 else "0")
 
-    m1.metric("Total Biaya Ongkir", f"Rp {total_biaya:,.0f}")
-    m2.metric("Total Koli (Volume)", f"{total_koli} Pcs")
-    m3.metric("Rata-rata Cost/Koli", f"Rp {avg_per_koli:,.0f}")
+    st.markdown("---")
 
-    st.divider()
+    # --- TABEL & SUMMARY EKSPEDISI ---
+    col_left, col_right = st.columns([2, 1])
 
-    # --- TABEL & SUMMARY ---
-    col_table, col_summary = st.columns([2, 1])
+    with col_left:
+        st.subheader("📝 Riwayat Transaksi")
+        # Mengubah created_at ke format yang lebih enak dibaca
+        df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
+        st.dataframe(df.sort_values('created_at', ascending=False), use_container_width=True)
 
-    with col_table:
-        st.subheader("Riwayat Transaksi")
-        # Menampilkan data terbaru di atas
-        df_display = df.sort_values(by='created_at', ascending=False)
-        st.dataframe(df_display, use_container_width=True)
-
-    with col_summary:
-        st.subheader("Summary per Ekspedisi")
-        summary = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index()
-        summary = summary.sort_values(by="total_ongkir", ascending=False)
-        # Format Rupiah untuk tabel summary
-        summary["total_ongkir"] = summary["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
-        st.table(summary)
+    with col_right:
+        st.subheader("📊 Summary Ekspedisi")
+        summary_df = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index()
+        summary_df = summary_df.sort_values("total_ongkir", ascending=False)
+        # Format ribuan untuk ongkir di tabel summary
+        summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
+        st.table(summary_df)
 
 else:
-    st.info("Belum ada data di tabel 'shipping_costs'. Silakan input data pertama Anda melalui sidebar.")
-    st.warning("Pastikan Anda sudah menjalankan SQL CREATE TABLE di Supabase Editor.")
+    st.info("Data masih kosong. Silakan input data di atas!")
 
 with st.sidebar:
        st.markdown("""
