@@ -4421,12 +4421,6 @@ from supabase import create_client, Client
 import pandas as pd
 
 def show_database_ongkir():
-    Mantap, tabel Supabase kamu sudah siap. Sekarang kita samakan style inputan agar seragam dengan "Nama Supplier" (memakai dark background dan gold border saat fokus) serta merapikan Header utamanya agar sinkron dengan menu lain di ERP kamu.
-
-Berikut adalah fungsi show_database_ongkir() yang sudah diperbarui CSS-nya:
-Python
-
-def show_database_ongkir():
     # --- 1. CSS CUSTOM (Sesuai Request: Samakan Style Input & Hero Header) ---
     st.markdown("""
         <style>
