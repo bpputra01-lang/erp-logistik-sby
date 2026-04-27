@@ -4700,6 +4700,8 @@ def show_database_ongkir():
                     margin-top: 25px; 
                     margin-bottom: 15px;
                     box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+                    display: inline-block;  /* INI KUNCINYA: Biar lebar ngikutin isi */
+                    min-width: 300px;       /* Biar gak kekecilan banget */
                 ">
                     <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">
                         💲 TOTAL BIAYA ONGKIR
