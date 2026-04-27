@@ -4579,7 +4579,7 @@ def show_database_ongkir():
         """, unsafe_allow_html=True)
 
     # --- 5. FORM INPUT MANUAL ---
-    with st.expander("➕ INPUT DATA ONGKIR BARU", expanded=True):
+    with st.expander("🛻 INPUT DATA ONGKIR BARU", expanded=True):
         with st.form("form_ongkir", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
@@ -4589,7 +4589,7 @@ def show_database_ongkir():
                 koli_input = st.number_input("Total Koli", min_value=1, step=1)
                 ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
             
-            if st.form_submit_button("🚀 SIMPAN DATA KE SUPABASE"):
+            if st.form_submit_button("▶️UPLOAD HASIL ONGKIR"):
                 if supplier_input:
                     if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input):
                         st.success(f"Data {supplier_input.upper()} Berhasil Disimpan!")
@@ -4622,7 +4622,7 @@ def show_database_ongkir():
                 df_mass = pd.read_csv(uploaded_file)
                 required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"]
                 if all(col in df_mass.columns for col in required):
-                    if st.button("🚀 EXECUTE BULK UPLOAD"):
+                    if st.button("▶️UPLOAD BULK ONGKIR"):
                         with st.spinner('Processing...'):
                             for _, row in df_mass.iterrows():
                                 data_batch = {
