@@ -4529,9 +4529,47 @@ def show_database_ongkir():
 
     st.divider()
 
-    # --- 6. DASHBOARD & MASS UPLOAD (PENTING: Harus menjorok ke dalam fungsi) ---
+    # --- 6. DASHBOARD & MASS UPLOAD ---
     df = fetch_data()
 
+    # --- MASS UPLOAD (Ditaruh di luar IF EMPTY agar selalu muncul) ---
+    with st.expander("📁 BATCH OPS: UPLOAD MASSAL", expanded=False):
+        c_dl, c_up = st.columns([1, 2])
+        with c_dl:
+            st.markdown("### 1. Download")
+            template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"])
+            st.download_button(
+                label="📄 DOWNLOAD TEMPLATE", 
+                data=template_df.to_csv(index=False).encode('utf-8'), 
+                file_name="template_ongkir_jezpro.csv", 
+                mime="text/csv"
+            )
+        
+        with c_up:
+            st.markdown("### 2. Upload")
+            uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+            if uploaded_file:
+                df_mass = pd.read_csv(uploaded_file)
+                required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"]
+                if all(col in df_mass.columns for col in required):
+                    if st.button("🚀 EXECUTE BULK UPLOAD"):
+                        with st.spinner('Processing...'):
+                            for _, row in df_mass.iterrows():
+                                data_batch = {
+                                    "supplier": str(row["SUPPLIER"]).upper(), 
+                                    "ekspedisi": row["EKSPEDISI"], 
+                                    "total_koli": int(row["TOTAL KOLI"]), 
+                                    "total_ongkir": int(row["ONGKIR"])
+                                }
+                                supabase.table("shipping_costs").insert(data_batch).execute()
+                        st.success("Berhasil diinput!")
+                        st.rerun()
+                else:
+                    st.error(f"Format salah! Harus: {required}")
+
+    st.markdown("---")
+
+    # --- TAMPILAN DATA (Hanya muncul jika ada isinya) ---
     if not df.empty:
         # Matrix
         m1, m2, m3 = st.columns(3)
@@ -4540,33 +4578,6 @@ def show_database_ongkir():
         m1.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
         m2.metric("TOTAL KOLI", f"{total_koli} Pcs")
         m3.metric("AVG COST/KOLI", f"Rp {total_biaya/total_koli:,.0f}" if total_koli > 0 else "0")
-
-        st.markdown("---")
-
-        # Mass Upload
-        with st.expander("📁 BATCH OPS: UPLOAD MASSAL", expanded=False):
-            c_dl, c_up = st.columns([1, 2])
-            with c_dl:
-                st.markdown("### 1. Download")
-                template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"])
-                st.download_button(label="📄 DOWNLOAD TEMPLATE", data=template_df.to_csv(index=False).encode('utf-8'), file_name="template_ongkir_jezpro.csv", mime="text/csv")
-            
-            with c_up:
-                st.markdown("### 2. Upload")
-                uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
-                if uploaded_file:
-                    df_mass = pd.read_csv(uploaded_file)
-                    required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"]
-                    if all(col in df_mass.columns for col in required):
-                        if st.button("🚀 EXECUTE BULK UPLOAD"):
-                            with st.spinner('Processing...'):
-                                for _, row in df_mass.iterrows():
-                                    data_batch = {"supplier": str(row["SUPPLIER"]).upper(), "ekspedisi": row["EKSPEDISI"], "total_koli": int(row["TOTAL KOLI"]), "total_ongkir": int(row["ONGKIR"])}
-                                    supabase.table("shipping_costs").insert(data_batch).execute()
-                            st.success("Berhasil diinput!")
-                            st.rerun()
-                    else:
-                        st.error(f"Format salah! Harus: {required}")
 
         st.markdown("---")
 
@@ -4584,7 +4595,8 @@ def show_database_ongkir():
             summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
             st.table(summary_df)
     else:
-        st.info("Data masih kosong.")
+        # Tampilan jika benar-benar belum ada data di Supabase
+        st.info("Data masih kosong. Gunakan form di atas atau Upload CSV untuk mengisi database.")
     
 
 with st.sidebar:
