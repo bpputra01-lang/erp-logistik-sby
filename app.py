@@ -4673,39 +4673,21 @@ def show_database_ongkir():
 
     with tab_summary:
         if not df_raw.empty:
-            # --- FILTER HANYA ADA DI TAB SUMMARY ---
-            st.markdown("### 🔍 FILTER & KONTROL")
-            f_col1, f_col2 = st.columns([2, 1])
-
-            with f_col1:
-                df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
-                min_date = df_raw['created_at'].min().date()
-                max_date = df_raw['created_at'].max().date()
-                
-                date_range = st.date_input(
-                    "Pilih Rentang Tanggal",
-                    value=(min_date, max_date),
-                    min_value=min_date,
-                    max_value=max_date
-                )
-                
-                if isinstance(date_range, tuple) and len(date_range) == 2:
-                    start_date, end_date = date_range
-                    mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
-                    df_filtered = df_raw.loc[mask]
-                else:
-                    df_filtered = df_raw
-
-            with f_col2:
-                st.markdown("🗑️ **Hapus Baris**")
-                id_to_delete = st.selectbox("Pilih ID untuk Dihapus", df_filtered['id'].tolist())
-                if st.button("🗑️ HAPUS PERMANEN"):
-                    try:
-                        supabase.table("shipping_costs").delete().eq("id", id_to_delete).execute()
-                        st.success(f"ID {id_to_delete} berhasil dihapus!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Gagal hapus: {e}")
+           # --- FILTER (Hapus f_col2 yang ada selectbox ID) ---
+            st.markdown("### 🔍 FILTER DATA")
+            # Cukup satu kolom aja buat filter tanggal biar luas
+            df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
+            min_date = df_raw['created_at'].min().date()
+            max_date = df_raw['created_at'].max().date()
+            
+            date_range = st.date_input("Pilih Rentang Tanggal", value=(min_date, max_date))
+            
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                start_date, end_date = date_range
+                mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
+                df_filtered = df_raw.loc[mask].copy()
+            else:
+                df_filtered = df_raw.copy()
 
             st.markdown("---")
 
@@ -4713,23 +4695,48 @@ def show_database_ongkir():
             m1, m2, m3 = st.columns(3)
             total_biaya = df_filtered['total_ongkir'].sum()
             total_koli = df_filtered['total_koli'].sum()
-            
-            with m1:
-                st.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
-            with m2:
-                st.metric("TOTAL KOLI", f"{total_koli} Pcs")
-            with m3:
+            with m1: st.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
+            with m2: st.metric("TOTAL KOLI", f"{total_koli} Pcs")
+            with m3: 
                 avg = total_biaya/total_koli if total_koli > 0 else 0
                 st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
 
             st.markdown("---")
 
+            # --- RIWAYAT TRANSAKSI (FITUR HAPUS LANGSUNG) ---
             st.subheader("📝 Riwayat Transaksi")
-            df_display = df_filtered.copy()
-            df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M')
-            st.dataframe(df_display.sort_values('created_at', ascending=False), use_container_width=True)
+            st.caption("Centang baris pada tabel di bawah, lalu klik tombol hapus.")
+
+            # Tampilkan dataframe dengan fitur seleksi baris
+            event = st.dataframe(
+                df_filtered.sort_values('created_at', ascending=False),
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun", # Biar interaktif pas diklik
+                selection_mode="multi-row" # Bisa pilih banyak baris sekaligus
+            )
+
+            # Ambil index baris yang dipilih
+            selected_rows = event.selection.rows
+            
+            if selected_rows:
+                # Ambil ID asli dari baris yang dicentang
+                ids_to_delete = df_filtered.sort_values('created_at', ascending=False).iloc[selected_rows]['id'].tolist()
+                
+                st.warning(f"Terpilih {len(ids_to_delete)} data untuk dihapus.")
+                if st.button("🗑️ HAPUS DATA TERPILIH", type="primary"):
+                    try:
+                        for target_id in ids_to_delete:
+                            supabase.table("shipping_costs").delete().eq("id", target_id).execute()
+                        st.success("Data berhasil dibantai!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Gagal hapus cok: {e}")
+            else:
+                st.info("💡 Centang baris di tabel untuk menghapus data.")
+
         else:
-            st.info("Data masih kosong. Input dulu")
+            st.info("Data masih kosong. Input dulu di tab sebelah!")
     
 
 with st.sidebar:
