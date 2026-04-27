@@ -4690,12 +4690,14 @@ def show_database_ongkir():
                 df_filtered = df_raw.copy()
 
             # --- JUDUL DASHBOARD DENGAN BACKGROUND ---
+            # --- JUDUL DASHBOARD DENGAN JARAK ATAS ---
             st.markdown("""
                 <div style="
                     background-color: #1e2227; 
                     padding: 10px 15px; 
                     border-radius: 8px; 
                     border-left: 5px solid #FFD700;
+                    margin-top: 25px; 
                     margin-bottom: 15px;
                     box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
                 ">
