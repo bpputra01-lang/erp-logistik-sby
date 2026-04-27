@@ -4527,7 +4527,16 @@ def show_database_ongkir():
             color: #ffffff !important;
             background-color: #0e1117 !important;
         }
-
+        /* 1. TARGETING HEADER EXPANDER (INPUT & BATCH OPS) */
+        /* Kita paksa background jadi Navy Gelap dan teks jadi Emas */
+        [data-testid="stExpander"] details summary {
+            background-color: #1a1e24 !important; /* Warna Gelap Industrial */
+            color: #FFD700 !important; /* Teks Emas */
+            border: 1px solid #3e444d !important;
+            border-radius: 8px !important;
+            padding: 10px 15px !important;
+            transition: 0.3s !important;
+        }
         /* Style Tabel & Metric */
         div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
         .stTable { background-color: #1e2227; border-radius: 5px; }
