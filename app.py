@@ -4724,12 +4724,6 @@ def show_database_ongkir():
 
             st.markdown("---")
 
-            # --- TABEL SUMMARY & HISTORY ---
-            st.subheader("📊 Summary per Ekspedisi")
-            summary_df = df_filtered.groupby("ekspedisi")["total_ongkir"].sum().reset_index().sort_values("total_ongkir", ascending=False)
-            summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
-            st.table(summary_df)
-
             st.subheader("📝 Riwayat Transaksi")
             df_display = df_filtered.copy()
             df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M')
