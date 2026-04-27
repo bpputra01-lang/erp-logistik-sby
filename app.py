@@ -4420,8 +4420,6 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 
-# --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="ERP Logistik - Ongkir", layout="wide")
 
 # Custom CSS untuk tampilan Dark Gold (Solid Dark)
 st.markdown("""
@@ -4466,7 +4464,7 @@ def fetch_data():
         return pd.DataFrame()
 
 # --- 4. INTERFACE (UI) ---
-st.title("📦 DATABASE ONGKIR IN/OUT")
+st.title("DATABASE ONGKIR IN/OUT")
 
 # SIDEBAR UNTUK INPUT
 with st.sidebar:
