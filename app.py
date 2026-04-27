@@ -4595,8 +4595,9 @@ def show_database_ongkir():
         with st.form("form_ongkir", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
-                supplier_input = st.text_input("Nama Supplier", placeholder="Contoh: PT. MAJU JAYA")
-                ekspedisi_input = st.selectbox("Pilih Ekspedisi", ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo", "Sentral Cargo", "Lion Parcel"])
+                supplier_input = st.text_input("Nama Supplier", placeholder="Tulis Nama Supplier....")
+                # GANTI SELECTBOX JADI TEXT INPUT BIAR BISA KETIK BEBAS
+                ekspedisi_input = st.text_input("Nama Ekspedisi", placeholder="Tulis Nama Ekspedisi...").upper()
             with col_b:
                 koli_input = st.number_input("Total Koli", min_value=1, step=1)
                 ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
