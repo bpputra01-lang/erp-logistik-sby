@@ -4487,6 +4487,41 @@ def show_database_ongkir():
             background-color: #FFD700 !important;
             color: #0e1117 !important;
         }
+        /* Mencari semua tombol di form maupun tombol download */
+        .stButton button, .stDownloadButton button {
+            background-color: #1a1e24 !important; /* Background Navy Tua Gelap */
+            color: #FFD700 !important; /* Tulisan warna Emas */
+            border: 3px solid #FFD700 !important; /* Bingkai Emas Tebal */
+            border-radius: 12px !important; /* Sudut melengkung premium */
+            padding: 12px 24px !important;
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important; /* Huruf besar semua */
+            letter-spacing: 1.5px; /* Spasi antar huruf biar gagah */
+            transition: all 0.3s ease-in-out; /* Efek transisi halus */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); /* Shadow biar timbul */
+        }
+
+        /* Efek pas kursor diarahkan ke tombol (Hover) */
+        .stButton button:hover, .stDownloadButton button:hover {
+            background-color: #FFD700 !important; /* Background berubah jadi Emas Solid */
+            color: #0e1117 !important; /* Tulisan berubah jadi Hitam biar kontras parah */
+            transform: translateY(-3px); /* Tombol sedikit terangkat */
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4); /* Efek glow emas */
+        }
+        
+        /* Menghilangkan border default yang jelek di sekitar tombol saat fokus */
+        .stButton button:focus, .stDownloadButton button:focus {
+            box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.5) !important;
+            outline: none !important;
+        }
+
+        /* Memperbaiki alignment icon roket agar sejajar teks */
+        .stButton button span {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         /* Samakan warna teks input number (Koli & Ongkir) agar putih */
         input[type="number"] {
             color: #ffffff !important;
