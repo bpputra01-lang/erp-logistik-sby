@@ -4433,71 +4433,88 @@ def show_database_ongkir():
     # --- 1. CSS CUSTOM (Sesuai Request: Samakan Style Input & Hero Header) ---
     st.markdown("""
         <style>
-        /* Style untuk Hero Header Utama */
+        /* 1. HERO HEADER: Gradient Gold & Glow Effect */
         .hero-header {
             background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
-            padding: 2rem;
-            border-radius: 10px;
-            border-left: 5px solid #FFD700;
+            padding: 2.5rem;
+            border-radius: 15px;
+            border-left: 8px solid #FFD700;
             margin-bottom: 2rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
         }
         .hero-header h1 {
-            color: #ffffff;
+            background: linear-gradient(to right, #FFD700, #fff7ad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 3rem !important;
+            font-weight: 900 !important;
+            letter-spacing: 2px;
             margin: 0;
-            font-size: 2.2rem;
-            letter-spacing: 1px;
         }
 
-        /* Style Input (Nama Supplier, Total Koli, Total Ongkir) agar Seragam */
+        /* 2. SOLID GOLD TITLES: Ganti warna putih yang lo benci */
+        /* Ini buat judul di dalam Expander & Subheader */
+        .solid-title {
+            background: #FFD700 !important;
+            color: #0e1117 !important; /* Teks item biar kontras parah */
+            padding: 12px 20px;
+            border-radius: 5px;
+            font-weight: 900 !important;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: block;
+            margin-bottom: 1rem;
+            box-shadow: 4px 4px 0px #8a7500; /* Shadow tegas style industrial */
+        }
+
+        /* 3. STYLE EXPANDER: Header Expander biar nggak polos */
+        div[data-testid="stExpander"] details summary {
+            background-color: #1e2227 !important;
+            border: 1px solid #3e444d !important;
+            padding: 15px !important;
+            border-radius: 10px !important;
+        }
+        div[data-testid="stExpander"] details summary span {
+            color: #FFD700 !important; /* Tulisan expander jadi emas */
+            font-weight: bold !important;
+            font-size: 1.1rem;
+        }
+
+        /* 4. INPUT FIELD: Dark & Gold Accent */
         div[data-baseweb="input"], div[data-baseweb="select"] {
             background-color: #0e1117 !important;
-            border: 1px solid #3e444d !important;
-            border-radius: 5px !important;
+            border: 2px solid #3e444d !important;
+            border-radius: 8px !important;
         }
-        
-        /* Gold Border saat Focus/Klik */
         div[data-baseweb="input"]:focus-within {
             border-color: #FFD700 !important;
-            box-shadow: 0 0 0 1px #FFD700 !important;
         }
+        input { color: #ffffff !important; }
 
-        /* Samakan warna teks input number (Koli & Ongkir) agar putih */
-        input[type="number"] {
-            color: #ffffff !important;
-            background-color: #0e1117 !important;
-        }
-
-        /* Style Tabel & Metric */
-        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
-        .stTable { background-color: #1e2227; border-radius: 5px; }
-        /* Judul-judul Subheader (Riwayat, Summary, Upload) */
-        .stMarkdown h2, .stMarkdown h3 {
-            color: #FFD700 !important; /* Warna Emas Solid */
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            border-bottom: 2px solid #3e444d;
-            padding-bottom: 10px;
-            font-weight: 700 !important;
-        }
-
-        /* Label Form agar lebih kontras */
-        .stMarkdown p {
-            color: #e0e0e0 !important;
-        }
-
-        /* Metric Label (TOTAL BIAYA dll) */
-        div[data-testid="stMetricLabel"] {
-            color: #FFD700 !important;
-            font-weight: bold !important;
-            text-transform: uppercase;
-        }
+        /* 5. METRIC & DIVIDER */
+        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: 900; font-size: 2rem !important; }
+        div[data-testid="stMetricLabel"] { color: #e0e0e0 !important; text-transform: uppercase; }
         
-        /* Garis Divider Emas */
         hr {
-            border: 0;
-            height: 1px;
-            background-image: linear-gradient(to right, rgba(255, 215, 0, 0), rgba(255, 215, 0, 0.75), rgba(255, 215, 0, 0));
+            border: 0; height: 2px;
+            background: linear-gradient(to right, transparent, #FFD700, transparent);
+            margin: 2rem 0;
+        }
+
+        /* 6. BUTTON: Industrial Gold */
+        .stButton button {
+            width: 100%;
+            background-color: #FFD700 !important;
+            color: #0e1117 !important;
+            font-weight: 900 !important;
+            border: none !important;
+            padding: 0.75rem !important;
+            transition: 0.3s;
+        }
+        .stButton button:hover {
+            background-color: #fff !important;
+            transform: translateY(-2px);
         }
         </style>
         """, unsafe_allow_html=True)
