@@ -4420,7 +4420,8 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 
-
+# --- SEMUA KODE DI BAWAH HANYA JALAN JIKA MENU DIPILIH ---
+if menu == "DATABASE ONGKIR IN/OUT"
 # Custom CSS untuk tampilan Dark Gold (Solid Dark)
 st.markdown("""
     <style>
