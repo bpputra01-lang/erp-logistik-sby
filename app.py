@@ -6391,9 +6391,9 @@ elif menu == "List Retur Out":
 elif menu == "Pengajuan Mutasi Karantina":
     project_mutasi_karantina()
 
-elif menu == "Database Ongkir In/Out"
+elif menu == "Database Ongkir In/Out":
     show_database_ongkir()
-    
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
