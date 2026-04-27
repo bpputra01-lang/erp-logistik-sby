@@ -4621,8 +4621,7 @@ if not df.empty:
         summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
         st.table(summary_df)
 
-    else:
-        st.info("Data masih kosong. Silakan input data secara manual atau via Mass Upload di atas!")
+    
 
 with st.sidebar:
        st.markdown("""
