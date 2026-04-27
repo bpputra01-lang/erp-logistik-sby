@@ -4564,12 +4564,14 @@ def show_database_ongkir():
             st.error(f"Gagal simpan: {e}")
             return False
 
-    def fetch_data():
-        try:
-            res = supabase.table("shipping_costs").select("*").execute()
-            return pd.DataFrame(res.data)
-        except:
-            return pd.DataFrame()
+    def sync_data():
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        # Pakai upsert biar kalau tanggalnya udah ada dia cuma update, gak bikin error
+        supabase.table("reset_tracker").upsert({"last_date": today}, on_conflict="last_date").execute()
+    except Exception as e:
+        # Biarin aja error-nya muncul di console, yang penting app gak stop
+        print(f"⚠️ {e}")
 
     # --- 4. HERO HEADER ---
     st.markdown("""
