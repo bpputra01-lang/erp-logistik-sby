@@ -4565,13 +4565,13 @@ def show_database_ongkir():
             return False
 
     def sync_data():
-    try:
-        today = datetime.now().strftime("%Y-%m-%d")
-        # Pakai upsert biar kalau tanggalnya udah ada dia cuma update, gak bikin error
-        supabase.table("reset_tracker").upsert({"last_date": today}, on_conflict="last_date").execute()
-    except Exception as e:
-        # Biarin aja error-nya muncul di console, yang penting app gak stop
-        print(f"⚠️ {e}")
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            # Pakai upsert biar kalau tanggalnya udah ada dia cuma update, gak bikin error
+            supabase.table("reset_tracker").upsert({"last_date": today}, on_conflict="last_date").execute()
+        except Exception as e:
+            # Biarin aja error-nya muncul di console, yang penting app gak stop
+            print(f"⚠️ {e}")
 
     # --- 4. HERO HEADER ---
     st.markdown("""
