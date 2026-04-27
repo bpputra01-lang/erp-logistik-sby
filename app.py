@@ -4461,7 +4461,32 @@ def show_database_ongkir():
             border-color: #FFD700 !important;
             box-shadow: 0 0 0 1px #FFD700 !important;
         }
-
+        /* 3. Style Subheader (1. DOWNLOAD & 2. UPLOAD) */
+        /* Kita bungkus pakai div khusus untuk background solid Gold */
+        .solid-header {
+            background-color: #FFD700 !important; /* Background Emas Solid */
+            color: #0e1117 !important; /* Teks Hitam biar kontras */
+            padding: 10px 15px !important;
+            border-radius: 5px !important;
+            font-weight: 900 !important;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 15px !important;
+            display: inline-block; /* Agar background pas sama teks */
+        }
+        /* 5. Style Tombol Utama (SIMPAN & UPLOAD) */
+        /* Background Navy Tua, Border & Text Gold */
+        .stButton button, .stDownloadButton button {
+            background-color: #1e2227 !important;
+            color: #FFD700 !important;
+            border: 2px solid #FFD700 !important;
+            font-weight: bold !important;
+            text-transform: uppercase;
+        }
+        .stButton button:hover, .stDownloadButton button:hover {
+            background-color: #FFD700 !important;
+            color: #0e1117 !important;
+        }
         /* Samakan warna teks input number (Koli & Ongkir) agar putih */
         input[type="number"] {
             color: #ffffff !important;
