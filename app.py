@@ -4433,56 +4433,45 @@ def show_database_ongkir():
     # --- 1. CSS CUSTOM (Sesuai Request: Samakan Style Input & Hero Header) ---
     st.markdown("""
         <style>
-        /* 1. HERO HEADER: Putih bersih di atas Navy/Gold */
+        /* Style untuk Hero Header Utama */
+        .hero-header {
+            background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
+            padding: 2rem;
+            border-radius: 10px;
+            border-left: 5px solid #FFD700;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
         .hero-header h1 {
-            color: #ffffff !important;
-            font-size: 3rem !important;
-            font-weight: 900 !important;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            color: #ffffff;
+            margin: 0;
+            font-size: 2.2rem;
+            letter-spacing: 1px;
         }
 
-        /* 2. HEADER EXPANDER: Tetap Gold biar gampang dicari */
-        div[data-testid="stExpander"] details summary span {
-            color: #FFD700 !important;
-            font-weight: bold !important;
-        }
-
-        /* 3. FIX KOLOM INPUT: Sikat warna putih babi-nya */
-        /* Ini buat input text, number, dan select box */
-        div[data-baseweb="input"], 
-        div[data-baseweb="select"], 
-        div[data-baseweb="base-input"] {
+        /* Style Input (Nama Supplier, Total Koli, Total Ongkir) agar Seragam */
+        div[data-baseweb="input"], div[data-baseweb="select"] {
             background-color: #0e1117 !important;
-            border: 2px solid #3e444d !important;
-        }
-
-        /* Paksa teks di dalam input number (Koli/Ongkir) jadi Putih */
-        input[data-testid="stNumberInputInput"], 
-        input[type="number"],
-        input[type="text"] {
-            color: #ffffff !important;
-            background-color: #0e1117 !important;
-            -webkit-text-fill-color: #ffffff !important; /* Buat browser tertentu */
-        }
-
-        /* 4. TOMBOL SIMPAN: Tetap gaya industrial */
-        .stButton button {
-            background-color: #1e2227 !important;
-            color: #FFD700 !important;
-            border: 2px solid #FFD700 !important;
-            border-radius: 8px !important;
-            font-weight: bold !important;
+            border: 1px solid #3e444d !important;
+            border-radius: 5px !important;
         }
         
-        /* 5. METRIC: Emas Menyala */
-        div[data-testid="stMetricValue"] { 
-            color: #FFD700 !important; 
+        /* Gold Border saat Focus/Klik */
+        div[data-baseweb="input"]:focus-within {
+            border-color: #FFD700 !important;
+            box-shadow: 0 0 0 1px #FFD700 !important;
         }
 
-        /* Hilangkan border putih saat hover di input */
-        div[data-baseweb="input"]:hover {
-            border-color: #FFD700 !important;
+        /* Samakan warna teks input number (Koli & Ongkir) agar putih */
+        input[type="number"] {
+            color: #ffffff !important;
+            background-color: #0e1117 !important;
         }
+
+        /* Style Tabel & Metric */
+        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
+        .stTable { background-color: #1e2227; border-radius: 5px; }
+        
         </style>
         """, unsafe_allow_html=True)
 
