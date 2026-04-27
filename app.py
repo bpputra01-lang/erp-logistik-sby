@@ -4659,101 +4659,104 @@ def show_database_ongkir():
 
         # Batch Upload
         with st.expander("📁 BATCH OPS: UPLOAD MASSAL", expanded=False):
-            # ... (Kode upload massal lo tetep di sini) ...
-            pass
-
-        with tab_summary:
-            if not df_raw.empty:
-                # --- FILTER HANYA ADA DI TAB SUMMARY ---
-                st.markdown("### 🔍 FILTER & KONTROL")
-                f_col1, f_col2 = st.columns([2, 1])
-
-                with f_col1:
-                    df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
-                    min_date = df_raw['created_at'].min().date()
-                    max_date = df_raw['created_at'].max().date()
-                    
-                    date_range = st.date_input(
-                        "Pilih Rentang Tanggal",
-                        value=(min_date, max_date),
-                        min_value=min_date,
-                        max_value=max_date
-                    )
-                    
-                    if isinstance(date_range, tuple) and len(date_range) == 2:
-                        start_date, end_date = date_range
-                        mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
-                        df_filtered = df_raw.loc[mask]
-                    else:
-                        df_filtered = df_raw
-
-                with f_col2:
-                    # Tombol Hapus Pindah Sini
-                    id_to_delete = st.selectbox("Pilih ID untuk Dihapus", df_filtered['id'].tolist())
-                    if st.button("🗑️ HAPUS PERMANEN"):
-                        supabase.table("shipping_costs").delete().eq("id", id_to_delete).execute()
-                        st.rerun()
-
-                st.markdown("---")
-
-                # --- MATRIX DENGAN STYLE BARU ---
-                m1, m2, m3 = st.columns(3)
-                total_biaya = df_filtered['total_ongkir'].sum()
-                total_koli = df_filtered['total_koli'].sum()
-                
-                with m1:
-                    st.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
-                with m2:
-                    st.metric("TOTAL KOLI", f"{total_koli} Pcs")
-                with m3:
-                    avg = total_biaya/total_koli if total_koli > 0 else 0
-                    st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
-
-                st.markdown("---")
-
-                # --- TABEL SUMMARY & HISTORY FULL WIDTH ---
-                st.subheader("📊 Summary per Ekspedisi")
-                summary_df = df_filtered.groupby("ekspedisi")["total_ongkir"].sum().reset_index().sort_values("total_ongkir", ascending=False)
-                summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
-                st.table(summary_df)
-
-                st.subheader("📝 Riwayat Transaksi")
-                df_display = df_filtered.copy()
-                df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M')
-                st.dataframe(df_display.sort_values('created_at', ascending=False), use_container_width=True)
+            c_dl, c_up = st.columns([1, 2])
+            with c_dl:
+                st.markdown("### 1. Download")
+                template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"])
+                st.download_button(
+                    label="📄 DOWNLOAD TEMPLATE", 
+                    data=template_df.to_csv(index=False).encode('utf-8'), 
+                    file_name="template_ongkir_jezpro.csv", 
+                    mime="text/csv"
+                )
+            
+            with c_up:
+                st.markdown("### 2. Upload")
+                uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+                if uploaded_file:
+                    df_mass = pd.read_csv(uploaded_file)
+                    required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"]
+                    if all(col in df_mass.columns for col in required):
+                        if st.button("▶️ UPLOAD BULK ONGKIR"):
+                            with st.spinner('Processing...'):
+                                for _, row in df_mass.iterrows():
+                                    data_batch = {
+                                        "supplier": str(row["SUPPLIER"]).upper(), 
+                                        "ekspedisi": str(row["EKSPEDISI"]).upper(), 
+                                        "total_koli": int(row["TOTAL KOLI"]), 
+                                        "total_ongkir": int(row["ONGKIR"])
+                                    }
+                                    supabase.table("shipping_costs").insert(data_batch).execute()
+                            st.success("Berhasil diinput!")
+                            st.rerun()
                     else:
                         st.error(f"Format salah! Harus: {required}")
 
-        st.markdown("---")
+    with tab_summary:
+        if not df_raw.empty:
+            # --- FILTER HANYA ADA DI TAB SUMMARY ---
+            st.markdown("### 🔍 FILTER & KONTROL")
+            f_col1, f_col2 = st.columns([2, 1])
 
-        # --- TAMPILAN DATA (Hanya muncul jika ada isinya) ---
-        if not df.empty:
-            # Matrix
-            m1, m2, m3 = st.columns(3)
-            total_biaya = df['total_ongkir'].sum()
-            total_koli = df['total_koli'].sum()
-            m1.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
-            m2.metric("TOTAL KOLI", f"{total_koli} Pcs")
-            m3.metric("AVG COST/KOLI", f"Rp {total_biaya/total_koli:,.0f}" if total_koli > 0 else "0")
+            with f_col1:
+                df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
+                min_date = df_raw['created_at'].min().date()
+                max_date = df_raw['created_at'].max().date()
+                
+                date_range = st.date_input(
+                    "Pilih Rentang Tanggal",
+                    value=(min_date, max_date),
+                    min_value=min_date,
+                    max_value=max_date
+                )
+                
+                if isinstance(date_range, tuple) and len(date_range) == 2:
+                    start_date, end_date = date_range
+                    mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
+                    df_filtered = df_raw.loc[mask]
+                else:
+                    df_filtered = df_raw
+
+            with f_col2:
+                st.markdown("🗑️ **Hapus Baris**")
+                id_to_delete = st.selectbox("Pilih ID untuk Dihapus", df_filtered['id'].tolist())
+                if st.button("🗑️ HAPUS PERMANEN"):
+                    try:
+                        supabase.table("shipping_costs").delete().eq("id", id_to_delete).execute()
+                        st.success(f"ID {id_to_delete} berhasil dihapus!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Gagal hapus: {e}")
 
             st.markdown("---")
 
-            # Tabel Riwayat
-            col_left, col_right = st.columns([2, 1])
-            with col_left:
-                st.subheader("📝 Riwayat Transaksi")
-                if 'created_at' in df.columns:
-                    df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
-                st.dataframe(df.sort_values('created_at', ascending=False), use_container_width=True)
+            # --- MATRIX ---
+            m1, m2, m3 = st.columns(3)
+            total_biaya = df_filtered['total_ongkir'].sum()
+            total_koli = df_filtered['total_koli'].sum()
+            
+            with m1:
+                st.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
+            with m2:
+                st.metric("TOTAL KOLI", f"{total_koli} Pcs")
+            with m3:
+                avg = total_biaya/total_koli if total_koli > 0 else 0
+                st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
 
-            with col_right:
-                st.subheader("📊 Summary")
-                summary_df = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index().sort_values("total_ongkir", ascending=False)
-                summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
-                st.table(summary_df)
+            st.markdown("---")
+
+            # --- TABEL SUMMARY & HISTORY ---
+            st.subheader("📊 Summary per Ekspedisi")
+            summary_df = df_filtered.groupby("ekspedisi")["total_ongkir"].sum().reset_index().sort_values("total_ongkir", ascending=False)
+            summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
+            st.table(summary_df)
+
+            st.subheader("📝 Riwayat Transaksi")
+            df_display = df_filtered.copy()
+            df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M')
+            st.dataframe(df_display.sort_values('created_at', ascending=False), use_container_width=True)
         else:
-            # Tampilan jika benar-benar belum ada data di Supabase
-            st.info("Data masih kosong. Gunakan form di atas atau Upload CSV untuk mengisi database.")
+            st.info("Data masih kosong. Input dulu")
     
 
 with st.sidebar:
