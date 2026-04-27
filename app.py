@@ -4421,13 +4421,53 @@ from supabase import create_client, Client
 import pandas as pd
 
 def show_database_ongkir():
+    Mantap, tabel Supabase kamu sudah siap. Sekarang kita samakan style inputan agar seragam dengan "Nama Supplier" (memakai dark background dan gold border saat fokus) serta merapikan Header utamanya agar sinkron dengan menu lain di ERP kamu.
+
+Berikut adalah fungsi show_database_ongkir() yang sudah diperbarui CSS-nya:
+Python
+
+def show_database_ongkir():
+    # --- 1. CSS CUSTOM (Sesuai Request: Samakan Style Input & Hero Header) ---
     st.markdown("""
         <style>
-        .main { background-color: #0e1117; color: #ffffff; }
+        /* Style untuk Hero Header Utama */
+        .hero-header {
+            background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
+            padding: 2rem;
+            border-radius: 10px;
+            border-left: 5px solid #FFD700;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .hero-header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 2.2rem;
+            letter-spacing: 1px;
+        }
+
+        /* Style Input (Nama Supplier, Total Koli, Total Ongkir) agar Seragam */
+        div[data-baseweb="input"], div[data-baseweb="select"] {
+            background-color: #0e1117 !important;
+            border: 1px solid #3e444d !important;
+            border-radius: 5px !important;
+        }
+        
+        /* Gold Border saat Focus/Klik */
+        div[data-baseweb="input"]:focus-within {
+            border-color: #FFD700 !important;
+            box-shadow: 0 0 0 1px #FFD700 !important;
+        }
+
+        /* Samakan warna teks input number (Koli & Ongkir) agar putih */
+        input[type="number"] {
+            color: #ffffff !important;
+            background-color: #0e1117 !important;
+        }
+
+        /* Style Tabel & Metric */
         div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
-        .stTable { background-color: #1e2227; }
-        /* Menghilangkan padding berlebih agar lebih compact */
-        .block-container { padding-top: 2rem; }
+        .stTable { background-color: #1e2227; border-radius: 5px; }
         </style>
         """, unsafe_allow_html=True)
 
@@ -4463,8 +4503,13 @@ def show_database_ongkir():
         except Exception:
             return pd.DataFrame()
 
-    # --- 4. INTERFACE (UI) ---
-    st.title("DATABASE ONGKIR IN/OUT")
+    # --- 2. HERO HEADER ---
+    st.markdown("""
+        <div class="hero-header">
+            <h1>📦 DATABASE ONGKIR IN/OUT</h1>
+            <p style="color: #808495; margin-top: 5px;">Logistik Operations Lead - Jezpro Indonesia</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     # FORM INPUT DI HALAMAN UTAMA
     with st.expander("➕ INPUT DATA ONGKIR BARU", expanded=True):
