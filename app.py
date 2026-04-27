@@ -4531,7 +4531,7 @@ def show_database_ongkir():
         /* Kita paksa background jadi Navy Gelap dan teks jadi Emas */
         [data-testid="stExpander"] details summary {
             background-color: #1a1e24 !important; /* Warna Gelap Industrial */
-            color: #FFD700 !important; /* Teks Emas */
+            color: #FFFFFF !important; /* Teks Emas */
             border: 1px solid #3e444d !important;
             border-radius: 8px !important;
             padding: 10px 15px !important;
