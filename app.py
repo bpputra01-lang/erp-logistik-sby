@@ -4689,7 +4689,21 @@ def show_database_ongkir():
             else:
                 df_filtered = df_raw.copy()
 
-            st.markdown("<h2 style='text-align: center; color: #FFD700;'>📊 TOTAL BIAYA ONGKIR</h2>", unsafe_allow_html=True)
+            # --- JUDUL DASHBOARD DENGAN BACKGROUND ---
+            st.markdown("""
+                <div style="
+                    background-color: #1e2227; 
+                    padding: 15px; 
+                    border-radius: 10px; 
+                    border-left: 5px solid #FFD700;
+                    margin-bottom: 20px;
+                    box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+                ">
+                    <h2 style="color: white; margin: 0; font-family: 'Inter', sans-serif;">
+                        💲 TOTAL BIAYA ONGKIR
+                    </h2>
+                </div>
+            """, unsafe_allow_html=True)
             st.markdown("---")
 
             # --- MATRIX ---
