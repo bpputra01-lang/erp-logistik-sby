@@ -4420,56 +4420,112 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 
-# --- KONEKSI ---
-# Gunakan nama variabel yang konsisten
+# --- 1. KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="ERP Logistik - Ongkir", layout="wide")
+
+# Custom CSS untuk tampilan Dark Gold (Solid Dark)
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; color: #ffffff; }
+    div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
+    .stTable { background-color: #1e2227; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. KONEKSI SUPABASE ---
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 
-# Pastikan di dalam kurung ini namanya sama dengan yang di atas
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Inisialisasi client dengan nama variabel yang benar
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.error(f"Gagal koneksi ke Supabase: {e}")
 
-# --- FUNGSI SIMPAN ---
+# --- 3. FUNGSI CRUD ---
 def save_data(supplier, ekspedisi, koli, ongkir):
-    data = {
-        "supplier": supplier,
-        "ekspedisi": ekspedisi,
-        "total_koli": koli,    # Sesuaikan dengan nama kolom baru
-        "total_ongkir": ongkir
-    }
-    supabase.table("shipping_costs").insert(data).execute()
+    try:
+        data = {
+            "supplier": supplier,
+            "ekspedisi": ekspedisi,
+            "total_koli": koli,
+            "total_ongkir": ongkir
+        }
+        supabase.table("shipping_costs").insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Gagal menyimpan data: {e}")
+        return False
 
-# --- INTERFACE ---
+def fetch_data():
+    try:
+        res = supabase.table("shipping_costs").select("*").execute()
+        return pd.DataFrame(res.data)
+    except Exception as e:
+        # Jika error karena tabel belum ada, kita kembalikan DataFrame kosong
+        return pd.DataFrame()
+
+# --- 4. INTERFACE (UI) ---
 st.title("📦 DATABASE ONGKIR IN/OUT")
 
+# SIDEBAR UNTUK INPUT
 with st.sidebar:
     st.header("Form Input")
     with st.form("form_ongkir", clear_on_submit=True):
-        supplier = st.text_input("Supplier")
-        ekspedisi = st.selectbox("Ekspedisi", ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo"])
-        koli = st.number_input("Total Koli", min_value=1, step=1)
-        ongkir = st.number_input("Total Ongkir", min_value=0, step=5000)
+        supplier_input = st.text_input("Nama Supplier")
+        ekspedisi_input = st.selectbox("Pilih Ekspedisi", ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo", "Sentral Cargo"])
+        koli_input = st.number_input("Total Koli (Pcs/Box)", min_value=1, step=1)
+        ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
         
-        if st.form_submit_button("Simpan Ke Supabase"):
-            if supplier:
-                save_data(supplier, ekspedisi, koli, ongkir)
-                st.success("Data berhasil masuk!")
-                st.rerun()
+        submitted = st.form_submit_button("🚀 Simpan Ke Supabase")
+        
+        if submitted:
+            if supplier_input:
+                success = save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input)
+                if success:
+                    st.success(f"Data {supplier_input} berhasil masuk!")
+                    st.rerun()
+            else:
+                st.warning("Nama Supplier tidak boleh kosong!")
 
-# --- SUMMARY & MATRIX BOX ---
-res = supabase.table("shipping_costs").select("*").execute()
-df = pd.DataFrame(res.data)
+# --- 5. DASHBOARD & SUMMARY ---
+df = fetch_data()
 
 if not df.empty:
-    # Matrix Box
+    # --- MATRIX BOX ---
+    st.subheader("Quick Stats")
     m1, m2, m3 = st.columns(3)
-    m1.metric("Total Biaya", f"Rp {df['total_ongkir'].sum():,.0f}")
-    m2.metric("Total Koli", f"{df['total_koli'].sum()} Pcs")
-    m3.metric("Rata-rata/Koli", f"Rp {df['total_ongkir'].sum() / df['total_koli'].sum():,.0f}")
+    
+    total_biaya = df['total_ongkir'].sum()
+    total_koli = df['total_koli'].sum()
+    avg_per_koli = total_biaya / total_koli if total_koli > 0 else 0
 
-    st.subheader("Summary per Ekspedisi")
-    summary = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index()
-    st.table(summary)
+    m1.metric("Total Biaya Ongkir", f"Rp {total_biaya:,.0f}")
+    m2.metric("Total Koli (Volume)", f"{total_koli} Pcs")
+    m3.metric("Rata-rata Cost/Koli", f"Rp {avg_per_koli:,.0f}")
 
+    st.divider()
+
+    # --- TABEL & SUMMARY ---
+    col_table, col_summary = st.columns([2, 1])
+
+    with col_table:
+        st.subheader("Riwayat Transaksi")
+        # Menampilkan data terbaru di atas
+        df_display = df.sort_values(by='created_at', ascending=False)
+        st.dataframe(df_display, use_container_width=True)
+
+    with col_summary:
+        st.subheader("Summary per Ekspedisi")
+        summary = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index()
+        summary = summary.sort_values(by="total_ongkir", ascending=False)
+        # Format Rupiah untuk tabel summary
+        summary["total_ongkir"] = summary["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
+        st.table(summary)
+
+else:
+    st.info("Belum ada data di tabel 'shipping_costs'. Silakan input data pertama Anda melalui sidebar.")
+    st.warning("Pastikan Anda sudah menjalankan SQL CREATE TABLE di Supabase Editor.")
 
 with st.sidebar:
        st.markdown("""
