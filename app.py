@@ -3312,20 +3312,39 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def convert_all_to_excel(df):
     import io
     output = io.BytesIO()
-    # Ambil hanya Status 2, lalu ambil kolom yang diminta saja
-    # Tambahkan kolom QTY secara manual atau pastikan ada di DB
+    
+    # 1. Filter hanya data dengan status 2
     df_download = df[df['status'] == 2].copy()
     
     if not df_download.empty:
-        # Filter kolom sesuai request: SKU, BIN ASAL, dan QTY
-        # Note: Jika di database belum ada kolom 'qty', kita buat default 1
+        # 2. Standarisasi kolom (QTY, SIZE, KETERANGAN)
+        # Jika kolom belum ada di dataframe, kita buatkan kolom dummy biar gak error
         if 'qty' not in df_download.columns:
             df_download['qty'] = 1 
-            
-        final_df = df_download[['sku', 'bin_asal', 'qty']]
         
+        if 'size' not in df_download.columns:
+            df_download['size'] = "-" # Default strip kalau kosong
+            
+        if 'keterangan' not in df_download.columns:
+            df_download['keterangan'] = "-" # Default strip kalau kosong
+            
+        # 3. Pilih kolom yang mau di-export (SKU, BIN ASAL, QTY, SIZE, KETERANGAN)
+        # Pastikan penulisan kolom di list ini sesuai dengan nama kolom di database/df lo
+        final_df = df_download[['sku', 'bin_asal', 'qty', 'size', 'keterangan']]
+        
+        # 4. Bikin Header jadi cakep (Huruf Kapital)
+        final_df.columns = ['SKU', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
+        
+        # 5. Proses tulis ke Excel
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             final_df.to_excel(writer, index=False, sheet_name='Mass_Request_Setup')
+            
+            # Tambahan: Auto-fit lebar kolom biar gak usah geser manual di Excel
+            worksheet = writer.sheets['Mass_Request_Setup']
+            for i, col in enumerate(final_df.columns):
+                column_len = max(final_df[col].astype(str).map(len).max(), len(col)) + 2
+                worksheet.set_column(i, i, column_len)
+                
     return output.getvalue()
 
 def project_approval_reject():
