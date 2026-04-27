@@ -4638,7 +4638,7 @@ def show_database_ongkir():
     with tab_input:
         # Form Input Manual
         with st.expander("🛻 INPUT DATA ONGKIR BARU", expanded=True):
-            with st.form("form_ongkir", clear_on_submit=True):
+            with st.form("form_ongkir_single", clear_on_submit=True):
                 col_a, col_b = st.columns(2)
                 with col_a:
                     supplier_input = st.text_input("Nama Supplier", placeholder="Tulis Nama Supplier....")
