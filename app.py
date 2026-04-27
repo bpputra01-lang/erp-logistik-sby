@@ -4500,8 +4500,8 @@ def show_database_ongkir():
     # --- 2. HERO HEADER ---
     st.markdown("""
         <div class="hero-header">
-            <h1>📦 DATABASE ONGKIR IN/OUT</h1>
-            <p style="color: #808495; margin-top: 5px;">Logistik Operations Lead - Jezpro Indonesia</p>
+            <h1>DATABASE ONGKIR IN/OUT</h1>
+            <p style="color: #808495; margin-top: 5px;">
         </div>
         """, unsafe_allow_html=True)
 
