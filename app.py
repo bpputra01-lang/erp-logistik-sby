@@ -4420,111 +4420,115 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 
-# --- SEMUA KODE DI BAWAH HANYA JALAN JIKA MENU DIPILIH ---
-if menu == "DATABASE ONGKIR IN/OUT"
-# Custom CSS untuk tampilan Dark Gold (Solid Dark)
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; color: #ffffff; }
-    div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
-    .stTable { background-color: #1e2227; }
-    /* Menghilangkan padding berlebih agar lebih compact */
-    .block-container { padding-top: 2rem; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- 1. NAVIGASI (Pastikan variabel 'menu' sudah didefinisikan sebelumnya) ---
 
-# --- 2. KONEKSI SUPABASE ---
-SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
-
-@st.cache_resource
-def init_connection():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
-
-supabase = init_connection()
-
-# --- 3. FUNGSI CRUD ---
-def save_data(supplier, ekspedisi, koli, ongkir):
-    try:
-        data = {
-            "supplier": supplier.upper(), # Auto Caps agar seragam
-            "ekspedisi": ekspedisi,
-            "total_koli": koli,
-            "total_ongkir": ongkir
-        }
-        supabase.table("shipping_costs").insert(data).execute()
-        return True
-    except Exception as e:
-        st.error(f"Gagal menyimpan data: {e}")
-        return False
-
-def fetch_data():
-    try:
-        res = supabase.table("shipping_costs").select("*").execute()
-        return pd.DataFrame(res.data)
-    except Exception:
-        return pd.DataFrame()
-
-# --- 4. INTERFACE (UI) ---
-st.title("DATABASE ONGKIR IN/OUT")
-
-# FORM INPUT DI HALAMAN UTAMA
-with st.expander("➕ INPUT DATA ONGKIR BARU", expanded=True):
-    with st.form("form_ongkir", clear_on_submit=True):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            supplier_input = st.text_input("Nama Supplier", placeholder="Contoh: PT. MAJU JAYA")
-            ekspedisi_input = st.selectbox("Pilih Ekspedisi", 
-                                          ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo", "Sentral Cargo", "Lion Parcel"])
-        with col_b:
-            koli_input = st.number_input("Total Koli", min_value=1, step=1)
-            ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
-        
-        submitted = st.form_submit_button("🚀 SIMPAN DATA KE SUPABASE")
-        if submitted:
-            if supplier_input:
-                if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input):
-                    st.success(f"Data {supplier_input.upper()} Berhasil Disimpan!")
-                    st.rerun()
-            else:
-                st.error("Nama Supplier wajib diisi cok!")
-
-st.divider()
-
-# --- 5. DASHBOARD SUMMARY & MATRIX ---
-df = fetch_data()
-
-if not df.empty:
-    # --- MATRIX BOX ---
-    m1, m2, m3 = st.columns(3)
-    total_biaya = df['total_ongkir'].sum()
-    total_koli = df['total_koli'].sum()
+if menu == "DATABASE ONGKIR IN/OUT":
+    # SEMUA KODE DI BAWAH INI HARUS MASUK KE DALAM IF (ADA JARAK/INDENTASI)
     
-    m1.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
-    m2.metric("TOTAL KOLI", f"{total_koli} Pcs")
-    m3.metric("AVG COST/KOLI", f"Rp {total_biaya/total_koli:,.0f}" if total_koli > 0 else "0")
+    # Custom CSS untuk tampilan Dark Gold (Solid Dark)
+    st.markdown("""
+        <style>
+        .main { background-color: #0e1117; color: #ffffff; }
+        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
+        .stTable { background-color: #1e2227; }
+        /* Menghilangkan padding berlebih agar lebih compact */
+        .block-container { padding-top: 2rem; }
+        </style>
+        """, unsafe_allow_html=True)
 
-    st.markdown("---")
+    # --- 2. KONEKSI SUPABASE ---
+    SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+    SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 
-    # --- TABEL & SUMMARY EKSPEDISI ---
-    col_left, col_right = st.columns([2, 1])
+    @st.cache_resource
+    def init_connection():
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-    with col_left:
-        st.subheader("📝 Riwayat Transaksi")
-        # Mengubah created_at ke format yang lebih enak dibaca
-        df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
-        st.dataframe(df.sort_values('created_at', ascending=False), use_container_width=True)
+    supabase = init_connection()
 
-    with col_right:
-        st.subheader("📊 Summary Ekspedisi")
-        summary_df = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index()
-        summary_df = summary_df.sort_values("total_ongkir", ascending=False)
-        # Format ribuan untuk ongkir di tabel summary
-        summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
-        st.table(summary_df)
+    # --- 3. FUNGSI CRUD ---
+    def save_data(supplier, ekspedisi, koli, ongkir):
+        try:
+            data = {
+                "supplier": supplier.upper(), # Auto Caps agar seragam
+                "ekspedisi": ekspedisi,
+                "total_koli": koli,
+                "total_ongkir": ongkir
+            }
+            supabase.table("shipping_costs").insert(data).execute()
+            return True
+        except Exception as e:
+            st.error(f"Gagal menyimpan data: {e}")
+            return False
 
-else:
-    st.info("Data masih kosong. Silakan input data di atas!")
+    def fetch_data():
+        try:
+            res = supabase.table("shipping_costs").select("*").execute()
+            return pd.DataFrame(res.data)
+        except Exception:
+            return pd.DataFrame()
+
+    # --- 4. INTERFACE (UI) ---
+    st.title("📦 DATABASE ONGKIR IN/OUT")
+
+    # FORM INPUT DI HALAMAN UTAMA
+    with st.expander("➕ INPUT DATA ONGKIR BARU", expanded=True):
+        with st.form("form_ongkir", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            with col_a:
+                supplier_input = st.text_input("Nama Supplier", placeholder="Contoh: PT. MAJU JAYA")
+                ekspedisi_input = st.selectbox("Pilih Ekspedisi", 
+                                              ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo", "Sentral Cargo", "Lion Parcel"])
+            with col_b:
+                koli_input = st.number_input("Total Koli", min_value=1, step=1)
+                ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
+            
+            submitted = st.form_submit_button("🚀 SIMPAN DATA KE SUPABASE")
+            if submitted:
+                if supplier_input:
+                    if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input):
+                        st.success(f"Data {supplier_input.upper()} Berhasil Disimpan!")
+                        st.rerun()
+                else:
+                    st.error("Nama Supplier wajib diisi cok!")
+
+    st.divider()
+
+    # --- 5. DASHBOARD SUMMARY & MATRIX ---
+    df = fetch_data()
+
+    if not df.empty:
+        # --- MATRIX BOX ---
+        m1, m2, m3 = st.columns(3)
+        total_biaya = df['total_ongkir'].sum()
+        total_koli = df['total_koli'].sum()
+        
+        m1.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
+        m2.metric("TOTAL KOLI", f"{total_koli} Pcs")
+        m3.metric("AVG COST/KOLI", f"Rp {total_biaya/total_koli:,.0f}" if total_koli > 0 else "0")
+
+        st.markdown("---")
+
+        # --- TABEL & SUMMARY EKSPEDISI ---
+        col_left, col_right = st.columns([2, 1])
+
+        with col_left:
+            st.subheader("📝 Riwayat Transaksi")
+            # Pastikan kolom created_at ada sebelum diformat
+            if 'created_at' in df.columns:
+                df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
+            st.dataframe(df.sort_values('created_at', ascending=False) if 'created_at' in df.columns else df, use_container_width=True)
+
+        with col_right:
+            st.subheader("📊 Summary Ekspedisi")
+            summary_df = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index()
+            summary_df = summary_df.sort_values("total_ongkir", ascending=False)
+            # Format ribuan untuk ongkir di tabel summary
+            summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
+            st.table(summary_df)
+
+    else:
+        st.info("Data masih kosong. Silakan input data di atas!")
 
 with st.sidebar:
        st.markdown("""
