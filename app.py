@@ -4471,6 +4471,34 @@ def show_database_ongkir():
         /* Style Tabel & Metric */
         div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
         .stTable { background-color: #1e2227; border-radius: 5px; }
+        /* Judul-judul Subheader (Riwayat, Summary, Upload) */
+        .stMarkdown h2, .stMarkdown h3 {
+            color: #FFD700 !important; /* Warna Emas Solid */
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border-bottom: 2px solid #3e444d;
+            padding-bottom: 10px;
+            font-weight: 700 !important;
+        }
+
+        /* Label Form agar lebih kontras */
+        .stMarkdown p {
+            color: #e0e0e0 !important;
+        }
+
+        /* Metric Label (TOTAL BIAYA dll) */
+        div[data-testid="stMetricLabel"] {
+            color: #FFD700 !important;
+            font-weight: bold !important;
+            text-transform: uppercase;
+        }
+        
+        /* Garis Divider Emas */
+        hr {
+            border: 0;
+            height: 1px;
+            background-image: linear-gradient(to right, rgba(255, 215, 0, 0), rgba(255, 215, 0, 0.75), rgba(255, 215, 0, 0));
+        }
         </style>
         """, unsafe_allow_html=True)
 
@@ -4504,7 +4532,7 @@ def show_database_ongkir():
     # --- 4. HERO HEADER ---
     st.markdown("""
         <div class="hero-header">
-            <h1>📦 DATABASE ONGKIR IN/OUT</h1>
+            <h1>DATABASE ONGKIR IN/OUT</h1>
         </div>
         """, unsafe_allow_html=True)
 
@@ -5831,7 +5859,7 @@ elif menu == "FDR Update":
         # --- LOGIKA SISA DATA (MANIFEST - FU IT) ---
         total_val = m.get('total', 0)
         fu_val = m.get('fu', 0)
-        sisa_data = total_val - fu_val # Ini yang lo mau, Bos
+        sisa_data = total_val - fu_val 
         
         st.markdown(f"""
         <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
