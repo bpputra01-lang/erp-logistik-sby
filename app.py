@@ -4433,88 +4433,55 @@ def show_database_ongkir():
     # --- 1. CSS CUSTOM (Sesuai Request: Samakan Style Input & Hero Header) ---
     st.markdown("""
         <style>
-        /* 1. HERO HEADER: Gradient Gold & Glow Effect */
-        .hero-header {
-            background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
-            padding: 2.5rem;
-            border-radius: 15px;
-            border-left: 8px solid #FFD700;
-            margin-bottom: 2rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            text-align: center;
-        }
+        /* 1. HERO HEADER: Putih bersih di atas Navy/Gold */
         .hero-header h1 {
-            background: linear-gradient(to right, #FFD700, #fff7ad);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #ffffff !important;
             font-size: 3rem !important;
             font-weight: 900 !important;
-            letter-spacing: 2px;
-            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
 
-        /* 2. SOLID GOLD TITLES: Ganti warna putih yang lo benci */
-        /* Ini buat judul di dalam Expander & Subheader */
-        .solid-title {
-            background: #FFD700 !important;
-            color: #0e1117 !important; /* Teks item biar kontras parah */
-            padding: 12px 20px;
-            border-radius: 5px;
-            font-weight: 900 !important;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            display: block;
-            margin-bottom: 1rem;
-            box-shadow: 4px 4px 0px #8a7500; /* Shadow tegas style industrial */
-        }
-
-        /* 3. STYLE EXPANDER: Header Expander biar nggak polos */
-        div[data-testid="stExpander"] details summary {
-            background-color: #1e2227 !important;
-            border: 1px solid #3e444d !important;
-            padding: 15px !important;
-            border-radius: 10px !important;
-        }
+        /* 2. HEADER EXPANDER: Tetap Gold biar gampang dicari */
         div[data-testid="stExpander"] details summary span {
-            color: #FFD700 !important; /* Tulisan expander jadi emas */
+            color: #FFD700 !important;
             font-weight: bold !important;
-            font-size: 1.1rem;
         }
 
-        /* 4. INPUT FIELD: Dark & Gold Accent */
-        div[data-baseweb="input"], div[data-baseweb="select"] {
+        /* 3. FIX KOLOM INPUT: Sikat warna putih babi-nya */
+        /* Ini buat input text, number, dan select box */
+        div[data-baseweb="input"], 
+        div[data-baseweb="select"], 
+        div[data-baseweb="base-input"] {
             background-color: #0e1117 !important;
             border: 2px solid #3e444d !important;
-            border-radius: 8px !important;
-        }
-        div[data-baseweb="input"]:focus-within {
-            border-color: #FFD700 !important;
-        }
-        input { color: #ffffff !important; }
-
-        /* 5. METRIC & DIVIDER */
-        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: 900; font-size: 2rem !important; }
-        div[data-testid="stMetricLabel"] { color: #e0e0e0 !important; text-transform: uppercase; }
-        
-        hr {
-            border: 0; height: 2px;
-            background: linear-gradient(to right, transparent, #FFD700, transparent);
-            margin: 2rem 0;
         }
 
-        /* 6. BUTTON: Industrial Gold */
+        /* Paksa teks di dalam input number (Koli/Ongkir) jadi Putih */
+        input[data-testid="stNumberInputInput"], 
+        input[type="number"],
+        input[type="text"] {
+            color: #ffffff !important;
+            background-color: #0e1117 !important;
+            -webkit-text-fill-color: #ffffff !important; /* Buat browser tertentu */
+        }
+
+        /* 4. TOMBOL SIMPAN: Tetap gaya industrial */
         .stButton button {
-            width: 100%;
-            background-color: #FFD700 !important;
-            color: #0e1117 !important;
-            font-weight: 900 !important;
-            border: none !important;
-            padding: 0.75rem !important;
-            transition: 0.3s;
+            background-color: #1e2227 !important;
+            color: #FFD700 !important;
+            border: 2px solid #FFD700 !important;
+            border-radius: 8px !important;
+            font-weight: bold !important;
         }
-        .stButton button:hover {
-            background-color: #fff !important;
-            transform: translateY(-2px);
+        
+        /* 5. METRIC: Emas Menyala */
+        div[data-testid="stMetricValue"] { 
+            color: #FFD700 !important; 
+        }
+
+        /* Hilangkan border putih saat hover di input */
+        div[data-baseweb="input"]:hover {
+            border-color: #FFD700 !important;
         }
         </style>
         """, unsafe_allow_html=True)
