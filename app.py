@@ -4416,6 +4416,58 @@ def process_picking_audit(file1, file2, file_tracking=None):
     except Exception as e:
         raise Exception(f"Gagal memproses data: {str(e)}")
 
+import streamlit as st
+from supabase import create_client, Client
+import pandas as pd
+
+# --- KONEKSI ---
+# Ganti dengan URL dan Key dari Project Settings > API Supabase Anda
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+supabase: Client = create_client(URL, KEY)
+
+# --- FUNGSI SIMPAN ---
+def save_data(supplier, ekspedisi, koli, ongkir):
+    data = {
+        "supplier": supplier,
+        "ekspedisi": ekspedisi,
+        "total_koli": koli,    # Sesuaikan dengan nama kolom baru
+        "total_ongkir": ongkir
+    }
+    supabase.table("shipping_costs").insert(data).execute()
+
+# --- INTERFACE ---
+st.title("📦 DATABASE ONGKIR IN/OUT")
+
+with st.sidebar:
+    st.header("Form Input")
+    with st.form("form_ongkir", clear_on_submit=True):
+        supplier = st.text_input("Supplier")
+        ekspedisi = st.selectbox("Ekspedisi", ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo"])
+        koli = st.number_input("Total Koli", min_value=1, step=1)
+        ongkir = st.number_input("Total Ongkir", min_value=0, step=5000)
+        
+        if st.form_submit_button("Simpan Ke Supabase"):
+            if supplier:
+                save_data(supplier, ekspedisi, koli, ongkir)
+                st.success("Data berhasil masuk!")
+                st.rerun()
+
+# --- SUMMARY & MATRIX BOX ---
+res = supabase.table("shipping_costs").select("*").execute()
+df = pd.DataFrame(res.data)
+
+if not df.empty:
+    # Matrix Box
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total Biaya", f"Rp {df['total_ongkir'].sum():,.0f}")
+    m2.metric("Total Koli", f"{df['total_koli'].sum()} Pcs")
+    m3.metric("Rata-rata/Koli", f"Rp {df['total_ongkir'].sum() / df['total_koli'].sum():,.0f}")
+
+    st.subheader("Summary per Ekspedisi")
+    summary = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index()
+    st.table(summary)
+
 
 with st.sidebar:
        st.markdown("""
@@ -4696,7 +4748,7 @@ with st.sidebar:
     # --- KELOMPOK 5: EXTRAS ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
     
-    m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC"]
+    m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Database Ongkit In/Out"]
     idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else 0
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
 
