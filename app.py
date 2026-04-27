@@ -4422,7 +4422,7 @@ import pandas as pd
 
 # --- 1. NAVIGASI (Pastikan variabel 'menu' sudah didefinisikan sebelumnya) ---
 
-if menu == "DATABASE ONGKIR IN/OUT":
+if selected == "DATABASE ONGKIR IN/OUT":
     # SEMUA KODE DI BAWAH INI HARUS MASUK KE DALAM IF (ADA JARAK/INDENTASI)
     
     # Custom CSS untuk tampilan Dark Gold (Solid Dark)
