@@ -4484,143 +4484,107 @@ def show_database_ongkir():
 
     supabase = init_connection()
 
-    # --- 3. FUNGSI CRUD ---
+# --- 3. FUNGSI INTERNAL ---
     def save_data(supplier, ekspedisi, koli, ongkir):
         try:
-            data = {
-                "supplier": supplier.upper(), # Auto Caps agar seragam
-                "ekspedisi": ekspedisi,
-                "total_koli": koli,
-                "total_ongkir": ongkir
-            }
+            data = {"supplier": supplier.upper(), "ekspedisi": ekspedisi, "total_koli": koli, "total_ongkir": ongkir}
             supabase.table("shipping_costs").insert(data).execute()
             return True
         except Exception as e:
-            st.error(f"Gagal menyimpan data: {e}")
+            st.error(f"Gagal simpan: {e}")
             return False
 
+    def fetch_data():
+        try:
+            res = supabase.table("shipping_costs").select("*").execute()
+            return pd.DataFrame(res.data)
+        except:
+            return pd.DataFrame()
 
-    # --- 2. HERO HEADER ---
+    # --- 4. HERO HEADER ---
     st.markdown("""
         <div class="hero-header">
-            <h1>DATABASE ONGKIR IN/OUT</h1>
-            <p style="color: #808495; margin-top: 5px;">
+            <h1>📦 DATABASE ONGKIR IN/OUT</h1>
         </div>
         """, unsafe_allow_html=True)
 
-    # FORM INPUT DI HALAMAN UTAMA
+    # --- 5. FORM INPUT MANUAL ---
     with st.expander("➕ INPUT DATA ONGKIR BARU", expanded=True):
         with st.form("form_ongkir", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
                 supplier_input = st.text_input("Nama Supplier", placeholder="Contoh: PT. MAJU JAYA")
-                ekspedisi_input = st.selectbox("Pilih Ekspedisi", 
-                                              ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo", "Sentral Cargo", "Lion Parcel"])
+                ekspedisi_input = st.selectbox("Pilih Ekspedisi", ["Internal", "JNE", "J&T", "Sicepat", "Indah Cargo", "Sentral Cargo", "Lion Parcel"])
             with col_b:
                 koli_input = st.number_input("Total Koli", min_value=1, step=1)
                 ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
             
-            submitted = st.form_submit_button("🚀 SIMPAN DATA KE SUPABASE")
-            if submitted:
+            if st.form_submit_button("🚀 SIMPAN DATA KE SUPABASE"):
                 if supplier_input:
                     if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input):
                         st.success(f"Data {supplier_input.upper()} Berhasil Disimpan!")
                         st.rerun()
                 else:
-                    st.error("Nama Supplier wajib diisi cok!")
+                    st.error("Nama Supplier wajib diisi!")
 
     st.divider()
 
-    # --- 5. DASHBOARD SUMMARY & MATRIX ---
-df = fetch_data()
+    # --- 6. DASHBOARD & MASS UPLOAD (PENTING: Harus menjorok ke dalam fungsi) ---
+    df = fetch_data()
 
-if not df.empty:
-    # --- MATRIX BOX ---
-    # Menggunakan CSS Gold yang sudah lo minta sebelumnya
-    m1, m2, m3 = st.columns(3)
-    total_biaya = df['total_ongkir'].sum()
-    total_koli = df['total_koli'].sum()
-    
-    m1.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
-    m2.metric("TOTAL KOLI", f"{total_koli} Pcs")
-    m3.metric("AVG COST/KOLI", f"Rp {total_biaya/total_koli:,.0f}" if total_koli > 0 else "0")
+    if not df.empty:
+        # Matrix
+        m1, m2, m3 = st.columns(3)
+        total_biaya = df['total_ongkir'].sum()
+        total_koli = df['total_koli'].sum()
+        m1.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
+        m2.metric("TOTAL KOLI", f"{total_koli} Pcs")
+        m3.metric("AVG COST/KOLI", f"Rp {total_biaya/total_koli:,.0f}" if total_koli > 0 else "0")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # --- FITUR MASS UPLOAD & DOWNLOAD TEMPLATE (TAMBAHAN BARU) ---
-    with st.expander("Upload Ongkir Bulk", expanded=False):
-        c_dl, c_up = st.columns([1, 2])
-        
-        with c_dl:
-            st.markdown("### 1. Download")
-            # Membuat template DataFrame sesuai request lo
-            template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"])
-            csv_template = template_df.to_csv(index=False).encode('utf-8')
+        # Mass Upload
+        with st.expander("📁 BATCH OPS: UPLOAD MASSAL", expanded=False):
+            c_dl, c_up = st.columns([1, 2])
+            with c_dl:
+                st.markdown("### 1. Download")
+                template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"])
+                st.download_button(label="📄 DOWNLOAD TEMPLATE", data=template_df.to_csv(index=False).encode('utf-8'), file_name="template_ongkir_jezpro.csv", mime="text/csv")
             
-            st.download_button(
-                label="📄 DOWNLOAD TEMPLATE",
-                data=csv_template,
-                file_name="template_ongkir_jezpro.csv",
-                mime="text/csv",
-                
-            )
-        
-        with c_up:
-            st.markdown("### 2. Upload")
-            uploaded_file = st.file_uploader("Upload File", type=["csv, xlxs"])
-            
-            if uploaded_file:
-                df_mass = pd.read_csv(uploaded_file)
-                required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"]
-                
-                # Cek apakah kolomnya sudah benar
-                if all(col in df_mass.columns for col in required):
-                    st.success("Format kolom aman! Siap eksekusi.")
-                    if st.button("🚀 MULAI UPLOAD KE SUPABASE"):
-                        success_count = 0
-                        with st.spinner('Processing Data...'):
-                            for _, row in df_mass.iterrows():
-                                data_batch = {
-                                    "supplier": str(row["SUPPLIER"]).upper(),
-                                    "ekspedisi": row["EKSPEDISI"],
-                                    "total_koli": int(row["TOTAL KOLI"]),
-                                    "total_ongkir": int(row["ONGKIR"])
-                                }
-                                # Kirim ke Supabase
-                                supabase.table("shipping_costs").insert(data_batch).execute()
-                                success_count += 1
-                        
-                        st.balloons()
-                        st.success(f"Done {success_count} data berhasil Diinput.")
-                        st.rerun()
-                else:
-                    st.error(f"Kolom salah! Harus: {required}")
+            with c_up:
+                st.markdown("### 2. Upload")
+                uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+                if uploaded_file:
+                    df_mass = pd.read_csv(uploaded_file)
+                    required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"]
+                    if all(col in df_mass.columns for col in required):
+                        if st.button("🚀 EXECUTE BULK UPLOAD"):
+                            with st.spinner('Processing...'):
+                                for _, row in df_mass.iterrows():
+                                    data_batch = {"supplier": str(row["SUPPLIER"]).upper(), "ekspedisi": row["EKSPEDISI"], "total_koli": int(row["TOTAL KOLI"]), "total_ongkir": int(row["ONGKIR"])}
+                                    supabase.table("shipping_costs").insert(data_batch).execute()
+                            st.success("Berhasil diinput!")
+                            st.rerun()
+                    else:
+                        st.error(f"Format salah! Harus: {required}")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # --- TABEL & SUMMARY EKSPEDISI ---
-    col_left, col_right = st.columns([2, 1])
+        # Tabel Riwayat
+        col_left, col_right = st.columns([2, 1])
+        with col_left:
+            st.subheader("📝 Riwayat Transaksi")
+            if 'created_at' in df.columns:
+                df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
+            st.dataframe(df.sort_values('created_at', ascending=False), use_container_width=True)
 
-    with col_left:
-        st.subheader("📝 Riwayat Transaksi")
-        if 'created_at' in df.columns:
-            df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
-        
-        # Sortir terbaru di atas biar user gampang ngecek data terakhir
-        st.dataframe(
-            df.sort_values('created_at', ascending=False) if 'created_at' in df.columns else df, 
-            use_container_width=True
-        )
-
-    with col_right:
-        st.subheader("📊 Summary Ekspedisi")
-        summary_df = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index()
-        summary_df = summary_df.sort_values("total_ongkir", ascending=False)
-        
-        # Format angka agar enak dibaca Lead (Rp 1.000.000)
-        summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
-        st.table(summary_df)
-
+        with col_right:
+            st.subheader("📊 Summary")
+            summary_df = df.groupby("ekspedisi")["total_ongkir"].sum().reset_index().sort_values("total_ongkir", ascending=False)
+            summary_df["total_ongkir"] = summary_df["total_ongkir"].apply(lambda x: f"Rp {x:,.0f}")
+            st.table(summary_df)
+    else:
+        st.info("Data masih kosong.")
     
 
 with st.sidebar:
