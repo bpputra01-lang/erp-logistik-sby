@@ -3307,42 +3307,29 @@ SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
 
-# --- 1. TARUH DI BAGIAN PALING ATAS (Luar semua fungsi/tabs) ---
 @st.cache_data
 def convert_all_to_excel(df):
     import io
     output = io.BytesIO()
     
-    # 1. Tetap pertahankan filter hanya Status 2
+    # 1. Filter Status 2 (Tetap dipertahankan)
     df_download = df[df['status'] == 2].copy()
     
     if not df_download.empty:
-        # 2. Standarisasi kolom (QTY, ARTICLE, SIZE, KETERANGAN)
-        # Pastikan kolom-kolom ini tidak bikin error jika salah satu kosong di DB
+        
+        # Cek kolom qty (kalo di DB ga ada, kita buat default 1)
         if 'qty' not in df_download.columns:
             df_download['qty'] = 1 
             
-        if 'article_name' not in df_download.columns:
-            df_download['article_name'] = "-" # Nama kolom sesuaikan dengan DB lo (misal: 'article')
+        final_df = df_download[['sku', 'article_name', 'bin_awal', 'qty', 'size', 'keterangan']]
         
-        if 'size' not in df_download.columns:
-            df_download['size'] = "-" 
-            
-        if 'keterangan' not in df_download.columns:
-            df_download['keterangan'] = "-" 
-            
-        # 3. Pilih kolom termasuk ARTICLE
-        # Urutan: SKU, ARTICLE, BIN ASAL, QTY, SIZE, KETERANGAN
-        final_df = df_download[['sku', 'article_name', 'bin_asal', 'qty', 'size', 'keterangan']]
+        # 4. Rename Header buat Excel (Biar Rapi)
+        final_df.columns = ['SKU', 'ARTICLE NAME', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
         
-        # 4. Bikin Header Kapital (Biar rapi di Excel)
-        final_df.columns = ['SKU', 'ARTICLE', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
-        
-        # 5. Proses tulis ke Excel
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             final_df.to_excel(writer, index=False, sheet_name='Mass_Request_Setup')
             
-            # Auto-fit lebar kolom biar gak usah geser manual
+            # Auto-fit kolom
             worksheet = writer.sheets['Mass_Request_Setup']
             for i, col in enumerate(final_df.columns):
                 column_len = max(final_df[col].astype(str).map(len).max(), len(col)) + 2
