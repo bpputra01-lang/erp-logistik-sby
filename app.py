@@ -3337,22 +3337,21 @@ def convert_all_to_excel(df):
     df_download = df[df['status'] == 2].copy()
     
     if not df_download.empty:
-        # --- LOGIKA ANTI-KEYERROR ---
-        # List kolom yang WAJIB ada di Excel
+        # --- LOGIKA ANTI-KEYERROR (SESUAI SUPABASE) ---
+        # Gunakan 'bin_awal' sesuai screenshot database lo
         target_cols = ['sku', 'article_name', 'bin_awal', 'qty', 'size', 'keterangan']
         
-        # Cek mana yang gak ada, kalo gak ada kita buatin kolom kosong biar gak error
         for col in target_cols:
             if col not in df_download.columns:
                 if col == 'qty':
-                    df_download['qty'] = 1 # Khusus QTY kasih default 1
+                    df_download['qty'] = 1 
                 else:
-                    df_download[col] = "-" # Sisanya kasih strip
+                    df_download[col] = "-" 
         
-        # 2. Ambil kolomnya (Sekarang dijamin gak akan KeyError)
+        # 2. Ambil kolomnya
         final_df = df_download[target_cols].copy()
         
-        # 3. Rename Header biar cakep
+        # 3. Rename Header (Di sini baru kita kasih nama 'BIN ASAL' biar user paham)
         final_df.columns = ['SKU', 'ARTICLE NAME', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
         
         # 4. Tulis ke Excel
@@ -3362,6 +3361,7 @@ def convert_all_to_excel(df):
             # Auto-fit kolom
             worksheet = writer.sheets['Mass_Request_Setup']
             for i, col in enumerate(final_df.columns):
+                # Hitung panjang data biar gak kepotong di Excel
                 column_len = max(final_df[col].astype(str).map(len).max(), len(col)) + 2
                 worksheet.set_column(i, i, column_len)
                 
