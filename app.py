@@ -4606,7 +4606,63 @@ def show_database_ongkir():
             background-color: #ff4b4b !important;
             color: #ffffff !important;
         }
+        /* 1. CONTAINER UTAMA UNTUK CARD */
+        .card-container {
+            background-color: #1e2227;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 4px 4px 15px rgba(0,0,0,0.3);
+            min-height: 120px;
+            margin-bottom: 10px;
+            transition: transform 0.2s ease;
+        }
         
+        .card-container:hover {
+            transform: translateY(-5px); /* Efek melayang dikit pas di-hover */
+        }
+
+        /* 2. STYLE LABEL (TEKS ATAS) */
+        .metric-label {
+            font-family: 'Inter', sans-serif;
+            color: #9ea4ad; /* Warna abu-abu soft */
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* 3. STYLE VALUE (ANGKA EMAS) */
+        .metric-value {
+            font-family: 'Inter', sans-serif;
+            color: #FFD700; /* Warna Emas JEZPRO */
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0;
+            line-height: 1;
+        }
+
+        /* 4. STYLE DELTA / STATUS (HIJAU OVERALL) */
+        .metric-delta {
+            font-family: 'Inter', sans-serif;
+            color: #2ecc71;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(46, 204, 113, 0.15); /* Hijau transparan */
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-top: 12px;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        /* 5. FIX STREAMLIT PADDING (Biar gak ada whitespace aneh) */
+        [data-testid="column"] {
+            padding: 0 5px !important;
+        }
         </style>
         """, unsafe_allow_html=True)
 
