@@ -4759,92 +4759,92 @@ def show_database_ongkir():
                     else:
                         st.error(f"Format salah! Harus: {required}")
 
-   with tab_summary:
-    if not df_raw.empty:
-        # 1. Pastikan created_at jadi format DATETIME
-        df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
+    with tab_summary:
+        if not df_raw.empty:
+            # 1. Pastikan created_at jadi format DATETIME
+            df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
 
-        st.markdown("### 🔍 FILTER DATA")
-        
-        # --- LOGIKA FILTER OTOMATIS ---
-        col_f1, col_f2 = st.columns(2)
-        
-        with col_f1:
+            st.markdown("### 🔍 FILTER DATA")
+            
+            # --- LOGIKA FILTER OTOMATIS ---
+            col_f1, col_f2 = st.columns(2)
+            
+            with col_f1:
+                # Filter Tanggal
+                min_date = df_raw['created_at'].min().date()
+                max_date = df_raw['created_at'].max().date()
+                date_range = st.date_input("Rentang Tanggal", value=(min_date, max_date))
+            
+            with col_f2:
+                # FILTER UNIQUE EKSPEDISI (Otomatis Update)
+                list_ekspedisi = ["SEMUA"] + sorted(df_raw['ekspedisi'].unique().tolist())
+                pilih_ekspedisi = st.selectbox("Pilih Ekspedisi", list_ekspedisi)
+
+            # --- APPLY FILTER ---
             # Filter Tanggal
-            min_date = df_raw['created_at'].min().date()
-            max_date = df_raw['created_at'].max().date()
-            date_range = st.date_input("Rentang Tanggal", value=(min_date, max_date))
-        
-        with col_f2:
-            # FILTER UNIQUE EKSPEDISI (Otomatis Update)
-            list_ekspedisi = ["SEMUA"] + sorted(df_raw['ekspedisi'].unique().tolist())
-            pilih_ekspedisi = st.selectbox("Pilih Ekspedisi", list_ekspedisi)
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                start_date, end_date = date_range
+                mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
+                df_filtered = df_raw.loc[mask].copy()
+            else:
+                df_filtered = df_raw.copy()
+            
+            # Filter Ekspedisi
+            if pilih_ekspedisi != "SEMUA":
+                df_filtered = df_filtered[df_filtered['ekspedisi'] == pilih_ekspedisi]
 
-        # --- APPLY FILTER ---
-        # Filter Tanggal
-        if isinstance(date_range, tuple) and len(date_range) == 2:
-            start_date, end_date = date_range
-            mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
-            df_filtered = df_raw.loc[mask].copy()
+            # --- JUDUL DASHBOARD & MATRIX ---
+            st.markdown("""
+                <div style="background-color: #1e2227; padding: 10px 15px; border-radius: 8px; border-left: 5px solid #FFD700; margin-top: 25px; margin-bottom: 15px; shadow: 2px 2px 5px rgba(0,0,0,0.2); display: inline-block; min-width: 300px;">
+                    <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">💲 TOTAL BIAYA ONGKIR</h4>
+                </div>
+            """, unsafe_allow_html=True)
+
+            m1, m2, m3 = st.columns(3)
+            total_biaya = df_filtered['total_ongkir'].sum()
+            total_koli = df_filtered['total_koli'].sum()
+            with m1: st.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
+            with m2: st.metric("TOTAL KOLI", f"{total_koli} Pcs")
+            with m3: 
+                avg = total_biaya/total_koli if total_koli > 0 else 0
+                st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
+
+            st.markdown("---")
+
+            # --- RIWAYAT TRANSAKSI ---
+            st.subheader("📝 Riwayat Transaksi")
+            st.caption("Centang baris pada tabel di bawah, lalu klik tombol hapus.")
+
+            # Format jam biar bersih buat tampilan
+            df_display = df_filtered.copy()
+            df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
+
+            event = st.dataframe(
+                df_display.sort_values('created_at', ascending=False),
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="multi-row"
+            )
+
+            selected_rows = event.selection.rows
+            
+            if selected_rows:
+                ids_to_delete = df_display.sort_values('created_at', ascending=False).iloc[selected_rows]['id'].tolist()
+                st.warning(f"Terpilih {len(ids_to_delete)} data untuk dihapus.")
+                if st.button("🗑️ HAPUS DATA TERPILIH", type="primary"):
+                    try:
+                        for target_id in ids_to_delete:
+                            supabase.table("shipping_costs").delete().eq("id", target_id).execute()
+                        st.success("Data berhasil dibantai!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Gagal hapus cok: {e}")
+            else:
+                st.info("💡 Centang baris di tabel untuk menghapus data.")
+
         else:
-            df_filtered = df_raw.copy()
-        
-        # Filter Ekspedisi
-        if pilih_ekspedisi != "SEMUA":
-            df_filtered = df_filtered[df_filtered['ekspedisi'] == pilih_ekspedisi]
-
-        # --- JUDUL DASHBOARD & MATRIX ---
-        st.markdown("""
-            <div style="background-color: #1e2227; padding: 10px 15px; border-radius: 8px; border-left: 5px solid #FFD700; margin-top: 25px; margin-bottom: 15px; shadow: 2px 2px 5px rgba(0,0,0,0.2); display: inline-block; min-width: 300px;">
-                <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">💲 TOTAL BIAYA ONGKIR</h4>
-            </div>
-        """, unsafe_allow_html=True)
-
-        m1, m2, m3 = st.columns(3)
-        total_biaya = df_filtered['total_ongkir'].sum()
-        total_koli = df_filtered['total_koli'].sum()
-        with m1: st.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
-        with m2: st.metric("TOTAL KOLI", f"{total_koli} Pcs")
-        with m3: 
-            avg = total_biaya/total_koli if total_koli > 0 else 0
-            st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
-
-        st.markdown("---")
-
-        # --- RIWAYAT TRANSAKSI ---
-        st.subheader("📝 Riwayat Transaksi")
-        st.caption("Centang baris pada tabel di bawah, lalu klik tombol hapus.")
-
-        # Format jam biar bersih buat tampilan
-        df_display = df_filtered.copy()
-        df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
-
-        event = st.dataframe(
-            df_display.sort_values('created_at', ascending=False),
-            use_container_width=True,
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="multi-row"
-        )
-
-        selected_rows = event.selection.rows
-        
-        if selected_rows:
-            ids_to_delete = df_display.sort_values('created_at', ascending=False).iloc[selected_rows]['id'].tolist()
-            st.warning(f"Terpilih {len(ids_to_delete)} data untuk dihapus.")
-            if st.button("🗑️ HAPUS DATA TERPILIH", type="primary"):
-                try:
-                    for target_id in ids_to_delete:
-                        supabase.table("shipping_costs").delete().eq("id", target_id).execute()
-                    st.success("Data berhasil dibantai!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Gagal hapus cok: {e}")
-        else:
-            st.info("💡 Centang baris di tabel untuk menghapus data.")
-
-    else:
-        st.info("Data masih kosong. Input dulu di tab sebelah!")    
+            st.info("Data masih kosong. Input dulu di tab sebelah!")    
 
 with st.sidebar:
        st.markdown("""
