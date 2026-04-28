@@ -4650,9 +4650,16 @@ def show_database_ongkir():
             return 0
 
 # --- 3. FUNGSI INTERNAL ---
-    def save_data(supplier, ekspedisi, koli, ongkir):
+    # --- 3. FUNGSI INTERNAL ---
+    def save_data(supplier, ekspedisi, koli, ongkir, tanggal_jam): # Tambah parameter tanggal_jam
         try:
-            data = {"supplier": supplier.upper(), "ekspedisi": ekspedisi, "total_koli": koli, "total_ongkir": ongkir}
+            data = {
+                "supplier": supplier.upper(), 
+                "ekspedisi": ekspedisi, 
+                "total_koli": koli, 
+                "total_ongkir": ongkir,
+                "created_at": tanggal_jam # Masukkan jam manual ke sini
+            }
             supabase.table("shipping_costs").insert(data).execute()
             return True
         except Exception as e:
@@ -4684,20 +4691,28 @@ def show_database_ongkir():
     tab_input, tab_summary = st.tabs(["📥 INPUT DATA", "📊 SUMMARY & HISTORY"])
 
     with tab_input:
-        # Form Input Manual
+    # Form Input Manual
         with st.expander("🛻 INPUT DATA ONGKIR BARU", expanded=True):
             with st.form("form_ongkir_single", clear_on_submit=True):
                 col_a, col_b = st.columns(2)
                 with col_a:
                     supplier_input = st.text_input("Nama Supplier", placeholder="Tulis Nama Supplier....")
                     ekspedisi_input = st.text_input("Nama Ekspedisi", placeholder="Tulis Nama Ekspedisi...").upper()
+                    # --- TAMBAHAN INPUT TANGGAL ---
+                    input_tgl = st.date_input("Tanggal Transaksi", value=datetime.now())
                 with col_b:
                     koli_input = st.number_input("Total Koli", min_value=1, step=1)
                     ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
+                    # --- TAMBAHAN INPUT JAM ---
+                    input_jam = st.time_input("Jam Transaksi", value=datetime.now().time())
+                
+                # Gabungkan tanggal dan jam biar formatnya bersih
+                fix_timestamp = f"{input_tgl} {input_jam.strftime('%H:%M:%S')}"
                 
                 if st.form_submit_button("▶️ UPLOAD HASIL ONGKIR"):
                     if supplier_input:
-                        if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input):
+                        # Panggil fungsi dengan fix_timestamp
+                        if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input, fix_timestamp):
                             st.success(f"Data {supplier_input.upper()} Berhasil Disimpan!")
                             st.rerun()
                     else:
@@ -4706,11 +4721,13 @@ def show_database_ongkir():
         st.markdown("---")
 
         # Batch Upload
+        # Batch Upload
         with st.expander("📁 BATCH OPS: UPLOAD MASSAL", expanded=False):
             c_dl, c_up = st.columns([1, 2])
             with c_dl:
                 st.markdown("### 1. Download")
-                template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"])
+                # Tambah kolom TANGGAL_JAM di template
+                template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"])
                 st.download_button(
                     label="📄 DOWNLOAD TEMPLATE", 
                     data=template_df.to_csv(index=False).encode('utf-8'), 
@@ -4723,7 +4740,8 @@ def show_database_ongkir():
                 uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
                 if uploaded_file:
                     df_mass = pd.read_csv(uploaded_file)
-                    required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR"]
+                    # Tambah TANGGAL_JAM di required
+                    required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"]
                     if all(col in df_mass.columns for col in required):
                         if st.button("▶️ UPLOAD BULK ONGKIR"):
                             with st.spinner('Processing...'):
@@ -4732,7 +4750,8 @@ def show_database_ongkir():
                                         "supplier": str(row["SUPPLIER"]).upper(), 
                                         "ekspedisi": str(row["EKSPEDISI"]).upper(), 
                                         "total_koli": int(row["TOTAL KOLI"]), 
-                                        "total_ongkir": clean_currency(row["ONGKIR"])
+                                        "total_ongkir": clean_currency(row["ONGKIR"]),
+                                        "created_at": str(row["TANGGAL_JAM"]) # Ambil jam dari CSV lo
                                     }
                                     supabase.table("shipping_costs").insert(data_batch).execute()
                             st.success("Berhasil diinput!")
@@ -4745,7 +4764,7 @@ def show_database_ongkir():
            # --- FILTER (Hapus f_col2 yang ada selectbox ID) ---
             st.markdown("### 🔍 FILTER DATA")
             # Cukup satu kolom aja buat filter tanggal biar luas
-            df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
+            df_raw['created_at'] = pd.to_datetime(df_raw['created_at']).dt.strftime('%Y-%m-%d %H:%M:%S')
             min_date = df_raw['created_at'].min().date()
             max_date = df_raw['created_at'].max().date()
             
