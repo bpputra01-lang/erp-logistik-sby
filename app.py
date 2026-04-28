@@ -2970,9 +2970,40 @@ conn = st.connection(
 )
 
 def save_data(df):
-    # Supabase butuh list of dicts. Nama kolom case-sensitive (disarankan lowercase di DB)
-    data_dict = df.to_dict(orient='records')
-    conn.table("reject_list").insert(data_dict).execute()
+    import numpy as np
+    
+    # 1. Bikin salinan biar data asli gak rusak
+    df_clean = df.copy()
+    
+    # 2. Paksa semua nama kolom jadi lowercase & tanpa spasi (Samain sama DB)
+    df_clean.columns = [str(c).lower().strip().replace(' ', '_') for c in df_clean.columns]
+    
+    # 3. LIST KOLOM WAJIB (Hanya yang ada di SS Supabase lo!)
+    # Kita buang 'id' karena itu auto-increment, dan 'qty' karena gak ada di DB lo.
+    db_cols = ['cabang', 'bin_awal', 'bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan', 'tanggal_input']
+    
+    # Filter hanya kolom yang emang ada di database lo
+    final_cols = [c for c in db_cols if c in df_clean.columns]
+    df_clean = df_clean[final_cols]
+    
+    # 4. HANDLE DATA KOSONG (NaN/None) -> Ini biang kerok APIError
+    # Ganti NaN jadi None agar Supabase ngebaca sebagai NULL (bukan error)
+    df_clean = df_clean.replace({np.nan: None})
+    
+    # 5. Konversi ke List of Dict
+    data_dict = df_clean.to_dict(orient='records')
+    
+    # 6. Eksekusi dengan Try-Except biar lo tau error aslinya kalau gagal
+    try:
+        if data_dict:
+            conn.table("reject_list").insert(data_dict).execute()
+        else:
+            import streamlit as st
+            st.error("Gak ada data yang valid buat di-insert, cok!")
+    except Exception as e:
+        import streamlit as st
+        st.error(f"SUPABASE NANGIS COK: {e}")
+        st.stop() # Berhenti di sini biar lo bisa baca errornya
 
 def delete_reject_item(row_id):
     # rowid di SQLite diganti dengan 'id' (Primary Key) di Supabase
