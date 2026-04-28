@@ -4800,14 +4800,29 @@ def show_database_ongkir():
                 </div>
             """, unsafe_allow_html=True)
 
-            m1, m2, m3 = st.columns(3)
+            # --- KALKULASI DATA MATRIX ---
             total_biaya = df_filtered['total_ongkir'].sum()
             total_koli = df_filtered['total_koli'].sum()
-            with m1: st.metric("TOTAL BIAYA", f"Rp {total_biaya:,.0f}")
+            avg = total_biaya/total_koli if total_koli > 0 else 0
+
+            # Logika Filter RTO vs Barang Datang (Non-RTO)
+            # na=False buat jaga-jaga kalau ada data kosong biar gak error
+            mask_rto = df_filtered['supplier'].str.contains('RTO', case=False, na=False)
+            biaya_rto = df_filtered[mask_rto]['total_ongkir'].sum()
+            biaya_datang = df_filtered[~mask_rto]['total_ongkir'].sum()
+
+            # --- TAMPILAN BARIS 1 (Main Metrics) ---
+            m1, m2, m3 = st.columns(3)
+            with m1: st.metric("TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
             with m2: st.metric("TOTAL KOLI", f"{total_koli} Pcs")
-            with m3: 
-                avg = total_biaya/total_koli if total_koli > 0 else 0
-                st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
+            with m3: st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
+
+            # --- TAMPILAN BARIS 2 (Breakdown Metrics) ---
+            m4, m5 = st.columns(2)
+            with m4: 
+                st.metric("BIAYA RTO (RETUR)", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
+            with m5: 
+                st.metric("BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
 
             st.markdown("---")
 
