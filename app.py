@@ -4795,7 +4795,7 @@ def show_database_ongkir():
 
             # --- JUDUL DASHBOARD & MATRIX ---
             st.markdown("""
-                <div style="background-color: #1e2227; padding: 10px 15px; border-radius: 8px; border-left: 5px solid #FFD700; margin-top: 25px; margin-bottom: 15px; shadow: 2px 2px 5px rgba(0,0,0,0.2); display: inline-block; min-width: 300px;">
+                <div style="background-color: #1e2227; padding: 10px 15px; border-radius: 8px; border-left: 5px solid #FFD700; margin-top: 25px; margin-bottom: 15px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); display: inline-block; min-width: 300px;">
                     <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">💲 TOTAL BIAYA ONGKIR</h4>
                 </div>
             """, unsafe_allow_html=True)
@@ -4805,24 +4805,52 @@ def show_database_ongkir():
             total_koli = df_filtered['total_koli'].sum()
             avg = total_biaya/total_koli if total_koli > 0 else 0
 
-            # Logika Filter RTO vs Barang Datang (Non-RTO)
-            # na=False buat jaga-jaga kalau ada data kosong biar gak error
             mask_rto = df_filtered['supplier'].str.contains('RTO', case=False, na=False)
             biaya_rto = df_filtered[mask_rto]['total_ongkir'].sum()
             biaya_datang = df_filtered[~mask_rto]['total_ongkir'].sum()
 
             # --- TAMPILAN BARIS 1 (Main Metrics) ---
             m1, m2, m3 = st.columns(3)
-            with m1: st.metric("TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
-            with m2: st.metric("TOTAL KOLI", f"{total_koli} Pcs")
-            with m3: st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
+
+            with m1:
+                st.markdown("""
+                    <div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #7a5af8; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+                """, unsafe_allow_html=True)
+                st.metric("📦 TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            with m2:
+                st.markdown("""
+                    <div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #2ecc71; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+                """, unsafe_allow_html=True)
+                st.metric("🏬 TOTAL KOLI", f"{total_koli} Pcs", "↑ OVERALL")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            with m3:
+                st.markdown("""
+                    <div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #f1c40f; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+                """, unsafe_allow_html=True)
+                st.metric("🏗️ AVG COST/KOLI", f"Rp {avg:,.0f}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            st.write("") # Spacer biar gak dempet
 
             # --- TAMPILAN BARIS 2 (Breakdown Metrics) ---
             m4, m5 = st.columns(2)
-            with m4: 
-                st.metric("BIAYA RTO (RETUR)", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
-            with m5: 
-                st.metric("BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
+
+            with m4:
+                st.markdown("""
+                    <div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #e74c3c; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+                """, unsafe_allow_html=True)
+                st.metric("⚠️ BIAYA RTO (RETUR)", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            with m5:
+                st.markdown("""
+                    <div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #3498db; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);">
+                """, unsafe_allow_html=True)
+                st.metric("📥 BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
+                st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown("---")
 
