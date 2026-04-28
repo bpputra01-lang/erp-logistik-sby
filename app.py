@@ -3312,20 +3312,29 @@ def convert_all_to_excel(df):
     import io
     output = io.BytesIO()
     
-    # 1. Filter Status 2 (Tetap dipertahankan)
+    # 1. Filter Status 2
     df_download = df[df['status'] == 2].copy()
     
     if not df_download.empty:
+        # --- LOGIKA ANTI-KEYERROR ---
+        # List kolom yang WAJIB ada di Excel
+        target_cols = ['sku', 'article_name', 'bin_awal', 'qty', 'size', 'keterangan']
         
-        # Cek kolom qty (kalo di DB ga ada, kita buat default 1)
-        if 'qty' not in df_download.columns:
-            df_download['qty'] = 1 
-            
-        final_df = df_download[['sku', 'article_name', 'bin_awal', 'qty', 'size', 'keterangan']]
+        # Cek mana yang gak ada, kalo gak ada kita buatin kolom kosong biar gak error
+        for col in target_cols:
+            if col not in df_download.columns:
+                if col == 'qty':
+                    df_download['qty'] = 1 # Khusus QTY kasih default 1
+                else:
+                    df_download[col] = "-" # Sisanya kasih strip
         
-        # 4. Rename Header buat Excel (Biar Rapi)
+        # 2. Ambil kolomnya (Sekarang dijamin gak akan KeyError)
+        final_df = df_download[target_cols].copy()
+        
+        # 3. Rename Header biar cakep
         final_df.columns = ['SKU', 'ARTICLE NAME', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
         
+        # 4. Tulis ke Excel
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             final_df.to_excel(writer, index=False, sheet_name='Mass_Request_Setup')
             
@@ -3336,7 +3345,7 @@ def convert_all_to_excel(df):
                 worksheet.set_column(i, i, column_len)
                 
     return output.getvalue()
-
+    
 def project_approval_reject():
     # --- CSS CUSTOM --- 
     st.markdown(""" 
