@@ -3123,33 +3123,12 @@ def menu_reject_defect():
         
         col_dl, col_up = st.columns([1, 2])
         with col_dl:
-            # Sesuaikan dengan kolom di Supabase lo: cabang, bin_awal, bin, sku, article_name, size, kategori, keterangan
-            template_cols = ['cabang', 'bin_awal', 'bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan']
-            
-            # Kita kasih contoh 1 baris kosong atau dummy biar user tau cara isinya
+            template_cols = ['cabang', 'bin_awal','bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan']
             df_template = pd.DataFrame(columns=template_cols)
-            
             output = BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_template.to_excel(writer, index=False, sheet_name='Template_Upload')
-                
-                # --- TAMBAHAN BIAR TEMPLATE CAKEP ---
-                workbook = writer.book
-                worksheet = writer.sheets['Template_Upload']
-                
-                # Kasih warna header biar admin lo gak salah baris
-                header_format = workbook.add_format({'bold': True, 'bg_color': '#FFD700', 'border': 1})
-                for col_num, value in enumerate(df_template.columns.values):
-                    worksheet.write(0, col_num, value, header_format)
-                    worksheet.set_column(col_num, col_num, 20) # Lebarin kolomnya otomatis
-
-            st.download_button(
-                label="📥 Download Template Excel",
-                data=output.getvalue(),
-                file_name="template_reject_massal.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+                df_template.to_excel(writer, index=False)
+            st.download_button("📥 Download Template", output.getvalue(), "template_reject.xlsx")
 
         with col_up:
             if 'upload_key' not in st.session_state: st.session_state.upload_key = 0
@@ -3328,45 +3307,49 @@ SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
 
+# --- 1. TARUH DI BAGIAN PALING ATAS (Luar semua fungsi/tabs) ---
 @st.cache_data
 def convert_all_to_excel(df):
     import io
     output = io.BytesIO()
     
-    # 1. Filter Status 2
+    # 1. Tetap pertahankan filter hanya Status 2
     df_download = df[df['status'] == 2].copy()
     
     if not df_download.empty:
-        # --- LOGIKA ANTI-KEYERROR (SESUAI SUPABASE) ---
-        # Gunakan 'bin_awal' sesuai screenshot database lo
-        target_cols = ['sku', 'article_name', 'bin_awal', 'qty', 'size', 'keterangan']
+        # 2. Standarisasi kolom (QTY, ARTICLE, SIZE, KETERANGAN)
+        # Pastikan kolom-kolom ini tidak bikin error jika salah satu kosong di DB
+        if 'qty' not in df_download.columns:
+            df_download['qty'] = 1 
+            
+        if 'article_name' not in df_download.columns:
+            df_download['article_name'] = "-" # Nama kolom sesuaikan dengan DB lo (misal: 'article')
         
-        for col in target_cols:
-            if col not in df_download.columns:
-                if col == 'qty':
-                    df_download['qty'] = 1 
-                else:
-                    df_download[col] = "-" 
+        if 'size' not in df_download.columns:
+            df_download['size'] = "-" 
+            
+        if 'keterangan' not in df_download.columns:
+            df_download['keterangan'] = "-" 
+            
+        # 3. Pilih kolom termasuk ARTICLE
+        # Urutan: SKU, ARTICLE, BIN ASAL, QTY, SIZE, KETERANGAN
+        final_df = df_download[['sku', 'article_name', 'bin_asal', 'qty', 'size', 'keterangan']]
         
-        # 2. Ambil kolomnya
-        final_df = df_download[target_cols].copy()
+        # 4. Bikin Header Kapital (Biar rapi di Excel)
+        final_df.columns = ['SKU', 'ARTICLE', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
         
-        # 3. Rename Header (Di sini baru kita kasih nama 'BIN ASAL' biar user paham)
-        final_df.columns = ['SKU', 'ARTICLE NAME', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
-        
-        # 4. Tulis ke Excel
+        # 5. Proses tulis ke Excel
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             final_df.to_excel(writer, index=False, sheet_name='Mass_Request_Setup')
             
-            # Auto-fit kolom
+            # Auto-fit lebar kolom biar gak usah geser manual
             worksheet = writer.sheets['Mass_Request_Setup']
             for i, col in enumerate(final_df.columns):
-                # Hitung panjang data biar gak kepotong di Excel
                 column_len = max(final_df[col].astype(str).map(len).max(), len(col)) + 2
                 worksheet.set_column(i, i, column_len)
                 
     return output.getvalue()
-    
+
 def project_approval_reject():
     # --- CSS CUSTOM --- 
     st.markdown(""" 
