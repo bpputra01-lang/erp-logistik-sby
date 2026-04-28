@@ -4820,7 +4820,7 @@ def show_database_ongkir():
             # --- TAMPILAN BARIS 2 (Breakdown Metrics) ---
             m4, m5 = st.columns(2)
             with m4: 
-                st.metric("BIAYA RTO (RETUR)", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
+                st.metric("BIAYA RTO", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
             with m5: 
                 st.metric("BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
 
