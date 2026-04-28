@@ -4606,26 +4606,7 @@ def show_database_ongkir():
             background-color: #ff4b4b !important;
             color: #ffffff !important;
         }
-        /* Style Tabel & Metric */
-        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
-        .stTable { background-color: #1e2227; border-radius: 5px; }
-        /* Matrix/Metric Card Style */
-        [data-testid="stMetricValue"] {
-            color: #FFD700 !important;
-            font-size: 28px !important;
-            font-weight: 700 !important;
-        }
-        [data-testid="stMetricLabel"] {
-            color: #ffffff !important;
-            font-size: 14px !important;
-            letter-spacing: 1px;
-        }
-        .stMetric {
-            background-color: #1e2227;
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 5px solid #FFD700;
-        }
+        
         </style>
         """, unsafe_allow_html=True)
 
