@@ -4638,6 +4638,16 @@ def show_database_ongkir():
         return create_client(SUPABASE_URL, SUPABASE_KEY)
 
     supabase = init_connection()
+    def clean_currency(value):
+        if pd.isna(value) or value == "":
+            return 0
+        # Buang Rp, buang titik (ribuan), buang koma (desimal), buang spasi
+        clean_val = str(value).replace('Rp', '').replace('.', '').replace(',', '').strip()
+        try:
+            # Pake float dulu baru int buat jaga-jaga kalau ada desimal
+            return int(float(clean_val))
+        except:
+            return 0
 
 # --- 3. FUNGSI INTERNAL ---
     def save_data(supplier, ekspedisi, koli, ongkir):
@@ -4722,7 +4732,7 @@ def show_database_ongkir():
                                         "supplier": str(row["SUPPLIER"]).upper(), 
                                         "ekspedisi": str(row["EKSPEDISI"]).upper(), 
                                         "total_koli": int(row["TOTAL KOLI"]), 
-                                        "total_ongkir": int(row["ONGKIR"])
+                                        "total_ongkir": clean_currency(row["ONGKIR"])
                                     }
                                     supabase.table("shipping_costs").insert(data_batch).execute()
                             st.success("Berhasil diinput!")
