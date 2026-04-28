@@ -3123,12 +3123,33 @@ def menu_reject_defect():
         
         col_dl, col_up = st.columns([1, 2])
         with col_dl:
-            template_cols = ['cabang', 'bin_awal','bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan']
+            # Sesuaikan dengan kolom di Supabase lo: cabang, bin_awal, bin, sku, article_name, size, kategori, keterangan
+            template_cols = ['cabang', 'bin_awal', 'bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan']
+            
+            # Kita kasih contoh 1 baris kosong atau dummy biar user tau cara isinya
             df_template = pd.DataFrame(columns=template_cols)
+            
             output = BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_template.to_excel(writer, index=False)
-            st.download_button("📥 Download Template", output.getvalue(), "template_reject.xlsx")
+                df_template.to_excel(writer, index=False, sheet_name='Template_Upload')
+                
+                # --- TAMBAHAN BIAR TEMPLATE CAKEP ---
+                workbook = writer.book
+                worksheet = writer.sheets['Template_Upload']
+                
+                # Kasih warna header biar admin lo gak salah baris
+                header_format = workbook.add_format({'bold': True, 'bg_color': '#FFD700', 'border': 1})
+                for col_num, value in enumerate(df_template.columns.values):
+                    worksheet.write(0, col_num, value, header_format)
+                    worksheet.set_column(col_num, col_num, 20) # Lebarin kolomnya otomatis
+
+            st.download_button(
+                label="📥 Download Template Excel",
+                data=output.getvalue(),
+                file_name="template_reject_massal.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
 
         with col_up:
             if 'upload_key' not in st.session_state: st.session_state.upload_key = 0
