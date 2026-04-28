@@ -3313,33 +3313,36 @@ def convert_all_to_excel(df):
     import io
     output = io.BytesIO()
     
-    # 1. Filter hanya data dengan status 2
+    # 1. Tetap pertahankan filter hanya Status 2
     df_download = df[df['status'] == 2].copy()
     
     if not df_download.empty:
-        # 2. Standarisasi kolom (QTY, SIZE, KETERANGAN)
-        # Jika kolom belum ada di dataframe, kita buatkan kolom dummy biar gak error
+        # 2. Standarisasi kolom (QTY, ARTICLE, SIZE, KETERANGAN)
+        # Pastikan kolom-kolom ini tidak bikin error jika salah satu kosong di DB
         if 'qty' not in df_download.columns:
             df_download['qty'] = 1 
+            
+        if 'article_name' not in df_download.columns:
+            df_download['article_name'] = "-" # Nama kolom sesuaikan dengan DB lo (misal: 'article')
         
         if 'size' not in df_download.columns:
-            df_download['size'] = "-" # Default strip kalau kosong
+            df_download['size'] = "-" 
             
         if 'keterangan' not in df_download.columns:
-            df_download['keterangan'] = "-" # Default strip kalau kosong
+            df_download['keterangan'] = "-" 
             
-        # 3. Pilih kolom yang mau di-export (SKU, BIN ASAL, QTY, SIZE, KETERANGAN)
-        # Pastikan penulisan kolom di list ini sesuai dengan nama kolom di database/df lo
-        final_df = df_download[['sku', 'bin_asal', 'qty', 'size', 'keterangan']]
+        # 3. Pilih kolom termasuk ARTICLE
+        # Urutan: SKU, ARTICLE, BIN ASAL, QTY, SIZE, KETERANGAN
+        final_df = df_download[['sku', 'article_name', 'bin_asal', 'qty', 'size', 'keterangan']]
         
-        # 4. Bikin Header jadi cakep (Huruf Kapital)
-        final_df.columns = ['SKU', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
+        # 4. Bikin Header Kapital (Biar rapi di Excel)
+        final_df.columns = ['SKU', 'ARTICLE', 'BIN ASAL', 'QTY', 'SIZE', 'KETERANGAN']
         
         # 5. Proses tulis ke Excel
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             final_df.to_excel(writer, index=False, sheet_name='Mass_Request_Setup')
             
-            # Tambahan: Auto-fit lebar kolom biar gak usah geser manual di Excel
+            # Auto-fit lebar kolom biar gak usah geser manual
             worksheet = writer.sheets['Mass_Request_Setup']
             for i, col in enumerate(final_df.columns):
                 column_len = max(final_df[col].astype(str).map(len).max(), len(col)) + 2
