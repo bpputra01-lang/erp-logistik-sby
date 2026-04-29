@@ -5771,7 +5771,10 @@ elif menu == "Stock Minus":
                     c1, c2, c3 = st.columns(3)
                     c1.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Minus</span><span class="m-val">{int(total_qty)}</span></div>', unsafe_allow_html=True)
                     c2.markdown(f'<div class="m-box"><span class="m-lbl">Tercover</span><span class="m-val">{int(df_s["QUANTITY"].sum()) if not df_s.empty else 0}</span></div>', unsafe_allow_html=True)
-                    c3.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Adj</span><span class="m-val">{len(df_n)}</span></div>', unsafe_allow_html=True)
+                    # Hitung total qty dari df_need_adj (df_n)
+                    total_sisa_qty = abs(df_n[col_qty].sum()) if not df_n.empty else 0
+
+                    c3.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Adj</span><span class="m-val">{int(total_sisa_qty)}</span></div>', unsafe_allow_html=True)
 
                     t1, t2, t3 = st.tabs(["📄 MINUS AWAL", "🔄 TEMPLATE SET UP", "⚠️ JUSTIFIKASI"])
                     with t1: st.dataframe(df_m, use_container_width=True)
