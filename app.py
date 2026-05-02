@@ -4833,30 +4833,21 @@ def show_database_ongkir():
                 biaya_rto = df_filtered[mask_rto]['total_ongkir'].sum()
                 biaya_datang = df_filtered[~mask_rto]['total_ongkir'].sum()
 
+                # --- TAMPILAN BARIS 1 ---
                 m1, m2, m3 = st.columns(3)
                 with m1:
-                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
                     st.metric("TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
-                    st.markdown('</div>', unsafe_allow_html=True)
                 with m2:
-                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
                     st.metric("TOTAL KOLI", f"{total_koli} Pcs")
-                    st.markdown('</div>', unsafe_allow_html=True)
                 with m3:
-                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
                     st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
-                    st.markdown('</div>', unsafe_allow_html=True)
 
-                st.write("") 
+                # --- TAMPILAN BARIS 2 (Breakdown Metrics) ---
                 m4, m5 = st.columns(2)
-                with m4: 
-                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
-                    st.metric("BIAYA RTO", f"Rp {biaya_rto:,.0f}")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                with m5: 
-                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
+                with m4:
+                    st.metric("BIAYA RTO", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
+                with m5:
                     st.metric("BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
-                    st.markdown('</div>', unsafe_allow_html=True)
 
                 # --- DATA TABLE & DELETE ---
                 st.markdown("---")
