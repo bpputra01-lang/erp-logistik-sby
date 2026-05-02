@@ -4839,22 +4839,22 @@ def show_database_ongkir():
                     st.metric("TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
                     st.markdown('</div>', unsafe_allow_html=True)
                 with m2:
-                    st.markdown('<div class="stMetric" style="border-left-color: #2ecc71;">', unsafe_allow_html=True)
+                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
                     st.metric("TOTAL KOLI", f"{total_koli} Pcs")
                     st.markdown('</div>', unsafe_allow_html=True)
                 with m3:
-                    st.markdown('<div class="stMetric" style="border-left-color: #f1c40f;">', unsafe_allow_html=True)
+                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
                     st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
                     st.markdown('</div>', unsafe_allow_html=True)
 
                 st.write("") 
                 m4, m5 = st.columns(2)
                 with m4: 
-                    st.markdown('<div class="stMetric" style="border-left-color: #e74c3c;">', unsafe_allow_html=True)
+                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
                     st.metric("BIAYA RTO", f"Rp {biaya_rto:,.0f}")
                     st.markdown('</div>', unsafe_allow_html=True)
                 with m5: 
-                    st.markdown('<div class="stMetric" style="border-left-color: #3498db;">', unsafe_allow_html=True)
+                    st.markdown('<div class="stMetric">', unsafe_allow_html=True)
                     st.metric("BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
                     st.markdown('</div>', unsafe_allow_html=True)
 
