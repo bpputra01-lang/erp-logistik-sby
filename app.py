@@ -4766,22 +4766,42 @@ def show_database_ongkir():
 
             st.markdown("### 🔍 FILTER DATA")
             
-            # --- LOGIKA FILTER OTOMATIS ---
+            # --- LOGIKA PRESET TANGGAL (Session State) ---
+            today = date.today()
+            first_day_month = today.replace(day=1)
+
+            # Inisialisasi session state jika belum ada
+            if 'filter_tgl' not in st.session_state:
+                st.session_state.filter_tgl = (first_day_month, today)
+
+            # Tombol Shortcut
+            col_s1, col_s2, col_s3, col_s4 = st.columns([1, 1, 1, 4])
+            with col_s1:
+                if st.button("📅 Today", use_container_width=True):
+                    st.session_state.filter_tgl = (today, today)
+                    st.rerun()
+            with col_s2:
+                if st.button("📊 This Month", use_container_width=True):
+                    st.session_state.filter_tgl = (first_day_month, today)
+                    st.rerun()
+            with col_s3:
+                if st.button("⬅️ 7 Days", use_container_width=True):
+                    st.session_state.filter_tgl = (today - timedelta(days=7), today)
+                    st.rerun()
+
+            # --- INPUT FILTER ---
             col_f1, col_f2 = st.columns(2)
-            
             with col_f1:
-                # Filter Tanggal
-                min_date = df_raw['created_at'].min().date()
-                max_date = df_raw['created_at'].max().date()
-                date_range = st.date_input("Rentang Tanggal", value=(min_date, max_date))
-            
+                date_range = st.date_input(
+                    "Pilih Rentang Tanggal",
+                    value=st.session_state.filter_tgl,
+                    key="date_selector"
+                )
             with col_f2:
-                # FILTER UNIQUE EKSPEDISI (Otomatis Update)
                 list_ekspedisi = ["SEMUA"] + sorted(df_raw['ekspedisi'].unique().tolist())
                 pilih_ekspedisi = st.selectbox("Pilih Ekspedisi", list_ekspedisi)
 
             # --- APPLY FILTER ---
-            # Filter Tanggal
             if isinstance(date_range, tuple) and len(date_range) == 2:
                 start_date, end_date = date_range
                 mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
@@ -4789,48 +4809,55 @@ def show_database_ongkir():
             else:
                 df_filtered = df_raw.copy()
             
-            # Filter Ekspedisi
             if pilih_ekspedisi != "SEMUA":
                 df_filtered = df_filtered[df_filtered['ekspedisi'] == pilih_ekspedisi]
 
-            # --- JUDUL DASHBOARD & MATRIX ---
+            # --- JUDUL DASHBOARD ---
             st.markdown("""
                 <div style="background-color: #1e2227; padding: 10px 15px; border-radius: 8px; border-left: 5px solid #FFD700; margin-top: 25px; margin-bottom: 15px; shadow: 2px 2px 5px rgba(0,0,0,0.2); display: inline-block; min-width: 300px;">
                     <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">💲 TOTAL BIAYA ONGKIR</h4>
                 </div>
             """, unsafe_allow_html=True)
 
-            # --- KALKULASI DATA MATRIX ---
+            # --- KALKULASI DATA ---
             total_biaya = df_filtered['total_ongkir'].sum()
             total_koli = df_filtered['total_koli'].sum()
             avg = total_biaya/total_koli if total_koli > 0 else 0
 
-            # Logika Filter RTO vs Barang Datang (Non-RTO)
-            # na=False buat jaga-jaga kalau ada data kosong biar gak error
             mask_rto = df_filtered['supplier'].str.contains('RTO', case=False, na=False)
             biaya_rto = df_filtered[mask_rto]['total_ongkir'].sum()
             biaya_datang = df_filtered[~mask_rto]['total_ongkir'].sum()
 
-            # --- TAMPILAN BARIS 1 (Main Metrics) ---
+            # --- TAMPILAN MATRIX STYLE (Sesuai CSS Global Lo) ---
             m1, m2, m3 = st.columns(3)
-            with m1: st.metric("TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
-            with m2: st.metric("TOTAL KOLI", f"{total_koli} Pcs")
-            with m3: st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
+            with m1:
+                st.markdown('<div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #7a5af8;">', unsafe_allow_html=True)
+                st.metric("📦 TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
+                st.markdown('</div>', unsafe_allow_html=True)
+            with m2:
+                st.markdown('<div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #2ecc71;">', unsafe_allow_html=True)
+                st.metric("🏬 TOTAL KOLI", f"{total_koli} Pcs", "↑ OVERALL")
+                st.markdown('</div>', unsafe_allow_html=True)
+            with m3:
+                st.markdown('<div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #f1c40f;">', unsafe_allow_html=True)
+                st.metric("🏗️ AVG COST/KOLI", f"Rp {avg:,.0f}")
+                st.markdown('</div>', unsafe_allow_html=True)
 
-            # --- TAMPILAN BARIS 2 (Breakdown Metrics) ---
+            st.write("") 
             m4, m5 = st.columns(2)
-            with m4: 
-                st.metric("BIAYA RTO", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
-            with m5: 
-                st.metric("BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
+            with m4:
+                st.markdown('<div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #e74c3c;">', unsafe_allow_html=True)
+                st.metric("⚠️ BIAYA RTO", f"Rp {biaya_rto:,.0f}")
+                st.markdown('</div>', unsafe_allow_html=True)
+            with m5:
+                st.markdown('<div style="background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #3498db;">', unsafe_allow_html=True)
+                st.metric("📥 BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
+                st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown("---")
 
             # --- RIWAYAT TRANSAKSI ---
             st.subheader("📝 Riwayat Transaksi")
-            st.caption("Centang baris pada tabel di bawah, lalu klik tombol hapus.")
-
-            # Format jam biar bersih buat tampilan
             df_display = df_filtered.copy()
             df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -4843,7 +4870,6 @@ def show_database_ongkir():
             )
 
             selected_rows = event.selection.rows
-            
             if selected_rows:
                 ids_to_delete = df_display.sort_values('created_at', ascending=False).iloc[selected_rows]['id'].tolist()
                 st.warning(f"Terpilih {len(ids_to_delete)} data untuk dihapus.")
@@ -4851,15 +4877,15 @@ def show_database_ongkir():
                     try:
                         for target_id in ids_to_delete:
                             supabase.table("shipping_costs").delete().eq("id", target_id).execute()
-                        st.success("Data berhasil dibantai!")
+                        st.success("Data berhasil dihapus!")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Gagal hapus cok: {e}")
+                        st.error(f"Gagal hapus: {e}")
             else:
                 st.info("💡 Centang baris di tabel untuk menghapus data.")
 
         else:
-            st.info("Data masih kosong. Input dulu di tab sebelah!")    
+            st.info("Data masih kosong. Input dulu di tab sebelah!") 
 
 with st.sidebar:
        st.markdown("""
