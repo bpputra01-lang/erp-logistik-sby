@@ -4492,21 +4492,41 @@ from supabase import create_client, Client
 from datetime import datetime, date, timedelta
 import pandas as pd
 
-    # --- 1. DEFINISIKAN FUNGSI DI ATAS (SEBELUM DIPANGGIL) ---
+# --- 1. KONEKSI SUPABASE (DILUAR FUNGSI AGAR GLOBAL) ---
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+
+@st.cache_resource
+def init_supabase():
+    # PERBAIKAN: Baris di bawah ini sekarang sudah menjorok ke dalam (Indented)
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Inisialisasi client sekali saja
+supabase = init_supabase()
+
+# --- 2. FUNGSI FETCH DATA ---
 @st.cache_data(ttl=60)
 def fetch_data():
     try:
-        # Mengambil data dari tabel shipping_costs di Supabase
         res = supabase.table("shipping_costs").select("*").execute()
         return pd.DataFrame(res.data)
-    except Exception:
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
+def clean_currency(value):
+    if pd.isna(value) or value == "":
+        return 0
+    clean_val = str(value).replace('Rp', '').replace('.', '').replace(',', '').strip()
+    try:
+        return int(float(clean_val))
+    except:
+        return 0
+
 def show_database_ongkir():
-    # --- 1. CSS CUSTOM (Sesuai Request: Samakan Style Input & Hero Header) ---
+    # --- 3. CSS CUSTOM (Aesthetic Premium Gold) ---
     st.markdown("""
         <style>
-        /* Style untuk Hero Header Utama */
         .hero-header {
             background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
             padding: 2rem;
@@ -4521,148 +4541,48 @@ def show_database_ongkir():
             font-size: 2.2rem;
             letter-spacing: 1px;
         }
-
-        /* Style Input (Nama Supplier, Total Koli, Total Ongkir) agar Seragam */
         div[data-baseweb="input"], div[data-baseweb="select"] {
             background-color: #0e1117 !important;
             border: 1px solid #3e444d !important;
             border-radius: 5px !important;
         }
-        
-        /* Gold Border saat Focus/Klik */
         div[data-baseweb="input"]:focus-within {
             border-color: #FFD700 !important;
             box-shadow: 0 0 0 1px #FFD700 !important;
         }
-        /* 3. Style Subheader (1. DOWNLOAD & 2. UPLOAD) */
-        /* Kita bungkus pakai div khusus untuk background solid Gold */
-        .solid-header {
-            background-color: #FFD700 !important; /* Background Emas Solid */
-            color: #0e1117 !important; /* Teks Hitam biar kontras */
-            padding: 10px 15px !important;
-            border-radius: 5px !important;
-            font-weight: 900 !important;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            margin-bottom: 15px !important;
-            display: inline-block; /* Agar background pas sama teks */
-        }
-        /* 5. Style Tombol Utama (SIMPAN & UPLOAD) */
-        /* Background Navy Tua, Border & Text Gold */
         .stButton button, .stDownloadButton button {
-            background-color: #1e2227 !important;
+            background-color: #1a1e24 !important;
             color: #FFD700 !important;
-            border: 2px solid #FFD700 !important;
-            font-weight: bold !important;
-            text-transform: uppercase;
+            border: 3px solid #FFD700 !important;
+            border-radius: 12px !important;
+            padding: 12px 24px !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important;
+            transition: all 0.3s ease-in-out;
         }
         .stButton button:hover, .stDownloadButton button:hover {
             background-color: #FFD700 !important;
             color: #0e1117 !important;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4);
         }
-        /* Mencari semua tombol di form maupun tombol download */
-        .stButton button, .stDownloadButton button {
-            background-color: #1a1e24 !important; /* Background Navy Tua Gelap */
-            color: #FFD700 !important; /* Tulisan warna Emas */
-            border: 3px solid #FFD700 !important; /* Bingkai Emas Tebal */
-            border-radius: 12px !important; /* Sudut melengkung premium */
-            padding: 12px 24px !important;
-            font-size: 1.1rem !important;
-            font-weight: 800 !important;
-            text-transform: uppercase !important; /* Huruf besar semua */
-            letter-spacing: 1.5px; /* Spasi antar huruf biar gagah */
-            transition: all 0.3s ease-in-out; /* Efek transisi halus */
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5); /* Shadow biar timbul */
-        }
-
-        /* Efek pas kursor diarahkan ke tombol (Hover) */
-        .stButton button:hover, .stDownloadButton button:hover {
-            background-color: #FFD700 !important; /* Background berubah jadi Emas Solid */
-            color: #0e1117 !important; /* Tulisan berubah jadi Hitam biar kontras parah */
-            transform: translateY(-3px); /* Tombol sedikit terangkat */
-            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4); /* Efek glow emas */
-        }
-        
-        /* Menghilangkan border default yang jelek di sekitar tombol saat fokus */
-        .stButton button:focus, .stDownloadButton button:focus {
-            box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.5) !important;
-            outline: none !important;
-        }
-
-        /* Memperbaiki alignment icon roket agar sejajar teks */
-        .stButton button span {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        /* Samakan warna teks input number (Koli & Ongkir) agar putih */
-        input[type="number"] {
-            color: #ffffff !important;
-            background-color: #0e1117 !important;
-        }
-        /* 1. TARGETING HEADER EXPANDER (INPUT & BATCH OPS) */
-        /* Kita paksa background jadi Navy Gelap dan teks jadi Emas */
-        [data-testid="stExpander"] details summary {
-            background-color: #1a1e24 !important; /* Warna Gelap Industrial */
-            color: #FFFFFF !important; /* Teks Emas */
-            border: 1px solid #3e444d !important;
-            border-radius: 8px !important;
-            padding: 10px 15px !important;
-            transition: 0.3s !important;
-        }
-        /* Style Tombol Hapus (Warna Merah Reject) */
-        .stButton button.btn-hapus {
-            background-color: #2a1a1a !important;
-            color: #ff4b4b !important;
-            border: 2px solid #ff4b4b !important;
-        }
-        .stButton button.btn-hapus:hover {
-            background-color: #ff4b4b !important;
-            color: #ffffff !important;
-        }
-        /* Style Tabel & Metric */
-        div[data-testid="stMetricValue"] { color: #FFD700; font-weight: bold; }
-        .stTable { background-color: #1e2227; border-radius: 5px; }
-        /* Matrix/Metric Card Style */
         [data-testid="stMetricValue"] {
             color: #FFD700 !important;
             font-size: 28px !important;
             font-weight: 700 !important;
         }
-        [data-testid="stMetricLabel"] {
-            color: #ffffff !important;
-            font-size: 14px !important;
-            letter-spacing: 1px;
-        }
-        .stMetric {
-            background-color: #1e2227;
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 5px solid #FFD700;
-        }
         </style>
         """, unsafe_allow_html=True)
 
-    # --- 2. KONEKSI SUPABASE ---
-    SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
-    SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
-
-    @st.cache_resource
-    def init_supabase():
-    from supabase import create_client
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
-
-    supabase = init_supabase()
-    def clean_currency(value):
-        if pd.isna(value) or value == "":
-            return 0
-        # Buang Rp, buang titik (ribuan), buang koma (desimal), buang spasi
-        clean_val = str(value).replace('Rp', '').replace('.', '').replace(',', '').strip()
-        try:
-            # Pake float dulu baru int buat jaga-jaga kalau ada desimal
-            return int(float(clean_val))
-        except:
-            return 0
+    # Header View
+    st.markdown('<div class="hero-header"><h1>🚚 DATABASE ONGKIR JEZPRO</h1></div>', unsafe_allow_html=True)
+    
+    # Contoh pemanggilan data
+    df = fetch_data()
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("Belum ada data ongkir.")
 
 # --- 3. FUNGSI INTERNAL ---
     # --- 3. FUNGSI INTERNAL ---
