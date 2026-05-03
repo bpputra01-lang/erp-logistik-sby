@@ -2150,7 +2150,8 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             note = "DRAFT SESUAI" if qty_j == qty_h else "BEDA QTY"
             status = "OK" if qty_j == qty_h else "PERLU EDIT QTY DRAFT"
             
-            df_res.loc[idx,['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \[qty_j, note, "", 0, status]
+            # (PERBAIKAN TYPO: Hapus tanda \ sebelum kurung siku)
+            df_res.loc[idx,['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [qty_j, note, "", 0, status]
             processed_indices.add(idx)
 
     # --- 3. TAHAP 2: SISANYA BARU CEK PINDAH BIN / DELETE ---
@@ -2168,9 +2169,11 @@ def engine_compare_draft_jezpro(df_app, df_draft):
             bin_lain = ", ".join([b[1] for b in possible_bins])
             qty_lain = sum([rem_app[b] for b in possible_bins])
             
-            df_res.loc[idx,['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \[0, "PINDAH BIN", bin_lain, qty_lain, "PERLU EDIT BIN DRAFT"]
+            # (PERBAIKAN TYPO: Hapus tanda \ sebelum kurung siku)
+            df_res.loc[idx,['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] =[0, "PINDAH BIN", bin_lain, qty_lain, "PERLU EDIT BIN DRAFT"]
         else:
-            df_res.loc[idx,['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = \[0, "HAPUS ITEM INI", "", 0, "DELETE ITEM"]
+            # (PERBAIKAN TYPO: Hapus tanda \ sebelum kurung siku)
+            df_res.loc[idx,['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [0, "HAPUS ITEM INI", "", 0, "DELETE ITEM"]
 
     # --- 4. TAHAP 3: ADD NEW (Hanya jika SKU bener-bener gak ada di Draft) ---
     sku_in_draft = set(df_draft.iloc[:, 3].apply(clean_sku).unique())
