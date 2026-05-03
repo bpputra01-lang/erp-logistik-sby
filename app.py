@@ -524,7 +524,294 @@ if 'login_success' not in st.session_state:
     # Set True supaya pas klik menu lain di dashboard, pop-up gak muncul terus-terusan
     st.session_state.login_success = True
 
+# =========================================================
+# SIDEBAR & MENU INITIALIZATION (KODE YANG SEMPAT HILANG)
+# =========================================================
+with st.sidebar:
+    st.markdown("""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
+        
+        /* --- JUDUL UTAMA 3D ELEGANT --- */
+        .elegant-header {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 900;
+            font-size: 26px;
+            text-align: left;
+            margin-top: -60px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(197, 160, 89, 0.3);
+            letter-spacing: -0.5px;
+            line-height: 1.3;
+            
+            /* Efek 3D dengan multiple shadows */
+            text-shadow: 
+                0 1px 0 rgba(255,255,255,0.1),
+                0 2px 0 rgba(0,0,0,0.2),
+                0 3px 0 rgba(0,0,0,0.15),
+                0 4px 15px rgba(0,0,0,0.3),
+                0 0 20px rgba(197, 160, 89, 0.15);
+            
+            /* Gradient text dengan warna lebih kaya */
+            background: linear-gradient(
+                180deg,
+                #FFFFFF 0%,
+                #E8E8E8 30%,
+                #C5A059 60%,
+                #8E6D35 100%
+            );
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            
+            /* Subtle glow effect */
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+        
+        /* --- ICON/Emoji dengan efek glow --- */
+        .elegant-header .header-icon {
+            display: inline-block;
+            font-size: 32px;
+            margin-right: 8px;
+            vertical-align: middle;
+            filter: drop-shadow(0 2px 8px rgba(197, 160, 89, 0.5));
+            animation: truck-bounce 2s ease-in-out infinite;
+        }
+        
+        /* Animasi halus untuk icon */
+        @keyframes truck-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        
+        /* --- SUBTITLE ELEGANT --- */
+        .elegant-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(197, 160, 89, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-top: -10px;
+            margin-bottom: 20px;
+            padding-left: 2px;
+            
+            /* Efek subtle glow */
+            text-shadow: 0 0 10px rgba(197, 160, 89, 0.3);
+        }
+        
+        /* --- DECORATIVE LINE --- */
+        .elegant-divider {
+            height: 2px;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                #C5A059 20%,
+                #FFD700 50%,
+                #C5A059 80%,
+                transparent 100%
+            );
+            margin: 15px 0 20px 0;
+            border-radius: 2px;
+            opacity: 0.6;
+        }
+        
+        /* --- VERSION TAG --- */
+        .version-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(197, 160, 89, 0.15) 0%, rgba(197, 160, 89, 0.05) 100%);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 9px;
+            font-weight: 600;
+            color: #C5A059;
+            letter-spacing: 1px;
+            margin-top: 5px;
+        }
 
+        /* --- LABEL STYLING --- */
+        section[data-testid="stSidebar"] label p,
+        section[data-testid="stSidebar"] .stCaption p {
+            color: #E2E8F0;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            opacity: 1 !important;
+            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* --- INPUT BOX STYLE --- */
+        div[data-baseweb="input"], div[data-baseweb="select"] > div {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 8px !important;
+        } 
+
+        input {
+            color: #FFFFFF !important;
+        }
+
+        /* --- LABEL HITAM DI AREA GELAP --- */
+        div[data-testid="stWidgetLabel"] p {
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
+            font-family: 'Inter', sans-serif;
+            font-weight: bold;
+        }
+
+        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+            border: 1px solid #FFD700 !important;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
+        }
+
+        /* --- FILE UPLOADER --- */[data-testid="stFileUploaderSection"] {
+            background-color: #1a2634 !important;
+            border: 2px dashed #C5A059 !important;
+            border-radius: 10px !important;
+        }
+
+        [data-testid="stFileUploaderText"] > span,
+        [data-testid="stFileUploaderText"] > small {
+            color: #FFFFFF !important;
+        }
+
+        [data-testid="stFileUploader"] button {
+            background-color: #C5A059 !important;
+            color: #1a2634 !important;
+            border-radius: 5px !important;
+            font-weight: bold !important;
+            border: none !important;
+            padding: 5px 15px !important;
+        }
+
+        [data-testid="stFileUploader"] button:hover {
+            background-color: #FFD700 !important;
+            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
+        }
+
+        [data-testid="stFileUploader"] svg {
+            fill: #C5A059 !important;
+        }
+        </style>
+        
+        <!-- JUDUL UTAMA DENGAN ICON -->
+        <div class="elegant-header">
+            <span class="header-icon">🚛</span>
+            ERP LOGISTIC<br>SURABAYA
+        </div>
+        
+        <!-- SUBTITLE -->
+        <div class="elegant-subtitle">
+            Warehouse Management System
+        </div>
+        
+        <!-- GARIS DEKORATIF -->
+        <div class="elegant-divider"></div>
+        
+        <!-- VERSION TAG -->
+        <div class="version-tag">v2.1 PRO</div>
+    """, unsafe_allow_html=True)
+
+# --- TOMBOL LOGOUT ---
+with st.sidebar:
+    st.markdown("""
+        <style>
+        /* Tombol logout simple elegant */
+        .simple-logout-btn {
+            background: rgba(197, 160, 89, 0.08) !important;
+            border: 1px solid rgba(197, 160, 89, 0.25) !important;
+            border-radius: 8px !important;
+            color: #B8956E !important;
+            font-size: 10px !important;
+            font-weight: 500 !important;
+            letter-spacing: 1px !important;
+            text-transform: uppercase !important;
+            padding: 10px 14px !important;
+            transition: all 0.25s ease !important;
+            margin-top: 10px !important;
+        }
+        
+        .simple-logout-btn:hover {
+            background: rgba(197, 160, 89, 0.15) !important;
+            border-color: #C5A059 !important;
+            color: #C5A059 !important;
+        }
+        
+        .simple-logout-btn::before {
+            content: '🔴  ';
+            font-size: 12px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    if st.button("🔴Logout", key="simple_logout"):
+        st.session_state.logged_in = False
+        st.rerun()
+
+# --- INITIALIZATION MENU ---
+if 'main_menu' not in st.session_state:
+    st.session_state.main_menu = "Dashboard Overview"
+
+# Fungsi callback untuk sinkronisasi menu
+def change_m1():
+    st.session_state.main_menu = st.session_state.m1_key
+def change_m2():
+    st.session_state.main_menu = st.session_state.m2_key
+def change_m3():
+    st.session_state.main_menu = st.session_state.m3_key
+def change_m4():
+    st.session_state.main_menu = st.session_state.m4_key
+def change_m5():
+    st.session_state.main_menu = st.session_state.m5_key
+
+with st.sidebar:
+    # --- KELOMPOK 1: DASHBOARD SUMMARY ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
+    
+    m1_list = ["Dashboard Overview", "Database Master"]
+    idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
+    st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
+
+    # --- KELOMPOK 2: OPERATIONAL ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
+    
+    m2_list =["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
+    idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
+    st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
+
+    # --- KELOMPOK 3: INVENTORY ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
+    
+    m3_list =["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
+    idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
+    st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
+
+    # --- KELOMPOK 4: REJECT/DEFECT ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">REJECT & DEFECT</p>', unsafe_allow_html=True)
+    
+    m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"]
+    idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else 0
+    st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=change_m4, label_visibility="collapsed")
+
+    # --- KELOMPOK 5: EXTRAS ---
+    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
+    
+    m5_list =["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Database Ongkir In/Out"]
+    idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else 0
+    st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
+
+    st.divider()
+
+# Final Menu Variable untuk dipakai di konten utama
+menu = st.session_state.main_menu
+
+# --- 4. MAIN UI ---
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
 
 # =========================================================
@@ -3761,8 +4048,6 @@ st.markdown("""
 
 
 # --- 4. MAIN UI ---
-menu = st.session_state.get('main_menu', 'Dashboard Overview')
-
 if menu == "Reporting & PIC":
     st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
 
