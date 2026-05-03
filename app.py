@@ -6716,23 +6716,30 @@ try:
 except ImportError:
     HAS_SUPABASE = False
 
-# Konfigurasi Supabase (Gunakan Secrets di Streamlit Cloud untuk keamanan)
+# Konfigurasi Supabase
 if HAS_SUPABASE:
+    # Nama variabel harus konsisten
     SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
     SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
-    supabase: Client = create_client(URL, KEY)
+    
+    # PERBAIKAN: Gunakan nama variabel yang sudah didefinisikan di atas
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 else:
     st.warning("Menjalankan mode lokal tanpa Database Cloud (Hanya untuk Testing)")
 
 # --- FUNGSI UPDATE STATUS ---
 def update_report_status(laporan_name):
     if HAS_SUPABASE:
-        supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", laporan_name).execute()
+        try:
+            supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", laporan_name).execute()
+        except Exception as e:
+            st.error(f"Gagal update ke database: {e}")
     else:
         # Fallback ke session state saja kalau di lokal
-        for item in st.session_state.db_report:
-            if item['Laporan'] == laporan_name:
-                item['Status'] = "✅ Selesai"
+        if 'db_report' in st.session_state:
+            for item in st.session_state.db_report:
+                if item['Laporan'] == laporan_name:
+                    item['Status'] = "✅ Selesai"
 
 import pandas as pd
 import streamlit as st
