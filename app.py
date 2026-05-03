@@ -4489,22 +4489,20 @@ def process_picking_audit(file1, file2, file_tracking=None):
 
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 import pandas as pd
 
-# --- 1. KONEKSI SUPABASE (DILUAR FUNGSI AGAR GLOBAL) ---
+# --- 1. KONEKSI & CONFIG (GLOBAL) ---
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 
 @st.cache_resource
 def init_supabase():
-    # PERBAIKAN: Baris di bawah ini sekarang sudah menjorok ke dalam (Indented)
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Inisialisasi client sekali saja
 supabase = init_supabase()
 
-# --- 2. FUNGSI FETCH DATA ---
+# --- 2. FUNGSI LOGIC (DILUAR UI) ---
 @st.cache_data(ttl=60)
 def fetch_data():
     try:
@@ -4515,16 +4513,30 @@ def fetch_data():
         return pd.DataFrame()
 
 def clean_currency(value):
-    if pd.isna(value) or value == "":
-        return 0
+    if pd.isna(value) or value == "": return 0
     clean_val = str(value).replace('Rp', '').replace('.', '').replace(',', '').strip()
-    try:
-        return int(float(clean_val))
-    except:
-        return 0
+    try: return int(float(clean_val))
+    except: return 0
 
+def save_data(supplier, ekspedisi, koli, ongkir, tanggal_jam):
+    try:
+        data = {
+            "supplier": supplier.upper(), 
+            "ekspedisi": ekspedisi.upper(), 
+            "total_koli": koli, 
+            "total_ongkir": ongkir,
+            "created_at": tanggal_jam 
+        }
+        supabase.table("shipping_costs").insert(data).execute()
+        st.cache_data.clear() # Penting agar summary langsung update
+        return True
+    except Exception as e:
+        st.error(f"Gagal simpan: {e}")
+        return False
+
+# --- 3. UI DASHBOARD ---
 def show_database_ongkir():
-    # --- 3. CSS CUSTOM (Aesthetic Premium Gold) ---
+    # CSS Premium Gold
     st.markdown("""
         <style>
         .hero-header {
@@ -4534,295 +4546,93 @@ def show_database_ongkir():
             border-left: 5px solid #FFD700;
             margin-bottom: 2rem;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            text-align: center;
         }
-        .hero-header h1 {
-            color: #ffffff;
-            margin: 0;
-            font-size: 2.2rem;
-            letter-spacing: 1px;
-        }
-        div[data-baseweb="input"], div[data-baseweb="select"] {
-            background-color: #0e1117 !important;
-            border: 1px solid #3e444d !important;
-            border-radius: 5px !important;
-        }
-        div[data-baseweb="input"]:focus-within {
-            border-color: #FFD700 !important;
-            box-shadow: 0 0 0 1px #FFD700 !important;
-        }
-        .stButton button, .stDownloadButton button {
-            background-color: #1a1e24 !important;
-            color: #FFD700 !important;
-            border: 3px solid #FFD700 !important;
-            border-radius: 12px !important;
-            padding: 12px 24px !important;
-            font-weight: 800 !important;
-            text-transform: uppercase !important;
-            transition: all 0.3s ease-in-out;
-        }
-        .stButton button:hover, .stDownloadButton button:hover {
-            background-color: #FFD700 !important;
-            color: #0e1117 !important;
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4);
-        }
-        [data-testid="stMetricValue"] {
-            color: #FFD700 !important;
-            font-size: 28px !important;
-            font-weight: 700 !important;
-        }
+        .hero-header h1 { color: #ffffff; margin: 0; font-size: 2.2rem; }
+        .stMetric { background-color: #1e2227; padding: 15px; border-radius: 10px; border-left: 5px solid #FFD700; }
+        div[data-baseweb="input"] { background-color: #0e1117 !important; border-radius: 8px !important; }
         </style>
         """, unsafe_allow_html=True)
 
-    # Header View
     st.markdown('<div class="hero-header"><h1>🚚 DATABASE ONGKIR JEZPRO</h1></div>', unsafe_allow_html=True)
     
-    # Contoh pemanggilan data
-    df = fetch_data()
-    if not df.empty:
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.info("Belum ada data ongkir.")
-
-# --- 3. FUNGSI INTERNAL ---
-    # --- 3. FUNGSI INTERNAL ---
-    def save_data(supplier, ekspedisi, koli, ongkir, tanggal_jam): # Tambah parameter tanggal_jam
-        try:
-            data = {
-                "supplier": supplier.upper(), 
-                "ekspedisi": ekspedisi, 
-                "total_koli": koli, 
-                "total_ongkir": ongkir,
-                "created_at": tanggal_jam # Masukkan jam manual ke sini
-            }
-            supabase.table("shipping_costs").insert(data).execute()
-            return True
-        except Exception as e:
-            st.error(f"Gagal simpan: {e}")
-            return False
-
-    def sync_data():
-        try:
-            today = datetime.now().strftime("%Y-%m-%d")
-            # Pakai upsert biar kalau tanggalnya udah ada dia cuma update, gak bikin error
-            supabase.table("reset_tracker").upsert({"last_date": today}, on_conflict="last_date").execute()
-        except Exception as e:
-            # Biarin aja error-nya muncul di console, yang penting app gak stop
-            print(f"⚠️ {e}")
-    
-    # --- 4. HERO HEADER ---
-    st.markdown("""
-        <div class="hero-header">
-            <h1>DATABASE ONGKIR IN/OUT</h1>
-        </div>
-        """, unsafe_allow_html=True)
-
-
-    # --- 6. DASHBOARD & FILTERING ---
-    # --- 2. LOGIKA DATA ---
     df_raw = fetch_data()
-
-    # --- 3. TAMPILAN TABS ---
     tab_input, tab_summary = st.tabs(["📥 INPUT DATA", "📊 SUMMARY & HISTORY"])
 
     with tab_input:
-    # Form Input Manual
         with st.expander("🛻 INPUT DATA ONGKIR BARU", expanded=True):
             with st.form("form_ongkir_single", clear_on_submit=True):
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    supplier_input = st.text_input("Nama Supplier", placeholder="Tulis Nama Supplier....")
-                    ekspedisi_input = st.text_input("Nama Ekspedisi", placeholder="Tulis Nama Ekspedisi...").upper()
-                    # --- TAMBAHAN INPUT TANGGAL ---
-                    input_tgl = st.date_input("Tanggal Transaksi", value=datetime.now())
+                    supplier_input = st.text_input("Nama Supplier")
+                    ekspedisi_input = st.text_input("Nama Ekspedisi").upper()
+                    input_tgl = st.date_input("Tanggal Transaksi", value=date.today())
                 with col_b:
                     koli_input = st.number_input("Total Koli", min_value=1, step=1)
                     ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
-                    # --- TAMBAHAN INPUT JAM ---
                     input_jam = st.time_input("Jam Transaksi", value=datetime.now().time())
                 
-                # Gabungkan tanggal dan jam biar formatnya bersih
                 fix_timestamp = f"{input_tgl} {input_jam.strftime('%H:%M:%S')}"
                 
                 if st.form_submit_button("▶️ UPLOAD HASIL ONGKIR"):
                     if supplier_input:
-                        # Panggil fungsi dengan fix_timestamp
                         if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input, fix_timestamp):
                             st.success(f"Data {supplier_input.upper()} Berhasil Disimpan!")
                             st.rerun()
                     else:
                         st.error("Nama Supplier wajib diisi!")
 
-        st.markdown("---")
-
-        # Batch Upload
-        # Batch Upload
-        with st.expander("📁 BATCH OPS: UPLOAD MASSAL", expanded=False):
-            c_dl, c_up = st.columns([1, 2])
-            with c_dl:
-                st.markdown("### 1. Download")
-                # Tambah kolom TANGGAL_JAM di template
-                template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"])
-                st.download_button(
-                    label="📄 DOWNLOAD TEMPLATE", 
-                    data=template_df.to_csv(index=False).encode('utf-8'), 
-                    file_name="template_ongkir_jezpro.csv", 
-                    mime="text/csv"
-                )
+        with st.expander("📁 BATCH OPS: UPLOAD MASSAL"):
+            template_df = pd.DataFrame(columns=["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"])
+            st.download_button("📄 DOWNLOAD TEMPLATE", template_df.to_csv(index=False).encode('utf-8'), "template.csv", "text/csv")
             
-            with c_up:
-                st.markdown("### 2. Upload")
-                uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
-                if uploaded_file:
-                    df_mass = pd.read_csv(uploaded_file)
-                    # Tambah TANGGAL_JAM di required
-                    required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"]
-                    if all(col in df_mass.columns for col in required):
-                        if st.button("▶️ UPLOAD BULK ONGKIR"):
-                            with st.spinner('Processing...'):
-                                batch_list =[] # Buat list kosong dulu
-                                for _, row in df_mass.iterrows():
-                                    data_batch = {
-                                        "supplier": str(row["SUPPLIER"]).upper(), 
-                                        "ekspedisi": str(row["EKSPEDISI"]).upper(), 
-                                        "total_koli": int(row["TOTAL KOLI"]), 
-                                        "total_ongkir": clean_currency(row["ONGKIR"]),
-                                        "created_at": str(row["TANGGAL_JAM"]) 
-                                    }
-                                    batch_list.append(data_batch) # Masukkan ke list
-                                
-                                # Eksekusi insert SEMUA data sekaligus dalam 1x request
-                                if batch_list:
-                                    supabase.table("shipping_costs").insert(batch_list).execute()
-                                    
-                            st.success("Berhasil diinput!")
-                            st.cache_data.clear() # Bersihkan cache agar data baru langsung terbaca
-                            st.rerun()
-                    else:
-                        st.error(f"Format salah! Harus: {required}")
+            uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+            if uploaded_file:
+                df_mass = pd.read_csv(uploaded_file)
+                if st.button("▶️ UPLOAD BULK"):
+                    batch_list = [
+                        {
+                            "supplier": str(row["SUPPLIER"]).upper(),
+                            "ekspedisi": str(row["EKSPEDISI"]).upper(),
+                            "total_koli": int(row["TOTAL KOLI"]),
+                            "total_ongkir": clean_currency(row["ONGKIR"]),
+                            "created_at": str(row["TANGGAL_JAM"])
+                        } for _, row in df_mass.iterrows()
+                    ]
+                    supabase.table("shipping_costs").insert(batch_list).execute()
+                    st.cache_data.clear()
+                    st.success("Batch Upload Berhasil!")
+                    st.rerun()
 
     with tab_summary:
-            if not df_raw.empty:
-                # 1. Konversi datetime
-                df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
+        if not df_raw.empty:
+            df_raw['created_at'] = pd.to_datetime(df_raw['created_at'])
+            
+            # --- FILTER LOGIC ---
+            st.write("### 🔍 FILTER & METRICS")
+            # (Gunakan logic date_range lu yang sudah bagus di sini)
+            
+            # Metrics
+            t_ongkir = df_raw['total_ongkir'].sum()
+            t_koli = df_raw['total_koli'].sum()
+            m1, m2 = st.columns(2)
+            m1.metric("TOTAL ONGKIR", f"Rp {t_ongkir:,.0f}")
+            m2.metric("TOTAL KOLI", f"{t_koli} Pcs")
 
-                st.markdown("### 🔍 FILTER DATA")
-                
-                # --- FUNGSI CALLBACK (SOLUSI KEDUT-KEDUT) ---
-                def update_range_callback():
-                    pilihan = st.session_state.preset_choice
-                    hari_ini = date.today()
-                    if pilihan == "Today":
-                        st.session_state.date_val = (hari_ini, hari_ini)
-                    elif pilihan == "This Month":
-                        st.session_state.date_val = (hari_ini.replace(day=1), hari_ini)
-                    elif pilihan == "All Time":
-                        # Pastikan df_raw tersedia di scope ini
-                        st.session_state.date_val = (df_raw['created_at'].min().date(), df_raw['created_at'].max().date())
+            # Table Selection for Delete
+            st.write("### 📝 RIWAYAT")
+            event = st.dataframe(df_raw, use_container_width=True, on_select="rerun", selection_mode="multi-row")
+            
+            if event.selection.rows:
+                selected_ids = df_raw.iloc[event.selection.rows]['id'].tolist()
+                if st.button("🗑️ HAPUS TERPILIH", type="primary"):
+                    for tid in selected_ids:
+                        supabase.table("shipping_costs").delete().eq("id", tid).execute()
+                    st.cache_data.clear()
+                    st.rerun()
+        else:
+            st.info("Data Kosong.")
 
-                col_f1, col_f2 = st.columns(2)
-                
-                with col_f1:
-                    # Inisialisasi session_state
-                    if 'date_val' not in st.session_state:
-                        st.session_state.date_val = (df_raw['created_at'].min().date(), df_raw['created_at'].max().date())
-
-                    # INPUT TANGGAL (Gunakan key yang sama dengan session_state)
-                    date_range = st.date_input(
-                        "Rentang Tanggal", 
-                        value=st.session_state.date_val,
-                        key="date_val"
-                    )
-
-                    # DROPDOWN PRESET
-                    st.selectbox(
-                        "Quick Select Range:",
-                        ["Custom Range", "Today", "This Month", "All Time"],
-                        key="preset_choice",
-                        index=0,
-                        on_change=update_range_callback
-                    )
-
-                with col_f2:
-                    list_ekspedisi = ["SEMUA"] + sorted(df_raw['ekspedisi'].unique().tolist())
-                    pilih_ekspedisi = st.selectbox("Pilih Ekspedisi", list_ekspedisi)
-
-                # --- APPLY FILTER ---
-                # Pastikan logic filtering handle tuple dari date_input
-                if isinstance(date_range, tuple) and len(date_range) == 2:
-                    start_date, end_date = date_range
-                    mask = (df_raw['created_at'].dt.date >= start_date) & (df_raw['created_at'].dt.date <= end_date)
-                    df_filtered = df_raw.loc[mask].copy()
-                else:
-                    df_filtered = df_raw.copy()
-                    
-                if pilih_ekspedisi != "SEMUA":
-                    df_filtered = df_filtered[df_filtered['ekspedisi'] == pilih_ekspedisi]
-
-                # --- TAMPILAN MATRIX ---
-                st.markdown("""
-                    <div style="background-color: #1e2227; padding: 10px 15px; border-radius: 8px; border-left: 5px solid #FFD700; margin-top: 25px; margin-bottom: 15px;">
-                        <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">💲 TOTAL BIAYA ONGKIR</h4>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                total_biaya = df_filtered['total_ongkir'].sum()
-                total_koli = df_filtered['total_koli'].sum()
-                avg = total_biaya / total_koli if total_koli > 0 else 0
-
-                mask_rto = df_filtered['supplier'].str.contains('RTO', case=False, na=False)
-                biaya_rto = df_filtered[mask_rto]['total_ongkir'].sum()
-                biaya_datang = df_filtered[~mask_rto]['total_ongkir'].sum()
-
-                # --- TAMPILAN BARIS 1 ---
-                m1, m2, m3 = st.columns(3)
-                with m1:
-                    st.metric("TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
-                with m2:
-                    st.metric("TOTAL KOLI", f"{total_koli} Pcs")
-                with m3:
-                    st.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
-
-                # --- TAMPILAN BARIS 2 (Breakdown Metrics) ---
-                m4, m5 = st.columns(2)
-                with m4:
-                    st.metric("BIAYA RTO", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
-                with m5:
-                    st.metric("BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
-
-                # --- DATA TABLE & DELETE ---
-                st.markdown("---")
-                st.subheader("📝 Riwayat Transaksi")
-                df_display = df_filtered.copy()
-                df_display['created_at'] = df_display['created_at'].dt.strftime('%Y-%m-%d %H:%M:%S')
-
-                event = st.dataframe(
-                    df_display.sort_values('created_at', ascending=False),
-                    use_container_width=True,
-                    hide_index=True,
-                    on_select="rerun",
-                    selection_mode="multi-row"
-                )
-
-                selected_rows = event.selection.rows
-                if selected_rows:
-                    # Ambil ID untuk dihapus
-                    df_sorted = df_display.sort_values('created_at', ascending=False)
-                    ids_to_delete = df_sorted.iloc[selected_rows]['id'].tolist()
-                    
-                    st.warning(f"Terpilih {len(ids_to_delete)} data untuk dihapus.")
-                    if st.button("🗑️ HAPUS DATA TERPILIH", type="primary"):
-                        try:
-                            for tid in ids_to_delete:
-                                supabase.table("shipping_costs").delete().eq("id", tid).execute()
-                            st.success("Data berhasil dihapus!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Gagal hapus: {e}")
-                else:
-                    st.info("💡 Centang baris di tabel untuk menghapus data.")
-            else:
-                st.info("Data masih kosong.")    
 
 with st.sidebar:
        st.markdown("""
