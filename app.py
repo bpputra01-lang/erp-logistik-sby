@@ -3934,7 +3934,3 @@ elif menu == "Pengajuan Mutasi Karantina":
     project_mutasi_karantina()
 elif menu == "Database Ongkir In/Out":
     show_database_ongkir()
-
-Kodingan di atas sudah sempurna digabungkan dan semua logika pembersihan cache
-(st.cache_data.clear()) serta update global koneksi database (supabase_global)
-sudah dimasukkan dengan rapi sampai baris paling akhir file! 🚀🔥
