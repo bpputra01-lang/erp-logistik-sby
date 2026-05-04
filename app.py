@@ -2954,7 +2954,6 @@ import datetime as dt_logic
 from io import BytesIO
 import plotly.express as px
 
-
 # --- 1. DATABASE ENGINE (DIRECT INITIALIZATION) ---
 # Gue ganti logic-nya biar langsung nembak URL & KEY lu biar gak error ConnectionRefused lagi.
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
@@ -2969,14 +2968,9 @@ conn = st.connection(
 )
 
 def save_data(df):
-    # PEMBERSIHAN KRUSIAL: Ubah NaN menjadi None agar bisa jadi JSON
-    df = df.where(pd.notnull(df), None)
-    
-    # Supabase butuh list of dicts
+    # Supabase butuh list of dicts. Nama kolom case-sensitive (disarankan lowercase di DB)
     data_dict = df.to_dict(orient='records')
-    
-    # Jalankan eksekusi
-    return conn.table("reject_list").insert(data_dict).execute()
+    conn.table("reject_list").insert(data_dict).execute()
 
 def delete_reject_item(row_id):
     # rowid di SQLite diganti dengan 'id' (Primary Key) di Supabase
@@ -3164,27 +3158,25 @@ def menu_reject_defect():
                 df_upload = pd.read_excel(uploaded_file)
                 
                 if st.button("⤴️ IMPORT DATA KE DATABASE"):
-                    # 1. Tambah timestamp (Gunakan format string standar)
+                    # 2. Tambah timestamp otomatis (Pakai format ISO biar Supabase seneng)
                     now_plus_7 = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7))
-                    df_upload['tanggal_input'] = now_plus_7.strftime("%Y-%m-%d %H:%M:%S")
+                    df_upload['tanggal_input'] = now_plus_7.isoformat()
                     
-                    # 2. Paksa SKU jadi String agar tidak jadi angka float (123.0)
-                    if 'sku' in df_upload.columns:
-                        df_upload['sku'] = df_upload['sku'].astype(str)
-
-                    # 3. Filter kolom yang valid
+                    # 3. FILTER KOLOM (KUNCINYA DI SINI!)
+                    # Kita cuma ambil kolom yang emang ada di tabel Supabase lo
+                    # Berdasarkan SS lo: id, cabang, bin_awal, bin, sku, article_name, size, kategori, keterangan, tanggal_input
                     db_cols = ['cabang', 'bin_awal', 'bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan', 'tanggal_input']
+                    
+                    # Cek kolom mana yang emang ada di file upload
                     valid_cols = [c for c in db_cols if c in df_upload.columns]
                     df_final = df_upload[valid_cols].copy()
                     
-                    # 4. Kirim data
-                    try:
-                        save_data(df_final)
-                        st.session_state.upload_key += 1
-                        st.success("✅ Import Cloud Berhasil!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Gagal Simpan: {e}")
+                    # 4. Kirim data yang udah BERSIH ke save_data
+                    save_data(df_final)
+                    
+                    st.session_state.upload_key += 1
+                    st.success("✅ Import Cloud Berhasil!")
+                    st.rerun()
 
     with tab_analytics:
         # Fetch data dari Supabase
@@ -3228,8 +3220,8 @@ def menu_reject_defect():
             # 2. Filter Search Bar (Jika ada input)
             if search_query:
                 df_final = df_final[
-                    (df_final['sku'].str.contains(search_query, case=False, na=False)) | 
-                    (df_final['article_name'].str.contains(search_query, case=False, na=False))
+                    (df_final['sku'].astype(str).str.contains(search_query, case=False, na=False)) | 
+                    (df_final['article_name'].astype(str).str.contains(search_query, case=False, na=False))
                 ]
 
             # --- DASHBOARD LOGIC (METRICS) ---
@@ -3295,9 +3287,6 @@ def menu_reject_defect():
                 categories = group['kategori'].astype(str).str.lower().values
                 has_kiri = any('kiri' in cat for cat in categories)
                 has_kanan = any('kanan' in cat for cat in categories)
-                
-                # Jika ada kata 'kiri' tapi tidak ada 'kanan' (atau sebaliknya), kita tandai atau filter
-                # Dalam konteks matching, kita biasanya hanya mau yang punya keduanya
                 return has_kiri and has_kanan
 
             # Filter SKU yang memenuhi syarat Kiri-Kanan
