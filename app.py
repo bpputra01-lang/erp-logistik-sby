@@ -4651,11 +4651,11 @@ def show_database_ongkir():
                     ongkir_input = st.number_input("Total Ongkir (Rp)", min_value=0, step=5000)
                     input_jam = st.time_input("Jam Transaksi", value=datetime.now().time())
                 
-                fix_timestamp = f"{input_tgl} {input_jam.strftime('%H:%M:%S')}"
+                fix_timestamp = f"{input_tgl.strftime('%Y-%m-%d')} {input_jam.strftime('%H:%M:%S')}"
                 
                 if st.form_submit_button("▶️ UPLOAD HASIL ONGKIR"):
                     if supplier_input:
-                        if save_data(supplier_input, ekspedisi_input, koli_input, ongkir_input, fix_timestamp):
+                        if save_data_ongkir(supplier_input, ekspedisi_input, koli_input, ongkir_input, fix_timestamp):
                             st.success(f"Data {supplier_input.upper()} Berhasil Disimpan!")
                             st.rerun()
                     else:
@@ -4778,9 +4778,9 @@ def show_database_ongkir():
                 st.warning(f"Terpilih {len(ids_to_delete)} data untuk dihapus.")
                 if st.button("🗑️ HAPUS DATA TERPILIH", type="primary"):
                     try:
-                        for tid in ids_to_delete:
-                            supabase.table("shipping_costs").delete().eq("id", tid).execute()
-                        st.success("Data berhasil dihapus!")
+                        # Langsung hapus semua ID yang ada di dalam list
+                        supabase.table("shipping_costs").delete().in_("id", ids_to_delete).execute()
+                        st.success(f"Berhasil menghapus {len(ids_to_delete)} data!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Gagal hapus: {e}")
