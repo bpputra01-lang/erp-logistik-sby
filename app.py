@@ -4058,32 +4058,39 @@ def apply_custom_ui():
     <div class="hero-header">RTO RECEIVING PROCESS</div>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGIKA ALOKASI & PERHITUNGAN (MODIFIED) ---
+# --- 3. LOGIKA ALOKASI & PERHITUNGAN (FINAL VERSION) ---
 def process_rto_logic(df_scan, df_tf):
-    # Mapping Index (Sesuaikan dengan format file lu)
+    # Mapping Index (Pastikan index ini sesuai dengan struktur kolom file lu)
     scan_sku_idx, scan_qty_idx = 0, 1
     tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
 
-    # Clean Data
+    # 1. Clean & Standardize Data
     df_scan = df_scan.copy()
     df_tf = df_tf.copy()
+    
+    # Paksa SKU jadi string uppercase & hapus spasi
     df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
     df_tf.iloc[:, tf_sku_idx] = df_tf.iloc[:, tf_sku_idx].astype(str).str.strip().str.upper()
     
-    # Agregasi Total per SKU untuk hitung Kurang/Lebih
+    # Simpan nama kolom asli buat keperluan merge nanti
+    col_tf_no = df_tf.columns[tf_no_idx]
+    col_tf_sku = df_tf.columns[tf_sku_idx]
+    
+    # 2. Agregasi Total per SKU untuk hitung selisih (Kurang/Lebih)
     agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
     agg_tf = df_tf.groupby(df_tf.columns[tf_sku_idx])[df_tf.columns[tf_qty_idx]].sum()
     
+    # Gabungkan agregasi untuk perbandingan side-by-side
     comp = pd.concat([agg_scan, agg_tf], axis=1).fillna(0)
     comp.columns = ['QTY_SCAN', 'QTY_TF']
     
-    # Hitung Qty Kurang/Lebih
-    # Kurang TF = Scan > TF (Ada barang fisik tapi TF-nya kurang/nggak ada)
-    # Lebih TF = TF > Scan (Ada data TF tapi barang fisiknya kurang)
+    # 3. Hitung Metrics (Qty Agregat)
+    # Kurang TF = Barang Fisik > Data Sistem (Butuh buat TF baru)
+    # Lebih TF = Data Sistem > Barang Fisik (Barang kurang kirim)
     qty_kurang_tf = comp[comp['QTY_SCAN'] > comp['QTY_TF']].apply(lambda x: x['QTY_SCAN'] - x['QTY_TF'], axis=1).sum()
     qty_lebih_tf = comp[comp['QTY_TF'] > comp['QTY_SCAN']].apply(lambda x: x['QTY_TF'] - x['QTY_SCAN'], axis=1).sum()
 
-    # Logika Alokasi Baris (FIFO)
+    # 4. Logika Alokasi Baris (FIFO)
     hasil_alokasi = []
     df_tf_work = df_tf.copy()
     
@@ -4107,11 +4114,32 @@ def process_rto_logic(df_scan, df_tf):
 
     df_hasil = pd.DataFrame(hasil_alokasi)
     
-    # Dataframes untuk Tab
-    df_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index().rename(columns={'index': 'SKU'})
-    df_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index().rename(columns={'index': 'SKU'})
+    # 5. Siapkan Dataframe untuk Tab (dengan No Transfer)
     
-    # Split TF (Hanya alokasi yang match)
+    # Kurang TF: Biasanya emang No TF-nya nggak ada karena barang "liar"
+    df_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
+    df_kurang.rename(columns={df_kurang.columns[0]: 'SKU'}, inplace=True)
+    
+    # Lebih TF: Ambil No TF dari data original biar tau TF mana yang bolong
+    selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
+    selisih_lebih.rename(columns={selisih_lebih.columns[0]: 'SKU'}, inplace=True)
+    
+    if not selisih_lebih.empty:
+        # Join ke data TF original untuk narik No Transfer
+        df_lebih = pd.merge(
+            selisih_lebih, 
+            df_tf[[col_tf_no, col_tf_sku]], 
+            left_on='SKU', 
+            right_on=col_tf_sku, 
+            how='left'
+        )
+        # Rapikan kolom hasil merge
+        df_lebih = df_lebih.rename(columns={col_tf_no: 'NO TRANSFER'})
+        df_lebih = df_lebih[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
+    else:
+        df_lebih = pd.DataFrame(columns=['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF'])
+    
+    # Split TF (Summary per No Transfer)
     df_split = df_hasil.groupby('No Transfer')['Qty Alokasi'].sum().reset_index() if not df_hasil.empty else pd.DataFrame()
 
     metrics = {
@@ -4172,27 +4200,29 @@ def main():
             st.dataframe(df_split, use_container_width=True)
             
         with t3:
-            st.warning("SKU yang ada di Fisik tapi di Transfer Stock kurang/tidak ada")
+            st.warning("⚠️ SKU yang ada di Fisik tapi di Transfer Stock kurang/tidak ada")
+            st.info("Note: Karena Kurang TF, maka No. TF biasanya tidak ditemukan di sistem untuk item ini.")
             st.dataframe(
                 df_kurang, 
                 use_container_width=True,
                 column_config={
                     "SKU": st.column_config.TextColumn("SKU", width="medium"),
-                    "QTY_SCAN": st.column_config.NumberColumn("QTY SCAN", format="%d", width="small"),
-                    "QTY_TF": st.column_config.NumberColumn("QTY TF", format="%d", width="small"),
+                    "QTY_SCAN": st.column_config.NumberColumn("QTY SCAN", format="%d"),
+                    "QTY_TF": st.column_config.NumberColumn("QTY TF", format="%d"),
                 },
-                hide_index=True # Menghilangkan kolom angka 0, 1, 2 di paling kiri
+                hide_index=True
             )
-                
+            
         with t4:
-            st.error("SKU yang ada di Transfer Stock tapi barang Fisiknya kurang")
+            st.error("❌ SKU yang ada di Transfer Stock tapi barang Fisiknya KURANG")
             st.dataframe(
                 df_lebih, 
                 use_container_width=True,
                 column_config={
+                    "NO TRANSFER": st.column_config.TextColumn("NO TRANSFER", width="medium"),
                     "SKU": st.column_config.TextColumn("SKU", width="medium"),
-                    "QTY_SCAN": st.column_config.NumberColumn("QTY SCAN", format="%d", width="small"),
-                    "QTY_TF": st.column_config.NumberColumn("QTY TF", format="%d", width="small"),
+                    "QTY_SCAN": st.column_config.NumberColumn("QTY SCAN", format="%d"),
+                    "QTY_TF": st.column_config.NumberColumn("QTY TF", format="%d"),
                 },
                 hide_index=True
             )
