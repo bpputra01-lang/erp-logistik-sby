@@ -2954,12 +2954,6 @@ import datetime as dt_logic
 from io import BytesIO
 import plotly.express as px
 
-import streamlit as st
-import pandas as pd
-from st_supabase_connection import SupabaseConnection
-import datetime as dt_logic
-from io import BytesIO
-import plotly.express as px
 
 # --- 1. DATABASE ENGINE (DIRECT INITIALIZATION) ---
 # Gue ganti logic-nya biar langsung nembak URL & KEY lu biar gak error ConnectionRefused lagi.
@@ -2975,9 +2969,14 @@ conn = st.connection(
 )
 
 def save_data(df):
-    # Supabase butuh list of dicts. Nama kolom case-sensitive (disarankan lowercase di DB)
+    # PEMBERSIHAN KRUSIAL: Ubah NaN menjadi None agar bisa jadi JSON
+    df = df.where(pd.notnull(df), None)
+    
+    # Supabase butuh list of dicts
     data_dict = df.to_dict(orient='records')
-    conn.table("reject_list").insert(data_dict).execute()
+    
+    # Jalankan eksekusi
+    return conn.table("reject_list").insert(data_dict).execute()
 
 def delete_reject_item(row_id):
     # rowid di SQLite diganti dengan 'id' (Primary Key) di Supabase
@@ -3165,25 +3164,27 @@ def menu_reject_defect():
                 df_upload = pd.read_excel(uploaded_file)
                 
                 if st.button("⤴️ IMPORT DATA KE DATABASE"):
-                    # 2. Tambah timestamp otomatis (Pakai format ISO biar Supabase seneng)
+                    # 1. Tambah timestamp (Gunakan format string standar)
                     now_plus_7 = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7))
-                    df_upload['tanggal_input'] = now_plus_7.isoformat()
+                    df_upload['tanggal_input'] = now_plus_7.strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # 3. FILTER KOLOM (KUNCINYA DI SINI!)
-                    # Kita cuma ambil kolom yang emang ada di tabel Supabase lo
-                    # Berdasarkan SS lo: id, cabang, bin_awal, bin, sku, article_name, size, kategori, keterangan, tanggal_input
+                    # 2. Paksa SKU jadi String agar tidak jadi angka float (123.0)
+                    if 'sku' in df_upload.columns:
+                        df_upload['sku'] = df_upload['sku'].astype(str)
+
+                    # 3. Filter kolom yang valid
                     db_cols = ['cabang', 'bin_awal', 'bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan', 'tanggal_input']
-                    
-                    # Cek kolom mana yang emang ada di file upload
                     valid_cols = [c for c in db_cols if c in df_upload.columns]
                     df_final = df_upload[valid_cols].copy()
                     
-                    # 4. Kirim data yang udah BERSIH ke save_data
-                    save_data(df_final)
-                    
-                    st.session_state.upload_key += 1
-                    st.success("✅ Import Cloud Berhasil!")
-                    st.rerun()
+                    # 4. Kirim data
+                    try:
+                        save_data(df_final)
+                        st.session_state.upload_key += 1
+                        st.success("✅ Import Cloud Berhasil!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Gagal Simpan: {e}")
 
     with tab_analytics:
         # Fetch data dari Supabase
