@@ -4180,6 +4180,21 @@ def process_rto_logic(df_scan, df_tf):
 # --- 4. MAIN APP ---
 def main():
     apply_custom_ui()
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **DATA SCAN :** Pastikan Formatnya di **KOLOM A = SKU** dan di **KOLOM B = QTY SCAN**
+        - **TRANSFER STOCK :** Download data **Transfer Stock** bukan data **Penerimaan Transfer Stock**
+        """)
+
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Compare:**
+        - SKU di data scan akan dilakukan compare dengan SKU yang ada di File Transfer Stock
+        - SKU teratas di File Transfer stock akan mendapatkan alokasi penuh dari data scan apabila ada > 1 No TF yang memiliki SKU yang sama
+        - Jika di File Stock Transfer ada yang tidak mendapatkan alokasi maka akan dilakukan cek ulang dan akan di FU ke cabang pengirim apabila barang yang datang < TF Stock
+        - Jika di File data scan ada SKU yang tidak terdapat di Stock Transfer maka akan dilakukan pengecekan ulang dan akan di FU ke cabang pengirim apabila ada item yang terkirim namun TF stock belum dibuatkan
+        """)
 
     if "rto_data" not in st.session_state:
         st.session_state.rto_data = None
