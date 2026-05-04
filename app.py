@@ -4214,7 +4214,7 @@ def main():
         st.divider()
 
         # 2. TABS SYSTEM
-        t1, t2, t3, t4 = st.tabs(["📊 Compare Alokasi", "✂️ Split TF", "📥 Kurang TF (Fisik > TF)", "📤 Lebih TF (TF > Fisik)"])
+        t1, t2, t3, t4 = st.tabs(["📊 Compare Alokasi", "📩 Split TF", "➖ Kurang TF", "➕ Lebih TF"])
         
         with t1:
             st.subheader("📊 DETAIL ALOKASI")
