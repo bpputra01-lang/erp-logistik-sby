@@ -4171,7 +4171,7 @@ def main():
             st.info("Alokasi unik berdasarkan Nomor Transfer")
             st.dataframe(df_split, use_container_width=True)
             
-       with t3:
+        with t3:
             st.warning("SKU yang ada di Fisik tapi di Transfer Stock kurang/tidak ada")
             st.dataframe(
                 df_kurang, 
@@ -4183,7 +4183,7 @@ def main():
                 },
                 hide_index=True # Menghilangkan kolom angka 0, 1, 2 di paling kiri
             )
-            
+                
         with t4:
             st.error("SKU yang ada di Transfer Stock tapi barang Fisiknya kurang")
             st.dataframe(
