@@ -2454,28 +2454,29 @@ def putaway_system(df_ds, df_asal):
         print(f"Detail Error: {e}")
         empty = pd.DataFrame()
         return empty, empty, empty, empty, empty, empty
+        
 def process_scan_out(df_scan, df_history, df_stock):
     # ========== COPY & NORMALISASI (TETAP SAMA) ==========
     df_scan = df_scan.copy()
     df_history = df_history.copy()
     df_stock = df_stock.copy()
-    
+
     df_scan.columns = [str(col).strip().upper() for col in df_scan.columns]
     df_history.columns = [str(col).strip().upper() for col in df_history.columns]
     df_stock.columns = [str(col).strip().upper() for col in df_stock.columns]
-    
+
     df_scan = df_scan.rename(columns={df_scan.columns[0]: 'BIN_AWAL', df_scan.columns[1]: 'SKU'})
-    
+
     if len(df_history.columns) > 3: df_history = df_history.rename(columns={df_history.columns[3]: 'SKU'})
     if len(df_history.columns) > 8: df_history = df_history.rename(columns={df_history.columns[8]: 'BIN_HIST'})
     if len(df_history.columns) > 10: df_history = df_history.rename(columns={df_history.columns[10]: 'QTY_HIST'})
     if len(df_history.columns) > 12: df_history = df_history.rename(columns={df_history.columns[12]: 'BIN_AFTER'})
-    
+
     if len(df_stock.columns) > 0: df_stock = df_stock.rename(columns={df_stock.columns[0]: 'INVOICE'})
     if len(df_stock.columns) > 1: df_stock = df_stock.rename(columns={df_stock.columns[1]: 'SKU'})
     if len(df_stock.columns) > 6: df_stock = df_stock.rename(columns={df_stock.columns[6]: 'BIN_STOCK'})
     if len(df_stock.columns) > 10: df_stock = df_stock.rename(columns={df_stock.columns[10]: 'QTY_STOCK'})
-    
+
     for df in [df_scan, df_history, df_stock]:
         for col in ['SKU', 'BIN_AWAL', 'BIN_HIST', 'BIN_STOCK', 'BIN_AFTER', 'INVOICE']:
             if col in df.columns:
@@ -2546,9 +2547,13 @@ def process_scan_out(df_scan, df_history, df_stock):
             qty_val = 0
 
         final_results.append({
-            'BIN AWAL': bin_fisik, 'SKU': sku, 'QTY SCAN': 1,
-            'Keterangan': keterangan, 'Total Qty Setup/Terjual': qty_val,
-            'Bin After Set Up': bin_aft, 'Invoice': inv
+            'BIN AWAL': bin_fisik, 
+            'SKU': sku, 
+            'QTY SCAN': 1,
+            'Keterangan': keterangan, 
+            'Total Qty Setup/Terjual': qty_val,
+            'Bin After Set Up': bin_aft, 
+            'Invoice': inv
         })
 
     df_res_raw = pd.DataFrame(final_results)
@@ -2581,7 +2586,7 @@ def process_scan_out(df_scan, df_history, df_stock):
                 'NOTES': 'WAITING OFFLINE'
             })
 
-        # Kondisi: DONE SET UP (QTY MISSMATCH) -> Asumsi jika label ini muncul di Keterangan
+        # Kondisi: DONE SET UP (QTY MISSMATCH)
         elif 'QTY MISSMATCH' in ket:
             draft_data.append({
                 'BIN AWAL': row['BIN AWAL'],
@@ -5230,6 +5235,7 @@ elif menu == "Scan Out Validation":
         - **HISTORY SET UP**: Sesuai yang ada pada template Mutasi Set Up Jezpro
         - **STOCK TRACKING**: Sesuai yang ada pada template Stock Tracking Jezpro
         """)
+        
     with st.expander("💡Logic Thinking"):
         st.info("""
         **Alur Compare Scan Out :**
@@ -5245,9 +5251,12 @@ elif menu == "Scan Out Validation":
         """)
     
     col1, col2, col3 = st.columns(3)
-    with col1: up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'], help="File dengan Kolom A=BIN, B=SKU")
-    with col2: up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'], help="File dengan Kolom D=SKU")
-    with col3: up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'], help="File dengan Kolom B=SKU, A=Invoice")
+    with col1: 
+        up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'], help="File dengan Kolom A=BIN, B=SKU")
+    with col2: 
+        up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'], help="File dengan Kolom D=SKU")
+    with col3: 
+        up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'], help="File dengan Kolom B=SKU, A=Invoice")
     
     if up_scan and up_hist and up_stock:
         if st.button("▶️ COMPARE DATA SCAN OUT"):
@@ -5283,57 +5292,38 @@ elif menu == "Scan Out Validation":
                 st.divider()
                 st.markdown("""
                 <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
+                    <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 total_items = len(df_res)
-                terjual_count = df_res['Keterangan'].str.contains('TERJUAL', case=False, na=False).sum()
-                mismatch_count = df_res['Keterangan'].str.contains('MISSMATCH', case=False, na=False).sum()
-                belum_count = df_res['Keterangan'].str.contains('BELUM', case=False, na=False).sum()
-                done_count = df_res['Keterangan'].str.contains('DONE', case=False, na=False).sum()
+                
+                # Perbaikan pemanggilan .str untuk menghindari AttributeError
+                if not df_res.empty:
+                    ket_series = df_res['Keterangan'].astype(str)
+                    terjual_count = ket_series.str.contains('TERJUAL', case=False, na=False).sum()
+                    mismatch_count = ket_series.str.contains('MISSMATCH', case=False, na=False).sum()
+                    belum_count = ket_series.str.contains('BELUM', case=False, na=False).sum()
+                    done_count = ket_series.str.contains('DONE', case=False, na=False).sum()
+                else:
+                    terjual_count = mismatch_count = belum_count = done_count = 0
                 
                 sc1, sc2, sc3, sc4, sc5 = st.columns(5)
                 
                 with sc1:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">📦 Total Items</span>
-                        <span class="m-val">{total_items}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">📦 Total Items</span><span class="m-val">{total_items}</span></div>''', unsafe_allow_html=True)
                 
                 with sc2:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">✅ DONE</span>
-                        <span class="m-val">{done_count}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">✅ DONE</span><span class="m-val">{done_count}</span></div>''', unsafe_allow_html=True)
                 
                 with sc3:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">📤 TERJUAL</span>
-                        <span class="m-val">{terjual_count}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">📤 TERJUAL</span><span class="m-val">{terjual_count}</span></div>''', unsafe_allow_html=True)
                 
                 with sc4:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">⚠️ MISSMATCH</span>
-                        <span class="m-val">{mismatch_count}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">⚠️ MISSMATCH</span><span class="m-val">{mismatch_count}</span></div>''', unsafe_allow_html=True)
                 
                 with sc5:
-                    st.markdown(f'''
-                    <div class="m-box">
-                        <span class="m-lbl">❌ BELUM TERSETUP</span>
-                        <span class="m-val">{belum_count}</span>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">❌ BELUM TERSETUP</span><span class="m-val">{belum_count}</span></div>''', unsafe_allow_html=True)
                 
                 st.divider()
                 
