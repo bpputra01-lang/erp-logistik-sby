@@ -4108,8 +4108,8 @@ def process_rto_logic(df_scan, df_tf):
     df_hasil = pd.DataFrame(hasil_alokasi)
     
     # Dataframes untuk Tab
-    df_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy()
-    df_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy()
+    df_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index().rename(columns={'index': 'SKU'})
+    df_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index().rename(columns={'index': 'SKU'})
     
     # Split TF (Hanya alokasi yang match)
     df_split = df_hasil.groupby('No Transfer')['Qty Alokasi'].sum().reset_index() if not df_hasil.empty else pd.DataFrame()
@@ -4171,13 +4171,31 @@ def main():
             st.info("Alokasi unik berdasarkan Nomor Transfer")
             st.dataframe(df_split, use_container_width=True)
             
-        with t3:
+       with t3:
             st.warning("SKU yang ada di Fisik tapi di Transfer Stock kurang/tidak ada")
-            st.dataframe(df_kurang, use_container_width=True)
+            st.dataframe(
+                df_kurang, 
+                use_container_width=True,
+                column_config={
+                    "SKU": st.column_config.TextColumn("SKU", width="medium"),
+                    "QTY_SCAN": st.column_config.NumberColumn("QTY SCAN", format="%d", width="small"),
+                    "QTY_TF": st.column_config.NumberColumn("QTY TF", format="%d", width="small"),
+                },
+                hide_index=True # Menghilangkan kolom angka 0, 1, 2 di paling kiri
+            )
             
         with t4:
             st.error("SKU yang ada di Transfer Stock tapi barang Fisiknya kurang")
-            st.dataframe(df_lebih, use_container_width=True)
+            st.dataframe(
+                df_lebih, 
+                use_container_width=True,
+                column_config={
+                    "SKU": st.column_config.TextColumn("SKU", width="medium"),
+                    "QTY_SCAN": st.column_config.NumberColumn("QTY SCAN", format="%d", width="small"),
+                    "QTY_TF": st.column_config.NumberColumn("QTY TF", format="%d", width="small"),
+                },
+                hide_index=True
+            )
 
         # 3. DOWNLOAD BUTTON
         output = BytesIO()
