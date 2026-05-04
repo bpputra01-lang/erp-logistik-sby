@@ -4180,8 +4180,34 @@ def main():
             st.dataframe(df_hasil, use_container_width=True)
         
         with t2:
-            st.info("Alokasi unik berdasarkan Nomor Transfer")
-            st.dataframe(df_split, use_container_width=True)
+            st.subheader("✂️ SPLIT PER NOMOR TRANSFER")
+            
+            if df_split is not None and not df_split.empty:
+                # Pastikan nama kolom No Transfer konsisten
+                col_no_tf = "No Transfer" if "No Transfer" in df_split.columns else "NO TRANSFER"
+                
+                list_tf = sorted(df_split[col_no_tf].unique().tolist())
+                selected_tf = st.selectbox("🎯 Pilih Nomor Transfer:", list_tf)
+                
+                detail_tf = df_split[df_split[col_no_tf] == selected_tf]
+                
+                # Cek apakah kolom yang dibutuhkan ada sebelum ditampilkan
+                cols_to_show = ["SKU", "QTY SCAN", "QTY_TF"]
+                available_cols = [c for c in cols_to_show if c in detail_tf.columns]
+
+                if "QTY SCAN" in detail_tf.columns:
+                    c1, c2 = st.columns(2)
+                    c1.metric("Total Qty Scan", f"{detail_tf['QTY SCAN'].sum():,.0f}")
+                    if "QTY_TF" in detail_tf.columns:
+                        c2.metric("Total Qty TF Sistem", f"{detail_tf['QTY_TF'].sum():,.0f}")
+
+                st.dataframe(
+                    detail_tf[available_cols],
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("Belum ada data alokasi. Silahkan Run Data terlebih dahulu.")
             
         with t3:
             st.warning("⚠️ SKU yang ada di Fisik tapi di Transfer Stock kurang/tidak ada")
