@@ -4185,23 +4185,26 @@ def main():
                 list_tf = sorted(df_split[col_no_tf].unique().tolist())
                 selected_tf = st.selectbox("🎯 Pilih Nomor Transfer:", list_tf)
                 
-                # Filter data berdasarkan TF yang dipilih
-                detail_tf = df_split[df_split[col_no_tf] == selected_tf]
+                # Filter data
+                detail_tf = df_split[df_split[col_no_tf] == selected_tf].copy()
                 
-                # --- PERBAIKAN METRIC DISINI ---
-                # Qty Scan dijumlahkan semua (karena ini hasil alokasi unik)
-                total_scan_tf = detail_tf['QTY SCAN'].sum()
+                # --- FIX DUPLIKAT: AGREGASI DISINI ---
+                # Gabungkan SKU yang sama agar tidak muncul berulang barisnya
+                detail_grouped = detail_tf.groupby('SKU').agg({
+                    'QTY SCAN': 'sum',
+                    'QTY_TF': 'first' # Ambil salah satu nilai TF asli sistem
+                }).reset_index()
                 
-                # Qty TF Sistem harus di-drop duplikat SKU-nya dulu sebelum di-sum 
-                # Biar nilai QTY per SKU gak dihitung berkali-kali
-                total_tf_sistem = detail_tf.drop_duplicates(subset=['SKU'])['QTY_TF'].sum()
+                # Hitung Metric Berdasarkan Data yang sudah bersih
+                total_scan_tf = detail_grouped['QTY SCAN'].sum()
+                total_tf_sistem = detail_grouped['QTY_TF'].sum()
                 
                 c1, c2 = st.columns(2)
                 c1.metric("Total Qty Scan", f"{total_scan_tf:,.0f}")
                 c2.metric("Total Qty TF Sistem", f"{total_tf_sistem:,.0f}")
 
                 st.dataframe(
-                    detail_tf[["SKU", "QTY SCAN", "QTY_TF"]], 
+                    detail_grouped, 
                     use_container_width=True, 
                     hide_index=True
                 )
