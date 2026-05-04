@@ -4185,15 +4185,26 @@ def main():
                 list_tf = sorted(df_split[col_no_tf].unique().tolist())
                 selected_tf = st.selectbox("🎯 Pilih Nomor Transfer:", list_tf)
                 
+                # Filter data berdasarkan TF yang dipilih
                 detail_tf = df_split[df_split[col_no_tf] == selected_tf]
                 
+                # --- PERBAIKAN METRIC DISINI ---
+                # Qty Scan dijumlahkan semua (karena ini hasil alokasi unik)
+                total_scan_tf = detail_tf['QTY SCAN'].sum()
+                
+                # Qty TF Sistem harus di-drop duplikat SKU-nya dulu sebelum di-sum 
+                # Biar nilai QTY per SKU gak dihitung berkali-kali
+                total_tf_sistem = detail_tf.drop_duplicates(subset=['SKU'])['QTY_TF'].sum()
+                
                 c1, c2 = st.columns(2)
-                c1.metric("Total Qty Scan", f"{detail_tf['QTY SCAN'].sum():,.0f}")
-                c2.metric("Total Qty TF Sistem", f"{detail_tf['QTY_TF'].sum():,.0f}")
+                c1.metric("Total Qty Scan", f"{total_scan_tf:,.0f}")
+                c2.metric("Total Qty TF Sistem", f"{total_tf_sistem:,.0f}")
 
-                st.dataframe(detail_tf[["SKU", "QTY SCAN", "QTY_TF"]], use_container_width=True, hide_index=True)
-            else:
-                st.info("Data Split tidak tersedia.")
+                st.dataframe(
+                    detail_tf[["SKU", "QTY SCAN", "QTY_TF"]], 
+                    use_container_width=True, 
+                    hide_index=True
+                )
 
         with t3:
             st.warning("⚠️ SKU yang ada di Fisik tapi di Transfer Stock kurang/tidak ada")
