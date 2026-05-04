@@ -2557,10 +2557,16 @@ def process_scan_out(df_scan, df_history, df_stock):
         })
 
     df_res_raw = pd.DataFrame(final_results)
+    
+    # --- FIX DUPLICATE COLUMN & CLEAN GROUPBY ---
     df_res = df_res_raw.groupby(['BIN AWAL', 'SKU', 'Keterangan', 'Bin After Set Up', 'Invoice'], dropna=False).agg({
         'QTY SCAN': 'sum',
         'Total Qty Setup/Terjual': 'sum'
     }).reset_index()
+
+    # FORCE: Pastikan kolom 'Keterangan' adalah kolom tunggal, bukan tabel duplikat
+    df_res = df_res.loc[:, ~df_res.columns.duplicated()]
+    df_res['Keterangan'] = df_res['Keterangan'].fillna('').astype(str)
 
     # ========== LOGIKA DRAFT SETUP (UPDATE SESUAI REQUEST) ==========
     draft_data = []
@@ -5299,14 +5305,20 @@ elif menu == "Scan Out Validation":
                 total_items = len(df_res)
                 
                 # --- BAGIAN YANG DIGANTI (UNTUK FIX ERROR) ---
+                # --- BAGIAN STATISTIK SAFE MODE ---
                 if not df_res.empty:
-                    # Ambil satu kolom 'Keterangan' secara spesifik dan paksa jadi string
-                    ket_series = df_res['Keterangan'].astype(str)
+                    # Ambil kolom keterangan, paksa jadi string
+                    # Jika df_res['Keterangan'] masih berupa DataFrame (duplikat), ambil kolom pertama (.iloc)
+                    if isinstance(df_res['Keterangan'], pd.DataFrame):
+                        kets = df_res['Keterangan'].iloc[:, 0].astype(str)
+                    else:
+                        kets = df_res['Keterangan'].astype(str)
                     
-                    terjual_count = ket_series.str.contains('TERJUAL', case=False, na=False).sum()
-                    mismatch_count = ket_series.str.contains('MISSMATCH', case=False, na=False).sum()
-                    belum_count = ket_series.str.contains('BELUM', case=False, na=False).sum()
-                    done_count = ket_series.str.contains('DONE', case=False, na=False).sum()
+                    # Hitung pakai lambda biar gak ada alasan error attribute 'str'
+                    terjual_count = kets.apply(lambda x: 'TERJUAL' in x.upper()).sum()
+                    mismatch_count = kets.apply(lambda x: 'MISSMATCH' in x.upper()).sum()
+                    belum_count = kets.apply(lambda x: 'BELUM' in x.upper()).sum()
+                    done_count = kets.apply(lambda x: 'DONE' in x.upper()).sum()
                 else:
                     terjual_count = mismatch_count = belum_count = done_count = 0
                 # --- AKHIR BAGIAN YANG DIGANTI ---
