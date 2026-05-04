@@ -3153,31 +3153,33 @@ def menu_reject_defect():
             if 'upload_key' not in st.session_state: st.session_state.upload_key = 0
             uploaded_file = st.file_uploader("Upload Excel Massal", type=['xlsx'], key=f"excel_up_{st.session_state.upload_key}")
 
+            # --- BAGIAN YANG PERLU DIUBAH DI DALAM TAB ENTRY (Mass Upload) ---
+
             if uploaded_file:
-                # 1. Baca Excel
                 df_upload = pd.read_excel(uploaded_file)
                 
                 if st.button("⤴️ IMPORT DATA KE DATABASE"):
-                    # 2. Tambah timestamp otomatis (Pakai format ISO biar Supabase seneng)
                     now_plus_7 = (dt_logic.datetime.now() + dt_logic.timedelta(hours=7))
+                    
+                    # 1. Pastikan kolom timestamp ada
                     df_upload['tanggal_input'] = now_plus_7.isoformat()
                     
-                    # 3. FILTER KOLOM (KUNCINYA DI SINI!)
-                    # Kita cuma ambil kolom yang emang ada di tabel Supabase lo
-                    # Berdasarkan SS lo: id, cabang, bin_awal, bin, sku, article_name, size, kategori, keterangan, tanggal_input
+                    # 2. Ambil hanya kolom yang valid
                     db_cols = ['cabang', 'bin_awal', 'bin', 'sku', 'article_name', 'size', 'kategori', 'keterangan', 'tanggal_input']
-                    
-                    # Cek kolom mana yang emang ada di file upload
                     valid_cols = [c for c in db_cols if c in df_upload.columns]
                     df_final = df_upload[valid_cols].copy()
                     
-                    # 4. Kirim data yang udah BERSIH ke save_data
-                    save_data(df_final)
+                    # --- FIX UTAMA: HANDLING TYPE ERROR ---
+                    # Ubah semua data menjadi string dan hilangkan NaN (sel kosong)
+                    df_final = df_final.astype(str).replace('nan', '') 
                     
-                    st.session_state.upload_key += 1
-                    st.success("✅ Import Cloud Berhasil!")
-                    st.rerun()
-
+                    # 3. Simpan data
+                    try:
+                        save_data(df_final)
+                        st.success("✅ Import Cloud Berhasil!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Gagal Simpan: {e}")
     with tab_analytics:
         # Fetch data dari Supabase
         try:
