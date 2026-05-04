@@ -4120,7 +4120,16 @@ def process_rto_logic(df_scan, df_tf):
                 available_qty -= allocated
 
     df_hasil = pd.DataFrame(hasil_alokasi)
-    df_split = df_hasil.groupby('No Transfer')['Qty Alokasi'].sum().reset_index() if not df_hasil.empty else pd.DataFrame()
+    if not df_hasil.empty:
+        df_split_detail = pd.merge(
+            df_hasil,
+            comp[['QTY_TF']].reset_index().rename(columns={comp.index.name: 'SKU'}),
+            on='SKU',
+            how='left'
+        )
+        df_split_detail = df_split_detail.rename(columns={'Qty Alokasi': 'QTY SCAN'})
+    else:
+        df_split_detail = pd.DataFrame(columns=['No Transfer', 'SKU', 'QTY SCAN', 'QTY_TF'])
 
     metrics = {
         "total_tf": agg_tf.sum(),
