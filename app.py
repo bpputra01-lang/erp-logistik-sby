@@ -4121,24 +4121,19 @@ def process_rto_logic(df_scan, df_tf):
 
     df_hasil = pd.DataFrame(hasil_alokasi)
     if not df_hasil.empty:
+        df_comp_reset = comp[['QTY_TF']].reset_index()
+        df_comp_reset.columns = ['SKU', 'QTY_TF_SISTEM'] 
         df_split_detail = pd.merge(
             df_hasil,
-            comp[['QTY_TF']].reset_index().rename(columns={comp.index.name: 'SKU'}),
+            df_comp_reset,
             on='SKU',
             how='left'
         )
-        df_split_detail = df_split_detail.rename(columns={'Qty Alokasi': 'QTY SCAN'})
+        df_split_detail = df_split_detail.rename(columns={'Qty Alokasi': 'QTY SCAN', 'QTY_TF_SISTEM': 'QTY_TF'})
     else:
         df_split_detail = pd.DataFrame(columns=['No Transfer', 'SKU', 'QTY SCAN', 'QTY_TF'])
 
-    metrics = {
-        "total_tf": agg_tf.sum(),
-        "total_scan": agg_scan.sum(),
-        "kurang_tf": qty_kurang_tf,
-        "lebih_tf": qty_lebih_tf
-    }
-    
-    return df_hasil, df_split, df_kurang, df_lebih, metrics
+    return df_hasil, df_split_detail, df_kurang, df_lebih, metrics
 
 # --- 4. MAIN APP ---
 def main():
