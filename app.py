@@ -4191,7 +4191,7 @@ def main():
         file_tf = st.file_uploader("Upload Transfer Stock Jezpro", type=['xlsx', 'csv'])
 
     if file_scan and file_tf:
-        if st.button("▶️ RUN DATA COMPARISON"):
+        if st.button("▶️ RUN DATA"):
             try:
                 df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
                 df_t = pd.read_excel(file_tf) if file_tf.name.endswith('.xlsx') else pd.read_csv(file_tf)
