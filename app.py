@@ -5298,16 +5298,19 @@ elif menu == "Scan Out Validation":
                 
                 total_items = len(df_res)
                 
-                # Perbaikan pemanggilan .str untuk menghindari AttributeError
+                # --- BAGIAN YANG DIGANTI (UNTUK FIX ERROR) ---
                 if not df_res.empty:
+                    # Ambil satu kolom 'Keterangan' secara spesifik dan paksa jadi string
                     ket_series = df_res['Keterangan'].astype(str)
+                    
                     terjual_count = ket_series.str.contains('TERJUAL', case=False, na=False).sum()
                     mismatch_count = ket_series.str.contains('MISSMATCH', case=False, na=False).sum()
                     belum_count = ket_series.str.contains('BELUM', case=False, na=False).sum()
                     done_count = ket_series.str.contains('DONE', case=False, na=False).sum()
                 else:
                     terjual_count = mismatch_count = belum_count = done_count = 0
-                
+                # --- AKHIR BAGIAN YANG DIGANTI ---
+
                 sc1, sc2, sc3, sc4, sc5 = st.columns(5)
                 
                 with sc1:
