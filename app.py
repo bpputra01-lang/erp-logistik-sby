@@ -5323,7 +5323,7 @@ elif menu == "Scan Out Validation":
             with sc2: st.markdown(f'''<div class="m-box"><span class="m-lbl">✅ DONE SETUP</span><span class="m-val">{done_count}</span></div>''', unsafe_allow_html=True)
             with sc3: st.markdown(f'''<div class="m-box"><span class="m-lbl">📤 TERJUAL</span><span class="m-val">{terjual_count}</span></div>''', unsafe_allow_html=True)
             with sc4: st.markdown(f'''<div class="m-box"><span class="m-lbl">⚠️ MISSMATCH</span><span class="m-val">{mismatch_count}</span></div>''', unsafe_allow_html=True)
-            with sc5: st.markdown(f'''<div class="m-box"><span class="m-lbl">❌ BELUM TERSETUP</span><span class="m-val">{belum_count}</span></div>''', unsafe_allow_html=True)
+            with sc5: st.markdown(f'''<div class="m-box"><span class="m-lbl">❌ BELUM SETUP</span><span class="m-val">{belum_count}</span></div>''', unsafe_allow_html=True)
             
             st.divider()
 
@@ -5357,9 +5357,6 @@ elif menu == "Scan Out Validation":
                 file_name="SCAN_OUT_RESULT.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-                
-            except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
                 
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
