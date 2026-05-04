@@ -4111,19 +4111,62 @@ def process_rto_logic(df_scan, df_tf):
         df_lebih.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
         df_lebih = df_lebih[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
 
-    # FIFO ALOKASI
+    # --- FIFO ALOKASI DENGAN STATUS ---
     hasil_alokasi = []
     df_tf_work = df_tf.copy()
+    
+    # Kita track semua SKU yang ada di TF untuk cek No Allocation nanti
+    all_tf_skus = df_tf_work.iloc[:, tf_sku_idx].unique()
+    skus_with_allocation = set()
+
     for sku in agg_scan.index:
         available_qty = agg_scan[sku]
         mask_tf = df_tf_work.iloc[:, tf_sku_idx] == sku
+        
         for idx, row in df_tf_work[mask_tf].iterrows():
-            if available_qty <= 0: break
-            needed = float(row.iloc[tf_qty_idx])
-            allocated = min(needed, available_qty)
-            if allocated > 0:
-                hasil_alokasi.append({'No Transfer': row.iloc[tf_no_idx], 'SKU': sku, 'Qty Alokasi': allocated})
-                available_qty -= allocated
+            target_qty = float(row.iloc[tf_qty_idx])
+            
+            if available_qty <= 0:
+                # Jika stok scan habis tapi masih ada baris di TF
+                hasil_alokasi.append({
+                    'No Transfer': row.iloc[tf_no_idx], 
+                    'SKU': sku, 
+                    'Qty Alokasi': 0,
+                    'Status': 'No Allocation'
+                })
+                continue
+                
+            allocated = min(target_qty, available_qty)
+            skus_with_allocation.add(sku)
+            
+            # Tentukan Status
+            if allocated == target_qty:
+                status = "Full Allocation"
+            elif allocated < target_qty and allocated > 0:
+                status = "Partial Allocation"
+            else:
+                status = "No Allocation"
+                
+            hasil_alokasi.append({
+                'No Transfer': row.iloc[tf_no_idx], 
+                'SKU': sku, 
+                'Qty Alokasi': allocated,
+                'Status': status
+            })
+            available_qty -= allocated
+
+    # Tambahkan SKU yang ada di TF tapi sama sekali nggak ada di Scan
+    for _, row in df_tf_work.iterrows():
+        s_tf = row.iloc[tf_sku_idx]
+        n_tf = row.iloc[tf_no_idx]
+        # Cek jika baris TF ini belum masuk ke hasil_alokasi
+        if not any(d['No Transfer'] == n_tf and d['SKU'] == s_tf for d in hasil_alokasi):
+            hasil_alokasi.append({
+                'No Transfer': n_tf, 
+                'SKU': s_tf, 
+                'Qty Alokasi': 0,
+                'Status': 'No Allocation'
+            })
 
     df_hasil = pd.DataFrame(hasil_alokasi)
     
@@ -4176,10 +4219,21 @@ def main():
         t1, t2, t3, t4 = st.tabs(["📊 Compare Alokasi", "✂️ Split TF", "📥 Kurang TF (Fisik > TF)", "📤 Lebih TF (TF > Fisik)"])
         
         with t1:
-            st.dataframe(df_hasil, use_container_width=True)
+            st.subheader("📊 DETAIL ALOKASI")
+            st.dataframe(
+                df_hasil, 
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Status": st.column_config.SelectboxColumn(
+                        "Status Alokasi",
+                        options=["Full Allocation", "Partial Allocation", "No Allocation"],
+                    )
+                }
+            )
         
         with t2:
-            st.subheader("✂️ SPLIT PER NOMOR TRANSFER")
+            st.subheader("📤 SPLIT PER NOMOR TRANSFER")
             if not df_split.empty:
                 col_no_tf = "No Transfer" if "No Transfer" in df_split.columns else "NO TRANSFER"
                 list_tf = sorted(df_split[col_no_tf].unique().tolist())
