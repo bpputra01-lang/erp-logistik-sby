@@ -2967,7 +2967,7 @@ conn = st.connection(
     key=SUPABASE_KEY
 )
 
-def save_data(df):
+def save_reject_data(df):
     # Supabase butuh list of dicts. Nama kolom case-sensitive (disarankan lowercase di DB)
     data_dict = df.to_dict(orient='records')
     conn.table("reject_list").insert(data_dict).execute()
@@ -3113,7 +3113,7 @@ def menu_reject_defect():
                 'article_name': article, 'size': size, 'kategori': kategori, 
                 'keterangan': keterangan, 'tanggal_input': jam
             }])
-            save_data(new_data)
+            save_reject_data(new_data)
             st.success(f"✅ SKU {sku} Berhasil Disimpan ke Cloud!")
             st.rerun()
 
@@ -3175,7 +3175,7 @@ def menu_reject_defect():
                     
                     # 3. Simpan data
                     try:
-                        save_data(df_final)
+                        save_reject_data(df_final)
                         st.success("✅ Import Cloud Berhasil!")
                         st.rerun()
                     except Exception as e:
@@ -4514,7 +4514,7 @@ def clean_currency(value):
     except:
         return 0
 
-def save_data(supplier, ekspedisi, koli, ongkir, tanggal_jam): 
+def save_data_ongkir(supplier, ekspedisi, koli, ongkir, tanggal_jam): 
     try:
         data = {
             "supplier": supplier.upper(), 
