@@ -4154,7 +4154,7 @@ def main():
                 df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
                 df_t = pd.read_excel(file_tf) if file_tf.name.endswith('.xlsx') else pd.read_csv(file_tf)
                 
-                # Eksekusi Logic
+                # Pastikan urutan variable ini SAMA dengan yang di return fungsi
                 st.session_state.rto_data = process_rto_logic(df_s, df_t)
                 st.success("Analisis Selesai!")
             except Exception as e:
