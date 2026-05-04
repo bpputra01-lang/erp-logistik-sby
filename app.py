@@ -4218,14 +4218,27 @@ def main():
         
         with t1:
             st.subheader("📊 DETAIL ALOKASI")
+            
+            # Pastikan kolom Qty TF ada di df_hasil agar bisa ditampilkan
+            # Urutan kolom diatur supaya Qty TF (Sistem) bersebelahan dengan Qty Alokasi (Fisik)
+            cols_order = ["No Transfer", "SKU", "Qty TF", "Qty Alokasi", "Status"]
+            
+            # Filter hanya kolom yang tersedia agar tidak error jika ada kolom yang absen
+            available_cols = [c for c in cols_order if c in df_hasil.columns]
+            
             st.dataframe(
-                df_hasil, 
+                df_hasil[available_cols], 
                 use_container_width=True,
                 hide_index=True,
                 column_config={
+                    "No Transfer": st.column_config.TextColumn("No Transfer", width="medium"),
+                    "SKU": st.column_config.TextColumn("SKU", width="medium"),
+                    "Qty TF": st.column_config.NumberColumn("Qty TF (Sistem)", format="%d"),
+                    "Qty Alokasi": st.column_config.NumberColumn("Qty Alokasi (Fisik)", format="%d"),
                     "Status": st.column_config.SelectboxColumn(
                         "Status Alokasi",
                         options=["Full Allocation", "Partial Allocation", "No Allocation"],
+                        help="Status berdasarkan ketersediaan stok scan fisik terhadap target sistem"
                     )
                 }
             )
