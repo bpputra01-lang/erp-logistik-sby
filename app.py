@@ -4021,7 +4021,7 @@ from io import BytesIO
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="RTO Compare System", layout="wide")
 
-# --- 2. FUNGSI UNTUK CSS & HEADER ---
+# --- 2. FUNGSI UI & CSS ---
 def apply_custom_ui():
     st.markdown("""
     <style>
@@ -4036,6 +4036,16 @@ def apply_custom_ui():
             font-weight: bold;
             font-size: 26px;
         }
+        .m-box {
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #007BFF;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .m-lbl { font-size: 14px; color: #666; display: block; }
+        .m-val { font-size: 22px; font-weight: bold; color: #007BFF; }
         div.stButton > button {
             background-color: #007BFF !important;
             color: white !important;
@@ -4048,122 +4058,141 @@ def apply_custom_ui():
     <div class="hero-header">RTO RECEIVING PROCESS</div>
     """, unsafe_allow_html=True)
 
-    with st.expander("📋 Informasi Format File"):
-            st.info("""
-            **Format yang diharapkan:**
-            - **DATA SCAN :** Pastikan Formatnya di **KOLOM A = SKU** dan di **KOLOM B = QTY SCAN**  
-            - **TRANSFER STOCK :** Download data **Transfer Stock** bukan data **Penerimaan Transfer Stock**
-            """)
-    with st.expander("💡Logic Thinking"):
-            st.info("""
-            **Alur Compare:**
-            - SKU di data scan akan dilakukan compare dengan SKU yang ada di File Transfer Stock
-            - SKU teratas di File Transfer stock akan mendapatkan alokasi penuh dari data scan apabila ada > 1 No TF yang memiliki SKU yang sama
-            - Jika di File Stock Transfer ada yang tidak mendapatkan alokasi maka akan dilakukan cek ulang dan akan di FU ke cabang pengirim apabila barang yang datang < TF Stock
-            - Jika di File data scan ada SKU yang tidak terdapat di Stock Transfer maka akan dilakukan pengecekan ulang dan akan di FU ke cabang pengirim apabila ada item yang terkirim namun TF stock belum dibuatkan
-            """)
-
-# --- 3. LOGIKA ALOKASI (KODE ASLI LU YANG SUDAH GUE WRAP) ---
-def process_allocation(df_scan, df_tf):
+# --- 3. LOGIKA ALOKASI & PERHITUNGAN (MODIFIED) ---
+def process_rto_logic(df_scan, df_tf):
+    # Mapping Index (Sesuaikan dengan format file lu)
     scan_sku_idx, scan_qty_idx = 0, 1
     tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
 
-    hasil_alokasi = []
-    
     # Clean Data
     df_scan = df_scan.copy()
     df_tf = df_tf.copy()
-    df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip()
-    df_tf.iloc[:, tf_sku_idx] = df_tf.iloc[:, tf_sku_idx].astype(str).str.strip()
-
-    # Perbaikan Kolom J (Index 9) untuk Sisa Qty
-    while df_tf.shape[1] < 10:
-        df_tf[f"Col_{df_tf.shape[1]}"] = 0
+    df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
+    df_tf.iloc[:, tf_sku_idx] = df_tf.iloc[:, tf_sku_idx].astype(str).str.strip().str.upper()
     
-    cols = list(df_tf.columns)
-    cols[9] = "SISA QTY TF"
-    df_tf.columns = cols
+    # Agregasi Total per SKU untuk hitung Kurang/Lebih
+    agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
+    agg_tf = df_tf.groupby(df_tf.columns[tf_sku_idx])[df_tf.columns[tf_qty_idx]].sum()
+    
+    comp = pd.concat([agg_scan, agg_tf], axis=1).fillna(0)
+    comp.columns = ['QTY_SCAN', 'QTY_TF']
+    
+    # Hitung Qty Kurang/Lebih
+    # Kurang TF = Scan > TF (Ada barang fisik tapi TF-nya kurang/nggak ada)
+    # Lebih TF = TF > Scan (Ada data TF tapi barang fisiknya kurang)
+    qty_kurang_tf = comp[comp['QTY_SCAN'] > comp['QTY_TF']].apply(lambda x: x['QTY_SCAN'] - x['QTY_TF'], axis=1).sum()
+    qty_lebih_tf = comp[comp['QTY_TF'] > comp['QTY_SCAN']].apply(lambda x: x['QTY_TF'] - x['QTY_SCAN'], axis=1).sum()
 
-    skus_scan = set(df_scan.iloc[:, scan_sku_idx].unique())
-    skus_tf = set(df_tf.iloc[:, tf_sku_idx].unique())
-    all_skus = skus_scan | skus_tf
-
-    for sku in all_skus:
-        data_s = df_scan[df_scan.iloc[:, scan_sku_idx] == sku].copy()
-        data_t = df_tf[df_tf.iloc[:, tf_sku_idx] == sku].copy()
-
-        if data_s.empty or data_t.empty:
-            continue
-
-        list_s = data_s.to_dict('records')
-        list_t = data_t.to_dict('records')
-        idx_s = 0
-
-        for row_t in list_t:
-            needed = float(row_t.get(df_tf.columns[tf_qty_idx], 0))
-            no_tf = row_t.get(df_tf.columns[tf_no_idx], "N/A")
+    # Logika Alokasi Baris (FIFO)
+    hasil_alokasi = []
+    df_tf_work = df_tf.copy()
+    
+    for sku in agg_scan.index:
+        available_qty = agg_scan[sku]
+        mask_tf = df_tf_work.iloc[:, tf_sku_idx] == sku
+        
+        for idx, row in df_tf_work[mask_tf].iterrows():
+            if available_qty <= 0: break
             
-            while needed > 0 and idx_s < len(list_s):
-                available = float(list_s[idx_s].get(df_scan.columns[scan_qty_idx], 0))
-                if available <= 0:
-                    idx_s += 1
-                    continue
-                
-                allocated = min(needed, available)
+            needed = float(row.iloc[tf_qty_idx])
+            allocated = min(needed, available_qty)
+            
+            if allocated > 0:
                 hasil_alokasi.append({
-                    'No Transfer': no_tf, 
-                    'SKU': sku, 
+                    'No Transfer': row.iloc[tf_no_idx],
+                    'SKU': sku,
                     'Qty Alokasi': allocated
                 })
-                needed -= allocated
-                list_s[idx_s][df_scan.columns[scan_qty_idx]] -= allocated
-    
-    return pd.DataFrame(hasil_alokasi)
+                available_qty -= allocated
 
-# --- 4. TAMPILAN MENU (MAIN APP) ---
+    df_hasil = pd.DataFrame(hasil_alokasi)
+    
+    # Dataframes untuk Tab
+    df_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy()
+    df_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy()
+    
+    # Split TF (Hanya alokasi yang match)
+    df_split = df_hasil.groupby('No Transfer')['Qty Alokasi'].sum().reset_index() if not df_hasil.empty else pd.DataFrame()
+
+    metrics = {
+        "total_tf": agg_tf.sum(),
+        "total_scan": agg_scan.sum(),
+        "kurang_tf": qty_kurang_tf,
+        "lebih_tf": qty_lebih_tf
+    }
+    
+    return df_hasil, df_split, df_kurang, df_lebih, metrics
+
+# --- 4. MAIN APP ---
 def main():
     apply_custom_ui()
-    
+
+    if "rto_data" not in st.session_state:
+        st.session_state.rto_data = None
+
     col1, col2 = st.columns(2)
-    
     with col1:
         file_scan = st.file_uploader("Upload Hasil Scan RTO/RTD", type=['xlsx', 'csv'])
-        
     with col2:
         file_tf = st.file_uploader("Upload Transfer Stock Jezpro", type=['xlsx', 'csv'])
 
     if file_scan and file_tf:
-        if st.button("▶️RUN DATA"):
+        if st.button("▶️ RUN DATA COMPARISON"):
             try:
-                # Load Data
                 df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
                 df_t = pd.read_excel(file_tf) if file_tf.name.endswith('.xlsx') else pd.read_csv(file_tf)
                 
-                # Proses
-                df_hasil = process_allocation(df_s, df_t)
-                
-                if not df_hasil.empty:
-                    st.success(f"Berhasil mengalokasi {len(df_hasil)} baris data!")
-                    st.dataframe(df_hasil, use_container_width=True)
-                    
-                    # Fitur Download ke Excel
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df_hasil.to_excel(writer, index=False, sheet_name='Hasil Alokasi')
-                    
-                    st.download_button(
-                        label="📥 Download Hasil (.xlsx)",
-                        data=output.getvalue(),
-                        file_name="Hasil_Alokasi_RTO.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                else:
-                    st.warning("Tidak ada SKU yang cocok untuk dialokasikan.")
-                    
+                # Eksekusi Logic
+                st.session_state.rto_data = process_rto_logic(df_s, df_t)
+                st.success("Analisis Selesai!")
             except Exception as e:
                 st.error(f"Gagal memproses data: {e}")
-    else:
-        st.info("Silakan upload kedua file di atas untuk proses.")
+
+    # DISPLAY AREA
+    if st.session_state.rto_data:
+        df_hasil, df_split, df_kurang, df_lebih, metrics = st.session_state.rto_data
+
+        # 1. METRICS BOX
+        m1, m2, m3, m4 = st.columns(4)
+        with m1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty TF</span><span class="m-val">{metrics["total_tf"]:,}</span></div>', unsafe_allow_html=True)
+        with m2: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Scan</span><span class="m-val">{metrics["total_scan"]:,}</span></div>', unsafe_allow_html=True)
+        with m3: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Kurang TF</span><span class="m-val" style="color:red;">{metrics["kurang_tf"]:,}</span></div>', unsafe_allow_html=True)
+        with m4: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Lebih TF</span><span class="m-val" style="color:orange;">{metrics["lebih_tf"]:,}</span></div>', unsafe_allow_html=True)
+
+        st.divider()
+
+        # 2. TABS SYSTEM
+        t1, t2, t3, t4 = st.tabs(["📊 Compare Alokasi", "✂️ Split TF", "📥 Kurang TF (Fisik > TF)", "📤 Lebih TF (TF > Fisik)"])
+        
+        with t1:
+            st.dataframe(df_hasil, use_container_width=True)
+        
+        with t2:
+            st.info("Alokasi unik berdasarkan Nomor Transfer")
+            st.dataframe(df_split, use_container_width=True)
+            
+        with t3:
+            st.warning("SKU yang ada di Fisik tapi di Transfer Stock kurang/tidak ada")
+            st.dataframe(df_kurang, use_container_width=True)
+            
+        with t4:
+            st.error("SKU yang ada di Transfer Stock tapi barang Fisiknya kurang")
+            st.dataframe(df_lebih, use_container_width=True)
+
+        # 3. DOWNLOAD BUTTON
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_hasil.to_excel(writer, index=False, sheet_name='Alokasi_Detail')
+            df_split.to_excel(writer, index=False, sheet_name='Split_TF')
+            df_kurang.to_excel(writer, index=True, sheet_name='Kurang_TF')
+            df_lebih.to_excel(writer, index=True, sheet_name='Lebih_TF')
+        
+        st.download_button(
+            label="📥 Download Full Report (.xlsx)",
+            data=output.getvalue(),
+            file_name="RTO_Comparison_Report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
                 
 import streamlit as st
 import pandas as pd
