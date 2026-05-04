@@ -5329,7 +5329,7 @@ elif menu == "Scan Out Validation":
                     st.markdown(f'''<div class="m-box"><span class="m-lbl">📦 Total Items</span><span class="m-val">{total_items}</span></div>''', unsafe_allow_html=True)
                 
                 with sc2:
-                    st.markdown(f'''<div class="m-box"><span class="m-lbl">✅ DONE</span><span class="m-val">{done_count}</span></div>''', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="m-box"><span class="m-lbl">✅ DONE SETUP</span><span class="m-val">{done_count}</span></div>''', unsafe_allow_html=True)
                 
                 with sc3:
                     st.markdown(f'''<div class="m-box"><span class="m-lbl">📤 TERJUAL</span><span class="m-val">{terjual_count}</span></div>''', unsafe_allow_html=True)
