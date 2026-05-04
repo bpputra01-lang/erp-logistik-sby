@@ -4058,54 +4058,60 @@ def apply_custom_ui():
     <div class="hero-header">RTO RECEIVING PROCESS</div>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGIKA ALOKASI & PERHITUNGAN (FIXED LOGIC) ---
+# --- 3. LOGIKA ALOKASI & PERHITUNGAN ---
 def process_rto_logic(df_scan, df_tf):
+    # Inisialisasi awal agar tidak ada error 'not defined'
+    metrics = {"total_tf": 0, "total_scan": 0, "kurang_tf": 0, "lebih_tf": 0}
+    df_hasil = pd.DataFrame()
+    df_split_detail = pd.DataFrame()
+    df_kurang = pd.DataFrame()
+    df_lebih = pd.DataFrame()
+
+    # Mapping Index (Sesuaikan dengan file lu)
     scan_sku_idx, scan_qty_idx = 0, 1
     tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
 
+    # Pembersihan Data
     df_scan = df_scan.copy()
     df_tf = df_tf.copy()
-    
     df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
     df_tf.iloc[:, tf_sku_idx] = df_tf.iloc[:, tf_sku_idx].astype(str).str.strip().str.upper()
     
     col_tf_no = df_tf.columns[tf_no_idx]
     col_tf_sku = df_tf.columns[tf_sku_idx]
     
+    # Agregasi Total
     agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
     agg_tf = df_tf.groupby(df_tf.columns[tf_sku_idx])[df_tf.columns[tf_qty_idx]].sum()
     
+    # Gabungkan untuk perbandingan
     comp = pd.concat([agg_scan, agg_tf], axis=1).fillna(0)
     comp.columns = ['QTY_SCAN', 'QTY_TF']
     
-    qty_kurang_tf = comp[comp['QTY_SCAN'] > comp['QTY_TF']].apply(lambda x: x['QTY_SCAN'] - x['QTY_TF'], axis=1).sum()
-    qty_lebih_tf = comp[comp['QTY_TF'] > comp['QTY_SCAN']].apply(lambda x: x['QTY_TF'] - x['QTY_SCAN'], axis=1).sum()
+    # ISI METRICS
+    metrics["total_tf"] = int(agg_tf.sum())
+    metrics["total_scan"] = int(agg_scan.sum())
+    metrics["kurang_tf"] = int(comp[comp['QTY_SCAN'] > comp['QTY_TF']].apply(lambda x: x['QTY_SCAN'] - x['QTY_TF'], axis=1).sum())
+    metrics["lebih_tf"] = int(comp[comp['QTY_TF'] > comp['QTY_SCAN']].apply(lambda x: x['QTY_TF'] - x['QTY_SCAN'], axis=1).sum())
 
-    # --- LOGIKA KURANG TF (FISIK > SISTEM) ---
+    # LOGIKA KURANG TF (Fisik > Sistem)
     selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
     selisih_kurang.rename(columns={selisih_kurang.columns[0]: 'SKU'}, inplace=True)
-    
     if not selisih_kurang.empty:
         df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
         df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
-        # Jika QTY_TF 0, isi dengan "TIDAK ADA DI TF"
         df_kurang['NO TRANSFER'] = df_kurang['NO TRANSFER'].fillna("TIDAK ADA DI TF")
         df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
-    else:
-        df_kurang = pd.DataFrame(columns=['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF'])
 
-    # --- LOGIKA LEBIH TF (SISTEM > FISIK) ---
+    # LOGIKA LEBIH TF (Sistem > Fisik)
     selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
     selisih_lebih.rename(columns={selisih_lebih.columns[0]: 'SKU'}, inplace=True)
-    
     if not selisih_lebih.empty:
         df_lebih = pd.merge(selisih_lebih, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
         df_lebih.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
         df_lebih = df_lebih[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
-    else:
-        df_lebih = pd.DataFrame(columns=['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF'])
 
-    # --- FIFO ALOKASI ---
+    # FIFO ALOKASI
     hasil_alokasi = []
     df_tf_work = df_tf.copy()
     for sku in agg_scan.index:
@@ -4120,19 +4126,14 @@ def process_rto_logic(df_scan, df_tf):
                 available_qty -= allocated
 
     df_hasil = pd.DataFrame(hasil_alokasi)
+    
+    # Detail untuk Split TF (Tab 2)
     if not df_hasil.empty:
         df_comp_reset = comp[['QTY_TF']].reset_index()
         df_comp_reset.columns = ['SKU', 'QTY_TF_SISTEM'] 
-        df_split_detail = pd.merge(
-            df_hasil,
-            df_comp_reset,
-            on='SKU',
-            how='left'
-        )
+        df_split_detail = pd.merge(df_hasil, df_comp_reset, on='SKU', how='left')
         df_split_detail = df_split_detail.rename(columns={'Qty Alokasi': 'QTY SCAN', 'QTY_TF_SISTEM': 'QTY_TF'})
-    else:
-        df_split_detail = pd.DataFrame(columns=['No Transfer', 'SKU', 'QTY SCAN', 'QTY_TF'])
-
+    
     return df_hasil, df_split_detail, df_kurang, df_lebih, metrics
 
 # --- 4. MAIN APP ---
@@ -4154,13 +4155,11 @@ def main():
                 df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
                 df_t = pd.read_excel(file_tf) if file_tf.name.endswith('.xlsx') else pd.read_csv(file_tf)
                 
-                # Pastikan urutan variable ini SAMA dengan yang di return fungsi
                 st.session_state.rto_data = process_rto_logic(df_s, df_t)
                 st.success("Analisis Selesai!")
             except Exception as e:
                 st.error(f"Gagal memproses data: {e}")
 
-    # DISPLAY AREA
     if st.session_state.rto_data:
         df_hasil, df_split, df_kurang, df_lebih, metrics = st.session_state.rto_data
 
@@ -4181,69 +4180,36 @@ def main():
         
         with t2:
             st.subheader("✂️ SPLIT PER NOMOR TRANSFER")
-            
-            if df_split is not None and not df_split.empty:
-                # Pastikan nama kolom No Transfer konsisten
+            if not df_split.empty:
                 col_no_tf = "No Transfer" if "No Transfer" in df_split.columns else "NO TRANSFER"
-                
                 list_tf = sorted(df_split[col_no_tf].unique().tolist())
                 selected_tf = st.selectbox("🎯 Pilih Nomor Transfer:", list_tf)
                 
                 detail_tf = df_split[df_split[col_no_tf] == selected_tf]
                 
-                # Cek apakah kolom yang dibutuhkan ada sebelum ditampilkan
-                cols_to_show = ["SKU", "QTY SCAN", "QTY_TF"]
-                available_cols = [c for c in cols_to_show if c in detail_tf.columns]
+                c1, c2 = st.columns(2)
+                c1.metric("Total Qty Scan", f"{detail_tf['QTY SCAN'].sum():,.0f}")
+                c2.metric("Total Qty TF Sistem", f"{detail_tf['QTY_TF'].sum():,.0f}")
 
-                if "QTY SCAN" in detail_tf.columns:
-                    c1, c2 = st.columns(2)
-                    c1.metric("Total Qty Scan", f"{detail_tf['QTY SCAN'].sum():,.0f}")
-                    if "QTY_TF" in detail_tf.columns:
-                        c2.metric("Total Qty TF Sistem", f"{detail_tf['QTY_TF'].sum():,.0f}")
-
-                st.dataframe(
-                    detail_tf[available_cols],
-                    use_container_width=True,
-                    hide_index=True
-                )
+                st.dataframe(detail_tf[["SKU", "QTY SCAN", "QTY_TF"]], use_container_width=True, hide_index=True)
             else:
-                st.info("Belum ada data alokasi. Silahkan Run Data terlebih dahulu.")
-            
+                st.info("Data Split tidak tersedia.")
+
         with t3:
             st.warning("⚠️ SKU yang ada di Fisik tapi di Transfer Stock kurang/tidak ada")
-            st.dataframe(
-                df_kurang, 
-                use_container_width=True,
-                column_config={
-                    "NO TRANSFER": st.column_config.TextColumn("NO TRANSFER", width="medium"),
-                    "SKU": st.column_config.TextColumn("SKU", width="medium"),
-                    "QTY_SCAN": st.column_config.NumberColumn("QTY SCAN", format="%d"),
-                    "QTY_TF": st.column_config.NumberColumn("QTY TF", format="%d"),
-                },
-                hide_index=True
-            )
+            st.dataframe(df_kurang, use_container_width=True, hide_index=True)
             
         with t4:
             st.error("❌ SKU yang ada di Transfer Stock tapi barang Fisiknya KURANG")
-            st.dataframe(
-                df_lebih, 
-                use_container_width=True,
-                column_config={
-                    "NO TRANSFER": st.column_config.TextColumn("NO TRANSFER", width="medium"),
-                    "SKU": st.column_config.TextColumn("SKU", width="medium"),
-                    "QTY_SCAN": st.column_config.NumberColumn("QTY SCAN", format="%d"),
-                    "QTY_TF": st.column_config.NumberColumn("QTY TF", format="%d"),
-                },
-                hide_index=True
-            )
+            st.dataframe(df_lebih, use_container_width=True, hide_index=True)
 
         # 3. DOWNLOAD BUTTON
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_hasil.to_excel(writer, index=False, sheet_name='Alokasi_Detail')
             df_split.to_excel(writer, index=False, sheet_name='Split_TF')
-            df_kurang.to_excel(writer, index=True, sheet_name='Kurang_TF')
-            df_lebih.to_excel(writer, index=True, sheet_name='Lebih_TF')
+            df_kurang.to_excel(writer, index=False, sheet_name='Kurang_TF')
+            df_lebih.to_excel(writer, index=False, sheet_name='Lebih_TF')
         
         st.download_button(
             label="📥 Download Full Report (.xlsx)",
