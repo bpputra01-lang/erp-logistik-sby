@@ -4619,7 +4619,7 @@ def tampilan_display_control():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><p class="hero-text">SHOPFLOOR DISPLAY CONTROL</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">PRECENTAGE DISPLAY CONTROL</p></div>', unsafe_allow_html=True)
     
     with st.expander("📋 Logika Penarikan Display"):
         st.info("""
