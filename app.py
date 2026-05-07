@@ -5370,11 +5370,6 @@ with st.sidebar:
             border-color: #C5A059 !important;
             color: #C5A059 !important;
         }
-        
-        .simple-logout-btn::before {
-            content: '🔴  ';
-            font-size: 12px;
-        }
         </style>
     """, unsafe_allow_html=True)
     
