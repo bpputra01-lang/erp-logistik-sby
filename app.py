@@ -479,11 +479,17 @@ div.stFormSubmitButton > button {
             
             submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
             
-            # Baris di bawah ini harus sejajar lurus dengan submit_button di atas
-            if submit_button:
+           if submit_button:
+                # Logic Login Multi-User
                 if user_input == "admin" and pass_input == "sby123":
                     st.session_state.logged_in = True
-                    st.toast("Berhasil Login! Selamat datang kembali.", icon="✅")
+                    st.session_state.role = "DC" # Role Full Akses
+                    st.session_state.branch = "SURABAYA"
+                    st.rerun()
+                elif user_input == "cabang" and pass_input == "toko123":
+                    st.session_state.logged_in = True
+                    st.session_state.role = "CABANG" # Role Terbatas
+                    st.session_state.branch = "SURABAYA"
                     st.rerun()
                 else:
                     st.error("Username atau Password salah!")
@@ -5380,8 +5386,15 @@ with st.sidebar:
 import streamlit as st
 
 # --- INITIALIZATION ---
+if 'role' not in st.session_state:
+    st.session_state.role = "CABANG"  # Default aman
+
+# Cek menu default agar tidak error jika Cabang tidak punya akses ke Dashboard Overview
 if 'main_menu' not in st.session_state:
-    st.session_state.main_menu = "Dashboard Overview"
+    if st.session_state.role == "DC":
+        st.session_state.main_menu = "Dashboard Overview"
+    else:
+        st.session_state.main_menu = "Compare Penerimaan RTO"
 
 # Fungsi callback untuk sinkronisasi menu
 def change_m1():
@@ -5395,46 +5408,87 @@ def change_m4():
 def change_m5():
     st.session_state.main_menu = st.session_state.m5_key
 
+# --- INITIALIZATION (Pastikan ini ada di atas sebelum sidebar) ---
+if 'role' not in st.session_state:
+    st.session_state.role = "CABANG" # Default safe role
+
+if 'main_menu' not in st.session_state:
+    # Default menu berdasarkan role agar tidak error
+    if st.session_state.role == "DC":
+        st.session_state.main_menu = "Dashboard Overview"
+    else:
+        st.session_state.main_menu = "Compare Penerimaan RTO"
+
+# --- CALLBACK FUNCTIONS (Untuk Sinkronisasi Antar Radio) ---
+def sync_menu(key):
+    st.session_state.main_menu = st.session_state[key]
+
+# --- SIDEBAR CONTENT ---
 with st.sidebar:
+    # ... (Bagian CSS Elegant Header & Logo tetap di sini, jangan dihapus) ...
+
+    # Logika Filter Menu Berdasarkan Role
+    is_dc = st.session_state.role == "DC"
+
     # --- KELOMPOK 1: DASHBOARD SUMMARY ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
-    
-    m1_list = ["Dashboard Overview", "Database Master"]
-    idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else 0
-    st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=change_m1, label_visibility="collapsed")
+    if is_dc: # Hanya muncul untuk DC
+        st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
+        
+        m1_list = ["Dashboard Overview", "Database Master"]
+        # Jika menu yang sedang aktif tidak ada di list ini, set index ke None agar radio tidak terpilih
+        idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else None
+        st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=sync_menu, args=("m1_key",), label_visibility="collapsed")
 
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
-    
-    m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
-    idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else 0
-    st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=change_m2, label_visibility="collapsed")
+    if is_dc:
+        m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
+    else:
+        m2_list = ["Compare Penerimaan RTO"] # Menu Cabang
+        
+    idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else None
+    st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=sync_menu, args=("m2_key",), label_visibility="collapsed")
 
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
-    
-    m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
-    idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else 0
-    st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=change_m3, label_visibility="collapsed")
+    if is_dc:
+        m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
+    else:
+        m3_list = ["Stock Opname", "Stock Minus"] # Menu Cabang
+
+    idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else None
+    st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=sync_menu, args=("m3_key",), label_visibility="collapsed")
 
     # --- KELOMPOK 4: REJECT/DEFECT ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">REJECT & DEFECT</p>', unsafe_allow_html=True)
-    
-    m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"]
-    idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else 0
-    st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=change_m4, label_visibility="collapsed")
+    if is_dc:
+        m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"]
+    else:
+        m4_list = ["Pengajuan Reject/Defect"] # Menu Cabang
+
+    idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else None
+    st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=sync_menu, args=("m4_key",), label_visibility="collapsed")
 
     # --- KELOMPOK 5: EXTRAS ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
-    
-    m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Database Ongkir In/Out", "Precentage Display"]
-    idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else 0
-    st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
+    if is_dc:
+        m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Database Ongkir In/Out", "Precentage Display"]
+    else:
+        m5_list = ["Precentage Display"] # Menu Cabang
+
+    idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else None
+    st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=sync_menu, args=("m5_key",), label_visibility="collapsed")
 
     st.divider()
+    
+    # Tombol Logout (Tetap di bawah)
+    if st.button("🔴 Logout", key="simple_logout"):
+        st.session_state.logged_in = False
+        st.session_state.login_success = False
+        st.rerun()
 
-# Final Menu Variable untuk dipakai di konten utama
+# Variabel final untuk kontrol konten di main area
 menu = st.session_state.main_menu
 
     
