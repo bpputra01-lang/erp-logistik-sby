@@ -8362,15 +8362,12 @@ elif menu == "Refill Toko":
         df_view = st.session_state.df_refill_toko
         
         # Row Metric Box
-        r_c1, r_c2, r_c3 = st.columns(3)
+        r_c1, r_c2 = st.columns(2)
         with r_c1:
             st.markdown(f"""<div class="m-box"><span class="m-lbl">📦 SKU PERLU REFILL</span><span class="m-val">{len(df_view)}</span></div>""", unsafe_allow_html=True)
         with r_c2:
-            total_qty_refill = int(df_view['QTY GUDANG'].sum())
-            st.markdown(f"""<div class="m-box" style="border-left-color: #2BEBFA !important;"><span class="m-lbl">🚚 TOTAL QTY AVAIL</span><span class="m-val" style="color:#2BEBFA;">{total_qty_refill}</span></div>""", unsafe_allow_html=True)
-        with r_c3:
             priority_sku = len(df_view[df_view["QTY TOKO"] == 0])
-            st.markdown(f"""<div class="m-box" style="border-left-color: #FACA2B !important;"><span class="m-lbl">📈 PRIORITY (TOKO 0)</span><span class="m-val" style="color:#FACA2B;">{priority_sku}</span></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="m-box" style="border-left-color: #FACA2B !important;"><span class="m-lbl">📈 PRIORITY (QTY TOKO 0)</span><span class="m-val" style="color:#FACA2B;">{priority_sku}</span></div>""", unsafe_allow_html=True)
 
         # Tabel Utama
         st.dataframe(df_view, use_container_width=True, hide_index=True)
