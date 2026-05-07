@@ -5161,8 +5161,6 @@ with st.sidebar:
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         
-        st.markdown("""
-    <style>
         /* --- JUDUL UTAMA 3D ELEGANT --- */
         .elegant-header {
             font-family: 'Poppins', sans-serif;
