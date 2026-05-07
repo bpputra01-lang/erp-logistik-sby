@@ -4644,7 +4644,7 @@ def tampilan_display_control():
         except Exception as e:
             st.error(f"Gagal upload: {e}")
 
-    # --- 2. LOGIKA ANALISIS (REVISED: ARTICLE + MIN SIZE + BIN) ---
+    # --- 2. LOGIKA ANALISIS (REVISED: ARTICLE + MIN SIZE + BIN + DELTA) ---
     try:
         df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_display_raw'", conn)
         if df_check.empty:
@@ -4653,17 +4653,17 @@ def tampilan_display_control():
 
         # 1. Identifikasi Kolom secara Dinamis (B=Bin, E=Desc, F=Size)
         cols = pd.read_sql("SELECT * FROM stock_display_raw LIMIT 1", conn).columns
-        col_bin = cols[1]   # Kolom B (Index 1)
+        col_bin = cols[1]   # Kolom B
         col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
-        col_desc = cols[4]  # Kolom E (Index 4)
-        col_size = cols[5]  # Kolom F (Index 5)
+        col_desc = cols[4]  # Kolom E
+        col_size = cols[5]  # Kolom F
 
         # 2. Proses Data: Ekstrak ARTICLE dari Kolom E
         df_raw = pd.read_sql("SELECT * FROM stock_display_raw", conn)
         df_raw['ARTICLE'] = df_raw[col_desc].astype(str).apply(lambda x: x.split(' ')[0])
         df_raw.to_sql('stock_display_processed', conn, index=False, if_exists='replace')
 
-        # 3. Filter Eksklusi
+        # 3. Filter Eksklusi & Area
         excl_condition = f"""
             UPPER("{col_bin}") NOT LIKE '%OFFLINE%' AND 
             UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND 
@@ -4678,7 +4678,7 @@ def tampilan_display_control():
         f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
         f_source_gudang = f"(NOT ({f_target_toko})) AND ({excl_condition})"
 
-        # 4. Logic Article: Cari Article yang di Toko Kosong tapi di Gudang Ada
+        # 4. Logic Article: Cari Article yang Kosong di Toko
         q_need_display_logic = f"""
             SELECT ARTICLE FROM stock_display_processed 
             WHERE {excl_condition}
@@ -4699,7 +4699,7 @@ def tampilan_display_control():
         on_display = int(q_data['Art_On_Display'])
         need_display = int(q_data['Art_Need_Display'])
 
-        # --- 3. TAMPILAN DASHBOARD ---
+        # --- 3. TAMPILAN DASHBOARD (DELTA KEMBALI) ---
         st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns(3)
@@ -4733,7 +4733,7 @@ def tampilan_display_control():
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # 6. DETAIL DATA (Size Terkecil & Bin Tetap Ada)
+        # 6. DETAIL DATA (Ditambah Size Terkecil & Bin)
         df_detail = pd.read_sql(f"""
             SELECT 
                 ARTICLE as "Article", 
