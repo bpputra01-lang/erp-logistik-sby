@@ -6318,7 +6318,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     if is_dc:
-        m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
+        m3_list = ["Stock Opname","Cycle Count", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
     else:
         m3_list = ["Stock Minus","Cycle Count"] # Menu Cabang
 
