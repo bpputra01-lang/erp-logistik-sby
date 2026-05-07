@@ -1263,12 +1263,11 @@ def menu_cycle_count():
                 with m_c2:
                     st.markdown(f"""
                         <div class="m-box">
-                            <span class="m-lbl">📦 SKU IMPACTED</span>
+                            <span class="m-lbl">📦 TOTAL SKU</span>
                             <span class="m-val">{len(df_adj_final)} SKU</span>
                         </div>
                     """, unsafe_allow_html=True)
 
-                st.info("Menampilkan item dengan selisih antara Hasil Rekon (G) vs System (E)")
                 st.dataframe(df_adj_final, use_container_width=True, hide_index=True)
                 
                 # Simpan ke session state biar gak ilang
