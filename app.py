@@ -967,6 +967,8 @@ def menu_cycle_count():
                 - Untuk Sub Kategori pilih sesuai dengan kategori yang sedang dianalisa
             - **BIN SYSTEM**
                 - Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa
+            - **BRAND**
+                - Untuk BRAND pilih sesuai dengan brand yang sedang dianalisa
             - **BIN COVERAGE**
                 - Untuk BIN COVERAGE sementara non aktifkan dulu dan jangan dipilih
         - **COMPARE DS VS STOCK SYSTEM**
@@ -979,27 +981,13 @@ def menu_cycle_count():
         - **BIN COVERAGE**
             - Download Bin Coverage  dari **Multiple Adjusment**
             - Pilih stocknya **Hanya ada di stock**
-        - **FINAL ADJUSMENT + PROCESS**
-            - **REAL + RECON**
-                - Upload file Recon Real + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
-            - **CEK STOCK ADJ +**
-                - Download Stock System yang terbaru dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-            - **STOCK ADJ + (MASTER)**
-                - Download Stock System dan pilih hanya *BIN STAGGING INBOUND* dan pilih **Termasuk yang sudah habis**
+        - **RECON REAL + PROCESS**
+            - Upload file Recon Real + yang sudah didownload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
         - **SET UP KARANTINA GENERATOR**
             - **SYTEM + RECON**
-                - Upload file Recon System + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
+                - Upload file Recon System + yang sudah didownload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
             - **CEK STOCK ADJ -**
                 - Download Stock System yang terbaru dari *Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-        - **SUMMARY ADJUSMENT REPORT**
-            - **OPSI 1**
-                - Jika ingin mengetahui value adjusment saat proses running bisa langsung klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
-            - **OPSI 2**
-                - Jika ingin mengetahui value adjusment total + dari all bin maka **Gabungkan All Adjusment +** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file Adjusment (-)**
-            - **OPSI 3**
-                - Jika ingin mengetahui value adjusment total - dari all bin maka **Gabungkan All Adjusment -** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file Adjusment (+)**
-            - **OPSI 4**
-                - Jika ingin mengetahui value adjusment total dari + dan - secara keseluruhan maka **Gabungkan All Adjusment + & - ** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT**
         """)
     with st.expander("💡Logic Thinking"):
         st.info("""
@@ -1032,11 +1020,6 @@ def menu_cycle_count():
             - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
             - Jika **Real yang ditemukan = stock system** maka tidak akan dimasukkan ke list adjusment
             - Jika **Real yang ditemukan > stock system** maka akan dimasukkan ke list adjusment
-        - **CEK STOCK ADJUSMENT**
-            - Download kembali file multiple adjusment All BIN dan **Termasuk yang sudah habis** untuk dilakukan sumifs antara SKU dan bin hasil recon dengan file multiple terbaru
-            - Hal ini dilakukan untuk mendapatkan selisih terupdate untuk dimasukkan ke BIN INBOUND
-        - **FILE INBOUND**
-            - Jika sudah upload file multiple adjusment **STAGGING INBOUND** maka selisih dari lookup tadi akan dimasukkan ke dalam file inbound untuk nantinya dilakukan proses adjusment
         - **RECON SYSTEM +**
             - System + yang DIFF nya belum teralokasi atau masih memiliki sisa maka akan dilakukan rekonsiliasi apakah item tersebut memang benar systemnya > realnya
             - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
@@ -1052,10 +1035,6 @@ def menu_cycle_count():
         **TOTAL MISS LOCATION :**
         - Cek total missloc untuk mengetahui seberapa banyak miss location dari Stock Opname periode tersebut
         - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
-
-        **VALUE ADJUSMENT :**
-        - Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut
-        - Untuk logic Value Adjusment sudah dijelaskan di bagian **INFORMATION FILE**
         """)
 
     # --- INITIALIZE ALL SESSION STATES ---
