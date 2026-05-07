@@ -6320,7 +6320,7 @@ with st.sidebar:
     if is_dc:
         m3_list = ["Stock Opname", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
     else:
-        m3_list = ["Stock Opname", "Stock Minus","Cycle Count"] # Menu Cabang
+        m3_list = ["Stock Minus","Cycle Count"] # Menu Cabang
 
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else None
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=sync_menu, args=("m3_key",), label_visibility="collapsed")
