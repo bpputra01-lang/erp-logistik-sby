@@ -1226,55 +1226,47 @@ def menu_cycle_count():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
     # =========================================================
-    # ⚙️ 4. RECON REAL + PROCESS (REVISED)
+    # ⚙️ 4. RECON REAL + PROCESS (FIXED DISPLAY)
     # =========================================================
     st.markdown("<br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ RECON REAL + PROCESS")
     
     up_recon_real = st.file_uploader("📥 Upload HASIL RECON REAL +", type=['xlsx','csv'], key="u4_recon_real")
     
+    # 1. LOGIKA PROSES (Hanya jalan pas tombol diklik)
     if up_recon_real:
-        # Pake tombol running sesuai request
         if st.button("▶️ RUN RECON ANALYSIS", use_container_width=True):
             try:
                 df_r_plus = pd.read_excel(up_recon_real) if up_recon_real.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_recon_real)
                 
-                # Logic Revisi: Kolom G (Index 6) - Kolom E (Index 4)
-                # G = QTY REKONSILIASI
-                # E = QTY SYSTEM
+                # Logic: Kolom G (6) - Kolom E (4)
                 qty_recon_r = pd.to_numeric(df_r_plus.iloc[:, 6], errors='coerce').fillna(0)
                 qty_system_r = pd.to_numeric(df_r_plus.iloc[:, 4], errors='coerce').fillna(0)
                 
                 df_r_plus['NEED_ADJ'] = qty_recon_r - qty_system_r
                 
-                # Filter hanya yang selisihnya tidak nol
-                df_adj_final = df_r_plus[df_r_plus['NEED_ADJ'] != 0].copy()
-                total_adj_qty = int(df_adj_final['NEED_ADJ'].sum())
-                
-                # --- METRIC BOXES RECON ---
-                m_c1, m_c2 = st.columns(2)
-                with m_c1:
-                    st.markdown(f"""
-                        <div class="m-box">
-                            <span class="m-lbl">⚠️ TOTAL REAL + NEED ADJ</span>
-                            <span class="m-val" style="color: #FF4B4B;">{total_adj_qty} QTY</span>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with m_c2:
-                    st.markdown(f"""
-                        <div class="m-box">
-                            <span class="m-lbl">📦 TOTAL SKU</span>
-                            <span class="m-val">{len(df_adj_final)} SKU</span>
-                        </div>
-                    """, unsafe_allow_html=True)
-
-                st.dataframe(df_adj_final, use_container_width=True, hide_index=True)
-                
-                # Simpan ke session state biar gak ilang
-                st.session_state.df_adj_final_4 = df_adj_final
+                # Filter & Simpan ke Session State
+                df_res = df_r_plus[df_r_plus['NEED_ADJ'] != 0].copy()
+                st.session_state.df_adj_final_4 = df_res
+                st.success("✅ Analisis Step 4 Berhasil!")
+                st.rerun() # Paksa refresh biar UI update
 
             except Exception as e:
-                st.error(f"Format Kolom salah bro atau file korup: {e}")
+                st.error(f"Format Kolom salah bro: {e}")
+
+    # 2. LOGIKA DISPLAY (Muncul terus selama data ada di memori/session_state)
+    if st.session_state.get('df_adj_final_4') is not None:
+        df_display = st.session_state.df_adj_final_4
+        total_adj_qty = int(df_display['NEED_ADJ'].sum())
+        
+        # --- METRIC BOXES ---
+        m_c1, m_c2 = st.columns(2)
+        with m_c1:
+            st.markdown(f"""<div class="m-box"><span class="m-lbl">⚠️ TOTAL REAL + NEED ADJ</span><span class="m-val" style="color: #FF4B4B;">{total_adj_qty} QTY</span></div>""", unsafe_allow_html=True)
+        with m_c2:
+            st.markdown(f"""<div class="m-box"><span class="m-lbl">📦 TOTAL SKU</span><span class="m-val">{len(df_display)} SKU</span></div>""", unsafe_allow_html=True)
+
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
 
     # Tampilkan ulang jika session state ada (biar gak ilang pas scroll)
     elif st.session_state.get('df_adj_final_4') is not None:
