@@ -4672,7 +4672,8 @@ def tampilan_display_control():
             UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND 
             UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
             UPPER("{col_bin}") NOT LIKE '%STAGING%' AND 
-            UPPER("{col_bin}") NOT LIKE '%STAGGING%'
+            UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
+            UPPER("{col_bin}") NOT LIKE '%KARANTINA%'
         """
 
         f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
