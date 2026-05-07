@@ -8303,7 +8303,7 @@ elif menu == "Refill Toko":
 
                 # 2. IDENTIFIKASI BIN
                 # Buat list BIN yang dikecualikan (Defect, Reject, dll)
-                exclude_bin_pattern = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE"
+                exclude_bin_pattern = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE|KARANTINA"
                 
                 # Masking untuk BIN TOKO dan BIN GUDANG (Selain Toko & Selain Exclude)
                 is_toko = df_ref['col_1'].astype(str).str.upper() == "TOKO"
