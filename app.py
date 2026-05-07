@@ -486,7 +486,7 @@ div.stFormSubmitButton > button {
                     st.session_state.role = "DC" # Role Full Akses
                     st.session_state.branch = "SURABAYA"
                     st.rerun()
-                elif user_input == "cabang" and pass_input == "toko123":
+                elif user_input == "toko" and pass_input == "toko123":
                     st.session_state.logged_in = True
                     st.session_state.role = "CABANG" # Role Terbatas
                     st.session_state.branch = "SURABAYA"
