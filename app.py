@@ -6985,9 +6985,6 @@ elif menu == "Refill & Withdraw":
 elif menu == "Stock Opname":
     menu_Stock_Opname()
 
-elif menu =="Cycle Count":
-    menu_cycle_count()
-
 # --- Navigasi ---
 elif menu == "Reject/Defect List":
     menu_reject_defect()
@@ -7476,61 +7473,6 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         df_final_stock = df_final_stock.drop(columns=['JOIN_KEY'])
 
     return df_final_stock, df_missing
-def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing):
-    def super_clean(val):
-        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
-        s = str(val).strip().upper()
-        return s
-
-    pivot_list = [] # Buat Multiple
-    single_list = [] # Buat Single
-
-    # A. DARI STOCK (Yang Match BIN|SKU & Selisih Plus)
-    df_s = df_stock_final.copy()
-    q_so = pd.to_numeric(df_s["QTY SO"], errors='coerce').fillna(0)
-    q_sys = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
-    
-    mask_plus = (q_so > q_sys) & (df_s["DIFF"].notna())
-    if mask_plus.any():
-        for idx, r in df_s[mask_plus].iterrows():
-            pivot_list.append({'SKU_KEY_TEMP': super_clean(r.iloc[2]), 'QTY_TOTAL': pd.to_numeric(r["DIFF"], errors='coerce')})
-
-    # B. LOOKUP SKU MISSING KE INBOUND (Hanya cek SKU)
-    inbound_master = df_staging_inbound.copy()
-    inbound_skus_set = {super_clean(x) for x in inbound_master.iloc[:, 2].unique() if super_clean(x)}
-
-    if df_recon_missing is not None and not df_recon_missing.empty:
-        for _, row in df_recon_missing.iterrows():
-            s_recon = super_clean(row.iloc[1])
-            q_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-            if not s_recon or q_recon <= 0: continue
-
-            if s_recon in inbound_skus_set:
-                # KETEMU SKU DI INBOUND -> MASUK MULTIPLE
-                pivot_list.append({'SKU_KEY_TEMP': s_recon, 'QTY_TOTAL': q_recon})
-            else:
-                # GAK ADA DI MANA-MANA -> SINGLE
-                single_list.append({'BIN': row.iloc[0], 'SKU': row.iloc[1], 'QTY ADJ': q_recon})
-
-    # C. PIVOT & MERGE KE MASTER INBOUND
-    df_mult_res = pd.DataFrame()
-    if pivot_list:
-        df_p = pd.DataFrame(pivot_list)
-        df_p_grouped = df_p.groupby('SKU_KEY_TEMP')['QTY_TOTAL'].sum().reset_index()
-        
-        inbound_master['SKU_JOIN'] = inbound_master.iloc[:, 2].apply(super_clean)
-        m_clean = inbound_master.drop_duplicates(subset=['SKU_JOIN'])
-        
-        df_mult_res = df_p_grouped.merge(m_clean, left_on='SKU_KEY_TEMP', right_on='SKU_JOIN', how='left')
-        
-        if not df_mult_res.empty:
-            # Update QTY kolom terakhir (Inbound Format)
-            df_mult_res.iloc[:, -2] = df_mult_res['QTY_TOTAL']
-            df_mult_res = df_mult_res.drop(columns=['SKU_KEY_TEMP', 'QTY_TOTAL', 'SKU_JOIN'], errors='ignore')
-
-    df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
-
-    return df_mult_res, df_sing_res
 
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
     def clean_val(x):
@@ -7883,80 +7825,7 @@ def logic_miss_location_report(df_setup_real):
     except:
         return pd.DataFrame(columns=columns_ref), 0, 0
 
-def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, up_minus=None):
-    """
-    Logic Hybrid: 
-    1. Jika ada file upload (up_plus/up_minus), pakai data dari file tersebut.
-    2. Jika tidak ada upload, pakai data current (yang sedang diolah aplikasi).
-    """
-    cols_header = [
-        "BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", 
-        "SUB KATEGORI", "HARGA BELI", "HARGA JUAL", 
-        "QTY SYSTEM", "QTY SO", "VALUE ADJ", "STATUS ADJ"
-    ]
 
-    def get_active_df(current_df, uploaded_file):
-        # Jika ada file yang di-upload, baca file tersebut
-        if uploaded_file is not None:
-            try:
-                uploaded_file.seek(0)
-                if uploaded_file.name.endswith(('.xlsx', '.xls')):
-                    return pd.read_excel(uploaded_file)
-                else:
-                    return pd.read_csv(uploaded_file)
-            except:
-                return current_df # Balik ke current jika file corrupt
-        return current_df # Pakai data aplikasi jika tidak ada upload
-
-    def process_data(df, status):
-        if df is None or (isinstance(df, pd.DataFrame) and df.empty):
-            return pd.DataFrame(columns=cols_header)
-        
-        # Ambil kolom yang dibutuhkan (Indeks 1-10 sesuai standar VBA lu)
-        temp = df.iloc[:, 1:11].copy() 
-        temp.columns = cols_header[:10]
-        
-        # Pastikan numerik untuk perhitungan
-        for col in ["HARGA BELI", "QTY SO", "QTY SYSTEM"]:
-            temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
-
-        # Hitung Value Adj
-        temp["VALUE ADJ"] = (temp["QTY SO"] - temp["QTY SYSTEM"]) * temp["HARGA BELI"]
-        temp["STATUS ADJ"] = status
-        return temp
-
-    # Pilih Sumber Data: Prioritas Upload > Current Data
-    active_plus = get_active_df(df_plus_current, up_plus)
-    active_minus = get_active_df(df_minus_current, up_minus)
-
-    # Proses Data
-    df_adj_plus = process_data(active_plus, "ADJ +")
-    df_adj_minus = process_data(active_minus, "ADJ -")
-
-    # Gabung untuk report total
-    df_final = pd.concat([df_adj_plus, df_adj_minus], ignore_index=True)
-
-    # --- HITUNG SUMMARY ---
-    val_plus = df_adj_plus["VALUE ADJ"].sum() if not df_adj_plus.empty else 0
-    val_minus = df_adj_minus["VALUE ADJ"].sum() if not df_adj_minus.empty else 0
-    
-    qty_plus = (df_adj_plus["QTY SO"] - df_adj_plus["QTY SYSTEM"]).abs().sum() if not df_adj_plus.empty else 0
-    qty_minus = -(df_adj_minus["QTY SO"] - df_adj_minus["QTY SYSTEM"]).abs().sum() if not df_adj_minus.empty else 0
-
-    df_sum = pd.DataFrame({
-        "METRIC": [
-            "Total SKU Adj.", "Total Value Adj. +", "Total Value Adj. -", 
-            "Total QTY Adj. +", "Total QTY Adj. -", "Total Value", "Total QTY"
-        ],
-        "VALUE": [
-            len(df_final[df_final["SKU"].astype(str).str.strip() != ""]),
-            val_plus, val_minus, qty_plus, qty_minus,
-            val_plus + val_minus,
-            qty_plus + qty_minus
-        ]
-    })
-
-    return df_final, df_sum
 # =========================================================
 # 2. MENU UTAMA & STATE MANAGEMENT
 # =========================================================
@@ -8354,5 +8223,9 @@ def menu_cycle_count():
             st.table(df_sum_ml)
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
+
+
+elif menu =="Cycle Count":
+    menu_cycle_count()
 
 
