@@ -8265,7 +8265,7 @@ elif menu == "Refill Toko":
     # =========================================================
     # ⚙️ REFILL TOKO ANALYZER
     # =========================================================
-    st.markdown('<div class="hero-header">📦 REFILL TOKO SYSTEM</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">REFILL TOKO LIST</div>', unsafe_allow_html=True)
     
     # CSS Custom untuk Metric Box (Biar selaras sama Surabaya Dashboard)
     st.markdown("""
