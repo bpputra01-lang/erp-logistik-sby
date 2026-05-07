@@ -479,25 +479,25 @@ div.stFormSubmitButton > button {
             
             submit_button = st.form_submit_button("SIGN IN TO SYSTEM")
             
-           if submit_button:
-                # Logic Login Multi-User
-                if user_input == "admin" and pass_input == "sby123":
-                    st.session_state.logged_in = True
-                    st.session_state.role = "DC" # Role Full Akses
-                    st.session_state.branch = "SURABAYA"
-                    st.rerun()
-                elif user_input == "toko" and pass_input == "toko123":
-                    st.session_state.logged_in = True
-                    st.session_state.role = "CABANG" # Role Terbatas
-                    st.session_state.branch = "SURABAYA"
-                    st.rerun()
-                else:
-                    st.error("Username atau Password salah!")
-        
-        # Tutup Container Card
-        st.markdown('</div>', unsafe_allow_html=True)
+            if submit_button:
+                    # Logic Login Multi-User
+                    if user_input == "admin" and pass_input == "sby123":
+                        st.session_state.logged_in = True
+                        st.session_state.role = "DC" # Role Full Akses
+                        st.session_state.branch = "SURABAYA"
+                        st.rerun()
+                    elif user_input == "toko" and pass_input == "toko123":
+                        st.session_state.logged_in = True
+                        st.session_state.role = "CABANG" # Role Terbatas
+                        st.session_state.branch = "SURABAYA"
+                        st.rerun()
+                    else:
+                        st.error("Username atau Password salah!")
+            
+            # Tutup Container Card
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    st.stop()
+        st.stop()
 # --- DASHBOARD UTAMA (Jalan setelah login) ---
 
 # Cek apakah notifikasi sudah pernah muncul
