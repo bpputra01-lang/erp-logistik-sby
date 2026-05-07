@@ -958,7 +958,7 @@ def menu_cycle_count():
          .m-val { font-size: 20px; font-weight: bold; color: white; }
         </style>
     """, unsafe_allow_html=True)
-    st.markdown('<div class="hero-header"><h1> STOCK OPNAME ANALYZER</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1> CYCLE COUNT ANALYZER</h1></div>', unsafe_allow_html=True)
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
