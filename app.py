@@ -5256,8 +5256,8 @@ with st.sidebar:
             font-size: 11px;
             letter-spacing: 1px;
             text-transform: uppercase;
-            margin-top: 10px !important;
-            margin-bottom: 0px !important;
+            margin-top: 15px !important;
+            margin-bottom: -10px !important; /* Menarik radio button di bawahnya agar rapat */
         }
 
         /* Menghilangkan whitespace label radio agar rapat ke judul */
@@ -5268,6 +5268,7 @@ with st.sidebar:
         /* Merapatkan jarak antar item menu (Radio) */
         section[data-testid="stSidebar"] .stRadio > div {
             gap: 2px !important;
+            margin-top: -5px !important; /* Paksa container radio naik lebih dekat ke judul */
             margin-bottom: 5px !important;
         }
 
@@ -5276,6 +5277,7 @@ with st.sidebar:
             font-family: 'Inter', sans-serif;
             font-size: 13px;
             opacity: 1 !important;
+            margin: 0px !important;
             -webkit-text-fill-color: #E2E8F0 !important;
         }
 
