@@ -5370,12 +5370,14 @@ with st.sidebar:
             border-color: #C5A059 !important;
             color: #C5A059 !important;
         }
+        
+        .simple-logout-btn::before {
+            content: '🔴  ';
+            font-size: 12px;
+        }
         </style>
     """, unsafe_allow_html=True)
     
-    if st.button("🔴Logout", key="simple_logout"):
-        st.session_state.logged_in = False
-        st.rerun()
     
 
 import streamlit as st
