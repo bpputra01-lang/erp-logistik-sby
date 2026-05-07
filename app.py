@@ -5173,12 +5173,16 @@ with st.sidebar:
             border-bottom: 1px solid rgba(197, 160, 89, 0.3);
             letter-spacing: -0.5px;
             line-height: 1.3;
+            
+            /* Efek 3D dengan multiple shadows */
             text-shadow: 
                 0 1px 0 rgba(255,255,255,0.1),
                 0 2px 0 rgba(0,0,0,0.2),
                 0 3px 0 rgba(0,0,0,0.15),
                 0 4px 15px rgba(0,0,0,0.3),
                 0 0 20px rgba(197, 160, 89, 0.15);
+            
+            /* Gradient text dengan warna lebih kaya */
             background: linear-gradient(
                 180deg,
                 #FFFFFF 0%,
@@ -5189,9 +5193,12 @@ with st.sidebar:
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            
+            /* Subtle glow effect */
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
         }
         
+        /* --- ICON/Emoji dengan efek glow --- */
         .elegant-header .header-icon {
             display: inline-block;
             font-size: 32px;
@@ -5201,11 +5208,13 @@ with st.sidebar:
             animation: truck-bounce 2s ease-in-out infinite;
         }
         
+        /* Animasi halus untuk icon */
         @keyframes truck-bounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-3px); }
         }
         
+        /* --- SUBTITLE ELEGANT --- */
         .elegant-subtitle {
             font-family: 'Inter', sans-serif;
             font-size: 11px;
@@ -5216,9 +5225,12 @@ with st.sidebar:
             margin-top: -10px;
             margin-bottom: 20px;
             padding-left: 2px;
+            
+            /* Efek subtle glow */
             text-shadow: 0 0 10px rgba(197, 160, 89, 0.3);
         }
         
+        /* --- DECORATIVE LINE --- */
         .elegant-divider {
             height: 2px;
             background: linear-gradient(
@@ -5234,6 +5246,7 @@ with st.sidebar:
             opacity: 0.6;
         }
         
+        /* --- VERSION TAG --- */
         .version-tag {
             display: inline-block;
             background: linear-gradient(135deg, rgba(197, 160, 89, 0.15) 0%, rgba(197, 160, 89, 0.05) 100%);
@@ -5248,37 +5261,16 @@ with st.sidebar:
             margin-top: 5px;
         }
 
-        /* --- PERBAIKAN JARAK ADAPTIF SIDEBAR --- */
-        .sidebar-label {
-            font-family: 'Inter', sans-serif;
-            font-weight: bold;
-            color: #808495;
-            font-size: 11px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            margin-top: 15px !important;
-            margin-bottom: -10px !important; /* Menarik radio button di bawahnya agar rapat */
-        }
-
-        /* Menghilangkan whitespace label radio agar rapat ke judul */
-        div[data-testid="stWidgetLabel"] {
-            display: none !important;
-        }
-
-        /* Merapatkan jarak antar item menu (Radio) */
-        section[data-testid="stSidebar"] .stRadio > div {
-            gap: 2px !important;
-            margin-top: -5px !important; /* Paksa container radio naik lebih dekat ke judul */
-            margin-bottom: 5px !important;
-        }
-
-        section[data-testid="stSidebar"] label p {
-            color: #E2E8F0 !important;
+        /* --- LABEL STYLING --- */
+        section[data-testid="stSidebar"] label p,
+        section[data-testid="stSidebar"] .stCaption p {
+            color: #E2E8F0;
             font-family: 'Inter', sans-serif;
             font-size: 13px;
             opacity: 1 !important;
-            margin: 0px !important;
-            -webkit-text-fill-color: #E2E8F0 !important;
+            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         /* --- INPUT BOX STYLE --- */
@@ -5290,6 +5282,14 @@ with st.sidebar:
 
         input {
             color: #FFFFFF !important;
+        }
+
+        /* --- LABEL HITAM DI AREA GELAP --- */
+        div[data-testid="stWidgetLabel"] p {
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
+            font-family: 'Inter', sans-serif;
+            font-weight: bold;
         }
 
         div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
@@ -5328,17 +5328,21 @@ with st.sidebar:
         }
     </style>
     
+    <!-- JUDUL UTAMA DENGAN ICON -->
     <div class="elegant-header">
         <span class="header-icon">🚛</span>
         ERP LOGISTIC<br>SURABAYA
     </div>
     
+    <!-- SUBTITLE -->
     <div class="elegant-subtitle">
         Warehouse Management System
     </div>
     
+    <!-- GARIS DEKORATIF -->
     <div class="elegant-divider"></div>
     
+    <!-- VERSION TAG -->
     <div class="version-tag">v2.1 PRO</div>
 """, unsafe_allow_html=True)
 
