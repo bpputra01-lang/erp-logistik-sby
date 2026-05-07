@@ -6944,7 +6944,7 @@ elif menu == "Pengajuan Mutasi Karantina":
 elif menu == "Database Ongkir In/Out":
     show_database_ongkir()
 
-elif menu == "Precentage Stock Display":
+elif menu == "Precentage Display":
     tampilan_display_control()
 
 import streamlit as st
