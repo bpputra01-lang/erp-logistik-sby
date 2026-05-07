@@ -25,36 +25,14 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
 
     /* ============================================
-       1. FIX SPASI ADAPTIF (MODIFIKASI DISINI)
+       1. LAYOUT & SPACING
        ============================================ */
-    /* Menghilangkan padding hantu antar widget di sidebar */
-    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
-        padding-top: 0rem !important;
+    .block-container {
+        padding-top: 3.5rem !important;
         padding-bottom: 0rem !important;
-        margin-top: 0px !important;
-        margin-bottom: 2px !important; /* Jarak minimal antar menu */
     }
-
-    /* Hilangkan total ruang kosong di atas radio button (Label bawaan) */
-    [data-testid="stSidebar"] div[data-testid="stWidgetLabel"] {
-        display: none !important;
-        height: 0px !important;
-        margin: 0px !important;
-        padding: 0px !important;
-    }
-
-    /* Judul Kelompok Menu Manual */
-    .sidebar-label {
-        font-family: 'Inter', sans-serif;
-        font-weight: 800 !important;
-        color: #808495 !important;
-        font-size: 11px !important;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        margin-top: 15px !important; 
-        margin-bottom: -8px !important; /* Menarik radio di bawahnya agar rapat */
-        line-height: 1 !important;
-    }
+    [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
+    [data-testid="stSidebarNav"] { display: none !important; }
 
     /* ============================================
        2. APP BACKGROUND
@@ -179,39 +157,29 @@ st.markdown("""
         font-weight: 700 !important; 
     } 
 
-    /* ============================================
-       8. RADIO BUTTONS - PREMIUM TIGHT
-       ============================================ */
-    div.row-widget.stRadio > div {
-        background-color: transparent !important;
-        gap: 4px !important; /* Jarak antar pilihan menu */
-        margin-top: 0px !important;
-    }
+    /* ============================================ 
+       8. RADIO BUTTONS 
+       ============================================ */ 
+    div.row-widget.stRadio > div { 
+        background-color: transparent !important; 
+    } 
 
-    div.row-widget.stRadio label {
-        color: #a0a5b5 !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 13px !important;
-        padding: 6px 14px !important; /* Lebih ramping */
-        border-radius: 6px !important;
-        background: rgba(26, 29, 46, 0.5) !important;
-        border: 1px solid rgba(197, 160, 89, 0.15) !important;
-        transition: all 0.2s ease !important;
-        margin-bottom: 0px !important;
-    }
+    div.row-widget.stRadio label { 
+        color: #a0a5b5 !important; 
+        font-family: 'Inter', sans-serif !important; 
+        font-size: 13px !important; 
+        padding: 8px 14px !important; 
+        border-radius: 6px !important; 
+        background: rgba(26, 29, 46, 0.5) !important; 
+        border: 1px solid rgba(197, 160, 89, 0.15) !important; 
+        transition: all 0.2s ease !important; 
+    } 
 
-    div.row-widget.stRadio label:hover {
-        background: rgba(197, 160, 89, 0.1) !important;
-        border-color: rgba(197, 160, 89, 0.3) !important;
-        color: #C5A059 !important;
-    }
-
-    /* Memastikan teks di dalam radio tetap putih/terang */
-    div.row-widget.stRadio label p {
-        color: inherit !important;
-        -webkit-text-fill-color: #a0a5b5 !important;
-        margin: 0px !important;
-    }
+    div.row-widget.stRadio label:hover { 
+        background: rgba(197, 160, 89, 0.1) !important; 
+        border-color: rgba(197, 160, 89, 0.3) !important; 
+        color: #C5A059 !important; 
+    } 
 
     /* ============================================ 
        9. INPUT BOXES - GOLD BORDER 
