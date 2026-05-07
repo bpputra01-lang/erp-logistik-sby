@@ -591,6 +591,841 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         df_final_stock = df_final_stock.drop(columns=['JOIN_KEY'])
 
     return df_final_stock, df_missing
+
+def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
+    def clean_val(x):
+        if pd.isna(x): return ""
+        s = str(x).strip().upper()
+        if s.startswith("SPE"): s = s[3:] 
+        if s.endswith('.0'): s = s[:-2]
+        return s
+
+    # 1. Dictionary dari MULTIPLE ADJ + (Untuk validasi barang ijin masuk)
+    dict_multi = {}
+    if not df_multiple_adj_plus.empty:
+        for _, row in df_multiple_adj_plus.iterrows():
+            sku = clean_val(row.iloc[2])
+            bin_asal = row.iloc[1]
+            if sku != "" and sku not in dict_multi:
+                dict_multi[sku] = bin_asal
+
+    setup_real_data = []
+    seen_entry = set()
+
+    # --- A. AMBIL DARI DF_STOCK_FINAL (Data Sistem) ---
+    df_stock = df_stock_final.copy()
+    qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
+    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
+    diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
+
+    for i in range(len(df_stock)):
+        if qty_so.iloc[i] > qty_system.iloc[i]:
+            sku_key = clean_val(df_stock.iloc[i, 2])
+            bin_tujuan = df_stock.iloc[i, 1]
+            
+            if sku_key in dict_multi:
+                setup_real_data.append({
+                    "BIN AWAL": dict_multi[sku_key],
+                    "BIN TUJUAN": bin_tujuan,
+                    "SKU": sku_key,
+                    "QUANTITY": diff_val.iloc[i],
+                    "NOTES": "RELOCATION"
+                })
+                seen_entry.add(f"{sku_key}|{bin_tujuan}")
+
+    # --- B. AMBIL DARI TAB MISSING (Data Ghaib di Sistem) ---
+    if df_recon_missing is not None and not df_recon_missing.empty:
+        for _, row_m in df_recon_missing.iterrows():
+            bin_tujuan_m = row_m.iloc[0] # Kolom BIN
+            sku_raw_m = row_m.iloc[1]    # Kolom SKU
+            sku_key_m = clean_val(sku_raw_m)
+            qty_m = pd.to_numeric(row_m.iloc[6], errors='coerce') or 0
+
+            # Cek jika SKU ada di daftar ijin tapi belum masuk di proses A
+            if sku_key_m in dict_multi and f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry:
+                setup_real_data.append({
+                    "BIN AWAL": "STAGING INBOUND", # Default asal buat item missing
+                    "BIN TUJUAN": bin_tujuan_m,
+                    "SKU": sku_key_m,
+                    "QUANTITY": qty_m,
+                    "NOTES": "RELOCATION (MISSING)"
+                })
+
+    result_df = pd.DataFrame(setup_real_data)
+    if result_df.empty:
+        return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
+    
+    return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
+
+def logic_setup_karantina_with_compare(df_outstanding, df_recon):
+    def clean_val(x):
+        if pd.isna(x): return ""
+        s = str(x).strip().upper()
+        # Sesuai preferensi user: hapus prefix SPE jika ada
+        if s.startswith("SPE"): s = s[3:].strip() 
+        if s.endswith('.0'): s = s[:-2]
+        return s
+
+    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT (Uploader 2) -> Kolom J (Index 9)
+    sys_map = {}
+    if df_recon is not None and not df_recon.empty:
+        for _, row in df_recon.iterrows():
+            try:
+                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
+                k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
+                val_sys = pd.to_numeric(row.iloc[9], errors='coerce') 
+                sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
+            except: continue
+
+    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING (Uploader 1) -> Kolom N (Index 13)
+    recon_map = {}
+    if df_outstanding is not None and not df_outstanding.empty:
+        for _, row in df_outstanding.iterrows():
+            try:
+                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
+                k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
+                val_rec = pd.to_numeric(row.iloc[13], errors='coerce') 
+                recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
+            except: continue
+
+    # 3. Proses Comparison
+    df_master = df_outstanding.copy()
+    audit_results = []
+    karantina_results = []
+
+    for _, row in df_master.iterrows():
+        bin_val = row.iloc[1]
+        sku_val = row.iloc[2]
+        key = f"{clean_val(bin_val)}|{clean_val(sku_val)}"
+        
+        q_system = sys_map.get(key, 0)
+        q_recon = recon_map.get(key, 0)
+        diff = q_system - q_recon
+
+        # TAB PENGECEKAN: Semua selisih (Plus/Minus) masuk sini buat audit
+        if diff != 0:
+            audit_results.append({
+                'BIN': bin_val,
+                'SKU': sku_val,
+                'QTY_SYSTEM_J': q_system,
+                'QTY_RECON_N': q_recon,
+                'SELISIH': diff
+            })
+
+            # TAB SET UP KARANTINA: HANYA YANG POSITIF (> 0)
+            # Nilai minus tidak akan dimasukkan ke list hasil karantina
+            if diff > 0:
+                karantina_results.append({
+                    "BIN AWAL": bin_val,
+                    "BIN TUJUAN": "KARANTINA",
+                    "SKU": sku_val,
+                    "QUANTITY": diff,
+                    "NOTES": "MISS LOCATION"
+                })
+
+    # 4. Output DataFrames
+    # Hasil Karantina sudah bersih dari minus
+    df_karantina = pd.DataFrame(karantina_results)
+    # Hasil Audit tetep lengkap
+    df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
+
+    return df_karantina, df_check
+    
+def clean_sku_bin(series):
+    """Fungsi helper untuk memastikan SKU/BIN tetap string dan bersih."""
+    return (series.astype(str)
+            .str.replace(r'\.0$', '', regex=True) # Menghilangkan .0 di ujung SKU jika ada
+            .str.replace(r'\s+', ' ', regex=True) # Spasi ganda jadi tunggal
+            .str.strip() 
+            .str.upper())
+
+def logic_compare_scan_to_stock(df_scan, df_stock):
+    # 1. Ambil kolom & Copy
+    ds = df_scan.iloc[:, [0, 1, 2]].copy()
+    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+    
+    dt = df_stock.iloc[:, [1, 2, 9]].copy()
+    dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+
+    # 2. Pembersihan Robust
+    for df in [ds, dt]:
+        df['BIN'] = clean_sku_bin(df['BIN'])
+        df['SKU'] = clean_sku_bin(df['SKU'])
+    
+    # 3. Paksa QTY jadi Angka
+    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+    dt['QTY_SYSTEM'] = pd.to_numeric(dt['QTY_SYSTEM'], errors='coerce').fillna(0)
+
+    # 4. Grouping Data System (SUMIFS) - Pastikan dijumlah dulu sebelum merge
+    dt_grouped = dt.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
+    
+    # 5. Merge
+    ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
+    
+    # 6. Hitung Selisih
+    ds_merged['DIFF'] = ds_merged['QTY_SCAN'] - ds_merged['QTY_SYSTEM']
+    ds_merged['NOTE'] = ds_merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else ("SYSTEM +" if x < 0 else "OK"))
+    
+    return ds_merged
+
+def logic_compare_stock_to_scan(df_stock, df_scan):
+    dt = df_stock.copy()
+    
+    # 1. Siapkan Data Scan & Grouping
+    ds = df_scan.iloc[:, [0, 1, 2]].copy()
+    ds.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
+    
+    # Cleaning Data Scan
+    ds['BIN_SCAN'] = clean_sku_bin(ds['BIN_SCAN'])
+    ds['SKU_SCAN'] = clean_sku_bin(ds['SKU_SCAN'])
+    ds['QTY_TOTAL_SCAN'] = pd.to_numeric(ds['QTY_TOTAL_SCAN'], errors='coerce').fillna(0)
+    
+    # AGREGASI: Ini kunci agar tidak duplikat saat merge
+    ds_grouped = ds.groupby(['BIN_SCAN', 'SKU_SCAN'], as_index=False)['QTY_TOTAL_SCAN'].sum()
+
+    # 2. Identifikasi Kolom System
+    col_bin_sys = dt.columns[1]
+    col_sku_sys = dt.columns[2]
+    col_qty_sys = dt.columns[9]
+    col_qty_so  = dt.columns[10] 
+
+    # 3. Cleaning Data System
+    dt[col_bin_sys] = clean_sku_bin(dt[col_bin_sys])
+    dt[col_sku_sys] = clean_sku_bin(dt[col_sku_sys])
+    dt[col_qty_sys] = pd.to_numeric(dt[col_qty_sys], errors='coerce').fillna(0)
+
+    # 4. Merge
+    dt_merged = dt.merge(
+        ds_grouped, 
+        left_on=[col_bin_sys, col_sku_sys], 
+        right_on=['BIN_SCAN', 'SKU_SCAN'], 
+        how='left'
+    )
+
+    # 5. Kalkulasi
+    dt_merged[col_qty_so] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
+    dt_merged['DIFF'] = dt_merged[col_qty_sys] - dt_merged[col_qty_so]
+    dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else ("REAL +" if x < 0 else "OK"))
+    
+    return dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'])
+def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
+    # 1. Siapkan data sumber dalam dictionary
+    system_dict = {}
+    for _, row in df_system_plus.iterrows():
+        key = (str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper())
+        system_dict[key] = system_dict.get(key, 0) + row.get('DIFF', 0)
+    
+    # Ambil daftar BIN yang lolos filter UI (Benerin chaining .str)
+    selected_bins = set(df_bin_coverage.iloc[:, 1].astype(str).str.strip().str.upper().unique())
+
+    coverage_dict = {}
+    for _, row in df_bin_coverage.iterrows():
+        # Kolom: index 1=BIN, index 2=SKU, index 9=QTY
+        bin_val = str(row.iloc[1]).strip().upper()
+        sku_val = str(row.iloc[2]).strip().upper()
+        
+        # PERBAIKAN TOTAL: Cuma masukin ke dict kalau BIN-nya ada di list filter
+        if bin_val in selected_bins:
+            key = (bin_val, sku_val)
+            try: val = float(row.iloc[9])
+            except: val = 0
+            coverage_dict[key] = coverage_dict.get(key, 0) + val
+
+    # 2. List untuk menampung baris baru
+    new_rows = []
+    df_sys_updated = df_system_plus.copy()
+    sys_reduction = defaultdict(float)
+
+    for _, row in df_real_plus.iterrows():
+        sku = str(row['SKU']).strip().upper()
+        diff_needed = row['DIFF']
+        
+        if diff_needed <= 0:
+            row_copy = row.to_dict()
+            row_copy.update({'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO DIFF'})
+            new_rows.append(row_copy)
+            continue
+
+        remaining = diff_needed
+        
+        # --- TAHAP 1: Cari di System Dictionary ---
+        for (bin_src, sku_src), qty_avail in system_dict.items():
+            if remaining <= 0: break
+            if sku_src == sku and qty_avail > 0:
+                alloc = min(qty_avail, remaining)
+                
+                row_alloc = row.to_dict()
+                row_alloc.update({
+                    'BIN ALOKASI': bin_src,
+                    'QTY ALLOCATION': alloc,
+                    'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'
+                })
+                new_rows.append(row_alloc)
+                
+                system_dict[(bin_src, sku_src)] -= alloc
+                sys_reduction[(bin_src, sku_src)] += alloc
+                remaining -= alloc
+
+        # --- TAHAP 2: Cari di Coverage Dictionary (DENGAN FILTER BIN KETAT) ---
+        if remaining > 0:
+            for (bin_src, sku_src), qty_avail in coverage_dict.items():
+                if remaining <= 0: break
+                # Karena dict sudah difilter di awal, ini buat double safety
+                if bin_src in selected_bins and sku_src == sku and qty_avail > 0:
+                    alloc = min(qty_avail, remaining)
+                    
+                    row_alloc = row.to_dict()
+                    row_alloc.update({
+                        'BIN ALOKASI': bin_src,
+                        'QTY ALLOCATION': alloc,
+                        'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'
+                    })
+                    new_rows.append(row_alloc)
+                    
+                    coverage_dict[(bin_src, sku_src)] -= alloc
+                    remaining -= alloc
+
+        # --- TAHAP 3: Jika Masih Sisa (NO ALLOCATION) ---
+        if remaining > 0:
+            row_no = row.to_dict()
+            row_no.update({
+                'DIFF': remaining,
+                'BIN ALOKASI': '',
+                'QTY ALLOCATION': 0,
+                'STATUS': 'NO ALLOCATION'
+            })
+            new_rows.append(row_no)
+
+    # 3. Convert kembali ke DataFrame
+    df_result = pd.DataFrame(new_rows)
+
+    # 4. Update df_sys_updated
+    for (b, s), q in sys_reduction.items():
+        mask = (df_sys_updated['BIN'].astype(str).str.upper() == b) & \
+               (df_sys_updated['SKU'].astype(str).str.upper() == s)
+        if mask.any():
+            df_sys_updated.loc[mask, 'DIFF'] -= q
+
+    return df_result, df_sys_updated
+
+def generate_set_up_real_plus(allocated_data):
+    filtered = allocated_data[allocated_data['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
+    if not filtered.empty:
+        filtered['BIN AWAL'], filtered['BIN TUJUAN'], filtered['QUANTITY'], filtered['NOTES'] = filtered['BIN ALOKASI'], filtered['BIN'], filtered['QTY ALLOCATION'], "RELOCATION"
+        return filtered[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']]
+    return pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+
+def generate_real_plus_recon(allocated_data):
+    filtered = allocated_data[allocated_data['STATUS'] == "NO ALLOCATION"].copy()
+    if not filtered.empty:
+        recon_df = filtered[['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF']].copy()
+        recon_df['HASIL RECONCILIATION'] = ""
+        return recon_df
+    return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
+
+def logic_miss_location_report(df_setup_real):
+    # Header standar sesuai Macro VBA
+    columns_ref = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
+    
+    # Cek jika data kosong atau None
+    if df_setup_real is None or not isinstance(df_setup_real, pd.DataFrame) or df_setup_real.empty:
+        return pd.DataFrame(columns=columns_ref), 0, 0
+    
+    try:
+        df_out = df_setup_real.iloc[:, 0:4].copy()
+        df_out.columns = columns_ref
+        df_out["QTY MISS LOC."] = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').fillna(0)
+        
+        total_sku = df_out["SKU"].nunique()
+        total_qty = int(df_out["QTY MISS LOC."].sum())
+        
+        return df_out, total_sku, total_qty
+    except:
+        return pd.DataFrame(columns=columns_ref), 0, 0
+
+
+# =========================================================
+# 2. MENU UTAMA & STATE MANAGEMENT
+# =========================================================
+
+def menu_cycle_count():
+    st.markdown("""
+        <style>
+         .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
+         .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
+         .m-box { background: #262730; padding: 15px; border-radius: 8px; border: 1px solid #464855; text-align: center; flex: 1; }
+         .m-lbl { display: block; font-size: 12px; color: #808495; margin-bottom: 5px; }
+         .m-val { font-size: 20px; font-weight: bold; color: white; }
+        </style>
+    """, unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1> STOCK OPNAME ANALYZER</h1></div>', unsafe_allow_html=True)
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **FILTER**
+            - **SUB KATEGORI**
+                - Untuk Sub Kategori pilih sesuai dengan kategori yang sedang dianalisa
+            - **BIN SYSTEM**
+                - Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa
+            - **BIN COVERAGE**
+                - Untuk BIN COVERAGE sementara non aktifkan dulu dan jangan dipilih
+        - **COMPARE DS VS STOCK SYSTEM**
+            - **DATA SCAN**: Upload data scan SO yang sudah diberi header :
+                - **Kolom A** = BIN
+                - **Kolom B** = SKU
+                - **Kolom C** = QTY SCAN
+            - **STOCK SYSTEM**
+                - Download All stock dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
+        - **BIN COVERAGE**
+            - Download Bin Coverage  dari **Multiple Adjusment**
+            - Pilih stocknya **Hanya ada di stock**
+        - **FINAL ADJUSMENT + PROCESS**
+            - **REAL + RECON**
+                - Upload file Recon Real + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
+            - **CEK STOCK ADJ +**
+                - Download Stock System yang terbaru dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
+            - **STOCK ADJ + (MASTER)**
+                - Download Stock System dan pilih hanya *BIN STAGGING INBOUND* dan pilih **Termasuk yang sudah habis**
+        - **SET UP KARANTINA GENERATOR**
+            - **SYTEM + RECON**
+                - Upload file Recon System + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
+            - **CEK STOCK ADJ -**
+                - Download Stock System yang terbaru dari *Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
+        - **SUMMARY ADJUSMENT REPORT**
+            - **OPSI 1**
+                - Jika ingin mengetahui value adjusment saat proses running bisa langsung klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
+            - **OPSI 2**
+                - Jika ingin mengetahui value adjusment total + dari all bin maka **Gabungkan All Adjusment +** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file Adjusment (-)**
+            - **OPSI 3**
+                - Jika ingin mengetahui value adjusment total - dari all bin maka **Gabungkan All Adjusment -** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file Adjusment (+)**
+            - **OPSI 4**
+                - Jika ingin mengetahui value adjusment total dari + dan - secara keseluruhan maka **Gabungkan All Adjusment + & - ** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT**
+        """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **DS VS Stock System :**
+        - **REAL +**
+            - Compare antara SKU dan BIN yang ada di data scan dengan SKU dan BIN yang ada di Stock System dimana logic yang digunakan menggunakan loigc rumus (SUMIFS)
+            - Fokus di file Data Scan karena yang akan menjadi acuan untuk Real +
+            - Apabila **QTY SCAN > QTY SYSTEM** maka yang akan dijadikan sebagai Real +
+
+        **Stock Sytem VS DS :**
+        - **SYSTEM +**
+            - Jika tadi berfokus pada file Data maka untuk system + berfokus pada file Stock System
+            - Apabila **QTY SYSTEM > QTY SCAN** maka akan dijadikan sebagai System +
+
+        **ALLOCATION REAL + :**
+        - **BIN COVERAGE**
+            - Compare antara SKU yang ada di Real + dengan SKU yang ada BIN Coverage jika SKU ditemukan maka akan diambil untuk cover system di REAL +
+            - Jika DIFF real + dapat tercover penuh maka akan diberi note **FULL ALLOCATION**
+            - Jika DIFF real + hanya tercover sebagian maka akan diberi note **PARTIAL ALLOCATION**
+            - Dan yang tidak dapat tercover sebagian atau tidak tercover secara total maka akan diberi note **NO ALLOCATION**
+        - **SYSTEM +**
+            - Item memiliki note **NO ALLOCATION** maka apabila tidak ditemukan di BIN COVERAGE akan mencari SKU yang cocok di system +
+            - Dan jika ditemukan SKU yang cocok maka note akan sama ketika compare dengan BIN COVERAGE
+        - **SET UP ALLOCATION**
+            - Item dengan note **FULL ALLOCATION** dan **PARTIAL ALLOCATION** akan dibuatkan list set up dengan note Relocation
+
+        **RECON REAL + & SYSTEM + :**
+        - **RECON REAL +**
+            - Item yang memiliki note **NO ALLOCATION** akan kembali di lakukan rekonsiliasi apakah item tersebut sesuai dengan total data scan atau hanya double scan
+            - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
+            - Jika **Real yang ditemukan = stock system** maka tidak akan dimasukkan ke list adjusment
+            - Jika **Real yang ditemukan > stock system** maka akan dimasukkan ke list adjusment
+        - **CEK STOCK ADJUSMENT**
+            - Download kembali file multiple adjusment All BIN dan **Termasuk yang sudah habis** untuk dilakukan sumifs antara SKU dan bin hasil recon dengan file multiple terbaru
+            - Hal ini dilakukan untuk mendapatkan selisih terupdate untuk dimasukkan ke BIN INBOUND
+        - **FILE INBOUND**
+            - Jika sudah upload file multiple adjusment **STAGGING INBOUND** maka selisih dari lookup tadi akan dimasukkan ke dalam file inbound untuk nantinya dilakukan proses adjusment
+        - **RECON SYSTEM +**
+            - System + yang DIFF nya belum teralokasi atau masih memiliki sisa maka akan dilakukan rekonsiliasi apakah item tersebut memang benar systemnya > realnya
+            - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
+            - Jika **Real yang ditemukan = stock system** maka tidak akan dimasukkan ke list adjusment
+            - Jika **Real yang ditemukan < stock system** maka akan dimasukkan ke list adjusment
+        - **CEK STOCK ADJUSMENT**
+            - File Cek adjusment tadi yang sudah di download bisa dimasukkan kembali
+            - Logicnya juga tetap sama yaitu dengan melakukan sumifs kemudian akan mengambil diffnya
+            - Jika DIFF > 0 maka akan dilakuka mutasi ke **BIN KARANTINA**
+        - **SET UP KARANTINA**
+            - System akan membuatkan list set up untuk DIFF > 0 dan akan diberikan note **MISS LOCATION**
+
+        **TOTAL MISS LOCATION :**
+        - Cek total missloc untuk mengetahui seberapa banyak miss location dari Stock Opname periode tersebut
+        - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
+
+        **VALUE ADJUSMENT :**
+        - Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut
+        - Untuk logic Value Adjusment sudah dijelaskan di bagian **INFORMATION FILE**
+        """)
+
+    # --- INITIALIZE ALL SESSION STATES ---
+    if 'compare_result' not in st.session_state: st.session_state.compare_result = None
+    if 'allocation_result' not in st.session_state: st.session_state.allocation_result = None
+    if 'set_up_real_plus' not in st.session_state: st.session_state.set_up_real_plus = None
+    if 'sys_updated_result' not in st.session_state: st.session_state.sys_updated_result = None
+    if 'recon_real_plus' not in st.session_state: st.session_state.recon_real_plus = None
+    if 'outstanding_system' not in st.session_state: st.session_state.outstanding_system = None
+    
+    if 'df_res_lookup' not in st.session_state: st.session_state.df_res_lookup = None
+    if 'df_missing_lookup' not in st.session_state: st.session_state.df_missing_lookup = None
+    if 'step4_done' not in st.session_state: st.session_state.step4_done = False
+    
+    if 'df_mult_5' not in st.session_state: st.session_state.df_mult_5 = None
+    if 'df_sing_5' not in st.session_state: st.session_state.df_sing_5 = None
+    if 'step5_done' not in st.session_state: st.session_state.step5_done = False
+    
+    if 'df_karantina_6' not in st.session_state: st.session_state.df_karantina_6 = None
+
+ # --- FILTER SECTION ---
+    col_f1, col_f2, col_f3, col_f4 = st.columns(4) # Diubah menjadi 4 kolom
+    with col_f1:
+        list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
+        selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
+    
+    with col_f2:
+        # List brand berdasarkan data yang Anda berikan
+        list_brand = [
+            "MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", 
+            "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", 
+            "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", 
+            "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", 
+            "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR"
+        ]
+        selected_brand = st.multiselect("🏷️ Brand:", list_brand)
+
+    with col_f3:
+        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "GL3-KOLI", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTN-","GUDANG LT 2"]
+        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
+        
+    with col_f4:
+        list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
+        selected_bin_cov = st.multiselect("📡 BIN Coverage:", list_bin_cov)
+
+    st.markdown("---")
+
+    st.subheader("1️⃣ Upload & Run Compare")
+    c1, c2 = st.columns(2)
+    with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
+    with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
+
+    if up_scan and up_stock:
+        if st.button("▶️ RUN COMPARE", use_container_width=True):
+            df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
+            df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
+            
+            # --- LOGIKA FILTER DATA ---
+            # Filter Sub Kategori (Kolom ke-7 / Index 6)
+            if selected_sub: 
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
+            
+            # Filter Brand (Kolom D / Index 3) sesuai permintaan Anda
+            if selected_brand:
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 3].astype(str).str.upper().isin([x.upper() for x in selected_brand])]
+
+            # Filter BIN System (Kolom ke-2 / Index 1)
+            if selected_bin_sys: 
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
+
+            # Menjalankan logic compare
+            res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
+            res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
+            
+            # Mapping Nama Item
+            item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
+            item_map.columns = ['SKU', 'NAME']
+            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
+            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
+            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict)
+
+            st.session_state.compare_result = {
+                'res_scan': res_scan, 'res_stock': res_stock, 
+                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
+                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
+                'map_dict': map_dict
+            }
+            st.rerun()
+
+    if st.session_state.compare_result:
+        d = st.session_state.compare_result
+        st.markdown(f"""
+            <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
+                <div class="m-box"><span class="m-lbl">📦 QTY REAL +</span><span class="m-val">{int(d['real_plus']['DIFF'].sum())}</span></div>
+                <div class="m-box"><span class="m-lbl">🔐 QTY SYSTEM +</span><span class="m-val">{int(d['system_plus']['DIFF'].sum())}</span></div>
+            </div>
+        """, unsafe_allow_html=True)
+        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "➕ REAL +", "➖ SYSTEM +"])
+        with t1: st.dataframe(d['res_scan'], use_container_width=True)
+        with t2: st.dataframe(d['res_stock'], use_container_width=True)
+        with t3: st.dataframe(d['real_plus'], use_container_width=True)
+        with t4: st.dataframe(d['system_plus'], use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
+        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="step2_cov")
+        if up_bin_cov:
+            if st.button("▶️ RUN ALLOCATION", use_container_width=True):
+                # 1. Baca data original
+                df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
+                
+                # 2. FILTER DATA BERDASARKAN PILIHAN USER (Logic "Mengandung")
+                if selected_bin_cov:
+                    import re
+                    # Gabungkan pilihan user jadi pattern regex (contoh: "KARANTINA|GL3-DC|GL4-DC")
+                    # re.escape gunanya biar karakter spesial kayak titik (.) gak bikin error regex
+                    pattern = "|".join([re.escape(str(b).strip().upper()) for b in selected_bin_cov])
+                    
+                    # Filter: Cari yang mengandung (contains) salah satu pattern di atas
+                    # Kolom index 1 (BIN) dipaksa UPPER agar matching-nya akurat
+                    mask = df_cov_raw.iloc[:, 1].astype(str).str.strip().str.upper().str.contains(pattern, na=False)
+                    df_cov = df_cov_raw[mask].copy()
+                else:
+                    df_cov = df_cov_raw # Kalau gak pilih apa-apa, hajar semua
+
+                # --- VALIDASI: Kasih peringatan kalau hasil filter kosong ---
+                if df_cov.empty and selected_bin_cov:
+                    st.error("❌ Data BIN Coverage kosong setelah difilter! Cek lagi pilihan BIN lu.")
+                else:
+                    # 3. Jalankan logic dengan data yang SUDAH DIFILTER
+                    allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov)
+                    
+                    allocated['ITEM NAME'] = allocated['SKU'].map(d['map_dict'])
+                    st.session_state.allocation_result = allocated
+                    st.session_state.sys_updated_result = sys_upd
+                    st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated)
+                    
+                    st.success(f"✅ Berhasil! Terfilter {len(df_cov)} baris dari {len(selected_bin_cov)} kriteria BIN.")
+                    st.rerun()
+
+    if st.session_state.allocation_result is not None:
+        st.markdown("### ✅ HASIL ALOKASI")
+        ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📉 UPDATED SYSTEM", "📦 SET UP REAL +"])
+        with ta1: st.dataframe(st.session_state.allocation_result, use_container_width=True)
+        with ta2: st.dataframe(st.session_state.sys_updated_result, use_container_width=True)
+        with ta3: st.dataframe(st.session_state.set_up_real_plus, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("3️⃣ RECON REPORTS")
+        if st.button("📊 Generate All RECON", use_container_width=True):
+            st.session_state.recon_real_plus = generate_real_plus_recon(st.session_state.allocation_result)
+            outstanding = st.session_state.sys_updated_result[st.session_state.sys_updated_result['DIFF'] != 0].copy()
+            outstanding['HASIL REKONSILIASI'] = ""
+            st.session_state.outstanding_system = outstanding
+            st.rerun()
+
+    if st.session_state.recon_real_plus is not None:
+        st.markdown("#### 📋 REAL + RECON & SYSTEM OUTSTANDING")
+        c_rec1, c_rec2 = st.columns(2)
+        with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
+        with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
+        
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
+            st.session_state.set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
+            st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
+            st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
+        st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
+    # =========================================================
+    # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
+    # =========================================================
+    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.subheader("5️⃣ SET UP KARANTINA GENERATOR")
+
+    # Tambahkan dua uploader agar logic compare BIN|SKU bisa jalan
+    col_k1, col_k2 = st.columns(2)
+    with col_k1:
+        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
+    with col_k2:
+        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
+
+    if up_k6 and up_adj6:
+        if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
+            try:
+                # 1. Baca File Outstanding
+                up_k6.seek(0)
+                df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
+                
+                # 2. Baca File Recon (Cek Adjustment)
+                up_adj6.seek(0)
+                df_recon6 = pd.read_excel(up_adj6) if up_adj6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_adj6)
+                
+                # 3. Jalankan Logic Baru dengan Compare BIN|SKU
+                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, df_recon6)
+                
+                # 4. Simpan ke Session State
+                st.session_state.df_karantina_6 = df_final6
+                st.session_state.df_check_6 = df_check6 # Simpan juga data pengecekannya
+                
+                st.success("✅ Analisis Karantina Selesai!")
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+
+    # Tampilkan Hasil Jika Sudah Diproses
+    if st.session_state.df_karantina_6 is not None:
+        tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
+        
+        with tab_res:
+            st.dataframe(st.session_state.df_karantina_6, use_container_width=True, hide_index=True)
+            
+            # Download Button (Excel)
+            out6 = io.BytesIO()
+            with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
+                st.session_state.df_karantina_6.to_excel(writer, index=False, sheet_name='Karantina')
+            st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
+
+        with tab_chk:
+            st.info("Tabel ini menunjukkan perbandingan QTY SYSTEM vs HASIL RECON per BIN|SKU.")
+            st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
+
+# =========================================================
+    # 📊 MISS LOCATION REPORT (FIXED RED ALERT)
+    # =========================================================
+    st.markdown("#### 📊 MISS LOCATION REPORT")
+    if st.button("▶️ GENERATE MISS LOC", key="btn_gen_miss_final_v6"):
+        data_src = st.session_state.get('set_up_real_plus')
+        df_res, count_sku, count_qty = logic_miss_location_report(data_src)
+        st.session_state.report_miss = {"data": df_res, "sku": count_sku, "qty": count_qty}
+        st.rerun()
+
+    if "report_miss" in st.session_state:
+        df_ml_data = st.session_state.report_miss["data"]
+        m_sku_val = int(st.session_state.report_miss["sku"])
+        m_qty_val = int(st.session_state.report_miss["qty"])
+        
+        # WARNA MERAH TETAP (HARDCODED)
+        fixed_red = "#FF4B4B"
+
+        m1, m2 = st.columns(2)
+        with m1:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {fixed_red};">
+                    <p style="color: #808495; font-size: 14px; margin-bottom: 5px;">📦 TOTAL SKU MISS LOC.</p>
+                    <h2 style="color: {fixed_red}; margin: 0; font-weight: bold;">{m_sku_val} <span style="font-size: 18px;">ITEM</span></h2>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with m2:
+            st.markdown(f"""
+                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {fixed_red};">
+                    <p style="color: #808495; font-size: 14px; margin-bottom: 5px;">🔢 TOTAL QTY MISS LOC.</p>
+                    <h2 style="color: {fixed_red}; margin: 0; font-weight: bold;">{m_qty_val} <span style="font-size: 18px;">ITEM</span></h2>
+                </div>
+            """, unsafe_allow_html=True)
+
+        # --- TAB AREA MISS LOC (2 SHEET DOWNLOAD) ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        t_ml_1, t_ml_2 = st.tabs(["📄 Detail List", "📊 Summary"])
+        
+        df_sum_ml = pd.DataFrame({
+            "METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"],
+            "VALUE": [m_sku_val, m_qty_val]
+        })
+
+        with t_ml_1:
+            st.dataframe(df_ml_data, use_container_width=True, hide_index=True)
+            
+            fname_ml = "Miss_Location_Report.xlsx"
+            with pd.ExcelWriter(fname_ml, engine='xlsxwriter') as writer:
+                df_ml_data.to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
+                df_sum_ml.to_excel(writer, sheet_name='SUMMARY', index=False)
+            
+            with open(fname_ml, "rb") as f:
+                st.download_button(
+                    label="📥 DOWNLOAD MISS LOC REPORT",
+                    data=f,
+                    file_name=fname_ml,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+        with t_ml_2:
+            st.table(df_sum_ml)
+
+    st.markdown("<br><hr>", unsafe_allow_html=True)
+
+# Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
+import pandas as pd
+import numpy as np
+import math
+
+
+import pandas as pd
+import streamlit as st
+import io
+import openpyxl
+from openpyxl import load_workbook
+
+import streamlit as st
+import pandas as pd
+import io
+from openpyxl import load_workbook
+import re
+from collections import defaultdict
+
+
+import pandas as pd
+import streamlit as st
+import io
+from openpyxl import load_workbook
+from collections import defaultdict
+
+# =========================================================
+# 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
+# =========================================================
+
+def get_yellow_skus(file, column_index):
+    yellow_set = set()
+    try:
+        wb = load_workbook(file, data_only=True)
+        ws = wb.active
+        for row_idx in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=column_index)
+            color = str(cell.fill.start_color.index)
+            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
+                sku_val = str(cell.value).strip().upper() if cell.value else ""
+                if sku_val: yellow_set.add(sku_val)
+    except: pass
+    return yellow_set
+
+def logic_cek_adjustment_final(df_recon, df_stock_adj):
+    df_s = df_stock_adj.copy()
+    
+    def super_clean(val):
+        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
+        s = str(val).strip().upper()
+        if s.endswith('.0'): s = s[:-2]
+        return s
+
+    # 1. Bikin Key BIN|SKU di Stock
+    df_s['JOIN_KEY'] = df_s.iloc[:, 1].fillna('').astype(str).apply(super_clean) + "|" + \
+                       df_s.iloc[:, 2].fillna('').astype(str).apply(super_clean)
+
+    # 2. Map Recon (BIN|SKU -> QTY)
+    recon_map = {}
+    for _, row in df_recon.iterrows():
+        b, s = super_clean(row.iloc[0]), super_clean(row.iloc[1])
+        q = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+        if b and s and q > 0:
+            recon_map[f"{b}|{s}"] = q
+
+    # 3. Hitung QTY SO & DIFF
+    new_qty_so = df_s['JOIN_KEY'].map(recon_map)
+    sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
+    new_diff = np.where(new_qty_so.notna(), (sys_qty - new_qty_so.fillna(0)).abs(), np.nan)
+
+    # --- JALUR PAKSA: HAPUS & TEMPEL (Fix Error Dtype Str) ---
+    cols_to_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11]]
+    df_final_stock = df_s.iloc[:, cols_to_keep].copy()
+    df_final_stock.insert(10, "QTY SO", new_qty_so.fillna(0))
+    df_final_stock.insert(11, "DIFF", new_diff)
+
+    # 4. Kumpulin SKU "Missing" (Yang BIN|SKU-nya gak match di Stock)
+    matched_keys = set(df_s[new_qty_so.notna()]['JOIN_KEY'])
+    df_missing = df_recon[df_recon.apply(lambda x: f"{super_clean(x.iloc[0])}|{super_clean(x.iloc[1])}" not in matched_keys, axis=1)].copy()
+
+    if 'JOIN_KEY' in df_final_stock.columns:
+        df_final_stock = df_final_stock.drop(columns=['JOIN_KEY'])
+
+    return df_final_stock, df_missing
 def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing):
     def super_clean(val):
         if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
@@ -6975,840 +7810,7 @@ if menu == "Logistic Schedule":
                 st.dataframe(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False), 
                              use_container_width=True, hide_index=True)
 
-# Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
-import pandas as pd
-import numpy as np
-import math
 
-
-import pandas as pd
-import streamlit as st
-import io
-import openpyxl
-from openpyxl import load_workbook
-
-import streamlit as st
-import pandas as pd
-import io
-from openpyxl import load_workbook
-import re
-from collections import defaultdict
-
-
-import pandas as pd
-import streamlit as st
-import io
-from openpyxl import load_workbook
-from collections import defaultdict
-
-# =========================================================
-# 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
-# =========================================================
-
-def get_yellow_skus(file, column_index):
-    yellow_set = set()
-    try:
-        wb = load_workbook(file, data_only=True)
-        ws = wb.active
-        for row_idx in range(2, ws.max_row + 1):
-            cell = ws.cell(row=row_idx, column=column_index)
-            color = str(cell.fill.start_color.index)
-            if color in ['FFFF0000', 'FFFFFF00', 'FFFF00', '00FFFF00']:
-                sku_val = str(cell.value).strip().upper() if cell.value else ""
-                if sku_val: yellow_set.add(sku_val)
-    except: pass
-    return yellow_set
-
-def logic_cek_adjustment_final(df_recon, df_stock_adj):
-    df_s = df_stock_adj.copy()
-    
-    def super_clean(val):
-        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
-        s = str(val).strip().upper()
-        if s.endswith('.0'): s = s[:-2]
-        return s
-
-    # 1. Bikin Key BIN|SKU di Stock
-    df_s['JOIN_KEY'] = df_s.iloc[:, 1].fillna('').astype(str).apply(super_clean) + "|" + \
-                       df_s.iloc[:, 2].fillna('').astype(str).apply(super_clean)
-
-    # 2. Map Recon (BIN|SKU -> QTY)
-    recon_map = {}
-    for _, row in df_recon.iterrows():
-        b, s = super_clean(row.iloc[0]), super_clean(row.iloc[1])
-        q = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-        if b and s and q > 0:
-            recon_map[f"{b}|{s}"] = q
-
-    # 3. Hitung QTY SO & DIFF
-    new_qty_so = df_s['JOIN_KEY'].map(recon_map)
-    sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
-    new_diff = np.where(new_qty_so.notna(), (sys_qty - new_qty_so.fillna(0)).abs(), np.nan)
-
-    # --- JALUR PAKSA: HAPUS & TEMPEL (Fix Error Dtype Str) ---
-    cols_to_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11]]
-    df_final_stock = df_s.iloc[:, cols_to_keep].copy()
-    df_final_stock.insert(10, "QTY SO", new_qty_so.fillna(0))
-    df_final_stock.insert(11, "DIFF", new_diff)
-
-    # 4. Kumpulin SKU "Missing" (Yang BIN|SKU-nya gak match di Stock)
-    matched_keys = set(df_s[new_qty_so.notna()]['JOIN_KEY'])
-    df_missing = df_recon[df_recon.apply(lambda x: f"{super_clean(x.iloc[0])}|{super_clean(x.iloc[1])}" not in matched_keys, axis=1)].copy()
-
-    if 'JOIN_KEY' in df_final_stock.columns:
-        df_final_stock = df_final_stock.drop(columns=['JOIN_KEY'])
-
-    return df_final_stock, df_missing
-
-def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
-    def clean_val(x):
-        if pd.isna(x): return ""
-        s = str(x).strip().upper()
-        if s.startswith("SPE"): s = s[3:] 
-        if s.endswith('.0'): s = s[:-2]
-        return s
-
-    # 1. Dictionary dari MULTIPLE ADJ + (Untuk validasi barang ijin masuk)
-    dict_multi = {}
-    if not df_multiple_adj_plus.empty:
-        for _, row in df_multiple_adj_plus.iterrows():
-            sku = clean_val(row.iloc[2])
-            bin_asal = row.iloc[1]
-            if sku != "" and sku not in dict_multi:
-                dict_multi[sku] = bin_asal
-
-    setup_real_data = []
-    seen_entry = set()
-
-    # --- A. AMBIL DARI DF_STOCK_FINAL (Data Sistem) ---
-    df_stock = df_stock_final.copy()
-    qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
-    qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
-    diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
-
-    for i in range(len(df_stock)):
-        if qty_so.iloc[i] > qty_system.iloc[i]:
-            sku_key = clean_val(df_stock.iloc[i, 2])
-            bin_tujuan = df_stock.iloc[i, 1]
-            
-            if sku_key in dict_multi:
-                setup_real_data.append({
-                    "BIN AWAL": dict_multi[sku_key],
-                    "BIN TUJUAN": bin_tujuan,
-                    "SKU": sku_key,
-                    "QUANTITY": diff_val.iloc[i],
-                    "NOTES": "RELOCATION"
-                })
-                seen_entry.add(f"{sku_key}|{bin_tujuan}")
-
-    # --- B. AMBIL DARI TAB MISSING (Data Ghaib di Sistem) ---
-    if df_recon_missing is not None and not df_recon_missing.empty:
-        for _, row_m in df_recon_missing.iterrows():
-            bin_tujuan_m = row_m.iloc[0] # Kolom BIN
-            sku_raw_m = row_m.iloc[1]    # Kolom SKU
-            sku_key_m = clean_val(sku_raw_m)
-            qty_m = pd.to_numeric(row_m.iloc[6], errors='coerce') or 0
-
-            # Cek jika SKU ada di daftar ijin tapi belum masuk di proses A
-            if sku_key_m in dict_multi and f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry:
-                setup_real_data.append({
-                    "BIN AWAL": "STAGING INBOUND", # Default asal buat item missing
-                    "BIN TUJUAN": bin_tujuan_m,
-                    "SKU": sku_key_m,
-                    "QUANTITY": qty_m,
-                    "NOTES": "RELOCATION (MISSING)"
-                })
-
-    result_df = pd.DataFrame(setup_real_data)
-    if result_df.empty:
-        return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
-    
-    return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
-
-def logic_setup_karantina_with_compare(df_outstanding, df_recon):
-    def clean_val(x):
-        if pd.isna(x): return ""
-        s = str(x).strip().upper()
-        # Sesuai preferensi user: hapus prefix SPE jika ada
-        if s.startswith("SPE"): s = s[3:].strip() 
-        if s.endswith('.0'): s = s[:-2]
-        return s
-
-    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT (Uploader 2) -> Kolom J (Index 9)
-    sys_map = {}
-    if df_recon is not None and not df_recon.empty:
-        for _, row in df_recon.iterrows():
-            try:
-                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
-                k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
-                val_sys = pd.to_numeric(row.iloc[9], errors='coerce') 
-                sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
-            except: continue
-
-    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING (Uploader 1) -> Kolom N (Index 13)
-    recon_map = {}
-    if df_outstanding is not None and not df_outstanding.empty:
-        for _, row in df_outstanding.iterrows():
-            try:
-                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
-                k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
-                val_rec = pd.to_numeric(row.iloc[13], errors='coerce') 
-                recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
-            except: continue
-
-    # 3. Proses Comparison
-    df_master = df_outstanding.copy()
-    audit_results = []
-    karantina_results = []
-
-    for _, row in df_master.iterrows():
-        bin_val = row.iloc[1]
-        sku_val = row.iloc[2]
-        key = f"{clean_val(bin_val)}|{clean_val(sku_val)}"
-        
-        q_system = sys_map.get(key, 0)
-        q_recon = recon_map.get(key, 0)
-        diff = q_system - q_recon
-
-        # TAB PENGECEKAN: Semua selisih (Plus/Minus) masuk sini buat audit
-        if diff != 0:
-            audit_results.append({
-                'BIN': bin_val,
-                'SKU': sku_val,
-                'QTY_SYSTEM_J': q_system,
-                'QTY_RECON_N': q_recon,
-                'SELISIH': diff
-            })
-
-            # TAB SET UP KARANTINA: HANYA YANG POSITIF (> 0)
-            # Nilai minus tidak akan dimasukkan ke list hasil karantina
-            if diff > 0:
-                karantina_results.append({
-                    "BIN AWAL": bin_val,
-                    "BIN TUJUAN": "KARANTINA",
-                    "SKU": sku_val,
-                    "QUANTITY": diff,
-                    "NOTES": "MISS LOCATION"
-                })
-
-    # 4. Output DataFrames
-    # Hasil Karantina sudah bersih dari minus
-    df_karantina = pd.DataFrame(karantina_results)
-    # Hasil Audit tetep lengkap
-    df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
-
-    return df_karantina, df_check
-    
-def clean_sku_bin(series):
-    """Fungsi helper untuk memastikan SKU/BIN tetap string dan bersih."""
-    return (series.astype(str)
-            .str.replace(r'\.0$', '', regex=True) # Menghilangkan .0 di ujung SKU jika ada
-            .str.replace(r'\s+', ' ', regex=True) # Spasi ganda jadi tunggal
-            .str.strip() 
-            .str.upper())
-
-def logic_compare_scan_to_stock(df_scan, df_stock):
-    # 1. Ambil kolom & Copy
-    ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-    
-    dt = df_stock.iloc[:, [1, 2, 9]].copy()
-    dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-
-    # 2. Pembersihan Robust
-    for df in [ds, dt]:
-        df['BIN'] = clean_sku_bin(df['BIN'])
-        df['SKU'] = clean_sku_bin(df['SKU'])
-    
-    # 3. Paksa QTY jadi Angka
-    ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
-    dt['QTY_SYSTEM'] = pd.to_numeric(dt['QTY_SYSTEM'], errors='coerce').fillna(0)
-
-    # 4. Grouping Data System (SUMIFS) - Pastikan dijumlah dulu sebelum merge
-    dt_grouped = dt.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
-    
-    # 5. Merge
-    ds_merged = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
-    
-    # 6. Hitung Selisih
-    ds_merged['DIFF'] = ds_merged['QTY_SCAN'] - ds_merged['QTY_SYSTEM']
-    ds_merged['NOTE'] = ds_merged['DIFF'].apply(lambda x: "REAL +" if x > 0 else ("SYSTEM +" if x < 0 else "OK"))
-    
-    return ds_merged
-
-def logic_compare_stock_to_scan(df_stock, df_scan):
-    dt = df_stock.copy()
-    
-    # 1. Siapkan Data Scan & Grouping
-    ds = df_scan.iloc[:, [0, 1, 2]].copy()
-    ds.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
-    
-    # Cleaning Data Scan
-    ds['BIN_SCAN'] = clean_sku_bin(ds['BIN_SCAN'])
-    ds['SKU_SCAN'] = clean_sku_bin(ds['SKU_SCAN'])
-    ds['QTY_TOTAL_SCAN'] = pd.to_numeric(ds['QTY_TOTAL_SCAN'], errors='coerce').fillna(0)
-    
-    # AGREGASI: Ini kunci agar tidak duplikat saat merge
-    ds_grouped = ds.groupby(['BIN_SCAN', 'SKU_SCAN'], as_index=False)['QTY_TOTAL_SCAN'].sum()
-
-    # 2. Identifikasi Kolom System
-    col_bin_sys = dt.columns[1]
-    col_sku_sys = dt.columns[2]
-    col_qty_sys = dt.columns[9]
-    col_qty_so  = dt.columns[10] 
-
-    # 3. Cleaning Data System
-    dt[col_bin_sys] = clean_sku_bin(dt[col_bin_sys])
-    dt[col_sku_sys] = clean_sku_bin(dt[col_sku_sys])
-    dt[col_qty_sys] = pd.to_numeric(dt[col_qty_sys], errors='coerce').fillna(0)
-
-    # 4. Merge
-    dt_merged = dt.merge(
-        ds_grouped, 
-        left_on=[col_bin_sys, col_sku_sys], 
-        right_on=['BIN_SCAN', 'SKU_SCAN'], 
-        how='left'
-    )
-
-    # 5. Kalkulasi
-    dt_merged[col_qty_so] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
-    dt_merged['DIFF'] = dt_merged[col_qty_sys] - dt_merged[col_qty_so]
-    dt_merged['NOTE'] = dt_merged['DIFF'].apply(lambda x: "SYSTEM +" if x > 0 else ("REAL +" if x < 0 else "OK"))
-    
-    return dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'])
-def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
-    # 1. Siapkan data sumber dalam dictionary
-    system_dict = {}
-    for _, row in df_system_plus.iterrows():
-        key = (str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper())
-        system_dict[key] = system_dict.get(key, 0) + row.get('DIFF', 0)
-    
-    # Ambil daftar BIN yang lolos filter UI (Benerin chaining .str)
-    selected_bins = set(df_bin_coverage.iloc[:, 1].astype(str).str.strip().str.upper().unique())
-
-    coverage_dict = {}
-    for _, row in df_bin_coverage.iterrows():
-        # Kolom: index 1=BIN, index 2=SKU, index 9=QTY
-        bin_val = str(row.iloc[1]).strip().upper()
-        sku_val = str(row.iloc[2]).strip().upper()
-        
-        # PERBAIKAN TOTAL: Cuma masukin ke dict kalau BIN-nya ada di list filter
-        if bin_val in selected_bins:
-            key = (bin_val, sku_val)
-            try: val = float(row.iloc[9])
-            except: val = 0
-            coverage_dict[key] = coverage_dict.get(key, 0) + val
-
-    # 2. List untuk menampung baris baru
-    new_rows = []
-    df_sys_updated = df_system_plus.copy()
-    sys_reduction = defaultdict(float)
-
-    for _, row in df_real_plus.iterrows():
-        sku = str(row['SKU']).strip().upper()
-        diff_needed = row['DIFF']
-        
-        if diff_needed <= 0:
-            row_copy = row.to_dict()
-            row_copy.update({'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO DIFF'})
-            new_rows.append(row_copy)
-            continue
-
-        remaining = diff_needed
-        
-        # --- TAHAP 1: Cari di System Dictionary ---
-        for (bin_src, sku_src), qty_avail in system_dict.items():
-            if remaining <= 0: break
-            if sku_src == sku and qty_avail > 0:
-                alloc = min(qty_avail, remaining)
-                
-                row_alloc = row.to_dict()
-                row_alloc.update({
-                    'BIN ALOKASI': bin_src,
-                    'QTY ALLOCATION': alloc,
-                    'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'
-                })
-                new_rows.append(row_alloc)
-                
-                system_dict[(bin_src, sku_src)] -= alloc
-                sys_reduction[(bin_src, sku_src)] += alloc
-                remaining -= alloc
-
-        # --- TAHAP 2: Cari di Coverage Dictionary (DENGAN FILTER BIN KETAT) ---
-        if remaining > 0:
-            for (bin_src, sku_src), qty_avail in coverage_dict.items():
-                if remaining <= 0: break
-                # Karena dict sudah difilter di awal, ini buat double safety
-                if bin_src in selected_bins and sku_src == sku and qty_avail > 0:
-                    alloc = min(qty_avail, remaining)
-                    
-                    row_alloc = row.to_dict()
-                    row_alloc.update({
-                        'BIN ALOKASI': bin_src,
-                        'QTY ALLOCATION': alloc,
-                        'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'
-                    })
-                    new_rows.append(row_alloc)
-                    
-                    coverage_dict[(bin_src, sku_src)] -= alloc
-                    remaining -= alloc
-
-        # --- TAHAP 3: Jika Masih Sisa (NO ALLOCATION) ---
-        if remaining > 0:
-            row_no = row.to_dict()
-            row_no.update({
-                'DIFF': remaining,
-                'BIN ALOKASI': '',
-                'QTY ALLOCATION': 0,
-                'STATUS': 'NO ALLOCATION'
-            })
-            new_rows.append(row_no)
-
-    # 3. Convert kembali ke DataFrame
-    df_result = pd.DataFrame(new_rows)
-
-    # 4. Update df_sys_updated
-    for (b, s), q in sys_reduction.items():
-        mask = (df_sys_updated['BIN'].astype(str).str.upper() == b) & \
-               (df_sys_updated['SKU'].astype(str).str.upper() == s)
-        if mask.any():
-            df_sys_updated.loc[mask, 'DIFF'] -= q
-
-    return df_result, df_sys_updated
-
-def generate_set_up_real_plus(allocated_data):
-    filtered = allocated_data[allocated_data['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
-    if not filtered.empty:
-        filtered['BIN AWAL'], filtered['BIN TUJUAN'], filtered['QUANTITY'], filtered['NOTES'] = filtered['BIN ALOKASI'], filtered['BIN'], filtered['QTY ALLOCATION'], "RELOCATION"
-        return filtered[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']]
-    return pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
-
-def generate_real_plus_recon(allocated_data):
-    filtered = allocated_data[allocated_data['STATUS'] == "NO ALLOCATION"].copy()
-    if not filtered.empty:
-        recon_df = filtered[['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF']].copy()
-        recon_df['HASIL RECONCILIATION'] = ""
-        return recon_df
-    return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
-
-def logic_miss_location_report(df_setup_real):
-    # Header standar sesuai Macro VBA
-    columns_ref = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
-    
-    # Cek jika data kosong atau None
-    if df_setup_real is None or not isinstance(df_setup_real, pd.DataFrame) or df_setup_real.empty:
-        return pd.DataFrame(columns=columns_ref), 0, 0
-    
-    try:
-        df_out = df_setup_real.iloc[:, 0:4].copy()
-        df_out.columns = columns_ref
-        df_out["QTY MISS LOC."] = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').fillna(0)
-        
-        total_sku = df_out["SKU"].nunique()
-        total_qty = int(df_out["QTY MISS LOC."].sum())
-        
-        return df_out, total_sku, total_qty
-    except:
-        return pd.DataFrame(columns=columns_ref), 0, 0
-
-
-# =========================================================
-# 2. MENU UTAMA & STATE MANAGEMENT
-# =========================================================
-
-def menu_cycle_count():
-    st.markdown("""
-        <style>
-         .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
-         .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
-         .m-box { background: #262730; padding: 15px; border-radius: 8px; border: 1px solid #464855; text-align: center; flex: 1; }
-         .m-lbl { display: block; font-size: 12px; color: #808495; margin-bottom: 5px; }
-         .m-val { font-size: 20px; font-weight: bold; color: white; }
-        </style>
-    """, unsafe_allow_html=True)
-    st.markdown('<div class="hero-header"><h1> STOCK OPNAME ANALYZER</h1></div>', unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **FILTER**
-            - **SUB KATEGORI**
-                - Untuk Sub Kategori pilih sesuai dengan kategori yang sedang dianalisa
-            - **BIN SYSTEM**
-                - Untuk BIN system pilih sesuai dengan bin yang sedang dianalisa
-            - **BIN COVERAGE**
-                - Untuk BIN COVERAGE sementara non aktifkan dulu dan jangan dipilih
-        - **COMPARE DS VS STOCK SYSTEM**
-            - **DATA SCAN**: Upload data scan SO yang sudah diberi header :
-                - **Kolom A** = BIN
-                - **Kolom B** = SKU
-                - **Kolom C** = QTY SCAN
-            - **STOCK SYSTEM**
-                - Download All stock dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-        - **BIN COVERAGE**
-            - Download Bin Coverage  dari **Multiple Adjusment**
-            - Pilih stocknya **Hanya ada di stock**
-        - **FINAL ADJUSMENT + PROCESS**
-            - **REAL + RECON**
-                - Upload file Recon Real + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
-            - **CEK STOCK ADJ +**
-                - Download Stock System yang terbaru dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-            - **STOCK ADJ + (MASTER)**
-                - Download Stock System dan pilih hanya *BIN STAGGING INBOUND* dan pilih **Termasuk yang sudah habis**
-        - **SET UP KARANTINA GENERATOR**
-            - **SYTEM + RECON**
-                - Upload file Recon System + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
-            - **CEK STOCK ADJ -**
-                - Download Stock System yang terbaru dari *Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-        - **SUMMARY ADJUSMENT REPORT**
-            - **OPSI 1**
-                - Jika ingin mengetahui value adjusment saat proses running bisa langsung klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file**
-            - **OPSI 2**
-                - Jika ingin mengetahui value adjusment total + dari all bin maka **Gabungkan All Adjusment +** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file Adjusment (-)**
-            - **OPSI 3**
-                - Jika ingin mengetahui value adjusment total - dari all bin maka **Gabungkan All Adjusment -** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT** tanpa upload file Adjusment (+)**
-            - **OPSI 4**
-                - Jika ingin mengetahui value adjusment total dari + dan - secara keseluruhan maka **Gabungkan All Adjusment + & - ** untuk all bin lalu klik tombol **▶️ SUMMARY ADJUSMENT**
-        """)
-    with st.expander("💡Logic Thinking"):
-        st.info("""
-        **DS VS Stock System :**
-        - **REAL +**
-            - Compare antara SKU dan BIN yang ada di data scan dengan SKU dan BIN yang ada di Stock System dimana logic yang digunakan menggunakan loigc rumus (SUMIFS)
-            - Fokus di file Data Scan karena yang akan menjadi acuan untuk Real +
-            - Apabila **QTY SCAN > QTY SYSTEM** maka yang akan dijadikan sebagai Real +
-
-        **Stock Sytem VS DS :**
-        - **SYSTEM +**
-            - Jika tadi berfokus pada file Data maka untuk system + berfokus pada file Stock System
-            - Apabila **QTY SYSTEM > QTY SCAN** maka akan dijadikan sebagai System +
-
-        **ALLOCATION REAL + :**
-        - **BIN COVERAGE**
-            - Compare antara SKU yang ada di Real + dengan SKU yang ada BIN Coverage jika SKU ditemukan maka akan diambil untuk cover system di REAL +
-            - Jika DIFF real + dapat tercover penuh maka akan diberi note **FULL ALLOCATION**
-            - Jika DIFF real + hanya tercover sebagian maka akan diberi note **PARTIAL ALLOCATION**
-            - Dan yang tidak dapat tercover sebagian atau tidak tercover secara total maka akan diberi note **NO ALLOCATION**
-        - **SYSTEM +**
-            - Item memiliki note **NO ALLOCATION** maka apabila tidak ditemukan di BIN COVERAGE akan mencari SKU yang cocok di system +
-            - Dan jika ditemukan SKU yang cocok maka note akan sama ketika compare dengan BIN COVERAGE
-        - **SET UP ALLOCATION**
-            - Item dengan note **FULL ALLOCATION** dan **PARTIAL ALLOCATION** akan dibuatkan list set up dengan note Relocation
-
-        **RECON REAL + & SYSTEM + :**
-        - **RECON REAL +**
-            - Item yang memiliki note **NO ALLOCATION** akan kembali di lakukan rekonsiliasi apakah item tersebut sesuai dengan total data scan atau hanya double scan
-            - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
-            - Jika **Real yang ditemukan = stock system** maka tidak akan dimasukkan ke list adjusment
-            - Jika **Real yang ditemukan > stock system** maka akan dimasukkan ke list adjusment
-        - **CEK STOCK ADJUSMENT**
-            - Download kembali file multiple adjusment All BIN dan **Termasuk yang sudah habis** untuk dilakukan sumifs antara SKU dan bin hasil recon dengan file multiple terbaru
-            - Hal ini dilakukan untuk mendapatkan selisih terupdate untuk dimasukkan ke BIN INBOUND
-        - **FILE INBOUND**
-            - Jika sudah upload file multiple adjusment **STAGGING INBOUND** maka selisih dari lookup tadi akan dimasukkan ke dalam file inbound untuk nantinya dilakukan proses adjusment
-        - **RECON SYSTEM +**
-            - System + yang DIFF nya belum teralokasi atau masih memiliki sisa maka akan dilakukan rekonsiliasi apakah item tersebut memang benar systemnya > realnya
-            - Masukkan real yang ditemukan di dalam kolom hasil rekonsiliasi lalu upload
-            - Jika **Real yang ditemukan = stock system** maka tidak akan dimasukkan ke list adjusment
-            - Jika **Real yang ditemukan < stock system** maka akan dimasukkan ke list adjusment
-        - **CEK STOCK ADJUSMENT**
-            - File Cek adjusment tadi yang sudah di download bisa dimasukkan kembali
-            - Logicnya juga tetap sama yaitu dengan melakukan sumifs kemudian akan mengambil diffnya
-            - Jika DIFF > 0 maka akan dilakuka mutasi ke **BIN KARANTINA**
-        - **SET UP KARANTINA**
-            - System akan membuatkan list set up untuk DIFF > 0 dan akan diberikan note **MISS LOCATION**
-
-        **TOTAL MISS LOCATION :**
-        - Cek total missloc untuk mengetahui seberapa banyak miss location dari Stock Opname periode tersebut
-        - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
-
-        **VALUE ADJUSMENT :**
-        - Cek Value Adjusment sebagai report dan analisa SO diperiode tersebut
-        - Untuk logic Value Adjusment sudah dijelaskan di bagian **INFORMATION FILE**
-        """)
-
-    # --- INITIALIZE ALL SESSION STATES ---
-    if 'compare_result' not in st.session_state: st.session_state.compare_result = None
-    if 'allocation_result' not in st.session_state: st.session_state.allocation_result = None
-    if 'set_up_real_plus' not in st.session_state: st.session_state.set_up_real_plus = None
-    if 'sys_updated_result' not in st.session_state: st.session_state.sys_updated_result = None
-    if 'recon_real_plus' not in st.session_state: st.session_state.recon_real_plus = None
-    if 'outstanding_system' not in st.session_state: st.session_state.outstanding_system = None
-    
-    if 'df_res_lookup' not in st.session_state: st.session_state.df_res_lookup = None
-    if 'df_missing_lookup' not in st.session_state: st.session_state.df_missing_lookup = None
-    if 'step4_done' not in st.session_state: st.session_state.step4_done = False
-    
-    if 'df_mult_5' not in st.session_state: st.session_state.df_mult_5 = None
-    if 'df_sing_5' not in st.session_state: st.session_state.df_sing_5 = None
-    if 'step5_done' not in st.session_state: st.session_state.step5_done = False
-    
-    if 'df_karantina_6' not in st.session_state: st.session_state.df_karantina_6 = None
-
- # --- FILTER SECTION ---
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4) # Diubah menjadi 4 kolom
-    with col_f1:
-        list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
-        selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
-    
-    with col_f2:
-        # List brand berdasarkan data yang Anda berikan
-        list_brand = [
-            "MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", 
-            "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", 
-            "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", 
-            "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", 
-            "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR"
-        ]
-        selected_brand = st.multiselect("🏷️ Brand:", list_brand)
-
-    with col_f3:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "GL3-KOLI", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTN-","GUDANG LT 2"]
-        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
-        
-    with col_f4:
-        list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
-        selected_bin_cov = st.multiselect("📡 BIN Coverage:", list_bin_cov)
-
-    st.markdown("---")
-
-    st.subheader("1️⃣ Upload & Run Compare")
-    c1, c2 = st.columns(2)
-    with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
-    with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
-
-    if up_scan and up_stock:
-        if st.button("▶️ RUN COMPARE", use_container_width=True):
-            df_s_raw = pd.read_excel(up_scan) if up_scan.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_scan)
-            df_t_raw = pd.read_excel(up_stock) if up_stock.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_stock)
-            
-            # --- LOGIKA FILTER DATA ---
-            # Filter Sub Kategori (Kolom ke-7 / Index 6)
-            if selected_sub: 
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in selected_sub])]
-            
-            # Filter Brand (Kolom D / Index 3) sesuai permintaan Anda
-            if selected_brand:
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 3].astype(str).str.upper().isin([x.upper() for x in selected_brand])]
-
-            # Filter BIN System (Kolom ke-2 / Index 1)
-            if selected_bin_sys: 
-                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in selected_bin_sys))]
-
-            # Menjalankan logic compare
-            res_scan = logic_compare_scan_to_stock(df_s_raw, df_t_raw)
-            res_stock = logic_compare_stock_to_scan(df_t_raw, df_s_raw)
-            
-            # Mapping Nama Item
-            item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
-            item_map.columns = ['SKU', 'NAME']
-            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
-            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
-            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict)
-
-            st.session_state.compare_result = {
-                'res_scan': res_scan, 'res_stock': res_stock, 
-                'real_plus': res_scan[res_scan['NOTE'] == "REAL +"].copy(),
-                'system_plus': res_stock[res_stock['NOTE'] == "SYSTEM +"].copy(),
-                'map_dict': map_dict
-            }
-            st.rerun()
-
-    if st.session_state.compare_result:
-        d = st.session_state.compare_result
-        st.markdown(f"""
-            <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;">
-                <div class="m-box"><span class="m-lbl">📦 QTY REAL +</span><span class="m-val">{int(d['real_plus']['DIFF'].sum())}</span></div>
-                <div class="m-box"><span class="m-lbl">🔐 QTY SYSTEM +</span><span class="m-val">{int(d['system_plus']['DIFF'].sum())}</span></div>
-            </div>
-        """, unsafe_allow_html=True)
-        t1, t2, t3, t4 = st.tabs(["📋 DATA SCAN", "📊 STOCK SYSTEM", "➕ REAL +", "➖ SYSTEM +"])
-        with t1: st.dataframe(d['res_scan'], use_container_width=True)
-        with t2: st.dataframe(d['res_stock'], use_container_width=True)
-        with t3: st.dataframe(d['real_plus'], use_container_width=True)
-        with t4: st.dataframe(d['system_plus'], use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
-        up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="step2_cov")
-        if up_bin_cov:
-            if st.button("▶️ RUN ALLOCATION", use_container_width=True):
-                # 1. Baca data original
-                df_cov_raw = pd.read_excel(up_bin_cov) if up_bin_cov.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_bin_cov)
-                
-                # 2. FILTER DATA BERDASARKAN PILIHAN USER (Logic "Mengandung")
-                if selected_bin_cov:
-                    import re
-                    # Gabungkan pilihan user jadi pattern regex (contoh: "KARANTINA|GL3-DC|GL4-DC")
-                    # re.escape gunanya biar karakter spesial kayak titik (.) gak bikin error regex
-                    pattern = "|".join([re.escape(str(b).strip().upper()) for b in selected_bin_cov])
-                    
-                    # Filter: Cari yang mengandung (contains) salah satu pattern di atas
-                    # Kolom index 1 (BIN) dipaksa UPPER agar matching-nya akurat
-                    mask = df_cov_raw.iloc[:, 1].astype(str).str.strip().str.upper().str.contains(pattern, na=False)
-                    df_cov = df_cov_raw[mask].copy()
-                else:
-                    df_cov = df_cov_raw # Kalau gak pilih apa-apa, hajar semua
-
-                # --- VALIDASI: Kasih peringatan kalau hasil filter kosong ---
-                if df_cov.empty and selected_bin_cov:
-                    st.error("❌ Data BIN Coverage kosong setelah difilter! Cek lagi pilihan BIN lu.")
-                else:
-                    # 3. Jalankan logic dengan data yang SUDAH DIFILTER
-                    allocated, sys_upd = logic_run_allocation(d['real_plus'], d['system_plus'], df_cov)
-                    
-                    allocated['ITEM NAME'] = allocated['SKU'].map(d['map_dict'])
-                    st.session_state.allocation_result = allocated
-                    st.session_state.sys_updated_result = sys_upd
-                    st.session_state.set_up_real_plus = generate_set_up_real_plus(allocated)
-                    
-                    st.success(f"✅ Berhasil! Terfilter {len(df_cov)} baris dari {len(selected_bin_cov)} kriteria BIN.")
-                    st.rerun()
-
-    if st.session_state.allocation_result is not None:
-        st.markdown("### ✅ HASIL ALOKASI")
-        ta1, ta2, ta3 = st.tabs(["📊 ALLOCATION DETAIL", "📉 UPDATED SYSTEM", "📦 SET UP REAL +"])
-        with ta1: st.dataframe(st.session_state.allocation_result, use_container_width=True)
-        with ta2: st.dataframe(st.session_state.sys_updated_result, use_container_width=True)
-        with ta3: st.dataframe(st.session_state.set_up_real_plus, use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("3️⃣ RECON REPORTS")
-        if st.button("📊 Generate All RECON", use_container_width=True):
-            st.session_state.recon_real_plus = generate_real_plus_recon(st.session_state.allocation_result)
-            outstanding = st.session_state.sys_updated_result[st.session_state.sys_updated_result['DIFF'] != 0].copy()
-            outstanding['HASIL REKONSILIASI'] = ""
-            st.session_state.outstanding_system = outstanding
-            st.rerun()
-
-    if st.session_state.recon_real_plus is not None:
-        st.markdown("#### 📋 REAL + RECON & SYSTEM OUTSTANDING")
-        c_rec1, c_rec2 = st.columns(2)
-        with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
-        with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
-        
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-            st.session_state.set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
-            st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
-            st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
-        st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
-    # =========================================================
-    # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
-    # =========================================================
-    st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("5️⃣ SET UP KARANTINA GENERATOR")
-
-    # Tambahkan dua uploader agar logic compare BIN|SKU bisa jalan
-    col_k1, col_k2 = st.columns(2)
-    with col_k1:
-        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
-    with col_k2:
-        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
-
-    if up_k6 and up_adj6:
-        if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
-            try:
-                # 1. Baca File Outstanding
-                up_k6.seek(0)
-                df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
-                
-                # 2. Baca File Recon (Cek Adjustment)
-                up_adj6.seek(0)
-                df_recon6 = pd.read_excel(up_adj6) if up_adj6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_adj6)
-                
-                # 3. Jalankan Logic Baru dengan Compare BIN|SKU
-                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, df_recon6)
-                
-                # 4. Simpan ke Session State
-                st.session_state.df_karantina_6 = df_final6
-                st.session_state.df_check_6 = df_check6 # Simpan juga data pengecekannya
-                
-                st.success("✅ Analisis Karantina Selesai!")
-            except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
-
-    # Tampilkan Hasil Jika Sudah Diproses
-    if st.session_state.df_karantina_6 is not None:
-        tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
-        
-        with tab_res:
-            st.dataframe(st.session_state.df_karantina_6, use_container_width=True, hide_index=True)
-            
-            # Download Button (Excel)
-            out6 = io.BytesIO()
-            with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
-                st.session_state.df_karantina_6.to_excel(writer, index=False, sheet_name='Karantina')
-            st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
-
-        with tab_chk:
-            st.info("Tabel ini menunjukkan perbandingan QTY SYSTEM vs HASIL RECON per BIN|SKU.")
-            st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
-
-# =========================================================
-    # 📊 MISS LOCATION REPORT (FIXED RED ALERT)
-    # =========================================================
-    st.markdown("#### 📊 MISS LOCATION REPORT")
-    if st.button("▶️ GENERATE MISS LOC", key="btn_gen_miss_final_v6"):
-        data_src = st.session_state.get('set_up_real_plus')
-        df_res, count_sku, count_qty = logic_miss_location_report(data_src)
-        st.session_state.report_miss = {"data": df_res, "sku": count_sku, "qty": count_qty}
-        st.rerun()
-
-    if "report_miss" in st.session_state:
-        df_ml_data = st.session_state.report_miss["data"]
-        m_sku_val = int(st.session_state.report_miss["sku"])
-        m_qty_val = int(st.session_state.report_miss["qty"])
-        
-        # WARNA MERAH TETAP (HARDCODED)
-        fixed_red = "#FF4B4B"
-
-        m1, m2 = st.columns(2)
-        with m1:
-            st.markdown(f"""
-                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {fixed_red};">
-                    <p style="color: #808495; font-size: 14px; margin-bottom: 5px;">📦 TOTAL SKU MISS LOC.</p>
-                    <h2 style="color: {fixed_red}; margin: 0; font-weight: bold;">{m_sku_val} <span style="font-size: 18px;">ITEM</span></h2>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        with m2:
-            st.markdown(f"""
-                <div style="background-color: #1E2129; padding: 20px; border-radius: 10px; border-left: 5px solid {fixed_red};">
-                    <p style="color: #808495; font-size: 14px; margin-bottom: 5px;">🔢 TOTAL QTY MISS LOC.</p>
-                    <h2 style="color: {fixed_red}; margin: 0; font-weight: bold;">{m_qty_val} <span style="font-size: 18px;">ITEM</span></h2>
-                </div>
-            """, unsafe_allow_html=True)
-
-        # --- TAB AREA MISS LOC (2 SHEET DOWNLOAD) ---
-        st.markdown("<br>", unsafe_allow_html=True)
-        t_ml_1, t_ml_2 = st.tabs(["📄 Detail List", "📊 Summary"])
-        
-        df_sum_ml = pd.DataFrame({
-            "METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"],
-            "VALUE": [m_sku_val, m_qty_val]
-        })
-
-        with t_ml_1:
-            st.dataframe(df_ml_data, use_container_width=True, hide_index=True)
-            
-            fname_ml = "Miss_Location_Report.xlsx"
-            with pd.ExcelWriter(fname_ml, engine='xlsxwriter') as writer:
-                df_ml_data.to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
-                df_sum_ml.to_excel(writer, sheet_name='SUMMARY', index=False)
-            
-            with open(fname_ml, "rb") as f:
-                st.download_button(
-                    label="📥 DOWNLOAD MISS LOC REPORT",
-                    data=f,
-                    file_name=fname_ml,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
-        with t_ml_2:
-            st.table(df_sum_ml)
-
-    st.markdown("<br><hr>", unsafe_allow_html=True)
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
