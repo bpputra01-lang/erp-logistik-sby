@@ -1256,7 +1256,7 @@ def menu_cycle_count():
                 with m_c1:
                     st.markdown(f"""
                         <div class="m-box">
-                            <span class="m-lbl">⚠️ TOTAL NEED ADJ (+)</span>
+                            <span class="m-lbl">⚠️ TOTAL REAL + NEED ADJ</span>
                             <span class="m-val" style="color: #FF4B4B;">{total_adj_qty} QTY</span>
                         </div>
                     """, unsafe_allow_html=True)
