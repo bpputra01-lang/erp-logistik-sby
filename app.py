@@ -6975,420 +6975,6 @@ if menu == "Logistic Schedule":
                 st.dataframe(pd.DataFrame(sum_data).sort_values(by="SHIFT", ascending=False), 
                              use_container_width=True, hide_index=True)
 
-elif menu == "Balancing Stock":
-    tampilan_balancing_stock()
-
-elif menu == "Refill & Withdraw":
-    menu_refill_withdraw()
-
-# --- Navigasi ---
-elif menu == "Stock Opname":
-    menu_Stock_Opname()
-
-# --- Navigasi ---
-elif menu == "Reject/Defect List":
-    menu_reject_defect()
-
-elif menu == "Compare Penerimaan RTO":
-    main()
-
-elif menu == "Pengajuan Reject/Defect":
-    project_approval_reject()
-
-elif menu == "List Retur Out":
-    menu_retur_out_system()
-
-elif menu == "Pengajuan Mutasi Karantina":
-    project_mutasi_karantina()
-
-elif menu == "Database Ongkir In/Out":
-    show_database_ongkir()
-
-elif menu == "Precentage Display":
-    tampilan_display_control()
-
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-
-# Trik agar tidak error di laptop meskipun library supabase belum terinstall
-try:
-    from supabase import create_client, Client
-    HAS_SUPABASE = True
-except ImportError:
-    HAS_SUPABASE = False
-
-# Konfigurasi Supabase
-if HAS_SUPABASE:
-    # Nama variabel harus konsisten
-    SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
-    SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
-    
-    # PERBAIKAN: Gunakan nama variabel yang sudah didefinisikan di atas
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    st.warning("Menjalankan mode lokal tanpa Database Cloud (Hanya untuk Testing)")
-
-# --- FUNGSI UPDATE STATUS ---
-def update_report_status(laporan_name):
-    if HAS_SUPABASE:
-        try:
-            supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", laporan_name).execute()
-        except Exception as e:
-            st.error(f"Gagal update ke database: {e}")
-    else:
-        # Fallback ke session state saja kalau di lokal
-        if 'db_report' in st.session_state:
-            for item in st.session_state.db_report:
-                if item['Laporan'] == laporan_name:
-                    item['Status'] = "✅ Selesai"
-
-import pandas as pd
-import streamlit as st
-import math
-from datetime import datetime
-from supabase import create_client, Client
-
-# --- 1. KONEKSI SUPABASE ---
-SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
-@st.cache_resource
-def init_supabase():
-    from supabase import create_client
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
-
-supabase = init_supabase()
-
-# --- 2. FUNGSI SINKRONISASI & RESET HARIAN ---
-def sync_data():
-    """Tarik data dari Supabase ke Session State & Handle Reset Harian"""
-    today = datetime.now().strftime('%Y-%m-%d')
-    
-    # A. Cek & Reset Harian
-    res_date = supabase.table("reset_tracker").select("*").execute()
-    
-    if not res_date.data:
-        supabase.table("reset_tracker").insert({"last_date": today}).execute()
-    elif res_date.data[0]['last_date'] != today:
-        # Reset Reports & To-Do (Ganti hari)
-        supabase.table("reports").update({"status": "❌ Belum"}).neq("status", "❌ Belum").execute()
-        supabase.table("todo").update({"done": False}).eq("done", True).execute()
-        # Update tanggal
-        supabase.table("reset_tracker").update({"last_date": today}).eq("id", res_date.data[0]['id']).execute()
-
-    # B. Tarik data Reports
-    res_reports = supabase.table("reports").select("*").order("id").execute()
-    
-    # C. Default Data jika kosong
-    if not res_reports.data:
-        default_reports = [
-            {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
-            {"laporan": "KERAPIHAN STOCK", "pic": "VERREL & GALIH", "status": "❌ Belum"},
-            {"laporan": "CEK STOCK MINUS", "pic": "VERREL & GALIH", "status": "❌ Belum"},
-            {"laporan": "BALANCING STOCK", "pic": "FARIL & YUDI", "status": "❌ Belum"},
-            {"laporan": "CEK RTO", "pic": "FARIL & YUDI", "status": "❌ Belum"},
-            {"laporan": "OUTBOUND PROCESS", "pic": "FARIL & YUDI", "status": "❌ Belum"},
-            {"laporan": "DASHBOARD SIDOARJO", "pic": "VANO", "status": "❌ Belum"},
-            {"laporan": "STORE ACTIVITY", "pic": "VANO", "status": "❌ Belum"},
-            {"laporan": "DASHBOARD SURABAYA", "pic": "HAMZAH", "status": "❌ Belum"},
-            {"laporan": "DASHBOARD SEMARANG", "pic": "HAMZAH", "status": "❌ Belum"},
-            {"laporan": "MANIFEST", "pic": "HAMZAH", "status": "❌ Belum"},
-            {"laporan": "REFUND", "pic": "HAMZAH", "status": "❌ Belum"},
-            {"laporan": "REFILL GL4 TO GL3", "pic": "KRISNA & DHIVA", "status": "❌ Belum"},
-            {"laporan": "COMPARE SYSTEM BEFORE & AFTER", "pic": "KRISNA & DHIVA", "status": "❌ Belum"},
-            {"laporan": "COMPARE SCAN OUT", "pic": "BAKCLINER", "status": "❌ Belum"},
-            {"laporan": "COMPARE BARANG DATANG", "pic": "BAKCLINER", "status": "❌ Belum"},
-            {"laporan": "STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"},
-            {"laporan": "TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"}
-        ]
-        supabase.table("reports").insert(default_reports).execute()
-        res_reports = supabase.table("reports").select("*").order("id").execute()
-
-    st.session_state.db_report = [{"Laporan": r['laporan'], "PIC": r['pic'], "Status": r['status']} for r in res_reports.data]
-    
-    # D. Tarik Data To Do List
-    res_todo = supabase.table("todo").select("*").order("id").execute()
-    st.session_state.todo_list = [{"id": t['id'], "task": t['task'], "done": t['done']} for t in res_todo.data]
-
-if 'db_report' not in st.session_state:
-    sync_data()
-
-# --- 3. FULL CSS (GABUNGAN SEMUA STYLE) ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    .hero-header {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        color: white; padding: 25px; border-radius: 12px;
-        text-align: center; margin-bottom: 35px; font-weight: 800; font-size: 26px;
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .report-card {
-        background-color: #1f2937; padding: 15px; border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); margin-bottom: 12px;
-        border-left: 5px solid #3b82f6; color: #f3f4f6;
-        transition: transform 0.2s ease;
-    }
-    .report-card:hover { transform: translateY(-2px); }
-
-    /* Checkbox Styling */
-    div[data-testid="stCheckbox"] div[role="checkbox"] {
-        background-color: #1f2937 !important;
-        border: 2px solid #3b82f6 !important;
-    }
-    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
-        background-color: #3b82f6 !important;
-    }
-
-    /* Input Styling */
-    .stTextInput input { 
-        background-color: #1f2937 !important; color: white !important; 
-        border: 1px solid #374151 !important; border-radius: 8px !important;
-    }
-
-    /* Button Styling */
-    .stButton > button { 
-        width: 100%; border-radius: 8px; background-color: #1e3a8a; 
-        color: white; border: 1px solid #3b82f6; font-weight: 600; 
-        transition: all 0.3s ease;
-    }
-    .stButton > button:hover { 
-        background-color: #3b82f6; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-
-# --- 4. MAIN UI (PASTIKAN KUTIPAN DITUTUP & INDENTASI BENAR) ---
-# --- 4. MAIN UI ---
-# Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar
-if menu == "Reporting & PIC":
-    st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
-
-    list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
-    current_user = st.selectbox("👤 Pilih Nama:", list_pic)
-
-    # Kolom harus didefinisikan DI DALAM blok IF
-    col_kiri, col_kanan = st.columns([1.8, 1])
-
-    with col_kiri:
-        tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
-        
-        with tab_me:
-            for idx, task in enumerate(st.session_state.db_report):
-                if task['PIC'] == current_user:
-                    ck1, ck2 = st.columns([4, 1.2])
-                    with ck1:
-                        # Ukuran font judul dikecilkan jadi 0.95rem dan status 0.8rem
-                        st.markdown(f'''
-                            <div class="report-card" style="margin-bottom: 10px; padding: 12px;">
-                                <div style="color: white !important; font-weight: 600; font-size: 1rem; line-height: 1.2;">
-                                    {task["Laporan"]}
-                                </div>
-                                <div style="color: #9ca3af !important; font-size: 0.8rem; margin-top: 4px;">
-                                    Status: {task["Status"]}
-                                </div>
-                            </div>
-                        ''', unsafe_allow_html=True)
-                    with ck2:
-                        st.write("")
-                        if task['Status'] == "❌ Belum":
-                            if st.button("Update", key=f"up_{idx}"):
-                                supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
-                                sync_data()
-                                st.rerun()
-                        else:
-                            st.button("Selesai", disabled=True, key=f"done_{idx}")
-
-        with tab_all:
-            st.subheader("📊 Team Progress Summary")
-            pic_stats = {}
-            for t in st.session_state.db_report:
-                pic = t['PIC']
-                if pic not in pic_stats: pic_stats[pic] = {"total": 0, "selesai": 0}
-                pic_stats[pic]["total"] += 1
-                if t['Status'] == "✅ Selesai": pic_stats[pic]["selesai"] += 1
-
-            for pic, stats in pic_stats.items():
-                prog = (stats['selesai'] / stats['total']) * 100
-                st.markdown(f"""
-                <div class="report-card">
-                    <div style="display: flex; justify-content: space-between; color: white !important;">
-                        <b>👤 {pic}</b><span>{stats['selesai']}/{stats['total']}</span>
-                    </div>
-                    <div style="background:#374151; border-radius:5px; margin-top:8px; height:8px;">
-                        <div style="background:#3b82f6; width:{prog}%; height:8px; border-radius:5px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.divider()
-            td_total = len(st.session_state.todo_list)
-            td_done = sum(1 for i in st.session_state.todo_list if i['done'])
-            td_prog = (td_done / td_total * 100) if td_total > 0 else 0
-            
-            # --- PROGRESS TO DO LIST (JARAK DISAMAKAN) ---
-            td_total = len(st.session_state.get('todo_list', []))
-            td_done = sum(1 for i in st.session_state.get('todo_list', []) if i['done'])
-            td_prog = (td_done / td_total * 100) if td_total > 0 else 0
-            
-            # Mengikuti struktur yang lu minta (tanpa divider, margin bawah 12px)
-            st.markdown(f"""
-            <div class="report-card" style="border-left-color: #10b981; margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; color: white !important; margin-bottom: 5px;">
-                    <b>📝 To-Do Progress</b>
-                    <span style="font-weight: 800;">{td_done} / {td_total}</span>
-                </div>
-                <div style="background:#374151; border-radius:5px; height:12px; width:100%;">
-                    <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    with col_kanan:
-        st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3 style="color:white !important; margin:0;">📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
-        
-        # 1. FORM INPUT TUGAS
-        with st.form("todo_form", clear_on_submit=True):
-            tugas_baru = st.text_input("Tugas Baru:")
-            if st.form_submit_button("➕ Tambah") and tugas_baru:
-                supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
-                sync_data()
-                st.rerun()
-
-        # 2. LOGIKA PAGINATION (Penting biar current_todo kedeteksi)
-        items_per_page = 3
-        total_items = len(st.session_state.get('todo_list', []))
-        total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
-        
-        # Ambil halaman aktif
-        curr_p = st.session_state.get('todo_page', 1)
-        
-        # Hitung data yang tampil di halaman ini
-        start = (curr_p - 1) * items_per_page
-        current_todo = st.session_state.get('todo_list', [])[start : start + items_per_page]
-
-        # 3. RENDER LIST TUGAS
-        for item in current_todo:
-            c1, c2 = st.columns([4, 1])
-            bd_color = "#10b981" if item['done'] else "#3b82f6"
-            
-            # Card dengan margin-bottom 10px biar gak mepet
-            c1.markdown(f'''
-                <div style="background:#111827; padding:12px; border-radius:8px; 
-                            border-left:4px solid {bd_color}; color:white; 
-                            margin-bottom:10px; min-height:50px; display:flex; align-items:center;">
-                    {item["task"]}
-                </div>
-            ''', unsafe_allow_html=True)
-            
-            with c2:
-                st.write("") # Spacer biar sejajar tengah
-                res = st.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
-                if res != item['done']:
-                    supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
-                    sync_data()
-                    st.rerun()
-
-        # --- Navigasi Halaman yang Dirapatkan ---
-        if total_pages > 1:
-            # Gunakan perbandingan kolom yang lebih sempit di tengah (0.5)
-            # biar tombol kiri dan kanan lebih mendekat ke angka
-            st.write("") 
-            p1, p2, p3 = st.columns([1, 0.5, 1]) 
-            
-            with p1:
-                if st.button("⬅️", key="prev_todo") and curr_p > 1:
-                    st.session_state.todo_page = curr_p - 1
-                    st.rerun()
-            
-            with p2:
-                # Teks angka halaman dengan padding atas dikit biar sejajar tombol
-                st.markdown(f"""
-                    <div style="text-align:center; color: white !important; 
-                                font-weight: 800; font-size: 1rem; margin-top: 8px;">
-                        {curr_p}/{total_pages}
-                    </div>
-                """, unsafe_allow_html=True)
-            
-            with p3:
-                if st.button("➡️", key="next_todo") and curr_p < total_pages:
-                    st.session_state.todo_page = curr_p + 1
-                    st.rerun()
-
-elif menu == "Picking Audit":
-    st.markdown('<div class="hero-header"><h1>PICKING AUDIT</h1></div>', unsafe_allow_html=True)
-    
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        - **STOCK SYSTEM 1**: Data Awal Shift 0 (07.:30)
-        - **STOCK SYSTEM 2**: Data End Shift 2 (21:30 - 22.00)
-        - **STOCK TRACKING**: Download Stock Tracking **(TODAY)**, Pilih Statusnya **DONE**
-        """)
-
-    # --- 1. INISIALISASI (Taruh di paling atas menu) ---
-    if 'audit_results' not in st.session_state:
-        st.session_state.audit_results = None
-    if 'audit_diff' not in st.session_state:
-        st.session_state.audit_diff = None
-
-    # --- 2. LAYOUT UPLOADER ---
-    u1, u2, u3 = st.columns(3)
-    with u1:
-        file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
-    with u2:
-        file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
-    with u3:
-        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
-
-    # --- 3. PROSES DATA (Hanya untuk simpan ke memory) ---
-    if file_sys1 and file_sys2:
-        if st.button("▶️ RUN COMPARE"):
-            try:
-                # Simpan hasil ke session_state agar tidak hilang
-                all_data, diff_data = process_picking_audit(file_sys1, file_sys2, file_tracking)
-                st.session_state.audit_results = all_data
-                st.session_state.audit_diff = diff_data
-            except Exception as e:
-                st.error(f"Terjadi Kesalahan: {e}")
-
-    # --- 4. TAMPILKAN HASIL (DI LUAR BLOK BUTTON) ---
-    # Ini kuncinya! Selama session_state ada isinya, data bakal tetap muncul di layar
-    if st.session_state.audit_results is not None:
-        result_all = st.session_state.audit_results
-        diff_only = st.session_state.audit_diff
-
-        st.divider()
-
-        # Summary Metrics
-        m1, m2, m3 = st.columns(3)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
-        
-        if 'KETERANGAN' in diff_only.columns:
-            sold_count = len(diff_only[diff_only['KETERANGAN'].str.contains("Terjual", na=False)])
-            m3.markdown(f'<div class="m-box"><span class="m-lbl">📑 ITEM TERJUAL</span><span class="m-val">{sold_count}</span></div>', unsafe_allow_html=True)
-
-        if not diff_only.empty:
-            st.warning("Hasil Analisis Perbedaan Stok:")
-            st.dataframe(diff_only, use_container_width=True)
-            
-            # Button download ditaruh di sini
-            csv = diff_only.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Report Selisih",
-                data=csv,
-                file_name='hasil_Pick_stok.csv',
-                mime='text/csv',
-                key="download_audit_final" # Tambah key unik
-            )
-        else:
-            st.success("✅ Tidak ada perbedaan stok!")
-
-
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
 import pandas as pd
 import numpy as np
@@ -8224,7 +7810,425 @@ def menu_cycle_count():
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
+elif menu == "Balancing Stock":
+    tampilan_balancing_stock()
+
+elif menu == "Refill & Withdraw":
+    menu_refill_withdraw()
+
+# --- Navigasi ---
+elif menu == "Stock Opname":
+    menu_Stock_Opname()
+
+# --- Navigasi ---
+elif menu == "Reject/Defect List":
+    menu_reject_defect()
+
+elif menu == "Compare Penerimaan RTO":
+    main()
+
+elif menu == "Pengajuan Reject/Defect":
+    project_approval_reject()
+
+elif menu == "List Retur Out":
+    menu_retur_out_system()
+
+elif menu == "Pengajuan Mutasi Karantina":
+    project_mutasi_karantina()
+
+elif menu == "Database Ongkir In/Out":
+    show_database_ongkir()
+
 elif menu == "Cycle Count":
     menu_cycle_count()
+
+elif menu == "Precentage Display":
+    tampilan_display_control()
+
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+
+# Trik agar tidak error di laptop meskipun library supabase belum terinstall
+try:
+    from supabase import create_client, Client
+    HAS_SUPABASE = True
+except ImportError:
+    HAS_SUPABASE = False
+
+# Konfigurasi Supabase
+if HAS_SUPABASE:
+    # Nama variabel harus konsisten
+    SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+    SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+    
+    # PERBAIKAN: Gunakan nama variabel yang sudah didefinisikan di atas
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+else:
+    st.warning("Menjalankan mode lokal tanpa Database Cloud (Hanya untuk Testing)")
+
+# --- FUNGSI UPDATE STATUS ---
+def update_report_status(laporan_name):
+    if HAS_SUPABASE:
+        try:
+            supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", laporan_name).execute()
+        except Exception as e:
+            st.error(f"Gagal update ke database: {e}")
+    else:
+        # Fallback ke session state saja kalau di lokal
+        if 'db_report' in st.session_state:
+            for item in st.session_state.db_report:
+                if item['Laporan'] == laporan_name:
+                    item['Status'] = "✅ Selesai"
+
+import pandas as pd
+import streamlit as st
+import math
+from datetime import datetime
+from supabase import create_client, Client
+
+# --- 1. KONEKSI SUPABASE ---
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+@st.cache_resource
+def init_supabase():
+    from supabase import create_client
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+supabase = init_supabase()
+
+# --- 2. FUNGSI SINKRONISASI & RESET HARIAN ---
+def sync_data():
+    """Tarik data dari Supabase ke Session State & Handle Reset Harian"""
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    # A. Cek & Reset Harian
+    res_date = supabase.table("reset_tracker").select("*").execute()
+    
+    if not res_date.data:
+        supabase.table("reset_tracker").insert({"last_date": today}).execute()
+    elif res_date.data[0]['last_date'] != today:
+        # Reset Reports & To-Do (Ganti hari)
+        supabase.table("reports").update({"status": "❌ Belum"}).neq("status", "❌ Belum").execute()
+        supabase.table("todo").update({"done": False}).eq("done", True).execute()
+        # Update tanggal
+        supabase.table("reset_tracker").update({"last_date": today}).eq("id", res_date.data[0]['id']).execute()
+
+    # B. Tarik data Reports
+    res_reports = supabase.table("reports").select("*").order("id").execute()
+    
+    # C. Default Data jika kosong
+    if not res_reports.data:
+        default_reports = [
+            {"laporan": "REJECT & DEFECT", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+            {"laporan": "KERAPIHAN STOCK", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+            {"laporan": "CEK STOCK MINUS", "pic": "VERREL & GALIH", "status": "❌ Belum"},
+            {"laporan": "BALANCING STOCK", "pic": "FARIL & YUDI", "status": "❌ Belum"},
+            {"laporan": "CEK RTO", "pic": "FARIL & YUDI", "status": "❌ Belum"},
+            {"laporan": "OUTBOUND PROCESS", "pic": "FARIL & YUDI", "status": "❌ Belum"},
+            {"laporan": "DASHBOARD SIDOARJO", "pic": "VANO", "status": "❌ Belum"},
+            {"laporan": "STORE ACTIVITY", "pic": "VANO", "status": "❌ Belum"},
+            {"laporan": "DASHBOARD SURABAYA", "pic": "HAMZAH", "status": "❌ Belum"},
+            {"laporan": "DASHBOARD SEMARANG", "pic": "HAMZAH", "status": "❌ Belum"},
+            {"laporan": "MANIFEST", "pic": "HAMZAH", "status": "❌ Belum"},
+            {"laporan": "REFUND", "pic": "HAMZAH", "status": "❌ Belum"},
+            {"laporan": "REFILL GL4 TO GL3", "pic": "KRISNA & DHIVA", "status": "❌ Belum"},
+            {"laporan": "COMPARE SYSTEM BEFORE & AFTER", "pic": "KRISNA & DHIVA", "status": "❌ Belum"},
+            {"laporan": "COMPARE SCAN OUT", "pic": "BAKCLINER", "status": "❌ Belum"},
+            {"laporan": "COMPARE BARANG DATANG", "pic": "BAKCLINER", "status": "❌ Belum"},
+            {"laporan": "STAGGING LT.3 DAN GL3.DC PUTAWAY CLEAR", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"},
+            {"laporan": "TIDAK ADA PESANAN DIBAWAH JAM 21.00 YANG MENGGANTUNG", "pic": "WAREHOUSE FULLFILLMENT", "status": "❌ Belum"}
+        ]
+        supabase.table("reports").insert(default_reports).execute()
+        res_reports = supabase.table("reports").select("*").order("id").execute()
+
+    st.session_state.db_report = [{"Laporan": r['laporan'], "PIC": r['pic'], "Status": r['status']} for r in res_reports.data]
+    
+    # D. Tarik Data To Do List
+    res_todo = supabase.table("todo").select("*").order("id").execute()
+    st.session_state.todo_list = [{"id": t['id'], "task": t['task'], "done": t['done']} for t in res_todo.data]
+
+if 'db_report' not in st.session_state:
+    sync_data()
+
+# --- 3. FULL CSS (GABUNGAN SEMUA STYLE) ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    .hero-header {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white; padding: 25px; border-radius: 12px;
+        text-align: center; margin-bottom: 35px; font-weight: 800; font-size: 26px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .report-card {
+        background-color: #1f2937; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); margin-bottom: 12px;
+        border-left: 5px solid #3b82f6; color: #f3f4f6;
+        transition: transform 0.2s ease;
+    }
+    .report-card:hover { transform: translateY(-2px); }
+
+    /* Checkbox Styling */
+    div[data-testid="stCheckbox"] div[role="checkbox"] {
+        background-color: #1f2937 !important;
+        border: 2px solid #3b82f6 !important;
+    }
+    div[data-testid="stCheckbox"] div[role="checkbox"][aria-checked="true"] {
+        background-color: #3b82f6 !important;
+    }
+
+    /* Input Styling */
+    .stTextInput input { 
+        background-color: #1f2937 !important; color: white !important; 
+        border: 1px solid #374151 !important; border-radius: 8px !important;
+    }
+
+    /* Button Styling */
+    .stButton > button { 
+        width: 100%; border-radius: 8px; background-color: #1e3a8a; 
+        color: white; border: 1px solid #3b82f6; font-weight: 600; 
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover { 
+        background-color: #3b82f6; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
+# --- 4. MAIN UI (PASTIKAN KUTIPAN DITUTUP & INDENTASI BENAR) ---
+# --- 4. MAIN UI ---
+# Pastikan variabel 'menu' sudah didefinisikan sebelumnya di sidebar
+if menu == "Reporting & PIC":
+    st.markdown('<div class="hero-header">🚹 REPORTING & PIC - JEZPRO</div>', unsafe_allow_html=True)
+
+    list_pic = ["VERREL & GALIH", "FARIL & YUDI", "BAKCLINER", "VANO", "HAMZAH", "KRISNA & DHIVA", "WAREHOUSE FULLFILLMENT"]
+    current_user = st.selectbox("👤 Pilih Nama:", list_pic)
+
+    # Kolom harus didefinisikan DI DALAM blok IF
+    col_kiri, col_kanan = st.columns([1.8, 1])
+
+    with col_kiri:
+        tab_me, tab_all = st.tabs(["Personal Dashboard", "Summary Teams"])
+        
+        with tab_me:
+            for idx, task in enumerate(st.session_state.db_report):
+                if task['PIC'] == current_user:
+                    ck1, ck2 = st.columns([4, 1.2])
+                    with ck1:
+                        # Ukuran font judul dikecilkan jadi 0.95rem dan status 0.8rem
+                        st.markdown(f'''
+                            <div class="report-card" style="margin-bottom: 10px; padding: 12px;">
+                                <div style="color: white !important; font-weight: 600; font-size: 1rem; line-height: 1.2;">
+                                    {task["Laporan"]}
+                                </div>
+                                <div style="color: #9ca3af !important; font-size: 0.8rem; margin-top: 4px;">
+                                    Status: {task["Status"]}
+                                </div>
+                            </div>
+                        ''', unsafe_allow_html=True)
+                    with ck2:
+                        st.write("")
+                        if task['Status'] == "❌ Belum":
+                            if st.button("Update", key=f"up_{idx}"):
+                                supabase.table("reports").update({"status": "✅ Selesai"}).eq("laporan", task['Laporan']).execute()
+                                sync_data()
+                                st.rerun()
+                        else:
+                            st.button("Selesai", disabled=True, key=f"done_{idx}")
+
+        with tab_all:
+            st.subheader("📊 Team Progress Summary")
+            pic_stats = {}
+            for t in st.session_state.db_report:
+                pic = t['PIC']
+                if pic not in pic_stats: pic_stats[pic] = {"total": 0, "selesai": 0}
+                pic_stats[pic]["total"] += 1
+                if t['Status'] == "✅ Selesai": pic_stats[pic]["selesai"] += 1
+
+            for pic, stats in pic_stats.items():
+                prog = (stats['selesai'] / stats['total']) * 100
+                st.markdown(f"""
+                <div class="report-card">
+                    <div style="display: flex; justify-content: space-between; color: white !important;">
+                        <b>👤 {pic}</b><span>{stats['selesai']}/{stats['total']}</span>
+                    </div>
+                    <div style="background:#374151; border-radius:5px; margin-top:8px; height:8px;">
+                        <div style="background:#3b82f6; width:{prog}%; height:8px; border-radius:5px;"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.divider()
+            td_total = len(st.session_state.todo_list)
+            td_done = sum(1 for i in st.session_state.todo_list if i['done'])
+            td_prog = (td_done / td_total * 100) if td_total > 0 else 0
+            
+            # --- PROGRESS TO DO LIST (JARAK DISAMAKAN) ---
+            td_total = len(st.session_state.get('todo_list', []))
+            td_done = sum(1 for i in st.session_state.get('todo_list', []) if i['done'])
+            td_prog = (td_done / td_total * 100) if td_total > 0 else 0
+            
+            # Mengikuti struktur yang lu minta (tanpa divider, margin bawah 12px)
+            st.markdown(f"""
+            <div class="report-card" style="border-left-color: #10b981; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; color: white !important; margin-bottom: 5px;">
+                    <b>📝 To-Do Progress</b>
+                    <span style="font-weight: 800;">{td_done} / {td_total}</span>
+                </div>
+                <div style="background:#374151; border-radius:5px; height:12px; width:100%;">
+                    <div style="background:#10b981; width:{td_prog}%; height:12px; border-radius:5px;"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col_kanan:
+        st.markdown('<div style="background-color:#1f2937;padding:15px;border-radius:10px;border:1px solid #3b82f6;text-align:center;"><h3 style="color:white !important; margin:0;">📝 TO DO LIST</h3></div>', unsafe_allow_html=True)
+        
+        # 1. FORM INPUT TUGAS
+        with st.form("todo_form", clear_on_submit=True):
+            tugas_baru = st.text_input("Tugas Baru:")
+            if st.form_submit_button("➕ Tambah") and tugas_baru:
+                supabase.table("todo").insert({"task": tugas_baru, "done": False}).execute()
+                sync_data()
+                st.rerun()
+
+        # 2. LOGIKA PAGINATION (Penting biar current_todo kedeteksi)
+        items_per_page = 3
+        total_items = len(st.session_state.get('todo_list', []))
+        total_pages = math.ceil(total_items / items_per_page) if total_items > 0 else 1
+        
+        # Ambil halaman aktif
+        curr_p = st.session_state.get('todo_page', 1)
+        
+        # Hitung data yang tampil di halaman ini
+        start = (curr_p - 1) * items_per_page
+        current_todo = st.session_state.get('todo_list', [])[start : start + items_per_page]
+
+        # 3. RENDER LIST TUGAS
+        for item in current_todo:
+            c1, c2 = st.columns([4, 1])
+            bd_color = "#10b981" if item['done'] else "#3b82f6"
+            
+            # Card dengan margin-bottom 10px biar gak mepet
+            c1.markdown(f'''
+                <div style="background:#111827; padding:12px; border-radius:8px; 
+                            border-left:4px solid {bd_color}; color:white; 
+                            margin-bottom:10px; min-height:50px; display:flex; align-items:center;">
+                    {item["task"]}
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            with c2:
+                st.write("") # Spacer biar sejajar tengah
+                res = st.checkbox("", value=item['done'], key=f"chk_{item['id']}", label_visibility="collapsed")
+                if res != item['done']:
+                    supabase.table("todo").update({"done": res}).eq("id", item['id']).execute()
+                    sync_data()
+                    st.rerun()
+
+        # --- Navigasi Halaman yang Dirapatkan ---
+        if total_pages > 1:
+            # Gunakan perbandingan kolom yang lebih sempit di tengah (0.5)
+            # biar tombol kiri dan kanan lebih mendekat ke angka
+            st.write("") 
+            p1, p2, p3 = st.columns([1, 0.5, 1]) 
+            
+            with p1:
+                if st.button("⬅️", key="prev_todo") and curr_p > 1:
+                    st.session_state.todo_page = curr_p - 1
+                    st.rerun()
+            
+            with p2:
+                # Teks angka halaman dengan padding atas dikit biar sejajar tombol
+                st.markdown(f"""
+                    <div style="text-align:center; color: white !important; 
+                                font-weight: 800; font-size: 1rem; margin-top: 8px;">
+                        {curr_p}/{total_pages}
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with p3:
+                if st.button("➡️", key="next_todo") and curr_p < total_pages:
+                    st.session_state.todo_page = curr_p + 1
+                    st.rerun()
+
+elif menu == "Picking Audit":
+    st.markdown('<div class="hero-header"><h1>PICKING AUDIT</h1></div>', unsafe_allow_html=True)
+    
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        - **STOCK SYSTEM 1**: Data Awal Shift 0 (07.:30)
+        - **STOCK SYSTEM 2**: Data End Shift 2 (21:30 - 22.00)
+        - **STOCK TRACKING**: Download Stock Tracking **(TODAY)**, Pilih Statusnya **DONE**
+        """)
+
+    # --- 1. INISIALISASI (Taruh di paling atas menu) ---
+    if 'audit_results' not in st.session_state:
+        st.session_state.audit_results = None
+    if 'audit_diff' not in st.session_state:
+        st.session_state.audit_diff = None
+
+    # --- 2. LAYOUT UPLOADER ---
+    u1, u2, u3 = st.columns(3)
+    with u1:
+        file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
+    with u2:
+        file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
+    with u3:
+        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
+
+    # --- 3. PROSES DATA (Hanya untuk simpan ke memory) ---
+    if file_sys1 and file_sys2:
+        if st.button("▶️ RUN COMPARE"):
+            try:
+                # Simpan hasil ke session_state agar tidak hilang
+                all_data, diff_data = process_picking_audit(file_sys1, file_sys2, file_tracking)
+                st.session_state.audit_results = all_data
+                st.session_state.audit_diff = diff_data
+            except Exception as e:
+                st.error(f"Terjadi Kesalahan: {e}")
+
+    # --- 4. TAMPILKAN HASIL (DI LUAR BLOK BUTTON) ---
+    # Ini kuncinya! Selama session_state ada isinya, data bakal tetap muncul di layar
+    if st.session_state.audit_results is not None:
+        result_all = st.session_state.audit_results
+        diff_only = st.session_state.audit_diff
+
+        st.divider()
+
+        # Summary Metrics
+        m1, m2, m3 = st.columns(3)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
+        
+        if 'KETERANGAN' in diff_only.columns:
+            sold_count = len(diff_only[diff_only['KETERANGAN'].str.contains("Terjual", na=False)])
+            m3.markdown(f'<div class="m-box"><span class="m-lbl">📑 ITEM TERJUAL</span><span class="m-val">{sold_count}</span></div>', unsafe_allow_html=True)
+
+        if not diff_only.empty:
+            st.warning("Hasil Analisis Perbedaan Stok:")
+            st.dataframe(diff_only, use_container_width=True)
+            
+            # Button download ditaruh di sini
+            csv = diff_only.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Report Selisih",
+                data=csv,
+                file_name='hasil_Pick_stok.csv',
+                mime='text/csv',
+                key="download_audit_final" # Tambah key unik
+            )
+        else:
+            st.success("✅ Tidak ada perbedaan stok!")
+
+
+
+
+
 
 
