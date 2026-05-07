@@ -1226,12 +1226,53 @@ def menu_cycle_count():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
     # =========================================================
-    # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
+    # ⚙️ 4. RECON REAL + PROCESS (NEW)
     # =========================================================
-    st.markdown("<br><br><br>---", unsafe_allow_html=True)
+    st.markdown("<br>---", unsafe_allow_html=True)
+    st.subheader("4️⃣ RECON REAL + PROCESS")
+    
+    up_recon_real = st.file_uploader("📥 Upload HASIL RECON REAL +", type=['xlsx','csv'], key="u4_recon_real")
+    
+    if up_recon_real:
+        df_r_plus = pd.read_excel(up_recon_real) if up_recon_real.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_recon_real)
+        
+        # Kalkulasi Need Adjustment: Kolom D (QTY SCAN) - Kolom G (HASIL RECONCILIATION)
+        # Note: Index D=3, G=6
+        try:
+            qty_scan_r = pd.to_numeric(df_r_plus.iloc[:, 3], errors='coerce').fillna(0)
+            qty_recon_r = pd.to_numeric(df_r_plus.iloc[:, 6], errors='coerce').fillna(0)
+            df_r_plus['NEED_ADJ'] = qty_scan_r - qty_recon_r
+            
+            # Filter hanya yang selisihnya tidak nol
+            df_adj_final = df_r_plus[df_r_plus['NEED_ADJ'] != 0].copy()
+            total_adj_qty = int(df_adj_final['NEED_ADJ'].sum())
+            
+            # --- METRIC BOXES RECON ---
+            m_c1, m_c2 = st.columns(2)
+            with m_c1:
+                st.markdown(f"""
+                    <div class="m-box">
+                        <span class="m-lbl">⚠️ TOTAL NEED ADJ (+)</span>
+                        <span class="m-val" style="color: #FF4B4B;">{total_adj_qty} QTY</span>
+                    </div>
+                """, unsafe_allow_html=True)
+            with m_c2:
+                st.markdown(f"""
+                    <div class="m-box">
+                        <span class="m-lbl">📦 SKU IMPACTED</span>
+                        <span class="m-val">{len(df_adj_final)} SKU</span>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            st.dataframe(df_adj_final, use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.error(f"Format Kolom salah bro: {e}")
+    # =========================================================
+    # ⚙️ 5. SET UP KARANTINA GENERATOR
+    # =========================================================
+    st.markdown("<br>---", unsafe_allow_html=True)
     st.subheader("5️⃣ SET UP KARANTINA GENERATOR")
 
-    # Tambahkan dua uploader agar logic compare BIN|SKU bisa jalan
     col_k1, col_k2 = st.columns(2)
     with col_k1:
         up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
@@ -1241,40 +1282,49 @@ def menu_cycle_count():
     if up_k6 and up_adj6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
             try:
-                # 1. Baca File Outstanding
                 up_k6.seek(0)
                 df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
-                
-                # 2. Baca File Recon (Cek Adjustment)
                 up_adj6.seek(0)
                 df_recon6 = pd.read_excel(up_adj6) if up_adj6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_adj6)
                 
-                # 3. Jalankan Logic Baru dengan Compare BIN|SKU
                 df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, df_recon6)
                 
-                # 4. Simpan ke Session State
                 st.session_state.df_karantina_6 = df_final6
-                st.session_state.df_check_6 = df_check6 # Simpan juga data pengecekannya
-                
+                st.session_state.df_check_6 = df_check6
                 st.success("✅ Analisis Karantina Selesai!")
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
-    # Tampilkan Hasil Jika Sudah Diproses
     if st.session_state.df_karantina_6 is not None:
-        tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
+        # --- METRIC BOXES KARANTINA ---
+        total_k_qty = int(st.session_state.df_karantina_6['QUANTITY'].sum())
+        total_k_sku = st.session_state.df_karantina_6['SKU'].nunique()
         
+        mk1, mk2 = st.columns(2)
+        with mk1:
+            st.markdown(f"""
+                <div class="m-box">
+                    <span class="m-lbl">☣️ QTY TO KARANTINA</span>
+                    <span class="m-val" style="color: #FACA2B;">{total_k_qty} QTY</span>
+                </div>
+            """, unsafe_allow_html=True)
+        with mk2:
+            st.markdown(f"""
+                <div class="m-box">
+                    <span class="m-lbl">🏷️ SKU TO KARANTINA</span>
+                    <span class="m-val">{total_k_sku} SKU</span>
+                </div>
+            """, unsafe_allow_html=True)
+
+        tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
         with tab_res:
             st.dataframe(st.session_state.df_karantina_6, use_container_width=True, hide_index=True)
-            
-            # Download Button (Excel)
             out6 = io.BytesIO()
             with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
                 st.session_state.df_karantina_6.to_excel(writer, index=False, sheet_name='Karantina')
             st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
 
         with tab_chk:
-            st.info("Tabel ini menunjukkan perbandingan QTY SYSTEM vs HASIL RECON per BIN|SKU.")
             st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
 
 # =========================================================
