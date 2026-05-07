@@ -4644,26 +4644,20 @@ def tampilan_display_control():
         except Exception as e:
             st.error(f"Gagal upload: {e}")
 
-    # --- 2. LOGIKA ANALISIS (REVISED: ARTICLE + MIN SIZE + BIN + DELTA) ---
+    # --- 2. LOGIKA ANALISIS ---
     try:
         df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_display_raw'", conn)
         if df_check.empty:
             st.info("Upload data stock untuk memulai analisis display.")
             return
 
-        # 1. Identifikasi Kolom secara Dinamis (B=Bin, E=Desc, F=Size)
         cols = pd.read_sql("SELECT * FROM stock_display_raw LIMIT 1", conn).columns
-        col_bin = cols[1]   # Kolom B
+        col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
+        col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
         col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
-        col_desc = cols[4]  # Kolom E
-        col_size = cols[5]  # Kolom F
+        col_desc = cols[4] 
 
-        # 2. Proses Data: Ekstrak ARTICLE dari Kolom E
-        df_raw = pd.read_sql("SELECT * FROM stock_display_raw", conn)
-        df_raw['ARTICLE'] = df_raw[col_desc].astype(str).apply(lambda x: x.split(' ')[0])
-        df_raw.to_sql('stock_display_processed', conn, index=False, if_exists='replace')
-
-        # 3. Filter Eksklusi & Area
+        # --- PENYEMPURNAAN FILTER EKSKLUSI ---
         excl_condition = f"""
             UPPER("{col_bin}") NOT LIKE '%OFFLINE%' AND 
             UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND 
@@ -4672,92 +4666,81 @@ def tampilan_display_control():
             UPPER("{col_bin}") NOT LIKE '%DEFECT%' AND 
             UPPER("{col_bin}") NOT LIKE '%REJECT%' AND 
             UPPER("{col_bin}") NOT LIKE '%STAGING%' AND 
-            UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
-            UPPER("{col_bin}") NOT LIKE '%KARANTINA%'
+            UPPER("{col_bin}") NOT LIKE '%STAGGING%'
         """
+
         f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
+        # Gudang adalah semua bin yang BUKAN toko DAN BUKAN bin eksklusi
         f_source_gudang = f"(NOT ({f_target_toko})) AND ({excl_condition})"
 
-        # 4. Logic Article: Cari Article yang Kosong di Toko
+        # Logic: Ada stok di Gudang utama, tapi Nol di Display Toko
         q_need_display_logic = f"""
-            SELECT ARTICLE FROM stock_display_processed 
+            SELECT "{col_sku}" FROM stock_display_raw 
             WHERE {excl_condition}
-            GROUP BY ARTICLE
+            GROUP BY "{col_sku}"
             HAVING SUM(CASE WHEN {f_source_gudang} THEN "{col_qty}" ELSE 0 END) > 0
                AND SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
-        # 5. Query Metriks
+        # Query Metriks (Hanya menghitung SKU yang masuk dalam filter eksklusi)
         q_data = pd.read_sql(f"""
             SELECT  
-                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {excl_condition} AND "{col_qty}" > 0) as Total_Art_Aktif,
-                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {f_target_toko} AND "{col_qty}" > 0) as Art_On_Display,
-                (SELECT COUNT(*) FROM ({q_need_display_logic})) as Art_Need_Display
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_display_raw WHERE {excl_condition} AND "{col_qty}" > 0) as Total_SKU_Aktif,
+                (SELECT COUNT(DISTINCT "{col_sku}") FROM stock_display_raw WHERE {f_target_toko} AND "{col_qty}" > 0) as SKU_On_Display,
+                (SELECT COUNT(*) FROM ({q_need_display_logic})) as SKU_Need_Display
         """, conn).iloc[0]
 
-        total_art = int(q_data['Total_Art_Aktif'])
-        on_display = int(q_data['Art_On_Display'])
-        need_display = int(q_data['Art_Need_Display'])
+        total_sku = int(q_data['Total_SKU_Aktif'])
+        on_display = int(q_data['SKU_On_Display'])
+        need_display = int(q_data['SKU_Need_Display'])
 
-        # --- 3. TAMPILAN DASHBOARD (DELTA KEMBALI) ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
+        # --- 3. TAMPILAN DASHBOARD ---
+        st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (CLEAN DATA)</h4></div>', unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(f'''
-                <div class="metric-card" style="border-left: 5px solid #7B61FF;">
-                    <p class="metric-label">🧥 TOTAL ARTICLE</p>
-                    <p class="metric-value">{total_art:,}</p>
-                    <p class="metric-arrow" style="color: #7B61FF;">Saleable Stock</p>
-                </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 SKU Siap Jual</p><p class="metric-value">{total_sku:,}</p><p class="metric-arrow" style="color: #00FF00;">Excl. Reject/Online</p></div>', unsafe_allow_html=True)
         with c2:
-            perc_display = (on_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'''
-                <div class="metric-card" style="border-left: 5px solid #00C853;">
-                    <p class="metric-label">✅ ON DISPLAY</p>
-                    <p class="metric-value">{on_display:,}</p>
-                    <p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}%</p>
-                </div>
-            ''', unsafe_allow_html=True)
+            perc_display = (on_display / total_sku * 100) if total_sku > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">✅ SKU On Display</p><p class="metric-value">{on_display:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Terpajang</p></div>', unsafe_allow_html=True)
         with c3:
-            perc_need = (need_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'''
-                <div class="metric-card" style="border-left: 5px solid #FF5252;">
-                    <p class="metric-label">⚠️ NEED DISPLAY</p>
-                    <p class="metric-value">{need_display:,}</p>
-                    <p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}%</p>
-                </div>
-            ''', unsafe_allow_html=True)
+            perc_need = (need_display / total_sku * 100) if total_sku > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF5252;"><p class="metric-label">⚠️ Need To Display</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Kosong di Toko</p></div>', unsafe_allow_html=True)
 
         st.divider()
-        st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
+        st.markdown("### 📋 List Penarikan SKU ke Display")
         
-        # 6. DETAIL DATA (Ditambah Size Terkecil & Bin)
+        # Detail Data
         df_detail = pd.read_sql(f"""
             SELECT 
-                ARTICLE as "Article", 
-                MAX("{col_desc}") as "Deskripsi Barang",
-                MIN("{col_size}") as "Size Display",
-                "{col_bin}" as "Bin Lokasi",
-                SUM("{col_qty}") as "Qty di Gudang"
-            FROM stock_display_processed 
-            WHERE ARTICLE IN ({q_need_display_logic}) 
-              AND {f_source_gudang}
-              AND "{col_qty}" > 0
-            GROUP BY ARTICLE
-            ORDER BY "Qty di Gudang" DESC
+                "{col_sku}" as SKU, 
+                MAX("{col_desc}") as "Nama Barang",
+                SUM(CASE WHEN {f_source_gudang} THEN "{col_qty}" ELSE 0 END) as "Qty Ready di Gudang",
+                'KOSONG' as "Status Toko"
+            FROM stock_display_raw 
+            WHERE "{col_sku}" IN ({q_need_display_logic}) 
+            GROUP BY "{col_sku}"
+            ORDER BY "Qty Ready di Gudang" DESC
         """, conn)
 
         if not df_detail.empty:
             st.dataframe(df_detail, use_container_width=True)
+            
+            # Download Button
             csv = df_detail.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download List Refill (CSV)", csv, "list_refill_article.csv", "text/csv")
+            st.download_button(
+                label="📥 Download List Penarikan (CSV)",
+                data=csv,
+                file_name='list_penarikan_display.csv',
+                mime='text/csv',
+            )
         else:
-            st.success("🎉 Semua Article saleable sudah tersedia di area Toko.")
+            st.success("🎉 Tidak ada SKU yang perlu ditarik. Semua stok gudang (saleable) sudah ada di area display.")
 
     except Exception as e:
         st.error(f"Error pada sistem analisis: {e}")
+    finally:
+        conn.close()
 
 
 def process_picking_audit(file1, file2, file_tracking=None):
