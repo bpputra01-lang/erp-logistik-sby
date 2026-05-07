@@ -5419,7 +5419,7 @@ with st.sidebar:
     # --- KELOMPOK 5: EXTRAS ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
     
-    m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Database Ongkir In/Out"]
+    m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Database Ongkir In/Out", "Precentage Display"]
     idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else 0
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=change_m5, label_visibility="collapsed")
 
