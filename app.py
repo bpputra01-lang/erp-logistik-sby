@@ -4651,20 +4651,19 @@ def tampilan_display_control():
             st.info("Upload data stock untuk memulai analisis display.")
             return
 
-        # 1. Identifikasi Kolom secara Dinamis
+        # 1. Identifikasi Kolom secara Dinamis (B=Bin, E=Desc, F=Size)
         cols = pd.read_sql("SELECT * FROM stock_display_raw LIMIT 1", conn).columns
         col_bin = cols[1]   # Kolom B (Index 1)
-        col_sku = cols[2]   # Kolom C (Index 2)
+        col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
         col_desc = cols[4]  # Kolom E (Index 4)
         col_size = cols[5]  # Kolom F (Index 5)
-        col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
 
         # 2. Proses Data: Ekstrak ARTICLE dari Kolom E
         df_raw = pd.read_sql("SELECT * FROM stock_display_raw", conn)
         df_raw['ARTICLE'] = df_raw[col_desc].astype(str).apply(lambda x: x.split(' ')[0])
         df_raw.to_sql('stock_display_processed', conn, index=False, if_exists='replace')
 
-        # 3. Filter Eksklusi & Area
+        # 3. Filter Eksklusi
         excl_condition = f"""
             UPPER("{col_bin}") NOT LIKE '%OFFLINE%' AND 
             UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND 
@@ -4679,7 +4678,7 @@ def tampilan_display_control():
         f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
         f_source_gudang = f"(NOT ({f_target_toko})) AND ({excl_condition})"
 
-        # 4. Logic Article: Ambil list article yang kosong di toko
+        # 4. Logic Article: Cari Article yang di Toko Kosong tapi di Gudang Ada
         q_need_display_logic = f"""
             SELECT ARTICLE FROM stock_display_processed 
             WHERE {excl_condition}
@@ -4688,7 +4687,7 @@ def tampilan_display_control():
                AND SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
-        # 5. Query Metriks (Article Base)
+        # 5. Query Metriks
         q_data = pd.read_sql(f"""
             SELECT  
                 (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {excl_condition} AND "{col_qty}" > 0) as Total_Art_Aktif,
@@ -4696,39 +4695,48 @@ def tampilan_display_control():
                 (SELECT COUNT(*) FROM ({q_need_display_logic})) as Art_Need_Display
         """, conn).iloc[0]
 
-        # --- Dashboard Metrics Cards (Sama seperti sebelumnya) ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (BY ARTICLE)</h4></div>', unsafe_allow_html=True)
+        total_art = int(q_data['Total_Art_Aktif'])
+        on_display = int(q_data['Art_On_Display'])
+        need_display = int(q_data['Art_Need_Display'])
+
+        # --- 3. TAMPILAN DASHBOARD ---
+        st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
+        
         c1, c2, c3 = st.columns(3)
-        with c1: st.markdown(f'<div class="metric-card"><p class="metric-label">🧥 Total Article</p><p class="metric-value">{int(q_data["Total_Art_Aktif"]):,}</p></div>', unsafe_allow_html=True)
-        with c2: st.markdown(f'<div class="metric-card"><p class="metric-label">✅ On Display</p><p class="metric-value">{int(q_data["Art_On_Display"]):,}</p></div>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<div class="metric-card"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{int(q_data["Art_Need_Display"]):,}</p></div>', unsafe_allow_html=True)
+        with c1:
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">🧥 Total Article</p><p class="metric-value">{total_art:,}</p></div>', unsafe_allow_html=True)
+        with c2:
+            perc_display = (on_display / total_art * 100) if total_art > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,}</p><p class="metric-arrow" style="color: #00FF00;">{perc_display:.1f}%</p></div>', unsafe_allow_html=True)
+        with c3:
+            perc_need = (need_display / total_art * 100) if total_art > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">{perc_need:.1f}%</p></div>', unsafe_allow_html=True)
 
         st.divider()
-        st.markdown("### 📋 List Article Kosong (Ambil Size Terkecil di Gudang)")
+        st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # 6. DETAIL LIST: Tambahkan Size Terkecil dan Lokasi Bin
-        # Kita hanya mengambil data dari source_gudang
+        # 6. DETAIL DATA (Ditambah Size Terkecil & Bin)
         df_detail = pd.read_sql(f"""
             SELECT 
                 ARTICLE as "Article", 
                 MAX("{col_desc}") as "Deskripsi Barang",
                 MIN("{col_size}") as "Size Display",
                 "{col_bin}" as "Bin Lokasi",
-                SUM("{col_qty}") as "Qty Ready"
+                SUM("{col_qty}") as "Qty di Gudang"
             FROM stock_display_processed 
             WHERE ARTICLE IN ({q_need_display_logic}) 
               AND {f_source_gudang}
               AND "{col_qty}" > 0
             GROUP BY ARTICLE
-            ORDER BY "Article" ASC
+            ORDER BY "Qty di Gudang" DESC
         """, conn)
 
         if not df_detail.empty:
             st.dataframe(df_detail, use_container_width=True)
             csv = df_detail.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download List Refill (CSV)", csv, "list_refill_detail.csv", "text/csv")
+            st.download_button("📥 Download List Refill (CSV)", csv, "list_refill_article.csv", "text/csv")
         else:
-            st.success("🎉 Area Toko sudah lengkap.")
+            st.success("🎉 Semua Article saleable sudah tersedia di area Toko.")
 
     except Exception as e:
         st.error(f"Error pada sistem analisis: {e}")
