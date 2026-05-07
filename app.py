@@ -8224,8 +8224,7 @@ def menu_cycle_count():
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
-
-elif menu =="Cycle Count":
+elif menu == "Cycle Count":
     menu_cycle_count()
 
 
