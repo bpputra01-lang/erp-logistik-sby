@@ -6945,7 +6945,7 @@ elif menu == "Database Ongkir In/Out":
     show_database_ongkir()
 
 elif menu == "Precentage Stock Display":
-    tampilan_display_control():
+    tampilan_display_control()
 
 import streamlit as st
 import pandas as pd
