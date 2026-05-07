@@ -1226,7 +1226,7 @@ def menu_cycle_count():
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
         st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
     # =========================================================
-    # ⚙️ 4. RECON REAL + PROCESS (NEW)
+    # ⚙️ 4. RECON REAL + PROCESS (REVISED)
     # =========================================================
     st.markdown("<br>---", unsafe_allow_html=True)
     st.subheader("4️⃣ RECON REAL + PROCESS")
@@ -1234,39 +1234,52 @@ def menu_cycle_count():
     up_recon_real = st.file_uploader("📥 Upload HASIL RECON REAL +", type=['xlsx','csv'], key="u4_recon_real")
     
     if up_recon_real:
-        df_r_plus = pd.read_excel(up_recon_real) if up_recon_real.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_recon_real)
-        
-        # Kalkulasi Need Adjustment: Kolom D (QTY SCAN) - Kolom G (HASIL RECONCILIATION)
-        # Note: Index D=3, G=6
-        try:
-            qty_scan_r = pd.to_numeric(df_r_plus.iloc[:, 3], errors='coerce').fillna(0)
-            qty_recon_r = pd.to_numeric(df_r_plus.iloc[:, 6], errors='coerce').fillna(0)
-            df_r_plus['NEED_ADJ'] = qty_scan_r - qty_recon_r
-            
-            # Filter hanya yang selisihnya tidak nol
-            df_adj_final = df_r_plus[df_r_plus['NEED_ADJ'] != 0].copy()
-            total_adj_qty = int(df_adj_final['NEED_ADJ'].sum())
-            
-            # --- METRIC BOXES RECON ---
-            m_c1, m_c2 = st.columns(2)
-            with m_c1:
-                st.markdown(f"""
-                    <div class="m-box">
-                        <span class="m-lbl">⚠️ TOTAL NEED ADJ (+)</span>
-                        <span class="m-val" style="color: #FF4B4B;">{total_adj_qty} QTY</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            with m_c2:
-                st.markdown(f"""
-                    <div class="m-box">
-                        <span class="m-lbl">📦 SKU IMPACTED</span>
-                        <span class="m-val">{len(df_adj_final)} SKU</span>
-                    </div>
-                """, unsafe_allow_html=True)
+        # Pake tombol running sesuai request
+        if st.button("▶️ RUN RECON ANALYSIS", use_container_width=True):
+            try:
+                df_r_plus = pd.read_excel(up_recon_real) if up_recon_real.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_recon_real)
+                
+                # Logic Revisi: Kolom G (Index 6) - Kolom E (Index 4)
+                # G = QTY REKONSILIASI
+                # E = QTY SYSTEM
+                qty_recon_r = pd.to_numeric(df_r_plus.iloc[:, 6], errors='coerce').fillna(0)
+                qty_system_r = pd.to_numeric(df_r_plus.iloc[:, 4], errors='coerce').fillna(0)
+                
+                df_r_plus['NEED_ADJ'] = qty_recon_r - qty_system_r
+                
+                # Filter hanya yang selisihnya tidak nol
+                df_adj_final = df_r_plus[df_r_plus['NEED_ADJ'] != 0].copy()
+                total_adj_qty = int(df_adj_final['NEED_ADJ'].sum())
+                
+                # --- METRIC BOXES RECON ---
+                m_c1, m_c2 = st.columns(2)
+                with m_c1:
+                    st.markdown(f"""
+                        <div class="m-box">
+                            <span class="m-lbl">⚠️ TOTAL NEED ADJ (+)</span>
+                            <span class="m-val" style="color: #FF4B4B;">{total_adj_qty} QTY</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+                with m_c2:
+                    st.markdown(f"""
+                        <div class="m-box">
+                            <span class="m-lbl">📦 SKU IMPACTED</span>
+                            <span class="m-val">{len(df_adj_final)} SKU</span>
+                        </div>
+                    """, unsafe_allow_html=True)
 
-            st.dataframe(df_adj_final, use_container_width=True, hide_index=True)
-        except Exception as e:
-            st.error(f"Format Kolom salah bro: {e}")
+                st.info("Menampilkan item dengan selisih antara Hasil Rekon (G) vs System (E)")
+                st.dataframe(df_adj_final, use_container_width=True, hide_index=True)
+                
+                # Simpan ke session state biar gak ilang
+                st.session_state.df_adj_final_4 = df_adj_final
+
+            except Exception as e:
+                st.error(f"Format Kolom salah bro atau file korup: {e}")
+
+    # Tampilkan ulang jika session state ada (biar gak ilang pas scroll)
+    elif st.session_state.get('df_adj_final_4') is not None:
+        st.dataframe(st.session_state.df_adj_final_4, use_container_width=True, hide_index=True)
     # =========================================================
     # ⚙️ 5. SET UP KARANTINA GENERATOR
     # =========================================================
