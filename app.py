@@ -3756,133 +3756,121 @@ def apply_po_ui():
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
+# --- 2. LOGIKA ALOKASI PO (ULTRA SAFE VERSION) ---
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
     
-    # INDEX SESUAI SS EXCEL LU
-    scan_sku_idx, scan_qty_idx = 0, 1  # Scan: A, B
-    po_no_idx = 0                     # PO: A
-    po_sku_idx = 6                    # PO: G (SKU)
-    po_qty_idx = 7                    # PO: H (Qty/In Stock)
+    # 1. Definisi Kolom
+    s_sku_col, s_qty_col = df_scan.columns[0], df_scan.columns[1]
+    p_no_col, p_sku_col, p_qty_col = df_po.columns[0], df_po.columns[6], df_po.columns[7]
 
+    # 2. Pre-processing & Cleaning (Paksa Tipe Data)
     df_s = df_scan.copy()
     df_p = df_po.copy()
 
-    # --- PROTEKSI 1: PAKSA SKU JADI STRING (BIAR GAK DIANGGAP ANGKA) ---
-    df_s.iloc[:, scan_sku_idx] = df_s.iloc[:, scan_sku_idx].astype(str).str.strip().str.replace('.0', '', regex=False).str.upper()
-    df_p.iloc[:, po_sku_idx] = df_p.iloc[:, po_sku_idx].astype(str).str.strip().str.replace('.0', '', regex=False).str.upper()
-
-    # --- PROTEKSI 2: PAKSA QTY JADI ANGKA (KALO ADA TEKS JADIIN 0) ---
-    df_s.iloc[:, scan_qty_idx] = pd.to_numeric(df_s.iloc[:, scan_qty_idx], errors='coerce').fillna(0)
-    df_p.iloc[:, po_qty_idx] = pd.to_numeric(df_p.iloc[:, po_qty_idx], errors='coerce').fillna(0)
-
-    # Grouping untuk dapetin total per SKU
-    agg_scan = df_s.groupby(df_s.columns[scan_sku_idx])[df_s.columns[scan_qty_idx]].sum()
-    agg_po = df_p.groupby(df_p.columns[po_sku_idx])[df_p.columns[po_qty_idx]].sum()
+    df_s[s_sku_col] = df_s[s_sku_col].astype(str).str.strip().str.replace('.0', '', regex=False).str.upper()
+    df_p[p_sku_col] = df_p[p_sku_col].astype(str).str.strip().str.replace('.0', '', regex=False).str.upper()
     
-    metrics["total_po"] = int(agg_po.sum())
-    metrics["total_scan"] = int(agg_scan.sum())
+    df_s[s_qty_col] = pd.to_numeric(df_s[s_qty_col], errors='coerce').fillna(0).astype(float)
+    df_p[p_qty_col] = pd.to_numeric(df_p[p_qty_col], errors='coerce').fillna(0).astype(float)
+
+    # 3. Aggregasi Total per SKU
+    agg_scan = df_s.groupby(s_sku_col)[s_qty_col].sum().to_dict()
+    agg_po_total = df_p.groupby(p_sku_col)[p_qty_col].sum().to_dict()
+    
+    metrics["total_po"] = int(sum(agg_po_total.values()))
+    metrics["total_scan"] = int(sum(agg_scan.values()))
     
     hasil_alokasi = []
-    # Loop Scan untuk cari alokasi ke PO
-    for sku in agg_scan.index:
-        available_qty = agg_scan[sku]
-        mask_po = df_p.iloc[:, po_sku_idx] == sku
-        po_rows = df_p[mask_po]
+    processed_skus = set()
+
+    # 4. Alokasi dari Hasil Scan ke PO
+    for sku, available_qty in agg_scan.items():
+        processed_skus.add(sku)
+        po_rows = df_p[df_p[p_sku_col] == sku]
         
         if po_rows.empty:
             hasil_alokasi.append({'No PO': 'WRONG SKU', 'SKU': sku, 'Qty PO': 0.0, 'Qty Alokasi': float(available_qty), 'Status Alokasi': 'Wrong SKU'})
             continue
 
-        for idx, row in po_rows.iterrows():
-            target_qty = float(row.iloc[po_qty_idx])
-            allocated = min(target_qty, max(0.0, available_qty))
-            status_val = "Full Allocation" if allocated == target_qty else "Partial Allocation"
-            hasil_alokasi.append({'No PO': row.iloc[po_no_idx], 'SKU': sku, 'Qty PO': target_qty, 'Qty Alokasi': allocated, 'Status Alokasi': status_val})
-            available_qty -= allocated
+        temp_qty = float(available_qty)
+        for _, row in po_rows.iterrows():
+            target = float(row[p_qty_col])
+            allocated = min(target, max(0.0, temp_qty))
+            status = "Full Allocation" if allocated == target else "Partial Allocation"
+            
+            hasil_alokasi.append({
+                'No PO': row[p_no_col], 'SKU': sku, 'Qty PO': target, 
+                'Qty Alokasi': allocated, 'Status Alokasi': status
+            })
+            temp_qty -= allocated
 
-        if available_qty > 0:
-            hasil_alokasi.append({'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0.0, 'Qty Alokasi': float(available_qty), 'Status Alokasi': 'Over Allocation'})
+        if temp_qty > 0:
+            hasil_alokasi.append({'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0.0, 'Qty Alokasi': temp_qty, 'Status Alokasi': 'Over Allocation'})
 
-    # Tambahin barang yang ada di PO tapi gak datang
+    # 5. Cek Item di PO yang sama sekali gak datang
     for _, row in df_p.iterrows():
-        s_po, n_po = row.iloc[po_sku_idx], row.iloc[po_no_idx]
-        if not any(d['No PO'] == n_po and d['SKU'] == s_po for d in hasil_alokasi):
-            hasil_alokasi.append({'No PO': n_po, 'SKU': s_po, 'Qty PO': float(row.iloc[po_qty_idx]), 'Qty Alokasi': 0.0, 'Status Alokasi': 'No Allocation'})
+        sku_p = str(row[p_sku_col])
+        no_p = str(row[p_no_col])
+        # Cek apakah kombinasi No PO & SKU ini sudah ada di hasil_alokasi
+        if not any(d['No PO'] == no_p and d['SKU'] == sku_p for d in hasil_alokasi):
+            hasil_alokasi.append({
+                'No PO': no_p, 'SKU': sku_p, 'Qty PO': float(row[p_qty_col]), 
+                'Qty Alokasi': 0.0, 'Status Alokasi': 'No Allocation'
+            })
 
     df_hasil = pd.DataFrame(hasil_alokasi)
     
-    # --- PROTEKSI 3: PASTIKAN KOLOM HASIL ADALAH ANGKA SEBELUM DI-SUM ---
-    df_hasil['Qty PO'] = pd.to_numeric(df_hasil['Qty PO'], errors='coerce').fillna(0)
-    df_hasil['Qty Alokasi'] = pd.to_numeric(df_hasil['Qty Alokasi'], errors='coerce').fillna(0)
-
-    # Hitung Metrics akhir
-    df_kurang = df_hasil[df_hasil['Status Alokasi'].isin(['Over Allocation', 'Wrong SKU'])].copy()
-    df_lebih = df_hasil[df_hasil['Status Alokasi'].isin(['No Allocation', 'Partial Allocation'])].copy()
+    # 6. Kalkulasi Metrics Akhir (Hanya ambil angka)
+    df_kurang_sub = df_hasil[df_hasil['Status Alokasi'].isin(['Over Allocation', 'Wrong SKU'])]
+    metrics["kurang_po"] = int(df_kurang_sub['Qty Alokasi'].sum())
     
-    metrics["kurang_po"] = int(df_kurang['Qty Alokasi'].sum())
-    
-    # Selisih untuk yang belum datang
-    df_lebih['Selisih'] = df_lebih['Qty PO'] - df_lebih['Qty Alokasi']
-    metrics["lebih_po"] = int(df_lebih['Selisih'].sum())
+    df_lebih_sub = df_hasil[df_hasil['Status Alokasi'].isin(['No Allocation', 'Partial Allocation'])].copy()
+    if not df_lebih_sub.empty:
+        df_lebih_sub['Selisih'] = df_lebih_sub['Qty PO'] - df_lebih_sub['Qty Alokasi']
+        metrics["lebih_po"] = int(df_lebih_sub['Selisih'].sum())
 
-    return df_hasil, df_kurang, df_lebih, metrics
-# --- 3. FUNGSI HALAMAN UTAMA PO (Tab-nya AMAN DISINI) ---
+    return df_hasil, df_kurang_sub, df_lebih_sub, metrics
+
+# --- 3. MAIN APP ---
 def tampilkan_halaman_po():
     apply_po_ui()
     
     if "po_data" not in st.session_state:
         st.session_state.po_data = None
 
-    col1, col2 = st.columns(2)
-    with col1:
-        f_scan = st.file_uploader("Upload Hasil Scan Penerimaan", type=['xlsx', 'csv'], key="po_scan_up")
-    with col2:
-        f_po = st.file_uploader("Upload File Purchase Order", type=['xlsx', 'csv'], key="po_master_up")
+    c1, c2 = st.columns(2)
+    with c1: f_scan = st.file_uploader("Upload Hasil Scan Penerimaan", type=['xlsx', 'csv'], key="up1")
+    with c2: f_po = st.file_uploader("Upload File Purchase Order", type=['xlsx', 'csv'], key="up2")
 
     if f_scan and f_po:
-        if st.button("▶️ PROSES KOMPARASI PO", key="po_btn"):
+        if st.button("▶️ PROSES KOMPARASI PO", use_container_width=True):
             try:
                 df_s = pd.read_excel(f_scan) if f_scan.name.endswith('.xlsx') else pd.read_csv(f_scan)
                 df_p = pd.read_excel(f_po) if f_po.name.endswith('.xlsx') else pd.read_csv(f_po)
-                st.session_state.po_data = process_po_logic(df_s, df_p)
-                st.success("Analisis PO Selesai!")
+                
+                # Cek minimal kolom (PO butuh 8 kolom: A-H)
+                if len(df_p.columns) < 8:
+                    st.error("File PO kurang kolom! Pastikan sampai kolom H.")
+                else:
+                    st.session_state.po_data = process_po_logic(df_s, df_p)
+                    st.success("Analisis Selesai!")
             except Exception as e:
                 st.error(f"Gagal memproses data: {e}")
 
     if st.session_state.po_data:
-        df_hasil, df_kurang, df_lebih, metrics = st.session_state.po_data
+        df_hasil, df_err, df_miss, m = st.session_state.po_data
 
-        # 1. METRICS BOX
         m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box-po"><span class="m-lbl">Total Qty PO</span><span class="m-val">{metrics["total_po"]:,}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box-po"><span class="m-lbl">Total Qty Datang</span><span class="m-val">{metrics["total_scan"]:,}</span></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="m-box-po"><span class="m-lbl">Extra / Wrong SKU</span><span class="m-val" style="color:red;">{metrics["kurang_po"]:,}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box-po"><span class="m-lbl">Qty Belum Datang</span><span class="m-val" style="color:orange;">{metrics["lebih_po"]:,}</span></div>', unsafe_allow_html=True)
+        m1.markdown(f'<div class="m-box-po"><span class="m-lbl">Total Qty PO</span><span class="m-val">{m["total_po"]:,}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box-po"><span class="m-lbl">Total Qty Datang</span><span class="m-val">{m["total_scan"]:,}</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box-po"><span class="m-lbl">Extra / Wrong SKU</span><span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box-po"><span class="m-lbl">Qty Belum Datang</span><span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span></div>', unsafe_allow_html=True)
 
-        st.divider()
-
-        # 2. TABS SYSTEM (LU LIAT NIH, MASIH ADA KAN TAB NYA?)
-        t1, t2, t3 = st.tabs(["📊 Detail Alokasi PO", "⚠️ Extra / Salah SKU", "❌ Item Belum Datang"])
-        
-        with t1:
-            st.dataframe(df_hasil, use_container_width=True, hide_index=True)
-        with t2:
-            st.warning("SKU ini tidak terdaftar di PO atau Scan melebihi Qty PO")
-            st.dataframe(df_kurang, use_container_width=True, hide_index=True)
-        with t3:
-            st.error("Item yang terdaftar di PO tapi fisiknya belum diterima secara lengkap")
-            st.dataframe(df_lebih, use_container_width=True, hide_index=True)
-
-        # 3. DOWNLOAD
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df_hasil.to_excel(writer, index=False, sheet_name='Alokasi_PO')
-            df_kurang.to_excel(writer, index=False, sheet_name='Salah_Input_Purchasing')
-            df_lebih.to_excel(writer, index=False, sheet_name='Barang_Kurang')
-        
-        st.download_button(label="📥 Download Report PO (.xlsx)", data=output.getvalue(), file_name="PO_Receiving_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_po")
-        
+        t1, t2, t3 = st.tabs(["📊 Detail Alokasi", "⚠️ Extra / Salah SKU", "❌ Item Belum Datang"])
+        with t1: st.dataframe(df_hasil, use_container_width=True, hide_index=True)
+        with t2: st.dataframe(df_err, use_container_width=True, hide_index=True)
+        with t3: st.dataframe(df_miss, use_container_width=True, hide_index=True)        
 import pandas as pd
 import io
 
