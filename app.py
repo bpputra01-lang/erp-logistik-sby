@@ -5024,7 +5024,7 @@ def process_rto_logic(df_scan, df_tf):
                 'SKU': sku, 
                 'Qty TF': target_qty,
                 'Qty Alokasi': allocated,
-                'Status': status
+                'Status Alokasi': status
             })
             available_qty -= allocated
 
