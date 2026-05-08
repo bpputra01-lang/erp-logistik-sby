@@ -3699,66 +3699,67 @@ from io import BytesIO
 def apply_po_ui():
     st.markdown("""
     <style>
-        /* 1. HERO HEADER - DISAMAKAN DENGAN RETUR OUT LIST */
+        /* BACKGROUND UTAMA DARK MODE */
+        .stApp { background-color: #f8f9fa !important; }
+
+        /* HEADER JUDUL BIRU NAVY - SESUAI GAMBAR LU */
         .hero-header-po {
-            background-color: #1d3e7a; /* Warna biru gelap dashboard */
-            padding: 20px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            padding: 25px;
             border-radius: 12px;
-            margin-bottom: 25px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
-            border-left: 8px solid #007BFF; /* Garis biru terang di kiri */
-            width: 100%; /* Pastikan full lebar */
+            text-align: left; /* Rata kiri biar sama kayak Putaway System */
+            margin-bottom: 30px;
+            box-shadow: 4px 4px 15px rgba(0,0,0,0.15);
+            display: inline-block; /* Agar box judul tidak full lebar jika pendek */
+            min-width: 300px;
         }
-        .hero-text-po {
-            color: white !important;
-            margin: 0 !important;
-            font-size: 24px !important; /* Ukuran font balik ke standar lu */
-            font-weight: 800 !important;
+        .hero-header-po h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 800;
             letter-spacing: 1px;
             text-transform: uppercase;
         }
 
-        /* 2. METRIC CARD - DISAMAKAN DENGAN STYLE RETUR */
+        /* METRIC CARD PREMIUM - DARK NAVY */
         .m-box-po {
-            background-color: #1E1E2E; /* Warna background dark menu lu */
-            padding: 18px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            color: white;
-            margin-bottom: 15px;
-            text-align: left; /* Rata kiri sesuai style retur */
+            background-color: #1e3a8a;
+            padding: 20px;
+            border-radius: 10px;
+            border-bottom: 4px solid #C5A059; /* Aksen Gold di bawah */
+            text-align: center;
+            box-shadow: 2px 4px 8px rgba(0,0,0,0.1);
         }
-        .m-lbl {
-            font-size: 11px;
-            color: #A0A0A0;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-            font-weight: 700;
-            margin-bottom: 5px;
-            display: block;
-        }
-        .m-val {
-            font-size: 26px; /* Font angka balik gede */
-            font-weight: 800;
-            color: #FFFFFF;
-            margin: 0;
-        }
+        .m-lbl { color: #cbd5e1; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .m-val { color: #ffffff; font-size: 24px; font-weight: 700; }
 
-        /* 3. BUTTON - FULL BLUE */
+        /* BUTTON PROSES - WARNA GOLD */
         div.stButton > button {
-            background-color: #007BFF !important;
+            background: #C5A059 !important;
             color: white !important;
-            font-weight: bold !important;
-            border-radius: 10px !important;
-            height: 45px !important;
-            width: 100% !important;
             border: none !important;
-            box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.3);
+            font-weight: bold !important;
+            height: 45px !important;
+            border-radius: 8px !important;
+            transition: 0.3s;
+        }
+        div.stButton > button:hover {
+            background: #a6864a !important;
+            transform: scale(1.02);
+        }
+        
+        /* FILE UPLOADER STYLE */
+        [data-testid="stFileUploader"] {
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px dashed #1e3a8a;
         }
     </style>
     
     <div class="hero-header-po">
-        <p class="hero-text-po">PURCHASE ORDER RECEIVING PROCESS</p>
+        <h1>PURCHASE ORDER RECEIVING</h1>
     </div>
     """, unsafe_allow_html=True)
 
