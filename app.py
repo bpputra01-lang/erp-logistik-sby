@@ -5190,8 +5190,6 @@ def main():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-
-
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -6316,7 +6314,7 @@ with st.sidebar:
     if is_dc:
         m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
     else:
-        m2_list = ["Compare Penerimaan RTO", "Putaway System","Purchase Order Receiving"] # Menu Cabang
+        m2_list = ["Compare Penerimaan RTO", "Putaway System"] # Menu Cabang
         
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else None
     st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=sync_menu, args=("m2_key",), label_visibility="collapsed")
@@ -7854,9 +7852,6 @@ if menu == "Logistic Schedule":
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
-elif menu == "Purchase Order Receiving":
-    apply_custom_ui()
-
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
 
@@ -8391,145 +8386,7 @@ elif menu == "Refill Toko":
                 st.session_state.df_refill_toko = None
                 st.rerun()
 
-import pandas as pd
-import streamlit as st
-from io import BytesIO
 
-# --- 1. CONFIG GLOBAL ---
-st.set_page_config(page_title="Logistics Compare System", layout="wide")
-
-# --- 2. FUNGSI UI & CSS DYNAMIC ---
-def apply_custom_ui(color, title):
-    st.markdown(f"""
-    <style>
-        .stApp {{ background-color: #f4faff !important; }}
-        .hero-header {{
-            background-color: {color};
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            margin-bottom: 25px;
-            font-weight: bold;
-            font-size: 26px;
-        }}
-        .m-box {{
-            background-color: white;
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 5px solid {color};
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-            text-align: center;
-        }}
-        .m-lbl {{ font-size: 14px; color: #666; display: block; }}
-        .m-val {{ font-size: 22px; font-weight: bold; color: {color}; }}
-        div.stButton > button {{
-            background-color: {color} !important;
-            color: white !important;
-            font-weight: bold !important;
-            height: 50px !important;
-            width: 100% !important;
-            border-radius: 8px !important;
-        }}
-    </style>
-    <div class="hero-header">{title}</div>
-    """, unsafe_allow_html=True)
-
-# --- 3. LOGIKA RTO ---
-def process_rto_logic(df_scan, df_tf):
-    # ... (Logic RTO lu yang lama tetap sama) ...
-    # Gw singkat bagian ini untuk efisiensi pesan, tapi isinya sama dengan code RTO awal lu
-    metrics = {"total_tf": 0, "total_scan": 0, "kurang_tf": 0, "lebih_tf": 0}
-    # [Insert logic FIFO RTO di sini]
-    return df_scan, df_scan, df_scan, df_scan, metrics # Placeholder return
-
-# --- 4. LOGIKA PO ---
-def process_po_logic(df_scan, df_po):
-    metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
-    scan_sku_idx, scan_qty_idx = 0, 1
-    po_no_idx, po_sku_idx, po_qty_idx = 0, 3, 7 
-
-    df_scan = df_scan.copy()
-    df_po = df_po.copy()
-    df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
-    df_po.iloc[:, po_sku_idx] = df_po.iloc[:, po_sku_idx].astype(str).str.strip().str.upper()
-    
-    agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
-    agg_po = df_po.groupby(df_po.columns[po_sku_idx])[df_po.columns[po_qty_idx]].sum()
-    
-    metrics["total_po"] = int(agg_po.sum()); metrics["total_scan"] = int(agg_scan.sum())
-    
-    hasil_alokasi = []
-    for sku in agg_scan.index:
-        available_qty = agg_scan[sku]
-        mask_po = df_po.iloc[:, po_sku_idx] == sku
-        po_rows = df_po[mask_po]
-        
-        if po_rows.empty:
-            hasil_alokasi.append({'No PO': 'WRONG SKU', 'SKU': sku, 'Qty PO': 0, 'Qty Alokasi': available_qty, 'Status Alokasi': 'Wrong SKU'})
-            continue
-
-        for idx, row in po_rows.iterrows():
-            target_qty = float(row.iloc[po_qty_idx])
-            allocated = min(target_qty, max(0, available_qty))
-            status_val = "Full Allocation" if allocated == target_qty else "Partial Allocation"
-            hasil_alokasi.append({'No PO': row.iloc[po_no_idx], 'SKU': sku, 'Qty PO': target_qty, 'Qty Alokasi': allocated, 'Status Alokasi': status_val})
-            available_qty -= allocated
-
-        if available_qty > 0:
-            hasil_alokasi.append({'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0, 'Qty Alokasi': available_qty, 'Status Alokasi': 'Over Allocation'})
-
-    df_hasil = pd.DataFrame(hasil_alokasi)
-    df_kurang = df_hasil[df_hasil['Status Alokasi'].str.contains('Over|Wrong', case=False)].copy()
-    df_lebih = df_hasil[df_hasil['Status Alokasi'].str.contains('No Allocation|Partial', case=False)].copy()
-    
-    metrics["kurang_po"] = int(df_kurang['Qty Alokasi'].sum())
-    metrics["lebih_po"] = int(df_lebih['Qty PO'].sum() - df_lebih['Qty Alokasi'].sum())
-
-    return df_hasil, df_kurang, df_lebih, metrics
-
-# --- 5. HALAMAN MODUL ---
-
-def show_rto_page():
-    apply_custom_ui("#007BFF", "RTO RECEIVING PROCESS")
-    col1, col2 = st.columns(2)
-    f_scan = col1.file_uploader("Upload Hasil Scan RTO", type=['xlsx', 'csv'], key="rto_s")
-    f_tf = col2.file_uploader("Upload Transfer Stock Jezpro", type=['xlsx', 'csv'], key="rto_t")
-    
-    if f_scan and f_tf:
-        if st.button("▶️ RUN DATA RTO"):
-            # Panggil process_rto_logic di sini
-            st.success("Analisis RTO Selesai!")
-
-def show_po_page():
-    apply_custom_ui("#28a745", "📦 PURCHASE ORDER RECEIVING")
-    if "po_data" not in st.session_state: st.session_state.po_data = None
-
-    col1, col2 = st.columns(2)
-    file_scan = col1.file_uploader("Upload Hasil Scan Penerimaan", type=['xlsx', 'csv'], key="po_s")
-    file_po = col2.file_uploader("Upload File Purchase Order", type=['xlsx', 'csv'], key="po_p")
-
-    if file_scan and file_po:
-        if st.button("▶️ PROSES KOMPARASI PO"):
-            df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
-            df_p = pd.read_excel(file_po) if file_po.name.endswith('.xlsx') else pd.read_csv(file_po)
-            st.session_state.po_data = process_po_logic(df_s, df_p)
-
-    if st.session_state.po_data:
-        df_hasil, df_kurang, df_lebih, metrics = st.session_state.po_data
-        m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty PO</span><span class="m-val">{metrics["total_po"]:,}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Datang</span><span class="m-val">{metrics["total_scan"]:,}</span></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="m-box"><span class="m-lbl">Extra / Wrong SKU</span><span class="m-val" style="color:red;">{metrics["kurang_po"]:,}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">Qty Belum Datang</span><span class="m-val" style="color:orange;">{metrics["lebih_po"]:,}</span></div>', unsafe_allow_html=True)
-        
-        t1, t2, t3 = st.tabs(["📊 Alokasi PO", "⚠️ Extra / Salah SKU", "❌ Belum Datang"])
-        t1.dataframe(df_hasil, use_container_width=True, hide_index=True)
-        t2.dataframe(df_kurang, use_container_width=True, hide_index=True)
-        t3.dataframe(df_lebih, use_container_width=True, hide_index=True)
-
-elif menu == "Purchase Order Receiving":
-    show_po_page()
 
 
 
