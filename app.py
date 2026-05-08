@@ -3767,7 +3767,6 @@ def apply_po_ui():
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header"><p class="hero-text">📦 PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
-# --- 2. LOGIKA ALOKASI PO (ULTRA SAFE VERSION) ---
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
     
@@ -3775,74 +3774,88 @@ def process_po_logic(df_scan, df_po):
     s_sku_col, s_qty_col = df_scan.columns[0], df_scan.columns[1]
     p_no_col, p_sku_col, p_qty_col = df_po.columns[0], df_po.columns[6], df_po.columns[7]
 
-    # 2. Pre-processing & Cleaning (Paksa Tipe Data)
     df_s = df_scan.copy()
     df_p = df_po.copy()
 
+    # 2. Cleaning & Standarisasi SKU
     df_s[s_sku_col] = df_s[s_sku_col].astype(str).str.strip().str.replace('.0', '', regex=False).str.upper()
     df_p[p_sku_col] = df_p[p_sku_col].astype(str).str.strip().str.replace('.0', '', regex=False).str.upper()
     
     df_s[s_qty_col] = pd.to_numeric(df_s[s_qty_col], errors='coerce').fillna(0).astype(float)
     df_p[p_qty_col] = pd.to_numeric(df_p[p_qty_col], errors='coerce').fillna(0).astype(float)
 
-    # 3. Aggregasi Total per SKU
-    agg_scan = df_s.groupby(s_sku_col)[s_qty_col].sum().to_dict()
-    agg_po_total = df_p.groupby(p_sku_col)[p_qty_col].sum().to_dict()
+    # 3. Aggregasi Awal untuk Metrics
+    metrics["total_po"] = int(df_p[p_qty_col].sum())
+    metrics["total_scan"] = int(df_s[s_qty_col].sum())
     
-    metrics["total_po"] = int(sum(agg_po_total.values()))
-    metrics["total_scan"] = int(sum(agg_scan.values()))
+    # Kita butuh tracker buat sisa Qty di tiap baris PO
+    df_p['remaining_target'] = df_p[p_qty_col]
+    
+    # Aggregasi Scan per SKU biar gak muter-muter kelamaan
+    agg_scan = df_s.groupby(s_sku_col)[s_qty_col].sum().to_dict()
     
     hasil_alokasi = []
-    processed_skus = set()
 
-    # 4. Alokasi dari Hasil Scan ke PO
+    # 4. LOGIKA ALOKASI YANG LEBIH PINTAR
     for sku, available_qty in agg_scan.items():
-        processed_skus.add(sku)
-        po_rows = df_p[df_p[p_sku_col] == sku]
+        temp_qty = float(available_qty)
         
-        if po_rows.empty:
-            hasil_alokasi.append({'No PO': 'WRONG SKU', 'SKU': sku, 'Qty PO': 0.0, 'Qty Alokasi': float(available_qty), 'Status Alokasi': 'Wrong SKU'})
+        # Cari SEMUA baris PO yang punya SKU ini
+        mask_po = df_p[p_sku_col] == sku
+        po_indices = df_p.index[mask_po].tolist()
+        
+        if not po_indices:
+            # Benar-benar tidak ada di PO
+            hasil_alokasi.append({
+                'No PO': 'WRONG SKU', 'SKU': sku, 'Qty PO': 0.0, 
+                'Qty Alokasi': temp_qty, 'Status Alokasi': 'Wrong SKU'
+            })
             continue
 
-        temp_qty = float(available_qty)
-        for _, row in po_rows.iterrows():
-            target = float(row[p_qty_col])
-            allocated = min(target, max(0.0, temp_qty))
-            status = "Full Allocation" if allocated == target else "Partial Allocation"
+        # Alokasikan ke tiap baris PO yang ditemukan sampai habis
+        for idx in po_indices:
+            if temp_qty <= 0: break
             
-            hasil_alokasi.append({
-                'No PO': row[p_no_col], 'SKU': sku, 'Qty PO': target, 
-                'Qty Alokasi': allocated, 'Status Alokasi': status
-            })
-            temp_qty -= allocated
+            target = df_p.at[idx, 'remaining_target']
+            allocated = min(target, temp_qty)
+            
+            if allocated > 0:
+                hasil_alokasi.append({
+                    'No PO': df_p.at[idx, p_no_col], 'SKU': sku, 'Qty PO': df_p.at[idx, p_qty_col], 
+                    'Qty Alokasi': allocated, 'Status Alokasi': 'Full Allocation' if allocated == target else 'Partial Allocation'
+                })
+                df_p.at[idx, 'remaining_target'] -= allocated
+                temp_qty -= allocated
 
+        # Jika setelah keliling semua baris PO masih ada sisa, baru masuk Over
         if temp_qty > 0:
-            hasil_alokasi.append({'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0.0, 'Qty Alokasi': temp_qty, 'Status Alokasi': 'Over Allocation'})
-
-    # 5. Cek Item di PO yang sama sekali gak datang
-    for _, row in df_p.iterrows():
-        sku_p = str(row[p_sku_col])
-        no_p = str(row[p_no_col])
-        # Cek apakah kombinasi No PO & SKU ini sudah ada di hasil_alokasi
-        if not any(d['No PO'] == no_p and d['SKU'] == sku_p for d in hasil_alokasi):
             hasil_alokasi.append({
-                'No PO': no_p, 'SKU': sku_p, 'Qty PO': float(row[p_qty_col]), 
+                'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0.0, 
+                'Qty Alokasi': temp_qty, 'Status Alokasi': 'Over Allocation'
+            })
+
+    # 5. Barang yang ada di PO tapi Qty Alokasi-nya masih 0 (No Allocation)
+    for idx, row in df_p.iterrows():
+        if row['remaining_target'] == row[p_qty_col]:
+            hasil_alokasi.append({
+                'No PO': row[p_no_col], 'SKU': row[p_sku_col], 'Qty PO': row[p_qty_col], 
                 'Qty Alokasi': 0.0, 'Status Alokasi': 'No Allocation'
             })
+        elif row['remaining_target'] > 0 and row['remaining_target'] < row[p_qty_col]:
+            # Handle kasus Partial yang belum tercatat di loop atas (opsional)
+            pass
 
     df_hasil = pd.DataFrame(hasil_alokasi)
     
-    # 6. Kalkulasi Metrics Akhir (Hanya ambil angka)
-    df_kurang_sub = df_hasil[df_hasil['Status Alokasi'].isin(['Over Allocation', 'Wrong SKU'])]
-    metrics["kurang_po"] = int(df_kurang_sub['Qty Alokasi'].sum())
+    # 6. Hitung Metrics
+    metrics["kurang_po"] = int(df_hasil[df_hasil['Status Alokasi'].isin(['Over Allocation', 'Wrong SKU'])]['Qty Alokasi'].sum())
     
-    df_lebih_sub = df_hasil[df_hasil['Status Alokasi'].isin(['No Allocation', 'Partial Allocation'])].copy()
-    if not df_lebih_sub.empty:
-        df_lebih_sub['Selisih'] = df_lebih_sub['Qty PO'] - df_lebih_sub['Qty Alokasi']
-        metrics["lebih_po"] = int(df_lebih_sub['Selisih'].sum())
+    # Selisih untuk yang belum datang (Qty PO - Qty Alokasi)
+    df_missing = df_hasil[df_hasil['Status Alokasi'].isin(['No Allocation', 'Partial Allocation'])].copy()
+    if not df_missing.empty:
+        metrics["lebih_po"] = int(df_missing['Qty PO'].sum() - df_missing['Qty Alokasi'].sum())
 
-    return df_hasil, df_kurang_sub, df_lebih_sub, metrics
-
+    return df_hasil, df_hasil[df_hasil['Status Alokasi'].isin(['Over Allocation', 'Wrong SKU'])], df_missing, metrics
 # --- 3. MAIN APP ---
 def tampilkan_halaman_po():
     apply_po_ui()
