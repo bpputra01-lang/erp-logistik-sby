@@ -4985,7 +4985,7 @@ def process_rto_logic(df_scan, df_tf):
         df_lebih.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
         df_lebih = df_lebih[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
 
-    # --- FIFO ALOKASI DENGAN PENANGANAN OVER ALLOCATION ---
+    # --- FIFO ALOKASI DENGAN PENANGANAN OVER ALLOCATION (VERSI GABUNGAN) ---
     hasil_alokasi = []
     df_tf_work = df_tf.copy()
 
@@ -4994,57 +4994,48 @@ def process_rto_logic(df_scan, df_tf):
         mask_tf = df_tf_work.iloc[:, tf_sku_idx] == sku
         tf_rows = df_tf_work[mask_tf]
         
-        # Jika SKU ada di scan tapi TIDAK ada di dokumen TF sama sekali
-        if tf_rows.empty:
-            hasil_alokasi.append({
-                'No Transfer': 'EXTRA / UNKNOWN', 
-                'SKU': sku, 
-                'Qty TF': 0,
-                'Qty Alokasi': available_qty,
-                'Status Alokasi': 'Over Allocation (No TF Found)'
-            })
-            continue
-
-        # Proses FIFO untuk SKU yang ada di dokumen TF
+        # 1. PROSES FIFO (Otomatis terlewati jika SKU tidak ada di dokumen TF)
         for idx, row in tf_rows.iterrows():
             target_qty = float(row.iloc[tf_qty_idx])
             
             if available_qty <= 0:
                 allocated = 0
-                status = 'No Allocation'
+                status_val = 'No Allocation'
             else:
                 allocated = min(target_qty, available_qty)
                 if allocated == target_qty:
-                    status = "Full Allocation"
+                    status_val = "Full Allocation"
                 else:
-                    status = "Partial Allocation"
+                    status_val = "Partial Allocation"
             
             hasil_alokasi.append({
                 'No Transfer': row.iloc[tf_no_idx], 
                 'SKU': sku, 
                 'Qty TF': target_qty,
                 'Qty Alokasi': allocated,
-                'Status Alokasi': status
+                'Status Alokasi': status_val
             })
             available_qty -= allocated
 
-        # --- LOGIKA OVER ALLOCATION ---
-        # Jika setelah melewati semua dokumen TF, fisik masih tersisa:
+        # 2. LOGIKA PENANGKAP SISA (GABUNGAN OVER SCAN & EXTRA UNKNOWN)
+        # Jika SKU tidak ada di TF sama sekali, available_qty masih utuh dan masuk sini.
+        # Jika SKU ada tapi scan lebih banyak dari total TF, sisanya juga masuk sini.
         if available_qty > 0:
             hasil_alokasi.append({
-                'No Transfer': 'Cek Hasil Scan & Real',
+                'No Transfer': 'EXTRA / OVER SCAN', 
                 'SKU': sku, 
                 'Qty TF': 0,
                 'Qty Alokasi': available_qty,
-                'Status Alokasi': 'Over Allocation (Sisa Scan)'
+                'Status Alokasi': 'Over Allocation'
             })
 
-    # Tambahkan SKU di TF yang sama sekali tidak ada di data scan (tetap sama)
+    # 3. TAMBAHKAN SKU DI TF YANG SAMA SEKALI TIDAK ADA DI DATA SCAN
     for _, row in df_tf_work.iterrows():
         s_tf = row.iloc[tf_sku_idx]
         n_tf = row.iloc[tf_no_idx]
         qty_tf_orig = float(row.iloc[tf_qty_idx])
         
+        # Cek apakah kombinasi No Transfer dan SKU ini sudah ada di hasil_alokasi
         if not any(d['No Transfer'] == n_tf and d['SKU'] == s_tf for d in hasil_alokasi):
             hasil_alokasi.append({
                 'No Transfer': n_tf, 
