@@ -3757,6 +3757,7 @@ def apply_po_ui():
         <h1>PURCHASE ORDER RECEIVING</h1>
     </div>
     """, unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
 # --- 2. LOGIKA ALOKASI PO ---
 def process_po_logic(df_scan, df_po):
