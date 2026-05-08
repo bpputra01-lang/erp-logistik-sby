@@ -5026,6 +5026,9 @@ def process_rto_logic(df_scan, df_tf):
             df_kurang = pd.concat([df_kurang, extra_rows[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]], ignore_index=True)
         
         df_kurang = df_kurang.drop_duplicates()
+        # --- UPDATE METRIC BOX BIAR SINKRON ---
+        # Hitung selisih qty (Qty Scan - Qty TF) untuk semua baris di df_kurang
+        metrics["kurang_tf"] = int((df_kurang['QTY_SCAN'] - df_kurang['QTY_TF']).sum())
 
     # LOGIKA LEBIH TF
     selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
