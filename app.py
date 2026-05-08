@@ -3699,9 +3699,6 @@ from io import BytesIO
 def apply_po_ui():
     st.markdown("""
     <style>
-        /* 1. BACKGROUND & APP STYLING */
-        .stApp { background-color: #0e1117 !important; } /* Paksa Dark Mode biar masuk sama Card */
-
         /* 2. HERO HEADER */
         .hero-header {
             background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
@@ -3758,13 +3755,12 @@ def apply_po_ui():
             width: 100%;
         }
 
-        /* 5. UPLOADER STYLE */
         [data-testid="stFileUploader"] {
-            background-color: #1a1d2e;
+            background-color: white !important;
             padding: 20px;
             border-radius: 10px;
-            border: 1px dashed #4b5563;
-            color: white;
+            border: 1px dashed #ced4da;
+            color: black !important;
         }
     </style>
     """, unsafe_allow_html=True)
