@@ -6314,7 +6314,7 @@ with st.sidebar:
     if is_dc:
         m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
     else:
-        m2_list = ["Compare Penerimaan RTO", "Putaway System"] # Menu Cabang
+        m2_list = ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"] # Menu Cabang
         
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else None
     st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=sync_menu, args=("m2_key",), label_visibility="collapsed")
@@ -8385,9 +8385,158 @@ elif menu == "Refill Toko":
             if st.button("🗑️ RESET", use_container_width=True):
                 st.session_state.df_refill_toko = None
                 st.rerun()
+import pandas as pd
+import streamlit as st
+from io import BytesIO
 
+# --- 1. UI KHUSUS PO (Nama fungsi gw bedain biar gak nabrak RTO) ---
+def apply_po_ui():
+    st.markdown("""
+    <style>
+        .stApp { background-color: #f4faff !important; }
+        .hero-header-po {
+            background-color: #28a745;
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 26px;
+        }
+        .m-box-po {
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #28a745;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .m-lbl { font-size: 14px; color: #666; display: block; }
+        .m-val { font-size: 22px; font-weight: bold; color: #28a745; }
+        div.stButton > button {
+            background-color: #28a745 !important;
+            color: white !important;
+            font-weight: bold !important;
+            height: 50px !important;
+            width: 100% !important;
+            border-radius: 8px !important;
+        }
+    </style>
+    <div class="hero-header-po">📦 PURCHASE ORDER RECEIVING PROCESS</div>
+    """, unsafe_allow_html=True)
 
+# --- 2. LOGIKA ALOKASI PO ---
+def process_po_logic(df_scan, df_po):
+    metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
+    scan_sku_idx, scan_qty_idx = 0, 1
+    po_no_idx, po_sku_idx, po_qty_idx = 0, 3, 7 
 
+    df_scan = df_scan.copy()
+    df_po = df_po.copy()
+    df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
+    df_po.iloc[:, po_sku_idx] = df_po.iloc[:, po_sku_idx].astype(str).str.strip().str.upper()
+    
+    agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
+    agg_po = df_po.groupby(df_po.columns[po_sku_idx])[df_po.columns[po_qty_idx]].sum()
+    
+    metrics["total_po"] = int(agg_po.sum())
+    metrics["total_scan"] = int(agg_scan.sum())
+    
+    hasil_alokasi = []
+    for sku in agg_scan.index:
+        available_qty = agg_scan[sku]
+        mask_po = df_po.iloc[:, po_sku_idx] == sku
+        po_rows = df_po[mask_po]
+        
+        if po_rows.empty:
+            hasil_alokasi.append({'No PO': 'WRONG SKU', 'SKU': sku, 'Qty PO': 0, 'Qty Alokasi': available_qty, 'Status Alokasi': 'Wrong SKU (Purchasing Error/Wrong Item)'})
+            continue
+
+        for idx, row in po_rows.iterrows():
+            target_qty = float(row.iloc[po_qty_idx])
+            allocated = min(target_qty, max(0, available_qty))
+            status_val = "Full Allocation" if allocated == target_qty else "Partial Allocation"
+            hasil_alokasi.append({'No PO': row.iloc[po_no_idx], 'SKU': sku, 'Qty PO': target_qty, 'Qty Alokasi': allocated, 'Status Alokasi': status_val})
+            available_qty -= allocated
+
+        if available_qty > 0:
+            hasil_alokasi.append({'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0, 'Qty Alokasi': available_qty, 'Status Alokasi': 'Over Allocation (Fisik > PO)'})
+
+    for _, row in df_po.iterrows():
+        s_po, n_po = row.iloc[po_sku_idx], row.iloc[po_no_idx]
+        if not any(d['No PO'] == n_po and d['SKU'] == s_po for d in hasil_alokasi):
+            hasil_alokasi.append({'No PO': n_po, 'SKU': s_po, 'Qty PO': float(row.iloc[po_qty_idx]), 'Qty Alokasi': 0, 'Status Alokasi': 'No Allocation (Barang Belum Datang)'})
+
+    df_hasil = pd.DataFrame(hasil_alokasi)
+    df_kurang = df_hasil[df_hasil['Status Alokasi'].str.contains('Over|Wrong', case=False)].copy()
+    df_lebih = df_hasil[df_hasil['Status Alokasi'].str.contains('No Allocation|Partial', case=False)].copy()
+    
+    # Hitung selisih real untuk Kurang PO
+    df_lebih['Selisih Kurang'] = df_lebih['Qty PO'] - df_lebih['Qty Alokasi']
+    metrics["kurang_po"] = int(df_kurang['Qty Alokasi'].sum())
+    metrics["lebih_po"] = int(df_lebih['Selisih Kurang'].sum())
+
+    return df_hasil, df_kurang, df_lebih, metrics
+
+# --- 3. FUNGSI HALAMAN UTAMA PO (Tab-nya AMAN DISINI) ---
+def tampilkan_halaman_po():
+    apply_po_ui()
+    
+    if "po_data" not in st.session_state:
+        st.session_state.po_data = None
+
+    col1, col2 = st.columns(2)
+    with col1:
+        f_scan = st.file_uploader("Upload Hasil Scan Penerimaan", type=['xlsx', 'csv'], key="po_scan_up")
+    with col2:
+        f_po = st.file_uploader("Upload File Purchase Order", type=['xlsx', 'csv'], key="po_master_up")
+
+    if f_scan and f_po:
+        if st.button("▶️ PROSES KOMPARASI PO", key="po_btn"):
+            try:
+                df_s = pd.read_excel(f_scan) if f_scan.name.endswith('.xlsx') else pd.read_csv(f_scan)
+                df_p = pd.read_excel(f_po) if f_po.name.endswith('.xlsx') else pd.read_csv(f_po)
+                st.session_state.po_data = process_po_logic(df_s, df_p)
+                st.success("Analisis PO Selesai!")
+            except Exception as e:
+                st.error(f"Gagal memproses data: {e}")
+
+    if st.session_state.po_data:
+        df_hasil, df_kurang, df_lebih, metrics = st.session_state.po_data
+
+        # 1. METRICS BOX
+        m1, m2, m3, m4 = st.columns(4)
+        m1.markdown(f'<div class="m-box-po"><span class="m-lbl">Total Qty PO</span><span class="m-val">{metrics["total_po"]:,}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box-po"><span class="m-lbl">Total Qty Datang</span><span class="m-val">{metrics["total_scan"]:,}</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box-po"><span class="m-lbl">Extra / Wrong SKU</span><span class="m-val" style="color:red;">{metrics["kurang_po"]:,}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box-po"><span class="m-lbl">Qty Belum Datang</span><span class="m-val" style="color:orange;">{metrics["lebih_po"]:,}</span></div>', unsafe_allow_html=True)
+
+        st.divider()
+
+        # 2. TABS SYSTEM (LU LIAT NIH, MASIH ADA KAN TAB NYA?)
+        t1, t2, t3 = st.tabs(["📊 Detail Alokasi PO", "⚠️ Extra / Salah SKU", "❌ Item Belum Datang"])
+        
+        with t1:
+            st.dataframe(df_hasil, use_container_width=True, hide_index=True)
+        with t2:
+            st.warning("SKU ini tidak terdaftar di PO atau Scan melebihi Qty PO")
+            st.dataframe(df_kurang, use_container_width=True, hide_index=True)
+        with t3:
+            st.error("Item yang terdaftar di PO tapi fisiknya belum diterima secara lengkap")
+            st.dataframe(df_lebih, use_container_width=True, hide_index=True)
+
+        # 3. DOWNLOAD
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_hasil.to_excel(writer, index=False, sheet_name='Alokasi_PO')
+            df_kurang.to_excel(writer, index=False, sheet_name='Salah_Input_Purchasing')
+            df_lebih.to_excel(writer, index=False, sheet_name='Barang_Kurang')
+        
+        st.download_button(label="📥 Download Report PO (.xlsx)", data=output.getvalue(), file_name="PO_Receiving_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_po")
+
+elif menu == "Purchase Order Receiving":
+    tampilkan_halaman_po()
 
 
 
