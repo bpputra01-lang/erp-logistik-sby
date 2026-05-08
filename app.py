@@ -5008,29 +5008,30 @@ def process_rto_logic(df_scan, df_tf):
 
     df_hasil = pd.DataFrame(hasil_alokasi)
 
-    # --- 2. LOGIKA KURANG TF (SEKARANG BISA AMBIL DARI df_hasil) ---
+    # --- 2. LOGIKA KURANG TF (FIX: NO DOUBLE, OVER ALLOCATION SEBAGAI PRIORITAS) ---
     selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
     selisih_kurang.rename(columns={selisih_kurang.columns[0]: 'SKU'}, inplace=True)
     
     if not selisih_kurang.empty:
-        # Logic Lama (Tetap Ada)
-        df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
+        # 1. Jalankan Logic Lama untuk dapet No Transfer yang valid (Inner Join biar yang 'TIDAK ADA' nggak masuk dulu)
+        df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='inner')
         df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
-        df_kurang['NO TRANSFER'] = df_kurang['NO TRANSFER'].fillna("TIDAK ADA DI TF")
         df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
-        # Ambil hanya baris yang statusnya 'Over Allocation' (Selisih Fisik > Sistem)
 
-        # Tambahkan Over Allocation dari FIFO
+        # 2. Ambil semua baris Over Allocation dari hasil FIFO (Ini nangkep selisih & barang nyasar)
         extra_rows = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
+        
         if not extra_rows.empty:
             extra_rows.rename(columns={'No Transfer': 'NO TRANSFER', 'Qty Alokasi': 'QTY_SCAN', 'Qty TF': 'QTY_TF'}, inplace=True)
+            # Gabungkan baris TF valid dengan baris Over Allocation
             df_kurang = pd.concat([df_kurang, extra_rows[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]], ignore_index=True)
         
+        # 3. Cleanup & Update Metrics
         df_kurang = df_kurang.drop_duplicates()
-        # --- UPDATE METRIC BOX BIAR SINKRON ---
-        # Hitung selisih qty (Qty Scan - Qty TF) untuk semua baris di df_kurang
+        
+        # Hitung metric dari selisih asli (biar angka di dashboard Surabaya lu bener)
         metrics["kurang_tf"] = int((df_kurang['QTY_SCAN'] - df_kurang['QTY_TF']).sum())
-
+        
     # LOGIKA LEBIH TF
     selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
     selisih_lebih.rename(columns={selisih_lebih.columns[0]: 'SKU'}, inplace=True)
