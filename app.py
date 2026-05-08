@@ -5016,7 +5016,6 @@ def process_rto_logic(df_scan, df_tf):
         # Logic Lama (Tetap Ada)
         df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
         df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
-        df_kurang['NO TRANSFER'] = df_kurang['NO TRANSFER'].fillna("TIDAK ADA DI TF")
         df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
 
         # Tambahkan Over Allocation dari FIFO
