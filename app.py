@@ -5189,7 +5189,211 @@ def main():
             file_name="RTO_Comparison_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-                
+
+import pandas as pd
+import streamlit as st
+from io import BytesIO
+
+# --- 1. KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="PO Receiving System", layout="wide")
+
+# --- 2. FUNGSI UI & CSS ---
+def apply_custom_ui():
+    st.markdown("""
+    <style>
+        .stApp { background-color: #f4faff !important; }
+        .hero-header {
+            background-color: #28a745;
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 26px;
+        }
+        .m-box {
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #28a745;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .m-lbl { font-size: 14px; color: #666; display: block; }
+        .m-val { font-size: 22px; font-weight: bold; color: #28a745; }
+        div.stButton > button {
+            background-color: #28a745 !important;
+            color: white !important;
+            font-weight: bold !important;
+            height: 50px !important;
+            width: 100% !important;
+            border-radius: 8px !important;
+        }
+    </style>
+    <div class="hero-header">📦 PURCHASE ORDER RECEIVING PROCESS</div>
+    """, unsafe_allow_html=True)
+
+# --- 3. LOGIKA ALOKASI PO ---
+def process_po_logic(df_scan, df_po):
+    metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
+    
+    # Indeks Kolom (Asumsi PO di Kolom A, SKU di Kolom D, Qty di Kolom H - Sesuaikan indeksnya jika beda)
+    # Berdasarkan instruksi lu: No PO di Kolom A (index 0)
+    scan_sku_idx, scan_qty_idx = 0, 1
+    po_no_idx, po_sku_idx, po_qty_idx = 0, 3, 7 # Sesuai template RTO lu sebelumnya
+
+    df_scan = df_scan.copy()
+    df_po = df_po.copy()
+    
+    df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
+    df_po.iloc[:, po_sku_idx] = df_po.iloc[:, po_sku_idx].astype(str).str.strip().str.upper()
+    
+    col_po_no = df_po.columns[po_no_idx]
+    col_po_sku = df_po.columns[po_sku_idx]
+    
+    agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
+    agg_po = df_po.groupby(df_po.columns[po_sku_idx])[df_po.columns[po_qty_idx]].sum()
+    
+    comp = pd.concat([agg_scan, agg_po], axis=1).fillna(0)
+    comp.columns = ['QTY_SCAN', 'QTY_PO']
+    
+    metrics["total_po"] = int(agg_po.sum())
+    metrics["total_scan"] = int(agg_scan.sum())
+    
+    # FIFO Alokasi
+    hasil_alokasi = []
+    for sku in agg_scan.index:
+        available_qty = agg_scan[sku]
+        mask_po = df_po.iloc[:, po_sku_idx] == sku
+        po_rows = df_po[mask_po]
+        
+        # JIKA SKU TIDAK ADA DI PO SAMA SEKALI (WRONG SKU / SALAH INPUT PURCHASING)
+        if po_rows.empty:
+            hasil_alokasi.append({
+                'No PO': 'WRONG SKU / BUKAN ITEM PO', 
+                'SKU': sku, 
+                'Qty PO': 0,
+                'Qty Alokasi': available_qty,
+                'Status Alokasi': 'Wrong SKU (Purchasing Error/Wrong Item)'
+            })
+            continue
+
+        for idx, row in po_rows.iterrows():
+            target_qty = float(row.iloc[po_qty_idx])
+            if available_qty <= 0:
+                allocated = 0
+                status_val = 'No Allocation'
+            else:
+                allocated = min(target_qty, available_qty)
+                status_val = "Full Allocation" if allocated == target_qty else "Partial Allocation"
+            
+            hasil_alokasi.append({
+                'No PO': row.iloc[po_no_idx], 
+                'SKU': sku, 
+                'Qty PO': target_qty,
+                'Qty Alokasi': allocated,
+                'Status Alokasi': status_val
+            })
+            available_qty -= allocated
+
+        if available_qty > 0:
+            hasil_alokasi.append({
+                'No PO': 'OVER SCAN PO', 
+                'SKU': sku, 
+                'Qty PO': 0,
+                'Qty Alokasi': available_qty,
+                'Status Alokasi': 'Over Allocation (Fisik > PO)'
+            })
+
+    # Tambahkan yang tidak terkirim (Kurang Fisik)
+    for _, row in df_po.iterrows():
+        s_po, n_po = row.iloc[po_sku_idx], row.iloc[po_no_idx]
+        if not any(d['No PO'] == n_po and d['SKU'] == s_po for d in hasil_alokasi):
+            hasil_alokasi.append({
+                'No PO': n_po, 'SKU': s_po, 
+                'Qty PO': float(row.iloc[po_qty_idx]), 'Qty Alokasi': 0,
+                'Status Alokasi': 'No Allocation (Barang Belum Datang)'
+            })
+
+    df_hasil = pd.DataFrame(hasil_alokasi)
+
+    # --- TAB KURANG PO (Fisik > Sistem / Barang Nyasar) ---
+    df_kurang = df_hasil[df_hasil['Status Alokasi'].str.contains('Over|Wrong', case=False)].copy()
+    metrics["kurang_po"] = int(df_kurang['Qty Alokasi'].sum())
+
+    # --- TAB LEBIH PO (Sistem > Fisik / Barang Kurang) ---
+    df_lebih = df_hasil[df_hasil['Status Alokasi'].str.contains('No Allocation|Partial', case=False)].copy()
+    # Hitung selisih realnya
+    df_lebih['Selisih Kurang'] = df_lebih['Qty PO'] - df_hasil['Qty Alokasi']
+    metrics["lebih_po"] = int(df_lebih['Selisih Kurang'].sum())
+
+    return df_hasil, df_kurang, df_lebih, metrics
+
+# --- 4. MAIN APP ---
+def main():
+    apply_custom_ui()
+    
+    if "po_data" not in st.session_state:
+        st.session_state.po_data = None
+
+    col1, col2 = st.columns(2)
+    with col1:
+        file_scan = st.file_uploader("Upload Hasil Scan Penerimaan", type=['xlsx', 'csv'])
+    with col2:
+        file_po = st.file_uploader("Upload File Purchase Order", type=['xlsx', 'csv'])
+
+    if file_scan and file_po:
+        if st.button("▶️ PROSES KOMPARASI PO"):
+            try:
+                df_s = pd.read_excel(file_scan) if file_scan.name.endswith('.xlsx') else pd.read_csv(file_scan)
+                df_p = pd.read_excel(file_po) if file_po.name.endswith('.xlsx') else pd.read_csv(file_po)
+                st.session_state.po_data = process_po_logic(df_s, df_p)
+                st.success("Analisis PO Selesai!")
+            except Exception as e:
+                st.error(f"Gagal memproses data: {e}")
+
+    if st.session_state.po_data:
+        df_hasil, df_kurang, df_lebih, metrics = st.session_state.po_data
+
+        # 1. METRICS BOX
+        m1, m2, m3, m4 = st.columns(4)
+        with m1: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty PO</span><span class="m-val">{metrics["total_po"]:,}</span></div>', unsafe_allow_html=True)
+        with m2: st.markdown(f'<div class="m-box"><span class="m-lbl">Total Qty Datang</span><span class="m-val">{metrics["total_scan"]:,}</span></div>', unsafe_allow_html=True)
+        with m3: st.markdown(f'<div class="m-box"><span class="m-lbl">Extra / Wrong SKU</span><span class="m-val" style="color:red;">{metrics["kurang_po"]:,}</span></div>', unsafe_allow_html=True)
+        with m4: st.markdown(f'<div class="m-box"><span class="m-lbl">Qty Belum Datang</span><span class="m-val" style="color:orange;">{metrics["lebih_po"]:,}</span></div>', unsafe_allow_html=True)
+
+        st.divider()
+
+        # 2. TABS SYSTEM
+        t1, t2, t3 = st.tabs(["📊 Detail Alokasi PO", "⚠️ Extra / Salah SKU", "❌ Item Belum Datang"])
+        
+        with t1:
+            st.dataframe(df_hasil, use_container_width=True, hide_index=True)
+        
+        with t2:
+            st.warning("SKU ini tidak terdaftar di PO atau Scan melebihi Qty PO")
+            st.dataframe(df_kurang, use_container_width=True, hide_index=True)
+            
+        with t3:
+            st.error("Item yang terdaftar di PO tapi fisiknya belum diterima secara lengkap")
+            st.dataframe(df_lebih, use_container_width=True, hide_index=True)
+
+        # 3. DOWNLOAD
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_hasil.to_excel(writer, index=False, sheet_name='Alokasi_PO')
+            df_kurang.to_excel(writer, index=False, sheet_name='Salah_Input_Purchasing')
+            df_lebih.to_excel(writer, index=False, sheet_name='Barang_Kurang')
+        
+        st.download_button(
+            label="📥 Download Report PO (.xlsx)",
+            data=output.getvalue(),
+            file_name="PO_Receiving_Report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -7851,6 +8055,9 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "Purchase Order Receiving":
+    apply_custom_ui()
 
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
