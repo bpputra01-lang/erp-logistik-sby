@@ -3738,7 +3738,7 @@ def apply_po_ui():
         }
         .m-val { 
             color: #C5A059 !important; /* Warna Gold lu */
-            font-size: 36px !important; 
+            font-size: 30px !important; 
             font-weight: 800 !important; 
             font-family: 'Inter', sans-serif !important; /* Font modern & tegas */
             display: block !important;
