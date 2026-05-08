@@ -3861,12 +3861,41 @@ def tampilkan_halaman_po():
     if st.session_state.po_data:
         df_hasil, df_err, df_miss, m = st.session_state.po_data
 
+     # 1. METRICS BOX - DIBUNGKUS CONTAINER BIAR MUNCUL KOTAKNYA
         m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box-po"><span class="m-lbl">Total Qty PO</span><span class="m-val">{m["total_po"]:,}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box-po"><span class="m-lbl">Total Qty Datang</span><span class="m-val">{m["total_scan"]:,}</span></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="m-box-po"><span class="m-lbl">Extra / Wrong SKU</span><span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box-po"><span class="m-lbl">Qty Belum Datang</span><span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span></div>', unsafe_allow_html=True)
-
+        
+        with m1:
+            st.markdown(f'''
+                <div class="m-box-po">
+                    <span class="m-lbl">Total Qty PO</span>
+                    <span class="m-val">{m["total_po"]:,}</span>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+        with m2:
+            st.markdown(f'''
+                <div class="m-box-po">
+                    <span class="m-lbl">Total Qty Datang</span>
+                    <span class="m-val">{m["total_scan"]:,}</span>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+        with m3:
+            st.markdown(f'''
+                <div class="m-box-po" style="border-bottom-color: #ff4b4b;">
+                    <span class="m-lbl">Extra / Wrong SKU</span>
+                    <span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+        with m4:
+            st.markdown(f'''
+                <div class="m-box-po" style="border-bottom-color: #ffa500;">
+                    <span class="m-lbl">Qty Belum Datang</span>
+                    <span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span>
+                </div>
+            ''', unsafe_allow_html=True)
+            
         t1, t2, t3 = st.tabs(["📊 Detail Alokasi", "⚠️ Extra / Salah SKU", "❌ Item Belum Datang"])
         with t1: st.dataframe(df_hasil, use_container_width=True, hide_index=True)
         with t2: st.dataframe(df_err, use_container_width=True, hide_index=True)
