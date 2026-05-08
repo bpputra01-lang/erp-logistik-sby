@@ -5008,16 +5008,26 @@ def process_rto_logic(df_scan, df_tf):
 
     df_hasil = pd.DataFrame(hasil_alokasi)
 
-    # --- 2. LOGIKA KURANG TF (SEKARANG BISA AMBIL DARI df_hasil) ---
-    selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
-    selisih_kurang.rename(columns={selisih_kurang.columns[0]: 'SKU'}, inplace=True)
-    
-    if not selisih_kurang.empty:
-        # Logic Lama (Tetap Ada)
-        df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
-        df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
-        df_kurang['NO TRANSFER'] = df_kurang['NO TRANSFER'].fillna("TIDAK ADA DI TF")
-        df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
+    # --- 2. LOGIKA KURANG TF (VERSI CLEAN - NO DOUBLE DATA) ---
+    if not df_hasil.empty:
+        # Ambil hanya baris yang statusnya 'Over Allocation' (Selisih Fisik > Sistem)
+        df_kurang = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
+        
+        if not df_kurang.empty:
+            # Samakan nama kolom sesuai template dashboard lu
+            df_kurang.rename(columns={
+                'No Transfer': 'NO TRANSFER',
+                'Qty Alokasi': 'QTY_SCAN',
+                'Qty TF': 'QTY_TF'
+            }, inplace=True)
+            
+            # Susun urutan kolom biar rapi
+            df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
+            
+            # Update Metric Box: Karena ini baris 'Over', Qty Scan di sini adalah angka selisihnya
+            metrics["kurang_tf"] = int(df_kurang['QTY_SCAN'].sum())
+        else:
+            df_kurang = pd.DataFrame(columns=['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF'])
 
         # Tambahkan Over Allocation dari FIFO
         extra_rows = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
