@@ -5001,7 +5001,7 @@ def process_rto_logic(df_scan, df_tf):
                 'SKU': sku, 
                 'Qty TF': 0,
                 'Qty Alokasi': available_qty,
-                'Status': 'Over Allocation (No TF Found)'
+                'Status Alokasi': 'Over Allocation (No TF Found)'
             })
             continue
 
@@ -5024,7 +5024,7 @@ def process_rto_logic(df_scan, df_tf):
                 'SKU': sku, 
                 'Qty TF': target_qty,
                 'Qty Alokasi': allocated,
-                'Status': status
+                'Status Alokasi': status
             })
             available_qty -= allocated
 
@@ -5036,7 +5036,7 @@ def process_rto_logic(df_scan, df_tf):
                 'SKU': sku, 
                 'Qty TF': 0,
                 'Qty Alokasi': available_qty,
-                'Status': 'Over Allocation (Sisa Scan)'
+                'Status Alokasi': 'Over Allocation (Sisa Scan)'
             })
 
     # Tambahkan SKU di TF yang sama sekali tidak ada di data scan (tetap sama)
@@ -5051,7 +5051,7 @@ def process_rto_logic(df_scan, df_tf):
                 'SKU': s_tf, 
                 'Qty TF': qty_tf_orig,
                 'Qty Alokasi': 0,
-                'Status': 'No Allocation'
+                'Status Alokasi': 'No Allocation'
             })
 
     df_hasil = pd.DataFrame(hasil_alokasi)
