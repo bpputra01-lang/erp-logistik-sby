@@ -6521,7 +6521,7 @@ with st.sidebar:
     # --- KELOMPOK 2: OPERATIONAL ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">OPERATIONAL</p>', unsafe_allow_html=True)
     if is_dc:
-        m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
+        m2_list = ["Purchase Order Receiving", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
     else:
         m2_list = ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"] # Menu Cabang
         
