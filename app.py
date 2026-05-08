@@ -3699,15 +3699,16 @@ from io import BytesIO
 def apply_po_ui():
     st.markdown("""
     <style>
-        /* BACKGROUND UTAMA DARK MODE */
-        .stApp { background-color: #f8f9fa !important; }
+        /* 1. BACKGROUND & APP STYLING */
+        .stApp { background-color: #0e1117 !important; } /* Paksa Dark Mode biar masuk sama Card */
 
+        /* 2. HERO HEADER */
         .hero-header {
-            background-color: #1d3e7a;
-            padding: 20px;
+            background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
+            padding: 25px;
             border-radius: 12px;
             margin-bottom: 25px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
             border-left: 8px solid #007BFF;
         }
         .hero-text {
@@ -3716,70 +3717,58 @@ def apply_po_ui():
             font-size: 24px !important;
             font-weight: 800 !important;
             letter-spacing: 1px;
+        } /* <-- Tadi di kode lu kurung ini ilang, cok! */
 
-        /* METRIC CARD PREMIUM - DARK NAVY */
+        /* 3. METRIC CARD PREMIUM (HANYA SATU DEFINISI BIAR GAK NABRAK) */
         .m-box-po {
-            background-color: #1e3a8a;
-            padding: 20px;
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            padding: 22px;
             border-radius: 10px;
-            border-bottom: 4px solid #C5A059; /* Aksen Gold di bawah */
-            text-align: center;
-            box-shadow: 2px 4px 8px rgba(0,0,0,0.1);
+            border-left: 5px solid #00d2ff;
+            text-align: left;
+            box-shadow: 2px 10px 20px rgba(0,0,0,0.4);
+            margin-bottom: 10px;
+            min-height: 120px;
         }
-        .m-lbl { color: #cbd5e1; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-        .m-val { color: #ffffff; font-size: 24px; font-weight: 700; }
+        .m-lbl { 
+            color: #8a8d9a !important; 
+            font-size: 11px !important; 
+            font-weight: 700 !important; 
+            text-transform: uppercase !important; 
+            letter-spacing: 1.2px !important;
+            margin-bottom: 10px !important;
+            display: block !important;
+        }
+        .m-val { 
+            color: #C5A059 !important; /* Warna Gold Premium */
+            font-size: 34px !important; 
+            font-weight: 800 !important; 
+            font-family: 'Courier New', Courier, monospace !important;
+            display: block !important;
+        }
 
-        /* BUTTON PROSES - WARNA GOLD */
+        /* 4. BUTTON STYLE */
         div.stButton > button {
             background: #C5A059 !important;
             color: white !important;
             border: none !important;
             font-weight: bold !important;
-            height: 45px !important;
+            height: 50px !important;
             border-radius: 8px !important;
-            transition: 0.3s;
+            width: 100%;
         }
-        div.stButton > button:hover {
-            background: #a6864a !important;
-            transform: scale(1.02);
-        }
-        
-        /* FILE UPLOADER STYLE */
+
+        /* 5. UPLOADER STYLE */
         [data-testid="stFileUploader"] {
-            background-color: white;
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px dashed #1e3a8a;
-        }
-        /* METRIC CARD PREMIUM - DARK NAVY STYLE */
-        .m-box-po {
-            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            background-color: #1a1d2e;
             padding: 20px;
             border-radius: 10px;
-            border-left: 5px solid #00d2ff; /* Default Biru Muda */
-            text-align: left;
-            box-shadow: 2px 10px 20px rgba(0,0,0,0.4);
-            margin-bottom: 10px;
-        }
-        .m-lbl { 
-            color: #8a8d9a; 
-            font-size: 11px; 
-            font-weight: 700; 
-            text-transform: uppercase; 
-            letter-spacing: 1px;
-            margin-bottom: 8px;
-            display: block;
-        }
-        .m-val { 
-            color: #C5A059; /* Warna Gold lu */
-            font-size: 32px; 
-            font-weight: 800; 
-            font-family: 'Courier New', Courier, monospace; /* Biar agak kaku kek SS lu */
+            border: 1px dashed #4b5563;
+            color: white;
         }
     </style>
-    
     """, unsafe_allow_html=True)
-    st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">📦 PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
 # --- 2. LOGIKA ALOKASI PO (ULTRA SAFE VERSION) ---
 def process_po_logic(df_scan, df_po):
