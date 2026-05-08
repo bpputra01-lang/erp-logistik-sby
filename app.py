@@ -3888,17 +3888,17 @@ def tampilkan_halaman_po():
             
         with m3:
             st.markdown(f'''<div class="m-box-po" style="border-left-color: #ff4b4b;">
-                <span class="m-lbl">⚠️ SELISIH</span>
+                <span class="m-lbl">➕ TOTAL DIFF SCAN VS PO </span>
                 <span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span>
             </div>''', unsafe_allow_html=True)
             
         with m4:
             st.markdown(f'''<div class="m-box-po" style="border-left-color: #ffa500;">
-                <span class="m-lbl">❌ QTY BELUM DATANG</span>
+                <span class="m-lbl">➖ TOTAL DIFF PO VS SCAN</span>
                 <span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span>
             </div>''', unsafe_allow_html=True)
 
-        t1, t2, t3 = st.tabs(["📊 Detail Alokasi", "⚠️ Extra / Salah SKU", "❌ Item Belum Datang"])
+        t1, t2, t3 = st.tabs(["📊 Detail Alokasi", "➕QTY SCAN > QTY PO", "➖QTY PO > QTY SCAN"])
         with t1: st.dataframe(df_hasil, use_container_width=True, hide_index=True)
         with t2: st.dataframe(df_err, use_container_width=True, hide_index=True)
         with t3: st.dataframe(df_miss, use_container_width=True, hide_index=True)        
