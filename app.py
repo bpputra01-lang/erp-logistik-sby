@@ -3756,29 +3756,27 @@ def apply_po_ui():
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
-# --- 2. LOGIKA ALOKASI PO (SUDAH FIX INDEX KOLOM) ---
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
     
-    # --- FIX INDEX KOLOM DISINI ---
-    # File Scan: A=0, B=1
-    scan_sku_idx = 0 
-    scan_qty_idx = 1
-    
-    # File PO: A=0, G=6, H=7
-    po_no_idx = 0
-    po_sku_idx = 6 # Tadi lu tulis 3, sekarang sudah G (6)
-    po_qty_idx = 7 # Tadi lu tulis 7, tetap H (7)
-    # ------------------------------
+    # Index Kolom (Pastiin lagi di Excel lu urutannya bener)
+    scan_sku_idx, scan_qty_idx = 0, 1
+    po_no_idx, po_sku_idx, po_qty_idx = 0, 6, 7 
 
     df_scan = df_scan.copy()
     df_po = df_po.copy()
-    
-    # Bersihin data biar gak error gara-gara spasi atau huruf kecil
+
+    # --- PERBAIKAN DI SINI: PAKSA JADI ANGKA, KALO ERROR JADI 0 ---
+    # Bersihin SKU (Hapus spasi & jadiin string)
     df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
     df_po.iloc[:, po_sku_idx] = df_po.iloc[:, po_sku_idx].astype(str).str.strip().str.upper()
-    
-    # Aggregasi
+
+    # Paksa Qty jadi angka (errors='coerce' bakal ngerubah yang bukan angka jadi NaN, terus kita isi 0)
+    df_scan.iloc[:, scan_qty_idx] = pd.to_numeric(df_scan.iloc[:, scan_qty_idx], errors='coerce').fillna(0)
+    df_po.iloc[:, po_qty_idx] = pd.to_numeric(df_po.iloc[:, po_qty_idx], errors='coerce').fillna(0)
+    # -----------------------------------------------------------
+
+    # Baru masuk ke grouping
     agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
     agg_po = df_po.groupby(df_po.columns[po_sku_idx])[df_po.columns[po_qty_idx]].sum()
     
