@@ -4988,7 +4988,7 @@ def process_rto_logic(df_scan, df_tf):
     # --- FIFO ALOKASI DENGAN PENANGANAN OVER ALLOCATION ---
     hasil_alokasi = []
     df_tf_work = df_tf.copy()
-    
+
     for sku in agg_scan.index:
         available_qty = agg_scan[sku]
         mask_tf = df_tf_work.iloc[:, tf_sku_idx] == sku
