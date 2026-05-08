@@ -3699,77 +3699,66 @@ from io import BytesIO
 def apply_po_ui():
     st.markdown("""
     <style>
-        /* BACKGROUND UTAMA - SOFT GREY BIAR KONTRAS */
-        .stApp { background-color: #f8f9fa !important; }
-
-        /* HEADER JUDUL - COMPACT & RAPI */
+        /* 1. HERO HEADER - DISAMAKAN DENGAN RETUR OUT LIST */
         .hero-header-po {
-            background: #1e40af; /* Biru Navy Solid sesuai gambar */
-            color: white;
-            padding: 12px 25px; /* Padding tipis biar nggak picek */
-            border-radius: 10px;
-            text-align: center;
-            margin-bottom: 20px;
-            display: inline-block; /* Lebar box ngikutin teks */
-            box-shadow: 2px 4px 10px rgba(0,0,0,0.1);
+            background-color: #1d3e7a; /* Warna biru gelap dashboard */
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+            border-left: 8px solid #007BFF; /* Garis biru terang di kiri */
+            width: 100%; /* Pastikan full lebar */
         }
-        .hero-header-po h1 {
-            margin: 0;
-            font-size: 18px; /* Font size dikecilkan biar proporsional */
-            font-weight: 700;
-            letter-spacing: 0.5px;
+        .hero-text-po {
+            color: white !important;
+            margin: 0 !important;
+            font-size: 24px !important; /* Ukuran font balik ke standar lu */
+            font-weight: 800 !important;
+            letter-spacing: 1px;
             text-transform: uppercase;
         }
 
-        /* METRIC CARD - DARK BLUE COMPACT */
+        /* 2. METRIC CARD - DISAMAKAN DENGAN STYLE RETUR */
         .m-box-po {
-            background-color: #1e3a8a;
-            padding: 12px;
-            border-radius: 8px;
-            border-bottom: 3px solid #C5A059; /* Aksen Gold tipis */
-            text-align: center;
-            box-shadow: 1px 2px 5px rgba(0,0,0,0.1);
+            background-color: #1E1E2E; /* Warna background dark menu lu */
+            padding: 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            color: white;
+            margin-bottom: 15px;
+            text-align: left; /* Rata kiri sesuai style retur */
         }
-        .m-lbl { color: #cbd5e1; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-        .m-val { color: #ffffff; font-size: 18px; font-weight: 700; }
+        .m-lbl {
+            font-size: 11px;
+            color: #A0A0A0;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .m-val {
+            font-size: 26px; /* Font angka balik gede */
+            font-weight: 800;
+            color: #FFFFFF;
+            margin: 0;
+        }
 
-        /* BUTTON PROSES - WARNA GOLD PREMIUM */
+        /* 3. BUTTON - FULL BLUE */
         div.stButton > button {
-            background: #C5A059 !important;
+            background-color: #007BFF !important;
             color: white !important;
-            border: none !important;
             font-weight: bold !important;
-            height: 40px !important; /* Button lebih slim */
-            border-radius: 8px !important;
-            transition: 0.2s;
-        }
-        div.stButton > button:hover {
-            background: #a6864a !important;
-            transform: scale(1.01);
-        }
-        
-        /* FILE UPLOADER STYLE */
-        [data-testid="stFileUploader"] {
-            background-color: white;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px dashed #cbd5e1;
-        }
-
-        /* TAB STYLE BIAR NGGAK NABRAK */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 10px;
-        }
-        .stTabs [data-baseweb="tab"] {
-            height: 40px;
-            background-color: white;
-            border-radius: 5px 5px 0px 0px;
-            padding: 0px 20px;
+            border-radius: 10px !important;
+            height: 45px !important;
+            width: 100% !important;
+            border: none !important;
+            box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.3);
         }
     </style>
     
     <div class="hero-header-po">
-        <h1>PURCHASE ORDER RECEIVING</h1>
+        <p class="hero-text-po">PURCHASE ORDER RECEIVING PROCESS</p>
     </div>
     """, unsafe_allow_html=True)
 
