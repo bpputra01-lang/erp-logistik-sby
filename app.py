@@ -3883,13 +3883,13 @@ def tampilkan_halaman_po():
             
         with m2:
             st.markdown(f'''<div class="m-box-po" style="border-left-color: #00d2ff;">
-                <span class="m-lbl">🚚 TOTAL QTY DATANG</span>
+                <span class="m-lbl">📲 TOTAL QTY SCAN</span>
                 <span class="m-val">{m["total_scan"]:,}</span>
             </div>''', unsafe_allow_html=True)
             
         with m3:
             st.markdown(f'''<div class="m-box-po" style="border-left-color: #ff4b4b;">
-                <span class="m-lbl">⚠️ EXTRA / WRONG SKU</span>
+                <span class="m-lbl">⚠️ SELISIH</span>
                 <span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span>
             </div>''', unsafe_allow_html=True)
             
