@@ -3740,7 +3740,8 @@ def apply_po_ui():
             color: #C5A059 !important; /* Warna Gold Premium */
             font-size: 34px !important; 
             font-weight: 800 !important; 
-            font-family: 'Courier New', Courier, monospace !important;
+            font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+            font-variant-numeric: tabular-nums; /* Biar angka sejajar kalau ada koma/titik */
             display: block !important;
         }
 
