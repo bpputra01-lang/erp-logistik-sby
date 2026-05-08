@@ -5194,8 +5194,6 @@ import pandas as pd
 import streamlit as st
 from io import BytesIO
 
-# --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="PO Receiving System", layout="wide")
 
 # --- 2. FUNGSI UI & CSS ---
 def apply_custom_ui():
