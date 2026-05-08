@@ -4969,13 +4969,31 @@ def process_rto_logic(df_scan, df_tf):
     metrics["lebih_tf"] = int(comp[comp['QTY_TF'] > comp['QTY_SCAN']].apply(lambda x: x['QTY_TF'] - x['QTY_SCAN'], axis=1).sum())
 
     # LOGIKA KURANG TF (Fisik > Sistem)
+    # LOGIKA KURANG TF (Fisik > Sistem)
     selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
     selisih_kurang.rename(columns={selisih_kurang.columns[0]: 'SKU'}, inplace=True)
+    
     if not selisih_kurang.empty:
+        # --- LOGIC LAMA LU (TETAP ADA) ---
         df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
         df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
         df_kurang['NO TRANSFER'] = df_kurang['NO TRANSFER'].fillna("TIDAK ADA DI TF")
         df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
+
+        # --- TAMBAHAN LOGIC: MASUKKAN OVER ALLOCATION DARI HASIL FIFO ---
+        if not df_hasil.empty:
+            extra_rows = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
+            if not extra_rows.empty:
+                extra_rows.rename(columns={
+                    'No Transfer': 'NO TRANSFER',
+                    'Qty Alokasi': 'QTY_SCAN',
+                    'Qty TF': 'QTY_TF'
+                }, inplace=True)
+                # Gabungkan logic lama dengan baris extra
+                df_kurang = pd.concat([df_kurang, extra_rows[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]], ignore_index=True)
+                
+        # Hapus duplikat kalau ada baris yang sama persis antara logic manual & FIFO
+        df_kurang = df_kurang.drop_duplicates()
 
     # LOGIKA LEBIH TF (Sistem > Fisik)
     selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
