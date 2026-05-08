@@ -3759,35 +3759,37 @@ def apply_po_ui():
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
     
-    # Index Kolom (Pastiin lagi di Excel lu urutannya bener)
-    scan_sku_idx, scan_qty_idx = 0, 1
-    po_no_idx, po_sku_idx, po_qty_idx = 0, 6, 7 
+    # INDEX KOLOM SESUAI GAMBAR LU
+    scan_sku_idx, scan_qty_idx = 0, 1  # Scan: A=SKU, B=Qty
+    po_no_idx = 0                     # PO: A=No PO
+    po_sku_idx = 6                    # PO: G=SKU
+    po_qty_idx = 7                    # PO: H=Variant 1 - In Stock
 
-    df_scan = df_scan.copy()
-    df_po = df_po.copy()
+    # Copy data biar aman
+    df_s = df_scan.copy()
+    df_p = df_po.copy()
 
-    # --- PERBAIKAN DI SINI: PAKSA JADI ANGKA, KALO ERROR JADI 0 ---
-    # Bersihin SKU (Hapus spasi & jadiin string)
-    df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
-    df_po.iloc[:, po_sku_idx] = df_po.iloc[:, po_sku_idx].astype(str).str.strip().str.upper()
+    # 1. CLEANING SKU (Paksa String & Hapus Spasi)
+    df_s.iloc[:, scan_sku_idx] = df_s.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
+    df_p.iloc[:, po_sku_idx] = df_p.iloc[:, po_sku_idx].astype(str).str.strip().str.upper()
 
-    # Paksa Qty jadi angka (errors='coerce' bakal ngerubah yang bukan angka jadi NaN, terus kita isi 0)
-    df_scan.iloc[:, scan_qty_idx] = pd.to_numeric(df_scan.iloc[:, scan_qty_idx], errors='coerce').fillna(0)
-    df_po.iloc[:, po_qty_idx] = pd.to_numeric(df_po.iloc[:, po_qty_idx], errors='coerce').fillna(0)
-    # -----------------------------------------------------------
+    # 2. FIX ERROR: PAKSA QTY JADI ANGKA (errors='coerce' bakal ngerubah teks/sampah jadi NaN)
+    df_s.iloc[:, scan_qty_idx] = pd.to_numeric(df_s.iloc[:, scan_qty_idx], errors='coerce').fillna(0)
+    df_p.iloc[:, po_qty_idx] = pd.to_numeric(df_p.iloc[:, po_qty_idx], errors='coerce').fillna(0)
 
-    # Baru masuk ke grouping
-    agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
-    agg_po = df_po.groupby(df_po.columns[po_sku_idx])[df_po.columns[po_qty_idx]].sum()
+    # 3. GROUPING
+    agg_scan = df_s.groupby(df_s.columns[scan_sku_idx])[df_s.columns[scan_qty_idx]].sum()
+    agg_po = df_p.groupby(df_p.columns[po_sku_idx])[df_p.columns[po_qty_idx]].sum()
     
     metrics["total_po"] = int(agg_po.sum())
     metrics["total_scan"] = int(agg_scan.sum())
     
     hasil_alokasi = []
+    # Logika alokasi (Tetap sama kayak sebelumnya)
     for sku in agg_scan.index:
         available_qty = agg_scan[sku]
-        mask_po = df_po.iloc[:, po_sku_idx] == sku
-        po_rows = df_po[mask_po]
+        mask_po = df_p.iloc[:, po_sku_idx] == sku
+        po_rows = df_p[mask_po]
         
         if po_rows.empty:
             hasil_alokasi.append({'No PO': 'WRONG SKU', 'SKU': sku, 'Qty PO': 0, 'Qty Alokasi': available_qty, 'Status Alokasi': 'Wrong SKU (Purchasing Error/Wrong Item)'})
@@ -3803,7 +3805,7 @@ def process_po_logic(df_scan, df_po):
         if available_qty > 0:
             hasil_alokasi.append({'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0, 'Qty Alokasi': available_qty, 'Status Alokasi': 'Over Allocation (Fisik > PO)'})
 
-    for _, row in df_po.iterrows():
+    for _, row in df_p.iterrows():
         s_po, n_po = row.iloc[po_sku_idx], row.iloc[po_no_idx]
         if not any(d['No PO'] == n_po and d['SKU'] == s_po for d in hasil_alokasi):
             hasil_alokasi.append({'No PO': n_po, 'SKU': s_po, 'Qty PO': float(row.iloc[po_qty_idx]), 'Qty Alokasi': 0, 'Status Alokasi': 'No Allocation (Barang Belum Datang)'})
@@ -3836,8 +3838,6 @@ def tampilkan_halaman_po():
             try:
                 df_s = pd.read_excel(f_scan) if f_scan.name.endswith('.xlsx') else pd.read_csv(f_scan)
                 df_p = pd.read_excel(f_po) if f_po.name.endswith('.xlsx') else pd.read_csv(f_po)
-                st.write("Cek Kolom PO lu:", df_p.columns.tolist())
-                st.write("Contoh Data PO:", df_p.head(2))
                 st.session_state.po_data = process_po_logic(df_s, df_p)
                 st.success("Analisis PO Selesai!")
             except Exception as e:
