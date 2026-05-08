@@ -6334,7 +6334,7 @@ with st.sidebar:
     if is_dc:
         m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"]
     else:
-        m4_list = ["Pengajuan Reject/Defect"] # Menu Cabang
+        m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"] # Menu Cabang
 
     idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else None
     st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=sync_menu, args=("m4_key",), label_visibility="collapsed")
