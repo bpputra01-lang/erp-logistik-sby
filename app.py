@@ -5124,7 +5124,7 @@ def main():
             
             # Pastikan kolom Qty TF ada di df_hasil agar bisa ditampilkan
             # Urutan kolom diatur supaya Qty TF (Sistem) bersebelahan dengan Qty Alokasi (Fisik)
-            cols_order = ["No Transfer", "SKU", "Qty TF", "Qty Alokasi", "Status"]
+            cols_order = ["No Transfer", "SKU", "Qty TF", "Qty Alokasi", "Status Alokasi"]
             
             # Filter hanya kolom yang tersedia agar tidak error jika ada kolom yang absen
             available_cols = [c for c in cols_order if c in df_hasil.columns]
