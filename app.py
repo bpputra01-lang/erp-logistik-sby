@@ -3836,6 +3836,8 @@ def tampilkan_halaman_po():
             try:
                 df_s = pd.read_excel(f_scan) if f_scan.name.endswith('.xlsx') else pd.read_csv(f_scan)
                 df_p = pd.read_excel(f_po) if f_po.name.endswith('.xlsx') else pd.read_csv(f_po)
+                st.write("Cek Kolom PO lu:", df_p.columns.tolist())
+                st.write("Contoh Data PO:", df_p.head(2))
                 st.session_state.po_data = process_po_logic(df_s, df_p)
                 st.success("Analisis PO Selesai!")
             except Exception as e:
