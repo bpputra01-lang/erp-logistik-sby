@@ -4934,18 +4934,14 @@ def apply_custom_ui():
 
 # --- 3. LOGIKA ALOKASI & PERHITUNGAN ---
 def process_rto_logic(df_scan, df_tf):
-    # Inisialisasi awal agar tidak ada error 'not defined'
     metrics = {"total_tf": 0, "total_scan": 0, "kurang_tf": 0, "lebih_tf": 0}
-    df_hasil = pd.DataFrame()
     df_split_detail = pd.DataFrame()
     df_kurang = pd.DataFrame()
     df_lebih = pd.DataFrame()
 
-    # Mapping Index (Sesuaikan dengan file lu)
     scan_sku_idx, scan_qty_idx = 0, 1
     tf_no_idx, tf_sku_idx, tf_qty_idx = 0, 3, 7
 
-    # Pembersihan Data
     df_scan = df_scan.copy()
     df_tf = df_tf.copy()
     df_scan.iloc[:, scan_sku_idx] = df_scan.iloc[:, scan_sku_idx].astype(str).str.strip().str.upper()
@@ -4954,56 +4950,18 @@ def process_rto_logic(df_scan, df_tf):
     col_tf_no = df_tf.columns[tf_no_idx]
     col_tf_sku = df_tf.columns[tf_sku_idx]
     
-    # Agregasi Total
     agg_scan = df_scan.groupby(df_scan.columns[scan_sku_idx])[df_scan.columns[scan_qty_idx]].sum()
     agg_tf = df_tf.groupby(df_tf.columns[tf_sku_idx])[df_tf.columns[tf_qty_idx]].sum()
     
-    # Gabungkan untuk perbandingan
     comp = pd.concat([agg_scan, agg_tf], axis=1).fillna(0)
     comp.columns = ['QTY_SCAN', 'QTY_TF']
     
-    # ISI METRICS
     metrics["total_tf"] = int(agg_tf.sum())
     metrics["total_scan"] = int(agg_scan.sum())
     metrics["kurang_tf"] = int(comp[comp['QTY_SCAN'] > comp['QTY_TF']].apply(lambda x: x['QTY_SCAN'] - x['QTY_TF'], axis=1).sum())
     metrics["lebih_tf"] = int(comp[comp['QTY_TF'] > comp['QTY_SCAN']].apply(lambda x: x['QTY_TF'] - x['QTY_SCAN'], axis=1).sum())
 
-    # LOGIKA KURANG TF (Fisik > Sistem)
-    # LOGIKA KURANG TF (Fisik > Sistem)
-    selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
-    selisih_kurang.rename(columns={selisih_kurang.columns[0]: 'SKU'}, inplace=True)
-    
-    if not selisih_kurang.empty:
-        # --- LOGIC LAMA LU (TETAP ADA) ---
-        df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
-        df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
-        df_kurang['NO TRANSFER'] = df_kurang['NO TRANSFER'].fillna("TIDAK ADA DI TF")
-        df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
-
-        # --- TAMBAHAN LOGIC: MASUKKAN OVER ALLOCATION DARI HASIL FIFO ---
-        if not df_hasil.empty:
-            extra_rows = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
-            if not extra_rows.empty:
-                extra_rows.rename(columns={
-                    'No Transfer': 'NO TRANSFER',
-                    'Qty Alokasi': 'QTY_SCAN',
-                    'Qty TF': 'QTY_TF'
-                }, inplace=True)
-                # Gabungkan logic lama dengan baris extra
-                df_kurang = pd.concat([df_kurang, extra_rows[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]], ignore_index=True)
-                
-        # Hapus duplikat kalau ada baris yang sama persis antara logic manual & FIFO
-        df_kurang = df_kurang.drop_duplicates()
-
-    # LOGIKA LEBIH TF (Sistem > Fisik)
-    selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
-    selisih_lebih.rename(columns={selisih_lebih.columns[0]: 'SKU'}, inplace=True)
-    if not selisih_lebih.empty:
-        df_lebih = pd.merge(selisih_lebih, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
-        df_lebih.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
-        df_lebih = df_lebih[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
-
-    # --- FIFO ALOKASI DENGAN PENANGANAN OVER ALLOCATION (VERSI GABUNGAN) ---
+    # --- 1. FIFO ALOKASI (JALANKAN INI DULU) ---
     hasil_alokasi = []
     df_tf_work = df_tf.copy()
 
@@ -5012,19 +4970,14 @@ def process_rto_logic(df_scan, df_tf):
         mask_tf = df_tf_work.iloc[:, tf_sku_idx] == sku
         tf_rows = df_tf_work[mask_tf]
         
-        # 1. PROSES FIFO (Otomatis terlewati jika SKU tidak ada di dokumen TF)
         for idx, row in tf_rows.iterrows():
             target_qty = float(row.iloc[tf_qty_idx])
-            
             if available_qty <= 0:
                 allocated = 0
                 status_val = 'No Allocation'
             else:
                 allocated = min(target_qty, available_qty)
-                if allocated == target_qty:
-                    status_val = "Full Allocation"
-                else:
-                    status_val = "Partial Allocation"
+                status_val = "Full Allocation" if allocated == target_qty else "Partial Allocation"
             
             hasil_alokasi.append({
                 'No Transfer': row.iloc[tf_no_idx], 
@@ -5035,9 +4988,6 @@ def process_rto_logic(df_scan, df_tf):
             })
             available_qty -= allocated
 
-        # 2. LOGIKA PENANGKAP SISA (GABUNGAN OVER SCAN & EXTRA UNKNOWN)
-        # Jika SKU tidak ada di TF sama sekali, available_qty masih utuh dan masuk sini.
-        # Jika SKU ada tapi scan lebih banyak dari total TF, sisanya juga masuk sini.
         if available_qty > 0:
             hasil_alokasi.append({
                 'No Transfer': 'KURANG TF / OVER SCAN', 
@@ -5047,24 +4997,44 @@ def process_rto_logic(df_scan, df_tf):
                 'Status Alokasi': 'Over Allocation'
             })
 
-    # 3. TAMBAHKAN SKU DI TF YANG SAMA SEKALI TIDAK ADA DI DATA SCAN
     for _, row in df_tf_work.iterrows():
-        s_tf = row.iloc[tf_sku_idx]
-        n_tf = row.iloc[tf_no_idx]
-        qty_tf_orig = float(row.iloc[tf_qty_idx])
-        
-        # Cek apakah kombinasi No Transfer dan SKU ini sudah ada di hasil_alokasi
+        s_tf, n_tf = row.iloc[tf_sku_idx], row.iloc[tf_no_idx]
         if not any(d['No Transfer'] == n_tf and d['SKU'] == s_tf for d in hasil_alokasi):
             hasil_alokasi.append({
-                'No Transfer': n_tf, 
-                'SKU': s_tf, 
-                'Qty TF': qty_tf_orig,
-                'Qty Alokasi': 0,
+                'No Transfer': n_tf, 'SKU': s_tf, 
+                'Qty TF': float(row.iloc[tf_qty_idx]), 'Qty Alokasi': 0,
                 'Status Alokasi': 'No Allocation'
             })
 
     df_hasil = pd.DataFrame(hasil_alokasi)
+
+    # --- 2. LOGIKA KURANG TF (SEKARANG BISA AMBIL DARI df_hasil) ---
+    selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
+    selisih_kurang.rename(columns={selisih_kurang.columns[0]: 'SKU'}, inplace=True)
     
+    if not selisih_kurang.empty:
+        # Logic Lama (Tetap Ada)
+        df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
+        df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
+        df_kurang['NO TRANSFER'] = df_kurang['NO TRANSFER'].fillna("TIDAK ADA DI TF")
+        df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
+
+        # Tambahkan Over Allocation dari FIFO
+        extra_rows = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
+        if not extra_rows.empty:
+            extra_rows.rename(columns={'No Transfer': 'NO TRANSFER', 'Qty Alokasi': 'QTY_SCAN', 'Qty TF': 'QTY_TF'}, inplace=True)
+            df_kurang = pd.concat([df_kurang, extra_rows[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]], ignore_index=True)
+        
+        df_kurang = df_kurang.drop_duplicates()
+
+    # LOGIKA LEBIH TF
+    selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
+    selisih_lebih.rename(columns={selisih_lebih.columns[0]: 'SKU'}, inplace=True)
+    if not selisih_lebih.empty:
+        df_lebih = pd.merge(selisih_lebih, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
+        df_lebih.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
+        df_lebih = df_lebih[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
+
     # Detail untuk Split TF (Tab 2)
     if not df_hasil.empty:
         df_comp_reset = comp[['QTY_TF']].reset_index()
