@@ -3753,9 +3753,6 @@ def apply_po_ui():
         }
     </style>
     
-    <div class="hero-header-po">
-        <h1>PURCHASE ORDER RECEIVING</h1>
-    </div>
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
