@@ -3737,12 +3737,12 @@ def apply_po_ui():
             display: block !important;
         }
         .m-val { 
-            color: #C5A059 !important; /* Warna Gold Premium */
-            font-size: 34px !important; 
+            color: #C5A059 !important; /* Warna Gold lu */
+            font-size: 36px !important; 
             font-weight: 800 !important; 
-            font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-            font-variant-numeric: tabular-nums; /* Biar angka sejajar kalau ada koma/titik */
+            font-family: 'Inter', sans-serif !important; /* Font modern & tegas */
             display: block !important;
+            line-height: 1.2 !important;
         }
 
         /* 4. BUTTON STYLE */
