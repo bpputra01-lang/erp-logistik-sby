@@ -3702,25 +3702,20 @@ def apply_po_ui():
         /* BACKGROUND UTAMA DARK MODE */
         .stApp { background-color: #f8f9fa !important; }
 
-        /* HEADER JUDUL BIRU NAVY - SESUAI GAMBAR LU */
-        .hero-header-po {
-            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-            color: white;
-            padding: 25px;
+        .hero-header {
+            background-color: #1d3e7a;
+            padding: 20px;
             border-radius: 12px;
-            text-align: left; /* Rata kiri biar sama kayak Putaway System */
-            margin-bottom: 30px;
-            box-shadow: 4px 4px 15px rgba(0,0,0,0.15);
-            display: inline-block; /* Agar box judul tidak full lebar jika pendek */
-            min-width: 300px;
+            margin-bottom: 25px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+            border-left: 8px solid #007BFF;
         }
-        .hero-header-po h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 800;
+        .hero-text {
+            color: white !important;
+            margin: 0 !important;
+            font-size: 24px !important;
+            font-weight: 800 !important;
             letter-spacing: 1px;
-            text-transform: uppercase;
-        }
 
         /* METRIC CARD PREMIUM - DARK NAVY */
         .m-box-po {
@@ -3757,8 +3752,12 @@ def apply_po_ui():
             border: 1px dashed #1e3a8a;
         }
     </style>
+    
+    <div class="hero-header-po">
+        <h1>PURCHASE ORDER RECEIVING</h1>
+    </div>
     """, unsafe_allow_html=True)
-    st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
+
 # --- 2. LOGIKA ALOKASI PO ---
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
