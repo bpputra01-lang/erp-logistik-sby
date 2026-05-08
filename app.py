@@ -3751,6 +3751,31 @@ def apply_po_ui():
             border-radius: 10px;
             border: 1px dashed #1e3a8a;
         }
+        /* METRIC CARD PREMIUM - DARK NAVY STYLE */
+        .m-box-po {
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #00d2ff; /* Default Biru Muda */
+            text-align: left;
+            box-shadow: 2px 10px 20px rgba(0,0,0,0.4);
+            margin-bottom: 10px;
+        }
+        .m-lbl { 
+            color: #8a8d9a; 
+            font-size: 11px; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .m-val { 
+            color: #C5A059; /* Warna Gold lu */
+            font-size: 32px; 
+            font-weight: 800; 
+            font-family: 'Courier New', Courier, monospace; /* Biar agak kaku kek SS lu */
+        }
     </style>
     
     """, unsafe_allow_html=True)
@@ -3861,41 +3886,33 @@ def tampilkan_halaman_po():
     if st.session_state.po_data:
         df_hasil, df_err, df_miss, m = st.session_state.po_data
 
-     # 1. METRICS BOX - DIBUNGKUS CONTAINER BIAR MUNCUL KOTAKNYA
+     # 1. METRICS BOX PREMIUM
         m1, m2, m3, m4 = st.columns(4)
         
         with m1:
-            st.markdown(f'''
-                <div class="m-box-po">
-                    <span class="m-lbl">Total Qty PO</span>
-                    <span class="m-val">{m["total_po"]:,}</span>
-                </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'''<div class="m-box-po" style="border-left-color: #00d2ff;">
+                <span class="m-lbl">📦 TOTAL QTY PO</span>
+                <span class="m-val">{m["total_po"]:,}</span>
+            </div>''', unsafe_allow_html=True)
             
         with m2:
-            st.markdown(f'''
-                <div class="m-box-po">
-                    <span class="m-lbl">Total Qty Datang</span>
-                    <span class="m-val">{m["total_scan"]:,}</span>
-                </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'''<div class="m-box-po" style="border-left-color: #00d2ff;">
+                <span class="m-lbl">🚚 TOTAL QTY DATANG</span>
+                <span class="m-val">{m["total_scan"]:,}</span>
+            </div>''', unsafe_allow_html=True)
             
         with m3:
-            st.markdown(f'''
-                <div class="m-box-po" style="border-bottom-color: #ff4b4b;">
-                    <span class="m-lbl">Extra / Wrong SKU</span>
-                    <span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span>
-                </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'''<div class="m-box-po" style="border-left-color: #ff4b4b;">
+                <span class="m-lbl">⚠️ EXTRA / WRONG SKU</span>
+                <span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span>
+            </div>''', unsafe_allow_html=True)
             
         with m4:
-            st.markdown(f'''
-                <div class="m-box-po" style="border-bottom-color: #ffa500;">
-                    <span class="m-lbl">Qty Belum Datang</span>
-                    <span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span>
-                </div>
-            ''', unsafe_allow_html=True)
-            
+            st.markdown(f'''<div class="m-box-po" style="border-left-color: #ffa500;">
+                <span class="m-lbl">❌ QTY BELUM DATANG</span>
+                <span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span>
+            </div>''', unsafe_allow_html=True)
+
         t1, t2, t3 = st.tabs(["📊 Detail Alokasi", "⚠️ Extra / Salah SKU", "❌ Item Belum Datang"])
         with t1: st.dataframe(df_hasil, use_container_width=True, hide_index=True)
         with t2: st.dataframe(df_err, use_container_width=True, hide_index=True)
