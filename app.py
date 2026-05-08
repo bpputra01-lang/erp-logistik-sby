@@ -5022,7 +5022,7 @@ def process_rto_logic(df_scan, df_tf):
         # Jika SKU ada tapi scan lebih banyak dari total TF, sisanya juga masuk sini.
         if available_qty > 0:
             hasil_alokasi.append({
-                'No Transfer': 'EXTRA / OVER SCAN', 
+                'No Transfer': 'KURANG TF / OVER SCAN', 
                 'SKU': sku, 
                 'Qty TF': 0,
                 'Qty Alokasi': available_qty,
