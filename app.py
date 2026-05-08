@@ -5073,6 +5073,12 @@ def main():
         - SKU teratas di File Transfer stock akan mendapatkan alokasi penuh dari data scan apabila ada > 1 No TF yang memiliki SKU yang sama
         - Jika di File Stock Transfer ada yang tidak mendapatkan alokasi maka akan dilakukan cek ulang dan akan di FU ke cabang pengirim apabila barang yang datang < TF Stock
         - Jika di File data scan ada SKU yang tidak terdapat di Stock Transfer maka akan dilakukan pengecekan ulang dan akan di FU ke cabang pengirim apabila ada item yang terkirim namun TF stock belum dibuatkan
+        
+        **Keterangan Note:**
+        - **FULL ALLOCATION** : Kondisi dimana Qty scan dan Qty tf cocok dan sesuai
+        - **PARTIAL ALLOCATION** : Kondisi dimana Qty scan < dari Qty TF
+        - **NO ALLOCATION** : Kondisi dimana terdapat indikasi **BARANG TIDAK DIKIRIM / BELUM TERSCAN / LEBIH TF** Sehingga di TF *ADA* Namun di Data Scan *TIDAK ADA*
+        - **OVER ALLOCATION** : Kondisi dimana terdapat Indikasi **KELEBIHAN SCAN / KURANG TF** Sehingga menyebabkan QTY Scan > QTY TF
         """)
 
     if "rto_data" not in st.session_state:
