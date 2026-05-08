@@ -3696,41 +3696,71 @@ import pandas as pd
 import streamlit as st
 from io import BytesIO
 
-# --- 1. UI KHUSUS PO (Nama fungsi gw bedain biar gak nabrak RTO) ---
 def apply_po_ui():
     st.markdown("""
     <style>
-        .stApp { background-color: #f4faff !important; }
+        /* BACKGROUND UTAMA DARK MODE */
+        .stApp { background-color: #f8f9fa !important; }
+
+        /* HEADER JUDUL BIRU NAVY - SESUAI GAMBAR LU */
         .hero-header-po {
-            background-color: #28a745;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
             color: white;
-            padding: 20px;
+            padding: 25px;
             border-radius: 12px;
-            text-align: center;
-            margin-bottom: 25px;
-            font-weight: bold;
-            font-size: 26px;
+            text-align: left; /* Rata kiri biar sama kayak Putaway System */
+            margin-bottom: 30px;
+            box-shadow: 4px 4px 15px rgba(0,0,0,0.15);
+            display: inline-block; /* Agar box judul tidak full lebar jika pendek */
+            min-width: 300px;
         }
+        .hero-header-po h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* METRIC CARD PREMIUM - DARK NAVY */
         .m-box-po {
+            background-color: #1e3a8a;
+            padding: 20px;
+            border-radius: 10px;
+            border-bottom: 4px solid #C5A059; /* Aksen Gold di bawah */
+            text-align: center;
+            box-shadow: 2px 4px 8px rgba(0,0,0,0.1);
+        }
+        .m-lbl { color: #cbd5e1; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .m-val { color: #ffffff; font-size: 24px; font-weight: 700; }
+
+        /* BUTTON PROSES - WARNA GOLD */
+        div.stButton > button {
+            background: #C5A059 !important;
+            color: white !important;
+            border: none !important;
+            font-weight: bold !important;
+            height: 45px !important;
+            border-radius: 8px !important;
+            transition: 0.3s;
+        }
+        div.stButton > button:hover {
+            background: #a6864a !important;
+            transform: scale(1.02);
+        }
+        
+        /* FILE UPLOADER STYLE */
+        [data-testid="stFileUploader"] {
             background-color: white;
             padding: 15px;
             border-radius: 10px;
-            border-left: 5px solid #28a745;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .m-lbl { font-size: 14px; color: #666; display: block; }
-        .m-val { font-size: 22px; font-weight: bold; color: #28a745; }
-        div.stButton > button {
-            background-color: #28a745 !important;
-            color: white !important;
-            font-weight: bold !important;
-            height: 50px !important;
-            width: 100% !important;
-            border-radius: 8px !important;
+            border: 1px dashed #1e3a8a;
         }
     </style>
-    <div class="hero-header-po">📦 PURCHASE ORDER RECEIVING PROCESS</div>
+    
+    <div class="hero-header-po">
+        <h1>📦 PURCHASE ORDER RECEIVING</h1>
+    </div>
     """, unsafe_allow_html=True)
 
 # --- 2. LOGIKA ALOKASI PO ---
