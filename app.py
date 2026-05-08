@@ -5032,7 +5032,7 @@ def process_rto_logic(df_scan, df_tf):
         # Jika setelah melewati semua dokumen TF, fisik masih tersisa:
         if available_qty > 0:
             hasil_alokasi.append({
-                'No Transfer': 'Cek Hasil Scan & Real'
+                'No Transfer': 'Cek Hasil Scan & Real',
                 'SKU': sku, 
                 'Qty TF': 0,
                 'Qty Alokasi': available_qty,
