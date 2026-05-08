@@ -3759,7 +3759,7 @@ def apply_po_ui():
     </style>
     
     <div class="hero-header-po">
-        <h2>PURCHASE ORDER RECEIVING</h2>
+        <p>PURCHASE ORDER RECEIVING</p>
     </div>
     """, unsafe_allow_html=True)
 
