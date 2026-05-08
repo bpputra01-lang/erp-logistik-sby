@@ -5008,20 +5008,17 @@ def process_rto_logic(df_scan, df_tf):
 
     df_hasil = pd.DataFrame(hasil_alokasi)
 
-    # --- 2. LOGIKA KURANG TF (FIX: SEMUA LOGIC JALAN TANPA DOUBLE) ---
-    if not df_hasil.empty:
-        df_kurang = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
-        if not df_kurang.empty:
-            df_kurang.rename(columns={
-                'No Transfer': 'NO TRANSFER',
-                'Qty Alokasi': 'QTY_SCAN',
-                'Qty TF': 'QTY_TF'
-            }, inplace=True)
-            
-            df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
-            metrics["kurang_tf"] = int((df_kurang['QTY_SCAN'] - df_kurang['QTY_TF']).sum())
-        else:
-            df_kurang = pd.DataFrame(columns=['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF'])
+    # --- 2. LOGIKA KURANG TF (SEKARANG BISA AMBIL DARI df_hasil) ---
+    selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
+    selisih_kurang.rename(columns={selisih_kurang.columns[0]: 'SKU'}, inplace=True)
+    
+    if not selisih_kurang.empty:
+        # Logic Lama (Tetap Ada)
+        df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
+        df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
+        df_kurang['NO TRANSFER'] = df_kurang['NO TRANSFER'].fillna("TIDAK ADA DI TF")
+        df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
+        # Ambil hanya baris yang statusnya 'Over Allocation' (Selisih Fisik > Sistem)
 
         # Tambahkan Over Allocation dari FIFO
         extra_rows = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
