@@ -3696,60 +3696,41 @@ import pandas as pd
 import streamlit as st
 from io import BytesIO
 
+# --- 1. UI KHUSUS PO (Nama fungsi gw bedain biar gak nabrak RTO) ---
 def apply_po_ui():
     st.markdown("""
     <style>
-        /* Background Utama Dark */
-        .stApp { background-color: #0e1117 !important; }
-
-        /* HEADER PREMIUM - SESUAI STYLE DASHBOARD SURABAYA */
+        .stApp { background-color: #f4faff !important; }
         .hero-header-po {
-            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%);
-            color: #ffffff;
-            padding: 30px;
-            border-radius: 15px;
-            text-align: center;
-            margin-bottom: 30px;
-            border-left: 5px solid #C5A059; /* Aksen Gold khas lu */
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-        }
-        .hero-header-po h1 {
-            margin: 0;
-            font-size: 28px;
-            letter-spacing: 2px;
-            font-weight: 800;
-            color: #C5A059; /* Judul Warna Gold */
-        }
-
-        /* METRIC BOXES - PREMIUM STYLE */
-        .m-box-po {
-            background: #1a1d2e;
+            background-color: #28a745;
+            color: white;
             padding: 20px;
             border-radius: 12px;
-            border: 1px solid #2d324a;
             text-align: center;
-            transition: transform 0.3s;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 26px;
         }
-        .m-box-po:hover { transform: translateY(-5px); }
-        .m-lbl { color: #8a8fb1; font-size: 13px; text-transform: uppercase; font-weight: 600; }
-        .m-val { color: #ffffff; font-size: 24px; font-weight: 700; margin-top: 5px; }
-
-        /* BUTTON PREMIUM */
+        .m-box-po {
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #28a745;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .m-lbl { font-size: 14px; color: #666; display: block; }
+        .m-val { font-size: 22px; font-weight: bold; color: #28a745; }
         div.stButton > button {
-            background: linear-gradient(90deg, #C5A059 0%, #9e7e45 100%) !important;
+            background-color: #28a745 !important;
             color: white !important;
-            border: none !important;
             font-weight: bold !important;
-            letter-spacing: 1px;
             height: 50px !important;
-            border-radius: 10px !important;
+            width: 100% !important;
+            border-radius: 8px !important;
         }
     </style>
-    
-    <div class="hero-header-po">
-        <h1>📦 PURCHASE ORDER RECEIVING</h1>
-        <div style="font-size: 14px; color: #8a8fb1; margin-top: 5px;">LOGISTICS AUTOMATION SYSTEM • SURABAYA BRANCH</div>
-    </div>
+    <div class="hero-header-po">📦 PURCHASE ORDER RECEIVING PROCESS</div>
     """, unsafe_allow_html=True)
 
 # --- 2. LOGIKA ALOKASI PO ---
