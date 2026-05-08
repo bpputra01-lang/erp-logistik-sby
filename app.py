@@ -7859,6 +7859,9 @@ elif menu == "Refill & Withdraw":
 elif menu == "Stock Opname":
     menu_Stock_Opname()
 
+elif menu == "Purchase Order Receiving":
+    tampilkan_halaman_po()
+    
 # --- Navigasi ---
 elif menu == "Reject/Defect List":
     menu_reject_defect()
@@ -8535,8 +8538,6 @@ def tampilkan_halaman_po():
         
         st.download_button(label="📥 Download Report PO (.xlsx)", data=output.getvalue(), file_name="PO_Receiving_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_po")
 
-elif menu == "Purchase Order Receiving":
-    tampilkan_halaman_po()
 
 
 
