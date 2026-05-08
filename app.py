@@ -3757,12 +3757,8 @@ def apply_po_ui():
             border: 1px dashed #1e3a8a;
         }
     </style>
-    
-    <div class="hero-header-po">
-        <p>PURCHASE ORDER RECEIVING</p>
-    </div>
     """, unsafe_allow_html=True)
-
+    st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 # --- 2. LOGIKA ALOKASI PO ---
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
