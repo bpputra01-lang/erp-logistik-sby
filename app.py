@@ -5031,7 +5031,7 @@ def process_rto_logic(df_scan, df_tf):
         
         # Hitung metric dari selisih asli (biar angka di dashboard Surabaya lu bener)
         metrics["kurang_tf"] = int((df_kurang['QTY_SCAN'] - df_kurang['QTY_TF']).sum())
-        
+
     # LOGIKA LEBIH TF
     selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
     selisih_lebih.rename(columns={selisih_lebih.columns[0]: 'SKU'}, inplace=True)
@@ -6314,7 +6314,7 @@ with st.sidebar:
     if is_dc:
         m2_list = ["Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
     else:
-        m2_list = ["Compare Penerimaan RTO"] # Menu Cabang
+        m2_list = ["Compare Penerimaan RTO", "Putaway System"] # Menu Cabang
         
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else None
     st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=sync_menu, args=("m2_key",), label_visibility="collapsed")
