@@ -4387,19 +4387,24 @@ def menu_reject_defect():
         
         if 'df_match_result' in locals() and not df_match_result.empty:
             
-            # Tetap pake copy biar data aslinya nggak rusak
-            df_match_active = df_match_result.copy()
+            # --- KUNCINYA DI SINI: FILTER AGAR YANG 'DONE' TIDAK MUNCUL ---
+            if 'status' in df_match_result.columns:
+                # Kita hanya ambil yang statusnya BUKAN 'DONE'
+                df_match_active = df_match_result[df_match_result['status'].astype(str).str.upper() != 'DONE'].copy()
+            else:
+                df_match_active = df_match_result.copy()
 
-            # --- LOGIK 2: FILTER KATEGORI (KIRI vs KANAN) ---
+            # --- LANJUTKAN LOGIK KIRI-KANAN PADA DATA YANG AKTIF SAJA ---
             def check_kiri_kanan_logic(group):
                 categories = group['kategori'].astype(str).str.lower().values
                 has_kiri = any('kiri' in cat for cat in categories)
                 has_kanan = any('kanan' in cat for cat in categories)
                 return has_kiri and has_kanan
 
+            # Gunakan df_match_active (yang sudah difilter statusnya)
             sku_valid = df_match_active.groupby('sku').filter(check_kiri_kanan_logic)['sku'].unique()
             df_filtered = df_match_active[df_match_active['sku'].isin(sku_valid)].copy()
-
+            
             if not df_filtered.empty:
                 m_col1, m_col2 = st.columns(2)
                 with m_col1:
