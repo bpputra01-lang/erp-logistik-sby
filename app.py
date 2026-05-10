@@ -4186,7 +4186,7 @@ def menu_reject_defect():
 
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
 
-    tab_entry, tab_analytics, tab_match = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD", "🔍 MATCH DEFECT/REJECT", "✅ DONE PROCESS"])
+    tab_entry, tab_analytics, tab_match, tab_done = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD", "🔍 MATCH DEFECT/REJECT", "✅ DONE PROCESS"])
 
     with tab_entry:
         with st.form("form_reject_new", clear_on_submit=True):
