@@ -4446,23 +4446,23 @@ def menu_reject_defect():
                 st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori yang cocok atau semua sudah diproses.")
         else:
             st.success("✅ Tidak ditemukan Reject/Defect Match")
-            
+
     with tab_done:
-    st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
-    
-    if 'status' in df_chart.columns:
-        df_finished = df_chart[df_chart['status'] == 'DONE'].copy()
-        if not df_finished.empty:
-            st.dataframe(df_finished[['tanggal_input', 'sku', 'article_name', 'cabang', 'kategori']], use_container_width=True, hide_index=True)
-            
-            # Opsi: Tombol untuk mengembalikan ke Pending jika salah klik
-            if st.button("🔄 Kembalikan Semua ke Pending"):
-                conn.table("reject_list").update({"status": "PENDING"}).gt("id", 0).execute()
-                st.rerun()
+        st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
+        
+        if 'status' in df_chart.columns:
+            df_finished = df_chart[df_chart['status'] == 'DONE'].copy()
+            if not df_finished.empty:
+                st.dataframe(df_finished[['tanggal_input', 'sku', 'article_name', 'cabang', 'kategori']], use_container_width=True, hide_index=True)
+                
+                # Opsi: Tombol untuk mengembalikan ke Pending jika salah klik
+                if st.button("🔄 Kembalikan Semua ke Pending"):
+                    conn.table("reject_list").update({"status": "PENDING"}).gt("id", 0).execute()
+                    st.rerun()
+            else:
+                st.info("Belum ada data yang diselesaikan.")
         else:
-            st.info("Belum ada data yang diselesaikan.")
-    else:
-        st.warning("Kolom 'status' tidak ditemukan di database Supabase.")
+            st.warning("Kolom 'status' tidak ditemukan di database Supabase.")
 
 import streamlit as st
 import pandas as pd
