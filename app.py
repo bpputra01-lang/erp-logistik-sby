@@ -4387,12 +4387,8 @@ def menu_reject_defect():
         
         if 'df_match_result' in locals() and not df_match_result.empty:
             
-            # --- LOGIC BARU: FILTER HANYA YANG PENDING ---
-            if 'status' in df_match_result.columns:
-                # Pake .str.upper() biar aman dari typo huruf besar/kecil di database
-                df_match_active = df_match_result[df_match_result['status'].astype(str).str.upper() != 'DONE'].copy()
-            else:
-                df_match_active = df_match_result.copy()
+            # --- FIX: JANGAN FILTER STATUS LAGI KARENA KOLOMNYA SUDAH DIHAPUS ---
+            df_match_active = df_match_result.copy()
 
             # --- LOGIK 2: FILTER KATEGORI (KIRI vs KANAN) ---
             def check_kiri_kanan_logic(group):
@@ -4413,8 +4409,8 @@ def menu_reject_defect():
                     st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #6c757d;"><p style="color: #888; margin: 0; font-size: 0.8rem;">UNIQUE SKU</p><h2 style="color: white; margin: 0; font-weight: 800;">{df_filtered["sku"].nunique()}</h2></div>', unsafe_allow_html=True)
                 
                 # --- LOGIK 1: PIVOT DENGAN KETERANGAN CABANG ---
-                # Ambil SKU, Nama, dan STATUS biar bisa muncul di tabel
-                df_core = df_filtered[['sku', 'article_name', 'status']].drop_duplicates(subset=['sku'])
+                # FIX: HAPUS 'status' DARI SINI AGAR TIDAK KEYERROR
+                df_core = df_filtered[['sku', 'article_name']].drop_duplicates(subset=['sku'])
                 df_temp = df_filtered[['sku', 'cabang']].drop_duplicates()
                 
                 # Membuat Pivot
@@ -4427,13 +4423,13 @@ def menu_reject_defect():
                 df_pivot['Match Route'] = df_pivot.apply(get_match_route, axis=1)
                 df_pivot = df_pivot.replace({True: '✅', False: ''})
                 
-                # Merge df_core (yang ada statusnya) dengan df_pivot
+                # Merge df_core dengan df_pivot
                 df_final_match = df_core.merge(df_pivot, on='sku', how='left')
 
                 st.markdown('<div style="margin-bottom: 10px; padding: 5px 0;"><span style="color: #000000 !important; font-size: 1.1rem !important; font-weight: 800 !important;">📋 Summary Match SKU & Kategori</span></div>', unsafe_allow_html=True)
                 
-                # --- PERBAIKAN KOLOM: Tambahkan 'status' ke dalam list cols ---
-                cols = ['sku', 'article_name', 'status', 'Match Route'] + [c for c in df_temp['cabang'].unique() if c in df_final_match.columns]
+                # --- FIX: HAPUS 'status' DARI DAFTAR KOLOM TAMPILAN ---
+                cols = ['sku', 'article_name', 'Match Route'] + [c for c in df_temp['cabang'].unique() if c in df_final_match.columns]
                 
                 st.data_editor(df_final_match[cols], use_container_width=True, hide_index=True, key="match_pivot_final")
 
@@ -4442,14 +4438,16 @@ def menu_reject_defect():
                 if st.button("🚀 SELESAI PROSES (UPDATE CLOUD)", use_container_width=True, type="primary"):
                     skus_to_done = df_final_match['sku'].tolist()
                     try:
+                        # Catatan: Fungsi mark_as_done tetap dipanggil, 
+                        # pastikan fungsi tersebut tidak error jika kolom 'status' tidak ada di DB
                         mark_as_done(skus_to_done)
-                        st.success(f"✅ Berhasil! {len(skus_to_done)} SKU telah ditandai DONE di Supabase.")
+                        st.success(f"✅ Berhasil! {len(skus_to_done)} SKU telah diproses.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Gagal update status: {e}")
 
             else:
-                st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori yang cocok atau semua sudah diproses.")
+                st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori yang cocok.")
         else:
             st.success("✅ Tidak ditemukan Reject/Defect Match")
 
