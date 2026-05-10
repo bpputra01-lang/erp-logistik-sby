@@ -4282,20 +4282,26 @@ def menu_reject_defect():
     # Fetch data dari Supabase
         try:
             response = conn.table("reject_list").select("*").execute()
-            df_chart = pd.DataFrame(response.data)
+            df_raw = pd.DataFrame(response.data)
             
-            # --- FIX FORMAT TANGGAL DI SINI (SETELAH DATAFRAME TERBENTUK) ---
-            if not df_chart.empty and 'tanggal_input' in df_chart.columns:
-                # Ubah ke datetime, lalu format jadi string yang rapi
-                df_chart['tanggal_input'] = pd.to_datetime(df_chart['tanggal_input'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
-        
+            # --- FILTER STATUS: HANYA AMBIL YANG PENDING UNTUK ANALYTICS ---
+            if not df_raw.empty and 'status' in df_raw.columns:
+                # Data yang muncul di Analytics & Match hanyalah yang PENDING
+                df_chart = df_raw[df_raw['status'].astype(str).str.upper() == 'PENDING'].copy()
+                
+                # Format tanggal tetap dilakukan pada data yang sudah difilter
+                if 'tanggal_input' in df_chart.columns:
+                    df_chart['tanggal_input'] = pd.to_datetime(df_chart['tanggal_input'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                df_chart = df_raw.copy()
+                
         except Exception as e:
             st.error(f"Gagal narik data: {e}")
             df_chart = pd.DataFrame()
         
         standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
         if not df_chart.empty:
-            # --- LOGIKA MATCHING (WAJIB ADA) ---
+            # --- LOGIKA MATCHING (Otomatis hanya mencari dari yang PENDING) ---
             df_non_std = df_chart[~df_chart['kategori'].isin(standard_codes)].copy()
             if not df_non_std.empty:
                 def find_matches(row, full_df):
@@ -4311,13 +4317,12 @@ def menu_reject_defect():
             with col_f1:
                 filter_view = st.selectbox("📍 FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
             with col_f2:
-                # --- TAMBAHAN SEARCH BAR ---
                 search_query = st.text_input("🔍 CARI SKU ATAU NAMA BARANG:", placeholder="Ketik SKU / Nama Barang di sini...", key="search_bar")
 
-            # 1. Filter Cabang dulu
+            # 1. Filter Cabang
             df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['cabang'] == filter_view]
 
-            # 2. Filter Search Bar (Jika ada input)
+            # 2. Filter Search Bar
             if search_query:
                 df_final = df_final[
                     (df_final['sku'].astype(str).str.contains(search_query, case=False, na=False)) | 
@@ -4325,11 +4330,12 @@ def menu_reject_defect():
                 ]
 
             # --- DASHBOARD LOGIC (METRICS) ---
+            # Sekarang angka ini murni hanya menghitung yang statusnya PENDING
             total_val = len(df_final)
             defect_cnt = len(df_final[df_final['bin'].str.contains('DEFECT', case=False, na=False)])
             reject_cnt = len(df_final[df_final['bin'].str.contains('REJECT', case=False, na=False)])
 
-            # LOGIKA DELTA (PANAH OTOMATIS)
+            # Logika Delta (Panah)
             if 'last_total' not in st.session_state:
                 st.session_state.last_total, st.session_state.last_defect, st.session_state.last_reject = total_val, defect_cnt, reject_cnt
 
@@ -4344,7 +4350,7 @@ def menu_reject_defect():
 
             st.session_state.last_total, st.session_state.last_defect, st.session_state.last_reject = total_val, defect_cnt, reject_cnt
 
-            # BOX METRIC DISPLAY (Akan otomatis update sesuai hasil search)
+            # BOX METRIC DISPLAY
             m1, m2, m3 = st.columns(3)
             with m1:
                 st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;"><p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p><h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2><span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Result</span></div>', unsafe_allow_html=True)
@@ -4355,11 +4361,11 @@ def menu_reject_defect():
                 p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
                 st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;"><p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p><h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2><span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span></div>', unsafe_allow_html=True)
 
-            # Tabel Detail juga akan mengikuti hasil search
+            # Tabel Detail
             st.markdown('<div class="detail-header">📋 DETAIL DATABASE CLOUD</div>', unsafe_allow_html=True)
             df_editor = df_final.copy().sort_values('id', ascending=False)
             
-            # --- TAMBAHAN: SEMBUNYIKAN KOLOM STATUS ---
+            # SEMBUNYIKAN KOLOM STATUS AGAR BERSIH
             if 'status' in df_editor.columns:
                 df_editor = df_editor.drop(columns=['status'])
                 
@@ -4371,7 +4377,7 @@ def menu_reject_defect():
                 use_container_width=True, hide_index=True, key="database_editor"
             )
 
-            # Logika hapus tetap sama
+            # Logika hapus
             rows_to_delete = event[event['HAPUS'] == True]
             if not rows_to_delete.empty:
                 st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
