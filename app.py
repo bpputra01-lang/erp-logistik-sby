@@ -4483,18 +4483,19 @@ def menu_reject_defect():
         else:
             st.success("✅ Tidak ditemukan Reject/Defect Match")
     with tab_done:
-        st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0; font-weight: 700; font-size: 1.2rem;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
-        
-        # Cek apakah kolom status ada di database
-        if 'status' in df_chart.columns:
-            # Hanya ambil yang sudah DONE
-            df_finished = df_chart[df_chart['status'].astype(str).str.upper() == 'DONE'].copy()
+    st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0; font-weight: 700; font-size: 1.2rem;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
+    
+    # KUNCI UTAMA: Pakai df_raw, bukan df_chart (karena df_chart cuma isi PENDING)
+    if 'df_raw' in locals() and not df_raw.empty:
+        if 'status' in df_raw.columns:
+            # Filter yang statusnya DONE dari data mentah
+            df_finished = df_raw[df_raw['status'].astype(str).str.upper() == 'DONE'].copy()
             
             if not df_finished.empty:
                 # 1. Tambahkan kolom bantuan untuk checkbox UI
                 df_finished['PILIH'] = False
                 
-                # 2. Tentukan kolom yang mau dipajang (TANPA kolom status agar bersih)
+                # 2. Tentukan kolom yang mau dipajang
                 cols_done = ['PILIH', 'tanggal_input', 'sku', 'article_name', 'cabang', 'kategori']
                 
                 st.markdown('<div style="margin: 10px 0; font-weight: 600; color: #888;">Centang ikon 🔙 untuk mengembalikan data ke Tab Match</div>', unsafe_allow_html=True)
@@ -4529,7 +4530,7 @@ def menu_reject_defect():
                         except Exception as e:
                             st.error(f"Gagal update: {e}")
                 else:
-                    # Tombol backup untuk kembalikan semua jika darurat
+                    # Tombol backup untuk kembalikan semua
                     if st.button("🔄 KEMBALIKAN SEMUA KE PENDING", use_container_width=True):
                         try:
                             conn.table("reject_list").update({"status": "PENDING"}).eq("status", "DONE").execute()
@@ -4537,11 +4538,12 @@ def menu_reject_defect():
                             st.rerun()
                         except Exception as e:
                             st.error(f"Gagal: {e}")
-                            
             else:
                 st.info("ℹ️ Belum ada data yang diselesaikan (Status DONE kosong).")
         else:
-            st.error("🚨 ERROR: Kolom 'status' tidak ditemukan di Supabase. Tolong buat dulu kolomnya!")
+            st.error("🚨 Kolom 'status' tidak ada di tabel database.")
+    else:
+        st.info("ℹ️ Tidak ada data yang ditemukan di Cloud.")
 
 import streamlit as st
 import pandas as pd
