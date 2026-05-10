@@ -4466,7 +4466,7 @@ def menu_reject_defect():
                 # ==========================================
                 selected_skus = edited_match[edited_match['PILIH'] == True]['sku'].tolist()
 
-                if st.button(f"DONE PROCESS ({len(selected_skus)} SKU TERPILIH)", use_container_width=True, type="primary"):
+                if st.button(f"▶️DONE PROCESS ({len(selected_skus)} SKU TERPILIH)", use_container_width=True, type="primary"):
                     if selected_skus:
                         try:
                             # Kirim list SKU yang cuma dicentang ke database
