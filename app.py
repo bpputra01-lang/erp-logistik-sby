@@ -4387,7 +4387,7 @@ def menu_reject_defect():
         
         if 'df_match_result' in locals() and not df_match_result.empty:
             
-            # --- FIX: JANGAN FILTER STATUS LAGI KARENA KOLOMNYA SUDAH DIHAPUS ---
+            # Tetap pake copy biar data aslinya nggak rusak
             df_match_active = df_match_result.copy()
 
             # --- LOGIK 2: FILTER KATEGORI (KIRI vs KANAN) ---
@@ -4397,7 +4397,6 @@ def menu_reject_defect():
                 has_kanan = any('kanan' in cat for cat in categories)
                 return has_kiri and has_kanan
 
-            # Filter SKU yang memenuhi syarat Kiri-Kanan
             sku_valid = df_match_active.groupby('sku').filter(check_kiri_kanan_logic)['sku'].unique()
             df_filtered = df_match_active[df_match_active['sku'].isin(sku_valid)].copy()
 
@@ -4409,11 +4408,9 @@ def menu_reject_defect():
                     st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #6c757d;"><p style="color: #888; margin: 0; font-size: 0.8rem;">UNIQUE SKU</p><h2 style="color: white; margin: 0; font-weight: 800;">{df_filtered["sku"].nunique()}</h2></div>', unsafe_allow_html=True)
                 
                 # --- LOGIK 1: PIVOT DENGAN KETERANGAN CABANG ---
-                # FIX: HAPUS 'status' DARI SINI AGAR TIDAK KEYERROR
                 df_core = df_filtered[['sku', 'article_name']].drop_duplicates(subset=['sku'])
                 df_temp = df_filtered[['sku', 'cabang']].drop_duplicates()
                 
-                # Membuat Pivot
                 df_pivot = df_temp.pivot(index='sku', columns='cabang', values='cabang').notna()
                 
                 def get_match_route(row):
@@ -4423,34 +4420,57 @@ def menu_reject_defect():
                 df_pivot['Match Route'] = df_pivot.apply(get_match_route, axis=1)
                 df_pivot = df_pivot.replace({True: '✅', False: ''})
                 
-                # Merge df_core dengan df_pivot
                 df_final_match = df_core.merge(df_pivot, on='sku', how='left')
 
+                # ==========================================
+                # 1. TAMBAHAN DI SINI: BIKIN KOLOM CHECKBOX
+                # ==========================================
+                df_final_match['PILIH'] = False
+                
                 st.markdown('<div style="margin-bottom: 10px; padding: 5px 0;"><span style="color: #000000 !important; font-size: 1.1rem !important; font-weight: 800 !important;">📋 Summary Match SKU & Kategori</span></div>', unsafe_allow_html=True)
                 
-                # --- FIX: HAPUS 'status' DARI DAFTAR KOLOM TAMPILAN ---
-                cols = ['sku', 'article_name', 'Match Route'] + [c for c in df_temp['cabang'].unique() if c in df_final_match.columns]
+                # ==========================================
+                # 2. TAMBAHAN DI SINI: ATUR KOLOM TAMPILAN (PILIH ditaruh paling depan)
+                # ==========================================
+                cols = ['PILIH', 'sku', 'article_name', 'Match Route'] + [c for c in df_temp['cabang'].unique() if c in df_final_match.columns]
                 
-                st.data_editor(df_final_match[cols], use_container_width=True, hide_index=True, key="match_pivot_final")
+                # ==========================================
+                # 3. TAMBAHAN DI SINI: AKTIFKAN CHECKBOX DI COLUMN_CONFIG
+                # ==========================================
+                edited_match = st.data_editor(
+                    df_final_match[cols], 
+                    column_config={
+                        "PILIH": st.column_config.CheckboxColumn("✅", default=False)
+                    },
+                    use_container_width=True, 
+                    hide_index=True, 
+                    key="match_pivot_final"
+                )
 
                 # --- LOGIC BARU: TOMBOL SELESAI PROSES ---
                 st.markdown("---")
-                if st.button("🚀 SELESAI PROSES (UPDATE CLOUD)", use_container_width=True, type="primary"):
-                    skus_to_done = df_final_match['sku'].tolist()
-                    try:
-                        # Catatan: Fungsi mark_as_done tetap dipanggil, 
-                        # pastikan fungsi tersebut tidak error jika kolom 'status' tidak ada di DB
-                        mark_as_done(skus_to_done)
-                        st.success(f"✅ Berhasil! {len(skus_to_done)} SKU telah diproses.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Gagal update status: {e}")
+                
+                # ==========================================
+                # 4. TAMBAHAN DI SINI: FILTER SKU YANG DICENTANG SAJA
+                # ==========================================
+                selected_skus = edited_match[edited_match['PILIH'] == True]['sku'].tolist()
+
+                if st.button(f"🚀 SELESAI PROSES ({len(selected_skus)} SKU TERPILIH)", use_container_width=True, type="primary"):
+                    if selected_skus:
+                        try:
+                            # Kirim list SKU yang cuma dicentang ke database
+                            mark_as_done(selected_skus)
+                            st.success(f"✅ Berhasil! {len(selected_skus)} SKU telah diproses.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Gagal update status: {e}")
+                    else:
+                        st.warning("Pilih minimal satu baris dulu bos!")
 
             else:
                 st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori yang cocok.")
         else:
             st.success("✅ Tidak ditemukan Reject/Defect Match")
-
     with tab_done:
         st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0; font-weight: 700; font-size: 1.2rem;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
         
