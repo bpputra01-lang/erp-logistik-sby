@@ -4280,107 +4280,107 @@ def menu_reject_defect():
                         st.error(f"Gagal Simpan: {e}")
     with tab_analytics:
     # Fetch data dari Supabase
-    try:
-        response = conn.table("reject_list").select("*").execute()
-        df_chart = pd.DataFrame(response.data)
+        try:
+            response = conn.table("reject_list").select("*").execute()
+            df_chart = pd.DataFrame(response.data)
+            
+            # --- FIX FORMAT TANGGAL DI SINI (SETELAH DATAFRAME TERBENTUK) ---
+            if not df_chart.empty and 'tanggal_input' in df_chart.columns:
+                # Ubah ke datetime, lalu format jadi string yang rapi
+                df_chart['tanggal_input'] = pd.to_datetime(df_chart['tanggal_input'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
         
-        # --- FIX FORMAT TANGGAL DI SINI (SETELAH DATAFRAME TERBENTUK) ---
-        if not df_chart.empty and 'tanggal_input' in df_chart.columns:
-            # Ubah ke datetime, lalu format jadi string yang rapi
-            df_chart['tanggal_input'] = pd.to_datetime(df_chart['tanggal_input'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
-    
-    except Exception as e:
-        st.error(f"Gagal narik data: {e}")
-        df_chart = pd.DataFrame()
-    
-    standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
-    if not df_chart.empty:
-        # --- LOGIKA MATCHING (WAJIB ADA) ---
-        df_non_std = df_chart[~df_chart['kategori'].isin(standard_codes)].copy()
-        if not df_non_std.empty:
-            def find_matches(row, full_df):
-                matches = full_df[(full_df['sku'] == row['sku']) & (full_df['id'] != row['id'])]
-                return ", ".join(matches['cabang'].unique()) if not matches.empty else "TIDAK ADA"
-            df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
-            df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
-        else:
-            df_match_result = pd.DataFrame()
+        except Exception as e:
+            st.error(f"Gagal narik data: {e}")
+            df_chart = pd.DataFrame()
+        
+        standard_codes = ['D1', 'D2', 'D3', 'D4', 'R1', 'R2', 'R3', 'R4']
+        if not df_chart.empty:
+            # --- LOGIKA MATCHING (WAJIB ADA) ---
+            df_non_std = df_chart[~df_chart['kategori'].isin(standard_codes)].copy()
+            if not df_non_std.empty:
+                def find_matches(row, full_df):
+                    matches = full_df[(full_df['sku'] == row['sku']) & (full_df['id'] != row['id'])]
+                    return ", ".join(matches['cabang'].unique()) if not matches.empty else "TIDAK ADA"
+                df_non_std['MATCH_DI_CABANG'] = df_non_std.apply(lambda x: find_matches(x, df_chart), axis=1)
+                df_match_result = df_non_std[df_non_std['MATCH_DI_CABANG'] != "TIDAK ADA"]
+            else:
+                df_match_result = pd.DataFrame()
 
-        # --- SEARCH & FILTER AREA ---
-        col_f1, col_f2 = st.columns([1, 2])
-        with col_f1:
-            filter_view = st.selectbox("📍 FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
-        with col_f2:
-            # --- TAMBAHAN SEARCH BAR ---
-            search_query = st.text_input("🔍 CARI SKU ATAU NAMA BARANG:", placeholder="Ketik SKU / Nama Barang di sini...", key="search_bar")
+            # --- SEARCH & FILTER AREA ---
+            col_f1, col_f2 = st.columns([1, 2])
+            with col_f1:
+                filter_view = st.selectbox("📍 FILTER CABANG:", ["SEMUA", "SURABAYA", "SIDOARJO", "SEMARANG"], key="filter_dash")
+            with col_f2:
+                # --- TAMBAHAN SEARCH BAR ---
+                search_query = st.text_input("🔍 CARI SKU ATAU NAMA BARANG:", placeholder="Ketik SKU / Nama Barang di sini...", key="search_bar")
 
-        # 1. Filter Cabang dulu
-        df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['cabang'] == filter_view]
+            # 1. Filter Cabang dulu
+            df_final = df_chart if filter_view == "SEMUA" else df_chart[df_chart['cabang'] == filter_view]
 
-        # 2. Filter Search Bar (Jika ada input)
-        if search_query:
-            df_final = df_final[
-                (df_final['sku'].astype(str).str.contains(search_query, case=False, na=False)) | 
-                (df_final['article_name'].astype(str).str.contains(search_query, case=False, na=False))
-            ]
+            # 2. Filter Search Bar (Jika ada input)
+            if search_query:
+                df_final = df_final[
+                    (df_final['sku'].astype(str).str.contains(search_query, case=False, na=False)) | 
+                    (df_final['article_name'].astype(str).str.contains(search_query, case=False, na=False))
+                ]
 
-        # --- DASHBOARD LOGIC (METRICS) ---
-        total_val = len(df_final)
-        defect_cnt = len(df_final[df_final['bin'].str.contains('DEFECT', case=False, na=False)])
-        reject_cnt = len(df_final[df_final['bin'].str.contains('REJECT', case=False, na=False)])
+            # --- DASHBOARD LOGIC (METRICS) ---
+            total_val = len(df_final)
+            defect_cnt = len(df_final[df_final['bin'].str.contains('DEFECT', case=False, na=False)])
+            reject_cnt = len(df_final[df_final['bin'].str.contains('REJECT', case=False, na=False)])
 
-        # LOGIKA DELTA (PANAH OTOMATIS)
-        if 'last_total' not in st.session_state:
+            # LOGIKA DELTA (PANAH OTOMATIS)
+            if 'last_total' not in st.session_state:
+                st.session_state.last_total, st.session_state.last_defect, st.session_state.last_reject = total_val, defect_cnt, reject_cnt
+
+            def get_delta(current, last):
+                if current > last: return "↑", "#28a745", "rgba(40,167,69,0.1)"
+                elif current < last: return "↓", "#FF4B4B", "rgba(255,75,75,0.1)"
+                return "•", "#888", "rgba(136,136,136,0.1)"
+
+            arr_t, col_t, bg_t = get_delta(total_val, st.session_state.last_total)
+            arr_d, col_d, bg_d = get_delta(defect_cnt, st.session_state.last_defect)
+            arr_r, col_r, bg_r = get_delta(reject_cnt, st.session_state.last_reject)
+
             st.session_state.last_total, st.session_state.last_defect, st.session_state.last_reject = total_val, defect_cnt, reject_cnt
 
-        def get_delta(current, last):
-            if current > last: return "↑", "#28a745", "rgba(40,167,69,0.1)"
-            elif current < last: return "↓", "#FF4B4B", "rgba(255,75,75,0.1)"
-            return "•", "#888", "rgba(136,136,136,0.1)"
+            # BOX METRIC DISPLAY (Akan otomatis update sesuai hasil search)
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;"><p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p><h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2><span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Result</span></div>', unsafe_allow_html=True)
+            with m2:
+                p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;"><p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p><h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2><span style="color: {col_d}; font-size: 0.8rem; background: {bg_d}; padding: 2px 8px; border-radius: 10px;">{arr_d} {p_d:.1f}%</span></div>', unsafe_allow_html=True)
+            with m3:
+                p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
+                st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;"><p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p><h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2><span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span></div>', unsafe_allow_html=True)
 
-        arr_t, col_t, bg_t = get_delta(total_val, st.session_state.last_total)
-        arr_d, col_d, bg_d = get_delta(defect_cnt, st.session_state.last_defect)
-        arr_r, col_r, bg_r = get_delta(reject_cnt, st.session_state.last_reject)
-
-        st.session_state.last_total, st.session_state.last_defect, st.session_state.last_reject = total_val, defect_cnt, reject_cnt
-
-        # BOX METRIC DISPLAY (Akan otomatis update sesuai hasil search)
-        m1, m2, m3 = st.columns(3)
-        with m1:
-            st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;"><p style="color: #888; margin: 0; font-size: 0.9rem;">TOTAL ITEMS</p><h2 style="color: white; margin: 0; font-weight: 800;">{total_val} SKU</h2><span style="color: {col_t}; font-size: 0.8rem; background: {bg_t}; padding: 2px 8px; border-radius: 10px;">{arr_t} {total_val} Result</span></div>', unsafe_allow_html=True)
-        with m2:
-            p_d = (defect_cnt/total_val*100) if total_val > 0 else 0
-            st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FFA500;"><p style="color: #888; margin: 0; font-size: 0.9rem;">📦 DEFECT (D)</p><h2 style="color: white; margin: 0; font-weight: 800;">{defect_cnt}</h2><span style="color: {col_d}; font-size: 0.8rem; background: {bg_d}; padding: 2px 8px; border-radius: 10px;">{arr_d} {p_d:.1f}%</span></div>', unsafe_allow_html=True)
-        with m3:
-            p_r = (reject_cnt/total_val*100) if total_val > 0 else 0
-            st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #FF4B4B;"><p style="color: #888; margin: 0; font-size: 0.9rem;">❌ REJECT (R)</p><h2 style="color: white; margin: 0; font-weight: 800;">{reject_cnt}</h2><span style="color: {col_r}; font-size: 0.8rem; background: {bg_r}; padding: 2px 8px; border-radius: 10px;">{arr_r} {p_r:.1f}%</span></div>', unsafe_allow_html=True)
-
-        # Tabel Detail juga akan mengikuti hasil search
-        st.markdown('<div class="detail-header">📋 DETAIL DATABASE CLOUD</div>', unsafe_allow_html=True)
-        df_editor = df_final.copy().sort_values('id', ascending=False)
-        
-        # --- TAMBAHAN: SEMBUNYIKAN KOLOM STATUS ---
-        if 'status' in df_editor.columns:
-            df_editor = df_editor.drop(columns=['status'])
+            # Tabel Detail juga akan mengikuti hasil search
+            st.markdown('<div class="detail-header">📋 DETAIL DATABASE CLOUD</div>', unsafe_allow_html=True)
+            df_editor = df_final.copy().sort_values('id', ascending=False)
             
-        df_editor['HAPUS'] = False
+            # --- TAMBAHAN: SEMBUNYIKAN KOLOM STATUS ---
+            if 'status' in df_editor.columns:
+                df_editor = df_editor.drop(columns=['status'])
+                
+            df_editor['HAPUS'] = False
 
-        event = st.data_editor(
-            df_editor,
-            column_config={"id": None, "HAPUS": st.column_config.CheckboxColumn("🗑️", default=False)},
-            use_container_width=True, hide_index=True, key="database_editor"
-        )
+            event = st.data_editor(
+                df_editor,
+                column_config={"id": None, "HAPUS": st.column_config.CheckboxColumn("🗑️", default=False)},
+                use_container_width=True, hide_index=True, key="database_editor"
+            )
 
-        # Logika hapus tetap sama
-        rows_to_delete = event[event['HAPUS'] == True]
-        if not rows_to_delete.empty:
-            st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
-            if st.button(f"🗑️ HAPUS {len(rows_to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
-                for rid in rows_to_delete['id']: delete_reject_item(rid)
-                st.rerun()
-        else:
-            if st.button("🚨 KOSONGKAN SEMUA DATABASE", use_container_width=True):
-                clear_all_data()
+            # Logika hapus tetap sama
+            rows_to_delete = event[event['HAPUS'] == True]
+            if not rows_to_delete.empty:
+                st.error(f"⚠️ **SIAP DIHAPUS:** {len(rows_to_delete)} item terpilih.")
+                if st.button(f"🗑️ HAPUS {len(rows_to_delete)} DATA TERPILIH", type="primary", use_container_width=True):
+                    for rid in rows_to_delete['id']: delete_reject_item(rid)
+                    st.rerun()
+            else:
+                if st.button("🚨 KOSONGKAN SEMUA DATABASE", use_container_width=True):
+                    clear_all_data()
 
     with tab_match:
         st.markdown('<div style="background-color: #1E1E26; padding: 15px 20px; border-radius: 5px; border-left: 5px solid #007BFF; margin-bottom: 20px;"><h3 style="color: white !important; margin: 0; font-weight: 700; font-size: 1.2rem; display: flex; align-items: center;">🔍 CROSS-CHECK SKU MATCHING</h3></div>', unsafe_allow_html=True)
