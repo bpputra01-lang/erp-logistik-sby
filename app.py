@@ -4075,6 +4075,10 @@ def clear_all_data():
     conn.table("reject_list").delete().gt("id", 0).execute()
     st.rerun()
 
+def mark_as_done(sku_list):
+    # Mengubah status SKU yang terpilih menjadi DONE di Supabase
+    if sku_list:
+        conn.table("reject_list").update({"status": "DONE"}).in_("sku", sku_list).execute()
 # --- 2. UI MENU ---
 def menu_reject_defect():
     # --- CSS AREA (WAJIB LENGKAP - TIDAK ADA YANG DIPOTONG) ---
@@ -4182,7 +4186,7 @@ def menu_reject_defect():
 
     st.markdown('<div class="hero-header">⚠️ REJECT / DEFECT LIST ENTRY</div>', unsafe_allow_html=True)
 
-    tab_entry, tab_analytics, tab_match = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD", "🔍 MATCH DEFECT/REJECT"])
+    tab_entry, tab_analytics, tab_match = st.tabs(["📥 ENTRY DATA", "📊 ANALYTICS DASHBOARD", "🔍 MATCH DEFECT/REJECT", "✅ DONE PROCESS"])
 
     with tab_entry:
         with st.form("form_reject_new", clear_on_submit=True):
@@ -4377,6 +4381,14 @@ def menu_reject_defect():
         st.markdown('<div style="background-color: #1E1E26; padding: 15px 20px; border-radius: 5px; border-left: 5px solid #007BFF; margin-bottom: 20px;"><h3 style="color: white !important; margin: 0; font-weight: 700; font-size: 1.2rem; display: flex; align-items: center;">🔍 CROSS-CHECK SKU MATCHING</h3></div>', unsafe_allow_html=True)
         
         if 'df_match_result' in locals() and not df_match_result.empty:
+            
+            # --- LOGIC BARU: FILTER HANYA YANG PENDING ---
+            # Kita hanya memproses data yang belum berstatus 'DONE'
+            if 'status' in df_match_result.columns:
+                df_match_active = df_match_result[df_match_result['status'] != 'DONE'].copy()
+            else:
+                df_match_active = df_match_result.copy()
+
             # --- LOGIK 2: FILTER KATEGORI (KIRI vs KANAN) ---
             # Memastikan jika satu SKU punya kategori 'Kiri', pasangannya harus ada yang 'Kanan'
             def check_kiri_kanan_logic(group):
@@ -4385,9 +4397,9 @@ def menu_reject_defect():
                 has_kanan = any('kanan' in cat for cat in categories)
                 return has_kiri and has_kanan
 
-            # Filter SKU yang memenuhi syarat Kiri-Kanan
-            sku_valid = df_match_result.groupby('sku').filter(check_kiri_kanan_logic)['sku'].unique()
-            df_filtered = df_match_result[df_match_result['sku'].isin(sku_valid)].copy()
+            # Filter SKU yang memenuhi syarat Kiri-Kanan (Gunakan df_match_active)
+            sku_valid = df_match_active.groupby('sku').filter(check_kiri_kanan_logic)['sku'].unique()
+            df_filtered = df_match_active[df_match_active['sku'].isin(sku_valid)].copy()
 
             if not df_filtered.empty:
                 m_col1, m_col2 = st.columns(2)
@@ -4418,10 +4430,39 @@ def menu_reject_defect():
                 # Tampilkan dengan kolom Match Route di awal setelah Nama Artikel
                 cols = ['sku', 'article_name', 'Match Route'] + [c for c in df_temp['cabang'].unique() if c in df_final_match.columns]
                 st.data_editor(df_final_match[cols], use_container_width=True, hide_index=True, key="match_pivot_final")
+
+                # --- LOGIC BARU: TOMBOL SELESAI PROSES ---
+                st.markdown("---")
+                if st.button("🚀 SELESAI PROSES (UPDATE CLOUD)", use_container_width=True, type="primary"):
+                    skus_to_done = df_final_match['sku'].tolist()
+                    try:
+                        mark_as_done(skus_to_done)
+                        st.success(f"✅ Berhasil! {len(skus_to_done)} SKU telah ditandai DONE di Supabase.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Gagal update status: {e}")
+
             else:
-                st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori yang cocok.")
+                st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori yang cocok atau semua sudah diproses.")
         else:
             st.success("✅ Tidak ditemukan Reject/Defect Match")
+            
+    with tab_done:
+    st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
+    
+    if 'status' in df_chart.columns:
+        df_finished = df_chart[df_chart['status'] == 'DONE'].copy()
+        if not df_finished.empty:
+            st.dataframe(df_finished[['tanggal_input', 'sku', 'article_name', 'cabang', 'kategori']], use_container_width=True, hide_index=True)
+            
+            # Opsi: Tombol untuk mengembalikan ke Pending jika salah klik
+            if st.button("🔄 Kembalikan Semua ke Pending"):
+                conn.table("reject_list").update({"status": "PENDING"}).gt("id", 0).execute()
+                st.rerun()
+        else:
+            st.info("Belum ada data yang diselesaikan.")
+    else:
+        st.warning("Kolom 'status' tidak ditemukan di database Supabase.")
 
 import streamlit as st
 import pandas as pd
