@@ -4382,10 +4382,10 @@ def menu_reject_defect():
         
         if 'df_match_result' in locals() and not df_match_result.empty:
             
-            # --- PERBAIKAN FILTER: Gunakan .str.upper() agar lebih aman ---
+            # --- LOGIC BARU: FILTER HANYA YANG PENDING ---
             if 'status' in df_match_result.columns:
-                # Kita paksa cek ke UPPERCASE supaya mau 'Pending' atau 'pending' tetep kena filter
-                df_match_active = df_match_result[df_match_result['status'].astype(str).str.upper() == 'PENDING'].copy()
+                # Pake .str.upper() biar aman dari typo huruf besar/kecil di database
+                df_match_active = df_match_result[df_match_result['status'].astype(str).str.upper() != 'DONE'].copy()
             else:
                 df_match_active = df_match_result.copy()
 
@@ -4396,24 +4396,23 @@ def menu_reject_defect():
                 has_kanan = any('kanan' in cat for cat in categories)
                 return has_kiri and has_kanan
 
-            # Filter SKU yang memenuhi syarat Kiri-Kanan (Gunakan df_match_active)
-            # Pastikan ada data yang tersisa setelah filter PENDING tadi
-            if not df_match_active.empty:
-                sku_valid = df_match_active.groupby('sku').filter(check_kiri_kanan_logic)['sku'].unique()
-                df_filtered = df_match_active[df_match_active['sku'].isin(sku_valid)].copy()
-            else:
-                df_filtered = pd.DataFrame()
+            # Filter SKU yang memenuhi syarat Kiri-Kanan
+            sku_valid = df_match_active.groupby('sku').filter(check_kiri_kanan_logic)['sku'].unique()
+            df_filtered = df_match_active[df_match_active['sku'].isin(sku_valid)].copy()
 
             if not df_filtered.empty:
-                # ... (Logika Metric Boxes dan Pivot kamu tetap sama di bawah ini) ...
                 m_col1, m_col2 = st.columns(2)
                 with m_col1:
                     st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #007BFF;"><p style="color: #888; margin: 0; font-size: 0.8rem;">MATCH FOUND (KIRI-KANAN)</p><h2 style="color: white; margin: 0; font-weight: 800;">{len(df_filtered)} Items</h2></div>', unsafe_allow_html=True)
                 with m_col2:
                     st.markdown(f'<div style="background-color: #1E1E26; padding: 20px; border-radius: 10px; border-left: 5px solid #6c757d;"><p style="color: #888; margin: 0; font-size: 0.8rem;">UNIQUE SKU</p><h2 style="color: white; margin: 0; font-weight: 800;">{df_filtered["sku"].nunique()}</h2></div>', unsafe_allow_html=True)
                 
-                df_core = df_filtered[['sku', 'article_name']].drop_duplicates()
+                # --- LOGIK 1: PIVOT DENGAN KETERANGAN CABANG ---
+                # Ambil SKU, Nama, dan STATUS biar bisa muncul di tabel
+                df_core = df_filtered[['sku', 'article_name', 'status']].drop_duplicates(subset=['sku'])
                 df_temp = df_filtered[['sku', 'cabang']].drop_duplicates()
+                
+                # Membuat Pivot
                 df_pivot = df_temp.pivot(index='sku', columns='cabang', values='cabang').notna()
                 
                 def get_match_route(row):
@@ -4422,24 +4421,30 @@ def menu_reject_defect():
 
                 df_pivot['Match Route'] = df_pivot.apply(get_match_route, axis=1)
                 df_pivot = df_pivot.replace({True: '✅', False: ''})
+                
+                # Merge df_core (yang ada statusnya) dengan df_pivot
                 df_final_match = df_core.merge(df_pivot, on='sku', how='left')
 
                 st.markdown('<div style="margin-bottom: 10px; padding: 5px 0;"><span style="color: #000000 !important; font-size: 1.1rem !important; font-weight: 800 !important;">📋 Summary Match SKU & Kategori</span></div>', unsafe_allow_html=True)
                 
-                cols = ['sku', 'article_name', 'Match Route'] + [c for c in df_temp['cabang'].unique() if c in df_final_match.columns]
+                # --- PERBAIKAN KOLOM: Tambahkan 'status' ke dalam list cols ---
+                cols = ['sku', 'article_name', 'status', 'Match Route'] + [c for c in df_temp['cabang'].unique() if c in df_final_match.columns]
+                
                 st.data_editor(df_final_match[cols], use_container_width=True, hide_index=True, key="match_pivot_final")
 
+                # --- LOGIC BARU: TOMBOL SELESAI PROSES ---
                 st.markdown("---")
                 if st.button("🚀 SELESAI PROSES (UPDATE CLOUD)", use_container_width=True, type="primary"):
                     skus_to_done = df_final_match['sku'].tolist()
                     try:
                         mark_as_done(skus_to_done)
-                        st.success(f"✅ Berhasil! {len(skus_to_done)} SKU telah ditandai DONE.")
+                        st.success(f"✅ Berhasil! {len(skus_to_done)} SKU telah ditandai DONE di Supabase.")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Gagal update status: {e}")
+
             else:
-                st.warning("⚠️ Tidak ada pasangan Kategori (Kiri & Kanan) yang ditemukan pada data Pending.")
+                st.warning("⚠️ SKU match ditemukan, tapi tidak ada pasangan Kategori yang cocok atau semua sudah diproses.")
         else:
             st.success("✅ Tidak ditemukan Reject/Defect Match")
 
