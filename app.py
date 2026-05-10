@@ -3576,6 +3576,7 @@ def menu_retur_out_system():
         **Format yang diharapkan:**
         - **MULTIPLE ADJUSTMENT: Download Multiple Adjusment dimana pilih saja yang **hanya ada di stok** Lalu filter sesuai dengan BIN dan SKU yang ingin di retur
         - Lalu Upload ke WEB dan setelah upload maka data akan tersimpan secara otomatis di WEB
+        - Apabila tidak semua stock dari SKU tersebut diretur maka **Pastikan QTY SYSTEM yang ada di file Multiple tersebut di edit dan disesuaikan dengan Realnya**
         """)
     # --- 3. UPLOAD & AUTO-SAVE (LOGIC API) ---
     uploaded_file = st.file_uploader("Upload File Retur", type=['xlsx', 'csv'], key="retur_up_v3_anon")
