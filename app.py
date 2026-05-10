@@ -3767,6 +3767,31 @@ def apply_po_ui():
     """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **DATA SCAN :** Pastikan Formatnya headernya di **KOLOM A = SKU** dan di **KOLOM B = QTY SCAN**
+        - **PENERIMAAN:** Download data **PENERIMAAN** pilih yang **ITEM ORDERED**
+        - Pastikan setelah download *Penerimaan* pada **KOLOM A** tambahkan kolom untuk memasukkan  **NO PO** jadi kolom A adalah NO PO dan kolom B baru NAME
+        - Jika ada lebih dari 1 NO PO maka gabungkan menjadi satu file dan tetap berikan NO PO sesuai NO PO nya di kolom A
+        """)
+
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Compare:**
+        - SKU di data scan akan dilakukan compare dengan SKU yang ada di File Purchase Order
+        - SKU teratas di File Purchase Order akan mendapatkan alokasi penuh dari data scan apabila ada > 1 No PO yang memiliki SKU yang sama
+        - Jika di File Penerimaan ada yang tidak mendapatkan alokasi maka akan dilakukan cek ulang dan akan di FU ke Purchasing apabia ada kesalahan input SKU PO atau QTY PO
+        - Jika di File Data Scan ada SKU yang tidak ada di PO maka akan muncul dalam *TAB + QTY SCAN > QTY PO* dan muncul keterangan **Wrong SKU**
+        - Jika di File Data Scan ada SKU yang Qty nya > daripada di PO maka akan muncul dalam *TAB + QTY SCAN > QTY PO* dan muncul keterangan **Over Scan** dan yang masuk list hanyalah sisa dari hasil setelah alokasi
+        - Jika di File Data Scan ada SKU yang Qty nya < daripada di PO maka akan muncul dalam *TAB - QTY PO > QTY SCAN*
+        
+        **Keterangan Note:**
+        - **FULL ALLOCATION** : Kondisi dimana Qty scan dan Qty PO cocok dan sesuai
+        - **PARTIAL ALLOCATION** : Kondisi dimana Qty scan < dari Qty PO
+        - **NO ALLOCATION** : Kondisi dimana terdapat indikasi **BARANG TIDAK DIKIRIM / BELUM TERSCAN / SALAH INPUT QTY PO**
+        - **OVER ALLOCATION** : Kondisi dimana terdapat Indikasi **KELEBIHAN SCAN / KURANG INPUT QTY PO / ADA SUBTITUDE ANTAR SKU**
+        """)
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
     
