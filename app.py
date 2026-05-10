@@ -4278,7 +4278,7 @@ def menu_reject_defect():
                         st.rerun()
                     except Exception as e:
                         st.error(f"Gagal Simpan: {e}")
-   with tab_analytics:
+    with tab_analytics:
     # Fetch data dari Supabase
     try:
         response = conn.table("reject_list").select("*").execute()
