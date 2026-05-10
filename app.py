@@ -4451,14 +4451,49 @@ def menu_reject_defect():
         st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
         
         if 'status' in df_chart.columns:
+            # Hanya ambil yang sudah DONE
             df_finished = df_chart[df_chart['status'] == 'DONE'].copy()
+            
             if not df_finished.empty:
-                st.dataframe(df_finished[['tanggal_input', 'sku', 'article_name', 'cabang', 'kategori']], use_container_width=True, hide_index=True)
+                # 1. Tambahkan kolom bantuan untuk checkbox (tidak disimpan di DB, hanya di UI)
+                df_finished['PILIH'] = False
                 
-                # Opsi: Tombol untuk mengembalikan ke Pending jika salah klik
-                if st.button("🔄 Kembalikan Semua ke Pending"):
-                    conn.table("reject_list").update({"status": "PENDING"}).gt("id", 0).execute()
-                    st.rerun()
+                # 2. Tampilkan dengan data_editor agar bisa dicentang
+                # Kita pindahkan kolom PILIH ke paling kiri agar enak dilihat
+                cols_done = ['PILIH', 'tanggal_input', 'sku', 'article_name', 'cabang', 'kategori']
+                
+                edited_done = st.data_editor(
+                    df_finished[cols_done],
+                    column_config={
+                        "PILIH": st.column_config.CheckboxColumn("🔙", default=False),
+                        "tanggal_input": "Waktu Selesai",
+                        "sku": "SKU",
+                        "article_name": "Nama Barang"
+                    },
+                    use_container_width=True,
+                    hide_index=True,
+                    key="editor_done_list"
+                )
+
+                # 3. Logika untuk mengembalikan data yang dipilih
+                selected_skus = edited_done[edited_done['PILIH'] == True]['sku'].tolist()
+
+                if selected_skus:
+                    st.warning(f"⚠️ {len(selected_skus)} item terpilih untuk dikembalikan ke PENDING.")
+                    if st.button(f"🔄 KEMBALIKAN {len(selected_skus)} ITEM TERPILIH", use_container_width=True):
+                        try:
+                            # Update status kembali ke PENDING berdasarkan list SKU yang dicentang
+                            conn.table("reject_list").update({"status": "PENDING"}).in_("sku", selected_skus).execute()
+                            st.success("Data berhasil dikembalikan!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Gagal update: {e}")
+                else:
+                    # Jika tidak ada yang dicentang, tombol "Kembalikan Semua" tetap ada sebagai cadangan (opsional)
+                    if st.button("🔄 KEMBALIKAN SEMUA KE PENDING", use_container_width=True):
+                        conn.table("reject_list").update({"status": "PENDING"}).eq("status", "DONE").execute()
+                        st.rerun()
+                        
             else:
                 st.info("Belum ada data yang diselesaikan.")
         else:
