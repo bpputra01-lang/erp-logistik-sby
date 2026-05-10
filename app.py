@@ -4483,67 +4483,67 @@ def menu_reject_defect():
         else:
             st.success("✅ Tidak ditemukan Reject/Defect Match")
     with tab_done:
-    st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0; font-weight: 700; font-size: 1.2rem;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
-    
-    # KUNCI UTAMA: Pakai df_raw, bukan df_chart (karena df_chart cuma isi PENDING)
-    if 'df_raw' in locals() and not df_raw.empty:
-        if 'status' in df_raw.columns:
-            # Filter yang statusnya DONE dari data mentah
-            df_finished = df_raw[df_raw['status'].astype(str).str.upper() == 'DONE'].copy()
-            
-            if not df_finished.empty:
-                # 1. Tambahkan kolom bantuan untuk checkbox UI
-                df_finished['PILIH'] = False
+        st.markdown('<div style="background-color: #1a1c27; padding: 15px; border-radius: 10px; border-left: 5px solid #28a745;"><h3 style="color: #28a745; margin: 0; font-weight: 700; font-size: 1.2rem;">📋 HISTORY SELESAI PROSES</h3></div>', unsafe_allow_html=True)
+        
+        # KUNCI UTAMA: Pakai df_raw, bukan df_chart (karena df_chart cuma isi PENDING)
+        if 'df_raw' in locals() and not df_raw.empty:
+            if 'status' in df_raw.columns:
+                # Filter yang statusnya DONE dari data mentah
+                df_finished = df_raw[df_raw['status'].astype(str).str.upper() == 'DONE'].copy()
                 
-                # 2. Tentukan kolom yang mau dipajang
-                cols_done = ['PILIH', 'tanggal_input', 'sku', 'article_name', 'cabang', 'kategori']
-                
-                st.markdown('<div style="margin: 10px 0; font-weight: 600; color: #888;">Centang ikon 🔙 untuk mengembalikan data ke Tab Match</div>', unsafe_allow_html=True)
+                if not df_finished.empty:
+                    # 1. Tambahkan kolom bantuan untuk checkbox UI
+                    df_finished['PILIH'] = False
+                    
+                    # 2. Tentukan kolom yang mau dipajang
+                    cols_done = ['PILIH', 'tanggal_input', 'sku', 'article_name', 'cabang', 'kategori']
+                    
+                    st.markdown('<div style="margin: 10px 0; font-weight: 600; color: #888;">Centang ikon 🔙 untuk mengembalikan data ke Tab Match</div>', unsafe_allow_html=True)
 
-                edited_done = st.data_editor(
-                    df_finished[cols_done],
-                    column_config={
-                        "PILIH": st.column_config.CheckboxColumn("🔙", default=False),
-                        "tanggal_input": st.column_config.Column("Waktu Input", width="medium"),
-                        "sku": "SKU",
-                        "article_name": "Nama Barang",
-                        "cabang": "Lokasi",
-                        "kategori": "Kat"
-                    },
-                    use_container_width=True,
-                    hide_index=True,
-                    key="editor_done_list"
-                )
+                    edited_done = st.data_editor(
+                        df_finished[cols_done],
+                        column_config={
+                            "PILIH": st.column_config.CheckboxColumn("🔙", default=False),
+                            "tanggal_input": st.column_config.Column("Waktu Input", width="medium"),
+                            "sku": "SKU",
+                            "article_name": "Nama Barang",
+                            "cabang": "Lokasi",
+                            "kategori": "Kat"
+                        },
+                        use_container_width=True,
+                        hide_index=True,
+                        key="editor_done_list"
+                    )
 
-                # 3. Logika untuk mengembalikan data yang dipilih
-                selected_skus = edited_done[edited_done['PILIH'] == True]['sku'].tolist()
+                    # 3. Logika untuk mengembalikan data yang dipilih
+                    selected_skus = edited_done[edited_done['PILIH'] == True]['sku'].tolist()
 
-                st.markdown("---")
-                if selected_skus:
-                    st.warning(f"⚠️ {len(selected_skus)} item terpilih untuk dikembalikan ke PENDING.")
-                    if st.button(f"🔄 KEMBALIKAN {len(selected_skus)} ITEM TERPILIH", use_container_width=True, type="primary"):
-                        try:
-                            # Update status kembali ke PENDING di Supabase
-                            conn.table("reject_list").update({"status": "PENDING"}).in_("sku", selected_skus).execute()
-                            st.success("✅ Data berhasil dikembalikan ke antrean Match!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Gagal update: {e}")
+                    st.markdown("---")
+                    if selected_skus:
+                        st.warning(f"⚠️ {len(selected_skus)} item terpilih untuk dikembalikan ke PENDING.")
+                        if st.button(f"🔄 KEMBALIKAN {len(selected_skus)} ITEM TERPILIH", use_container_width=True, type="primary"):
+                            try:
+                                # Update status kembali ke PENDING di Supabase
+                                conn.table("reject_list").update({"status": "PENDING"}).in_("sku", selected_skus).execute()
+                                st.success("✅ Data berhasil dikembalikan ke antrean Match!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Gagal update: {e}")
+                    else:
+                        # Tombol backup untuk kembalikan semua
+                        if st.button("🔄 KEMBALIKAN SEMUA KE PENDING", use_container_width=True):
+                            try:
+                                conn.table("reject_list").update({"status": "PENDING"}).eq("status", "DONE").execute()
+                                st.success("✅ Semua data dikembalikan ke PENDING.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Gagal: {e}")
                 else:
-                    # Tombol backup untuk kembalikan semua
-                    if st.button("🔄 KEMBALIKAN SEMUA KE PENDING", use_container_width=True):
-                        try:
-                            conn.table("reject_list").update({"status": "PENDING"}).eq("status", "DONE").execute()
-                            st.success("✅ Semua data dikembalikan ke PENDING.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Gagal: {e}")
+                    st.info("ℹ️ Belum ada data yang diselesaikan (Status DONE kosong).")
             else:
-                st.info("ℹ️ Belum ada data yang diselesaikan (Status DONE kosong).")
+                st.error("🚨 Kolom 'status' tidak ada di tabel database.")
         else:
-            st.error("🚨 Kolom 'status' tidak ada di tabel database.")
-    else:
-        st.info("ℹ️ Tidak ada data yang ditemukan di Cloud.")
+            st.info("ℹ️ Tidak ada data yang ditemukan di Cloud.")
 
 import streamlit as st
 import pandas as pd
