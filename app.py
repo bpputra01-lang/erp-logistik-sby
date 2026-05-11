@@ -5886,6 +5886,7 @@ def tampilan_display_control():
 
     # --- 2. LOGIKA ANALISIS ---
     try:
+        # --- 2. LOGIKA ANALISIS (VERSI SINKRON 100%) ---
         df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_display_raw'", conn)
         if df_check.empty:
             st.info("Upload data stock untuk memulai analisis display.")
@@ -5898,7 +5899,7 @@ def tampilan_display_control():
         col_desc = cols[4] # Kolom E
         col_size = cols[5] # Kolom F
 
-        # 1. Tambah Kolom Article ke database sementara (karena mainnya di Article sekarang)
+        # 1. Tambah Kolom Article ke database sementara
         df_raw = pd.read_sql("SELECT * FROM stock_display_raw", conn)
         df_raw['ARTICLE'] = df_raw[col_desc].astype(str).apply(lambda x: x.split(' ')[0])
         df_raw.to_sql('stock_display_processed', conn, index=False, if_exists='replace')
@@ -5924,7 +5925,7 @@ def tampilan_display_control():
         f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
         f_source_gudang = f"(NOT ({f_target_toko})) AND ({excl_condition})"
 
-        # Logic: Article ada di gudang, tapi nol di Toko
+        # Logic: Article ada di gudang (Source), tapi stok 0 di Toko (Target)
         q_need_display_logic = f"""
             SELECT ARTICLE FROM stock_display_processed 
             WHERE {excl_condition}
@@ -5933,26 +5934,25 @@ def tampilan_display_control():
                AND SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
-        # Gabungkan filter agar lebih terbaca
-        f_total_kondisi = f"""
-            (
-                ({f_source_gudang}) 
-                OR 
-                ({f_target_toko})
-            ) 
-            AND "{col_qty}" > 0
+        # --- LOGIKA SINKRONISASI METRIK ---
+        # 1. Ambil list artikel yang memang sudah ada di display
+        q_art_on_display = f"""
+            SELECT DISTINCT ARTICLE FROM stock_display_processed 
+            WHERE {f_target_toko} AND "{col_qty}" > 0
         """
 
+        # 2. Hitung jumlah untuk dashboard
         q_data = pd.read_sql(f"""
             SELECT  
-                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {f_total_kondisi}) as Total_Art_Aktif,
-                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {f_target_toko} AND "{col_qty}" > 0) as Art_On_Display,
-                (SELECT COUNT(*) FROM ({q_need_display_logic})) as Art_Need_Display
+                (SELECT COUNT(DISTINCT ARTICLE) FROM ({q_art_on_display})) as On_Display,
+                (SELECT COUNT(*) FROM ({q_need_display_logic})) as Need_Display
         """, conn).iloc[0]
 
-        total_art = int(q_data['Total_Art_Aktif'])
-        on_display = int(q_data['Art_On_Display'])
-        need_display = int(q_data['Art_Need_Display'])
+        on_display = int(q_data['On_Display'])
+        need_display = int(q_data['Need_Display'])
+        
+        # Total Artikel adalah gabungan dari yang sudah terpajang + yang harus dipajang
+        total_art = on_display + need_display
 
         # --- 3. TAMPILAN DASHBOARD ---
         st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
@@ -5964,13 +5964,14 @@ def tampilan_display_control():
             perc_display = (on_display / total_art * 100) if total_art > 0 else 0
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Terpajang</p></div>', unsafe_allow_html=True)
         with c3:
+            # Agar hasil visual tetap klop 100% jika dijumlahkan
             perc_need = (need_display / total_art * 100) if total_art > 0 else 0
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # Detail Data (TAMBAH KOLOM SIZE DISPLAY DAN BIN)
+        # Detail Data (Menampilkan stok di gudang untuk ditarik)
         df_detail = pd.read_sql(f"""
             SELECT 
                 ARTICLE as Article, 
