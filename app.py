@@ -6714,7 +6714,7 @@ with st.sidebar:
     # --- KELOMPOK 5: EXTRAS ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
     if is_dc:
-        m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC","Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display"]
+        m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display"]
     else:
         m5_list = ["Precentage Display","Refill Toko"] # Menu Cabang
 
