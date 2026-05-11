@@ -5933,12 +5933,21 @@ def tampilan_display_control():
                AND SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
-        # Query Metriks
+        # Gabungkan filter agar lebih terbaca
+        f_total_kondisi = f"""
+            (
+                ({f_source_gudang}) 
+                OR 
+                ({f_target_toko})
+            ) 
+            AND "{col_qty}" > 0
+        """
+
         q_data = pd.read_sql(f"""
             SELECT  
-                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed 
-                WHERE ({f_source_gudang} OR {f_target_toko}) AND "{col_qty}" > 0) as Total_Art_Aktif,
-                ...
+                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {f_total_kondisi}) as Total_Art_Aktif,
+                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {f_target_toko} AND "{col_qty}" > 0) as Art_On_Display,
+                (SELECT COUNT(*) FROM ({q_need_display_logic})) as Art_Need_Display
         """, conn).iloc[0]
 
         total_art = int(q_data['Total_Art_Aktif'])
