@@ -5936,9 +5936,9 @@ def tampilan_display_control():
         # Query Metriks
         q_data = pd.read_sql(f"""
             SELECT  
-                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {excl_condition} AND "{col_qty}" > 0) as Total_Art_Aktif,
-                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed WHERE {f_target_toko} AND "{col_qty}" > 0) as Art_On_Display,
-                (SELECT COUNT(*) FROM ({q_need_display_logic})) as Art_Need_Display
+                (SELECT COUNT(DISTINCT ARTICLE) FROM stock_display_processed 
+                WHERE ({f_source_gudang} OR {f_target_toko}) AND "{col_qty}" > 0) as Total_Art_Aktif,
+                ...
         """, conn).iloc[0]
 
         total_art = int(q_data['Total_Art_Aktif'])
