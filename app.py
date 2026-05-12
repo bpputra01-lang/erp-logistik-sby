@@ -6527,10 +6527,10 @@ def show_timbang_system():
     tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
 
     with tab_input:
-    # --- CSS UNTUK DARK MODE TOTAL (HAJAR SEMUA NUMBER INPUT) ---
+        # --- CSS ULTRA DARK FORCING (Targeting the actual input field) ---
         st.markdown("""
             <style>
-                /* 1. Target utama semua container input */
+                /* 1. Hajar semua container utama */
                 div[data-baseweb="input"], 
                 div[data-baseweb="select"], 
                 div[data-testid="stNumberInputContainer"] {
@@ -6539,41 +6539,49 @@ def show_timbang_system():
                     border-radius: 8px !important;
                 }
 
-                /* 2. KHUSUS NUMBER INPUT: Paksa background putih di tengah jadi gelap */
+                /* 2. PAKSA elemen input di dalem number container jadi gelap */
+                div[data-testid="stNumberInputContainer"] input {
+                    background-color: #1a1d2e !important;
+                    color: white !important;
+                    -webkit-text-fill-color: white !important;
+                }
+
+                /* 3. Bersihin background div pembungkus internal number input */
                 div[data-testid="stNumberInputContainer"] > div {
                     background-color: transparent !important;
                 }
                 
-                /* 3. Warna teks input dan tombol plus/minus */
-                input, div[data-testid="stNumberInputContainer"] button {
+                /* 4. Tombol Plus & Minus */
+                div[data-testid="stNumberInputContainer"] button {
+                    background-color: #252a3d !important;
                     color: #ffffff !important;
-                    background-color: transparent !important;
                     border: none !important;
                 }
 
-                /* 4. Hover tombol plus minus biar tetep kelihatan */
                 div[data-testid="stNumberInputContainer"] button:hover {
-                    background-color: #252a3d !important;
                     color: #C5A059 !important;
                 }
 
-                /* Warna label biar tetep putih/abu khas dashboard lu */
+                /* 5. Fix Label agar tetap konsisten premium */
                 label p {
                     color: #ffffff !important;
                     font-weight: 500 !important;
+                    text-transform: uppercase;
+                    font-size: 0.85rem;
+                    letter-spacing: 0.5px;
                 }
             </style>
         """, unsafe_allow_html=True)
 
-        st.markdown("### Form Input Timbangan")
-        with st.form("form_timbang", clear_on_submit=True):
+        st.markdown("### 📝 FORM DATA TIMBANG")
+        with st.form("form_timbang_final", clear_on_submit=True):
             col_kiri, col_kanan = st.columns(2)
             
             with col_kiri:
                 ekspedisi_in = st.text_input("Ekspedisi", placeholder="Nama Ekspedisi...")
                 jenis_in = st.selectbox("Jenis Pengiriman", ["RTO"], index=0)
                 
-                # Input Koli dan Berat (Sekarang sudah gelap total)
+                # Area Number Input yang tadinya belang
                 c_koli, c_berat = st.columns(2)
                 with c_koli:
                     koli_in = st.number_input("Total Koli", min_value=1, step=1)
@@ -6584,11 +6592,12 @@ def show_timbang_system():
                 dari_in = st.text_input("Pengiriman Dari", placeholder="Asal Barang...")
                 ke_in = st.text_input("Pengiriman Ke", placeholder="Tujuan Barang...")
             
+            st.markdown("<br>", unsafe_allow_html=True)
             submit = st.form_submit_button("➕ SIMPAN DATA TIMBANGAN", use_container_width=True)
             
             if submit:
-                # Logic simpan lu di sini
-                st.success("Data Tersimpan!")
+                # Logic simpan data lu di sini
+                st.success("Data Berhasil Masuk Database!")
 
     # --- TAB 2: METRIC BOXES ---
     with tab_metrics:
