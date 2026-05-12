@@ -3900,7 +3900,7 @@ def tampilkan_halaman_po():
                 st.error(f"Gagal memproses data: {e}")
 
     if st.session_state.po_data:
-        df_hasil, df_err, df_miss, m = st.session_state.po_data
+        df_hasil, df_err, df_miss, m, df_split = st.session_state.po_data
 
      # 1. METRICS BOX PREMIUM
         m1, m2, m3, m4 = st.columns(4)
@@ -3929,7 +3929,7 @@ def tampilkan_halaman_po():
                 <span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span>
             </div>''', unsafe_allow_html=True)
 
-        t1, t2, t3 = st.tabs(["📊 Detail Alokasi", "➕QTY SCAN > QTY PO", "➖QTY PO > QTY SCAN"])
+        t1, t2, t3, t4 = st.tabs(["📊 Detail Alokasi", "➕QTY SCAN > QTY PO", "➖QTY PO > QTY SCAN", "📂 SPLIT PER PO"])
         with t1: st.dataframe(df_hasil, use_container_width=True, hide_index=True)
         with t2: st.dataframe(df_err, use_container_width=True, hide_index=True)
         with t3: st.dataframe(df_miss, use_container_width=True, hide_index=True)
