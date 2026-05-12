@@ -3932,7 +3932,42 @@ def tampilkan_halaman_po():
         t1, t2, t3 = st.tabs(["📊 Detail Alokasi", "➕QTY SCAN > QTY PO", "➖QTY PO > QTY SCAN"])
         with t1: st.dataframe(df_hasil, use_container_width=True, hide_index=True)
         with t2: st.dataframe(df_err, use_container_width=True, hide_index=True)
-        with t3: st.dataframe(df_miss, use_container_width=True, hide_index=True)        
+        with t3: st.dataframe(df_miss, use_container_width=True, hide_index=True)
+        with t4:
+            st.subheader("Split Data by No PO")
+            unique_po = df_split['No PO'].unique()
+            selected_po = st.selectbox("Pilih Nomor PO untuk View:", unique_po)
+            
+            # Filter View
+            df_filtered = df_split[df_split['No PO'] == selected_po][['SKU', 'Qty Alokasi']]
+            st.dataframe(df_filtered, use_container_width=True, hide_index=True)
+            
+            st.divider()
+            
+            # Logika Download ZIP
+            st.write("### 📥 Download Semua PO (Multiple Files)")
+            st.info("Klik tombol di bawah untuk mendownload file ZIP berisi Excel untuk setiap No PO.")
+            
+            buf = BytesIO()
+            with zipfile.ZipFile(buf, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                for po_no in unique_po:
+                    # Filter data per PO
+                    df_po_file = df_split[df_split['No PO'] == po_no][['SKU', 'Qty Alokasi']]
+                    
+                    # Simpan ke Excel di memori
+                    output = BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        df_po_file.to_excel(writer, index=False, sheet_name='Sheet1')
+                    
+                    # Masukkan Excel ke dalam ZIP
+                    zip_file.writestr(f"PO_{po_no}.xlsx", output.getvalue())
+            
+            st.download_button(
+                label="📦 DOWNLOAD ALL PO (.ZIP)",
+                data=buf.getvalue(),
+                file_name="rekap_penerimaan_per_po.zip",
+                mime="application/zip"
+            )      
 import pandas as pd
 import io
 
