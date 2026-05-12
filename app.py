@@ -3924,8 +3924,7 @@ def tampilkan_halaman_po():
             st.dataframe(df_err, use_container_width=True, hide_index=True)
         with t3: 
             st.dataframe(df_miss, use_container_width=True, hide_index=True)
-        
-        with t4:
+with t4:
             st.subheader("Download Satuan Per Nomor PO")
             unique_po = df_split['No PO'].unique()
             selected_po = st.selectbox("Pilih Nomor PO:", unique_po, key="po_selector_tab4")
