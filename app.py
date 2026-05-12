@@ -3702,6 +3702,7 @@ import pandas as pd
 import streamlit as st
 from io import BytesIO
 import zipfile
+import re # Tambahkan ini di bagian atas (import)
 
 
 def apply_po_ui():
@@ -3877,19 +3878,33 @@ def process_po_logic(df_scan, df_po):
 
     return df_hasil_final, df_extra_sku, df_p[df_p['Qty Alokasi'] < df_p[p_qty_col]], metrics, df_split
 
-# 1. TARUH DI LUAR FUNGSI UTAMA (Top Level)
 @st.cache_data(show_spinner="Sedang mengompres data PO...")
 def prepare_zip(data_split):
     list_po = data_split['No PO'].unique()
     buf = BytesIO()
-    with zipfile.ZipFile(buf, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+    
+    # PERBAIKAN 1: Gunakan mode "w" (write), bukan "a"
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for po_no in list_po:
+            # PERBAIKAN 2: Bersihkan nama PO dari karakter ilegal (/, \, :, dll)
+            # Jika No PO = "PO/123", maka akan diubah jadi "PO_123" agar ZIP tidak error
+            safe_po_no = re.sub(r'[\\/*?:"<>|]', "_", str(po_no))
+            
             df_po_file = data_split[data_split['No PO'] == po_no][['SKU', 'Qty Alokasi']]
             output = BytesIO()
-            # Pakai engine xlsxwriter biar ultra fast
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_po_file.to_excel(writer, index=False)
-            zip_file.writestr(f"PO_{po_no}.xlsx", output.getvalue())
+            
+            # PERBAIKAN 3: Gunakan blok Try-Except untuk fallback engine Excel
+            try:
+                # Coba pakai xlsxwriter (lebih cepat)
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df_po_file.to_excel(writer, index=False)
+            except ModuleNotFoundError:
+                # Jika xlsxwriter belum diinstall, otomatis pakai openpyxl
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_po_file.to_excel(writer, index=False)
+                    
+            zip_file.writestr(f"PO_{safe_po_no}.xlsx", output.getvalue())
+            
     return buf.getvalue()
 
 def tampilkan_halaman_po():
