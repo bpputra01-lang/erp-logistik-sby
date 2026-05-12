@@ -6683,7 +6683,16 @@ def show_timbang_system():
             if not df.empty:
                 # Pastikan 'id' ada, kalau nggak ada kita kasih proteksi biar gak crash
                 if 'id' in df.columns:
+                    # --- FIX TAMPILAN DI DATA EDITOR ---
                     df_display = df.copy()
+                    
+                    # 1. Konversi ke Datetime & Jakarta Time (WIB)
+                    df_display['created_at'] = pd.to_datetime(df_display['created_at']).dt.tz_convert('Asia/Jakarta')
+                    
+                    # 2. Hilangkan info +07:00 biar bersih di tabel
+                    df_display['created_at'] = df_display['created_at'].dt.tz_localize(None)
+                    
+                    # 3. Baru masukkan kolom SELECT
                     df_display.insert(0, "SELECT", False)
 
                     edited_df = st.data_editor(
@@ -6693,6 +6702,11 @@ def show_timbang_system():
                         column_config={
                             "SELECT": st.column_config.CheckboxColumn("🗑️", default=False),
                             "id": st.column_config.TextColumn("ID", disabled=True),
+                            "created_at": st.column_config.DatetimeColumn(
+                                "Waktu",
+                                format="DD MMM YYYY | HH:mm", # Ini kunci biar gak balik ke format aneh
+                                disabled=True
+                            ),
                         },
                         disabled=[col for col in df_display.columns if col != "SELECT"]
                     )
