@@ -3871,8 +3871,11 @@ def process_po_logic(df_scan, df_po):
 
     # Tab Extra dapet kolom baru 'Ref PO Asli'
     df_extra_sku = pd.DataFrame(over_allocation_list)
+# Buat dulu df_split-nya di dalam fungsi
+    df_split = df_p[[p_no_col, p_sku_col, 'Qty Alokasi']].copy()
+    df_split.columns = ['No PO', 'SKU', 'Qty Alokasi']
 
-    return df_hasil_final, df_extra_sku, df_p[df_p['Qty Alokasi'] < df_p[p_qty_col]], metrics
+    return df_hasil_final, df_extra_sku, df_p[df_p['Qty Alokasi'] < df_p[p_qty_col]], metrics, df_split
 # --- 3. MAIN APP ---
 def tampilkan_halaman_po():
     apply_po_ui()
