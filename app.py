@@ -6675,37 +6675,37 @@ def show_timbang_system():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-          st.markdown("### 📋 LIST DATA TIMBANG")
-        
-        # Cek kolom 'id' dengan lebih teliti
-        df = fetch_timbang_data()
-        
-        if not df.empty:
-            # Pastikan 'id' ada, kalau nggak ada kita kasih proteksi biar gak crash
-            if 'id' in df.columns:
-                df_display = df.copy()
-                df_display.insert(0, "SELECT", False)
+            st.markdown("### 📋 LIST DATA TIMBANG")
+            
+            # Cek kolom 'id' dengan lebih teliti
+            df = fetch_timbang_data()
+            
+            if not df.empty:
+                # Pastikan 'id' ada, kalau nggak ada kita kasih proteksi biar gak crash
+                if 'id' in df.columns:
+                    df_display = df.copy()
+                    df_display.insert(0, "SELECT", False)
 
-                edited_df = st.data_editor(
-                    df_display,
-                    hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "SELECT": st.column_config.CheckboxColumn("🗑️", default=False),
-                        "id": st.column_config.TextColumn("ID", disabled=True),
-                    },
-                    disabled=[col for col in df_display.columns if col != "SELECT"]
-                )
+                    edited_df = st.data_editor(
+                        df_display,
+                        hide_index=True,
+                        use_container_width=True,
+                        column_config={
+                            "SELECT": st.column_config.CheckboxColumn("🗑️", default=False),
+                            "id": st.column_config.TextColumn("ID", disabled=True),
+                        },
+                        disabled=[col for col in df_display.columns if col != "SELECT"]
+                    )
 
-                ids_to_delete = edited_df[edited_df["SELECT"] == True]["id"].tolist()
-                
-                if ids_to_delete:
-                    if st.button(f"🗑️ HAPUS {len(ids_to_delete)} DATA", use_container_width=True):
-                        if delete_multiple_timbang(ids_to_delete):
-                            st.toast("Data Berhasil Dihapus!")
-                            st.rerun()
-            else:
-                st.warning("⚠️ Data lama terdeteksi tanpa ID. Coba input data baru dulu di tab sebelah.")
+                    ids_to_delete = edited_df[edited_df["SELECT"] == True]["id"].tolist()
+                    
+                    if ids_to_delete:
+                        if st.button(f"🗑️ HAPUS {len(ids_to_delete)} DATA", use_container_width=True):
+                            if delete_multiple_timbang(ids_to_delete):
+                                st.toast("Data Berhasil Dihapus!")
+                                st.rerun()
+                else:
+                    st.warning("⚠️ Data lama terdeteksi tanpa ID. Coba input data baru dulu di tab sebelah.")
        st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
