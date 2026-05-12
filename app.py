@@ -6379,14 +6379,51 @@ def show_database_ongkir():
             biaya_rto = df_filtered[mask_rto]['total_ongkir'].sum()
             biaya_datang = df_filtered[~mask_rto]['total_ongkir'].sum()
 
+            # --- TAB 2: METRIC BOXES ---
             m1, m2, m3 = st.columns(3)
-            m1.metric("TOTAL BIAYA ALL", f"Rp {total_biaya:,.0f}")
-            m2.metric("TOTAL KOLI", f"{total_koli} Pcs")
-            m3.metric("AVG COST/KOLI", f"Rp {avg:,.0f}")
+            
+            with m1:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">💰 TOTAL BIAYA ALL</span>
+                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">Rp {total_biaya:,.0f}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
+            
+            with m2:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">📦 TOTAL KOLI</span>
+                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">{total_koli} <small style="font-size: 1rem;">Pcs</small></span>
+                    </div>
+                ''', unsafe_allow_html=True)
+
+            with m3:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">📊 AVG COST/KOLI</span>
+                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">Rp {avg:,.0f}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True) # Jeda antar baris
 
             m4, m5 = st.columns(2)
-            m4.metric("BIAYA RTO", f"Rp {biaya_rto:,.0f}", delta_color="inverse")
-            m5.metric("BIAYA BARANG DATANG", f"Rp {biaya_datang:,.0f}")
+            with m4:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FF4B4B; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">🔄 BIAYA RTO</span>
+                        <span style="color: #FF4B4B; font-size: 2rem; font-weight: 800;">Rp {biaya_rto:,.0f}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
+
+            with m5:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #00EB93; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">🚚 BIAYA BARANG DATANG</span>
+                        <span style="color: #00EB93; font-size: 2rem; font-weight: 800;">Rp {biaya_datang:,.0f}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
 
             st.markdown("---")
             st.subheader("📝 Riwayat Transaksi")
