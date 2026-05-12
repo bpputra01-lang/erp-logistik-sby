@@ -6495,8 +6495,7 @@ def show_timbang_system():
         </style>
         """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><h2 style="color:white; margin:0;">⚖️ SISTEM TIMBANG KOLIAN</h2></div>', unsafe_allow_html=True)
-
+    st.markdown('<div class="hero-header"><p class="hero-text">SISTEM TIMBANG KOLIAN</p></div>', unsafe_allow_html=True)
     tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
 
     with tab_input:
