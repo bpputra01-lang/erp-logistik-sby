@@ -6529,39 +6529,31 @@ def show_timbang_system():
     with tab_input:
         st.markdown("""
             <style>
-                /* Gunakan prefix .main supaya Sidebar tidak ikut berubah */
-                .main div[data-baseweb="input"], 
-                .main div[data-baseweb="select"], 
-                .main div[data-testid="stNumberInputContainer"] {
-                    background-color: #1a1d2e !important;
-                    border: 1px solid #3d4452 !important;
-                    border-radius: 8px !important;
-                }
+            /* Target khusus area utama agar sidebar tidak kena */
+            .main div[data-testid="stNumberInputContainer"] {
+                background-color: #1a1d2e !important;
+                border: 1px solid #3d4452 !important;
+                border-radius: 8px !important;
+            }
 
-                /* Paksa input di dalam area utama saja yang gelap */
-                .main div[data-testid="stNumberInputContainer"] input {
-                    background-color: #1a1d2e !important;
-                    color: white !important;
-                    -webkit-text-fill-color: white !important;
-                }
+            /* Paksa bagian tengah (input field) tetap gelap meski di dalam tab */
+            .main div[data-testid="stNumberInputContainer"] input {
+                background-color: #1a1d2e !important;
+                color: white !important;
+                -webkit-text-fill-color: white !important;
+            }
 
-                /* Bersihin background internal di area utama */
-                .main div[data-testid="stNumberInputContainer"] > div {
-                    background-color: transparent !important;
-                }
-                
-                /* Tombol Plus & Minus di area utama */
-                .main div[data-testid="stNumberInputContainer"] button {
-                    background-color: #252a3d !important;
-                    color: #ffffff !important;
-                    border: none !important;
-                }
+            /* Hilangkan background putih bawaan yang suka muncul lagi */
+            .main div[data-testid="stNumberInputContainer"] > div {
+                background-color: transparent !important;
+            }
 
-                /* Warna Label Form di area utama */
-                .main label p {
-                    color: #ffffff !important;
-                    font-weight: 500 !important;
-                }
+            /* Tombol plus minus agar tetap konsisten gelap */
+            .main div[data-testid="stNumberInputContainer"] button {
+                background-color: #252a3d !important;
+                color: white !important;
+                border: none !important;
+            }
             </style>
         """, unsafe_allow_html=True)
 
