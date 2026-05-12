@@ -6675,36 +6675,39 @@ def show_timbang_system():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- 4. LIST DATA DENGAN CHECKBOX ---
+          # --- 4. LIST DATA DENGAN CHECKBOX ---
         st.markdown("### 📋 LIST DATA TIMBANG")
         
-        # Tambahkan kolom 'Hapus' (Checkbox) di awal dataframe
+        # Buat copy dataframe dan tambahkan kolom checkbox di paling depan
         df_display = df.copy()
-        df_display.insert(0, "HAPUS", False)
+        df_display.insert(0, "SELECT", False)
 
-        # Tampilkan tabel yang bisa diedit (centang)
+        # Tampilkan tabel yang bisa diedit
         edited_df = st.data_editor(
             df_display,
             hide_index=True,
             use_container_width=True,
             column_config={
-                "HAPUS": st.column_config.CheckboxColumn("🗑️", default=False),
-                "id": None, # Sembunyikan kolom ID
+                "SELECT": st.column_config.CheckboxColumn("🗑️", default=False),
+                "id": st.column_config.TextColumn("ID", disabled=True), # Tetap ada tapi gak bisa diedit
                 "created_at": "Waktu",
                 "ekspedisi": "Ekspedisi",
                 "total_koli": "Koli",
                 "berat_total_timbang": "Berat (Kg)"
             },
-            disabled=["created_at", "ekspedisi", "total_koli", "berat_total_timbang"] # Biar gak bisa diedit isinya
+            # Kolom selain SELECT jangan sampai bisa diedit manual
+            disabled=[col for col in df_display.columns if col != "SELECT"]
         )
 
-        # Tombol Eksekusi Hapus
-        ids_to_delete = edited_df[edited_df["HAPUS"] == True]["id"].tolist()
+        # Filter ID yang mau dihapus
+        # Kita pakai nama kolom 'SELECT' biar gak bentrok sama logic lain
+        ids_to_delete = edited_df[edited_df["SELECT"] == True]["id"].tolist()
         
         if ids_to_delete:
-            if st.button(f"🗑️ HAPUS {len(ids_to_delete)} DATA TERPILIH", use_container_width=True):
+            st.warning(f"⚠️ {len(ids_to_delete)} data terpilih untuk dihapus.")
+            if st.button(f"🚮 EKSEKUSI HAPUS DATA", use_container_width=True):
                 if delete_multiple_timbang(ids_to_delete):
-                    st.toast(f"{len(ids_to_delete)} Data Berhasil Dihapus!")
+                    st.toast("Data Berhasil Dihapus!")
                     st.rerun()
 with st.sidebar:
        st.markdown("""
