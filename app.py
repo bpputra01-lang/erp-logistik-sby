@@ -3830,7 +3830,6 @@ def process_po_logic(df_scan, df_po):
         sisa_stok = float(total_stok)
         target_po_indices = df_p[df_p[p_sku_col] == sku].index.tolist()
         
-        # Cari semua daftar No PO unik untuk SKU ini (buat tracing di tab Extra)
         po_references = ", ".join(df_p.loc[df_p[p_sku_col] == sku, p_no_col].unique().astype(str))
         
         if not target_po_indices:
@@ -3852,7 +3851,7 @@ def process_po_logic(df_scan, df_po):
             over_allocation_list.append({
                 'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0, 
                 'Qty Alokasi': sisa_stok, 'Status Alokasi': 'Over Allocation',
-                'Ref PO Asli': po_references # Ini yang lu minta, daftar No PO dipisah koma
+                'Ref PO Asli': po_references
             })
 
     # 5. Finalisasi DataFrame
@@ -3863,20 +3862,21 @@ def process_po_logic(df_scan, df_po):
         pd.DataFrame(over_allocation_list).drop(columns=['Ref PO Asli'], errors='ignore')
     ], ignore_index=True)
 
-    # 6. Metrics
+    # 6. Metrics & Data Split
     metrics["total_po"] = int(df_p[p_qty_col].sum())
     metrics["total_scan"] = int(df_s[s_qty_col].sum())
     metrics["kurang_po"] = int(sum(x['Qty Alokasi'] for x in over_allocation_list))
     metrics["lebih_po"] = int(df_p[p_qty_col].sum() - df_p['Qty Alokasi'].sum())
 
-    # Tab Extra dapet kolom baru 'Ref PO Asli'
     df_extra_sku = pd.DataFrame(over_allocation_list)
+    df_split = df_p[[p_no_col, p_sku_col, 'Qty Alokasi']].copy()
+    df_split.columns = ['No PO', 'SKU', 'Qty Alokasi']
 
-    return df_hasil_final, df_extra_sku, df_p[df_p['Qty Alokasi'] < df_p[p_qty_col]], metrics
-# --- 3. MAIN APP ---
+    # Return 5 variabel agar sinkron dengan UI
+    return df_hasil_final, df_extra_sku, df_p[df_p['Qty Alokasi'] < df_p[p_qty_col]], metrics, df_split
+
 def tampilkan_halaman_po():
-    apply_po_ui()
-    
+    # Pastikan CSS Premium Card sudah dipanggil (Gue asumsikan apply_po_ui ada)
     if "po_data" not in st.session_state:
         st.session_state.po_data = None
 
@@ -3890,49 +3890,62 @@ def tampilkan_halaman_po():
                 df_s = pd.read_excel(f_scan) if f_scan.name.endswith('.xlsx') else pd.read_csv(f_scan)
                 df_p = pd.read_excel(f_po) if f_po.name.endswith('.xlsx') else pd.read_csv(f_po)
                 
-                # Cek minimal kolom (PO butuh 8 kolom: A-H)
                 if len(df_p.columns) < 8:
                     st.error("File PO kurang kolom! Pastikan sampai kolom H.")
                 else:
+                    # Update session state dengan 5 variabel return
                     st.session_state.po_data = process_po_logic(df_s, df_p)
                     st.success("Analisis Selesai!")
+                    st.rerun() # Paksa refresh biar Tab muncul
             except Exception as e:
                 st.error(f"Gagal memproses data: {e}")
 
+    # UI RENDERING - Dilakukan jika data sudah ada di session state
     if st.session_state.po_data:
-        df_hasil, df_err, df_miss, m = st.session_state.po_data
+        df_hasil, df_err, df_miss, m, df_split = st.session_state.po_data
 
-     # 1. METRICS BOX PREMIUM
+        # 1. METRICS BOX PREMIUM
         m1, m2, m3, m4 = st.columns(4)
-        
         with m1:
-            st.markdown(f'''<div class="m-box-po" style="border-left-color: #00d2ff;">
-                <span class="m-lbl">📦 TOTAL QTY PO</span>
-                <span class="m-val">{m["total_po"]:,}</span>
-            </div>''', unsafe_allow_html=True)
-            
+            st.markdown(f'<div class="m-box-po" style="border-left-color: #00d2ff;"><span class="m-lbl">📦 TOTAL QTY PO</span><span class="m-val">{m["total_po"]:,}</span></div>', unsafe_allow_html=True)
         with m2:
-            st.markdown(f'''<div class="m-box-po" style="border-left-color: #00d2ff;">
-                <span class="m-lbl">📲 TOTAL QTY SCAN</span>
-                <span class="m-val">{m["total_scan"]:,}</span>
-            </div>''', unsafe_allow_html=True)
-            
+            st.markdown(f'<div class="m-box-po" style="border-left-color: #00d2ff;"><span class="m-lbl">📲 TOTAL QTY SCAN</span><span class="m-val">{m["total_scan"]:,}</span></div>', unsafe_allow_html=True)
         with m3:
-            st.markdown(f'''<div class="m-box-po" style="border-left-color: #ff4b4b;">
-                <span class="m-lbl">➕ TOTAL DIFF SCAN VS PO </span>
-                <span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span>
-            </div>''', unsafe_allow_html=True)
-            
+            st.markdown(f'<div class="m-box-po" style="border-left-color: #ff4b4b;"><span class="m-lbl">➕ DIFF SCAN VS PO</span><span class="m-val" style="color:#ff4b4b;">{m["kurang_po"]:,}</span></div>', unsafe_allow_html=True)
         with m4:
-            st.markdown(f'''<div class="m-box-po" style="border-left-color: #ffa500;">
-                <span class="m-lbl">➖ TOTAL DIFF PO VS SCAN</span>
-                <span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span>
-            </div>''', unsafe_allow_html=True)
+            st.markdown(f'<div class="m-box-po" style="border-left-color: #ffa500;"><span class="m-lbl">➖ DIFF PO VS SCAN</span><span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span></div>', unsafe_allow_html=True)
 
-        t1, t2, t3 = st.tabs(["📊 Detail Alokasi", "➕QTY SCAN > QTY PO", "➖QTY PO > QTY SCAN"])
-        with t1: st.dataframe(df_hasil, use_container_width=True, hide_index=True)
-        with t2: st.dataframe(df_err, use_container_width=True, hide_index=True)
-        with t3: st.dataframe(df_miss, use_container_width=True, hide_index=True)        
+        # 2. TAB RENDERING - DEFINISI 4 TAB
+        t1, t2, t3, t4 = st.tabs(["📊 Detail Alokasi", "➕ QTY SCAN > PO", "➖ QTY PO > SCAN", "📂 DOWNLOAD PER PO"])
+        
+        with t1: 
+            st.dataframe(df_hasil, use_container_width=True, hide_index=True)
+        with t2: 
+            st.dataframe(df_err, use_container_width=True, hide_index=True)
+        with t3: 
+            st.dataframe(df_miss, use_container_width=True, hide_index=True)
+        
+        with t4:
+            st.subheader("Download Satuan Per Nomor PO")
+            unique_po = df_split['No PO'].unique()
+            selected_po = st.selectbox("Pilih Nomor PO:", unique_po, key="po_selector_tab4")
+            
+            # Filter data untuk preview & download
+            df_selected = df_split[df_split['No PO'] == selected_po][['SKU', 'Qty Alokasi']]
+            st.dataframe(df_selected, use_container_width=True, hide_index=True)
+            
+            # Logic Download Satuan (One by One)
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_selected.to_excel(writer, index=False)
+            
+            st.download_button(
+                label=f"📥 DOWNLOAD PO: {selected_po}",
+                data=output.getvalue(),
+                file_name=f"REKAP_PO_{selected_po}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )        
 import pandas as pd
 import io
 
