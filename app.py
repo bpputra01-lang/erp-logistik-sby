@@ -6527,48 +6527,40 @@ def show_timbang_system():
     tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
 
     with tab_input:
-        # --- CSS ULTRA DARK FORCING (Targeting the actual input field) ---
         st.markdown("""
             <style>
-                /* 1. Hajar semua container utama */
-                div[data-baseweb="input"], 
-                div[data-baseweb="select"], 
-                div[data-testid="stNumberInputContainer"] {
+                /* Gunakan prefix .main supaya Sidebar tidak ikut berubah */
+                .main div[data-baseweb="input"], 
+                .main div[data-baseweb="select"], 
+                .main div[data-testid="stNumberInputContainer"] {
                     background-color: #1a1d2e !important;
                     border: 1px solid #3d4452 !important;
                     border-radius: 8px !important;
                 }
 
-                /* 2. PAKSA elemen input di dalem number container jadi gelap */
-                div[data-testid="stNumberInputContainer"] input {
+                /* Paksa input di dalam area utama saja yang gelap */
+                .main div[data-testid="stNumberInputContainer"] input {
                     background-color: #1a1d2e !important;
                     color: white !important;
                     -webkit-text-fill-color: white !important;
                 }
 
-                /* 3. Bersihin background div pembungkus internal number input */
-                div[data-testid="stNumberInputContainer"] > div {
+                /* Bersihin background internal di area utama */
+                .main div[data-testid="stNumberInputContainer"] > div {
                     background-color: transparent !important;
                 }
                 
-                /* 4. Tombol Plus & Minus */
-                div[data-testid="stNumberInputContainer"] button {
+                /* Tombol Plus & Minus di area utama */
+                .main div[data-testid="stNumberInputContainer"] button {
                     background-color: #252a3d !important;
                     color: #ffffff !important;
                     border: none !important;
                 }
 
-                div[data-testid="stNumberInputContainer"] button:hover {
-                    color: #C5A059 !important;
-                }
-
-                /* 5. Fix Label agar tetap konsisten premium */
-                label p {
+                /* Warna Label Form di area utama */
+                .main label p {
                     color: #ffffff !important;
                     font-weight: 500 !important;
-                    text-transform: uppercase;
-                    font-size: 0.85rem;
-                    letter-spacing: 0.5px;
                 }
             </style>
         """, unsafe_allow_html=True)
