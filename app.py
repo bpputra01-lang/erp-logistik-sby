@@ -3701,6 +3701,8 @@ def menu_retur_out_system():
 import pandas as pd
 import streamlit as st
 from io import BytesIO
+import zipfile
+
 
 def apply_po_ui():
     st.markdown("""
@@ -3798,6 +3800,7 @@ def apply_po_ui():
         - **NO ALLOCATION** : Kondisi dimana terdapat indikasi **BARANG TIDAK DIKIRIM / BELUM TERSCAN / SALAH INPUT QTY PO**
         - **OVER ALLOCATION** : Kondisi dimana terdapat Indikasi **KELEBIHAN SCAN / KURANG INPUT QTY PO / ADA SUBTITUDE ANTAR SKU**
         """)
+
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
     
@@ -3830,7 +3833,7 @@ def process_po_logic(df_scan, df_po):
         sisa_stok = float(total_stok)
         target_po_indices = df_p[df_p[p_sku_col] == sku].index.tolist()
         
-        # Cari semua daftar No PO unik untuk SKU ini (buat tracing di tab Extra)
+        # Cari semua daftar No PO unik untuk SKU ini
         po_references = ", ".join(df_p.loc[df_p[p_sku_col] == sku, p_no_col].unique().astype(str))
         
         if not target_po_indices:
@@ -3852,7 +3855,7 @@ def process_po_logic(df_scan, df_po):
             over_allocation_list.append({
                 'No PO': 'OVER SCAN PO', 'SKU': sku, 'Qty PO': 0, 
                 'Qty Alokasi': sisa_stok, 'Status Alokasi': 'Over Allocation',
-                'Ref PO Asli': po_references # Ini yang lu minta, daftar No PO dipisah koma
+                'Ref PO Asli': po_references
             })
 
     # 5. Finalisasi DataFrame
@@ -3869,14 +3872,15 @@ def process_po_logic(df_scan, df_po):
     metrics["kurang_po"] = int(sum(x['Qty Alokasi'] for x in over_allocation_list))
     metrics["lebih_po"] = int(df_p[p_qty_col].sum() - df_p['Qty Alokasi'].sum())
 
-    # Tab Extra dapet kolom baru 'Ref PO Asli'
+    # Data Extra
     df_extra_sku = pd.DataFrame(over_allocation_list)
-# Buat dulu df_split-nya di dalam fungsi
+    
+    # Data Split per PO
     df_split = df_p[[p_no_col, p_sku_col, 'Qty Alokasi']].copy()
     df_split.columns = ['No PO', 'SKU', 'Qty Alokasi']
 
     return df_hasil_final, df_extra_sku, df_p[df_p['Qty Alokasi'] < df_p[p_qty_col]], metrics, df_split
-# --- 3. MAIN APP ---
+
 def tampilkan_halaman_po():
     apply_po_ui()
     
@@ -3893,19 +3897,21 @@ def tampilkan_halaman_po():
                 df_s = pd.read_excel(f_scan) if f_scan.name.endswith('.xlsx') else pd.read_csv(f_scan)
                 df_p = pd.read_excel(f_po) if f_po.name.endswith('.xlsx') else pd.read_csv(f_po)
                 
-                # Cek minimal kolom (PO butuh 8 kolom: A-H)
                 if len(df_p.columns) < 8:
                     st.error("File PO kurang kolom! Pastikan sampai kolom H.")
                 else:
+                    # SIMPAN HASIL KE STATE
                     st.session_state.po_data = process_po_logic(df_s, df_p)
                     st.success("Analisis Selesai!")
+                    st.rerun() # Refresh agar UI baru muncul
             except Exception as e:
                 st.error(f"Gagal memproses data: {e}")
 
+    # BAGIAN UI DI BAWAH INI HARUS DI LUAR BLOK BUTTON
     if st.session_state.po_data:
         df_hasil, df_err, df_miss, m, df_split = st.session_state.po_data
 
-     # 1. METRICS BOX PREMIUM
+        # 1. METRICS BOX PREMIUM
         m1, m2, m3, m4 = st.columns(4)
         
         with m1:
@@ -3932,14 +3938,19 @@ def tampilkan_halaman_po():
                 <span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span>
             </div>''', unsafe_allow_html=True)
 
+        # 2. TABS RENDERING
         t1, t2, t3, t4 = st.tabs(["📊 Detail Alokasi", "➕QTY SCAN > QTY PO", "➖QTY PO > QTY SCAN", "📂 SPLIT PER PO"])
-        with t1: st.dataframe(df_hasil, use_container_width=True, hide_index=True)
-        with t2: st.dataframe(df_err, use_container_width=True, hide_index=True)
-        with t3: st.dataframe(df_miss, use_container_width=True, hide_index=True)
+        
+        with t1: 
+            st.dataframe(df_hasil, use_container_width=True, hide_index=True)
+        with t2: 
+            st.dataframe(df_err, use_container_width=True, hide_index=True)
+        with t3: 
+            st.dataframe(df_miss, use_container_width=True, hide_index=True)
         with t4:
             st.subheader("Split Data by No PO")
             unique_po = df_split['No PO'].unique()
-            selected_po = st.selectbox("Pilih Nomor PO untuk View:", unique_po)
+            selected_po = st.selectbox("Pilih Nomor PO untuk View:", unique_po, key="sel_po")
             
             # Filter View
             df_filtered = df_split[df_split['No PO'] == selected_po][['SKU', 'Qty Alokasi']]
@@ -3954,23 +3965,22 @@ def tampilkan_halaman_po():
             buf = BytesIO()
             with zipfile.ZipFile(buf, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
                 for po_no in unique_po:
-                    # Filter data per PO
                     df_po_file = df_split[df_split['No PO'] == po_no][['SKU', 'Qty Alokasi']]
                     
-                    # Simpan ke Excel di memori
                     output = BytesIO()
                     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                         df_po_file.to_excel(writer, index=False, sheet_name='Sheet1')
                     
-                    # Masukkan Excel ke dalam ZIP
                     zip_file.writestr(f"PO_{po_no}.xlsx", output.getvalue())
             
             st.download_button(
                 label="📦 DOWNLOAD ALL PO (.ZIP)",
                 data=buf.getvalue(),
                 file_name="rekap_penerimaan_per_po.zip",
-                mime="application/zip"
-            )      
+                mime="application/zip",
+                use_container_width=True,
+                key="dl_zip"
+            )
 import pandas as pd
 import io
 
