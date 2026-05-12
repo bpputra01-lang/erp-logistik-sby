@@ -3705,7 +3705,7 @@ import zipfile
 
 def apply_po_ui():
     # 1. CSS CUSTOM STYLING
-st.markdown("""
+    st.markdown("""
         <style>
             /* HERO HEADER */
             .hero-header {
