@@ -3704,60 +3704,60 @@ from io import BytesIO
 
 def apply_po_ui():
     st.markdown("""
-        <style>
-            /* 2. HERO HEADER */
-            .hero-header {
-                background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
-                padding: 25px;
-                border-radius: 12px;
-                margin-bottom: 25px;
-                box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
-                border-left: 8px solid #007BFF;
-                display: block !important; /* Memastikan element tampil */
-            }
-            .hero-text {
-                color: white !important;
-                margin: 0 !important;
-                font-size: 24px !important;
-                font-weight: 800 !important;
-                letter-spacing: 1px;
-            }
+    <style>
+        /* 2. HERO HEADER */
+        .hero-header {
+            background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
+            border-left: 8px solid #007BFF;
+            display: block !important; /* Memastikan element tampil */
+        }
+        .hero-text {
+            color: white !important;
+            margin: 0 !important;
+            font-size: 24px !important;
+            font-weight: 800 !important;
+            letter-spacing: 1px;
+        }
 
-            /* 3. METRIC CARD PREMIUM */
-            .m-box-po {
-                background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
-                padding: 22px;
-                border-radius: 10px;
-                border-left: 5px solid #00d2ff;
-                text-align: left;
-                box-shadow: 2px 10px 20px rgba(0,0,0,0.4);
-                margin-bottom: 10px;
-                min-height: 120px;
-            }
-            
-            /* 4. FIX UNTUK EXPANDER & TEXT */
-            /* Pastikan tulisan di dalam expander tidak ikut memutih jika backgroundnya terang */
-            .stExpander {
-                background-color: transparent !important;
-                border: 1px solid #3d4452 !important;
-                margin-bottom: 10px;
-            }
+        /* 3. METRIC CARD PREMIUM */
+        .m-box-po {
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            padding: 22px;
+            border-radius: 10px;
+            border-left: 5px solid #00d2ff;
+            text-align: left;
+            box-shadow: 2px 10px 20px rgba(0,0,0,0.4);
+            margin-bottom: 10px;
+            min-height: 120px;
+        }
+        
+        /* 4. FIX UNTUK EXPANDER & TEXT */
+        /* Pastikan tulisan di dalam expander tidak ikut memutih jika backgroundnya terang */
+        .stExpander {
+            background-color: transparent !important;
+            border: 1px solid #3d4452 !important;
+            margin-bottom: 10px;
+        }
 
-            /* 5. FILE UPLOADER FIX */
-            /* Jangan gunakan background-color white secara paksa pada container besar */
-            [data-testid="stFileUploader"] {
-                background-color: rgba(255, 255, 255, 0.05) !important; /* Gunakan transparan atau warna spesifik */
-                padding: 20px;
-                border-radius: 10px;
-                border: 1px dashed #4e5563;
-            }
-            
-            /* Fix warna teks pada info box agar terbaca */
-            .stAlert p {
-                color: white !important;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+        /* 5. FILE UPLOADER FIX */
+        /* Jangan gunakan background-color white secara paksa pada container besar */
+        [data-testid="stFileUploader"] {
+            background-color: rgba(255, 255, 255, 0.05) !important; /* Gunakan transparan atau warna spesifik */
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px dashed #4e5563;
+        }
+        
+        /* Fix warna teks pada info box agar terbaca */
+        .stAlert p {
+            color: white !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
     st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
     with st.expander("📋 Informasi Format File"):
