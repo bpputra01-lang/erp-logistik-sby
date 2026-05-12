@@ -1,14 +1,12 @@
 streamlit>=1.31.0
-pandas==2.2.1
+pandas
 numpy
 mysql-connector-python
 python-calamine
 xlsxwriter
 openpyxl
-altair<5
 plotly
 pytz
-streamlit
 streamlit-autorefresh
 supabase
 sqlalchemy
