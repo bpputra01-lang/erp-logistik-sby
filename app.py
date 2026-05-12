@@ -6551,6 +6551,7 @@ def show_timbang_system():
     tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
 
     with tab_input:
+        st.markdown('<div class="form-container-premium">', unsafe_allow_html=True)
         st.markdown("### 📝 FORM DATA TIMBANG")
         with st.form("form_timbang_final", clear_on_submit=True):
             col_kiri, col_kanan = st.columns(2)
