@@ -3703,7 +3703,7 @@ import streamlit as st
 from io import BytesIO
 
 def apply_po_ui():
-    st.markdown("""
+st.markdown("""
     <style>
         /* 2. HERO HEADER */
         .hero-header {
@@ -3713,6 +3713,7 @@ def apply_po_ui():
             margin-bottom: 25px;
             box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
             border-left: 8px solid #007BFF;
+            display: block !important; /* Memastikan element tampil */
         }
         .hero-text {
             color: white !important;
@@ -3720,9 +3721,9 @@ def apply_po_ui():
             font-size: 24px !important;
             font-weight: 800 !important;
             letter-spacing: 1px;
-        } /* <-- Tadi di kode lu kurung ini ilang, cok! */
+        }
 
-        /* 3. METRIC CARD PREMIUM (HANYA SATU DEFINISI BIAR GAK NABRAK) */
+        /* 3. METRIC CARD PREMIUM */
         .m-box-po {
             background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
             padding: 22px;
@@ -3733,41 +3734,27 @@ def apply_po_ui():
             margin-bottom: 10px;
             min-height: 120px;
         }
-        .m-lbl { 
-            color: #8a8d9a !important; 
-            font-size: 11px !important; 
-            font-weight: 700 !important; 
-            text-transform: uppercase !important; 
-            letter-spacing: 1.2px !important;
-            margin-bottom: 10px !important;
-            display: block !important;
-        }
-        .m-val { 
-            color: #C5A059 !important; /* Warna Gold lu */
-            font-size: 30px !important; 
-            font-weight: 800 !important; 
-            font-family: 'Inter', sans-serif !important; /* Font modern & tegas */
-            display: block !important;
-            line-height: 1.2 !important;
+        
+        /* 4. FIX UNTUK EXPANDER & TEXT */
+        /* Pastikan tulisan di dalam expander tidak ikut memutih jika backgroundnya terang */
+        .stExpander {
+            background-color: transparent !important;
+            border: 1px solid #3d4452 !important;
+            margin-bottom: 10px;
         }
 
-        /* 4. BUTTON STYLE */
-        div.stButton > button {
-            background: #C5A059 !important;
-            color: white !important;
-            border: none !important;
-            font-weight: bold !important;
-            height: 50px !important;
-            border-radius: 8px !important;
-            width: 100%;
-        }
-
+        /* 5. FILE UPLOADER FIX */
+        /* Jangan gunakan background-color white secara paksa pada container besar */
         [data-testid="stFileUploader"] {
-            background-color: white !important;
+            background-color: rgba(255, 255, 255, 0.05) !important; /* Gunakan transparan atau warna spesifik */
             padding: 20px;
             border-radius: 10px;
-            border: 1px dashed #ced4da;
-            color: black !important;
+            border: 1px dashed #4e5563;
+        }
+        
+        /* Fix warna teks pada info box agar terbaca */
+        .stAlert p {
+            color: white !important;
         }
     </style>
     """, unsafe_allow_html=True)
