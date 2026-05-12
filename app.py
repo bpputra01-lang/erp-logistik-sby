@@ -6527,38 +6527,38 @@ def show_timbang_system():
     tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
 
     with tab_input:
-        # --- CSS UNTUK DARK INPUT BOX ---
-            st.markdown("""
-                <style>
-                    /* Mengubah background container input (text, number, selectbox) */
-                    div[data-baseweb="input"], div[data-baseweb="select"] {
-                        background-color: #1a1d2e !important;
-                        border: 1px solid #3d4452 !important;
-                        border-radius: 8px !important;
-                    }
+    # --- CSS UNTUK DARK INPUT BOX ---
+        st.markdown("""
+            <style>
+                /* Mengubah background container input (text, number, selectbox) */
+                div[data-baseweb="input"], div[data-baseweb="select"] {
+                    background-color: #1a1d2e !important;
+                    border: 1px solid #3d4452 !important;
+                    border-radius: 8px !important;
+                }
 
-                    /* Warna teks di dalam input */
-                    input, div[data-baseweb="select"] div {
-                        color: #ffffff !important;
-                        font-weight: 500 !important;
-                    }
+                /* Warna teks di dalam input */
+                input, div[data-baseweb="select"] div {
+                    color: #ffffff !important;
+                    font-weight: 500 !important;
+                }
 
-                    /* Menyesuaikan placeholder agar tidak terlalu terang */
-                    input::placeholder {
-                        color: #5d647a !important;
-                    }
+                /* Menyesuaikan placeholder agar tidak terlalu terang */
+                input::placeholder {
+                    color: #5d647a !important;
+                }
 
-                    /* Merampingkan tombol submit agar tidak terlalu kaku */
-                    button[kind="primaryFormSubmit"] {
-                        background: #C5A059 !important;
-                        border: none !important;
-                        color: white !important;
-                        font-weight: bold !important;
-                        height: 45px !important;
-                        border-radius: 8px !important;
-                    }
-                </style>
-            """, unsafe_allow_html=True)
+                /* Merampingkan tombol submit agar tidak terlalu kaku */
+                button[kind="primaryFormSubmit"] {
+                    background: #C5A059 !important;
+                    border: none !important;
+                    color: white !important;
+                    font-weight: bold !important;
+                    height: 45px !important;
+                    border-radius: 8px !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
 
         st.markdown("### Form Input Timbangan")
         with st.form("form_timbang", clear_on_submit=True):
