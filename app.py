@@ -6530,14 +6530,6 @@ def show_timbang_system():
         # --- CSS ULTRA DARK FORCING (Targeting the actual input field) ---
         st.markdown("""
             <style>
-                /* 1. Hajar semua container utama */
-                div[data-baseweb="input"], 
-                div[data-baseweb="select"], 
-                div[data-testid="stNumberInputContainer"] {
-                    background-color: #1a1d2e !important;
-                    border: 1px solid #3d4452 !important;
-                    border-radius: 8px !important;
-                }
 
                 /* 2. PAKSA elemen input di dalem number container jadi gelap */
                 div[data-testid="stNumberInputContainer"] input {
