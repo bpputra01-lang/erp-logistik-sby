@@ -6588,8 +6588,14 @@ def show_timbang_system():
         df = fetch_timbang_data()
         
         if not df.empty:
-            # --- 1. RAPIHIN DATE TIME ---
-            df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%d %b %Y | %H:%M')
+            # --- FIX JAM SURABAYA (UTC ke WIB) ---
+            df['created_at'] = pd.to_datetime(df['created_at']) # Pastikan jadi format datetime
+            
+            # Tambahin 7 jam biar jadi WIB
+            df['created_at'] = df['created_at'].dt.tz_convert('Asia/Jakarta') 
+            
+            # Baru diformat buat tampilan tabel
+            df['created_at'] = df['created_at'].dt.strftime('%d %b %Y | %H:%M')
             
             # --- 2. HITUNG METRIK ---
             total_koli = df['total_koli'].sum()
