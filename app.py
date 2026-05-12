@@ -6409,6 +6409,7 @@ def show_database_ongkir():
                 st.info("💡 Centang baris di tabel untuk menghapus data.")
         else:
             st.info("Data masih kosong.")
+            
 import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime
