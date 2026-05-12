@@ -6588,27 +6588,50 @@ def show_timbang_system():
         df = fetch_timbang_data()
         
         if not df.empty:
-            # --- PERHITUNGAN METRIK ---
+            # --- 1. RAPIHIN DATE TIME ---
+            df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%d %b %Y | %H:%M')
+            
+            # --- 2. HITUNG METRIK ---
             total_koli = df['total_koli'].sum()
             total_berat = df['berat_total_timbang'].sum()
+            total_data = len(df)
             
+            # --- 3. TAMPILAN METRIK PREMIUM ---
             m1, m2, m3 = st.columns(3)
             with m1:
-                st.markdown(f'<div class="m-box-premium"><span class="m-label">📦 Total Koli</span><span class="m-value">{total_koli:,}</span></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">📦 TOTAL KOLI</span>
+                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">{total_koli:,}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
             with m2:
-                st.markdown(f'<div class="m-box-premium"><span class="m-label">⚖️ Total Berat</span><span class="m-value">{total_berat:,.2f} Kg</span></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">⚖️ TOTAL BERAT</span>
+                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">{total_berat:,.2f} <small style="font-size: 1rem;">Kg</small></span>
+                    </div>
+                ''', unsafe_allow_html=True)
             with m3:
-                st.markdown(f'<div class="m-box-premium"><span class="m-label">📝 Total Data</span><span class="m-value">{len(df)}</span></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">📝 TOTAL DATA</span>
+                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">{total_data:,}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
-            # Urutkan berdasarkan data terbaru agar langsung kelihatan di atas
-            st.dataframe(df.sort_values('created_at', ascending=False), use_container_width=True, hide_index=True)
+            
+            # --- 4. DATA FRAME RAPI ---
+            # Kita sembunyikan kolom ID biar nggak menuh-menuhin
+            st.dataframe(
+                df.sort_values('created_at', ascending=False), 
+                use_container_width=True, 
+                hide_index=True,
+                column_order=("created_at", "ekspedisi", "jenis_pengiriman", "total_koli", "berat_total_timbang", "pengiriman_dari", "pengiriman_ke")
+            )
         else:
-            # Jika blank, tampilkan warning agar lu tau fungsinya jalan atau nggak
             st.warning("⚠️ Belum ada data timbangan terdeteksi di database.")
-
-
-    
 
 with st.sidebar:
        st.markdown("""
