@@ -6465,61 +6465,85 @@ def show_timbang_system():
     # CSS Custom - Menjaga konsistensi dengan UI Premium Surabaya Dashboard
     st.markdown("""
         <style>
-        /* HERO HEADER */
         .hero-header {
-            background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
-            border-left: 8px solid #007BFF;
+            background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
+            padding: 2rem;
+            border-radius: 10px;
+            border-left: 5px solid #FFD700;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        
-        .hero-text {
-            color: white !important;
-            margin: 0 !important;
-            font-size: 24px !important;
-            font-weight: 800 !important;
+        .hero-header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 2.2rem;
             letter-spacing: 1px;
         }
-
-        /* PREMIUM BOX */
-        .m-box-premium {
-            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
-            padding: 20px;
-            border-radius: 12px;
-            border-left: 4px solid #C5A059;
-            box-shadow: 2px 4px 15px rgba(0,0,0,0.3);
-            margin-bottom: 10px;
+        div[data-baseweb="input"], div[data-baseweb="select"] {
+            background-color: #0e1117 !important;
+            border: 1px solid #3e444d !important;
+            border-radius: 5px !important;
         }
-        
-        /* DARK INPUT BOX - Mengubah kolom putih jadi gelap */
-        div[data-baseweb="input"] {
-            background-color: #1a1d2e !important;
-            border: 1px solid #3d4452 !important;
-            border-radius: 8px !important;
+        div[data-baseweb="input"]:focus-within {
+            border-color: #FFD700 !important;
+            box-shadow: 0 0 0 1px #FFD700 !important;
         }
-        
-        input {
+        .solid-header {
+            background-color: #FFD700 !important; 
+            color: #0e1117 !important; 
+            padding: 10px 15px !important;
+            border-radius: 5px !important;
+            font-weight: 900 !important;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 15px !important;
+            display: inline-block;
+        }
+        .stButton button, .stDownloadButton button {
+            background-color: #1a1e24 !important; 
+            color: #FFD700 !important; 
+            border: 3px solid #FFD700 !important; 
+            border-radius: 12px !important; 
+            padding: 12px 24px !important;
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important; 
+            letter-spacing: 1.5px; 
+            transition: all 0.3s ease-in-out; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+        }
+        .stButton button:hover, .stDownloadButton button:hover {
+            background-color: #FFD700 !important; 
+            color: #0e1117 !important; 
+            transform: translateY(-3px); 
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4); 
+        }
+        .stButton button:focus, .stDownloadButton button:focus {
+            box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.5) !important;
+            outline: none !important;
+        }
+        input[type="number"] {
             color: #ffffff !important;
-            font-weight: 600 !important;
+            background-color: #0e1117 !important;
         }
-
-        /* CUSTOM BUTTON - Dibuat tidak panjang (auto width) */
-        .stButton > button {
-            background: #C5A059 !important;
-            color: white !important;
-            border: none !important;
-            padding: 10px 30px !important;
-            font-weight: bold !important;
+        [data-testid="stExpander"] details summary {
+            background-color: #1a1e24 !important; 
+            color: #FFFFFF !important; 
+            border: 1px solid #3e444d !important;
             border-radius: 8px !important;
-            width: auto !important; /* Biar gak panjang banget */
-            display: block;
-            margin: 0 auto; /* Center alignment jika diperlukan */
+            padding: 10px 15px !important;
+            transition: 0.3s !important;
         }
-        
-        .m-label { color: #8a8d9a; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
-        .m-value { color: #ffffff; font-size: 1.8rem; font-weight: 700; display: block; }
+        [data-testid="stMetricValue"] {
+            color: #FFD700 !important;
+            font-size: 28px !important;
+            font-weight: 700 !important;
+        }
+        [data-testid="stMetricLabel"] {
+            color: #ffffff !important;
+            font-size: 14px !important;
+            letter-spacing: 1px;
+        }
         </style>
         """, unsafe_allow_html=True)
 
@@ -6527,52 +6551,6 @@ def show_timbang_system():
     tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
 
     with tab_input:
-        # --- CSS ULTRA DARK FORCING (Targeting the actual input field) ---
-        st.markdown("""
-            <style>
-                /* 1. Hajar container utama (Tetap pakai .main agar Sidebar aman) */
-                .main div[data-baseweb="input"], 
-                .main div[data-baseweb="select"], 
-                .main div[data-testid="stNumberInputContainer"] {
-                    background-color: #1a1d2e !important;
-                    border: 1px solid #3d4452 !important;
-                    border-radius: 8px !important;
-                }
-
-                /* 2. PAKSA elemen input di dalem number container jadi gelap */
-                div[data-testid="stNumberInputContainer"] input {
-                    background-color: #1a1d2e !important;
-                    color: white !important;
-                    -webkit-text-fill-color: white !important;
-                }
-
-                /* 3. Bersihin background div pembungkus internal number input */
-                div[data-testid="stNumberInputContainer"] > div {
-                    background-color: transparent !important;
-                }
-                
-                /* 4. Tombol Plus & Minus */
-                div[data-testid="stNumberInputContainer"] button {
-                    background-color: #252a3d !important;
-                    color: #ffffff !important;
-                    border: none !important;
-                }
-
-                div[data-testid="stNumberInputContainer"] button:hover {
-                    color: #C5A059 !important;
-                }
-
-                /* 5. Fix Label agar tetap konsisten premium */
-                label p {
-                    color: #ffffff !important;
-                    font-weight: 500 !important;
-                    text-transform: uppercase;
-                    font-size: 0.85rem;
-                    letter-spacing: 0.5px;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-
         st.markdown("### 📝 FORM DATA TIMBANG")
         with st.form("form_timbang_final", clear_on_submit=True):
             col_kiri, col_kanan = st.columns(2)
