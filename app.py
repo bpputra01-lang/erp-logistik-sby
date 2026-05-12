@@ -6465,13 +6465,23 @@ def show_timbang_system():
     # CSS Custom - Menjaga konsistensi dengan UI Premium Surabaya Dashboard
     st.markdown("""
         <style>
-        .hero-header {
-            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%);
-            padding: 1.5rem;
-            border-radius: 10px;
-            border-left: 5px solid #C5A059;
-            margin-bottom: 2rem;
-        }
+        /* HERO HEADER */
+            .hero-header {
+                background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
+                padding: 25px;
+                border-radius: 12px;
+                margin-bottom: 25px;
+                box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
+                border-left: 8px solid #007BFF;
+            }
+            
+            .hero-text {
+                color: white !important;
+                margin: 0 !important;
+                font-size: 24px !important;
+                font-weight: 800 !important;
+                letter-spacing: 1px;
+            }
         .m-box-premium {
             background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
             padding: 20px;
