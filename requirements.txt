@@ -1,5 +1,5 @@
 streamlit>=1.31.0
-pandas
+pandas==2.2.1
 numpy
 mysql-connector-python
 python-calamine
