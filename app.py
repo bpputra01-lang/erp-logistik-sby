@@ -6498,6 +6498,14 @@ def fetch_timbang_data():
         st.error(f"Error Database: {e}") # Biar muncul errornya apa, bukan cuma blank!
         return pd.DataFrame()
 
+def delete_timbang_data(row_id):
+    try:
+        supabase.table("timbang_kolian").delete().eq("id", row_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Gagal hapus data: {e}")
+        return False
+
 # --- 3. UI STYLE & DASHBOARD ---
 def show_timbang_system():
     # CSS Custom - Menjaga konsistensi dengan UI Premium Surabaya Dashboard
@@ -6665,17 +6673,31 @@ def show_timbang_system():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- 4. DATA FRAME RAPI ---
-            # Kita sembunyikan kolom ID biar nggak menuh-menuhin
-            st.dataframe(
-                df.sort_values('created_at', ascending=False), 
-                use_container_width=True, 
-                hide_index=True,
-                column_order=("created_at", "ekspedisi", "jenis_pengiriman", "total_koli", "berat_total_timbang", "pengiriman_dari", "pengiriman_ke")
-            )
-        else:
-            st.warning("⚠️ Belum ada data timbangan terdeteksi di database.")
+            st.markdown("### 📋 LIST DATA TIMBANG")
+            
+            # Header Tabel Manual agar bisa disisipi tombol
+            h_col1, h_col2, h_col3, h_col4, h_col5 = st.columns([2, 2, 1, 1, 1])
+            with h_col1: st.write("**Waktu**")
+            with h_col2: st.write("**Ekspedisi**")
+            with h_col3: st.write("**Koli**")
+            with h_col4: st.write("**Berat**")
+            with h_col5: st.write("**Aksi**")
+            st.divider()
 
+            # Looping data dari dataframe
+            for index, row in df.sort_values('created_at', ascending=False).iterrows():
+                r_col1, r_col2, r_col3, r_col4, r_col5 = st.columns([2, 2, 1, 1, 1])
+                
+                with r_col1: st.write(row['created_at'])
+                with r_col2: st.write(row['ekspedisi'])
+                with r_col3: st.write(f"{row['total_koli']} Pcs")
+                with r_col4: st.write(f"{row['berat_total_timbang']} Kg")
+                with r_col5:
+                    # Tombol hapus dengan key unik berdasarkan ID baris
+                    if st.button("🗑️", key=f"del_{row['id']}", help="Hapus Baris Ini"):
+                        if delete_timbang_data(row['id']):
+                            st.toast(f"Data {row['ekspedisi']} Berhasil Dihapus!")
+                            st.rerun() # Refresh biar data ilang dari list
 with st.sidebar:
        st.markdown("""
         <style>
