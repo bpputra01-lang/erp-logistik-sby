@@ -6498,10 +6498,12 @@ def fetch_timbang_data():
         st.error(f"Error Database: {e}") # Biar muncul errornya apa, bukan cuma blank!
         return pd.DataFrame()
 
-def delete_timbang_data(row_id):
+def delete_multiple_timbang(list_ids):
     try:
-        supabase.table("timbang_kolian").delete().eq("id", row_id).execute()
-        return True
+        if list_ids:
+            # Hapus semua ID yang ada di list
+            supabase.table("timbang_kolian").delete().in_("id", list_ids).execute()
+            return True
     except Exception as e:
         st.error(f"Gagal hapus data: {e}")
         return False
@@ -6673,31 +6675,37 @@ def show_timbang_system():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            st.markdown("### 📋 LIST DATA TIMBANG")
-            
-            # Header Tabel Manual agar bisa disisipi tombol
-            h_col1, h_col2, h_col3, h_col4, h_col5 = st.columns([2, 2, 1, 1, 1])
-            with h_col1: st.write("**Waktu**")
-            with h_col2: st.write("**Ekspedisi**")
-            with h_col3: st.write("**Koli**")
-            with h_col4: st.write("**Berat**")
-            with h_col5: st.write("**Aksi**")
-            st.divider()
+            # --- 4. LIST DATA DENGAN CHECKBOX ---
+        st.markdown("### 📋 LIST DATA TIMBANG")
+        
+        # Tambahkan kolom 'Hapus' (Checkbox) di awal dataframe
+        df_display = df.copy()
+        df_display.insert(0, "HAPUS", False)
 
-            # Looping data dari dataframe
-            for index, row in df.sort_values('created_at', ascending=False).iterrows():
-                r_col1, r_col2, r_col3, r_col4, r_col5 = st.columns([2, 2, 1, 1, 1])
-                
-                with r_col1: st.write(row['created_at'])
-                with r_col2: st.write(row['ekspedisi'])
-                with r_col3: st.write(f"{row['total_koli']} Pcs")
-                with r_col4: st.write(f"{row['berat_total_timbang']} Kg")
-                with r_col5:
-                    # Tombol hapus dengan key unik berdasarkan ID baris
-                    if st.button("🗑️", key=f"del_{row['id']}", help="Hapus Baris Ini"):
-                        if delete_timbang_data(row['id']):
-                            st.toast(f"Data {row['ekspedisi']} Berhasil Dihapus!")
-                            st.rerun() # Refresh biar data ilang dari list
+        # Tampilkan tabel yang bisa diedit (centang)
+        edited_df = st.data_editor(
+            df_display,
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                "HAPUS": st.column_config.CheckboxColumn("🗑️", default=False),
+                "id": None, # Sembunyikan kolom ID
+                "created_at": "Waktu",
+                "ekspedisi": "Ekspedisi",
+                "total_koli": "Koli",
+                "berat_total_timbang": "Berat (Kg)"
+            },
+            disabled=["created_at", "ekspedisi", "total_koli", "berat_total_timbang"] # Biar gak bisa diedit isinya
+        )
+
+        # Tombol Eksekusi Hapus
+        ids_to_delete = edited_df[edited_df["HAPUS"] == True]["id"].tolist()
+        
+        if ids_to_delete:
+            if st.button(f"🗑️ HAPUS {len(ids_to_delete)} DATA TERPILIH", use_container_width=True):
+                if delete_multiple_timbang(ids_to_delete):
+                    st.toast(f"{len(ids_to_delete)} Data Berhasil Dihapus!")
+                    st.rerun()
 with st.sidebar:
        st.markdown("""
         <style>
