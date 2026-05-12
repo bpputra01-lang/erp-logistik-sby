@@ -8355,7 +8355,7 @@ if menu == "Logistic Schedule":
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
-elif menu == "Data Timbang Ongkir"
+elif menu == "Data Timbang Ongkir":
     show_timbang_system()
 
 elif menu == "Refill & Withdraw":
