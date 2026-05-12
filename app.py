@@ -6578,27 +6578,27 @@ def show_timbang_system():
                 st.success("Data Berhasil Masuk Database!")
 
     with tab_metrics:
-    df = fetch_timbang_data()
-    
-    if not df.empty:
-        # --- PERHITUNGAN METRIK ---
-        total_koli = df['total_koli'].sum()
-        total_berat = df['berat_total_timbang'].sum()
+        df = fetch_timbang_data()
         
-        m1, m2, m3 = st.columns(3)
-        with m1:
-            st.markdown(f'<div class="m-box-premium"><span class="m-label">📦 Total Koli</span><span class="m-value">{total_koli:,}</span></div>', unsafe_allow_html=True)
-        with m2:
-            st.markdown(f'<div class="m-box-premium"><span class="m-label">⚖️ Total Berat</span><span class="m-value">{total_berat:,.2f} Kg</span></div>', unsafe_allow_html=True)
-        with m3:
-            st.markdown(f'<div class="m-box-premium"><span class="m-label">📝 Total Data</span><span class="m-value">{len(df)}</span></div>', unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        # Urutkan berdasarkan data terbaru agar langsung kelihatan di atas
-        st.dataframe(df.sort_values('created_at', ascending=False), use_container_width=True, hide_index=True)
-    else:
-        # Jika blank, tampilkan warning agar lu tau fungsinya jalan atau nggak
-        st.warning("⚠️ Belum ada data timbangan terdeteksi di database.")
+        if not df.empty:
+            # --- PERHITUNGAN METRIK ---
+            total_koli = df['total_koli'].sum()
+            total_berat = df['berat_total_timbang'].sum()
+            
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                st.markdown(f'<div class="m-box-premium"><span class="m-label">📦 Total Koli</span><span class="m-value">{total_koli:,}</span></div>', unsafe_allow_html=True)
+            with m2:
+                st.markdown(f'<div class="m-box-premium"><span class="m-label">⚖️ Total Berat</span><span class="m-value">{total_berat:,.2f} Kg</span></div>', unsafe_allow_html=True)
+            with m3:
+                st.markdown(f'<div class="m-box-premium"><span class="m-label">📝 Total Data</span><span class="m-value">{len(df)}</span></div>', unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            # Urutkan berdasarkan data terbaru agar langsung kelihatan di atas
+            st.dataframe(df.sort_values('created_at', ascending=False), use_container_width=True, hide_index=True)
+        else:
+            # Jika blank, tampilkan warning agar lu tau fungsinya jalan atau nggak
+            st.warning("⚠️ Belum ada data timbangan terdeteksi di database.")
 
 
     
