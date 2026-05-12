@@ -6574,9 +6574,15 @@ def show_timbang_system():
             st.markdown("<br>", unsafe_allow_html=True)
             submit = st.form_submit_button("⚖️ SIMPAN DATA TIMBANG", use_container_width=True)
             
-            if submit:
-                # Logic simpan data lu di sini
-                st.success("Data Berhasil Masuk Database!")
+           if submit:
+                # PANGGIL FUNGSI SAVE DI SINI
+                success = save_timbang_data(
+                    ekspedisi_in, jenis_in, dari_in, ke_in, koli_in, berat_in
+                )
+                
+                if success:
+                    st.success("✅ Data Berhasil Masuk Database!")
+                    st.rerun()  # WAJIB: Supaya Tab 2 langsung ditarik data barunya
 
     with tab_metrics:
         df = fetch_timbang_data()
