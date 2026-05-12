@@ -3922,27 +3922,37 @@ def tampilkan_halaman_po():
         with t3: 
             st.dataframe(df_miss, use_container_width=True, hide_index=True)
         with t4:
+            st.subheader("Split Data by No PO")
             unique_po = df_split['No PO'].unique()
             selected_po = st.selectbox("Pilih Nomor PO:", unique_po, key="unique_po_selector")
             
+            # Tampilan table tetap instan
             df_filtered = df_split[df_split['No PO'] == selected_po][['SKU', 'Qty Alokasi']]
             st.dataframe(df_filtered, use_container_width=True, hide_index=True)
             
             st.divider()
             st.write("### 📥 Download ZIP")
-            
-            buf = BytesIO()
-            with zipfile.ZipFile(buf, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                for po_no in unique_po:
-                    df_po_file = df_split[df_split['No PO'] == po_no][['SKU', 'Qty Alokasi']]
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                        df_po_file.to_excel(writer, index=False)
-                    zip_file.writestr(f"PO_{po_no}.xlsx", output.getvalue())
-            
+
+            # GUNAKAN CACHE: Supaya ZIP cuma dibuat 1x, kecuali data df_split berubah
+            @st.cache_data(show_spinner="Sedang mengompres data PO...")
+            def prepare_zip(data_split):
+                list_po = data_split['No PO'].unique()
+                buf = BytesIO()
+                with zipfile.ZipFile(buf, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                    for po_no in list_po:
+                        df_po_file = data_split[data_split['No PO'] == po_no][['SKU', 'Qty Alokasi']]
+                        output = BytesIO()
+                        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                            df_po_file.to_excel(writer, index=False)
+                        zip_file.writestr(f"PO_{po_no}.xlsx", output.getvalue())
+                return buf.getvalue()
+
+            # Panggil fungsi cache
+            zip_data = prepare_zip(df_split)
+
             st.download_button(
                 label="📦 DOWNLOAD ALL (.ZIP)",
-                data=buf.getvalue(),
+                data=zip_data,
                 file_name="rekap_per_po.zip",
                 mime="application/zip",
                 use_container_width=True,
