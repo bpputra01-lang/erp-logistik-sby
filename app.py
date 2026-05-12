@@ -3701,90 +3701,111 @@ def menu_retur_out_system():
 import pandas as pd
 import streamlit as st
 from io import BytesIO
+import zipfile
 
-# --- 1. FUNGSI UI & CSS ---
 def apply_po_ui():
+    # 1. CSS CUSTOM STYLING
     st.markdown("""
-    <style>
-        /* 2. HERO HEADER */
-        .hero-header {
-            background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
-            border-left: 8px solid #007BFF;
-            display: block !important; /* Memastikan element tampil */
-        }
-        .hero-text {
-            color: white !important;
-            margin: 0 !important;
-            font-size: 24px !important;
-            font-weight: 800 !important;
-            letter-spacing: 1px;
-        }
+        <style>
+            /* HERO HEADER */
+            .hero-header {
+                background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
+                padding: 25px;
+                border-radius: 12px;
+                margin-bottom: 25px;
+                box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
+                border-left: 8px solid #007BFF;
+            }
+            
+            .hero-text {
+                color: white !important;
+                margin: 0 !important;
+                font-size: 24px !important;
+                font-weight: 800 !important;
+                letter-spacing: 1px;
+            }
 
-        /* 3. METRIC CARD PREMIUM */
-        .m-box-po {
-            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
-            padding: 22px;
-            border-radius: 10px;
-            border-left: 5px solid #00d2ff;
-            text-align: left;
-            box-shadow: 2px 10px 20px rgba(0,0,0,0.4);
-            margin-bottom: 10px;
-            min-height: 120px;
-        }
-        
-        /* 4. FIX UNTUK EXPANDER & TEXT */
-        /* Pastikan tulisan di dalam expander tidak ikut memutih jika backgroundnya terang */
-        .stExpander {
-            background-color: transparent !important;
-            border: 1px solid #3d4452 !important;
-            margin-bottom: 10px;
-        }
+            /* METRIC CARD PREMIUM */
+            .m-box-po {
+                background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+                padding: 22px;
+                border-radius: 10px;
+                border-left: 5px solid #00d2ff;
+                text-align: left;
+                box-shadow: 2px 10px 20px rgba(0,0,0,0.4);
+                margin-bottom: 10px;
+                min-height: 120px;
+            }
 
-        /* 5. FILE UPLOADER FIX */
-        /* Jangan gunakan background-color white secara paksa pada container besar */
-        [data-testid="stFileUploader"] {
-            background-color: rgba(255, 255, 255, 0.05) !important; /* Gunakan transparan atau warna spesifik */
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px dashed #4e5563;
-        }
-        
-        /* Fix warna teks pada info box agar terbaca */
-        .stAlert p {
-            color: white !important;
-        }
-    </style>
+            .m-lbl { 
+                color: #8a8d9a !important; 
+                font-size: 11px !important; 
+                font-weight: 700 !important; 
+                text-transform: uppercase !important; 
+                letter-spacing: 1.2px !important;
+                margin-bottom: 10px !important;
+                display: block !important;
+            }
+
+            .m-val { 
+                color: #C5A059 !important; 
+                font-size: 30px !important; 
+                font-weight: 800 !important; 
+                font-family: 'Inter', sans-serif !important; 
+                display: block !important;
+                line-height: 1.2 !important;
+            }
+
+            /* BUTTON STYLE */
+            div.stButton > button {
+                background: #C5A059 !important;
+                color: white !important;
+                border: none !important;
+                font-weight: bold !important;
+                height: 50px !important;
+                border-radius: 8px !important;
+                width: 100%;
+            }
+
+            /* FILE UPLOADER STYLE */
+            [data-testid="stFileUploader"] {
+                background-color: white !important;
+                padding: 20px;
+                border-radius: 10px;
+                border: 1px dashed #ced4da;
+                color: black !important;
+            }
+        </style>
     """, unsafe_allow_html=True)
+
+    # 2. RENDER COMPONENTS
     st.markdown('<div class="hero-header"><p class="hero-text">PURCHASE ORDER RECEIVING</p></div>', unsafe_allow_html=True)
 
+    # 3. EXPANDERS (INFORMATION & LOGIC)
     with st.expander("📋 Informasi Format File"):
         st.info("""
-        **Format yang diharapkan:**
-        - **DATA SCAN :** Pastikan Formatnya headernya di **KOLOM A = SKU** dan di **KOLOM B = QTY SCAN**
-        - **PENERIMAAN:** Download data **PENERIMAAN** pilih yang **ITEM ORDERED**
-        - Pastikan setelah download *Penerimaan* pada **KOLOM A** tambahkan kolom untuk memasukkan  **NO PO** jadi kolom A adalah NO PO dan kolom B baru NAME
-        - Jika ada lebih dari 1 NO PO maka gabungkan menjadi satu file dan tetap berikan NO PO sesuai NO PO nya di kolom A
+            **Format yang diharapkan:**
+            - **DATA SCAN :** Pastikan Formatnya headernya di **KOLOM A = SKU** dan di **KOLOM B = QTY SCAN**
+            - **PENERIMAAN:** Download data **PENERIMAAN** pilih yang **ITEM ORDERED**
+            - Pastikan setelah download *Penerimaan* pada **KOLOM A** tambahkan kolom untuk memasukkan **NO PO**. Jadi kolom A adalah NO PO dan kolom B baru NAME.
+            - Jika ada lebih dari 1 NO PO maka gabungkan menjadi satu file dan tetap berikan NO PO sesuai NO PO nya di kolom A.
         """)
 
-    with st.expander("💡Logic Thinking"):
+    with st.expander("💡 Logic Thinking"):
         st.info("""
-        **Alur Compare:**
-        - SKU di data scan akan dilakukan compare dengan SKU yang ada di File Purchase Order
-        - SKU teratas di File Purchase Order akan mendapatkan alokasi penuh dari data scan apabila ada > 1 No PO yang memiliki SKU yang sama
-        - Jika di File Penerimaan ada yang tidak mendapatkan alokasi maka akan dilakukan cek ulang dan akan di FU ke Purchasing apabia ada kesalahan input SKU PO atau QTY PO
-        - Jika di File Data Scan ada SKU yang tidak ada di PO maka akan muncul dalam *TAB + QTY SCAN > QTY PO* dan muncul keterangan **Wrong SKU**
-        - Jika di File Data Scan ada SKU yang Qty nya > daripada di PO maka akan muncul dalam *TAB + QTY SCAN > QTY PO* dan muncul keterangan **Over Scan** dan yang masuk list hanyalah sisa dari hasil setelah alokasi
-        - Jika di File Data Scan ada SKU yang Qty nya < daripada di PO maka akan muncul dalam *TAB - QTY PO > QTY SCAN*
-        
-        **Keterangan Note:**
-        - **FULL ALLOCATION** : Kondisi dimana Qty scan dan Qty PO cocok dan sesuai
-        - **PARTIAL ALLOCATION** : Kondisi dimana Qty scan < dari Qty PO
-        - **NO ALLOCATION** : Kondisi dimana terdapat indikasi **BARANG TIDAK DIKIRIM / BELUM TERSCAN / SALAH INPUT QTY PO**
-        - **OVER ALLOCATION** : Kondisi dimana terdapat Indikasi **KELEBIHAN SCAN / KURANG INPUT QTY PO / ADA SUBTITUDE ANTAR SKU**
+            **Alur Compare:**
+            - SKU di data scan akan dilakukan compare dengan SKU yang ada di File Purchase Order.
+            - SKU teratas di File Purchase Order akan mendapatkan alokasi penuh dari data scan apabila ada > 1 No PO yang memiliki SKU yang sama.
+            - Jika di File Penerimaan ada yang tidak mendapatkan alokasi maka akan dilakukan cek ulang dan akan di FU ke Purchasing apabila ada kesalahan input SKU PO atau QTY PO.
+            - Jika di File Data Scan ada SKU yang tidak ada di PO maka akan muncul dalam **TAB + QTY SCAN > QTY PO** dan muncul keterangan **Wrong SKU**.
+            - Jika di File Data Scan ada SKU yang Qty nya > daripada di PO maka akan muncul dalam **TAB + QTY SCAN > QTY PO** dan muncul keterangan **Over Scan**.
+            - Jika di File Data Scan ada SKU yang Qty nya < daripada di PO maka akan muncul dalam **TAB - QTY PO > QTY SCAN**.
+            
+            **Keterangan Note:**
+            - **FULL ALLOCATION** : Kondisi dimana Qty scan dan Qty PO cocok dan sesuai.
+            - **PARTIAL ALLOCATION** : Kondisi dimana Qty scan < dari Qty PO.
+            - **NO ALLOCATION** : Kondisi dimana terdapat indikasi **BARANG TIDAK DIKIRIM / BELUM TERSCAN / SALAH INPUT QTY PO**.
+            - **OVER ALLOCATION** : Kondisi dimana terdapat Indikasi **KELEBIHAN SCAN / KURANG INPUT QTY PO / ADA SUBSTITUT ANTAR SKU**.
         """)
 def process_po_logic(df_scan, df_po):
     metrics = {"total_po": 0, "total_scan": 0, "kurang_po": 0, "lebih_po": 0}
