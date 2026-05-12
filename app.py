@@ -6574,7 +6574,7 @@ def show_timbang_system():
             st.markdown("<br>", unsafe_allow_html=True)
             submit = st.form_submit_button("⚖️ SIMPAN DATA TIMBANG", use_container_width=True)
             
-           if submit:
+            if submit:
                 # PANGGIL FUNGSI SAVE DI SINI
                 success = save_timbang_data(
                     ekspedisi_in, jenis_in, dari_in, ke_in, koli_in, berat_in
