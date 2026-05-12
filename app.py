@@ -6675,43 +6675,37 @@ def show_timbang_system():
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-          # --- 4. LIST DATA DENGAN CHECKBOX ---
-     # --- 4. LIST DATA DENGAN CHECKBOX ---
-        st.markdown("### 📋 LIST DATA TIMBANG")
+          st.markdown("### 📋 LIST DATA TIMBANG")
         
-        # Cek dulu kolom 'id' ada gak di dataframe hasil fetch
-        if 'id' not in df.columns:
-            st.error("❌ ERROR: Kolom 'id' tidak ditemukan di database. Pastikan tabel di Supabase punya Primary Key bernama 'id'.")
-        else:
-            df_display = df.copy()
-            df_display.insert(0, "SELECT", False)
+        # Cek kolom 'id' dengan lebih teliti
+        df = fetch_timbang_data()
+        
+        if not df.empty:
+            # Pastikan 'id' ada, kalau nggak ada kita kasih proteksi biar gak crash
+            if 'id' in df.columns:
+                df_display = df.copy()
+                df_display.insert(0, "SELECT", False)
 
-            # Tampilkan tabel yang bisa diedit
-            edited_df = st.data_editor(
-                df_display,
-                hide_index=True,
-                use_container_width=True,
-                column_config={
-                    "SELECT": st.column_config.CheckboxColumn("🗑️", default=False),
-                    "id": st.column_config.TextColumn("ID System", disabled=True),
-                    "created_at": "Waktu",
-                    "ekspedisi": "Ekspedisi",
-                    "total_koli": "Koli",
-                    "berat_total_timbang": "Berat (Kg)"
-                },
-                disabled=[col for col in df_display.columns if col != "SELECT"]
-            )
+                edited_df = st.data_editor(
+                    df_display,
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "SELECT": st.column_config.CheckboxColumn("🗑️", default=False),
+                        "id": st.column_config.TextColumn("ID", disabled=True),
+                    },
+                    disabled=[col for col in df_display.columns if col != "SELECT"]
+                )
 
-            # Filter ID yang mau dihapus
-            ids_to_delete = edited_df[edited_df["SELECT"] == True]["id"].tolist()
-            
-            if ids_to_delete:
-                st.warning(f"⚠️ {len(ids_to_delete)} data terpilih untuk dihapus.")
-                if st.button(f"🚀 EKSEKUSI HAPUS DATA", use_container_width=True):
-                    if delete_multiple_timbang(ids_to_delete):
-                        st.success("Data Berhasil Dihapus!")
-                        st.rerun()
-with st.sidebar:
+                ids_to_delete = edited_df[edited_df["SELECT"] == True]["id"].tolist()
+                
+                if ids_to_delete:
+                    if st.button(f"🗑️ HAPUS {len(ids_to_delete)} DATA", use_container_width=True):
+                        if delete_multiple_timbang(ids_to_delete):
+                            st.toast("Data Berhasil Dihapus!")
+                            st.rerun()
+            else:
+                st.warning("⚠️ Data lama terdeteksi tanpa ID. Coba input data baru dulu di tab sebelah.")
        st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
