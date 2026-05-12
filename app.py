@@ -6706,6 +6706,9 @@ def show_timbang_system():
                                 st.rerun()
                 else:
                     st.warning("⚠️ Data lama terdeteksi tanpa ID. Coba input data baru dulu di tab sebelah.")
+                
+    
+with st.sidebar:
        st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
