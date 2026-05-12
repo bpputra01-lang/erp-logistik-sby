@@ -8390,6 +8390,7 @@ elif menu == "List Retur Out":
 
 elif menu == "Purchase Order Receiving":
     apply_po_ui()
+    tampilkan_halaman_po()
 
 elif menu == "Pengajuan Mutasi Karantina":
     project_mutasi_karantina()
