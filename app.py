@@ -8389,7 +8389,7 @@ elif menu == "List Retur Out":
     menu_retur_out_system()
 
 elif menu == "Purchase Order Receiving":
-    tampilkan_halaman_po()
+    apply_po_ui()
 
 elif menu == "Pengajuan Mutasi Karantina":
     project_mutasi_karantina()
