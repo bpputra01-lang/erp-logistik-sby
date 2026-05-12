@@ -3924,7 +3924,7 @@ def tampilkan_halaman_po():
             st.dataframe(df_err, use_container_width=True, hide_index=True)
         with t3: 
             st.dataframe(df_miss, use_container_width=True, hide_index=True)
-with t4:
+        with t4:
             st.subheader("Download Satuan Per Nomor PO")
             unique_po = df_split['No PO'].unique()
             selected_po = st.selectbox("Pilih Nomor PO:", unique_po, key="po_selector_tab4")
@@ -6409,7 +6409,126 @@ def show_database_ongkir():
                 st.info("💡 Centang baris di tabel untuk menghapus data.")
         else:
             st.info("Data masih kosong.")
+import streamlit as st
+from supabase import create_client, Client
+from datetime import datetime
+import pandas as pd
 
+# --- 1. KONEKSI SUPABASE ---
+# Gunakan URL & Key yang lu punya, ini gue samakan dengan contoh lu
+SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+
+@st.cache_resource
+def init_connection():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+supabase = init_connection()
+
+def save_timbang_data(ekspedisi, jenis, dari, ke, koli, berat):
+    try:
+        data = {
+            "ekspedisi": ekspedisi.upper(),
+            "jenis_pengiriman": jenis,
+            "pengiriman_dari": dari.upper(),
+            "pengiriman_ke": ke.upper(),
+            "total_koli": koli, # Kolom Baru
+            "berat_total_timbang": berat,
+            "created_at": datetime.now().isoformat()
+        }
+        # Pastikan kolom 'total_koli' sudah ada di tabel timbang_kolian Supabase lu
+        supabase.table("timbang_kolian").insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Gagal simpan data: {e}")
+        return False
+
+def fetch_timbang_data():
+    try:
+        res = supabase.table("timbang_kolian").select("*").execute()
+        return pd.DataFrame(res.data)
+    except:
+        return pd.DataFrame()
+
+# --- 3. UI STYLE & DASHBOARD ---
+def show_timbang_system():
+    # CSS Custom - Menjaga konsistensi dengan UI Premium Surabaya Dashboard
+    st.markdown("""
+        <style>
+        .hero-header {
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%);
+            padding: 1.5rem;
+            border-radius: 10px;
+            border-left: 5px solid #C5A059;
+            margin-bottom: 2rem;
+        }
+        .m-box-premium {
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #C5A059;
+            box-shadow: 2px 4px 15px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+        }
+        .m-label { color: #8a8d9a; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
+        .m-value { color: #ffffff; font-size: 1.8rem; font-weight: 700; display: block; }
+        </style>
+        """, unsafe_allow_html=True)
+
+    st.markdown('<div class="hero-header"><h2 style="color:white; margin:0;">⚖️ SISTEM TIMBANG KOLIAN</h2></div>', unsafe_allow_html=True)
+
+    tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
+
+    with tab_input:
+        st.markdown("### Form Input Timbangan")
+        with st.form("form_timbang", clear_on_submit=True):
+            col_kiri, col_kanan = st.columns(2)
+            
+            with col_kiri:
+                ekspedisi_in = st.text_input("Ekspedisi", placeholder="Nama Ekspedisi...")
+                jenis_in = st.selectbox("Jenis Pengiriman", ["RTO"], index=0)
+                
+                # Input Koli dan Berat
+                c_koli, c_berat = st.columns(2)
+                with c_koli:
+                    koli_in = st.number_input("Total Koli", min_value=1, step=1)
+                with c_berat:
+                    berat_in = st.number_input("Berat Total (Kg)", min_value=0.1, step=0.1)
+                
+            with col_kanan:
+                dari_in = st.text_input("Pengiriman Dari", placeholder="Asal Barang...")
+                ke_in = st.text_input("Pengiriman Ke", placeholder="Tujuan Barang...")
+            
+            submit = st.form_submit_button("➕ SIMPAN DATA TIMBANGAN", use_container_width=True)
+            
+            if submit:
+                if ekspedisi_in and dari_in and ke_in:
+                    # Panggil fungsi dengan parameter koli baru
+                    if save_timbang_data(ekspedisi_in, jenis_in, dari_in, ke_in, koli_in, berat_in):
+                        st.success(f"Data Berhasil Disimpan!")
+                        st.rerun()
+                else:
+                    st.error("Mohon isi semua kolom teks (Ekspedisi, Dari, Ke)!")
+
+    # --- TAB 2: METRIC BOXES ---
+    with tab_metrics:
+        df = fetch_timbang_data()
+        if not df.empty:
+            total_koli = df['total_koli'].sum() # Metrik Baru
+            total_berat = df['berat_total_timbang'].sum()
+            
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                st.markdown(f'<div class="m-box-premium"><span class="m-label">📦 Total Koli</span><span class="m-value">{total_koli:,}</span></div>', unsafe_allow_html=True)
+            with m2:
+                st.markdown(f'<div class="m-box-premium"><span class="m-label">⚖️ Total Berat</span><span class="m-value">{total_berat:,.2f} Kg</span></div>', unsafe_allow_html=True)
+            with m3:
+                st.markdown(f'<div class="m-box-premium"><span class="m-label">📝 Total Data</span><span class="m-value">{len(df)}</span></div>', unsafe_allow_html=True)
+            
+            st.dataframe(df.sort_values('created_at', ascending=False), use_container_width=True, hide_index=True)
+
+
+    
 
 with st.sidebar:
        st.markdown("""
@@ -8235,6 +8354,9 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "Data Timbang Ongkir"
+    show_timbang_system()
 
 elif menu == "Refill & Withdraw":
     menu_refill_withdraw()
