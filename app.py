@@ -6457,7 +6457,8 @@ def fetch_timbang_data():
     try:
         res = supabase.table("timbang_kolian").select("*").execute()
         return pd.DataFrame(res.data)
-    except:
+    except Exception as e:
+        st.error(f"Error Database: {e}") # Biar muncul errornya apa, bukan cuma blank!
         return pd.DataFrame()
 
 # --- 3. UI STYLE & DASHBOARD ---
