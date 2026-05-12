@@ -3891,7 +3891,7 @@ def prepare_zip(data_split):
                 df_po_file.to_excel(writer, index=False)
             zip_file.writestr(f"PO_{po_no}.xlsx", output.getvalue())
     return buf.getvalue()
-    
+
 def tampilkan_halaman_po():
     # Pastikan CSS Premium Card sudah dipanggil di sini
     if "po_data" not in st.session_state:
@@ -3928,7 +3928,7 @@ def tampilkan_halaman_po():
         with m4: st.markdown(f'<div class="m-box-po" style="border-left-color:#ffa500;"><span class="m-lbl">➖ DIFF PO > SCAN</span><span class="m-val" style="color:#ffa500;">{m["lebih_po"]:,}</span></div>', unsafe_allow_html=True)
 
         # TAB RENDERING - DEFINISIKAN 4 VARIABEL
-        t1, t2, t3, t4 = st.tabs(["📊 Detail Alokasi", "➕ SCAN > PO", "➖ PO > SCAN", "📂 SPLIT PER PO"])
+        t1, t2, t3, t4 = st.tabs(["📊 Detail Alokasi", "➕ SCAN > PO", "➖ PO > SCAN", "📂 DOWNLOAD PER PO"])
         
         with t1: 
             st.dataframe(df_hasil, use_container_width=True, hide_index=True)
