@@ -6466,22 +6466,24 @@ def show_timbang_system():
     st.markdown("""
         <style>
         /* HERO HEADER */
-            .hero-header {
-                background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
-                padding: 25px;
-                border-radius: 12px;
-                margin-bottom: 25px;
-                box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
-                border-left: 8px solid #007BFF;
-            }
-            
-            .hero-text {
-                color: white !important;
-                margin: 0 !important;
-                font-size: 24px !important;
-                font-weight: 800 !important;
-                letter-spacing: 1px;
-            }
+        .hero-header {
+            background: linear-gradient(135deg, #1d3e7a 0%, #102a5a 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
+            border-left: 8px solid #007BFF;
+        }
+        
+        .hero-text {
+            color: white !important;
+            margin: 0 !important;
+            font-size: 24px !important;
+            font-weight: 800 !important;
+            letter-spacing: 1px;
+        }
+
+        /* PREMIUM BOX */
         .m-box-premium {
             background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
             padding: 20px;
@@ -6490,6 +6492,32 @@ def show_timbang_system():
             box-shadow: 2px 4px 15px rgba(0,0,0,0.3);
             margin-bottom: 10px;
         }
+        
+        /* DARK INPUT BOX - Mengubah kolom putih jadi gelap */
+        div[data-baseweb="input"] {
+            background-color: #1a1d2e !important;
+            border: 1px solid #3d4452 !important;
+            border-radius: 8px !important;
+        }
+        
+        input {
+            color: #ffffff !important;
+            font-weight: 600 !important;
+        }
+
+        /* CUSTOM BUTTON - Dibuat tidak panjang (auto width) */
+        .stButton > button {
+            background: #C5A059 !important;
+            color: white !important;
+            border: none !important;
+            padding: 10px 30px !important;
+            font-weight: bold !important;
+            border-radius: 8px !important;
+            width: auto !important; /* Biar gak panjang banget */
+            display: block;
+            margin: 0 auto; /* Center alignment jika diperlukan */
+        }
+        
         .m-label { color: #8a8d9a; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; }
         .m-value { color: #ffffff; font-size: 1.8rem; font-weight: 700; display: block; }
         </style>
@@ -6499,35 +6527,68 @@ def show_timbang_system():
     tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
 
     with tab_input:
-        st.markdown("### Form Input Timbangan")
-        with st.form("form_timbang", clear_on_submit=True):
-            col_kiri, col_kanan = st.columns(2)
+    # --- CSS UNTUK DARK INPUT BOX ---
+    st.markdown("""
+        <style>
+            /* Mengubah background container input (text, number, selectbox) */
+            div[data-baseweb="input"], div[data-baseweb="select"] {
+                background-color: #1a1d2e !important;
+                border: 1px solid #3d4452 !important;
+                border-radius: 8px !important;
+            }
+
+            /* Warna teks di dalam input */
+            input, div[data-baseweb="select"] div {
+                color: #ffffff !important;
+                font-weight: 500 !important;
+            }
+
+            /* Menyesuaikan placeholder agar tidak terlalu terang */
+            input::placeholder {
+                color: #5d647a !important;
+            }
+
+            /* Merampingkan tombol submit agar tidak terlalu kaku */
+            button[kind="primaryFormSubmit"] {
+                background: #C5A059 !important;
+                border: none !important;
+                color: white !important;
+                font-weight: bold !important;
+                height: 45px !important;
+                border-radius: 8px !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### Form Input Timbangan")
+    with st.form("form_timbang", clear_on_submit=True):
+        col_kiri, col_kanan = st.columns(2)
+        
+        with col_kiri:
+            ekspedisi_in = st.text_input("Ekspedisi", placeholder="Nama Ekspedisi...")
+            jenis_in = st.selectbox("Jenis Pengiriman", ["RTO"], index=0)
             
-            with col_kiri:
-                ekspedisi_in = st.text_input("Ekspedisi", placeholder="Nama Ekspedisi...")
-                jenis_in = st.selectbox("Jenis Pengiriman", ["RTO"], index=0)
-                
-                # Input Koli dan Berat
-                c_koli, c_berat = st.columns(2)
-                with c_koli:
-                    koli_in = st.number_input("Total Koli", min_value=1, step=1)
-                with c_berat:
-                    berat_in = st.number_input("Berat Total (Kg)", min_value=0.1, step=0.1)
-                
-            with col_kanan:
-                dari_in = st.text_input("Pengiriman Dari", placeholder="Asal Barang...")
-                ke_in = st.text_input("Pengiriman Ke", placeholder="Tujuan Barang...")
+            # Input Koli dan Berat
+            c_koli, c_berat = st.columns(2)
+            with c_koli:
+                koli_in = st.number_input("Total Koli", min_value=1, step=1)
+            with c_berat:
+                berat_in = st.number_input("Berat Total (Kg)", min_value=0.1, step=0.1)
             
-            submit = st.form_submit_button("➕ SIMPAN DATA TIMBANGAN", use_container_width=True)
-            
-            if submit:
-                if ekspedisi_in and dari_in and ke_in:
-                    # Panggil fungsi dengan parameter koli baru
-                    if save_timbang_data(ekspedisi_in, jenis_in, dari_in, ke_in, koli_in, berat_in):
-                        st.success(f"Data Berhasil Disimpan!")
-                        st.rerun()
-                else:
-                    st.error("Mohon isi semua kolom teks (Ekspedisi, Dari, Ke)!")
+        with col_kanan:
+            dari_in = st.text_input("Pengiriman Dari", placeholder="Asal Barang...")
+            ke_in = st.text_input("Pengiriman Ke", placeholder="Tujuan Barang...")
+        
+        # Tombol submit sekarang otomatis mengikuti style gold premium
+        submit = st.form_submit_button("➕ SIMPAN DATA TIMBANGAN", use_container_width=True)
+        
+        if submit:
+            if ekspedisi_in and dari_in and ke_in:
+                if save_timbang_data(ekspedisi_in, jenis_in, dari_in, ke_in, koli_in, berat_in):
+                    st.success(f"Data Berhasil Disimpan!")
+                    st.rerun()
+            else:
+                st.error("Mohon isi semua kolom teks (Ekspedisi, Dari, Ke)!")
 
     # --- TAB 2: METRIC BOXES ---
     with tab_metrics:
