@@ -6571,7 +6571,7 @@ def show_timbang_system():
                 ke_in = st.text_input("Pengiriman Ke", placeholder="Tujuan Barang...")
             
             st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("➕ SIMPAN DATA TIMBANGAN", use_container_width=True)
+            submit = st.form_submit_button("⚖️ SIMPAN DATA TIMBANG", use_container_width=True)
             
             if submit:
                 # Logic simpan data lu di sini
