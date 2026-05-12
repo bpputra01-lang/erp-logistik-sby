@@ -3922,7 +3922,6 @@ def tampilkan_halaman_po():
         with t3: 
             st.dataframe(df_miss, use_container_width=True, hide_index=True)
         with t4:
-            st.subheader("Split Data by No PO")
             unique_po = df_split['No PO'].unique()
             selected_po = st.selectbox("Pilih Nomor PO:", unique_po, key="unique_po_selector")
             
