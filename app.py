@@ -6409,7 +6409,7 @@ def show_database_ongkir():
                 st.info("💡 Centang baris di tabel untuk menghapus data.")
         else:
             st.info("Data masih kosong.")
-            
+
 import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime
@@ -7819,6 +7819,7 @@ elif menu == "Justification SO":
             - **Kondisi 3:** Jika QTY System < QTY SO AND Current Stock < Real QTY (L2 & T2 ≠ 0).
         - **UNDEFINED**
             - **Kondisi dimana ke-4 Logic diatas tidak ada yang sesuai sehingga memerlukan analisa detail secara manual untuk cek justifikasinya.**
+        - **NANANAN**
         """)
     # 1. Inisialisasi Session State biar data nggak hilang pas diklik
     if 'result_so' not in st.session_state:
