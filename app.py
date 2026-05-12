@@ -6678,6 +6678,10 @@ def show_timbang_system():
           # --- 4. LIST DATA DENGAN CHECKBOX ---
      # --- 4. LIST DATA DENGAN CHECKBOX ---
         st.markdown("### 📋 LIST DATA TIMBANG")
+        
+        # Cek dulu kolom 'id' ada gak di dataframe hasil fetch
+        if 'id' not in df.columns:
+            st.error("❌ ERROR: Kolom 'id' tidak ditemukan di database. Pastikan tabel di Supabase punya Primary Key bernama 'id'.")
         else:
             df_display = df.copy()
             df_display.insert(0, "SELECT", False)
