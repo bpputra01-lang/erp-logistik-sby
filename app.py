@@ -6394,7 +6394,7 @@ def show_database_ongkir():
                 st.markdown(f'''
                     <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
                         <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">📦 TOTAL KOLI</span>
-                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">{total_koli} <small style="font-size: 1rem;">Pcs</small></span>
+                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">{total_koli} <small style="font-size: 1rem;">Koli/Bag</small></span>
                     </div>
                 ''', unsafe_allow_html=True)
 
