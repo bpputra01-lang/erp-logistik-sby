@@ -5371,16 +5371,15 @@ def process_rto_logic(df_scan, df_tf):
     metrics["kurang_tf"] = int(comp[comp['QTY_SCAN'] > comp['QTY_TF']].apply(lambda x: x['QTY_SCAN'] - x['QTY_TF'], axis=1).sum())
     metrics["lebih_tf"] = int(comp[comp['QTY_TF'] > comp['QTY_SCAN']].apply(lambda x: x['QTY_TF'] - x['QTY_SCAN'], axis=1).sum())
 
-   # --- 1. FIFO ALOKASI (JALANKAN INI DULU) ---
+  # --- 1. FIFO ALOKASI (SINKRONISASI TOTAL QTY) ---
     hasil_alokasi = []
     
-    # PERBAIKAN: Agregasikan df_tf berdasarkan 'No Transfer' dan 'SKU' terlebih dahulu 
-    # agar tidak ada baris SKU yang terpisah/double di nomor transfer yang sama.
+    # Agregasikan df_tf berdasarkan Nomor Transfer dan SKU sebelum masuk FIFO
     tf_cols = df_tf.columns
     df_tf_grouped = df_tf.groupby([tf_cols[tf_no_idx], tf_cols[tf_sku_idx]])[tf_cols[tf_qty_idx]].sum().reset_index()
     df_tf_grouped.columns = ['No Transfer', 'SKU', 'Qty TF']
 
-    # Lakukan alokasi FIFO menggunakan data TF yang sudah bersih teragregasi
+    # Proses alokasi FIFO
     for sku in agg_scan.index:
         available_qty = agg_scan[sku]
         tf_rows = df_tf_grouped[df_tf_grouped['SKU'] == sku]
@@ -5403,7 +5402,6 @@ def process_rto_logic(df_scan, df_tf):
             })
             available_qty -= allocated
 
-        # Jika setelah keliling nomor TF ternyata fisik scan masih sisa (Over Scan)
         if available_qty > 0:
             hasil_alokasi.append({
                 'No Transfer': 'KURANG TF / OVER SCAN', 
@@ -5413,7 +5411,7 @@ def process_rto_logic(df_scan, df_tf):
                 'Status Alokasi': 'Over Allocation'
             })
 
-    # Masukkan data TF yang sama sekali tidak mendapatkan alokasi scan fisik
+    # Masukkan sisa nomor transfer yang tidak teralokasi fisik sama sekali
     for _, row in df_tf_grouped.iterrows():
         n_tf, s_tf = row['No Transfer'], row['SKU']
         if not any(d['No Transfer'] == n_tf and d['SKU'] == s_tf for d in hasil_alokasi):
@@ -5451,14 +5449,22 @@ def process_rto_logic(df_scan, df_tf):
         # Hitung metric dari selisih asli (biar angka di dashboard Surabaya lu bener)
         metrics["kurang_tf"] = int((df_kurang['QTY_SCAN'] - df_kurang['QTY_TF']).sum())
 
-    # LOGIKA LEBIH TF
+    # ==================== PERBAIKAN LOGIKA LEBIH TF ====================
     selisih_lebih = comp[comp['QTY_TF'] > comp['QTY_SCAN']].copy().reset_index()
     selisih_lebih.rename(columns={selisih_lebih.columns[0]: 'SKU'}, inplace=True)
+    
     if not selisih_lebih.empty:
-        df_lebih = pd.merge(selisih_lebih, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='left')
+        # 1. Agregasikan df_tf mentah terlebih dahulu agar Nomor Transfer + SKU jadi unik
+        df_tf_clean = df_tf.groupby([col_tf_no, col_tf_sku]).size().reset_index()
+        df_tf_clean = df_tf_clean[[col_tf_no, col_tf_sku]] # Ambil kolom No TF dan SKU saja
+        
+        # 2. Lakukan merge dengan data TF yang sudah bersih/di-drop duplikatnya
+        df_lebih = pd.merge(selisih_lebih, df_tf_clean, left_on='SKU', right_on=col_tf_sku, how='left')
         df_lebih.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
+        
+        # 3. Susun urutan kolom hasil akhir
         df_lebih = df_lebih[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
-
+        
     # Detail untuk Split TF (Tab 2)
     if not df_hasil.empty:
         df_comp_reset = comp[['QTY_TF']].reset_index()
