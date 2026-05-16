@@ -7240,9 +7240,10 @@ elif menu == "Scan Out Validation":
             - Untuk Trx Type pilih **Yesterday**
             - Untuk Store_stockadj pilih **JEZ SURABAYA (DC)**
             - Setelah itu Download filenya
+            - **File tidak perlu diedit dan bisa langsung di Uplaod**
         - **HISTORY SET UP**: Sesuai yang ada pada template Mutasi Set Up Jezpro
         - **STOCK TRACKING**: Sesuai yang ada pada template Stock Tracking Jezpro
-        - **PS** ➡️ *Pilih salah satu mau menggunakan file data scan dari Appsheet atau dari PBI*
+        - **PS** ➡️ *Pilih salah satu mau menggunakan file data scan dari Appsheet atau dari file PBI*
         """)
         
     with st.expander("💡Logic Thinking"):
