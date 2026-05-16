@@ -7250,14 +7250,14 @@ elif menu == "Scan Out Validation":
         """)
     
    # Baris 1: Pilihan File Utama
-    st.markdown("### 📥 1. Upload File Utama (Pilih Salah Satu)")
+    st.markdown("### 📥 1. Upload File Data Scan (Pilih Salah Satu)")
     uc1, uc2 = st.columns(2)
     with uc1:
         up_scan = st.file_uploader(
-            "Upload DATA SCAN (Format Jadi)", type=["xlsx", "csv"]
+            "Upload DATA SCAN (Format APPSHEET)", type=["xlsx", "csv"]
         )
     with uc2:
-        up_pbi = st.file_uploader("Upload DATA PBI (Format Mentah)", type=["xlsx"])
+        up_pbi = st.file_uploader("Upload DATA PBI (Format Power BI)", type=["xlsx", "csv"])
 
     # Baris 2: File Pendukung
     st.markdown("### 📥 2. Upload File Dokumen Pendukung")
