@@ -5371,17 +5371,22 @@ def process_rto_logic(df_scan, df_tf):
     metrics["kurang_tf"] = int(comp[comp['QTY_SCAN'] > comp['QTY_TF']].apply(lambda x: x['QTY_SCAN'] - x['QTY_TF'], axis=1).sum())
     metrics["lebih_tf"] = int(comp[comp['QTY_TF'] > comp['QTY_SCAN']].apply(lambda x: x['QTY_TF'] - x['QTY_SCAN'], axis=1).sum())
 
-    # --- 1. FIFO ALOKASI (JALANKAN INI DULU) ---
+   # --- 1. FIFO ALOKASI (JALANKAN INI DULU) ---
     hasil_alokasi = []
-    df_tf_work = df_tf.copy()
+    
+    # PERBAIKAN: Agregasikan df_tf berdasarkan 'No Transfer' dan 'SKU' terlebih dahulu 
+    # agar tidak ada baris SKU yang terpisah/double di nomor transfer yang sama.
+    tf_cols = df_tf.columns
+    df_tf_grouped = df_tf.groupby([tf_cols[tf_no_idx], tf_cols[tf_sku_idx]])[tf_cols[tf_qty_idx]].sum().reset_index()
+    df_tf_grouped.columns = ['No Transfer', 'SKU', 'Qty TF']
 
+    # Lakukan alokasi FIFO menggunakan data TF yang sudah bersih teragregasi
     for sku in agg_scan.index:
         available_qty = agg_scan[sku]
-        mask_tf = df_tf_work.iloc[:, tf_sku_idx] == sku
-        tf_rows = df_tf_work[mask_tf]
+        tf_rows = df_tf_grouped[df_tf_grouped['SKU'] == sku]
         
         for idx, row in tf_rows.iterrows():
-            target_qty = float(row.iloc[tf_qty_idx])
+            target_qty = float(row['Qty TF'])
             if available_qty <= 0:
                 allocated = 0
                 status_val = 'No Allocation'
@@ -5390,7 +5395,7 @@ def process_rto_logic(df_scan, df_tf):
                 status_val = "Full Allocation" if allocated == target_qty else "Partial Allocation"
             
             hasil_alokasi.append({
-                'No Transfer': row.iloc[tf_no_idx], 
+                'No Transfer': row['No Transfer'], 
                 'SKU': sku, 
                 'Qty TF': target_qty,
                 'Qty Alokasi': allocated,
@@ -5398,6 +5403,7 @@ def process_rto_logic(df_scan, df_tf):
             })
             available_qty -= allocated
 
+        # Jika setelah keliling nomor TF ternyata fisik scan masih sisa (Over Scan)
         if available_qty > 0:
             hasil_alokasi.append({
                 'No Transfer': 'KURANG TF / OVER SCAN', 
@@ -5407,12 +5413,15 @@ def process_rto_logic(df_scan, df_tf):
                 'Status Alokasi': 'Over Allocation'
             })
 
-    for _, row in df_tf_work.iterrows():
-        s_tf, n_tf = row.iloc[tf_sku_idx], row.iloc[tf_no_idx]
+    # Masukkan data TF yang sama sekali tidak mendapatkan alokasi scan fisik
+    for _, row in df_tf_grouped.iterrows():
+        n_tf, s_tf = row['No Transfer'], row['SKU']
         if not any(d['No Transfer'] == n_tf and d['SKU'] == s_tf for d in hasil_alokasi):
             hasil_alokasi.append({
-                'No Transfer': n_tf, 'SKU': s_tf, 
-                'Qty TF': float(row.iloc[tf_qty_idx]), 'Qty Alokasi': 0,
+                'No Transfer': n_tf, 
+                'SKU': s_tf, 
+                'Qty TF': float(row['Qty TF']), 
+                'Qty Alokasi': 0,
                 'Status Alokasi': 'No Allocation'
             })
 
