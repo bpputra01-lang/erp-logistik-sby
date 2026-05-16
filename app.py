@@ -3328,6 +3328,33 @@ def putaway_system(df_ds, df_asal):
         print(f"Detail Error: {e}")
         empty = pd.DataFrame()
         return empty, empty, empty, empty, empty, empty
+
+def pre_process_pbi_data(uploaded_pbi_file):
+    # Baca tanpa header dulu agar aman filter teks bawaan
+    df_pbi = pd.read_excel(uploaded_pbi_file, header=None)
+    if df_pbi.empty:
+        return pd.DataFrame(columns=["BIN", "SKU"])
+
+    # Filter: Kolom S (18) tidak blank & buang teks header bawaan sistem
+    df_filtered = df_pbi[
+        df_pbi[18].notna()
+        & (df_pbi[18].astype(str).str.strip() != "")
+        & (df_pbi[18].astype(str).str.strip().str.lower() != "bin_code")
+        & (df_pbi[4].astype(str).str.strip().str.lower() != "ps_barcode")
+    ].copy()
+
+    # Ubah qty kolom V (21) ke angka, duplikasi baris secepat kilat
+    df_filtered[21] = (
+        pd.to_numeric(df_filtered[21], errors="coerce").fillna(1).astype(int)
+    )
+    df_duplicated = df_filtered.loc[
+        df_filtered.index.repeat(df_filtered[21].apply(lambda x: x if x > 1 else 1))
+    ]
+
+    # Ambil kolom S (18) dan E (4), balik posisi, set header baru
+    df_final = df_duplicated[[18, 4]].copy()
+    df_final.columns = ["BIN", "SKU"]
+    return df_final
         
 def process_scan_out(df_scan, df_history, df_stock):
     # ========== COPY & NORMALISASI (TETAP SAMA) ==========
@@ -7222,15 +7249,25 @@ elif menu == "Scan Out Validation":
         - Jika permintaan item ada > 1 item dan yang terjual hanya 1 maka akan dilakukan split row dimana akan dilakukan pengecekan di kedua file dan akan split note juga menyesuaikan kondisi hasil compare 
         """)
     
-    col1, col2, col3 = st.columns(3)
-    with col1: 
-        up_scan = st.file_uploader("📥Upload DATA SCAN", type=['xlsx', 'csv'], help="File dengan Kolom A=BIN, B=SKU")
-    with col2: 
-        up_hist = st.file_uploader("📥Upload HISTORY SET UP", type=['xlsx'], help="File dengan Kolom D=SKU")
-    with col3: 
-        up_stock = st.file_uploader("📥Upload STOCK TRACKING", type=['xlsx'], help="File dengan Kolom B=SKU, A=Invoice")
+   # Baris 1: Pilihan File Utama
+    st.markdown("### 📥 1. Upload File Utama (Pilih Salah Satu)")
+    uc1, uc2 = st.columns(2)
+    with uc1:
+        up_scan = st.file_uploader(
+            "Upload DATA SCAN (Format Jadi)", type=["xlsx", "csv"]
+        )
+    with uc2:
+        up_pbi = st.file_uploader("Upload DATA PBI (Format Mentah)", type=["xlsx"])
+
+    # Baris 2: File Pendukung
+    st.markdown("### 📥 2. Upload File Dokumen Pendukung")
+    col2, col3 = st.columns(2)
+    with col2:
+        up_hist = st.file_uploader("Upload HISTORY SET UP", type=["xlsx"])
+    with col3:
+        up_stock = st.file_uploader("Upload STOCK TRACKING", type=["xlsx"])
     
-    if up_scan and up_hist and up_stock:
+    if (up_scan or up_pbi) and up_hist and up_stock:
         # 1. Inisialisasi Session State (Tempat penitipan data)
         if "df_res" not in st.session_state:
             st.session_state.df_res = None
@@ -7239,28 +7276,40 @@ elif menu == "Scan Out Validation":
 
         if st.button("▶️ COMPARE DATA SCAN OUT"):
             try:
-                if up_scan.name.endswith('.csv'):
-                    df_s = pd.read_csv(up_scan)
-                else:
-                    df_s = pd.read_excel(up_scan, engine='openpyxl')
+                with st.spinner("🔄 Sedang memproses data..."):
+                    # LOGIKA BARU: Pilih proses berdasarkan file yang diupload
+                    if up_pbi is not None:
+                        df_s = pre_process_pbi_data(up_pbi)
+                        # Data PBI keluar dari fungsi sudah auto-standard (BIN & SKU)
+                        
+                    elif up_scan is not None:
+                        if up_scan.name.endswith(".csv"):
+                            df_s = pd.read_csv(up_scan)
+                        else:
+                            df_s = pd.read_excel(up_scan, engine="openpyxl")
+                        
+                        # PERBAIKAN: Taruh standardisasi kolom khusus untuk DATA SCAN langsung di sini
+                        df_s.columns = [str(col).strip().upper() for col in df_s.columns]
+                        
+                        if len(df_s.columns) < 2:
+                            st.error("❌ DATA SCAN harus memiliki minimal 2 kolom (BIN, SKU)")
+                            st.stop()
                 
+                # Baca file pendukung (Posisinya sejajar, di luar blok if/elif file utama)
                 df_h = pd.read_excel(up_hist, engine='openpyxl')
                 df_st = pd.read_excel(up_stock, engine='openpyxl')
                 
-                # Standarisasi kolom
-                df_s.columns = [str(col).strip().upper() for col in df_s.columns]
+                # Standardisasi kolom dokumen pendukung tetap jalan
                 df_h.columns = [str(col).strip().upper() for col in df_h.columns]
                 df_st.columns = [str(col).strip().upper() for col in df_st.columns]
                 
-                if len(df_s.columns) < 2:
-                    st.error("❌ DATA SCAN harus memiliki minimal 2 kolom (BIN, SKU)")
-                    st.stop()
+                # HAPUS / KOMENTARI baris spinner ganda di bawah ini agar tidak redundant:
+                # with st.spinner('🔄 Sedang memproses data...'): 
                 
-                with st.spinner('🔄 Sedang memproses data...'):
-                    # Masukkan hasil ke session state
-                    res, draft = process_scan_out(df_s, df_h, df_st)
-                    st.session_state.df_res = res
-                    st.session_state.df_draft = draft
+                # Masukkan hasil ke session state
+                res, draft = process_scan_out(df_s, df_h, df_st)
+                st.session_state.df_res = res
+                st.session_state.df_draft = draft
                 
                 st.success("✅ Validasi Selesai!")
                 
