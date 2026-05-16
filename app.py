@@ -7230,9 +7230,19 @@ elif menu == "Scan Out Validation":
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan :**
-        - **DATA SCAN**: Kolom A = **BIN**, Kolom B = **SKU** (QTY akan dihitung otomatis)
+
+        - **UPLOAD MENGGUNAKAN FILE DATA SCAN (APPSHEET)**: Kolom A = **BIN**, Kolom B = **SKU** (QTY akan dihitung otomatis)
+        - **UPLOAD MENGGUNAKAN DATA POWER BI**: Berikut cara download permintaan FL by PBI
+            - Buka Power BI
+            - Pilih Menu **Moving Stock**
+            - Pilih Tab atau Sheet **Detail**
+            - Lalu untuk Period pilih **YESTERDAY**
+            - Untuk Trx Type pilih **Yesterday**
+            - Untuk Store_stockadj pilih **JEZ SURABAYA (DC)**
+            - Setelah itu Download filenya
         - **HISTORY SET UP**: Sesuai yang ada pada template Mutasi Set Up Jezpro
         - **STOCK TRACKING**: Sesuai yang ada pada template Stock Tracking Jezpro
+        - **PS** ➡️ *Pilih salah satu mau menggunakan file data scan dari Appsheet atau dari PBI*
         """)
         
     with st.expander("💡Logic Thinking"):
