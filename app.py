@@ -5425,7 +5425,7 @@ def process_rto_logic(df_scan, df_tf):
                 'Status Alokasi': 'No Allocation'
             })
 
-    f_hasil = pd.DataFrame(hasil_alokasi)
+    df_hasil = pd.DataFrame(hasil_alokasi)
 
     # --- 2. LOGIKA KURANG TF (FIX: NO DOUBLE, OVER ALLOCATION SEBAGAI PRIORITAS) ---
     selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
