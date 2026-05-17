@@ -6500,8 +6500,9 @@ def show_database_ongkir():
 
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import pandas as pd
+
 
 # --- 1. KONEKSI SUPABASE ---
 # Gunakan URL & Key yang lu punya, ini gue samakan dengan contoh lu
@@ -6636,7 +6637,8 @@ def show_timbang_system():
         }
         </style>
         """, unsafe_allow_html=True)
-# --- HERO HEADER ---
+
+    # --- HERO HEADER ---
     st.markdown('<div class="hero-header"><h1>SISTEM TIMBANG KOLIAN</h1></div>', unsafe_allow_html=True)
     tab_input, tab_metrics = st.tabs(["📥 INPUT DATA MANUAL", "📊 METRIC MONITORING"])
 
@@ -6646,10 +6648,10 @@ def show_timbang_system():
             col_kiri, col_kanan = st.columns(2)
             
             with col_kiri:
-                ekspedisi_in = st.text_input("Ekspedisi", placeholder="Nama Ekspedisi...")
+                # Perubahan Menjadi Dropdown Dropdown Pilihan
+                ekspedisi_in = st.selectbox("Ekspedisi", ["ACCESS", "ADex (Adika Express)"])
                 jenis_in = st.selectbox("Jenis Pengiriman", ["RTO"], index=0)
                 
-                # Area Number Input yang tadinya belang
                 c_koli, c_berat = st.columns(2)
                 with c_koli:
                     koli_in = st.number_input("Total Koli", min_value=1, step=1)
@@ -6657,42 +6659,87 @@ def show_timbang_system():
                     berat_in = st.number_input("Berat Total (Kg)", min_value=0.1, step=0.1)
                 
             with col_kanan:
-                dari_in = st.text_input("Pengiriman Dari", placeholder="Asal Barang...")
-                ke_in = st.text_input("Pengiriman Ke", placeholder="Tujuan Barang...")
+                # Perubahan Menjadi Dropdown Terbatas
+                dari_in = st.selectbox("Pengiriman Dari", ["SURABAYA"])
+                ke_in = st.selectbox("Pengiriman Ke", ["SEMARANG", "HUB JAKARTA"])
             
             st.markdown("<br>", unsafe_allow_html=True)
             submit = st.form_submit_button("⚖️ SIMPAN DATA TIMBANG", use_container_width=True)
             
             if submit:
-                # PANGGIL FUNGSI SAVE DI SINI
                 success = save_timbang_data(
                     ekspedisi_in, jenis_in, dari_in, ke_in, koli_in, berat_in
                 )
                 
                 if success:
-                    st.success("✅ Data Berhasil Masuk Database!")
-                    st.rerun()  # WAJIB: Supaya Tab 2 langsung ditarik data barunya
+                    st.toast("✅ Data Berhasil Masuk Database!", icon="🚀")
+                    st.rerun()
 
     with tab_metrics:
-        df = fetch_timbang_data()
+        raw_df = fetch_timbang_data()
         
-        if not df.empty:
-            # --- FIX JAM SURABAYA (UTC ke WIB) ---
-            df['created_at'] = pd.to_datetime(df['created_at']) # Pastikan jadi format datetime
+        if not raw_df.empty:
+            # --- CONVERT & FIX JAM KE WIB ---
+            raw_df['created_at'] = pd.to_datetime(raw_df['created_at'])
+            if raw_df['created_at'].dt.tz is None:
+                raw_df['created_at'] = raw_df['created_at'].dt.tz_localize('UTC')
+            raw_df['created_at'] = raw_df['created_at'].dt.tz_convert('Asia/Jakarta')
+
+            # --- FILTER TANGGAL DI TAB MONITORING ---
+            col_filter, _ = st.columns([1, 2])
+            with col_filter:
+                filter_waktu = st.selectbox(
+                    "📅 Filter Periode Data", 
+                    ["Today (Hari Ini)", "This Month (Bulan Ini)", "All Time (Semua Data)"]
+                )
             
-            # Tambahin 7 jam biar jadi WIB
-            df['created_at'] = df['created_at'].dt.tz_convert('Asia/Jakarta') 
-            
-            # Baru diformat buat tampilan tabel
-            df['created_at'] = df['created_at'].dt.strftime('%d %b %Y | %H:%M')
-            
+            now_jkt = datetime.now(timezone(timedelta(hours=7)))
+            df_filtered = raw_df.copy()
+
+            if filter_waktu == "Today (Hari Ini)":
+                df_filtered = df_filtered[df_filtered['created_at'].dt.date == now_jkt.date()]
+            elif filter_waktu == "This Month (Bulan Ini)":
+                df_filtered = df_filtered[
+                    (df_filtered['created_at'].dt.year == now_jkt.year) & 
+                    (df_filtered['created_at'].dt.month == now_jkt.month)
+                ]
+
+            # --- LOGIKAL PERHITUNGAN HARGA TARIF ---
+            def hitung_harga(row):
+                eksp = str(row['ekspedisi']).upper()
+                tujuan = str(row['pengiriman_ke']).upper()
+                koli = row['total_koli']
+                berat = row['berat_total_timbang']
+                
+                # Logic 1: ACCESS + SEMARANG = Koli * 40.000
+                if "ACCESS" in eksp and "SEMARANG" in tujuan:
+                    return koli * 40000
+                # Logic 2: ACCESS + HUB JAKARTA = Kg * 2.500
+                elif "ACCESS" in eksp and "HUB JAKARTA" in tujuan:
+                    return berat * 2500
+                # Logic 3: ADEX + SEMARANG = Kg * 1.000
+                elif "ADEX" in eksp and "SEMARANG" in tujuan:
+                    return berat * 1000
+                # Logic 4: ADEX + HUB JAKARTA = Kg * 2.000
+                elif "ADEX" in eksp and "HUB JAKARTA" in tujuan:
+                    return berat * 2000
+                return 0
+
+            # Daftarkan kolom harga baru secara dinamis
+            if not df_filtered.empty:
+                df_filtered['Harga (Rp)'] = df_filtered.apply(hitung_harga, axis=1)
+                total_harga = df_filtered['Harga (Rp)'].sum()
+            else:
+                df_filtered['Harga (Rp)'] = 0
+                total_harga = 0
+
             # --- 2. HITUNG METRIK ---
-            total_koli = df['total_koli'].sum()
-            total_berat = df['berat_total_timbang'].sum()
-            total_data = len(df)
+            total_koli = df_filtered['total_koli'].sum() if not df_filtered.empty else 0
+            total_berat = df_filtered['berat_total_timbang'].sum() if not df_filtered.empty else 0
+            total_data = len(df_filtered)
             
-            # --- 3. TAMPILAN METRIK PREMIUM ---
-            m1, m2, m3 = st.columns(3)
+            # --- 3. TAMPILAN METRIK PREMIUM + TOTAL BIAYA ---
+            m1, m2, m3, m4 = st.columns(4)
             with m1:
                 st.markdown(f'''
                     <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
@@ -6710,58 +6757,55 @@ def show_timbang_system():
             with m3:
                 st.markdown(f'''
                     <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">💰 TOTAL BIAYA</span>
+                        <span style="color: #00FF66; font-size: 1.8rem; font-weight: 800;">Rp {total_harga:,.0f}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
+            with m4:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
                         <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">📝 TOTAL DATA</span>
                         <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">{total_data:,}</span>
                     </div>
                 ''', unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
-            
             st.markdown("### 📋 LIST DATA TIMBANG")
             
-            # Cek kolom 'id' dengan lebih teliti
-            df = fetch_timbang_data()
-            
-            if not df.empty:
-                # Pastikan 'id' ada, kalau nggak ada kita kasih proteksi biar gak crash
-                if 'id' in df.columns:
-                    # --- FIX TAMPILAN DI DATA EDITOR ---
-                    df_display = df.copy()
-                    
-                    # 1. Konversi ke Datetime & Jakarta Time (WIB)
-                    df_display['created_at'] = pd.to_datetime(df_display['created_at']).dt.tz_convert('Asia/Jakarta')
-                    
-                    # 2. Hilangkan info +07:00 biar bersih di tabel
-                    df_display['created_at'] = df_display['created_at'].dt.tz_localize(None)
-                    
-                    # 3. Baru masukkan kolom SELECT
-                    df_display.insert(0, "SELECT", False)
+            if 'id' in df_filtered.columns:
+                df_display = df_filtered.copy()
+                df_display['created_at'] = df_display['created_at'].dt.tz_localize(None)
+                df_display.insert(0, "SELECT", False)
 
-                    edited_df = st.data_editor(
-                        df_display,
-                        hide_index=True,
-                        use_container_width=True,
-                        column_config={
-                            "SELECT": st.column_config.CheckboxColumn("🗑️", default=False),
-                            "id": st.column_config.TextColumn("ID", disabled=True),
-                            "created_at": st.column_config.DatetimeColumn(
-                                "Waktu",
-                                format="DD MMM YYYY | HH:mm", # Ini kunci biar gak balik ke format aneh
-                                disabled=True
-                            ),
-                        },
-                        disabled=[col for col in df_display.columns if col != "SELECT"]
-                    )
+                # Reorder kolom biar rapi (opsional, mindahin Harga ke dekat total koli/berat)
+                edited_df = st.data_editor(
+                    df_display,
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "SELECT": st.column_config.CheckboxColumn("🗑️", default=False),
+                        "id": st.column_config.TextColumn("ID", disabled=True),
+                        "Harga (Rp)": st.column_config.NumberColumn("Estimasi Harga", format="Rp %,d", disabled=True),
+                        "created_at": st.column_config.DatetimeColumn(
+                            "Waktu",
+                            format="DD MMM YYYY | HH:mm",
+                            disabled=True
+                        ),
+                    },
+                    disabled=[col for col in df_display.columns if col != "SELECT"]
+                )
 
-                    ids_to_delete = edited_df[edited_df["SELECT"] == True]["id"].tolist()
-                    
-                    if ids_to_delete:
-                        if st.button(f"🗑️ HAPUS {len(ids_to_delete)} DATA", use_container_width=True):
-                            if delete_multiple_timbang(ids_to_delete):
-                                st.toast("Data Berhasil Dihapus!")
-                                st.rerun()
-                else:
-                    st.warning("⚠️ Data lama terdeteksi tanpa ID. Coba input data baru dulu di tab sebelah.")
+                ids_to_delete = edited_df[edited_df["SELECT"] == True]["id"].tolist()
+                
+                if ids_to_delete:
+                    if st.button(f"🗑️ HAPUS {len(ids_to_delete)} DATA SELECTED", use_container_width=True):
+                        if delete_multiple_timbang(ids_to_delete):
+                            st.toast("Data Berhasil Dihapus!")
+                            st.rerun()
+            else:
+                st.warning("⚠️ Data lama terdeteksi tanpa ID. Coba input data baru dulu.")
+        else:
+            st.info("💡 Belum ada data timbang masuk untuk periode ini.")
                 
     
 with st.sidebar:
