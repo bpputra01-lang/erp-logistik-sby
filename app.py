@@ -2942,13 +2942,20 @@ def tarik_data_cycle_count():
             else:
                 df_scan["BRAND"] = "UNKNOWN"
 
-            # Cleaning data
+            # Cleaning data awal
             df_scan["BIN"] = df_scan["BIN"].astype(str).str.strip()
             df_scan["SKU"] = df_scan["SKU"].astype(str).str.strip()
             df_scan["SUB_KATEGORI"] = df_scan["SUB_KATEGORI"].astype(str).str.strip().str.upper()
             df_scan["BRAND"] = df_scan["BRAND"].astype(str).str.strip().str.upper()
             df_scan["QTY_SCAN"] = pd.to_numeric(df_scan["QTY_SCAN"], errors='coerce').fillna(0).astype(int)
 
+            # ---------------------------------------------------------
+            # KECUALIKAN BIN: DEFECT, REJECT, KARANTINA, STAGGING/STAGING, INB, OUT
+            # ---------------------------------------------------------
+            kata_kunci_block = "DEFECT|REJECT|KARANTINA|STAG|INB|OUT"
+            
+            # Filter baris yang kolom BIN-nya TIDAK mengandung kata kunci di atas (case-insensitive)
+            df_scan = df_scan[~df_scan["BIN"].str.contains(kata_kunci_block, case=False, na=False)]
             # =========================================================
             # 4. FILTER SECTION (FRONTEND VISUAL UI)
             # =========================================================
