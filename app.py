@@ -2924,93 +2924,21 @@ def tarik_data_cycle_count():
                 st.error("⚠️ File kurang dari 10 kolom! Pastikan isi file sesuai format (Kolom B, C, G, J).")
                 return
 
-            # =========================================================
-            # 3. BACKEND MAPPING (OTOMATIS PAKAI HEADER ASLI FILE EXCEL)
-            # =========================================================
-            # Kita bikin df_scan langsung pakai nama kolom asli dari df_raw berdasarkan indexnya
-            df_scan = pd.DataFrame({
-                df_raw.columns[1]: df_raw.iloc[:, 1],   # Kolom B (BIN)
-                df_raw.columns[2]: df_raw.iloc[:, 2],   # Kolom C (SKU)
-                df_raw.columns[4]: df_raw.iloc[:, 4],   # Kolom E (ITEM NAME)
-                df_raw.columns[5]: df_raw.iloc[:, 5],   # Kolom F (VARIANT)
-                df_raw.columns[6]: df_raw.iloc[:, 6],   # Kolom G (SUB KATEGORI)
-                df_raw.columns[7]: df_raw.iloc[:, 7],   # Kolom H (Harga / Harga Jual)
-                df_raw.columns[9]: df_raw.iloc[:, 9]    # Kolom J (QTY SO / QTY SCAN)
-            })
-
-            # Ambil kolom BRAND secara otomatis dari file jika terdeteksi
-            brand_col = [col for col in df_raw.columns if 'BRAND' in str(col).upper()]
-            if brand_col:
-                df_scan["BRAND"] = df_raw[brand_col[0]]
-            else:
-                df_scan["BRAND"] = "UNKNOWN"
-
-            # Ambil nama variabel kolom asli biar coding di bawah gak eror saat dipanggil
-            col_bin = df_raw.columns[1]
-            col_sku = df_raw.columns[2]
-            col_item = df_raw.columns[4]
-            col_variant = df_raw.columns[5]
-            col_sub = df_raw.columns[6]
-            col_harga = df_raw.columns[7]
-            col_qty = df_raw.columns[9]
-
-            # Cleaning data awal (Menggunakan variabel kolom asli)
-            df_scan[col_bin] = df_scan[col_bin].astype(str).str.strip()
-            df_scan[col_sku] = df_scan[col_sku].astype(str).str.strip()
-            df_scan[col_item] = df_scan[col_item].astype(str).str.strip().str.upper()
-            df_scan[col_variant] = df_scan[col_variant].astype(str).str.strip().str.upper()
-            df_scan[col_sub] = df_scan[col_sub].astype(str).str.strip().str.upper()
-            df_scan["BRAND"] = df_scan["BRAND"].astype(str).str.strip().str.upper()
-            df_scan[col_qty] = pd.to_numeric(df_scan[col_qty], errors='coerce').fillna(0).astype(int)
-
-            # Bersihkan Kolom Harga dari format mata uang
-            df_scan["HARGA_NUMERIC"] = pd.to_numeric(df_scan[col_harga], errors='coerce').fillna(0)
-
-            # ---------------------------------------------------------
-            # LOGIKA PENGELOMPOKAN TIER HARGA (KOLOM H)
-            # ---------------------------------------------------------
-            import numpy as np
-            
-            kondisi = [
-                (df_scan["HARGA_NUMERIC"] >= 1000000),
-                (df_scan["HARGA_NUMERIC"] >= 700000) & (df_scan["HARGA_NUMERIC"] < 1000000),
-                (df_scan["HARGA_NUMERIC"] >= 400000) & (df_scan["HARGA_NUMERIC"] < 700000),
-                (df_scan["HARGA_NUMERIC"] >= 100000) & (df_scan["HARGA_NUMERIC"] < 400000),
-                (df_scan["HARGA_NUMERIC"] >= 0) & (df_scan["HARGA_NUMERIC"] < 100000)
-            ]
-            
-            pilihan_tier = [
-                "LUXURY TIER (>= 1 JUTA)",
-                "TOP TIER (700 RIBU - < 1 JUTA)",
-                "MID TIER (400 RIBU - < 700 RIBU)",
-                "ENTRY TIER (100 RIBU- < 700 RIBU)",
-                "MASS MARKET TIER (0 - < 100 RIBU)"
-            ]
-            
-            df_scan["TIER_HARGA"] = np.select(kondisi, pilihan_tier, default="Tidak Terdefinisi")
-
-            # ---------------------------------------------------------
-            # KECUALIKAN BIN: DEFECT, REJECT, KARANTINA, STAGGING, INB, OUT, PUTAWAY
-            # ---------------------------------------------------------
-            kata_kunci_block = "DEFECT|REJECT|KARANTINA|STAG|INB|OUT|PUTAWAY"
-            df_scan = df_scan[~df_scan[col_bin].str.contains(kata_kunci_block, case=False, na=False)]
-            
-            # =========================================================
+           # =========================================================
             # 4. FILTER SECTION (FRONTEND VISUAL UI)
             # =========================================================
             st.markdown("### 🔍 Filter Brand, Sub Kategori & Kategori Harga")
             col_f1, col_f2, col_f3 = st.columns(3) # Ubah jadi 3 kolom agar rapi kesamping
             
             with col_f1:
-                # Aman dari NaN karena dipaksa str(x) dan dicek nilainya
+                # Menggunakan col_sub (nama asli dari file) biar gak eror key 'SUB_KATEGORI'
                 list_sub_kat = sorted([
-                    str(x).strip().upper() for x in df_scan["SUB_KATEGORI"].unique() 
+                    str(x).strip().upper() for x in df_scan[col_sub].unique() 
                     if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'
                 ])
-                selected_sub = st.multiselect("🗂 Sub Kategori:", list_sub_kat, key="selected_sub")
+                selected_sub = st.multiselect(f"🗂 {col_sub}:", list_sub_kat, key="selected_sub")
             
             with col_f2:
-                # Aman dari NaN karena dipaksa str(x) dan dicek nilainya
                 list_brand = sorted([
                     str(x).strip().upper() for x in df_scan["BRAND"].unique() 
                     if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'
@@ -3042,7 +2970,7 @@ def tarik_data_cycle_count():
             df_filtered = df_scan.copy()
             
             if selected_sub:
-                df_filtered = df_filtered[df_filtered["SUB_KATEGORI"].isin(selected_sub)]
+                df_filtered = df_filtered[df_filtered[col_sub].isin(selected_sub)]
                 
             if selected_brand:
                 df_filtered = df_filtered[df_filtered["BRAND"].isin(selected_brand)]
@@ -3050,10 +2978,10 @@ def tarik_data_cycle_count():
             if selected_tier:
                 df_filtered = df_filtered[df_filtered["TIER_HARGA"].isin(selected_tier)]
             
-            # Kalkulasi Target untuk Metric
-            total_bin = df_filtered["BIN"].nunique()
-            unique_sku = df_filtered["SKU"].nunique()
-            total_qty = df_filtered["QTY_SCAN"].sum()
+            # Kalkulasi Target untuk Metric (Semua ditarik pake variabel nama asli file)
+            total_bin = df_filtered[col_bin].nunique()
+            unique_sku = df_filtered[col_sku].nunique()
+            total_qty = df_filtered[col_qty].sum()
             
             # =========================================================
             # 6. DISPLAY METRIC BOX (HASIL CSS INJECTION)
