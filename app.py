@@ -2925,16 +2925,17 @@ def tarik_data_cycle_count():
                 return
 
             # =========================================================
-            # 3. BACKEND MAPPING (KOLOM B, C, G, H, J)
+            # 3. BACKEND MAPPING (OTOMATIS PAKAI HEADER ASLI FILE EXCEL)
             # =========================================================
+            # Kita bikin df_scan langsung pakai nama kolom asli dari df_raw berdasarkan indexnya
             df_scan = pd.DataFrame({
-                "BIN": df_raw.iloc[:, 1],           # Kolom B (Index 1)
-                "SKU": df_raw.iloc[:, 2],           # Kolom C (Index 2)
-                "ITEM_NAME": df_raw.iloc[:, 4],     # Kolom E (Index 4) - TAMBAHKAN INI
-                "VARIANT": df_raw.iloc[:, 5],       # Kolom F (Index 5) - TAMBAHKAN INI
-                "SUB_KATEGORI": df_raw.iloc[:, 6],  # Kolom G (Index 6)
-                "HARGA_MENTAH": df_raw.iloc[:, 7],  # Kolom H (Index 7)
-                "QTY_SCAN": df_raw.iloc[:, 9]       # Kolom J (Index 9)
+                df_raw.columns[1]: df_raw.iloc[:, 1],   # Kolom B (BIN)
+                df_raw.columns[2]: df_raw.iloc[:, 2],   # Kolom C (SKU)
+                df_raw.columns[4]: df_raw.iloc[:, 4],   # Kolom E (ITEM NAME)
+                df_raw.columns[5]: df_raw.iloc[:, 5],   # Kolom F (VARIANT)
+                df_raw.columns[6]: df_raw.iloc[:, 6],   # Kolom G (SUB KATEGORI)
+                df_raw.columns[7]: df_raw.iloc[:, 7],   # Kolom H (Harga / Harga Jual)
+                df_raw.columns[9]: df_raw.iloc[:, 9]    # Kolom J (QTY SO / QTY SCAN)
             })
 
             # Ambil kolom BRAND secara otomatis dari file jika terdeteksi
@@ -2944,17 +2945,26 @@ def tarik_data_cycle_count():
             else:
                 df_scan["BRAND"] = "UNKNOWN"
 
-            # Cleaning data awal
-            df_scan["BIN"] = df_scan["BIN"].astype(str).str.strip()
-            df_scan["SKU"] = df_scan["SKU"].astype(str).str.strip()
-            df_scan["ITEM_NAME"] = df_scan["ITEM_NAME"].astype(str).str.strip().str.upper() # TAMBAHKAN INI
-            df_scan["VARIANT"] = df_scan["VARIANT"].astype(str).str.strip().str.upper()   # TAMBAHKAN INI
-            df_scan["SUB_KATEGORI"] = df_scan["SUB_KATEGORI"].astype(str).str.strip().str.upper()
-            df_scan["BRAND"] = df_scan["BRAND"].astype(str).str.strip().str.upper()
-            df_scan["QTY_SCAN"] = pd.to_numeric(df_scan["QTY_SCAN"], errors='coerce').fillna(0).astype(int)
+            # Ambil nama variabel kolom asli biar coding di bawah gak eror saat dipanggil
+            col_bin = df_raw.columns[1]
+            col_sku = df_raw.columns[2]
+            col_item = df_raw.columns[4]
+            col_variant = df_raw.columns[5]
+            col_sub = df_raw.columns[6]
+            col_harga = df_raw.columns[7]
+            col_qty = df_raw.columns[9]
 
-            # Bersihkan Kolom H (Harga) dari format mata uang agar menjadi angka murni
-            df_scan["HARGA_NUMERIC"] = pd.to_numeric(df_scan["HARGA_MENTAH"], errors='coerce').fillna(0)
+            # Cleaning data awal (Menggunakan variabel kolom asli)
+            df_scan[col_bin] = df_scan[col_bin].astype(str).str.strip()
+            df_scan[col_sku] = df_scan[col_sku].astype(str).str.strip()
+            df_scan[col_item] = df_scan[col_item].astype(str).str.strip().str.upper()
+            df_scan[col_variant] = df_scan[col_variant].astype(str).str.strip().str.upper()
+            df_scan[col_sub] = df_scan[col_sub].astype(str).str.strip().str.upper()
+            df_scan["BRAND"] = df_scan["BRAND"].astype(str).str.strip().str.upper()
+            df_scan[col_qty] = pd.to_numeric(df_scan[col_qty], errors='coerce').fillna(0).astype(int)
+
+            # Bersihkan Kolom Harga dari format mata uang
+            df_scan["HARGA_NUMERIC"] = pd.to_numeric(df_scan[col_harga], errors='coerce').fillna(0)
 
             # ---------------------------------------------------------
             # LOGIKA PENGELOMPOKAN TIER HARGA (KOLOM H)
@@ -2980,12 +2990,10 @@ def tarik_data_cycle_count():
             df_scan["TIER_HARGA"] = np.select(kondisi, pilihan_tier, default="Tidak Terdefinisi")
 
             # ---------------------------------------------------------
-            # KECUALIKAN BIN: DEFECT, REJECT, KARANTINA, STAGGING/STAGING, INB, OUT, PUTAWAY
+            # KECUALIKAN BIN: DEFECT, REJECT, KARANTINA, STAGGING, INB, OUT, PUTAWAY
             # ---------------------------------------------------------
             kata_kunci_block = "DEFECT|REJECT|KARANTINA|STAG|INB|OUT|PUTAWAY"
-            
-            # Filter baris yang kolom BIN-nya TIDAK mengandung kata kunci di atas (case-insensitive)
-            df_scan = df_scan[~df_scan["BIN"].str.contains(kata_kunci_block, case=False, na=False)]
+            df_scan = df_scan[~df_scan[col_bin].str.contains(kata_kunci_block, case=False, na=False)]
             
             # =========================================================
             # 4. FILTER SECTION (FRONTEND VISUAL UI)
