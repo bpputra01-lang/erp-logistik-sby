@@ -3004,11 +3004,11 @@ def tarik_data_cycle_count():
                         <span class="m-val">{total_bin:,}</span>
                     </div>
                     <div class="m-box">
-                        <span class="m-lbl">📦 Unique SKU Harus Di-Scan</span>
+                        <span class="m-lbl">📦 Total SKU Harus Di-Scan</span>
                         <span class="m-val">{unique_sku:,}</span>
                     </div>
                     <div class="m-box">
-                        <span class="m-lbl">🔢 Total QTY Scan Target</span>
+                        <span class="m-lbl">🔢 Total QTY Harus di Scan</span>
                         <span class="m-val">{total_qty:,}</span>
                     </div>
                 </div>
