@@ -2925,12 +2925,13 @@ def tarik_data_cycle_count():
                 return
 
             # =========================================================
-            # 3. BACKEND MAPPING (KOLOM B, C, G, J)
+            # 3. BACKEND MAPPING (KOLOM B, C, G, H, J)
             # =========================================================
             df_scan = pd.DataFrame({
                 "BIN": df_raw.iloc[:, 1],           # Kolom B (Index 1)
                 "SKU": df_raw.iloc[:, 2],           # Kolom C (Index 2)
                 "SUB_KATEGORI": df_raw.iloc[:, 6],  # Kolom G (Index 6)
+                "HARGA_MENTAH": df_raw.iloc[:, 7],  # Kolom H (Index 7) - KOLOM BARU
                 "QTY_SCAN": df_raw.iloc[:, 9]       # Kolom J (Index 9)
             })
 
@@ -2948,18 +2949,45 @@ def tarik_data_cycle_count():
             df_scan["BRAND"] = df_scan["BRAND"].astype(str).str.strip().str.upper()
             df_scan["QTY_SCAN"] = pd.to_numeric(df_scan["QTY_SCAN"], errors='coerce').fillna(0).astype(int)
 
+            # Bersihkan Kolom H (Harga) dari format mata uang agar menjadi angka murni
+            df_scan["HARGA_NUMERIC"] = pd.to_numeric(df_scan["HARGA_MENTAH"], errors='coerce').fillna(0)
+
             # ---------------------------------------------------------
-            # KECUALIKAN BIN: DEFECT, REJECT, KARANTINA, STAGGING/STAGING, INB, OUT
+            # LOGIKA PENGELOMPOKAN TIER HARGA (KOLOM H)
+            # ---------------------------------------------------------
+            import numpy as np
+            
+            kondisi = [
+                (df_scan["HARGA_NUMERIC"] >= 1000000),
+                (df_scan["HARGA_NUMERIC"] >= 700000) & (df_scan["HARGA_NUMERIC"] < 1000000),
+                (df_scan["HARGA_NUMERIC"] >= 400000) & (df_scan["HARGA_NUMERIC"] < 700000),
+                (df_scan["HARGA_NUMERIC"] >= 100000) & (df_scan["HARGA_NUMERIC"] < 400000),
+                (df_scan["HARGA_NUMERIC"] >= 0) & (df_scan["HARGA_NUMERIC"] < 100000)
+            ]
+            
+            pilihan_tier = [
+                "1. >= 1 Juta",
+                "2. < 1 Juta - >= 700 Ribu",
+                "3. < 700 Ribu - >= 400 Ribu",
+                "4. < 400 Ribu - >= 100 Ribu",
+                "5. < 100 Ribu - >= 0"
+            ]
+            
+            df_scan["TIER_HARGA"] = np.select(kondisi, pilihan_tier, default="Tidak Terdefinisi")
+
+            # ---------------------------------------------------------
+            # KECUALIKAN BIN: DEFECT, REJECT, KARANTINA, STAGGING/STAGING, INB, OUT, PUTAWAY
             # ---------------------------------------------------------
             kata_kunci_block = "DEFECT|REJECT|KARANTINA|STAG|INB|OUT|PUTAWAY"
             
             # Filter baris yang kolom BIN-nya TIDAK mengandung kata kunci di atas (case-insensitive)
             df_scan = df_scan[~df_scan["BIN"].str.contains(kata_kunci_block, case=False, na=False)]
+            
             # =========================================================
             # 4. FILTER SECTION (FRONTEND VISUAL UI)
             # =========================================================
-            st.markdown("### 🔍 Filter Brand & Sub Kategori")
-            col_f1, col_f2 = st.columns(2)
+            st.markdown("### 🔍 Filter Brand, Sub Kategori & Kategori Harga")
+            col_f1, col_f2, col_f3 = st.columns(3) # Ubah jadi 3 kolom agar rapi kesamping
             
             with col_f1:
                 # Aman dari NaN karena dipaksa str(x) dan dicek nilainya
@@ -2976,6 +3004,14 @@ def tarik_data_cycle_count():
                     if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'
                 ])
                 selected_brand = st.multiselect("🏷️ Brand:", list_brand, key="selected_brand")
+
+            with col_f3:
+                # Ambil daftar tier harga yang tersedia secara otomatis
+                list_tier = sorted([
+                    str(x).strip() for x in df_scan["TIER_HARGA"].unique()
+                    if pd.notna(x) and str(x).strip() != '' and str(x) != 'Tidak Terdefinisi'
+                ])
+                selected_tier = st.multiselect("💰 Kategori Harga:", list_tier, key="selected_tier")
             
             # =========================================================
             # 5. FILTERING PROCESS
@@ -2987,6 +3023,9 @@ def tarik_data_cycle_count():
                 
             if selected_brand:
                 df_filtered = df_filtered[df_filtered["BRAND"].isin(selected_brand)]
+
+            if selected_tier:
+                df_filtered = df_filtered[df_filtered["TIER_HARGA"].isin(selected_tier)]
             
             # Kalkulasi Target untuk Metric
             total_bin = df_filtered["BIN"].nunique()
@@ -3017,7 +3056,8 @@ def tarik_data_cycle_count():
             # 7. DETAIL PREVIEW TABLE
             # =========================================================
             st.subheader("📋 Detail List Data Bin Cycle Count")
-            display_cols = ["BIN", "SKU", "BRAND", "SUB_KATEGORI", "QTY_SCAN"]
+            # Gue masukin TIER_HARGA ke preview table biar user bisa kroscek hasilnya
+            display_cols = ["BIN", "SKU", "BRAND", "SUB_KATEGORI", "TIER_HARGA", "QTY_SCAN"]
             st.dataframe(df_filtered[display_cols], use_container_width=True, hide_index=True)
                 
         except Exception as e:
