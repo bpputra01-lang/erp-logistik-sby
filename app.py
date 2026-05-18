@@ -947,7 +947,7 @@ def logic_miss_location_report(df_setup_real):
 import streamlit as st
 import pandas as pd
 
-def tarik_data_cycle_count():
+    def tarik_data_cycle_count():
     # =========================================================
     # 1. PREMIUM CSS INJECTION (DARK MODE & GOLD ACCENT)
     # =========================================================
