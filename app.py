@@ -3016,7 +3016,7 @@ def tarik_data_cycle_count():
             # =========================================================
             # 7. DETAIL PREVIEW TABLE
             # =========================================================
-            st.subheader("📋 Detail List Data Kerja Lapangan")
+            st.subheader("📋 Detail List Data Bin Cycle Count")
             display_cols = ["BIN", "SKU", "BRAND", "SUB_KATEGORI", "QTY_SCAN"]
             st.dataframe(df_filtered[display_cols], use_container_width=True, hide_index=True)
                 
