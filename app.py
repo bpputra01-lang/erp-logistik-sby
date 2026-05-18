@@ -2966,11 +2966,11 @@ def tarik_data_cycle_count():
             ]
             
             pilihan_tier = [
-                "1. >= 1 Juta",
-                "2. < 1 Juta - >= 700 Ribu",
-                "3. < 700 Ribu - >= 400 Ribu",
-                "4. < 400 Ribu - >= 100 Ribu",
-                "5. < 100 Ribu - >= 0"
+                "Luxury Tier (>= 1 Juta)",
+                "Top Tier (< 1 Juta - >= 700 Ribu)",
+                "Mid Tier (< 700 Ribu - >= 400 Ribu)",
+                "Entry Tier (< 400 Ribu - >= 100 Ribu)",
+                "Mass Market Tier (< 100 Ribu - >= 0)"
             ]
             
             df_scan["TIER_HARGA"] = np.select(kondisi, pilihan_tier, default="Tidak Terdefinisi")
