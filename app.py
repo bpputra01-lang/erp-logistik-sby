@@ -3068,14 +3068,21 @@ def tarik_data_cycle_count():
             """, unsafe_allow_html=True)
             
             # =========================================================
-            # 7. DETAIL PREVIEW TABLE (UBAH LIST DISPLAY COLS DISINI)
+            # 7. DETAIL PREVIEW TABLE (MURNI JIPLAK HEADER ASLI FILE EXCEL)
             # =========================================================
             st.subheader("📋 Detail List Data Bin Cycle Count")
             
-            # Selipkan ITEM_NAME dan VARIANT setelah SKU
-            display_cols = ["BIN", "SKU", "ITEM_NAME", "VARIANT", "BRAND", "SUB_KATEGORI", "TIER_HARGA", "QTY_SCAN"]
+            # 1. Otomatis comot semua daftar nama kolom asli dari file Excel hasil upload
+            kolom_asli_file = list(df_raw.columns)
             
-            st.dataframe(df_filtered[display_cols], use_container_width=True, hide_index=True)
+            # 2. Bikin dataframe preview baru yang isinya murni mengikuti susunan kolom file asli
+            df_tampilan = df_filtered[kolom_asli_file].copy()
+            
+            # 3. Selipkan kolom TIER_HARGA buatan kita tepat di sebelah kanan kolom Harga (Kolom H / Index ke-7)
+            df_tampilan.insert(8, "TIER_HARGA", df_filtered["TIER_HARGA"])
+            
+            # 4. Langsung cetak ke UI Streamlit
+            st.dataframe(df_tampilan, use_container_width=True, hide_index=True)
                 
         except Exception as e:
             st.error(f"Terjadi kesalahan saat memproses data: {e}")
