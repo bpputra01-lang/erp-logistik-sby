@@ -2930,8 +2930,10 @@ def tarik_data_cycle_count():
             df_scan = pd.DataFrame({
                 "BIN": df_raw.iloc[:, 1],           # Kolom B (Index 1)
                 "SKU": df_raw.iloc[:, 2],           # Kolom C (Index 2)
+                "ITEM_NAME": df_raw.iloc[:, 4],     # Kolom E (Index 4) - TAMBAHKAN INI
+                "VARIANT": df_raw.iloc[:, 5],       # Kolom F (Index 5) - TAMBAHKAN INI
                 "SUB_KATEGORI": df_raw.iloc[:, 6],  # Kolom G (Index 6)
-                "HARGA_MENTAH": df_raw.iloc[:, 7],  # Kolom H (Index 7) - KOLOM BARU
+                "HARGA_MENTAH": df_raw.iloc[:, 7],  # Kolom H (Index 7)
                 "QTY_SCAN": df_raw.iloc[:, 9]       # Kolom J (Index 9)
             })
 
@@ -2945,6 +2947,8 @@ def tarik_data_cycle_count():
             # Cleaning data awal
             df_scan["BIN"] = df_scan["BIN"].astype(str).str.strip()
             df_scan["SKU"] = df_scan["SKU"].astype(str).str.strip()
+            df_scan["ITEM_NAME"] = df_scan["ITEM_NAME"].astype(str).str.strip().str.upper() # TAMBAHKAN INI
+            df_scan["VARIANT"] = df_scan["VARIANT"].astype(str).str.strip().str.upper()   # TAMBAHKAN INI
             df_scan["SUB_KATEGORI"] = df_scan["SUB_KATEGORI"].astype(str).str.strip().str.upper()
             df_scan["BRAND"] = df_scan["BRAND"].astype(str).str.strip().str.upper()
             df_scan["QTY_SCAN"] = pd.to_numeric(df_scan["QTY_SCAN"], errors='coerce').fillna(0).astype(int)
@@ -3064,11 +3068,13 @@ def tarik_data_cycle_count():
             """, unsafe_allow_html=True)
             
             # =========================================================
-            # 7. DETAIL PREVIEW TABLE
+            # 7. DETAIL PREVIEW TABLE (UBAH LIST DISPLAY COLS DISINI)
             # =========================================================
             st.subheader("📋 Detail List Data Bin Cycle Count")
-            # Gue masukin TIER_HARGA ke preview table biar user bisa kroscek hasilnya
-            display_cols = ["BIN", "SKU", "BRAND", "SUB_KATEGORI", "TIER_HARGA", "QTY_SCAN"]
+            
+            # Selipkan ITEM_NAME dan VARIANT setelah SKU
+            display_cols = ["BIN", "SKU", "ITEM_NAME", "VARIANT", "BRAND", "SUB_KATEGORI", "TIER_HARGA", "QTY_SCAN"]
+            
             st.dataframe(df_filtered[display_cols], use_container_width=True, hide_index=True)
                 
         except Exception as e:
