@@ -8837,6 +8837,7 @@ elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
 elif menu == "List Bin Cycle Count":
+    st.write("HALO, KODE MASUK SINI!")  # <--- Tambahin ini buat ngetes
     tarik_data_cycle_count()
 
 elif menu == "Data Timbang Ongkir":
