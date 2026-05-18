@@ -2906,7 +2906,6 @@ def tarik_data_cycle_count():
     # =========================================================
     # 2. FILE UPLOADER SECTION
     # =========================================================
-    st.subheader("📁 Upload Data Scan Stock Opname")
     uploaded_file = st.file_uploader("Upload File Excel / CSV Data Scan", type=["xlsx", "xls", "csv"])
     
     if 'selected_sub' not in st.session_state: st.session_state.selected_sub = []
