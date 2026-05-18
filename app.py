@@ -2924,53 +2924,43 @@ def tarik_data_cycle_count():
                 st.error("⚠️ File kurang dari 10 kolom! Pastikan isi file sesuai format (Kolom B, C, G, J).")
                 return
 
+           # =========================================================
+            # 3. BACKEND MAPPING (UTUH AMBIL SEMUA KOLOM ASLI FILE LO)
             # =========================================================
-            # 3. BACKEND MAPPING (OTOMATIS PAKAI HEADER ASLI FILE EXCEL)
-            # =========================================================
-            # Kita bikin df_scan langsung pakai nama kolom asli dari df_raw berdasarkan indexnya
-            df_scan = pd.DataFrame({
-                df_raw.columns[1]: df_raw.iloc[:, 1],   # Kolom B (BIN)
-                df_raw.columns[2]: df_raw.iloc[:, 2],   # Kolom C (SKU)
-                df_raw.columns[4]: df_raw.iloc[:, 4],   # Kolom E (ITEM NAME)
-                df_raw.columns[5]: df_raw.iloc[:, 5],   # Kolom F (VARIANT)
-                df_raw.columns[6]: df_raw.iloc[:, 6],   # Kolom G (SUB KATEGORI)
-                df_raw.columns[7]: df_raw.iloc[:, 7],   # Kolom H (Harga / Harga Jual)
-                df_raw.columns[9]: df_raw.iloc[:, 9]    # Kolom J (QTY SO / QTY SCAN)
-            })
+            # Buat df_scan langsung dari copy df_raw agar SEMUA kolom asli lo gak hilang
+            df_scan = df_raw.copy()
 
-            # Ambil kolom BRAND secara otomatis dari file jika terdeteksi
+            # Ambil nama kolom asli berdasarkan index urutan biar fleksibel
+            col_bin = df_raw.columns[1]       # Kolom B (BIN)
+            col_sku = df_raw.columns[2]       # Kolom C (SKU)
+            col_item = df_raw.columns[4]      # Kolom E (ITEM NAME)
+            col_variant = df_raw.columns[5]   # Kolom F (VARIANT)
+            col_sub = df_raw.columns[6]       # Kolom G (SUB KATEGORI)
+            col_harga = df_raw.columns[7]     # Kolom H (Harga Jual / Harga)
+            col_qty = df_raw.columns[9]       # Kolom J (QTY SO / QTY SCAN)
+
+            # Ambil kolom BRAND secara otomatis jika ada kata 'BRAND'
             brand_col = [col for col in df_raw.columns if 'BRAND' in str(col).upper()]
-            if brand_col:
-                df_scan["BRAND"] = df_raw[brand_col[0]]
-            else:
+            col_brand = brand_col[0] if brand_col else "BRAND"
+            if not brand_col:
                 df_scan["BRAND"] = "UNKNOWN"
 
-            # Ambil nama variabel kolom asli biar coding di bawah gak eror saat dipanggil
-            col_bin = df_raw.columns[1]
-            col_sku = df_raw.columns[2]
-            col_item = df_raw.columns[4]
-            col_variant = df_raw.columns[5]
-            col_sub = df_raw.columns[6]
-            col_harga = df_raw.columns[7]
-            col_qty = df_raw.columns[9]
-
-            # Cleaning data awal (Menggunakan variabel kolom asli)
+            # Cleaning data menggunakan nama kolom asli file lo
             df_scan[col_bin] = df_scan[col_bin].astype(str).str.strip()
             df_scan[col_sku] = df_scan[col_sku].astype(str).str.strip()
             df_scan[col_item] = df_scan[col_item].astype(str).str.strip().str.upper()
             df_scan[col_variant] = df_scan[col_variant].astype(str).str.strip().str.upper()
             df_scan[col_sub] = df_scan[col_sub].astype(str).str.strip().str.upper()
-            df_scan["BRAND"] = df_scan["BRAND"].astype(str).str.strip().str.upper()
+            df_scan[col_brand] = df_scan[col_brand].astype(str).str.strip().str.upper()
             df_scan[col_qty] = pd.to_numeric(df_scan[col_qty], errors='coerce').fillna(0).astype(int)
 
-            # Bersihkan Kolom Harga dari format mata uang
+            # Bersihkan Kolom Harga asli untuk kalkulasi tier
             df_scan["HARGA_NUMERIC"] = pd.to_numeric(df_scan[col_harga], errors='coerce').fillna(0)
 
             # ---------------------------------------------------------
-            # LOGIKA PENGELOMPOKAN TIER HARGA (KOLOM H)
+            # LOGIKA PENGELOMPOKAN TIER HARGA
             # ---------------------------------------------------------
             import numpy as np
-            
             kondisi = [
                 (df_scan["HARGA_NUMERIC"] >= 1000000),
                 (df_scan["HARGA_NUMERIC"] >= 700000) & (df_scan["HARGA_NUMERIC"] < 1000000),
@@ -2978,7 +2968,6 @@ def tarik_data_cycle_count():
                 (df_scan["HARGA_NUMERIC"] >= 100000) & (df_scan["HARGA_NUMERIC"] < 400000),
                 (df_scan["HARGA_NUMERIC"] >= 0) & (df_scan["HARGA_NUMERIC"] < 100000)
             ]
-            
             pilihan_tier = [
                 "LUXURY TIER (>= 1 JUTA)",
                 "TOP TIER (700 RIBU - < 1 JUTA)",
@@ -2986,12 +2975,9 @@ def tarik_data_cycle_count():
                 "ENTRY TIER (100 RIBU- < 700 RIBU)",
                 "MASS MARKET TIER (0 - < 100 RIBU)"
             ]
-            
             df_scan["TIER_HARGA"] = np.select(kondisi, pilihan_tier, default="Tidak Terdefinisi")
 
-            # ---------------------------------------------------------
-            # KECUALIKAN BIN: DEFECT, REJECT, KARANTINA, STAGGING, INB, OUT, PUTAWAY
-            # ---------------------------------------------------------
+            # Filter block BIN
             kata_kunci_block = "DEFECT|REJECT|KARANTINA|STAG|INB|OUT|PUTAWAY"
             df_scan = df_scan[~df_scan[col_bin].str.contains(kata_kunci_block, case=False, na=False)]
             
@@ -2999,10 +2985,9 @@ def tarik_data_cycle_count():
             # 4. FILTER SECTION (FRONTEND VISUAL UI)
             # =========================================================
             st.markdown("### 🔍 Filter Brand, Sub Kategori & Kategori Harga")
-            col_f1, col_f2, col_f3 = st.columns(3) # Ubah jadi 3 kolom agar rapi kesamping
+            col_f1, col_f2, col_f3 = st.columns(3)
             
             with col_f1:
-                # Menggunakan col_sub (nama asli dari file) biar gak eror key 'SUB_KATEGORI'
                 list_sub_kat = sorted([
                     str(x).strip().upper() for x in df_scan[col_sub].unique() 
                     if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'
@@ -3011,13 +2996,12 @@ def tarik_data_cycle_count():
             
             with col_f2:
                 list_brand = sorted([
-                    str(x).strip().upper() for x in df_scan["BRAND"].unique() 
+                    str(x).strip().upper() for x in df_scan[col_brand].unique() 
                     if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'
                 ])
-                selected_brand = st.multiselect("🏷️ Brand:", list_brand, key="selected_brand")
+                selected_brand = st.multiselect(f"🏷️ {col_brand}:", list_brand, key="selected_brand")
 
             with col_f3:
-                # 1. Kunci urutan kasta tier secara manual biar estetik dan urut dari mahal ke murah
                 urutan_premium = [
                     "LUXURY TIER (>= 1 JUTA)",
                     "TOP TIER (700 RIBU - < 1 JUTA)",
@@ -3025,14 +3009,8 @@ def tarik_data_cycle_count():
                     "ENTRY TIER (100 RIBU- < 700 RIBU)",
                     "MASS MARKET TIER (0 - < 100 RIBU)"
                 ]
-                
-                # 2. Ambil data unik yang beneran ada di file hasil upload saat ini
                 tier_unik_di_file = df_scan["TIER_HARGA"].unique()
-                
-                # 3. Filter dan urutkan list_tier berdasarkan standar urutan_premium di atas
                 list_tier = [tier for tier in urutan_premium if tier in tier_unik_di_file]
-                
-                # 4. Tampilkan ke UI multiselect Streamlit
                 selected_tier = st.multiselect("💰 Kategori Harga:", list_tier, key="selected_tier")
             
             # =========================================================
@@ -3044,18 +3022,18 @@ def tarik_data_cycle_count():
                 df_filtered = df_filtered[df_filtered[col_sub].isin(selected_sub)]
                 
             if selected_brand:
-                df_filtered = df_filtered[df_filtered["BRAND"].isin(selected_brand)]
+                df_filtered = df_filtered[df_filtered[col_brand].isin(selected_brand)]
 
             if selected_tier:
                 df_filtered = df_filtered[df_filtered["TIER_HARGA"].isin(selected_tier)]
             
-            # Kalkulasi Target untuk Metric (Semua ditarik pake variabel nama asli file)
+            # Kalkulasi Target untuk Metric
             total_bin = df_filtered[col_bin].nunique()
             unique_sku = df_filtered[col_sku].nunique()
             total_qty = df_filtered[col_qty].sum()
             
             # =========================================================
-            # 6. DISPLAY METRIC BOX (HASIL CSS INJECTION)
+            # 6. DISPLAY METRIC BOX
             # =========================================================
             st.markdown(f"""
                 <div class="metric-container">
@@ -3075,21 +3053,15 @@ def tarik_data_cycle_count():
             """, unsafe_allow_html=True)
             
             # =========================================================
-            # 7. DETAIL PREVIEW TABLE (MURNI JIPLAK HEADER ASLI FILE EXCEL)
+            # 7. DETAIL PREVIEW TABLE (MURNI KOLOM ASLI FILE EXCEL LO)
             # =========================================================
             st.subheader("📋 Detail List Data Bin Cycle Count")
             
-            # 1. Otomatis comot semua daftar nama kolom asli dari file Excel hasil upload
-            kolom_asli_file = list(df_raw.columns)
-            
-            # 2. Bikin dataframe preview baru yang isinya murni mengikuti susunan kolom file asli
-            df_tampilan = df_filtered[kolom_asli_file].copy()
-            
-            # 3. Selipkan kolom TIER_HARGA buatan kita tepat di sebelah kanan kolom Harga (Kolom H / Index ke-7)
-            df_tampilan.insert(8, "TIER_HARGA", df_filtered["TIER_HARGA"])
-            
-            # 4. Langsung cetak ke UI Streamlit
-            st.dataframe(df_tampilan, use_container_width=True, hide_index=True)
+            # Ambil list kolom asli bawaan spreadsheet mentah lo bulat-bulat
+            list_kolom_asli = list(df_raw.columns)
+                
+            # Langsung lempar ke UI, dijamin tampilannya murni 100% sama kayak file lo
+            st.dataframe(df_filtered[list_kolom_asli], use_container_width=True, hide_index=True)
                 
         except Exception as e:
             st.error(f"Terjadi kesalahan saat memproses data: {e}")
