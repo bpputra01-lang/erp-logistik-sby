@@ -2952,7 +2952,7 @@ def tarik_data_cycle_count():
             # ---------------------------------------------------------
             # KECUALIKAN BIN: DEFECT, REJECT, KARANTINA, STAGGING/STAGING, INB, OUT
             # ---------------------------------------------------------
-            kata_kunci_block = "DEFECT|REJECT|KARANTINA|STAG|INB|OUT"
+            kata_kunci_block = "DEFECT|REJECT|KARANTINA|STAG|INB|OUT|PUTAWAY"
             
             # Filter baris yang kolom BIN-nya TIDAK mengandung kata kunci di atas (case-insensitive)
             df_scan = df_scan[~df_scan["BIN"].str.contains(kata_kunci_block, case=False, na=False)]
