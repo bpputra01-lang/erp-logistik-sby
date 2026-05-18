@@ -2956,11 +2956,19 @@ def tarik_data_cycle_count():
             col_f1, col_f2 = st.columns(2)
             
             with col_f1:
-                list_sub_kat = sorted([x for x in df_scan["SUB_KATEGORI"].unique().tolist() if x != 'NAN' and x != ''])
-                selected_sub = st.multiselect("🗂 shrink Sub Kategori:", list_sub_kat, key="selected_sub")
+                # Aman dari NaN karena dipaksa str(x) dan dicek nilainya
+                list_sub_kat = sorted([
+                    str(x).strip().upper() for x in df_scan["SUB_KATEGORI"].unique() 
+                    if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'
+                ])
+                selected_sub = st.multiselect("🗂 Sub Kategori:", list_sub_kat, key="selected_sub")
             
             with col_f2:
-                list_brand = sorted([x for x in df_scan["BRAND"].unique().tolist() if x != 'NAN' and x != ''])
+                # Aman dari NaN karena dipaksa str(x) dan dicek nilainya
+                list_brand = sorted([
+                    str(x).strip().upper() for x in df_scan["BRAND"].unique() 
+                    if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'
+                ])
                 selected_brand = st.multiselect("🏷️ Brand:", list_brand, key="selected_brand")
             
             # =========================================================
