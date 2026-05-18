@@ -944,6 +944,176 @@ def logic_miss_location_report(df_setup_real):
         return pd.DataFrame(columns=columns_ref), 0, 0
 
 
+import streamlit as st
+import pandas as pd
+
+def tarik_data_cycle_count():
+    # =========================================================
+    # 1. PREMIUM CSS INJECTION (DARK MODE & GOLD ACCENT)
+    # =========================================================
+    st.markdown("""
+        <style>
+         .hero-header { 
+             background-color: #0E1117; 
+             padding: 20px; 
+             border-radius: 10px; 
+             margin-bottom: 25px; 
+             text-align: center; 
+             border: 1px solid #333; 
+         }
+         .hero-header h1 { 
+             color: #FF4B4B; 
+             margin: 0; 
+             font-size: 32px; 
+         }
+         
+         /* CONTAINER UNTUK METRIC BOXES */
+         .metric-container {
+             display: flex;
+             gap: 15px;
+             margin-bottom: 25px;
+         }
+         
+         /* PREMIUM METRIC CARD */
+         .m-box { 
+             background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important; 
+             padding: 20px 15px; 
+             border-radius: 8px; 
+             border: 1px solid #33394d;
+             border-left: 4px solid #C5A059 !important; /* Gold Line Accent */
+             text-align: center; 
+             flex: 1; 
+             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+         }
+         .m-lbl { 
+             display: block; 
+             font-size: 13px; 
+             color: #808495; 
+             text-transform: uppercase;
+             letter-spacing: 1px;
+             margin-bottom: 8px; 
+         }
+         .m-val { 
+             font-size: 28px; 
+             font-weight: bold; 
+             color: #ffffff; 
+         }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Header Utama Dashboard
+    st.markdown('<div class="hero-header"><h1>📋 CYCLE COUNT ANALYZER</h1></div>', unsafe_allow_html=True)
+    
+    # =========================================================
+    # 2. FILE UPLOADER SECTION
+    # =========================================================
+    st.subheader("📁 Upload Data Scan Stock Opname")
+    uploaded_file = st.file_uploader("Upload File Excel / CSV Data Scan", type=["xlsx", "xls", "csv"])
+    
+    if 'selected_sub' not in st.session_state: st.session_state.selected_sub = []
+    if 'selected_brand' not in st.session_state: st.session_state.selected_brand = []
+
+    if uploaded_file is not None:
+        try:
+            # Baca file mentah
+            if uploaded_file.name.endswith('.csv'):
+                df_raw = pd.read_csv(uploaded_file, header=0)
+            else:
+                df_raw = pd.read_excel(uploaded_file, header=0)
+                
+            # Validasi minimal 10 kolom agar aman sampai kolom J
+            if df_raw.shape[1] < 10:
+                st.error("⚠️ File kurang dari 10 kolom! Pastikan isi file sesuai format (Kolom B, C, G, J).")
+                return
+
+            # =========================================================
+            # 3. BACKEND MAPPING (KOLOM B, C, G, J)
+            # =========================================================
+            df_scan = pd.DataFrame({
+                "BIN": df_raw.iloc[:, 1],           # Kolom B (Index 1)
+                "SKU": df_raw.iloc[:, 2],           # Kolom C (Index 2)
+                "SUB_KATEGORI": df_raw.iloc[:, 6],  # Kolom G (Index 6)
+                "QTY_SCAN": df_raw.iloc[:, 9]       # Kolom J (Index 9)
+            })
+
+            # Ambil kolom BRAND secara otomatis dari file jika terdeteksi
+            brand_col = [col for col in df_raw.columns if 'BRAND' in str(col).upper()]
+            if brand_col:
+                df_scan["BRAND"] = df_raw[brand_col[0]]
+            else:
+                df_scan["BRAND"] = "UNKNOWN"
+
+            # Cleaning data
+            df_scan["BIN"] = df_scan["BIN"].astype(str).str.strip()
+            df_scan["SKU"] = df_scan["SKU"].astype(str).str.strip()
+            df_scan["SUB_KATEGORI"] = df_scan["SUB_KATEGORI"].astype(str).str.strip().str.upper()
+            df_scan["BRAND"] = df_scan["BRAND"].astype(str).str.strip().str.upper()
+            df_scan["QTY_SCAN"] = pd.to_numeric(df_scan["QTY_SCAN"], errors='coerce').fillna(0).astype(int)
+
+            # =========================================================
+            # 4. FILTER SECTION (FRONTEND VISUAL UI)
+            # =========================================================
+            st.markdown("### 🔍 Filter Data Scan")
+            col_f1, col_f2 = st.columns(2)
+            
+            with col_f1:
+                list_sub_kat = sorted([x for x in df_scan["SUB_KATEGORI"].unique().tolist() if x != 'NAN' and x != ''])
+                selected_sub = st.multiselect("🗂 shrink Sub Kategori:", list_sub_kat, key="selected_sub")
+            
+            with col_f2:
+                list_brand = sorted([x for x in df_scan["BRAND"].unique().tolist() if x != 'NAN' and x != ''])
+                selected_brand = st.multiselect("🏷️ Brand:", list_brand, key="selected_brand")
+            
+            # =========================================================
+            # 5. FILTERING PROCESS
+            # =========================================================
+            df_filtered = df_scan.copy()
+            
+            if selected_sub:
+                df_filtered = df_filtered[df_filtered["SUB_KATEGORI"].isin(selected_sub)]
+                
+            if selected_brand:
+                df_filtered = df_filtered[df_filtered["BRAND"].isin(selected_brand)]
+            
+            # Kalkulasi Target untuk Metric
+            total_bin = df_filtered["BIN"].nunique()
+            unique_sku = df_filtered["SKU"].nunique()
+            total_qty = df_filtered["QTY_SCAN"].sum()
+            
+            # =========================================================
+            # 6. DISPLAY METRIC BOX (HASIL CSS INJECTION)
+            # =========================================================
+            st.markdown(f"""
+                <div class="metric-container">
+                    <div class="m-box">
+                        <span class="m-lbl">🏭 Total BIN Harus Di-Scan</span>
+                        <span class="m-val">{total_bin:,}</span>
+                    </div>
+                    <div class="m-box">
+                        <span class="m-lbl">📦 Unique SKU Harus Di-Scan</span>
+                        <span class="m-val">{unique_sku:,}</span>
+                    </div>
+                    <div class="m-box">
+                        <span class="m-lbl">🔢 Total QTY Scan Target</span>
+                        <span class="m-val">{total_qty:,}</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # =========================================================
+            # 7. DETAIL PREVIEW TABLE
+            # =========================================================
+            st.subheader("📋 Detail List Data Kerja Lapangan")
+            display_cols = ["BIN", "SKU", "BRAND", "SUB_KATEGORI", "QTY_SCAN"]
+            st.dataframe(df_filtered[display_cols], use_container_width=True, hide_index=True)
+                
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat memproses data: {e}")
+            
+    else:
+        st.info("💡 Silakan upload file data scan terlebih dahulu untuk memunculkan filter dan ringkasan Metric Box.")
+
+    st.markdown("---")
 # =========================================================
 # 2. MENU UTAMA & STATE MANAGEMENT
 # =========================================================
@@ -8665,6 +8835,9 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "List Bin Cycle Count":
+    tarik_data_cycle_count()
 
 elif menu == "Data Timbang Ongkir":
     show_timbang_system()
