@@ -3013,7 +3013,7 @@ def tarik_data_cycle_count():
         st.info("💡 Silakan upload file data scan terlebih dahulu untuk memunculkan filter dan ringkasan Metric Box.")
 
     st.markdown("---")
-    
+
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -8840,7 +8840,6 @@ elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
 elif menu == "List Bin Cycle Count":
-    st.write("HALO, KODE MASUK SINI!")  # <--- Tambahin ini buat ngetes
     tarik_data_cycle_count()
 
 elif menu == "Data Timbang Ongkir":
