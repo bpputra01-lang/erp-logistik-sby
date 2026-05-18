@@ -2901,12 +2901,12 @@ def tarik_data_cycle_count():
     """, unsafe_allow_html=True)
     
     # Header Utama Dashboard
-    st.markdown('<div class="hero-header"><h1>📋 CYCLE COUNT ANALYZER</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>LIST DATA BIN CYCLE COUNT</h1></div>', unsafe_allow_html=True)
     
     # =========================================================
     # 2. FILE UPLOADER SECTION
     # =========================================================
-    uploaded_file = st.file_uploader("Upload File Excel / CSV Data Scan", type=["xlsx", "xls", "csv"])
+    uploaded_file = st.file_uploader("Upload File Multiple Adjusment", type=["xlsx", "xls", "csv"])
     
     if 'selected_sub' not in st.session_state: st.session_state.selected_sub = []
     if 'selected_brand' not in st.session_state: st.session_state.selected_brand = []
