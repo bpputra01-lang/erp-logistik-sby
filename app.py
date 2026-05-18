@@ -3006,11 +3006,22 @@ def tarik_data_cycle_count():
                 selected_brand = st.multiselect("🏷️ Brand:", list_brand, key="selected_brand")
 
             with col_f3:
-                # Ambil daftar tier harga yang tersedia secara otomatis
-                list_tier = sorted([
-                    str(x).strip() for x in df_scan["TIER_HARGA"].unique()
-                    if pd.notna(x) and str(x).strip() != '' and str(x) != 'Tidak Terdefinisi'
-                ])
+                # 1. Kunci urutan kasta tier secara manual biar estetik dan urut dari mahal ke murah
+                urutan_premium = [
+                    "Luxury Tier (>= 1 Juta)",
+                    "Top Tier (< 1 Juta - >= 700 Ribu)",
+                    "Mid Tier (< 700 Ribu - >= 400 Ribu)",
+                    "Entry Tier (< 400 Ribu - >= 100 Ribu)",
+                    "Mass Market Tier (< 100 Ribu - >= 0)"
+                ]
+                
+                # 2. Ambil data unik yang beneran ada di file hasil upload saat ini
+                tier_unik_di_file = df_scan["TIER_HARGA"].unique()
+                
+                # 3. Filter dan urutkan list_tier berdasarkan standar urutan_premium di atas
+                list_tier = [tier for tier in urutan_premium if tier in tier_unik_di_file]
+                
+                # 4. Tampilkan ke UI multiselect Streamlit
                 selected_tier = st.multiselect("💰 Kategori Harga:", list_tier, key="selected_tier")
             
             # =========================================================
