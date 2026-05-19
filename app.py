@@ -6164,6 +6164,7 @@ def tampilan_display_control():
         **Cara Kerja Pemantauan :**
         - **Source (Gudang):** Semua BIN aktif (selain area TOKO/DISPLAY & Area Eksklusi).
         - **Target (Toko):** BIN yang mengandung kata 'TOKO', 'STORE', atau 'DISPLAY'.
+        - **Aturan Tambahan:** Jika Article sudah ada di Bin **'OUT'** dengan Qty > 0, maka otomatis **dikeluarkan dari list refill**.
         - **Logic:** Jika SKU memiliki **Stok > 0 di Gudang** tapi **Stok = 0 di Toko**, maka SKU wajib tambah display.
         """)
 
@@ -6223,13 +6224,14 @@ def tampilan_display_control():
         f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
         f_source_gudang = f"(NOT ({f_target_toko})) AND ({excl_condition})"
 
-        # Logic: Article ada di gudang (Source), tapi stok 0 di Toko (Target)
+        # Logic: Article ada di gudang (Source), stok 0 di Toko (Target), DAN TIDAK SEDANG BERADA DI BIN 'OUT'
         q_need_display_logic = f"""
             SELECT ARTICLE FROM stock_display_processed 
             WHERE {excl_condition}
             GROUP BY ARTICLE
             HAVING SUM(CASE WHEN {f_source_gudang} THEN "{col_qty}" ELSE 0 END) > 0
                AND SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
+               AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%OUT%' THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
         # --- LOGIKA SINKRONISASI METRIK ---
@@ -6265,7 +6267,7 @@ def tampilan_display_control():
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # --- PERBAIKAN TOTAL LOGIKA PRIORITAS BERDASARKAN SKU & BIN ---
+        # --- PERBAIKAN LOGIKA PRIORITAS BERDASARKAN SKU & BIN (DENGAN GEKONDISIAN EXCLUSI BIN OUT) ---
         query_prioritas_refill = f"""
             WITH 
             ArticlesNeedDisplay AS (
@@ -6352,7 +6354,7 @@ def tampilan_display_control():
         st.error(f"Error pada sistem analisis: {e}")
     finally:
         conn.close()
-
+        
 def process_picking_audit(file1, file2, file_tracking=None):
     try:
         # Load data utama
