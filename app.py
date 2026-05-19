@@ -6264,21 +6264,74 @@ def tampilan_display_control():
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # Detail Data (Menampilkan stok di gudang untuk ditarik)
-        df_detail = pd.read_sql(f"""
+        # --- PERBAIKAN LOGIKA PRIORITAS BERTINGKAT LEVEL SKU (KOLOM C & KOLOM J) ---
+        query_prioritas_refill = f"""
+            WITH 
+            -- 1. Cari dulu artikel apa saja yang wajib tambah display (Bawaan Kode Asli)
+            ArticlesNeedDisplay AS (
+                {q_need_display_logic}
+            ),
+            
+            -- 2. Ambil semua data stok siap tarik di Gudang, lengkap dengan SKU dan Qty per Bin
+            RawGudangStock AS (
+                SELECT 
+                    ARTICLE as Article,
+                    "{col_sku}" as SKU, -- Kolom C
+                    "{col_desc}" as Deskripsi_Barang,
+                    "{col_size}" as Size_Display,
+                    "{col_bin}" as Bin_Lokasi,
+                    "{col_qty}" as Qty_In_Bin -- Kolom J
+                FROM stock_display_processed
+                WHERE ARTICLE IN (SELECT ARTICLE FROM ArticlesNeedDisplay)
+                  AND {f_source_gudang}
+                  AND "{col_qty}" > 0
+            ),
+            
+            -- 3. Cek apakah Artikel tersebut punya stok di area Prioritas (GUDANG atau STR)
+            PrioritasStock AS (
+                SELECT *,
+                       -- Jika ada beberapa SKU/Bin prioritas, urutkan dari Qty terbanyak
+                       ROW_NUMBER() OVER (PARTITION BY Article, SKU ORDER BY Qty_In_Bin DESC) as rn
+                FROM RawGudangStock
+                WHERE UPPER(Bin_Lokasi) LIKE '%GUDANG%' OR UPPER(Bin_Lokasi) LIKE '%STR%'
+            ),
+            
+            -- 4. Jika tidak ada di area Prioritas, ambil dari semua area sesuai kode asli
+            RegulerStock AS (
+                SELECT *,
+                       ROW_NUMBER() OVER (PARTITION BY Article, SKU ORDER BY Qty_In_Bin DESC) as rn
+                FROM RawGudangStock
+            ),
+            
+            -- 5. Gabungkan Logika: Pakai Prioritas dulu, kalau kosong baru fallback ke Reguler
+            FinalSelection AS (
+                SELECT 
+                    r.Article,
+                    r.SKU,
+                    r.Deskripsi_Barang,
+                    r.Size_Display,
+                    COALESCE(p.Bin_Lokasi, r.Bin_Lokasi) as Bin_Lokasi,
+                    COALESCE(p.Qty_In_Bin, r.Qty_In_Bin) as Qty_In_Bin,
+                    ROW_NUMBER() OVER (PARTITION BY r.Article, r.SKU ORDER BY r.Article) as final_rn
+                FROM RegulerStock r
+                LEFT JOIN PrioritasStock p ON r.Article = p.Article AND r.SKU = p.SKU AND p.rn = 1
+                WHERE r.rn = 1
+            )
+            
+            -- 6. Tampilkan ke Dashboard
             SELECT 
-                ARTICLE as Article, 
-                MAX("{col_desc}") as "Deskripsi Barang",
-                MIN("{col_size}") as "Size Display",
-                "{col_bin}" as "Bin Lokasi",
-                SUM("{col_qty}") as "Qty Ready di Gudang"
-            FROM stock_display_processed 
-            WHERE ARTICLE IN ({q_need_display_logic}) 
-              AND {f_source_gudang}
-              AND "{col_qty}" > 0
-            GROUP BY ARTICLE
-            ORDER BY "Qty Ready di Gudang" DESC
-        """, conn)
+                Article,
+                SKU,
+                Deskripsi_Barang as "Deskripsi Barang",
+                Size_Display as "Size Display",
+                Bin_Lokasi as "Bin Lokasi",
+                Qty_In_Bin as "Qty In Bin"
+            FROM FinalSelection
+            WHERE final_rn = 1
+            ORDER BY "Qty In Bin" DESC
+        """
+
+        df_detail = pd.read_sql(query_prioritas_refill, conn)
 
         if not df_detail.empty:
             st.dataframe(df_detail, use_container_width=True)
@@ -6286,7 +6339,7 @@ def tampilan_display_control():
             st.download_button(
                 label="📥 Download List Penarikan (CSV)",
                 data=csv,
-                file_name='list_refill_article.csv',
+                file_name='list_refill_sku.csv',
                 mime='text/csv',
             )
         else:
