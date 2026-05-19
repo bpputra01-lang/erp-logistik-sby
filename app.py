@@ -6090,9 +6090,11 @@ import sqlite3
 
 def init_db():
     # Database fisik untuk menyimpan data upload
-    conn = sqlite3.connect('database_display_control.db', check_same_thread=False)
-    # Mode WAL aktif agar proses baca-tulis stabil dan bebas dari 'database is locked'
+    conn = sqlite3.connect('database_display_control.db', check_same_thread=False, timeout=30.0)
+    # Mode WAL aktif agar pembacaan (read) tidak memblokir penulisan (write)
     conn.execute('PRAGMA journal_mode=WAL;')
+    # Memaksa sistem untuk menyelesaikan proses antrean write secepat mungkin
+    conn.execute('PRAGMA synchronous=NORMAL;')
     return conn
 
 def tampilan_display_control():
@@ -6168,18 +6170,33 @@ def tampilan_display_control():
         - **Logic:** Jika SKU memiliki **Stok > 0 di Gudang** tapi **Stok = 0 di Toko**, maka SKU wajib tambah display.
         """)
 
-    conn = init_db()
+    # Handle Upload Data dengan Koneksi Mandiri Istimewa (Bebas Lock)
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="display_upload")
 
     if uploaded_file:
         try:
-            df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
-            df.columns = [str(c).strip() for c in df.columns]
-            with conn:
-                df.to_sql('stock_display_raw', conn, index=False, if_exists='replace')
-            st.success("Data Berhasil Diperbarui!")
+            df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
+            df_upload.columns = [str(c).strip() for c in df_upload.columns]
+            
+            # Buka koneksi khusus tulis, lakukan isolasi bertipe IMMEDIATE agar query read lain mengalah
+            write_conn = sqlite3.connect('database_display_control.db', timeout=30.0)
+            write_conn.execute('PRAGMA journal_mode=WAL;')
+            write_conn.execute('BEGIN IMMEDIATE;')
+            try:
+                df_upload.to_sql('stock_display_raw', write_conn, index=False, if_exists='replace')
+                write_conn.commit()
+                st.success("Data Berhasil Diperbarui!")
+            except Exception as write_err:
+                write_conn.rollback()
+                raise write_err
+            finally:
+                write_conn.close()
+                
         except Exception as e:
             st.error(f"Gagal upload: {e}")
+
+    # Buka koneksi utama untuk proses Analisis & Tampilan Dashboard
+    conn = init_db()
 
     # --- 2. LOGIKA ANALISIS ---
     try:
@@ -6267,7 +6284,7 @@ def tampilan_display_control():
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # --- PERBAIKAN LOGIKA PRIORITAS BERDASARKAN SKU & BIN (DENGAN GEKONDISIAN EXCLUSI BIN OUT) ---
+        # --- LOGIKA PRIORITAS BERDASARKAN SKU & BIN ---
         query_prioritas_refill = f"""
             WITH 
             ArticlesNeedDisplay AS (
@@ -6288,7 +6305,6 @@ def tampilan_display_control():
                   AND "{col_qty}" > 0
             ),
             
-            -- Tahap 1: Ambil data dari Bin Prioritas (GUDANG / STR) jika ada
             PrioritasStock AS (
                 SELECT *,
                        ROW_NUMBER() OVER (PARTITION BY Article, SKU ORDER BY Qty_In_Bin DESC) as rn
@@ -6296,14 +6312,12 @@ def tampilan_display_control():
                 WHERE UPPER(Bin_Lokasi) LIKE '%GUDANG%' OR UPPER(Bin_Lokasi) LIKE '%STR%'
             ),
             
-            -- Tahap 2: Saring hanya ranking 1 dari Prioritas
             FinalPrioritas AS (
                 SELECT Article, SKU, Deskripsi_Barang, Size_Display, Bin_Lokasi, Qty_In_Bin
                 FROM PrioritasStock
                 WHERE rn = 1
             ),
             
-            -- Tahap 3: Siapkan data Reguler sebagai fallback
             RegulerStock AS (
                 SELECT *,
                        ROW_NUMBER() OVER (PARTITION BY Article, SKU ORDER BY Qty_In_Bin DESC) as rn
@@ -6317,7 +6331,6 @@ def tampilan_display_control():
                 WHERE rn = 1
             ),
             
-            -- Tahap 4: Gabungkan Hasil Akhir menggunakan UNION
             CombinedSelection AS (
                 SELECT * FROM FinalPrioritas
                 UNION ALL
@@ -6354,7 +6367,7 @@ def tampilan_display_control():
         st.error(f"Error pada sistem analisis: {e}")
     finally:
         conn.close()
-        
+
 def process_picking_audit(file1, file2, file_tracking=None):
     try:
         # Load data utama
