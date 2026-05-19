@@ -6166,7 +6166,7 @@ def tampilan_display_control():
         **Cara Kerja Pemantauan :**
         - **Source (Gudang):** Semua BIN aktif (selain area TOKO/DISPLAY & Area Eksklusi).
         - **Target (Toko):** BIN yang mengandung kata 'TOKO', 'STORE', atau 'DISPLAY'.
-        - **Aturan Tambahan:** Jika Article sudah ada di Bin **'OUT'** dengan Qty > 0, maka otomatis **dikeluarkan dari list refill**.
+        - **Aturan Proteksi OUT:** Jika Article / SKU sudah berada di bin **'OUT'** dengan Qty > 0, otomatis **dihapus dari list penarikan**.
         - **Logic:** Jika SKU memiliki **Stok > 0 di Gudang** tapi **Stok = 0 di Toko**, maka SKU wajib tambah display.
         """)
 
@@ -6241,7 +6241,7 @@ def tampilan_display_control():
         f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
         f_source_gudang = f"(NOT ({f_target_toko})) AND ({excl_condition})"
 
-        # Logic: Article ada di gudang (Source), stok 0 di Toko (Target), DAN TIDAK SEDANG BERADA DI BIN 'OUT'
+        # Kunci Ringkasan Atas: Hanya Article yang bersih dari target toko dan bin OUT
         q_need_display_logic = f"""
             SELECT ARTICLE FROM stock_display_processed 
             WHERE {excl_condition}
@@ -6284,11 +6284,18 @@ def tampilan_display_control():
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # --- LOGIKA PRIORITAS BERDASARKAN SKU & BIN ---
+        # --- PERBAIKAN TOTAL: VALIDASI FILTER SKU TERINTEGRASI BIN OUT ---
         query_prioritas_refill = f"""
             WITH 
             ArticlesNeedDisplay AS (
                 {q_need_display_logic}
+            ),
+            
+            -- Cari tahu SKU mana saja yang sudah nangkring di BIN OUT (berapapun Qty-nya asal > 0)
+            SKUInBinOut AS (
+                SELECT DISTINCT "{col_sku}" as Out_SKU 
+                FROM stock_display_processed
+                WHERE UPPER("{col_bin}") LIKE '%OUT%' AND "{col_qty}" > 0
             ),
             
             RawGudangStock AS (
@@ -6303,6 +6310,8 @@ def tampilan_display_control():
                 WHERE ARTICLE IN (SELECT ARTICLE FROM ArticlesNeedDisplay)
                   AND {f_source_gudang}
                   AND "{col_qty}" > 0
+                  -- PROTEKSI UTAMA: Buang SKU jika terdaftar sudah ada di bin OUT!
+                  AND "{col_sku}" NOT IN (SELECT Out_SKU FROM SKUInBinOut)
             ),
             
             PrioritasStock AS (
@@ -6361,12 +6370,10 @@ def tampilan_display_control():
                 mime='text/csv',
             )
         else:
-            st.success("🎉 Semua Article saleable sudah tersedia di area Toko.")
+            st.success("🎉 Semua Article/SKU saleable sudah tersedia di Toko atau sedang berada di proses OUT.")
 
     except Exception as e:
         st.error(f"Error pada sistem analisis: {e}")
-    finally:
-        conn.close()
 
 def process_picking_audit(file1, file2, file_tracking=None):
     try:
