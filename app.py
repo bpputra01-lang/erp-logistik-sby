@@ -6091,6 +6091,8 @@ import sqlite3
 def init_db():
     # Database fisik untuk menyimpan data upload
     conn = sqlite3.connect('database_display_control.db', check_same_thread=False)
+    # Mode WAL aktif agar proses baca-tulis stabil dan bebas dari 'database is locked'
+    conn.execute('PRAGMA journal_mode=WAL;')
     return conn
 
 def tampilan_display_control():
@@ -6172,20 +6174,22 @@ def tampilan_display_control():
         try:
             df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df.columns = [str(c).strip() for c in df.columns]
-            df.to_sql('stock_display_raw', conn, index=False, if_exists='replace')
+            with conn:
+                df.to_sql('stock_display_raw', conn, index=False, if_exists='replace')
             st.success("Data Berhasil Diperbarui!")
         except Exception as e:
             st.error(f"Gagal upload: {e}")
 
     # --- 2. LOGIKA ANALISIS ---
     try:
-        # --- 2. LOGIKA ANALISIS (VERSI SINKRON 100%) ---
-        df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_display_raw'", conn)
+        with conn:
+            df_check = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='stock_display_raw'", conn)
         if df_check.empty:
             st.info("Upload data stock untuk memulai analisis display.")
             return
 
-        cols = pd.read_sql("SELECT * FROM stock_display_raw LIMIT 1", conn).columns
+        with conn:
+            cols = pd.read_sql("SELECT * FROM stock_display_raw LIMIT 1", conn).columns
         col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
         col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
         col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
@@ -6193,9 +6197,10 @@ def tampilan_display_control():
         col_size = cols[5] # Kolom F
 
         # 1. Tambah Kolom Article ke database sementara
-        df_raw = pd.read_sql("SELECT * FROM stock_display_raw", conn)
-        df_raw['ARTICLE'] = df_raw[col_desc].astype(str).apply(lambda x: x.split(' ')[0])
-        df_raw.to_sql('stock_display_processed', conn, index=False, if_exists='replace')
+        with conn:
+            df_raw = pd.read_sql("SELECT * FROM stock_display_raw", conn)
+            df_raw['ARTICLE'] = df_raw[col_desc].astype(str).apply(lambda x: x.split(' ')[0])
+            df_raw.to_sql('stock_display_processed', conn, index=False, if_exists='replace')
 
         # --- PENYEMPURNAAN FILTER EKSKLUSI ---
         excl_condition = f"""
@@ -6228,23 +6233,20 @@ def tampilan_display_control():
         """
 
         # --- LOGIKA SINKRONISASI METRIK ---
-        # 1. Ambil list artikel yang memang sudah ada di display
         q_art_on_display = f"""
             SELECT DISTINCT ARTICLE FROM stock_display_processed 
             WHERE {f_target_toko} AND "{col_qty}" > 0
         """
 
-        # 2. Hitung jumlah untuk dashboard
-        q_data = pd.read_sql(f"""
-            SELECT  
-                (SELECT COUNT(DISTINCT ARTICLE) FROM ({q_art_on_display})) as On_Display,
-                (SELECT COUNT(*) FROM ({q_need_display_logic})) as Need_Display
-        """, conn).iloc[0]
+        with conn:
+            q_data = pd.read_sql(f"""
+                SELECT  
+                    (SELECT COUNT(DISTINCT ARTICLE) FROM ({q_art_on_display})) as On_Display,
+                    (SELECT COUNT(*) FROM ({q_need_display_logic})) as Need_Display
+            """, conn).iloc[0]
 
         on_display = int(q_data['On_Display'])
         need_display = int(q_data['Need_Display'])
-        
-        # Total Artikel adalah gabungan dari yang sudah terpajang + yang harus dipajang
         total_art = on_display + need_display
 
         # --- 3. TAMPILAN DASHBOARD ---
@@ -6257,68 +6259,69 @@ def tampilan_display_control():
             perc_display = (on_display / total_art * 100) if total_art > 0 else 0
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Terpajang</p></div>', unsafe_allow_html=True)
         with c3:
-            # Agar hasil visual tetap klop 100% jika dijumlahkan
             perc_need = (need_display / total_art * 100) if total_art > 0 else 0
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # --- PERBAIKAN LOGIKA PRIORITAS BERTINGKAT LEVEL SKU (KOLOM C & KOLOM J) ---
+        # --- PERBAIKAN TOTAL LOGIKA PRIORITAS BERDASARKAN SKU & BIN ---
         query_prioritas_refill = f"""
             WITH 
-            -- 1. Cari dulu artikel apa saja yang wajib tambah display (Bawaan Kode Asli)
             ArticlesNeedDisplay AS (
                 {q_need_display_logic}
             ),
             
-            -- 2. Ambil semua data stok siap tarik di Gudang, lengkap dengan SKU dan Qty per Bin
             RawGudangStock AS (
                 SELECT 
                     ARTICLE as Article,
-                    "{col_sku}" as SKU, -- Kolom C
+                    "{col_sku}" as SKU, 
                     "{col_desc}" as Deskripsi_Barang,
                     "{col_size}" as Size_Display,
                     "{col_bin}" as Bin_Lokasi,
-                    "{col_qty}" as Qty_In_Bin -- Kolom J
+                    "{col_qty}" as Qty_In_Bin
                 FROM stock_display_processed
                 WHERE ARTICLE IN (SELECT ARTICLE FROM ArticlesNeedDisplay)
                   AND {f_source_gudang}
                   AND "{col_qty}" > 0
             ),
             
-            -- 3. Cek apakah Artikel tersebut punya stok di area Prioritas (GUDANG atau STR)
+            -- Tahap 1: Ambil data dari Bin Prioritas (GUDANG / STR) jika ada
             PrioritasStock AS (
                 SELECT *,
-                       -- Jika ada beberapa SKU/Bin prioritas, urutkan dari Qty terbanyak
                        ROW_NUMBER() OVER (PARTITION BY Article, SKU ORDER BY Qty_In_Bin DESC) as rn
                 FROM RawGudangStock
                 WHERE UPPER(Bin_Lokasi) LIKE '%GUDANG%' OR UPPER(Bin_Lokasi) LIKE '%STR%'
             ),
             
-            -- 4. Jika tidak ada di area Prioritas, ambil dari semua area sesuai kode asli
+            -- Tahap 2: Saring hanya ranking 1 dari Prioritas
+            FinalPrioritas AS (
+                SELECT Article, SKU, Deskripsi_Barang, Size_Display, Bin_Lokasi, Qty_In_Bin
+                FROM PrioritasStock
+                WHERE rn = 1
+            ),
+            
+            -- Tahap 3: Siapkan data Reguler sebagai fallback
             RegulerStock AS (
                 SELECT *,
                        ROW_NUMBER() OVER (PARTITION BY Article, SKU ORDER BY Qty_In_Bin DESC) as rn
                 FROM RawGudangStock
+                WHERE SKU NOT IN (SELECT SKU FROM FinalPrioritas)
             ),
             
-            -- 5. Gabungkan Logika: Pakai Prioritas dulu, kalau kosong baru fallback ke Reguler
-            FinalSelection AS (
-                SELECT 
-                    r.Article,
-                    r.SKU,
-                    r.Deskripsi_Barang,
-                    r.Size_Display,
-                    COALESCE(p.Bin_Lokasi, r.Bin_Lokasi) as Bin_Lokasi,
-                    COALESCE(p.Qty_In_Bin, r.Qty_In_Bin) as Qty_In_Bin,
-                    ROW_NUMBER() OVER (PARTITION BY r.Article, r.SKU ORDER BY r.Article) as final_rn
-                FROM RegulerStock r
-                LEFT JOIN PrioritasStock p ON r.Article = p.Article AND r.SKU = p.SKU AND p.rn = 1
-                WHERE r.rn = 1
+            FinalReguler AS (
+                SELECT Article, SKU, Deskripsi_Barang, Size_Display, Bin_Lokasi, Qty_In_Bin
+                FROM RegulerStock
+                WHERE rn = 1
+            ),
+            
+            -- Tahap 4: Gabungkan Hasil Akhir menggunakan UNION
+            CombinedSelection AS (
+                SELECT * FROM FinalPrioritas
+                UNION ALL
+                SELECT * FROM FinalReguler
             )
             
-            -- 6. Tampilkan ke Dashboard
             SELECT 
                 Article,
                 SKU,
@@ -6326,12 +6329,12 @@ def tampilan_display_control():
                 Size_Display as "Size Display",
                 Bin_Lokasi as "Bin Lokasi",
                 Qty_In_Bin as "Qty In Bin"
-            FROM FinalSelection
-            WHERE final_rn = 1
+            FROM CombinedSelection
             ORDER BY "Qty In Bin" DESC
         """
 
-        df_detail = pd.read_sql(query_prioritas_refill, conn)
+        with conn:
+            df_detail = pd.read_sql(query_prioritas_refill, conn)
 
         if not df_detail.empty:
             st.dataframe(df_detail, use_container_width=True)
@@ -6347,6 +6350,8 @@ def tampilan_display_control():
 
     except Exception as e:
         st.error(f"Error pada sistem analisis: {e}")
+    finally:
+        conn.close()
 
 def process_picking_audit(file1, file2, file_tracking=None):
     try:
