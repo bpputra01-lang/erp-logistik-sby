@@ -6054,11 +6054,20 @@ def tampilan_balancing_stock():
 
         cc1, cc2 = st.columns(2)
         with cc1:
-            perc = (dc_missing / dc_total * 100) if dc_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ Not Yet Distributed DC to Store</p><p class="metric-value">{dc_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc:.1f}% Belum Terdistribusi</p></div>', unsafe_allow_html=True)
+            perc_dc_miss = (dc_missing / dc_total * 100) if dc_total > 0 else 0
+            # PERBAIKAN: Jika ada SKU yang missing tapi persentase terlalu kecil, paksa tampilkan 0.1%
+            if dc_missing > 0 and perc_dc_miss < 0.1:
+                perc_dc_miss = 0.1
+                
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #E91E63;"><p class="metric-label">⚠️ Not Yet Distributed DC to Store</p><p class="metric-value">{dc_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_dc_miss:.1f}% Belum Terdistribusi</p></div>', unsafe_allow_html=True)
+            
         with cc2:
-            perc = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ Not Yet Refill GL4 to GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
+            perc_gl_miss = (gl4_missing / gl4_total * 100) if gl4_total > 0 else 0
+            # PERBAIKAN: Jika ada SKU yang missing tapi persentase terlalu kecil, paksa tampilkan 0.1%
+            if gl4_missing > 0 and perc_gl_miss < 0.1:
+                perc_gl_miss = 0.1
+                
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF9800;"><p class="metric-label">⚠️ Not Yet Refill GL4 to GL3</p><p class="metric-value">{gl4_missing:,} SKU</p><p class="metric-arrow" style="color: #FF5252;">{perc_gl_miss:.1f}% Belum Turun</p></div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 📋 Detail List SKU Need Distributed")
