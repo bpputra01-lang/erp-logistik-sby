@@ -6036,12 +6036,21 @@ def tampilan_balancing_stock():
             st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">📦 Total SKU Aktif</p><p class="metric-value">{int(q_data["Total_SKU_Clean"]):,}</p><p class="metric-arrow" style="color: #00FF00;">↑ OVERALL</p></div>', unsafe_allow_html=True)
         with c2:
             dc_avail = dc_total - dc_missing
-            perc = (dc_avail / dc_total * 100) if dc_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Store</p><p class="metric-value">{dc_avail:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+            # Mencegah pembulatan ke atas jadi 100% jika aslinya masih ada yang missing
+            perc_dc = (dc_avail / dc_total * 100) if dc_total > 0 else 0
+            if dc_missing > 0 and perc_dc > 99.9:
+                perc_dc = 99.9  # Dipaksa ke 99.9% agar tidak menipu mata jadi 100.0%
+                
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">🏪 DC to Store</p><p class="metric-value">{dc_avail:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_dc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+            
         with c3:
             gl_avail = gl4_total - gl4_missing
-            perc = (gl_avail / gl4_total * 100) if gl4_total > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl_avail:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
+            # Mencegah pembulatan ke atas jadi 100% jika aslinya masih ada yang missing
+            perc_gl = (gl_avail / gl4_total * 100) if gl4_total > 0 else 0
+            if gl4_missing > 0 and perc_gl > 99.9:
+                perc_gl = 99.9  # Dipaksa ke 99.9% agar tidak menipu mata jadi 100.0%
+                
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FFAB00;"><p class="metric-label">🏗️ GL4 to GL3</p><p class="metric-value">{gl_avail:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_gl:.1f}% Tersedia</p></div>', unsafe_allow_html=True)
 
         cc1, cc2 = st.columns(2)
         with cc1:
