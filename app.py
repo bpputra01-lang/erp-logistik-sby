@@ -5967,9 +5967,9 @@ def tampilan_balancing_stock():
             UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND UPPER("{col_bin}") NOT LIKE '%LIVE%' AND
             UPPER("{col_bin}") NOT LIKE '%MARKOM%' AND UPPER("{col_bin}") NOT LIKE '%KARANTINA%' AND
             UPPER("{col_bin}") NOT LIKE '%STAGING%' AND UPPER("{col_bin}") NOT LIKE '%STAGGING%' AND
-            UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND UPPER("{col_bin}") NOT LIKE '%OUT%' AND
+            UPPER("{col_bin}") NOT LIKE '%PUTAWAY%' AND 
             UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%AMP%' AND
-            UPPER("{col_bin}") NOT LIKE '%INB%' AND UPPER("{col_bin}") NOT LIKE '%RAK%'
+            UPPER("{col_bin}") NOT LIKE '%RAK%'
         """
 
         # --- DEFINISI AREA FILTER ---
@@ -5985,10 +5985,12 @@ def tampilan_balancing_stock():
         """
 
         # Target Store: TOKO, STORE, GUDANG LT.2
-        f_target_store = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%GL2-STORE%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG LT.2%')"
+        f_target_store = f"""
+            (UPPER("{col_bin}") LIKE '%TOKO%' OR UPPER("{col_bin}") LIKE '%GL2-STORE%' OR UPPER("{col_bin}") LIKE '%GUDANG LT.2%' OR UPPER("{col_bin}") LIKE '%OUT%')
+        """
         
         # Source DC: Area pusat
-        f_source_dc = f"UPPER(\"{col_bin}\") LIKE '%DC%' AND {base_excl}"
+        f_source_dc = f"UPPER(\"{col_bin}\") LIKE '%DC%' AND UPPER(\"{col_bin}\") NOT LIKE '%OUT%' AND {base_excl}"
 
         # --- 1. LOGIKA MISSING (STOK SOURCE > 0 DAN STOK TARGET <= 0) ---
         
