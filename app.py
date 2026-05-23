@@ -5942,13 +5942,8 @@ def tampilan_balancing_stock():
         try:
             df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df.columns = [str(c).strip() for c in df.columns]
-            
-            # PERBAIKAN: Buka koneksi baru khusus untuk nulis data, lalu langsung tutup
-            with sqlite3.connect('database_sby.db') as write_conn:
-                df.to_sql('stock_raw', write_conn, index=False, if_exists='replace')
-                
+            df.to_sql('stock_raw', conn, index=False, if_exists='replace')
             st.success("Data Berhasil Diperbarui!")
-            st.rerun() # Paksa refresh halaman biar query di bawah membaca tabel baru
         except Exception as e:
             st.error(f"Gagal upload: {e}")
 
