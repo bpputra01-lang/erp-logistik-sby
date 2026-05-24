@@ -8628,8 +8628,9 @@ elif menu == "Compare System":
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **STOCK SYSTEM 1**: Download ALL DATA STOCK Setelah jam operasional **Shift 2 (22:00)**
-        - **STOCK SYSTEM 2**: Download ALL DATA STOCK Sebelum jam operasional **Shift 0 (07:30)**
+        - **STOCK SYSTEM 1**: Download ALL DATA STOCK Sebelum jam operasional **Before Shift 0 (07:30)**
+        - **STOCK SYSTEM 2**: Download ALL DATA STOCK Setelah jam operasional **After Shift 2 (10:00)**
+        - **STOCK TRACKING** : Download sesuaikan dengan tanggal dan pilih hanya yang **DONE**
         """)
     with st.expander("💡Logic Thinking"):
         st.info("""
