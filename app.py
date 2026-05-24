@@ -4323,102 +4323,121 @@ def process_justification(df_case, df_tracking, df_po):
     return res[final_cols]
 
 import pandas as pd
+import numpy as np
 
 def load_data(file):
-    """Fungsi pembantu untuk membaca file CSV atau Excel tanpa merusak data."""
     if file.name.endswith('.csv'):
         return pd.read_csv(file, header=None if pd.read_csv(file).empty else 0)
     else:
         return pd.read_excel(file)
 
 def prepare_columns(df):
-    """Fungsi baru: Mengunci kolom File 1 & 2 langsung berdasarkan posisi koordinat (B, C, J)."""
     df_clean = df.copy()
-    
-    # Cek apakah jumlah kolom mencukupi sampai kolom J (minimal 10 kolom)
     if df_clean.shape[1] < 10:
-        raise ValueError(
-            f"File System lu kurang dari 10 kolom (Kolom J tidak ada). "
-            f"Jumlah kolom yang kedeteksi cuma: {df_clean.shape[1]}"
-        )
+        raise ValueError(f"File System kurang dari 10 kolom (Kolom J tidak ada).")
     
-    # Kunci koordinat posisi kolom berdasarkan urutan Excel:
-    # Kolom B = index 1 (BIN)
-    # Kolom C = index 2 (SKU)
-    # Kolom J = index 9 (QTY SYSTEM)
     df_mapped = pd.DataFrame({
         'BIN': df_clean.iloc[:, 1].astype(str).str.strip().str.upper(),
         'SKU': df_clean.iloc[:, 2].astype(str).str.strip().str.upper(),
         'QTY': pd.to_numeric(df_clean.iloc[:, 9], errors='coerce').fillna(0)
     })
-    
     return df_mapped
 
-
 def process_stock_comparison(file1, file2, file_tracking=None):
-    """Fungsi utama: Jalankan compare murni koordinat, lalu validasi tracking penjualan."""
     try:
-        # === 1. ALUR UTAMA COMPARE (FILE 1 & 2) ===
+        # === A. COMPARE FILE SYSTEM 1 & 2 ===
         df1 = load_data(file1)
         df2 = load_data(file2)
 
-        # Proses ambil kolom B, C, J otomatis tanpa nyari nama teks lagi
         data1 = prepare_columns(df1)
         data2 = prepare_columns(df2)
 
-        # Gabungkan data hasil mapping koordinat berdasarkan BIN dan SKU
         comparison = pd.merge(
-            data1, 
-            data2, 
-            on=['BIN', 'SKU'], 
-            how='outer', 
-            suffixes=('_Sys1', '_Sys2')
+            data1, data2, on=['BIN', 'SKU'], how='outer', suffixes=('_Sys1', '_Sys2')
         ).fillna(0)
 
         # Hitung Selisih
         comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
-        
-        # Ambil hanya yang ada perbedaan stok
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
-        # === 2. LOGIKA VALIDASI TRACKING (JALAN JIKA ADA SELISIH & TRACKING DI-UPLOAD) ===
+        # Tambahkan kolom tracking default yang lu minta
+        discrepancies['TRACK_INVOICE'] = "-"
+        discrepancies['TRACK_BIN'] = "-"
+        discrepancies['TRACK_QTY_SALES'] = 0
         discrepancies['STATUS_CHECK'] = "Belum Dicek (Upload Tracking)"
         
+        # === B. VALIDASI SILANG KE STOCK TRACKING ===
         if file_tracking is not None and not discrepancies.empty:
             df_track = load_data(file_tracking)
-            
             if df_track.shape[1] < 11:
-                raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K (QTY) tidak ditemukan.")
+                raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K tidak ditemukan.")
             
-            # Kunci koordinat File Tracking (A=0, B=1, G=6, K=10)
+            # Mapping kolom tracking: A=Invoice, B=SKU, G=Bin, K=Qty
             df_track_clean = pd.DataFrame({
-                'INVOICE': df_track.iloc[:, 0],
+                'INVOICE': df_track.iloc[:, 0].astype(str).str.strip(),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.upper(),
                 'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.upper(),
                 'QTY_SALES': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
             })
             
             status_list = []
+            invoice_list = []
+            track_bin_list = []
+            track_qty_list = []
             
-            # Loop baris selisih untuk dicocokkan ke data penjualan (A, B, G, K)
             for idx, row in discrepancies.iterrows():
                 target_sku = str(row['SKU']).strip().upper()
                 target_bin = str(row['BIN']).strip().upper()
+                target_diff = abs(row['DIFF']) # Pakai nilai absolut untuk compare dengan QTY penjualan
                 
-                # Cek SKU di Kolom B tracking
-                sales_sku_match = df_track_clean[df_track_clean['SKU'] == target_sku]
+                # 1. Filter tracking berdasarkan SKU yang sama
+                match_sku = df_track_clean[df_track_clean['SKU'] == target_sku]
                 
-                if sales_sku_match.empty:
+                if match_sku.empty:
+                    # Aturan 4: TOTAL SELISIH NO SALES
                     status_list.append("NO Sales cek mutasi & RTO")
+                    invoice_list.append("-")
+                    track_bin_list.append("-")
+                    track_qty_list.append(0)
                 else:
-                    # Cek Bin di Kolom G tracking
-                    sales_bin_match = sales_sku_match[sales_sku_match['BIN'] == target_bin]
+                    # Ambil list invoice unik, bin unik, dan total qty terjual untuk info kolom tambahan
+                    invoices_str = ", ".join(match_sku['INVOICE'].unique())
+                    bins_str = ", ".join(match_sku['BIN'].unique())
+                    total_qty_sales = match_sku['QTY_SALES'].sum()
                     
-                    if sales_bin_match.empty:
-                        status_list.append("done terjual bin missmatch")
+                    # 2. Cek apakah ada yang terjual dari BIN yang sama
+                    match_bin = match_sku[match_sku['BIN'] == target_bin]
+                    
+                    if not match_bin.empty:
+                        # Jika SKU dan BIN cocok, cek apakah nominal QTY sales akumulatifnya sama dengan DIFF
+                        total_qty_bin_sales = match_bin['QTY_SALES'].sum()
+                        
+                        if total_qty_bin_sales == target_diff:
+                            # Aturan 1: SKU, BIN, dan QTY Match Sempurna
+                            status_list.append("done terjual")
+                        else:
+                            # Aturan 2: SKU & BIN cocok, tapi QTY/DIFF tidak match
+                            status_list.append("QTY sales tidak match dengan Selisih")
+                        
+                        # Tarik data spesifik yang matching BIN-nya
+                        invoice_list.append(", ".join(match_bin['INVOICE'].unique()))
+                        track_bin_list.append(", ".join(match_bin['BIN'].unique()))
+                        track_qty_list.append(total_qty_bin_sales)
                     else:
-                        status_list.append("done terjual")
+                        # Aturan 3: SKU dan QTY match, tapi BIN tidak cocok (BIN MISSMATCH)
+                        if total_qty_sales == target_diff:
+                            status_list.append("Terjual (BIN MISSMATCH)")
+                        else:
+                            status_list.append("QTY sales tidak match dengan Selisih (BIN MISSMATCH)")
+                            
+                        invoice_list.append(invoices_str)
+                        track_bin_list.append(bins_str)
+                        track_qty_list.append(total_qty_sales)
             
+            # Masukkan semua data yang berhasil di-track ke kolom dataframe hasil
+            discrepancies['TRACK_INVOICE'] = invoice_list
+            discrepancies['TRACK_BIN'] = track_bin_list
+            discrepancies['TRACK_QTY_SALES'] = track_qty_list
             discrepancies['STATUS_CHECK'] = status_list
             
         return comparison, discrepancies
@@ -8620,34 +8639,62 @@ elif menu == "Compare System":
         """)
     # ... (Kode expander Informasi Format File dan Logic Thinking tetap sama)
 
-    # Ubah susunan kolom menjadi 3 kolom agar rapi, atau susun vertikal
     col1, col2, col3 = st.columns(3)
     with col1:
         file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
     with col2:
         file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
     with col3:
-        file_tracking = st.file_uploader("Upload Stock Tracking (Opsional)", type=['xlsx', 'csv'])
+        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
 
     if file_sys1 and file_sys2:
         if st.button("▶️RUN COMPARE"):
             try:
-                # Masukkan file_tracking ke dalam parameter fungsi pencocokan
                 result_all, diff_only = process_stock_comparison(file_sys1, file_sys2, file_tracking)
-                
                 st.divider()
 
-                # METRIC BOXES
+                # --- HITUNG METRIK DATA UNTUK DITAMPILKAN ---
+                total_checked = len(result_all)
+                total_diff = len(diff_only)
+                
+                # Hitung breakdown status berdasarkan aturan baru lu
+                if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
+                    match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("done terjual|Terjual \(BIN MISSMATCH\)", na=False, case=False)])
+                    unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("tidak match", na=False, case=False)])
+                    no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO Sales", na=False, case=False)])
+                else:
+                    match_count, unmatch_count, no_sales_count = 0, 0, 0
+
+                # --- RENDER 5 METRIC BOXES ELEGAN ---
+                # Baris 1: Ringkasan Utama
                 m1, m2 = st.columns(2)
-                m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
-                m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ ITEM SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
+                m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{total_checked}</span></div>', unsafe_allow_html=True)
+                m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ TOTAL ITEM SELISIH</span><span class="m-val">{total_diff}</span></div>', unsafe_allow_html=True)
+                
+                st.write("") # Spacer
+                
+                # Baris 2: Hasil Validasi Tracking (Aturan Baru Lu)
+                m3, m4, m5 = st.columns(3)
+                m3.markdown(f'<div class="m-box" style="border-left: 5px solid #28a745;"><span class="m-lbl">✅ SELISIH & SALES MATCH</span><span class="m-val" style="color: #28a745;">{match_count}</span></div>', unsafe_allow_html=True)
+                m4.markdown(f'<div class="m-box" style="border-left: 5px solid #dc3545;"><span class="m-lbl">❌ SELISIH & SALES UNMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count}</span></div>', unsafe_allow_html=True)
+                m5.markdown(f'<div class="m-box" style="border-left: 5px solid #ffc107;"><span class="m-lbl">🔍 TOTAL SELISIH NO SALES</span><span class="m-val" style="color: #ffc107;">{no_sales_count}</span></div>', unsafe_allow_html=True)
+
+                st.write("")
 
                 if not diff_only.empty:
-                    st.warning("Daftar Perbedaan Stok beserta Hasil Tracking:")
-                    # Menampilkan dataframe yang sekarang sudah otomatis berisi kolom STATUS_CHECK
-                    st.dataframe(diff_only, use_container_width=True)
+                    st.warning("Daftar Perbedaan Stok Beserta Hasil Cross-Check Tracking Penjualan:")
                     
-                    csv = diff_only.to_csv(index=False).encode('utf-8')
+                    # Susun urutan kolom biar rapi pas dibaca di UI
+                    ordered_cols = [
+                        'BIN', 'SKU', 'QTY_Sys1', 'QTY_Sys2', 'DIFF', 
+                        'TRACK_INVOICE', 'TRACK_BIN', 'TRACK_QTY_SALES', 'STATUS_CHECK'
+                    ]
+                    # Filter kolom yang ada aja biar gak crash kalau salah satu kosong
+                    display_df = diff_only[[c for c in ordered_cols if c in diff_only.columns]]
+                    
+                    st.dataframe(display_df, use_container_width=True)
+                    
+                    csv = display_df.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="📥 Download Hasil Selisih & Status",
                         data=csv,
