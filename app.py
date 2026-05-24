@@ -4357,7 +4357,7 @@ def process_stock_comparison(file1, file2, file_tracking=None):
         ).fillna(0)
 
         # Hitung Selisih
-        comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
+        comparison['DIFF'] = comparison['Qty Start Shift'] - comparison['Qty End Shift']
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
         # Tambahkan kolom tracking default yang lu minta
