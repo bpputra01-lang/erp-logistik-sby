@@ -4321,35 +4321,10 @@ def process_justification(df_case, df_tracking, df_po):
 
     final_cols = [col for col in ordered_headers if col in res.columns]
     return res[final_cols]
-import pandas as pd
-
-def load_data(file):
-    """Fungsi untuk membaca file baik format CSV maupun Excel."""
-    if file.name.endswith('.csv'):
-        return pd.read_csv(file)
-    else:
-        return pd.read_excel(file)
-
-def prepare_columns(df):
-    """Fungsi untuk menstandardisasi nama kolom menjadi UPPERCASE dan mengambil BIN, SKU, QTY."""
-    # Copy dataframe agar tidak merusak data asli
-    df_clean = df.copy()
-    
-    # Bereskan spasi gaib dan buat jadi huruf kapital semua
-    df_clean.columns = [str(col).strip().upper() for col in df_clean.columns]
-    
-    # Pastikan kolom utama yang dibutuhkan ada
-    required_cols = ['BIN', 'SKU', 'QTY']
-    for col in required_cols:
-        if col not in df_clean.columns:
-            raise ValueError(f"Kolom '{col}' tidak ditemukan di dalam file. Mohon cek kembali header file Anda.")
-            
-    # Ambil hanya kolom yang kita butuhkan saja
-    return df_clean[required_cols]
 def process_stock_comparison(file1, file2, file_tracking=None):
-    """Fungsi utama untuk memproses perbandingan dengan validasi tracking penjualan berdasarkan posisi kolom."""
+    """Fungsi utama untuk memproses perbandingan sesuai logika asli lu."""
     try:
-        # 1. Proses File 1 dan File 2 (Tetap pakai prepare_columns standar)
+        # === 1. ALUR ASLI LU (TIDAK DIUBAH SAMA SEKALI) ===
         df1 = load_data(file1)
         df2 = load_data(file2)
 
@@ -4371,57 +4346,39 @@ def process_stock_comparison(file1, file2, file_tracking=None):
         # Ambil hanya yang ada perbedaan
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
-        # Tambahkan kolom status default
-        discrepancies['STATUS_CHECK'] = "Match / No Issue"
+        # === 2. LOGIKA BARU: JIKA ADA SELISIH, BARU CEK FILE STOCK TRACKING ===
+        # Default kolom status jika file tracking tidak di-upload
+        discrepancies['STATUS_CHECK'] = "Belum Dicek (Upload Tracking)"
         
-        # 2. LOGIKA FIX UNTUK FILE STOCK TRACKING (LOCK POSISI KOLOM A, B, G, K)
         if file_tracking is not None and not discrepancies.empty:
             df_track = load_data(file_tracking)
             
-            # Cek apakah jumlah kolom mencukupi sampai kolom K (minimal 11 kolom)
-            if df_track.shape[1] < 11:
-                raise ValueError("File Stock Tracking kurang dari 11 kolom. Pastikan kolom K (QTY) tersedia.")
-            
-            # Ambil data berdasarkan urutan indeks kolom Excel:
-            # Kolom A = index 0 (Invoice)
-            # Kolom B = index 1 (SKU)
-            # Kolom G = index 6 (Bin)
-            # Kolom K = index 10 (Qty)
-            df_track_clean = pd.DataFrame({
-                'INVOICE': df_track.iloc[:, 0],
-                'SKU': df_track.iloc[:, 1],
-                'BIN': df_track.iloc[:, 6],
-                'QTY_SALES': df_track.iloc[:, 10]
-            })
-            
-            # Bersihkan data tracking (hapus spasi gaib & paksa uppercase untuk text)
-            df_track_clean['SKU'] = df_track_clean['SKU'].astype(str).str.strip().str.upper()
-            df_track_clean['BIN'] = df_track_clean['BIN'].astype(str).str.strip().str.upper()
-            
             status_list = []
             
-            # Loop setiap baris yang selisih untuk divalidasi ke history penjualan
+            # Loop setiap baris yang selisih untuk dicocokkan ke file tracking
             for idx, row in discrepancies.iterrows():
+                # Paksa string uppercase biar gak miss saat compare text
                 target_sku = str(row['SKU']).strip().upper()
                 target_bin = str(row['BIN']).strip().upper()
                 
-                # A. Cek apakah SKU ini ada di history penjualan (Kolom B)
-                sales_sku_match = df_track_clean[df_track_clean['SKU'] == target_sku]
+                # Cek Kolom B (Indeks 1) untuk SKU
+                sales_sku_match = df_track[df_track.iloc[:, 1].astype(str).str.strip().str.upper() == target_sku]
                 
                 if sales_sku_match.empty:
-                    # Jika SKU sama sekali tidak ada di history penjualan
+                    # Jika SKU tidak ada di history penjualan (Kolom B)
                     status_list.append("NO Sales cek mutasi & RTO")
                 else:
-                    # B. Jika SKU ada, cek apakah ada yang keluar dari BIN ini (Kolom G)
-                    sales_bin_match = sales_sku_match[sales_sku_match['BIN'] == target_bin]
+                    # Jika SKU ada, cek lokasi di Kolom G (Indeks 6)
+                    sales_bin_match = sales_sku_match[sales_sku_match.iloc[:, 6].astype(str).str.strip().str.upper() == target_bin]
                     
                     if sales_bin_match.empty:
-                        # SKU terjual tapi BIN-nya tidak kecocokan
+                        # SKU ada yang terjual, tapi BIN (Kolom G) tidak sesuai
                         status_list.append("done terjual bin missmatch")
                     else:
-                        # SKU terjual dan BIN sesuai
+                        # SKU ada dan BIN sesuai
                         status_list.append("done terjual")
-                        
+            
+            # Masukkan hasil pengecekan ke kolom baru di data selisih
             discrepancies['STATUS_CHECK'] = status_list
             
         return comparison, discrepancies
