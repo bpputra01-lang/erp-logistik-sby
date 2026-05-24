@@ -7674,10 +7674,10 @@ elif menu == "Scan Out Validation":
         if "df_draft" not in st.session_state:
             st.session_state.df_draft = None
 
-       if st.button("▶️ COMPARE DATA SCAN OUT"):
+        if st.button("▶️ COMPARE DATA SCAN OUT"):
             try:
                 with st.spinner("🔄 Sedang memproses data..."):
-                    # 1. PILIH PROSES UTAMA (PBI ATAU SCAN MANUAL)
+                    # LOGIKA BARU: Pilih proses berdasarkan file yang diupload
                     if up_pbi is not None:
                         df_s = pre_process_pbi_data(up_pbi)
                         
@@ -7687,25 +7687,23 @@ elif menu == "Scan Out Validation":
                         else:
                             df_s = pd.read_excel(up_scan, engine="openpyxl")
                         
-                        # Standardisasi kolom khusus untuk DATA SCAN
+                        # PERBAIKAN: Standardisasi kolom khusus untuk DATA SCAN
                         df_s.columns = [str(col).strip().upper() for col in df_s.columns]
                         
                         if len(df_s.columns) < 2:
                             st.error("❌ DATA SCAN harus memiliki minimal 2 kolom (BIN, SKU)")
                             st.stop()
                 
-                    # 2. BACA FILE DOKUMEN PENDUKUNG (Harus sejajar di dalam spinner setelah file utama beres)
+                    # Baca file pendukung (Di dalam spinner agar alur berurutan)
                     df_h = pd.read_excel(up_hist, engine='openpyxl')
                     df_st = pd.read_excel(up_stock, engine='openpyxl')
                     
-                    # Standardisasi kolom dokumen pendukung
+                    # Standardisasi kolom dokumen pendukung tetap jalan
                     df_h.columns = [str(col).strip().upper() for col in df_h.columns]
                     df_st.columns = [str(col).strip().upper() for col in df_st.columns]
                     
-                    # 3. PROSES VALIDASI SCAN OUT
-                    res, draft = process_scan_out(df_s, df_h, df_st)
-                    
                     # Masukkan hasil ke session state
+                    res, draft = process_scan_out(df_s, df_h, df_st)
                     st.session_state.df_res = res
                     st.session_state.df_draft = draft
                     
@@ -7761,8 +7759,6 @@ elif menu == "Scan Out Validation":
                 df_res.to_excel(writer, sheet_name='DATA SCAN', index=False)
                 if len(df_draft) > 0:
                     df_draft.to_excel(writer, sheet_name='DRAFT SET UP', index=False)
-                
-                # (Optional) Tambahkan formatting writer.book di sini jika perlu
             
             st.download_button(
                 label="📥 DOWNLOAD HASIL (DATA SCAN + DRAFT)",
