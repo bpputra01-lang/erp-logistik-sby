@@ -3567,9 +3567,9 @@ def pre_process_pbi_data(uploaded_pbi_file):
 
     # Filter: Kolom S (18) tidak blank & buang teks header bawaan sistem
     df_filtered = df_pbi[
-        df_pbi[18].notna()
-        & (df_pbi[18].astype(str).str.strip() != "")
-        & (df_pbi[18].astype(str).str.strip().str.lower() != "bin_code")
+        df_pbi[19].notna()
+        & (df_pbi[19].astype(str).str.strip() != "")
+        & (df_pbi[19].astype(str).str.strip().str.lower() != "bin_code")
         & (df_pbi[4].astype(str).str.strip().str.lower() != "ps_barcode")
     ].copy()
 
@@ -3582,7 +3582,7 @@ def pre_process_pbi_data(uploaded_pbi_file):
     ]
 
     # Ambil kolom S (18) dan E (4), balik posisi, set header baru
-    df_final = df_duplicated[[18, 4]].copy()
+    df_final = df_duplicated[[19, 4]].copy()
     df_final.columns = ["BIN", "SKU"]
     return df_final
         
