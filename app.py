@@ -8641,9 +8641,9 @@ elif menu == "Compare System":
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
+        file_sys1 = st.file_uploader("Stock System Start Shift", type=['xlsx', 'csv'])
     with col2:
-        file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
+        file_sys2 = st.file_uploader("Stock System End Shift", type=['xlsx', 'csv'])
     with col3:
         file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
 
