@@ -4395,7 +4395,7 @@ def process_stock_comparison(file1, file2, file_tracking=None):
                 
                 if match_sku.empty:
                     # Aturan 4: TOTAL SELISIH NO SALES
-                    status_list.append("NO Sales cek mutasi & RTO")
+                    status_list.append("NO SALES ➡️ PERLU CEK RTO")
                     invoice_list.append("-")
                     track_bin_list.append("-")
                     track_qty_list.append(0)
@@ -4414,10 +4414,10 @@ def process_stock_comparison(file1, file2, file_tracking=None):
                         
                         if total_qty_bin_sales == target_diff:
                             # Aturan 1: SKU, BIN, dan QTY Match Sempurna
-                            status_list.append("done terjual")
+                            status_list.append("DONE TERJUAL")
                         else:
                             # Aturan 2: SKU & BIN cocok, tapi QTY/DIFF tidak match
-                            status_list.append("QTY sales tidak match dengan Selisih")
+                            status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH")
                         
                         # Tarik data spesifik yang matching BIN-nya
                         invoice_list.append(", ".join(match_bin['INVOICE'].unique()))
@@ -4426,9 +4426,9 @@ def process_stock_comparison(file1, file2, file_tracking=None):
                     else:
                         # Aturan 3: SKU dan QTY match, tapi BIN tidak cocok (BIN MISSMATCH)
                         if total_qty_sales == target_diff:
-                            status_list.append("Terjual (BIN MISSMATCH)")
+                            status_list.append("TERJUAL (BIN MISSMATCH)")
                         else:
-                            status_list.append("QTY sales tidak match dengan Selisih (BIN MISSMATCH)")
+                            status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH(BIN MISSMATCH)")
                             
                         invoice_list.append(invoices_str)
                         track_bin_list.append(bins_str)
@@ -8659,25 +8659,25 @@ elif menu == "Compare System":
                 
                 # Hitung breakdown status berdasarkan aturan baru lu
                 if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
-                    match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("done terjual|Terjual \(BIN MISSMATCH\)", na=False, case=False)])
-                    unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("tidak match", na=False, case=False)])
-                    no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO Sales", na=False, case=False)])
+                    match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("DONE TERJUAL|TERJUAL \(BIN MISSMATCH\)", na=False, case=False)])
+                    unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("UNMATCH", na=False, case=False)])
+                    no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO SALES", na=False, case=False)])
                 else:
                     match_count, unmatch_count, no_sales_count = 0, 0, 0
 
                 # --- RENDER 5 METRIC BOXES ELEGAN ---
                 # Baris 1: Ringkasan Utama
                 m1, m2 = st.columns(2)
-                m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{total_checked}</span></div>', unsafe_allow_html=True)
-                m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ TOTAL ITEM SELISIH</span><span class="m-val">{total_diff}</span></div>', unsafe_allow_html=True)
+                m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{total_checked} ROW</span></div>', unsafe_allow_html=True)
+                m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ TOTAL ITEM SELISIH</span><span class="m-val">{total_diff} SKU</span></div>', unsafe_allow_html=True)
                 
                 st.write("") # Spacer
                 
                 # Baris 2: Hasil Validasi Tracking (Aturan Baru Lu)
                 m3, m4, m5 = st.columns(3)
-                m3.markdown(f'<div class="m-box" style="border-left: 5px solid #28a745;"><span class="m-lbl">✅ SELISIH & SALES MATCH</span><span class="m-val" style="color: #28a745;">{match_count}</span></div>', unsafe_allow_html=True)
-                m4.markdown(f'<div class="m-box" style="border-left: 5px solid #dc3545;"><span class="m-lbl">❌ SELISIH & SALES UNMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count}</span></div>', unsafe_allow_html=True)
-                m5.markdown(f'<div class="m-box" style="border-left: 5px solid #ffc107;"><span class="m-lbl">🔍 TOTAL SELISIH NO SALES</span><span class="m-val" style="color: #ffc107;">{no_sales_count}</span></div>', unsafe_allow_html=True)
+                m3.markdown(f'<div class="m-box" style="border-left: 5px solid #28a745;"><span class="m-lbl">✅ SELISIH & SALES MATCH</span><span class="m-val" style="color: #28a745;">{match_count} SKU</span></div>', unsafe_allow_html=True)
+                m4.markdown(f'<div class="m-box" style="border-left: 5px solid #dc3545;"><span class="m-lbl">❌ SELISIH & SALES UNMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
+                m5.markdown(f'<div class="m-box" style="border-left: 5px solid #ffc107;"><span class="m-lbl">🔍 TOTAL SELISIH NO SALES</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
 
                 st.write("")
 
