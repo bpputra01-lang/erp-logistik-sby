@@ -4321,6 +4321,27 @@ def process_justification(df_case, df_tracking, df_po):
 
     final_cols = [col for col in ordered_headers if col in res.columns]
     return res[final_cols]
+
+def load_data(file):
+    """Fungsi pembantu untuk membaca file CSV atau Excel."""
+    if file.name.endswith('.csv'):
+        return pd.read_csv(file)
+    else:
+        return pd.read_excel(file)
+
+def prepare_columns(df):
+    """Fungsi standar lu untuk memastikan kolom utama bersih dan uppercase."""
+    df_clean = df.copy()
+    df_clean.columns = [str(col).strip().upper() for col in df_clean.columns]
+    
+    # Memastikan file system 1 & 2 punya kolom utama
+    required_cols = ['BIN', 'SKU', 'QTY']
+    for col in required_cols:
+        if col not in df_clean.columns:
+            raise ValueError(f"Kolom '{col}' tidak ditemukan di dalam file System. Mohon periksa kembali header File 1 atau File 2 Anda.")
+            
+    return df_clean[required_cols]
+    
 def process_stock_comparison(file1, file2, file_tracking=None):
     """Fungsi utama untuk memproses perbandingan sesuai logika asli lu."""
     try:
