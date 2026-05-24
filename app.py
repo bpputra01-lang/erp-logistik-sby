@@ -3574,11 +3574,11 @@ def pre_process_pbi_data(uploaded_pbi_file):
     ].copy()
 
     # Ubah qty kolom V (21) ke angka, duplikasi baris secepat kilat
-    df_filtered[21] = (
-        pd.to_numeric(df_filtered[21], errors="coerce").fillna(1).astype(int)
+    df_filtered[20] = (
+        pd.to_numeric(df_filtered[20], errors="coerce").fillna(1).astype(int)
     )
     df_duplicated = df_filtered.loc[
-        df_filtered.index.repeat(df_filtered[21].apply(lambda x: x if x > 1 else 1))
+        df_filtered.index.repeat(df_filtered[20].apply(lambda x: x if x > 1 else 1))
     ]
 
     # Ambil kolom S (18) dan E (4), balik posisi, set header baru
