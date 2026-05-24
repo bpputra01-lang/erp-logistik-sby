@@ -8639,7 +8639,11 @@ elif menu == "Compare System":
         - Untuk item yang berbeda akan dipisahkan dan akan dilakukan follow Up ke tim IT untuk dilakukan perbaikan
         """)
     # ... (Kode expander Informasi Format File dan Logic Thinking tetap sama)
-
+    # Inisialisasi session state biar data gak hilang pas rerun
+    if 'result_all' not in st.session_state:
+        st.session_state.result_all = None
+    if 'diff_only' not in st.session_state:
+        st.session_state.diff_only = None
     col1, col2, col3 = st.columns(3)
     with col1:
         file_sys1 = st.file_uploader("Stock System Start Shift", type=['xlsx', 'csv'])
