@@ -4321,8 +4321,8 @@ def process_justification(df_case, df_tracking, df_po):
 
     final_cols = [col for col in ordered_headers if col in res.columns]
     return res[final_cols]
-def process_stock_comparison(file1, file2):
-    """Fungsi utama untuk memproses perbandingan."""
+def process_stock_comparison(file1, file2, file_tracking=None):
+    """Fungsi utama untuk memproses perbandingan dengan validasi tracking penjualan."""
     try:
         df1 = load_data(file1)
         df2 = load_data(file2)
@@ -4330,7 +4330,7 @@ def process_stock_comparison(file1, file2):
         data1 = prepare_columns(df1)
         data2 = prepare_columns(df2)
 
-        # Gabungkan data berdasarkan BIN dan SKU
+        # 1. Gabungkan data berdasarkan BIN dan SKU
         comparison = pd.merge(
             data1, 
             data2, 
@@ -4339,15 +4339,63 @@ def process_stock_comparison(file1, file2):
             suffixes=('_Sys1', '_Sys2')
         ).fillna(0)
 
-        # Hitung Selisih
+        # 2. Hitung Selisih
         comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
         
         # Ambil hanya yang ada perbedaan
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
+        # Tambahkan kolom status default di hasil akhir
+        discrepancies['STATUS_CHECK'] = "Match / No Issue"
+        
+        # 3. LOGIKA TAMBAHAN: Cek ke File Stock Tracking jika file di-upload
+        if file_tracking is not None and not discrepancies.empty:
+            df_track = load_data(file_tracking)
+            
+            # Ambil kolom yang dibutuhkan berdasarkan aturanmu (A, B, G, K)
+            # Pastikan fungsi load_data() atau prepare_columns() milikmu sudah menyesuaikan nama kolom ini.
+            # Di sini diasumsikan kita mapping kolom tersebut ke nama: INVOICE, SKU, BIN, QTY_SALES
+            df_track.columns = [str(col).strip().upper() for col in df_track.columns]
+            
+            # Rename kolom tracking agar seragam dan mudah diolah
+            # Sesuaikan nama string di bawah dengan header asli file tracking-mu jika berbeda
+            rename_dict = {
+                'INVOICE': 'INVOICE', # Kolom A
+                'SKU': 'SKU',         # Kolom B
+                'BIN': 'BIN',         # Kolom G
+                'QTY': 'QTY_SALES'    # Kolom K
+            }
+            df_track = df_track.rename(columns=rename_dict)
+            
+            # --- PROSES VALIDASI PER BARIS SELISIH ---
+            status_list = []
+            
+            for idx, row in discrepancies.iterrows():
+                target_sku = row['SKU']
+                target_bin = row['BIN']
+                
+                # A. Cek apakah SKU tersebut pernah terjual (ada di history penjualan)
+                sales_sku_match = df_track[df_track['SKU'] == target_sku]
+                
+                if sales_sku_match.empty:
+                    # Case: SKU sama sekali tidak ada di history penjualan
+                    status_list.append("NO Sales cek mutasi & RTO")
+                else:
+                    # B. Jika SKU ada, cek apakah BIN-nya juga cocok
+                    sales_bin_match = sales_sku_match[sales_sku_match['BIN'] == target_bin]
+                    
+                    if sales_bin_match.empty:
+                        # Case: SKU ada yang terjual, tapi tidak ada yang dari BIN ini
+                        status_list.append("done terjual bin missmatch")
+                    else:
+                        # Case: SKU ada dan BIN cocok (Terjual normal)
+                        status_list.append("done terjual")
+                        
+            discrepancies['STATUS_CHECK'] = status_list
+            
         return comparison, discrepancies
+        
     except Exception as e:
-        # Lempar error agar bisa ditangkap oleh UI (st.error)
         raise e
 
 import streamlit as st
@@ -8542,34 +8590,40 @@ elif menu == "Compare System":
         - Untuk Compare hanya menggunakan logic rumus **SUMIFS** dimana akan dilakukan di kedua file sehingga mengetahui apakah terdapat perbedaan QTY saat tidak terjadi transaksi
         - Untuk item yang berbeda akan dipisahkan dan akan dilakukan follow Up ke tim IT untuk dilakukan perbaikan
         """)
-    col1, col2 = st.columns(2)
+    # ... (Kode expander Informasi Format File dan Logic Thinking tetap sama)
+
+    # Ubah susunan kolom menjadi 3 kolom agar rapi, atau susun vertikal
+    col1, col2, col3 = st.columns(3)
     with col1:
         file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
     with col2:
         file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
+    with col3:
+        file_tracking = st.file_uploader("Upload Stock Tracking (Opsional)", type=['xlsx', 'csv'])
 
     if file_sys1 and file_sys2:
         if st.button("▶️RUN COMPARE"):
             try:
-                # Ambil data dari fungsi logic lu
-                result_all, diff_only = process_stock_comparison(file_sys1, file_sys2)
+                # Masukkan file_tracking ke dalam parameter fungsi pencocokan
+                result_all, diff_only = process_stock_comparison(file_sys1, file_sys2, file_tracking)
                 
                 st.divider()
 
-                # PAKAI STYLE BOX ELEGAN TAPI CUMA 2 (Sesuai data lu)
+                # METRIC BOXES
                 m1, m2 = st.columns(2)
                 m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
                 m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ ITEM SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
 
                 if not diff_only.empty:
-                    st.warning("Daftar Perbedaan Stok (BIN | SKU | QTY):")
+                    st.warning("Daftar Perbedaan Stok beserta Hasil Tracking:")
+                    # Menampilkan dataframe yang sekarang sudah otomatis berisi kolom STATUS_CHECK
                     st.dataframe(diff_only, use_container_width=True)
                     
                     csv = diff_only.to_csv(index=False).encode('utf-8')
                     st.download_button(
-                        label="📥 Download Hasil Selisih",
+                        label="📥 Download Hasil Selisih & Status",
                         data=csv,
-                        file_name='selisih_stok.csv',
+                        file_name='selisih_stok_validated.csv',
                         mime='text/csv',
                     )
                 else:
