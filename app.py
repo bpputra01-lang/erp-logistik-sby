@@ -7674,13 +7674,12 @@ elif menu == "Scan Out Validation":
         if "df_draft" not in st.session_state:
             st.session_state.df_draft = None
 
-        if st.button("▶️ COMPARE DATA SCAN OUT"):
+       if st.button("▶️ COMPARE DATA SCAN OUT"):
             try:
                 with st.spinner("🔄 Sedang memproses data..."):
-                    # LOGIKA BARU: Pilih proses berdasarkan file yang diupload
+                    # 1. PILIH PROSES UTAMA (PBI ATAU SCAN MANUAL)
                     if up_pbi is not None:
                         df_s = pre_process_pbi_data(up_pbi)
-                        # Data PBI keluar dari fungsi sudah auto-standard (BIN & SKU)
                         
                     elif up_scan is not None:
                         if up_scan.name.endswith(".csv"):
@@ -7688,29 +7687,28 @@ elif menu == "Scan Out Validation":
                         else:
                             df_s = pd.read_excel(up_scan, engine="openpyxl")
                         
-                        # PERBAIKAN: Taruh standardisasi kolom khusus untuk DATA SCAN langsung di sini
+                        # Standardisasi kolom khusus untuk DATA SCAN
                         df_s.columns = [str(col).strip().upper() for col in df_s.columns]
                         
                         if len(df_s.columns) < 2:
                             st.error("❌ DATA SCAN harus memiliki minimal 2 kolom (BIN, SKU)")
                             st.stop()
                 
-                # Baca file pendukung (Posisinya sejajar, di luar blok if/elif file utama)
-                df_h = pd.read_excel(up_hist, engine='openpyxl')
-                df_st = pd.read_excel(up_stock, engine='openpyxl')
-                
-                # Standardisasi kolom dokumen pendukung tetap jalan
-                df_h.columns = [str(col).strip().upper() for col in df_h.columns]
-                df_st.columns = [str(col).strip().upper() for col in df_st.columns]
-                
-                # HAPUS / KOMENTARI baris spinner ganda di bawah ini agar tidak redundant:
-                # with st.spinner('🔄 Sedang memproses data...'): 
-                
-                # Masukkan hasil ke session state
-                res, draft = process_scan_out(df_s, df_h, df_st)
-                st.session_state.df_res = res
-                st.session_state.df_draft = draft
-                
+                    # 2. BACA FILE DOKUMEN PENDUKUNG (Harus sejajar di dalam spinner setelah file utama beres)
+                    df_h = pd.read_excel(up_hist, engine='openpyxl')
+                    df_st = pd.read_excel(up_stock, engine='openpyxl')
+                    
+                    # Standardisasi kolom dokumen pendukung
+                    df_h.columns = [str(col).strip().upper() for col in df_h.columns]
+                    df_st.columns = [str(col).strip().upper() for col in df_st.columns]
+                    
+                    # 3. PROSES VALIDASI SCAN OUT
+                    res, draft = process_scan_out(df_s, df_h, df_st)
+                    
+                    # Masukkan hasil ke session state
+                    st.session_state.df_res = res
+                    st.session_state.df_draft = draft
+                    
                 st.success("✅ Validasi Selesai!")
                 
             except Exception as e:
