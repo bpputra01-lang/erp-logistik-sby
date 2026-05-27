@@ -2619,6 +2619,7 @@ def menu_Stock_Opname():
                 )
 
     download_section()
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -2689,15 +2690,15 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     except Exception as e:
         st.error(f"Error processing PO logic: {e}")
 
-    # 2. Logic Mutasi: A=DateTime(0), C=PIC(2), D=SKU(3), I=Bin Awal(8), M=Bin Tujuan(12), K=Qty(10)
+    # 2. Logic Mutasi (PERBAIKAN KOLOM): B=Bin Awal(1), C=SKU(2), E=DateTime(4), F=Bin Tujuan(5), G=Qty(6), H=PIC(7)
     try:
-        mutasi_filtered = df_mutasi[df_mutasi.iloc[:, 3] == selected_sku]
+        mutasi_filtered = df_mutasi[df_mutasi.iloc[:, 2] == selected_sku]
         for _, row in mutasi_filtered.iterrows():
             timeline_events.append({
-                'Tanggal': pd.to_datetime(row.iloc[0]),
+                'Tanggal': pd.to_datetime(row.iloc[4]),
                 'Tipe': 'MUTASI INTERNAL',
                 'Qty': 0,  # Tidak merubah total qty fisik stock utama
-                'Keterangan': f"Perpindahan BIN: {row.iloc[8]} ➡️ {row.iloc[12]} | Qty: {row.iloc[10]} Pcs | PIC: {row.iloc[2]}"
+                'Keterangan': f"Perpindahan BIN: {row.iloc[1]} ➡️ {row.iloc[5]} | Qty: {row.iloc[6]} Pcs | PIC: {row.iloc[7]}"
             })
     except Exception as e:
         st.error(f"Error processing Mutasi logic: {e}")
@@ -2717,16 +2718,20 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     except Exception as e:
         st.error(f"Error processing Adjustment logic: {e}")
 
-    # 4. Logic Stock Tracking/Sales: A=Invoice(0), B=SKU(1), J=Status(9), K=Qty(10), L=DateTime(11)
+    # 4. Logic Stock Tracking/Sales (PERBAIKAN KOLOM & LOGIKA QTY): C=DateTime(2), H=Invoice(7), S=Qty(18), W=Status(22), AA=SKU(26)
     try:
-        track_filtered = df_track[df_track.iloc[:, 1] == selected_sku]
+        track_filtered = df_track[df_track.iloc[:, 26] == selected_sku]
         for _, row in track_filtered.iterrows():
-            qty_out = float(row.iloc[10])
+            qty_out = float(row.iloc[18])
+            # Logika terbalik: di excel minus (-) jadi stock masuk (+), di excel plus (+) jadi stock keluar (-)
+            final_qty = -qty_out
+            txt_status = "Refund In" if qty_out < 0 else "Sales Out"
+            
             timeline_events.append({
-                'Tanggal': pd.to_datetime(row.iloc[11]),
+                'Tanggal': pd.to_datetime(row.iloc[2]),
                 'Tipe': 'STOCK TRACKING / SALES',
-                'Qty': -abs(qty_out),  # Memotong stock
-                'Keterangan': f"Sales Out | Inv: {row.iloc[0]} | Status: {row.iloc[9]} | Qty: -{qty_out} Pcs"
+                'Qty': final_qty,
+                'Keterangan': f"{txt_status} | Inv: {row.iloc[7]} | Status: {row.iloc[22]} | Qty: {qty_out} Pcs"
             })
     except Exception as e:
         st.error(f"Error processing Stock Tracking logic: {e}")
@@ -2831,7 +2836,6 @@ def render_html_timeline_ui(df_timeline):
 
 
 def main_menu_routing():
-    # 1. Render Hero Header Sejajar Horizontal (Sesuai Gambar 2 Mockup)
     st.markdown("""
         <style>
         .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
@@ -2856,10 +2860,10 @@ def main_menu_routing():
         # Dipecah menjadi 5 kolom sejajar agar muat ditambahkan File RTO
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1: file_po = st.file_uploader("📄 File Purchase Order (A, D, G, L)", type=["xlsx", "csv"], key="p")
-        with col2: file_mutasi = st.file_uploader("🔄 File Mutasi (A, C, D, I, M, K)", type=["xlsx", "csv"], key="mu")
+        with col2: file_mutasi = st.file_uploader("🔄 File Mutasi (B, C, E, F, G, H)", type=["xlsx", "csv"], key="mu")
         with col3: file_adj = st.file_uploader("🔧 File Adjustment (F, B, H, K, O, P)", type=["xlsx", "csv"], key="ad")
-        with col4: file_tracking = st.file_uploader("🛒 File Stock Tracking (A, B, J, K, L)", type=["xlsx", "csv"], key="tr")
-        with col5: file_rto = st.file_uploader("🚛 File RTO (A, D, E, F, G, I, J)", type=["xlsx", "csv"], key="rt") # Tambahan Uploader RTO
+        with col4: file_tracking = st.file_uploader("🛒 File Stock Tracking (C, H, S, W, AA)", type=["xlsx", "csv"], key="tr")
+        with col5: file_rto = st.file_uploader("🚛 File RTO (A, D, E, F, G, I, J)", type=["xlsx", "csv"], key="rt")
         
         # Validasi wajib menyertakan ke-5 file log transaksi + 1 master file
         if file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto:
@@ -2888,7 +2892,7 @@ def main_menu_routing():
                 df_mutasi_raw = load_data_safe(file_mutasi)
                 df_adj_raw = load_data_safe(file_adj)
                 df_track_raw = load_data_safe(file_tracking)
-                df_rto_raw = load_data_safe(file_rto) # Load data RTO mentah
+                df_rto_raw = load_data_safe(file_rto)
                 
                 # Jalankan fungsi gabungan pemrosesan timeline (Mengirimkan 5 Dataframe)
                 df_timeline = process_master_timeline(selected_sku, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
