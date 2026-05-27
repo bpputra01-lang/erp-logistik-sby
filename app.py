@@ -2854,11 +2854,46 @@ def render_html_timeline_ui(df_timeline):
 def main_menu_routing():
     st.markdown("""
         <style>
-        .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
-        .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
-        .m-box { background: #262730; padding: 15px; border-radius: 8px; border: 1px solid #464855; text-align: center; flex: 1; }
-        .m-lbl { display: block; font-size: 12px; color: #808495; margin-bottom: 5px; }
-        .m-val { font-size: 20px; font-weight: bold; color: white; }
+        .hero-header { 
+            background-color: #0E1117; 
+            padding: 20px; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
+            text-align: center; 
+            border: 1px solid #333; 
+        }
+        .hero-header h1 { 
+            color: #FF4B4B; 
+            margin: 0; 
+            font-size: 32px; 
+        }
+        
+        /* 💎 METRIC BOXES - FIX PREMIUM DARK MODE GRADIENT STYLE */
+        .m-box { 
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important; 
+            padding: 20px; 
+            border-radius: 10px; 
+            border-left: 4px solid #C5A059 !important; 
+            border-top: 1px solid #333;
+            border-right: 1px solid #333;
+            border-bottom: 1px solid #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            margin-bottom: 15px;
+        }
+        .m-lbl { 
+            display: block; 
+            font-size: 13px; 
+            color: #808495; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px; 
+        }
+        .m-val { 
+            font-size: 26px; 
+            font-weight: bold; 
+            color: white; 
+            margin: 0;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -2910,22 +2945,37 @@ def main_menu_routing():
                 df_track_raw = load_data_safe(file_tracking)
                 df_rto_raw = load_data_safe(file_rto)
                 
-                # Jalankan fungsi gabungan pemrosesan timeline (Mengirimkan 5 Dataframe)
+                # Jalankan fungsi gabungan pemrosesan timeline
                 df_timeline = process_master_timeline(selected_sku, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
                 
                 if not df_timeline.empty:
                     total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
                     current_end_stock = df_timeline['Running_Stock'].iloc[-1]
                     
-                    # Render UI KPI Box
+                    # 🔥 PERBAIKAN DI SINI: RENDER UI KPI BOX SESUAI CSS CLASS .m-box
                     st.write("---")
                     c_kpi1, c_kpi2 = st.columns(2)
-                    with c_kpi1: st.markdown(f"<div class='metric-card'><h4>📦 Total Initial Qty PO</h4><h2>{int(total_initial_po)} Pcs</h2></div>", unsafe_allow_html=True)
-                    with c_kpi2: st.markdown(f"<div class='metric-card'><h4>🏁 Current End Stock</h4><h2>{int(current_end_stock)} Pcs</h2></div>", unsafe_allow_html=True)
+                    with c_kpi1: 
+                        st.markdown(f"""
+                            <div class='m-box'>
+                                <span class='m-lbl'>📦 Total Initial Qty PO</span>
+                                <div class='m-val'>{int(total_initial_po)} Pcs</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with c_kpi2: 
+                        st.markdown(f"""
+                            <div class='m-box'>
+                                <span class='m-lbl'>🏁 Current End Stock</span>
+                                <div class='m-val'>{int(current_end_stock)} Pcs</div>
+                            </div>
+                        """, unsafe_allow_html=True)
                     
                     # Render Grafik & Timeline Visual Akhir
                     render_chart_ui(df_timeline)
+                    st.write("---")
                     st.write(f"### ⏳ Riwayat Kronologis SKU: {selected_sku}")
+                    
+                    # Dipanggil mandiri, HTML auto-render bersih di dalam fungsi aslinya
                     render_html_timeline_ui(df_timeline)
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
