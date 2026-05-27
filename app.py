@@ -2653,19 +2653,21 @@ st.markdown("""
 # ==========================================
 # 🧠 2. FUNGSI LOGIC (DATA PROCESSING)
 # ==========================================
-
 def load_data_safe(file_obj):
-    """Fungsi logic untuk membaca file excel atau csv dengan aman dan kebal dari sel korup"""
+    """
+    Fungsi logic untuk membaca file excel atau csv.
+    Menggunakan engine xlrd untuk menghindari crash openpyxl akibat sel korup.
+    """
     if file_obj.name.endswith('.xlsx'):
         try:
-            # Cara 1: Menggunakan engine default openpyxl standar (bukan read-only bawaan pandas)
-            return pd.read_excel(file_obj, engine='openpyxl')
+            # Memaksa pembacaan menggunakan engine xlrd agar kebal dari error openpyxl
+            return pd.read_excel(file_obj, engine='xlrd')
         except Exception:
             try:
-                # Cara 2: Jika masih error, paksa baca semua kolom sebagai text/string biar gak dicek tipe datanya sama Excel
-                return pd.read_excel(file_obj, engine='openpyxl', dtype=str)
+                # Jika xlrd belum terinstall di server, fallback ke openpyxl tanpa read-only mode
+                return pd.read_excel(file_obj, engine='openpyxl')
             except Exception as e:
-                st.error(f"Gagal membaca file Excel secara normal karena data sel korup. Error: {e}")
+                st.error(f"Gagal membaca file Excel. Masalah pada format data: {e}")
                 return pd.DataFrame()
     return pd.read_csv(file_obj)
 
