@@ -2744,7 +2744,7 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     except Exception as e:
         st.error(f"Error processing Adjustment logic: {e}")
 
-# 4. Logic Stock Tracking/Sales & Refund (SANITZED FOR HTML SAFETY)
+# 4. Logic Stock Tracking/Sales & Refund (SANITZED FOR HTML SAFETY - FIXED ABSOLUTE QTY)
     try:
         if df_track is not None and not df_track.empty and df_track.shape[1] >= 27:
             track_filtered = df_track[df_track.iloc[:, 26] == selected_sku]
@@ -2753,31 +2753,36 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
                 if pd.isna(qty_raw) or str(qty_raw).strip().upper() == 'NAN':
                     continue
                     
+                # Ambil nilai mentah Qty dari Excel (Bisa minus/positif tergantung sistem log)
                 qty_out = float(qty_raw)
                 
                 # Ambil data Invoice (Indeks 7) dan Status (Indeks 22)
                 inv_val = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "-"
                 status_val = str(row.iloc[22]).strip() if not pd.isna(row.iloc[22]) else "-"
                 
-                # 🔥 CEK LOGIKA DINAMIS: Apakah statusnya REFUND atau SALES OUT?
+                # 🔥 CEK LOGIKA STATUS & ARAH ARUS STOCK
                 if status_val.upper() == 'REFUND':
                     tipe_transaksi = 'REFUND'
                     txt_status = "Refund In"
-                    final_qty = qty_out  # Refund = Barang retur masuk kembali -> Stock Bertambah (+)
+                    # Di Excel terdata minus (-1), kita paksa jadi positif (+1) karena barang retur MASUK gudang
+                    final_qty = abs(qty_out)  
+                    display_qty = abs(qty_out) # Untuk tampilan teks keterangan agar rapi '+1 Pcs'
                 else:
                     tipe_transaksi = 'STOCK TRACKING / SALES'
                     txt_status = "Sales Out"
-                    final_qty = -qty_out # Sales = Barang terjual keluar -> Stock Berkurang (-)
+                    # Di Excel terdata positif (1), kita paksa jadi minus (-1) karena barang KELUAR terjual
+                    final_qty = -abs(qty_out) 
+                    display_qty = abs(qty_out)
                 
                 # Bungkus keterangan dengan aman
-                ket_track = f"{txt_status} | Inv: {inv_val} | Status: {status_val} | Qty: {qty_out} Pcs"
+                ket_track = f"{txt_status} | Inv: {inv_val} | Status: {status_val} | Qty: {display_qty} Pcs"
                 ket_track = ket_track.replace('"', "'") # Amankan dari double quotes HTML
                 
-                # Masukkan ke array master dengan memanggil variabel tipe_transaksi secara dinamis
+                # Masukkan ke array master dengan memanggil variabel secara dinamis
                 timeline_events.append({
                     'Tanggal': pd.to_datetime(row.iloc[2]),
-                    'Tipe': tipe_transaksi,  # ✅ SEKARANG SUDAH DINAMIS (Bisa 'REFUND' atau 'STOCK TRACKING / SALES')
-                    'Qty': final_qty,
+                    'Tipe': tipe_transaksi,
+                    'Qty': final_qty,       # Efek kumulatif running stock akan benar (+) untuk refund
                     'Keterangan': ket_track
                 })
     except Exception as e:
@@ -3008,8 +3013,8 @@ def main_menu_routing():
                     # 📊 ADDON LOGIC: REAL QTY, SYSTEM STOCK (FALLBACK), & DIAGNOSA ERROR
                     # =========================================================
                     
-                    # 1. Perhitungan Real Qty: Hanya hitung IN/OUT murni dari PO, SALES, & RTO (Mengabaikan ADJUSTMENT & MUTASI)
-                    df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'RETURN TO OFFICE (RTO)'])]
+                    # 1. Perhitungan Real Qty: Tambahkan 'REFUND' ke dalam filter hitungan murni
+                    df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'REFUND', 'RETURN TO OFFICE (RTO)'])]
                     real_qty = df_real['Qty'].sum()
                     
                     # 2. Stock System: Jika running stock akhir = 0, ambil dari Kolom J (Indeks 9) File Master SKU df_main
