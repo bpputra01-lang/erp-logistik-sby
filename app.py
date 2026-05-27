@@ -2669,10 +2669,10 @@ def extract_sku_list(df_main):
         return []
 
 
-def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track):
+def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df_rto):
     """
     Fungsi logic utama untuk memproses, memfilter, mendisplay running total,
-    dan menggabungkan ke-4 log file transaksi menjadi 1 Master Dataframe Timeline kronologis.
+    dan menggabungkan ke-5 log file transaksi menjadi 1 Master Dataframe Timeline kronologis.
     """
     timeline_events = []
 
@@ -2731,7 +2731,38 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track):
     except Exception as e:
         st.error(f"Error processing Stock Tracking logic: {e}")
 
-    # Menggabungkan & mengurutkan secara kronologis (Jika data ada)
+    # 5. Logic RTO (Khusus Filter Surabaya): A=DateTime(0), D=No Transfer(3), E=Status(4), F=Store Awal(5), G=Store Akhir(6), I=SKU(8), J=Qty(9)
+    try:
+        if df_rto is not None and not df_rto.empty:
+            rto_filtered = df_rto[df_rto.iloc[:, 8] == selected_sku]
+            for _, row in rto_filtered.iterrows():
+                store_awal = str(row.iloc[5]).upper()
+                store_akhir = str(row.iloc[6]).upper()
+                qty_raw = float(row.iloc[9])
+                
+                # Cek arah mutasi stock berdasarkan cabang SURABAYA
+                if "SURABAYA" in store_akhir:
+                    # Gudang tujuan ada kata SURABAYA -> Stock Masuk (+)
+                    qty_final = abs(qty_raw)
+                    timeline_events.append({
+                        'Tanggal': pd.to_datetime(row.iloc[0]),
+                        'Tipe': 'RETURN TO OFFICE (RTO)',
+                        'Qty': qty_final,
+                        'Keterangan': f"RTO Masuk (SBY) | No Transfer: {row.iloc[3]} | Asal: {row.iloc[5]} ➡️ Tujuan: {row.iloc[6]} | Status: {row.iloc[4]} | Qty: +{qty_final} Pcs"
+                    })
+                elif "SURABAYA" in store_awal:
+                    # Gudang asal ada kata SURABAYA -> Stock Keluar (-)
+                    qty_final = -abs(qty_raw)
+                    timeline_events.append({
+                        'Tanggal': pd.to_datetime(row.iloc[0]),
+                        'Tipe': 'RETURN TO OFFICE (RTO)',
+                        'Qty': qty_final,
+                        'Keterangan': f"RTO Keluar (SBY) | No Transfer: {row.iloc[3]} | Asal: {row.iloc[5]} ➡️ Tujuan: {row.iloc[6]} | Status: {row.iloc[4]} | Qty: {qty_final} Pcs"
+                    })
+    except Exception as e:
+        st.error(f"Error processing RTO logic: {e}")
+
+    # Menggabungkan & mengurutkan secara kronologis
     if timeline_events:
         df_timeline = pd.DataFrame(timeline_events)
         df_timeline = df_timeline.sort_values(by='Tanggal').reset_index(drop=True)
@@ -2773,7 +2804,8 @@ def render_html_timeline_ui(df_timeline):
         'PURCHASE ORDER (IN)': '#2ecc71',
         'MUTASI INTERNAL': '#3498db',
         'ADJUSTMENT': '#f1c40f',
-        'STOCK TRACKING / SALES': '#e74c3c'
+        'STOCK TRACKING / SALES': '#e74c3c',
+        'RETURN TO OFFICE (RTO)': '#9b59b6' # Warna ungu khusus badge RTO
     }
     
     timeline_html = '<div class="timeline-container">'
@@ -2799,43 +2831,49 @@ def render_html_timeline_ui(df_timeline):
 
 
 def main_menu_routing():
+    # 1. Render Hero Header Sejajar Horizontal (Sesuai Gambar 2 Mockup)
     st.markdown("""
         <style>
-         .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
-         .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
-         .m-box { background: #262730; padding: 15px; border-radius: 8px; border: 1px solid #464855; text-align: center; flex: 1; }
-         .m-lbl { display: block; font-size: 12px; color: #808495; margin-bottom: 5px; }
-         .m-val { font-size: 20px; font-weight: bold; color: white; }
+        .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
+        .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
+        .m-box { background: #262730; padding: 15px; border-radius: 8px; border: 1px solid #464855; text-align: center; flex: 1; }
+        .m-lbl { display: block; font-size: 12px; color: #808495; margin-bottom: 5px; }
+        .m-val { font-size: 20px; font-weight: bold; color: white; }
         </style>
     """, unsafe_allow_html=True)
+
     st.markdown('<div class="hero-header"><h1>STOCK TRACKING TIMELINE</h1></div>', unsafe_allow_html=True)
     
     # Init Tab Menu
     tab_uploader, tab_timeline = st.tabs(["📂 UPLOADER CENTRAL", "📊 STOCK TIMELINE DASHBOARD"])
     
-    # --- MENU TAB 1: UPLOADER CENTRAL (RENDERING ONLY) ---
+    # --- MENU TAB 1: UPLOADER CENTRAL ---
     with tab_uploader:
         st.subheader("📥 Upload & Konfigurasi File Sumber Data")
         file_main = st.file_uploader("Upload File Master SKU (SKU Wajib di Kolom C)", type=["xlsx", "csv"], key="m")
         st.write("---")
-        col1, col2, col3, col4 = st.columns(4)
+        
+        # Dipecah menjadi 5 kolom sejajar agar muat ditambahkan File RTO
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1: file_po = st.file_uploader("📄 File Purchase Order (A, D, G, L)", type=["xlsx", "csv"], key="p")
         with col2: file_mutasi = st.file_uploader("🔄 File Mutasi (A, C, D, I, M, K)", type=["xlsx", "csv"], key="mu")
         with col3: file_adj = st.file_uploader("🔧 File Adjustment (F, B, H, K, O, P)", type=["xlsx", "csv"], key="ad")
         with col4: file_tracking = st.file_uploader("🛒 File Stock Tracking (A, B, J, K, L)", type=["xlsx", "csv"], key="tr")
+        with col5: file_rto = st.file_uploader("🚛 File RTO (A, D, E, F, G, I, J)", type=["xlsx", "csv"], key="rt") # Tambahan Uploader RTO
         
-        if file_main and file_po and file_mutasi and file_adj and file_tracking:
-            st.success("✅ Semua file sukses terunggah! Silahkan buka Tab **📊 STOCK TIMELINE DASHBOARD**.")
+        # Validasi wajib menyertakan ke-5 file log transaksi + 1 master file
+        if file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto:
+            st.success("✅ Semua file termasuk file RTO sukses terunggah! Silahkan buka Tab **📊 STOCK TIMELINE DASHBOARD**.")
         else:
             st.warning("⚠️ Menunggu semua file lengkap di-upload.")
 
-    # --- MENU TAB 2: STOCK TIMELINE DASHBOARD (RENDERING & LOGIC CALL) ---
+    # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
     with tab_timeline:
-        if not (file_main and file_po and file_mutasi and file_adj and file_tracking):
+        if not (file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto):
             st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
             return
 
-        # PANGGIL LOGIC: Load File Dataframes
+        # Load File Dataframes
         df_main = load_data_safe(file_main)
         list_sku = extract_sku_list(df_main)
         
@@ -2845,17 +2883,17 @@ def main_menu_routing():
                 selected_sku = st.selectbox("🎯 Pilih SKU untuk Analisis Timeline:", list_sku)
             
             if selected_sku:
-                # PANGGIL LOGIC: Load sisa file log transaksi
+                # Load semua data mentah
                 df_po_raw = load_data_safe(file_po)
                 df_mutasi_raw = load_data_safe(file_mutasi)
                 df_adj_raw = load_data_safe(file_adj)
                 df_track_raw = load_data_safe(file_tracking)
+                df_rto_raw = load_data_safe(file_rto) # Load data RTO mentah
                 
-                # PANGGIL LOGIC MAIN TIGHT LOOP: Dapatkan dataframe gabungan final
-                df_timeline = process_master_timeline(selected_sku, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw)
+                # Jalankan fungsi gabungan pemrosesan timeline (Mengirimkan 5 Dataframe)
+                df_timeline = process_master_timeline(selected_sku, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
                 
                 if not df_timeline.empty:
-                    # Ambil kalkulasi metric angka
                     total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
                     current_end_stock = df_timeline['Running_Stock'].iloc[-1]
                     
@@ -2865,13 +2903,12 @@ def main_menu_routing():
                     with c_kpi1: st.markdown(f"<div class='metric-card'><h4>📦 Total Initial Qty PO</h4><h2>{int(total_initial_po)} Pcs</h2></div>", unsafe_allow_html=True)
                     with c_kpi2: st.markdown(f"<div class='metric-card'><h4>🏁 Current End Stock</h4><h2>{int(current_end_stock)} Pcs</h2></div>", unsafe_allow_html=True)
                     
-                    # RENDER UI: Chart dan Timeline
+                    # Render Grafik & Timeline Visual Akhir
                     render_chart_ui(df_timeline)
                     st.write(f"### ⏳ Riwayat Kronologis SKU: {selected_sku}")
                     render_html_timeline_ui(df_timeline)
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
-
             
 import math
 import pandas as pd
