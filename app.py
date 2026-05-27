@@ -2701,15 +2701,20 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     except Exception as e:
         st.error(f"Error processing PO logic: {e}")
 
-    # 2. Logic Mutasi (PERBAIKAN KOLOM): B=Bin Awal(1), C=SKU(2), E=DateTime(4), F=Bin Tujuan(5), G=Qty(6), H=PIC(7)
+    # 2. Logic Mutasi (ANTI-NAN VISUAL UPDATE)
     try:
         mutasi_filtered = df_mutasi[df_mutasi.iloc[:, 2] == selected_sku]
         for _, row in mutasi_filtered.iterrows():
+            # Handling jika Bin Awal atau Bin Tujuan kosong (NaN) agar diganti teks strip (-) atau kosong
+            bin_awal = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else "-"
+            bin_tujuan = str(row.iloc[5]).strip() if not pd.isna(row.iloc[5]) else "-"
+            pic_mutasi = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "No Name"
+            
             timeline_events.append({
                 'Tanggal': pd.to_datetime(row.iloc[4]),
                 'Tipe': 'MUTASI INTERNAL',
                 'Qty': 0,  # Tidak merubah total qty fisik stock utama
-                'Keterangan': f"Perpindahan BIN: {row.iloc[1]} ➡️ {row.iloc[5]} | Qty: {row.iloc[6]} Pcs | PIC: {row.iloc[7]}"
+                'Keterangan': f"Perpindahan BIN: {bin_awal} ➡️ {bin_tujuan} | Qty: {row.iloc[6]} Pcs | PIC: {pic_mutasi}"
             })
     except Exception as e:
         st.error(f"Error processing Mutasi logic: {e}")
