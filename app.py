@@ -2840,34 +2840,54 @@ def render_chart_ui(df_timeline):
 
 
 def render_html_timeline_ui(df_timeline):
-    """Fungsi UI untuk merender komponen vertical timeline HTML/CSS premium"""
+    """Fungsi UI untuk merender komponen vertical timeline HTML/CSS premium (ANTI-CORRUPT STRING)"""
     color_map = {
         'PURCHASE ORDER (IN)': '#2ecc71',
         'MUTASI INTERNAL': '#3498db',
         'ADJUSTMENT': '#f1c40f',
         'STOCK TRACKING / SALES': '#e74c3c',
-        'RETURN TO OFFICE (RTO)': '#9b59b6' # Warna ungu khusus badge RTO
+        'RETURN TO OFFICE (RTO)': '#9b59b6'
     }
     
     timeline_html = '<div class="timeline-container">'
+    
     for _, row in df_timeline.iterrows():
         badge_color = color_map.get(row['Tipe'], '#95a5a6')
-        tgl_str = row['Tanggal'].strftime('%Y-%m-%d %H:%M:%S')
         
-        timeline_html += f"""
-        <div class="timeline-block">
-            <div class="timeline-dot" style="background-color: {badge_color};"></div>
-            <div class="timeline-content">
-                <div class="timeline-time">📅 {tgl_str}</div>
-                <span class="timeline-badge" style="background-color: {badge_color};">{row['Tipe']}</span>
-                <div style="color: #ffffff; font-size: 0.95rem; margin-top: 5px;">{row['Keterangan']}</div>
-                <div style="color: #C5A059; font-size: 0.85rem; margin-top: 8px; font-weight: bold;">
-                    🏁 Sisa Stock Berjalan: {int(row['Running_Stock'])} Pcs
-                </div>
-            </div>
-        </div>
-        """
+        # PENGAMAN 1: Format tanggal yang aman
+        try:
+            tgl_str = row['Tanggal'].strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            tgl_str = str(row['Tanggal'])
+            
+        # PENGAMAN 2: Sanitasi ketat isi keterangan text dari karakter yang merusak tag HTML
+        ket_safe = str(row['Keterangan']).replace('"', '&quot;').replace('<', '&lt;').replace('>', '&gt;')
+        
+        # PENGAMAN 3: Amankan nilai running stock biar ga crash pass di-render
+        try:
+            stock_val = int(float(row['Running_Stock']))
+        except Exception:
+            stock_val = 0
+            
+        # PENGAMAN 4: Susun HTML secara modular (bukan f-string raksasa yang rawan bocor)
+        block_html = (
+            '<div class="timeline-block">'
+            f'<div class="timeline-dot" style="background-color: {badge_color};"></div>'
+            '<div class="timeline-content">'
+            f'<div class="timeline-time">📅 {tgl_str}</div>'
+            f'<span class="timeline-badge" style="background-color: {badge_color};">{row["Tipe"]}</span>'
+            f'<div style="color: #ffffff; font-size: 0.95rem; margin-top: 5px;">{ket_safe}</div>'
+            '<div style="color: #C5A059; font-size: 0.85rem; margin-top: 8px; font-weight: bold;">'
+            f'🏁 Sisa Stock Berjalan: {stock_val} Pcs'
+            '</div>'
+            '</div>'
+            '</div>'
+        )
+        timeline_html += block_html
+        
     timeline_html += '</div>'
+    
+    # EKSEKUSI MUTLAK KE STREAMLIT MARKDOWN HTML
     st.markdown(timeline_html, unsafe_allow_html=True)
 
 
