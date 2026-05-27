@@ -2701,20 +2701,30 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     except Exception as e:
         st.error(f"Error processing PO logic: {e}")
 
-    # 2. Logic Mutasi (ANTI-NAN VISUAL UPDATE)
+   # 2. Logic Mutasi (SANITZED FOR HTML SAFETY)
     try:
         mutasi_filtered = df_mutasi[df_mutasi.iloc[:, 2] == selected_sku]
         for _, row in mutasi_filtered.iterrows():
-            # Handling jika Bin Awal atau Bin Tujuan kosong (NaN) agar diganti teks strip (-) atau kosong
+            # Pastikan diclean dari NaN dan karakter yang bisa ngerusak HTML
             bin_awal = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else "-"
             bin_tujuan = str(row.iloc[5]).strip() if not pd.isna(row.iloc[5]) else "-"
             pic_mutasi = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "No Name"
+            qty_mutasi = row.iloc[6]
+            
+            # Hilangkan karakter tulisan 'nan' atau simbol aneh
+            if bin_awal.lower() == 'nan': bin_awal = "-"
+            if bin_tujuan.lower() == 'nan': bin_tujuan = "-"
+            
+            # Bungkus string dengan aman tanpa tanda kutip ganda yang merusak f-string HTML
+            ket_text = f"Perpindahan BIN: {bin_awal} -> {bin_tujuan} | Qty: {qty_mutasi} Pcs | PIC: {pic_mutasi}"
+            # Ganti tanda panah emoji jika itu yang bikin crash
+            ket_text = ket_text.replace('➡️', '->').replace('"', "'") 
             
             timeline_events.append({
                 'Tanggal': pd.to_datetime(row.iloc[4]),
                 'Tipe': 'MUTASI INTERNAL',
-                'Qty': 0,  # Tidak merubah total qty fisik stock utama
-                'Keterangan': f"Perpindahan BIN: {bin_awal} ➡️ {bin_tujuan} | Qty: {row.iloc[6]} Pcs | PIC: {pic_mutasi}"
+                'Qty': 0,
+                'Keterangan': ket_text
             })
     except Exception as e:
         st.error(f"Error processing Mutasi logic: {e}")
@@ -2734,21 +2744,31 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     except Exception as e:
         st.error(f"Error processing Adjustment logic: {e}")
 
-    # 4. Logic Stock Tracking/Sales (PERBAIKAN KOLOM & LOGIKA QTY): C=DateTime(2), H=Invoice(7), S=Qty(18), W=Status(22), AA=SKU(26)
+   # 4. Logic Stock Tracking/Sales (SANITZED FOR HTML SAFETY)
     try:
-        track_filtered = df_track[df_track.iloc[:, 26] == selected_sku]
-        for _, row in track_filtered.iterrows():
-            qty_out = float(row.iloc[18])
-            # Logika terbalik: di excel minus (-) jadi stock masuk (+), di excel plus (+) jadi stock keluar (-)
-            final_qty = -qty_out
-            txt_status = "Refund In" if qty_out < 0 else "Sales Out"
-            
-            timeline_events.append({
-                'Tanggal': pd.to_datetime(row.iloc[2]),
-                'Tipe': 'STOCK TRACKING / SALES',
-                'Qty': final_qty,
-                'Keterangan': f"{txt_status} | Inv: {row.iloc[7]} | Status: {row.iloc[22]} | Qty: {qty_out} Pcs"
-            })
+        if df_track is not None and not df_track.empty and df_track.shape[1] >= 27:
+            track_filtered = df_track[df_track.iloc[:, 26] == selected_sku]
+            for _, row in track_filtered.iterrows():
+                qty_raw = row.iloc[18]
+                if pd.isna(qty_raw) or str(qty_raw).strip().upper() == 'NAN':
+                    continue
+                    
+                qty_out = float(qty_raw)
+                final_qty = -qty_out
+                txt_status = "Refund In" if qty_out < 0 else "Sales Out"
+                
+                inv_val = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "-"
+                status_val = str(row.iloc[22]).strip() if not pd.isna(row.iloc[22]) else "-"
+                
+                ket_track = f"{txt_status} | Inv: {inv_val} | Status: {status_val} | Qty: {qty_out} Pcs"
+                ket_track = ket_track.replace('"', "'") # Amankan dari double quotes
+                
+                timeline_events.append({
+                    'Tanggal': pd.to_datetime(row.iloc[2]),
+                    'Tipe': 'STOCK TRACKING / SALES',
+                    'Qty': final_qty,
+                    'Keterangan': ket_track
+                })
     except Exception as e:
         st.error(f"Error processing Stock Tracking logic: {e}")
 
