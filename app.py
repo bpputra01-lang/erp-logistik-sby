@@ -2846,7 +2846,7 @@ def render_html_timeline_ui(df_timeline):
         'MUTASI INTERNAL': '#3498db',
         'ADJUSTMENT': '#f1c40f',
         'STOCK TRACKING / SALES': '#e74c3c',
-        'REFUND': '#e67e22',
+        'REFUND': '#e84393',
         'REQUEST TRANSFER ORDER (RTO)': '#9b59b6'
     }
     
