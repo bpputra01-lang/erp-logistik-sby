@@ -2655,9 +2655,18 @@ st.markdown("""
 # ==========================================
 
 def load_data_safe(file_obj):
-    """Fungsi logic untuk membaca file excel atau csv dengan aman"""
+    """Fungsi logic untuk membaca file excel atau csv dengan aman dan kebal dari sel korup"""
     if file_obj.name.endswith('.xlsx'):
-        return pd.read_excel(file_obj)
+        try:
+            # Cara 1: Menggunakan engine default openpyxl standar (bukan read-only bawaan pandas)
+            return pd.read_excel(file_obj, engine='openpyxl')
+        except Exception:
+            try:
+                # Cara 2: Jika masih error, paksa baca semua kolom sebagai text/string biar gak dicek tipe datanya sama Excel
+                return pd.read_excel(file_obj, engine='openpyxl', dtype=str)
+            except Exception as e:
+                st.error(f"Gagal membaca file Excel secara normal karena data sel korup. Error: {e}")
+                return pd.DataFrame()
     return pd.read_csv(file_obj)
 
 
