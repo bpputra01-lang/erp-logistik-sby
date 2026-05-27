@@ -6388,13 +6388,13 @@ def tampilan_display_control():
         
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">🧥 Total Article</p><p class="metric-value">{total_art:,}</p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">🧥 Total Article</p><p class="metric-value">{total_art:,} ARTICLE/p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
         with c2:
             perc_display = (on_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Terpajang</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,} ARTICLE</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Terpajang</p></div>', unsafe_allow_html=True)
         with c3:
             perc_need = (need_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,} ARTICLE</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
