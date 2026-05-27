@@ -2744,7 +2744,7 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     except Exception as e:
         st.error(f"Error processing Adjustment logic: {e}")
 
-   # 4. Logic Stock Tracking/Sales & Refund (SANITZED FOR HTML SAFETY)
+   # 4. Logic Stock Tracking/Sales (SANITZED FOR HTML SAFETY)
     try:
         if df_track is not None and not df_track.empty and df_track.shape[1] >= 27:
             track_filtered = df_track[df_track.iloc[:, 26] == selected_sku]
@@ -2754,34 +2754,23 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
                     continue
                     
                 qty_out = float(qty_raw)
+                final_qty = -qty_out
+                txt_status = "Refund In" if qty_out < 0 else "Sales Out"
                 
-                # Ambil data Invoice (Indeks 7) dan Status (Indeks 22)
                 inv_val = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "-"
                 status_val = str(row.iloc[22]).strip() if not pd.isna(row.iloc[22]) else "-"
                 
-                # 🔥 CEK LOGIKA STATUS: Apakah ini REFUND atau SALES OUT?
-                if status_val.upper() == 'REFUND':
-                    tipe_transaksi = 'REFUND'
-                    txt_status = "Refund In"
-                    final_qty = qty_out  # Barang retur masuk kembali = Stock Bertambah (+)
-                else:
-                    tipe_transaksi = 'STOCK TRACKING / SALES'
-                    txt_status = "Sales Out"
-                    final_qty = -qty_out # Barang terjual keluar = Stock Berkurang (-)
-                
-                # Bungkus keterangan dengan aman
                 ket_track = f"{txt_status} | Inv: {inv_val} | Status: {status_val} | Qty: {qty_out} Pcs"
-                ket_track = ket_track.replace('"', "'") # Amankan dari double quotes HTML
+                ket_track = ket_track.replace('"', "'") # Amankan dari double quotes
                 
-                # Masukkan ke dalam array master timeline
                 timeline_events.append({
                     'Tanggal': pd.to_datetime(row.iloc[2]),
-                    'Tipe': tipe_transaksi,  # Dynamic: Bisa 'REFUND' atau 'STOCK TRACKING / SALES'
+                    'Tipe': 'STOCK TRACKING / SALES',
                     'Qty': final_qty,
                     'Keterangan': ket_track
                 })
     except Exception as e:
-        st.error(f"Error processing Stock Tracking & Refund logic: {e}")
+        st.error(f"Error processing Stock Tracking logic: {e}")
 
     # 5. Logic RTO (Khusus Filter Surabaya): A=DateTime(0), D=No Transfer(3), E=Status(4), F=Store Awal(5), G=Store Akhir(6), I=SKU(8), J=Qty(9)
     try:
@@ -2857,8 +2846,7 @@ def render_html_timeline_ui(df_timeline):
         'MUTASI INTERNAL': '#3498db',
         'ADJUSTMENT': '#f1c40f',
         'STOCK TRACKING / SALES': '#e74c3c',
-        'REFUND': '#e84393',
-        'REQUEST TRANSFER ORDER (RTO)': '#9b59b6'
+        'RETURN TO OFFICE (RTO)': '#9b59b6'
     }
     
     timeline_html = '<div class="timeline-container">'
@@ -3005,29 +2993,15 @@ def main_menu_routing():
                     current_end_stock = df_timeline['Running_Stock'].iloc[-1]
                     
                     # =========================================================
-                    # 📊 ADDON LOGIC: REAL QTY, SYSTEM STOCK (FALLBACK), & DIAGNOSA ERROR
+                    # 📊 ADDON LOGIC: REAL QTY, SYSTEM STOCK, & DIAGNOSA ERROR
                     # =========================================================
                     
-                   # 1. Perhitungan Real Qty: Tambahkan 'REFUND' ke dalam filter hitungan murni
+                    # 1. Perhitungan Real Qty: Hanya hitung IN/OUT murni dari PO, SALES, & RTO (Mengabaikan ADJUSTMENT & MUTASI)
                     df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'RETURN TO OFFICE (RTO)'])]
                     real_qty = df_real['Qty'].sum()
                     
-                    # 2. Stock System: Jika running stock akhir = 0, ambil dari Kolom J (Indeks 9) File Master SKU df_main
-                    lbl_system = "🖥️ Stock System (Last)"
-                    if current_end_stock == 0:
-                        try:
-                            # Cari baris SKU yang dipilih di df_main (Kolom C = Indeks 2)
-                            sku_row = df_main[df_main.iloc[:, 2] == selected_sku]
-                            if not sku_row.empty:
-                                master_qty_raw = sku_row.iloc[0, 9] # Kolom J = Indeks 9
-                                stock_system = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
-                                lbl_system = "🖥️ Stock System (Web Utama)"
-                            else:
-                                stock_system = 0
-                        except Exception:
-                            stock_system = 0
-                    else:
-                        stock_system = current_end_stock
+                    # 2. Stock System: Diambil murni dari sisa stock berjalan terakhir di timeline
+                    stock_system = current_end_stock
                     
                     # 3. Hitung Selisih (Varian) untuk menentukan Indikasi Kesalahan
                     selisih = stock_system - real_qty
@@ -3051,7 +3025,7 @@ def main_menu_routing():
                             detail_indikasi = f"Terdeteksi minus stock {int(selisih)} Pcs. Ada transaksi RTO terdata, indikasi kuat tim inbound salah scan/salah verifikasi fisik barang retur masuk."
                         else:
                             status_indikasi = "❌ INDIKASI: KESALAHAN SISTEM / LOGISTIK DATA"
-                            detail_indikasi = f"Terdapat selisih sebesar {int(selisih)} Pcs antara Real Hitungan Fisik Transaksi dan Angka System. Indikasi API delay, log transaksi hilang, atau salah mapping SKU."
+                            detail_indikasi = f"Terdapat selisih gaib sebesar {int(selisih)} Pcs antara Real Hitungan Fisik Transaksi dan Angka System. Indikasi API delay, log transaksi hilang, atau salah mapping SKU."
 
                     # =========================================================
                     # 🎨 UPDATE UI DISPLAY (Premium Layout - Anti Duplikat)
@@ -3077,7 +3051,7 @@ def main_menu_routing():
                     with c_kpi3: 
                         st.markdown(f"""
                             <div class='m-box' style='border-left: 4px solid #3498db !important;'>
-                                <span class='m-lbl'>{lbl_system}</span>
+                                <span class='m-lbl'>🖥️ Stock System (Last)</span>
                                 <div class='m-val'>{int(stock_system)} Pcs</div>
                             </div>
                         """, unsafe_allow_html=True)
