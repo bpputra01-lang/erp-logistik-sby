@@ -3009,7 +3009,7 @@ def main_menu_routing():
                     # =========================================================
                     
                    # 1. Perhitungan Real Qty: Tambahkan 'REFUND' ke dalam filter hitungan murni
-                    df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'REFUND', 'RETURN TO OFFICE (RTO)'])]
+                    df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'RETURN TO OFFICE (RTO)'])]
                     real_qty = df_real['Qty'].sum()
                     
                     # 2. Stock System: Jika running stock akhir = 0, ambil dari Kolom J (Indeks 9) File Master SKU df_main
