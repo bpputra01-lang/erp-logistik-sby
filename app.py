@@ -2992,30 +2992,92 @@ def main_menu_routing():
                     total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
                     current_end_stock = df_timeline['Running_Stock'].iloc[-1]
                     
-                    # 🔥 PERBAIKAN DI SINI: RENDER UI KPI BOX SESUAI CSS CLASS .m-box
+                    # =========================================================
+                    # 📊 ADDON LOGIC: REAL QTY, SYSTEM STOCK, & DIAGNOSA ERROR
+                    # =========================================================
+                    
+                    # 1. Perhitungan Real Qty: Hanya hitung IN/OUT murni dari PO, SALES, & RTO (Mengabaikan ADJUSTMENT & MUTASI)
+                    df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'RETURN TO OFFICE (RTO)'])]
+                    real_qty = df_real['Qty'].sum()
+                    
+                    # 2. Stock System: Diambil murni dari sisa stock berjalan terakhir di timeline
+                    stock_system = current_end_stock
+                    
+                    # 3. Hitung Selisih (Varian) untuk menentukan Indikasi Kesalahan
+                    selisih = stock_system - real_qty
+                    
+                    # Ambil total nominal adjustment untuk tracking pembantu analisa
+                    total_adj = df_timeline[df_timeline['Tipe'] == 'ADJUSTMENT']['Qty'].sum()
+                    total_rto = df_timeline[df_timeline['Tipe'] == 'RETURN TO OFFICE (RTO)']['Qty'].sum()
+                    
+                    # Logic AI Detector / Indikasi Kesalahan
+                    status_indikasi = "🟢 MATCH (Data Sinkron)"
+                    detail_indikasi = "Kondisi aman, tidak terdeteksi adanya selisih fisik dan transaksi."
+                    warna_indikasi = "#2ecc71" # Hijau
+                    
+                    if selisih != 0:
+                        warna_indikasi = "#e74c3c" # Merah
+                        if total_adj != 0 and abs(total_adj) == abs(selisih):
+                            status_indikasi = "⚠️ INDIKASI: SALAH ADJUSTMENT"
+                            detail_indikasi = f"Terdeteksi selisih {int(selisih)} Pcs. Jumlah ini cocok dengan total history Adjustment sebesar {int(total_adj)} Pcs. Tim admin kemungkinan salah input adjustment atau double input data."
+                        elif total_rto != 0 and selisih < 0:
+                            status_indikasi = "⚠️ INDIKASI: SALAH TERIMA ITEM RTO"
+                            detail_indikasi = f"Terdeteksi minus stock {int(selisih)} Pcs. Ada transaksi RTO terdata, indikasi kuat tim inbound salah scan/salah verifikasi fisik barang retur masuk."
+                        else:
+                            status_indikasi = "❌ INDIKASI: KESALAHAN SISTEM / LOGISTIK DATA"
+                            detail_indikasi = f"Terdapat selisih gaib sebesar {int(selisih)} Pcs antara Real Hitungan Fisik Transaksi dan Angka System. Indikasi API delay, log transaksi hilang, atau salah mapping SKU."
+
+                    # =========================================================
+                    # 🎨 UPDATE UI DISPLAY (Premium Layout - Anti Duplikat)
+                    # =========================================================
                     st.write("---")
-                    c_kpi1, c_kpi2 = st.columns(2)
+                    
+                    # Row 1: Tampilkan 4 KPI Utama sejajar biar hemat space & lengkap
+                    c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
                     with c_kpi1: 
                         st.markdown(f"""
-                            <div class='m-box'>
-                                <span class='m-lbl'>📦 Total Initial Qty PO</span>
+                            <div class='m-box' style='border-left: 4px solid #9b59b6 !important;'>
+                                <span class='m-lbl'>📦 Initial Qty PO</span>
                                 <div class='m-val'>{int(total_initial_po)} Pcs</div>
                             </div>
                         """, unsafe_allow_html=True)
                     with c_kpi2: 
                         st.markdown(f"""
-                            <div class='m-box'>
-                                <span class='m-lbl'>🏁 Current End Stock</span>
-                                <div class='m-val'>{int(current_end_stock)} Pcs</div>
+                            <div class='m-box' style='border-left: 4px solid #2ecc71 !important;'>
+                                <span class='m-lbl'>📊 Real Qty (PO+Sales+RTO)</span>
+                                <div class='m-val'>{int(real_qty)} Pcs</div>
                             </div>
                         """, unsafe_allow_html=True)
+                    with c_kpi3: 
+                        st.markdown(f"""
+                            <div class='m-box' style='border-left: 4px solid #3498db !important;'>
+                                <span class='m-lbl'>🖥️ Stock System (Last)</span>
+                                <div class='m-val'>{int(stock_system)} Pcs</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with c_kpi4: 
+                        warna_var = "#2ecc71" if selisih == 0 else "#e74c3c"
+                        st.markdown(f"""
+                            <div class='m-box' style='border-left: 4px solid {warna_var} !important;'>
+                                <span class='m-lbl'>⚠️ Selisih Varian</span>
+                                <div class='m-val'>{int(selisih)} Pcs</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                    # Row 2: Box Lebar Khusus Hasil Diagnosa Kesalahan Otomatis
+                    st.markdown(f"""
+                        <div style='background: #1e1e2a; padding: 20px; border-radius: 10px; border: 1px solid #333; margin-top: 5px; margin-bottom: 20px;'>
+                            <h4 style='color: {warna_indikasi}; margin-top: 0; font-size: 16px; font-weight: bold;'>{status_indikasi}</h4>
+                            <p style='color: #b0b3c6; font-size: 14px; margin: 5px 0 0 0; line-height: 1.5;'>{detail_indikasi}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
                     
                     # Render Grafik & Timeline Visual Akhir
                     render_chart_ui(df_timeline)
                     st.write("---")
                     st.write(f"### ⏳ Riwayat Kronologis SKU: {selected_sku}")
                     
-                    # Dipanggil mandiri, HTML auto-render bersih di dalam fungsi aslinya
+                    # Panggil langsung fungsi UI timeline lo yang udah aman kemarin
                     render_html_timeline_ui(df_timeline)
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
