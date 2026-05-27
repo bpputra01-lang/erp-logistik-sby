@@ -2800,17 +2800,15 @@ def render_html_timeline_ui(df_timeline):
 
 def main_menu_routing():
     st.markdown("""
-        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
-            <div style="background-color: #1f407a; padding: 10px 20px; border-radius: 6px; 
-                        font-weight: bold; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.15);
-                        white-space: nowrap; font-size: 0.9rem;">
-                LIST DATA STOCK TRACKING
-            </div>
-            <h1 style="color: #2e313a; font-weight: 800; font-size: 2.0rem; margin: 0; padding: 0; line-height: 1;">
-                📦 LOGISTICS STOCK TIMELINE TRACKER
-            </h1>
-        </div>
+        <style>
+         .hero-header { background-color: #0E1117; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333; }
+         .hero-header h1 { color: #FF4B4B; margin: 0; font-size: 32px; }
+         .m-box { background: #262730; padding: 15px; border-radius: 8px; border: 1px solid #464855; text-align: center; flex: 1; }
+         .m-lbl { display: block; font-size: 12px; color: #808495; margin-bottom: 5px; }
+         .m-val { font-size: 20px; font-weight: bold; color: white; }
+        </style>
     """, unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><h1>STOCK TRACKING TIMELINE</h1></div>', unsafe_allow_html=True)
     
     # Init Tab Menu
     tab_uploader, tab_timeline = st.tabs(["📂 UPLOADER CENTRAL", "📊 STOCK TIMELINE DASHBOARD"])
