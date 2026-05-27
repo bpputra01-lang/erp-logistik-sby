@@ -2744,7 +2744,7 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     except Exception as e:
         st.error(f"Error processing Adjustment logic: {e}")
 
-   # 4. Logic Stock Tracking/Sales (SANITZED FOR HTML SAFETY)
+# 4. Logic Stock Tracking/Sales & Refund (SANITZED FOR HTML SAFETY)
     try:
         if df_track is not None and not df_track.empty and df_track.shape[1] >= 27:
             track_filtered = df_track[df_track.iloc[:, 26] == selected_sku]
@@ -2754,29 +2754,34 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
                     continue
                     
                 qty_out = float(qty_raw)
-                final_qty = -qty_out
-                txt_status = "Refund In" if qty_out < 0 else "Sales Out"
                 
+                # Ambil data Invoice (Indeks 7) dan Status (Indeks 22)
                 inv_val = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "-"
                 status_val = str(row.iloc[22]).strip() if not pd.isna(row.iloc[22]) else "-"
-                # --- Di dalam fungsi process_master_timeline pas ngolah data tracking ---
-                # Cek apakah ada status REFUND di baris data tersebut
-                if str(row['Status']).upper() == 'REFUND':
+                
+                # 🔥 CEK LOGIKA DINAMIS: Apakah statusnya REFUND atau SALES OUT?
+                if status_val.upper() == 'REFUND':
                     tipe_transaksi = 'REFUND'
+                    txt_status = "Refund In"
+                    final_qty = qty_out  # Refund = Barang retur masuk kembali -> Stock Bertambah (+)
                 else:
                     tipe_transaksi = 'STOCK TRACKING / SALES'
+                    txt_status = "Sales Out"
+                    final_qty = -qty_out # Sales = Barang terjual keluar -> Stock Berkurang (-)
                 
+                # Bungkus keterangan dengan aman
                 ket_track = f"{txt_status} | Inv: {inv_val} | Status: {status_val} | Qty: {qty_out} Pcs"
-                ket_track = ket_track.replace('"', "'") # Amankan dari double quotes
+                ket_track = ket_track.replace('"', "'") # Amankan dari double quotes HTML
                 
+                # Masukkan ke array master dengan memanggil variabel tipe_transaksi secara dinamis
                 timeline_events.append({
                     'Tanggal': pd.to_datetime(row.iloc[2]),
-                    'Tipe': 'STOCK TRACKING / SALES',
+                    'Tipe': tipe_transaksi,  # ✅ SEKARANG SUDAH DINAMIS (Bisa 'REFUND' atau 'STOCK TRACKING / SALES')
                     'Qty': final_qty,
                     'Keterangan': ket_track
                 })
     except Exception as e:
-        st.error(f"Error processing Stock Tracking logic: {e}")
+        st.error(f"Error processing Stock Tracking & Refund logic: {e}")
 
     # 5. Logic RTO (Khusus Filter Surabaya): A=DateTime(0), D=No Transfer(3), E=Status(4), F=Store Awal(5), G=Store Akhir(6), I=SKU(8), J=Qty(9)
     try:
