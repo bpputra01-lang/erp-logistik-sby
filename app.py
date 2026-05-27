@@ -2848,12 +2848,12 @@ def render_chart_ui(df_timeline):
 def render_html_timeline_ui(df_timeline):
     """Fungsi UI untuk merender komponen vertical timeline HTML/CSS premium (ANTI-CORRUPT STRING)"""
     color_map = {
-        'PURCHASE ORDER (IN)': '#2ecc71',
-        'MUTASI INTERNAL': '#3498db',
-        'ADJUSTMENT': '#f1c40f',
-        'STOCK TRACKING / SALES': '#e74c3c',
-        'REFUND': '#e84393',
-        'RETURN TO OFFICE (RTO)': '#9b59b6'
+        'PURCHASE ORDER (IN)': '#2ecc71',         # Hijau
+        'MUTASI INTERNAL': '#3498db',             # Biru (Tetap aman, ga kembar!)
+        'ADJUSTMENT': '#f1c40f',                  # Kuning
+        'STOCK TRACKING / SALES': '#e74c3c',      # Merah
+        'REFUND': '#e84393',                      # 🔥 Pink Magenta Premium (ANTI-KEMBAR)
+        'RETURN TO OFFICE (RTO)': '#9b59b6'       # Ungu
     }
     
     timeline_html = '<div class="timeline-container">'
