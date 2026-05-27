@@ -2759,6 +2759,12 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
                 
                 inv_val = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "-"
                 status_val = str(row.iloc[22]).strip() if not pd.isna(row.iloc[22]) else "-"
+                # --- Di dalam fungsi process_master_timeline pas ngolah data tracking ---
+                # Cek apakah ada status REFUND di baris data tersebut
+                if str(row['Status']).upper() == 'REFUND':
+                    tipe_transaksi = 'REFUND'
+                else:
+                    tipe_transaksi = 'STOCK TRACKING / SALES'
                 
                 ket_track = f"{txt_status} | Inv: {inv_val} | Status: {status_val} | Qty: {qty_out} Pcs"
                 ket_track = ket_track.replace('"', "'") # Amankan dari double quotes
@@ -2846,6 +2852,7 @@ def render_html_timeline_ui(df_timeline):
         'MUTASI INTERNAL': '#3498db',
         'ADJUSTMENT': '#f1c40f',
         'STOCK TRACKING / SALES': '#e74c3c',
+        'REFUND': '#e84393',
         'RETURN TO OFFICE (RTO)': '#9b59b6'
     }
     
