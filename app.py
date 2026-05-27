@@ -2962,7 +2962,7 @@ def main_menu_routing():
         else:
             st.warning("⚠️ Menunggu semua file lengkap di-upload.")
 
-    # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
+   # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
     with tab_timeline:
         if not (file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto):
             st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
@@ -2993,15 +2993,29 @@ def main_menu_routing():
                     current_end_stock = df_timeline['Running_Stock'].iloc[-1]
                     
                     # =========================================================
-                    # 📊 ADDON LOGIC: REAL QTY, SYSTEM STOCK, & DIAGNOSA ERROR
+                    # 📊 ADDON LOGIC: REAL QTY, SYSTEM STOCK (FALLBACK), & DIAGNOSA ERROR
                     # =========================================================
                     
                     # 1. Perhitungan Real Qty: Hanya hitung IN/OUT murni dari PO, SALES, & RTO (Mengabaikan ADJUSTMENT & MUTASI)
                     df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'RETURN TO OFFICE (RTO)'])]
                     real_qty = df_real['Qty'].sum()
                     
-                    # 2. Stock System: Diambil murni dari sisa stock berjalan terakhir di timeline
-                    stock_system = current_end_stock
+                    # 2. Stock System: Jika running stock akhir = 0, ambil dari Kolom J (Indeks 9) File Master SKU df_main
+                    lbl_system = "🖥️ Stock System (Last)"
+                    if current_end_stock == 0:
+                        try:
+                            # Cari baris SKU yang dipilih di df_main (Kolom C = Indeks 2)
+                            sku_row = df_main[df_main.iloc[:, 2] == selected_sku]
+                            if not sku_row.empty:
+                                master_qty_raw = sku_row.iloc[0, 9] # Kolom J = Indeks 9
+                                stock_system = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
+                                lbl_system = "🖥️ Stock System (Web Utama)"
+                            else:
+                                stock_system = 0
+                        except Exception:
+                            stock_system = 0
+                    else:
+                        stock_system = current_end_stock
                     
                     # 3. Hitung Selisih (Varian) untuk menentukan Indikasi Kesalahan
                     selisih = stock_system - real_qty
@@ -3025,7 +3039,7 @@ def main_menu_routing():
                             detail_indikasi = f"Terdeteksi minus stock {int(selisih)} Pcs. Ada transaksi RTO terdata, indikasi kuat tim inbound salah scan/salah verifikasi fisik barang retur masuk."
                         else:
                             status_indikasi = "❌ INDIKASI: KESALAHAN SISTEM / LOGISTIK DATA"
-                            detail_indikasi = f"Terdapat selisih gaib sebesar {int(selisih)} Pcs antara Real Hitungan Fisik Transaksi dan Angka System. Indikasi API delay, log transaksi hilang, atau salah mapping SKU."
+                            detail_indikasi = f"Terdapat selisih sebesar {int(selisih)} Pcs antara Real Hitungan Fisik Transaksi dan Angka System. Indikasi API delay, log transaksi hilang, atau salah mapping SKU."
 
                     # =========================================================
                     # 🎨 UPDATE UI DISPLAY (Premium Layout - Anti Duplikat)
@@ -3051,7 +3065,7 @@ def main_menu_routing():
                     with c_kpi3: 
                         st.markdown(f"""
                             <div class='m-box' style='border-left: 4px solid #3498db !important;'>
-                                <span class='m-lbl'>🖥️ Stock System (Last)</span>
+                                <span class='m-lbl'>{lbl_system}</span>
                                 <div class='m-val'>{int(stock_system)} Pcs</div>
                             </div>
                         """, unsafe_allow_html=True)
