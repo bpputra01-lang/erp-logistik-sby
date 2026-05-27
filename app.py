@@ -6399,14 +6399,14 @@ def tampilan_display_control():
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # --- PERBAIKAN TOTAL: VALIDASI FILTER SKU TERINTEGRASI BIN OUT ---
+        # --- PERBAIKAN TOTAL: LOCK LEVEL ARTICLE, BUKAN SKU ---
         query_prioritas_refill = f"""
             WITH 
             ArticlesNeedDisplay AS (
                 {q_need_display_logic}
             ),
             
-            -- Cari tahu SKU mana saja yang sudah nangkring di BIN OUT (berapapun Qty-nya asal > 0)
+            -- Cari tahu SKU mana saja yang sudah nangkring di BIN OUT (Qty > 0)
             SKUInBinOut AS (
                 SELECT DISTINCT "{col_sku}" as Out_SKU 
                 FROM stock_display_processed
@@ -6429,9 +6429,10 @@ def tampilan_display_control():
                   AND "{col_sku}" NOT IN (SELECT Out_SKU FROM SKUInBinOut)
             ),
             
+            -- Prioritas Utama: Cari 1 baris terbaik per ARTICLE yang ada di GUDANG / STR
             PrioritasStock AS (
                 SELECT *,
-                       ROW_NUMBER() OVER (PARTITION BY Article, SKU ORDER BY Qty_In_Bin DESC) as rn
+                       ROW_NUMBER() OVER (PARTITION BY Article ORDER BY Qty_In_Bin DESC) as rn
                 FROM RawGudangStock
                 WHERE UPPER(Bin_Lokasi) LIKE '%GUDANG%' OR UPPER(Bin_Lokasi) LIKE '%STR%'
             ),
@@ -6442,11 +6443,12 @@ def tampilan_display_control():
                 WHERE rn = 1
             ),
             
+            -- Reguler: Cari alternatif 1 baris terbaik per ARTICLE jika tidak ada di GUDANG / STR
             RegulerStock AS (
                 SELECT *,
-                       ROW_NUMBER() OVER (PARTITION BY Article, SKU ORDER BY Qty_In_Bin DESC) as rn
+                       ROW_NUMBER() OVER (PARTITION BY Article ORDER BY Qty_In_Bin DESC) as rn
                 FROM RawGudangStock
-                WHERE SKU NOT IN (SELECT SKU FROM FinalPrioritas)
+                WHERE Article NOT IN (SELECT Article FROM FinalPrioritas)
             ),
             
             FinalReguler AS (
