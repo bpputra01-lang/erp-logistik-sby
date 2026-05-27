@@ -9386,7 +9386,7 @@ elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
 # RUN PROGRAM UTAMA
-elif menu == "Stock Tracking Timeline"
+elif menu == "Stock Tracking Timeline":
     main_menu_routing()
 
 elif menu == "List Bin Cycle Count":
