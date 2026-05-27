@@ -2799,7 +2799,7 @@ def render_html_timeline_ui(df_timeline):
 
 
 def main_menu_routing():
-   st.markdown("""
+    st.markdown("""
         <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
             <div style="background-color: #1f407a; padding: 10px 20px; border-radius: 6px; 
                         font-weight: bold; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.15);
