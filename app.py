@@ -2619,6 +2619,252 @@ def menu_Stock_Opname():
                 )
 
     download_section()
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
+st.set_page_config(layout="wide", page_title="Stock Timeline Tracking System")
+
+# ==========================================
+# 🎨 1. CORE STYLE & CSS (PREMIUM DARK)
+# ==========================================
+st.markdown("""
+    <style>
+    .reportview-container { background: #0e1117; }
+    .metric-card {
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+        border-left: 4px solid #C5A059 !important;
+        padding: 15px; border-radius: 8px; margin-bottom: 15px;
+    }
+    .timeline-container { border-left: 3px solid #252a3d; padding-left: 20px; margin-left: 10px; position: relative; }
+    .timeline-block { position: relative; margin-bottom: 25px; }
+    .timeline-dot { position: absolute; left: -31px; top: 5px; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #0e1117; }
+    .timeline-content { background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .timeline-time { color: #8c92ac; font-size: 0.85rem; font-weight: bold; }
+    .timeline-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; color: #fff; margin-bottom: 5px; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { background-color: #1a1d2e; border: 1px solid #252a3d; color: #8c92ac; padding: 10px 20px; border-radius: 4px; }
+    .stTabs [aria-selected="true"] { background-color: #C5A059 !important; color: #0e1117 !important; font-weight: bold; }
+    </style>
+""", unsafe_allow_html=True)
+
+
+# ==========================================
+# 🧠 2. FUNGSI LOGIC (DATA PROCESSING)
+# ==========================================
+
+def load_data_safe(file_obj):
+    """Fungsi logic untuk membaca file excel atau csv dengan aman"""
+    if file_obj.name.endswith('.xlsx'):
+        return pd.read_excel(file_obj)
+    return pd.read_csv(file_obj)
+
+
+def extract_sku_list(df_main):
+    """Fungsi logic untuk mengambil list unique SKU dari Kolom C (Index 2)"""
+    try:
+        return sorted(df_main.iloc[:, 2].dropna().unique())
+    except Exception as e:
+        st.error(f"Error extracting SKU from Main File: {e}")
+        return []
+
+
+def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track):
+    """
+    Fungsi logic utama untuk memproses, memfilter, mendisplay running total,
+    dan menggabungkan ke-4 log file transaksi menjadi 1 Master Dataframe Timeline kronologis.
+    """
+    timeline_events = []
+
+    # 1. Logic PO: A=No PO(0), D=SKU(3), G=DateTime(6), L=Qty(11)
+    try:
+        po_filtered = df_po[df_po.iloc[:, 3] == selected_sku]
+        for _, row in po_filtered.iterrows():
+            timeline_events.append({
+                'Tanggal': pd.to_datetime(row.iloc[6]),
+                'Tipe': 'PURCHASE ORDER (IN)',
+                'Qty': float(row.iloc[11]),
+                'Keterangan': f"PO Baru Masuk No: {row.iloc[0]} | Qty: +{row.iloc[11]} Pcs"
+            })
+    except Exception as e:
+        st.error(f"Error processing PO logic: {e}")
+
+    # 2. Logic Mutasi: A=DateTime(0), C=PIC(2), D=SKU(3), I=Bin Awal(8), M=Bin Tujuan(12), K=Qty(10)
+    try:
+        mutasi_filtered = df_mutasi[df_mutasi.iloc[:, 3] == selected_sku]
+        for _, row in mutasi_filtered.iterrows():
+            timeline_events.append({
+                'Tanggal': pd.to_datetime(row.iloc[0]),
+                'Tipe': 'MUTASI INTERNAL',
+                'Qty': 0,  # Tidak merubah total qty fisik stock utama
+                'Keterangan': f"Perpindahan BIN: {row.iloc[8]} ➡️ {row.iloc[12]} | Qty: {row.iloc[10]} Pcs | PIC: {row.iloc[2]}"
+            })
+    except Exception as e:
+        st.error(f"Error processing Mutasi logic: {e}")
+
+    # 3. Logic Adjustment: F=No Adj(5), B=DateTime Appr(1), H=SKU(7), K=Qty(10), O=Pembuat(14), P=Approval(15)
+    try:
+        adj_filtered = df_adj[df_adj.iloc[:, 7] == selected_sku]
+        for _, row in adj_filtered.iterrows():
+            qty_val = float(row.iloc[10])
+            prefix = "+" if qty_val > 0 else ""
+            timeline_events.append({
+                'Tanggal': pd.to_datetime(row.iloc[1]),
+                'Tipe': 'ADJUSTMENT',
+                'Qty': qty_val,
+                'Keterangan': f"Adj No: {row.iloc[5]} ({prefix}{qty_val} Pcs) | Dibuat: {row.iloc[14]} | Appr: {row.iloc[15]}"
+            })
+    except Exception as e:
+        st.error(f"Error processing Adjustment logic: {e}")
+
+    # 4. Logic Stock Tracking/Sales: A=Invoice(0), B=SKU(1), J=Status(9), K=Qty(10), L=DateTime(11)
+    try:
+        track_filtered = df_track[df_track.iloc[:, 1] == selected_sku]
+        for _, row in track_filtered.iterrows():
+            qty_out = float(row.iloc[10])
+            timeline_events.append({
+                'Tanggal': pd.to_datetime(row.iloc[11]),
+                'Tipe': 'STOCK TRACKING / SALES',
+                'Qty': -abs(qty_out),  # Memotong stock
+                'Keterangan': f"Sales Out | Inv: {row.iloc[0]} | Status: {row.iloc[9]} | Qty: -{qty_out} Pcs"
+            })
+    except Exception as e:
+        st.error(f"Error processing Stock Tracking logic: {e}")
+
+    # Menggabungkan & mengurutkan secara kronologis (Jika data ada)
+    if timeline_events:
+        df_timeline = pd.DataFrame(timeline_events)
+        df_timeline = df_timeline.sort_values(by='Tanggal').reset_index(drop=True)
+        df_timeline['Running_Stock'] = df_timeline['Qty'].cumsum() # Hitung sisa stok berjalan
+        return df_timeline
+    
+    return pd.DataFrame()
+
+
+# ==========================================
+# 🖥️ 3. FUNGSI MENU & UI RENDERING
+# ==========================================
+
+def render_chart_ui(df_timeline):
+    """Fungsi UI untuk merender grafik garis Plotly"""
+    st.write("### 📈 Grafik Perjalanan Saldo Stock")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df_timeline['Tanggal'],
+        y=df_timeline['Running_Stock'],
+        mode='lines+markers',
+        line=dict(color='#C5A059', width=3),
+        marker=dict(size=8, color='#ffffff', line=dict(color='#C5A059', width=2)),
+        text=df_timeline['Keterangan'],
+        hoverinfo='x+y+text'
+    ))
+    fig.update_layout(
+        template='plotly_dark', hovermode="x unified",
+        margin=dict(l=10, r=10, t=10, b=10), height=280,
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#252a3d')
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_html_timeline_ui(df_timeline):
+    """Fungsi UI untuk merender komponen vertical timeline HTML/CSS premium"""
+    color_map = {
+        'PURCHASE ORDER (IN)': '#2ecc71',
+        'MUTASI INTERNAL': '#3498db',
+        'ADJUSTMENT': '#f1c40f',
+        'STOCK TRACKING / SALES': '#e74c3c'
+    }
+    
+    timeline_html = '<div class="timeline-container">'
+    for _, row in df_timeline.iterrows():
+        badge_color = color_map.get(row['Tipe'], '#95a5a6')
+        tgl_str = row['Tanggal'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        timeline_html += f"""
+        <div class="timeline-block">
+            <div class="timeline-dot" style="background-color: {badge_color};"></div>
+            <div class="timeline-content">
+                <div class="timeline-time">📅 {tgl_str}</div>
+                <span class="timeline-badge" style="background-color: {badge_color};">{row['Tipe']}</span>
+                <div style="color: #ffffff; font-size: 0.95rem; margin-top: 5px;">{row['Keterangan']}</div>
+                <div style="color: #C5A059; font-size: 0.85rem; margin-top: 8px; font-weight: bold;">
+                    🏁 Sisa Stock Berjalan: {int(row['Running_Stock'])} Pcs
+                </div>
+            </div>
+        </div>
+        """
+    timeline_html += '</div>'
+    st.markdown(timeline_html, unsafe_allow_html=True)
+
+
+def main_menu_routing():
+    """Fungsi Utama Router Menu Tab Streamlit"""
+    st.title("📦 LOGISTICS STOCK TIMELINE TRACKER")
+    st.write("---")
+    
+    # Init Tab Menu
+    tab_uploader, tab_timeline = st.tabs(["📂 UPLOADER CENTRAL", "📊 STOCK TIMELINE DASHBOARD"])
+    
+    # --- MENU TAB 1: UPLOADER CENTRAL (RENDERING ONLY) ---
+    with tab_uploader:
+        st.subheader("📥 Upload & Konfigurasi File Sumber Data")
+        file_main = st.file_uploader("Upload File Master SKU (SKU Wajib di Kolom C)", type=["xlsx", "csv"], key="m")
+        st.write("---")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1: file_po = st.file_uploader("📄 File Purchase Order (A, D, G, L)", type=["xlsx", "csv"], key="p")
+        with col2: file_mutasi = st.file_uploader("🔄 File Mutasi (A, C, D, I, M, K)", type=["xlsx", "csv"], key="mu")
+        with col3: file_adj = st.file_uploader("🔧 File Adjustment (F, B, H, K, O, P)", type=["xlsx", "csv"], key="ad")
+        with col4: file_tracking = st.file_uploader("🛒 File Stock Tracking (A, B, J, K, L)", type=["xlsx", "csv"], key="tr")
+        
+        if file_main and file_po and file_mutasi and file_adj and file_tracking:
+            st.success("✅ Semua file sukses terunggah! Silahkan buka Tab **📊 STOCK TIMELINE DASHBOARD**.")
+        else:
+            st.warning("⚠️ Menunggu semua file lengkap di-upload.")
+
+    # --- MENU TAB 2: STOCK TIMELINE DASHBOARD (RENDERING & LOGIC CALL) ---
+    with tab_timeline:
+        if not (file_main and file_po and file_mutasi and file_adj and file_tracking):
+            st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
+            return
+
+        # PANGGIL LOGIC: Load File Dataframes
+        df_main = load_data_safe(file_main)
+        list_sku = extract_sku_list(df_main)
+        
+        if list_sku:
+            c_select, _ = st.columns([2, 2])
+            with c_select:
+                selected_sku = st.selectbox("🎯 Pilih SKU untuk Analisis Timeline:", list_sku)
+            
+            if selected_sku:
+                # PANGGIL LOGIC: Load sisa file log transaksi
+                df_po_raw = load_data_safe(file_po)
+                df_mutasi_raw = load_data_safe(file_mutasi)
+                df_adj_raw = load_data_safe(file_adj)
+                df_track_raw = load_data_safe(file_tracking)
+                
+                # PANGGIL LOGIC MAIN TIGHT LOOP: Dapatkan dataframe gabungan final
+                df_timeline = process_master_timeline(selected_sku, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw)
+                
+                if not df_timeline.empty:
+                    # Ambil kalkulasi metric angka
+                    total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
+                    current_end_stock = df_timeline['Running_Stock'].iloc[-1]
+                    
+                    # Render UI KPI Box
+                    st.write("---")
+                    c_kpi1, c_kpi2 = st.columns(2)
+                    with c_kpi1: st.markdown(f"<div class='metric-card'><h4>📦 Total Initial Qty PO</h4><h2>{int(total_initial_po)} Pcs</h2></div>", unsafe_allow_html=True)
+                    with c_kpi2: st.markdown(f"<div class='metric-card'><h4>🏁 Current End Stock</h4><h2>{int(current_end_stock)} Pcs</h2></div>", unsafe_allow_html=True)
+                    
+                    # RENDER UI: Chart dan Timeline
+                    render_chart_ui(df_timeline)
+                    st.write(f"### ⏳ Riwayat Kronologis SKU: {selected_sku}")
+                    render_html_timeline_ui(df_timeline)
+                else:
+                    st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
+
             
 import math
 import pandas as pd
@@ -7530,7 +7776,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     if is_dc:
-        m3_list = ["Stock Opname","Cycle Count", "List Bin Cycle Count", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
+        m3_list = ["Stock Opname","Cycle Count", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
     else:
         m3_list = ["Stock Minus","Cycle Count"] # Menu Cabang
 
@@ -9138,6 +9384,10 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+# RUN PROGRAM UTAMA
+elif menu == "Stock Tracking Timeline"
+    main_menu_routing()
 
 elif menu == "List Bin Cycle Count":
     tarik_data_cycle_count()
