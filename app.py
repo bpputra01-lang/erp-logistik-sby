@@ -3149,68 +3149,89 @@ def main_menu_routing():
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {active_sku}")
 
        # ==============================================================================
-        # 2. DOWNLOAD SINGLE ACTIVE SKU REPORT (INCLUDE DATA KETERANGAN)
+        # 🛠️ INJECT CUSTOM CSS UNTUK PREMIUM COMPACT BUTTONS
         # ==============================================================================
-        if df_download_target is not None and not df_download_target.empty:
-            st.markdown("<br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
-            st.subheader("📦 Export SKU Timeline Report")
-            st.caption(f"Unduh log riwayat transaksi spesifik beserta hasil analisis keterangan untuk SKU: **{active_sku}**")
+        st.markdown("""
+            <style>
+                /* Menghilangkan padding bawaan kolom tombol agar lebih rapat */
+                div[data-testid="stColumn"] {
+                    padding: 0px 5px !important;
+                }
+                
+                /* Styling Tombol Download Premium */
+                div.stDownloadButton > button {
+                    background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%) !important;
+                    color: #ffffff !important;
+                    border: none !important;
+                    padding: 8px 16px !important;
+                    border-radius: 6px !important;
+                    font-weight: 6px !important;
+                    font-size: 13px !important;
+                    width: auto !important;
+                    transition: all 0.3s ease !important;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+                }
+                
+                /* Efek Hover Tombol */
+                div.stDownloadButton > button:hover {
+                    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+                    transform: translateY(-1px) !important;
+                    box-shadow: 0 4px 10px rgba(79, 70, 229, 0.4) !important;
+                    color: #ffffff !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
 
-            col_btn_single, _ = st.columns([1, 2])
-            with col_btn_single:
+        # ==============================================================================
+        # COMPACT EXPORT PANEL (SINGLE & MASAL SEJAJER)
+        # ==============================================================================
+        st.markdown("<br><hr style='border-top: 1px dashed #252a3d; margin-bottom: 20px;'>", unsafe_allow_html=True)
+        
+        # Buat 2 kolom sejajar untuk meletakkan tombol secara compact
+        col_dl_single, col_dl_all = st.columns([1, 1])
+
+        # 1. Tombol Download Single Active SKU
+        with col_dl_single:
+            if df_download_target is not None and not df_download_target.empty:
                 import io
                 buffer_single = io.BytesIO()
                 safe_sheet_name = f"Timeline_{str(active_sku)}"[:30]
                 for char in ['\\', '/', '?', '*', '[', ']']: 
                     safe_sheet_name = safe_sheet_name.replace(char, '')
                 
-                # Cukup biarkan block 'with' ini selesai untuk auto-save data ke buffer
                 with pd.ExcelWriter(buffer_single, engine='openpyxl') as writer:
                     df_download_target.to_excel(writer, index=False, sheet_name=safe_sheet_name)
                 
-                # 🔥 AMAN: Ambil value DI LUAR block 'with' (Setelah file tertutup sempurna)
                 processed_single_data = buffer_single.getvalue()
-                
                 st.download_button(
-                    label=f"📥 Download Report SKU: {active_sku} (.xlsx)",
+                    label=f"📥 Download Report SKU: {active_sku}",
                     data=processed_single_data, 
                     file_name=f"Timeline_Report_{str(active_sku).strip()}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="btn_download_single_sku_fixed_integrated"
                 )
 
-        # ==============================================================================
-        # 3. 🔥 SAKTI BUTTON: DOWNLOAD ALL SKU IN DROPDOWN (DATA FULL TERKONDISI)
-        # ==============================================================================
-        st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
-        st.subheader("📊 Export Dropdown SKU Master Timeline Report")
-        st.caption("Klik tombol di bawah untuk langsung mengunduh data gabungan riwayat transaksi dari **SEMUA SKU** sekaligus dalam satu file Excel.")
-
-        col_btn_all, _ = st.columns([1, 2])
-        with col_btn_all:
+        # 2. Tombol Sakti (Download All SKU)
+        with col_dl_all:
             if not df_all_dropdown_sku.empty:
                 import io
                 buffer_all = io.BytesIO()
                 
-                # Bersihkan kolom database internal (Kolom bantuan J) biar report Excel lo tetep clean
                 df_excel_all_download = df_all_dropdown_sku.drop(columns=['Qty_Master_Col_J'], errors='ignore')
                 
-                # Cukup biarkan block 'with' ini selesai untuk auto-save data ke buffer
                 with pd.ExcelWriter(buffer_all, engine='openpyxl') as writer:
                     df_excel_all_download.to_excel(writer, index=False, sheet_name='All_Dropdown_SKU_Timeline')
                 
-                # 🔥 AMAN: Ambil value DI LUAR block 'with' (Mencegah file kosong / corrupt)
                 processed_dropdown_data = buffer_all.getvalue()
-                
                 st.download_button(
-                    label="📥 Download Master Report All SKU Dropdown (.xlsx)",
+                    label="📊 Download Master Report (All SKU)",
                     data=processed_dropdown_data, 
                     file_name="Master_Timeline_All_Dropdown_SKU.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="btn_download_dropdown_sku_massive_final_fixed"
                 )
             else:
-                st.warning("Data log transaksi kosong atau list SKU dropdown tidak terdeteksi.")
+                st.button("📊 Download Master Report (All SKU)", disabled=True, help="Data log transaksi kosong.")
 import pandas as pd
 import streamlit as st
 import requests
