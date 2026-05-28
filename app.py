@@ -3117,7 +3117,7 @@ def main_menu_routing():
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {active_sku}")
 
             # ==============================================================================
-            # 3. 🔥 SAKTI BUTTON: DOWNLOAD ALL SKU IN DROPDOWN
+            # 3. 🔥 SAKTI BUTTON: DOWNLOAD ALL SKU IN DROPDOWN (DATA FULL TERKONDISI)
             # ==============================================================================
             st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
             st.subheader("📊 Export Dropdown SKU Master Timeline Report")
@@ -3129,7 +3129,7 @@ def main_menu_routing():
                     import io
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                        # File Excel ini otomatis bersih dan rapi mencakup data seluruh SKU dropdown lo bro
+                        # 🛠️ FIXED REQUEST 1: File Excel sekarang full mencakup kolom itungan rumus baru lo bro!
                         df_all_dropdown_sku.to_excel(writer, index=False, sheet_name='All_Dropdown_SKU_Timeline')
                     processed_dropdown_data = buffer.getvalue()
 
@@ -3142,6 +3142,8 @@ def main_menu_routing():
                     )
                 else:
                     st.warning("Data log transaksi kosong atau list SKU dropdown tidak terdeteksi.")
+
+                    
 import streamlit as st
 import requests
 
