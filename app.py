@@ -3297,7 +3297,7 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     df_stock_all_grouped = df_surabaya_stock.groupby('SKU', as_index=False)['QTY_STOCK'].sum()
     
     # Ambil yang QTY_STOCK > 2 untuk kriteria over-request
-    df_stock_over_2 = df_stock_all_grouped[df_stock_all_grouped['QTY_STOCK'] > 2]
+    df_stock_over_2 = df_stock_all_grouped[df_stock_all_grouped['QTY_STOCK'] >= 2]
 
     # --- FILTER 3: Cek Matching Data (Indikasi Over-Request) ---
     df_req_filtered['SKU'] = df_req_filtered['SKU'].astype(str).str.strip()
@@ -3353,11 +3353,6 @@ def render_premium_ui():
         .metric-value { font-size: 32px; font-weight: 700; color: #ffffff; margin-top: 5px; }
         .metric-desc { font-size: 12px; color: #a3b0c2; margin-top: 5px; }
         
-        /* FIX TOTAL: Hajar paksa semua heading teks agar berwarna PUTIH terang, kontras di dark mode */
-        h1, h2, h3, h4, h5, h6, .stMarkdown h2, .stMarkdown h3 {
-            color: #ffffff !important;
-            font-weight: 700 !important;
-        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -3405,7 +3400,6 @@ def display_dashboard_metrics(results: dict):
 
 def display_data_tables(results: dict):
     # Judul bagian tabel analitik
-    st.subheader("🔍 Detail Analisis Data")
     
     tab1, tab2 = st.tabs(["📋 SKU Terindikasi Over-Request", "🔄 Compare SKU Permintaan FL vs All Stock"])
     
