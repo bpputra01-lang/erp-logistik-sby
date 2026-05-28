@@ -3133,11 +3133,11 @@ def main_menu_routing():
                     with c_kpi3: st.markdown(f"<div class='m-box' style='border-left: 4px solid #3498db !important;'><span class='m-lbl'>{lbl_system}</span><div class='m-val'>{int(stock_system)} Pcs</div></div>", unsafe_allow_html=True)
                     with c_kpi4: st.markdown(f"<div class='m-box' style='border-left: 4px solid {'#2ecc71' if selisih == 0 else '#e74c3c'} !important;'><span class='m-lbl'>⚠️ Selisih Varian</span><div class='m-val'>{int(selisih)} Pcs</div></div>", unsafe_allow_html=True)
                     
-                    # 🛠️ FIXED REQUEST 2: Ukuran font case diperkecil (font-size dikurangi + padding dirapikan agar tidak over)
+                   # 🛠️ ADJUSTED: Ukuran font dinaikin dikit biar pas (Status 16px, Detail 13px)
                     st.markdown(f"""
-                        <div style='background: #1e1e2a; padding: 12px 18px; border-radius: 8px; border: 1px solid #333; margin-top: 5px; margin-bottom: 15px;'>
-                            <h5 style='color: {warna_indikasi}; margin: 0 0 4px 0; font-size: 14px; font-weight: bold;'>{status_indikasi}</h5>
-                            <p style='color: #b0b3c6; margin: 0; font-size: 11px; line-height: 1.4;'>{detail_indikasi}</p>
+                        <div style='background: #1e1e2a; padding: 14px 20px; border-radius: 8px; border: 1px solid #333; margin-top: 5px; margin-bottom: 15px;'>
+                            <h5 style='color: {warna_indikasi}; margin: 0 0 6px 0; font-size: 16px; font-weight: bold;'>{status_indikasi}</h5>
+                            <p style='color: #b0b3c6; margin: 0; font-size: 13px; line-height: 1.4;'>{detail_indikasi}</p>
                         </div>
                     """, unsafe_allow_html=True)
                     
