@@ -3232,6 +3232,222 @@ def main_menu_routing():
                 )
             else:
                 st.button("📊 Download Master Report (All SKU)", disabled=True, help="Data log transaksi kosong.")
+
+# ==============================================================================
+# 1. LOGIC PROCESS (BACKEND DATA ENGINE) - UPDATED V2 (KOLOM U UNTUK QTY PERMINTAAN)
+# ==============================================================================
+def process_logistics_analytics(file_stock, file_permintaan) -> dict:
+    """
+    Fungsi core untuk memproses data inventori dan permintaan.
+    Menggunakan Pandas murni agar performa ultra fast dan reusable.
+    """
+    # Read file All Stock
+    if file_stock.name.endswith('.csv'):
+        df_stock_raw = pd.read_csv(file_stock)
+    else:
+        df_stock_raw = pd.read_excel(file_stock)
+        
+    # Read file Permintaan FL
+    if file_permintaan.name.endswith('.csv'):
+        df_permintaan_raw = pd.read_csv(file_permintaan)
+    else:
+        df_permintaan_raw = pd.read_excel(file_permintaan)
+
+    # --- Standarisasi Kolom Berdasarkan Indeks ---
+    # All Stock: B=Bin(1), C=SKU(2), J=Qty(9)
+    df_stock = df_stock_raw.iloc[:, [1, 2, 9]].copy()
+    df_stock.columns = ['BIN', 'SKU', 'QTY_STOCK']
+    
+    # Permintaan FL: Amankan index, ambil C=SKU(2), T=Kriteria_T(19), dan U=Qty_Permintaan(20)
+    df_permintaan = df_permintaan_raw.copy()
+    df_permintaan.columns = [f"col_{i}" for i in range(len(df_permintaan.columns))]
+    df_req_filtered = df_permintaan[['col_2', 'col_19', 'col_20']].copy()
+    df_req_filtered.columns = ['SKU', 'KOLOM_T', 'QTY_REQUEST']
+
+    # --- FILTER 1: Eliminasi Kolom T yang Blank / Empty ---
+    df_req_filtered['KOLOM_T'] = df_req_filtered['KOLOM_T'].astype(str).str.strip()
+    df_req_filtered = df_req_filtered[
+        (df_req_filtered['KOLOM_T'] != '') & 
+        (df_req_filtered['KOLOM_T'] != 'nan') & 
+        (df_req_filtered['KOLOM_T'].notna())
+    ]
+    
+    # Bersihkan data QTY_REQUEST di file permintaan agar berupa angka
+    df_req_filtered['QTY_REQUEST'] = pd.to_numeric(df_req_filtered['QTY_REQUEST'], errors='coerce').fillna(0)
+    
+    # Total seluruh qty permintaan yang valid (berdasarkan filter kolom T)
+    total_qty_permintaan_valid = df_req_filtered['QTY_REQUEST'].sum()
+
+    # --- FILTER 2: Filter Stock Store Surabaya (BIN mengandung TOKO, GUDANG, STR) ---
+    df_stock['BIN'] = df_stock['BIN'].astype(str).str.upper()
+    bin_filter = df_stock['BIN'].str.contains('TOKO|GUDANG|STR', na=False)
+    df_surabaya_stock = df_stock[bin_filter].copy()
+    
+    # Bersihkan SKU & QTY Stock
+    df_surabaya_stock['SKU'] = df_surabaya_stock['SKU'].astype(str).str.strip()
+    df_surabaya_stock['QTY_STOCK'] = pd.to_numeric(df_surabaya_stock['QTY_STOCK'], errors='coerce').fillna(0)
+    
+    # Groupby SKU untuk hitung total stok di store Surabaya
+    df_stock_grouped = df_surabaya_stock.groupby('SKU', as_index=False)['QTY_STOCK'].sum()
+    
+    # Sesuai Aturan: Ambil yang QTY_STOCK > 2
+    df_stock_over_2 = df_stock_grouped[df_stock_grouped['QTY_STOCK'] > 2]
+
+    # --- FILTER 3: Cek Matching Data (Indikasi Over-Request) ---
+    df_req_filtered['SKU'] = df_req_filtered['SKU'].astype(str).str.strip()
+    df_bad_indications = df_req_filtered.merge(df_stock_over_2, on='SKU', how='inner')
+    
+    # Total qty permintaan yang masuk kategori buruk (Minta ke DC padahal stok store > 2)
+    total_bad_qty_requests = df_bad_indications['QTY_REQUEST'].sum()
+
+    # --- Hitung Persentase Berdasarkan Volume QTY ---
+    percentage_over = (total_bad_qty_requests / total_qty_permintaan_valid * 100) if total_qty_permintaan_valid > 0 else 0.0
+
+    # Kembalikan hasil dalam bentuk dictionary payload
+    return {
+        "total_valid": total_qty_permintaan_valid,
+        "total_bad": total_bad_qty_requests,
+        "percentage": percentage_over,
+        "df_bad": df_bad_indications[['SKU', 'QTY_STOCK', 'QTY_REQUEST']].rename(
+            columns={'QTY_STOCK': 'Current Stock di Store', 'QTY_REQUEST': 'QTY Diminta ke DC'}
+        ),
+        "df_stock_over": df_stock_over_2.rename(columns={'QTY_STOCK': 'Total Stock Store'})
+    }
+# ==============================================================================
+# 2. LOGIC MENU & LAYOUT (FRONTEND UI)
+# ==============================================================================
+def render_premium_ui():
+    """
+    Fungsi untuk menangani seluruh layouting, dashboard styling, dan rendering menu.
+    """
+    st.set_page_config(page_title="Store Request Analytics", layout="wide", initial_sidebar_state="expanded")
+
+    # Inject Premium Dark Theme Stylesheet
+    st.markdown("""
+        <style>
+        .stApp { background-color: #0e1117; color: #ffffff; }
+        .hero-header {
+            font-size: 28px; font-weight: 700; letter-spacing: 0.5px; color: #FFFFFF;
+            background: linear-gradient(135deg, #1f2438 0%, #111424 100%);
+            padding: 20px; border-radius: 10px; border-left: 5px solid #C5A059;
+            margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .premium-card {
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            border-left: 4px solid #C5A059 !important; border-radius: 8px;
+            padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); margin-bottom: 15px;
+        }
+        .metric-title { font-size: 14px; color: #8c96a8; text-transform: uppercase; letter-spacing: 1px; }
+        .metric-value { font-size: 32px; font-weight: 700; color: #ffffff; margin-top: 5px; }
+        .metric-desc { font-size: 12px; color: #a3b0c2; margin-top: 5px; }
+        [data-testid="stSidebar"] { background-color: #111424; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="hero-header">📊 STORE TO DC REQUEST ANALYTICS (SURABAYA)</div>', unsafe_allow_html=True)
+
+
+def render_sidebar_menu():
+    """
+    Menangani menu interaksi di sidebar (Uploader Menu).
+    """
+    with st.sidebar:
+        st.markdown("### 📥 UPLOAD DATASET")
+        st.info("Pastikan format file sesuai dengan instruksi kolom.")
+        
+        file_stock = st.file_uploader("1. Upload File All Stock", type=["xlsx", "xls", "csv"])
+        file_permintaan = st.file_uploader("2. Upload File Permintaan FL", type=["xlsx", "xls", "csv"])
+        
+        st.markdown("---")
+        st.caption("Developed for Logistics Data Optimization | Target: Surabaya Branch")
+        
+    return file_stock, file_permintaan
+
+
+def display_dashboard_metrics(results: dict):
+    """
+    Menampilkan metrik boxes premium di main dashboard panel.
+    """
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(f"""
+            <div class="premium-card">
+                <div class="metric-title">📋 Total Permintaan Valid</div>
+                <div class="metric-value">{results['total_valid']:,}</div>
+                <div class="metric-desc">Kolom T tidak kosong / bernilai</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown(f"""
+            <div class="premium-card">
+                <div class="metric-title">⚠️ Indikasi Over-Request</div>
+                <div class="metric-value" style="color: #FF4B4B;">{results['total_bad']:,}</div>
+                <div class="metric-desc">Minta ke DC padahal Stok Store > 2</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        color_pct = "#FF4B4B" if results['percentage'] > 20 else "#C5A059"
+        st.markdown(f"""
+            <div class="premium-card">
+                <div class="metric-title">🚨 Percentage Indikasi Buruk</div>
+                <div class="metric-value" style="color: {color_pct};">{results['percentage']:.2f}%</div>
+                <div class="metric-desc">Semakin tinggi % = Efisiensi Alokasi Buruk</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+
+def display_data_tables(results: dict):
+    """
+    Menampilkan data detail menggunakan elemen layouting Tabs.
+    """
+    st.markdown("### 🔍 Detail Analisis Data")
+    tab1, tab2 = st.tabs(["📋 SKU Terindikasi Over-Request", "📦 Ringkasan Stok Store (QTY > 2)"])
+    
+    with tab1:
+        if not results['df_bad'].empty:
+            st.dataframe(results['df_bad'], use_container_width=True)
+        else:
+            st.success("Aman! Tidak ada store yang meminta barang ke DC saat stoknya masih melimpah.")
+            
+    with tab2:
+        st.dataframe(results['df_stock_over'], use_container_width=True)
+
+
+# ==============================================================================
+# 3. DISTINCT MAIN CONTROLLER (CUSTOM CONTROLLER RUNNER)
+# ==============================================================================
+def run_store_request_analytics():
+    """
+    Fungsi pengatur utama pengganti main() untuk menghindari konflik penamaan file.
+    """
+    # Panggil render UI dasar
+    render_premium_ui()
+    
+    # Ambil state input dari menu sidebar
+    file_stock, file_permintaan = render_sidebar_menu()
+    
+    # Jalankan proses jika kedua file sudah siap
+    if file_stock and file_permintaan:
+        with st.spinner("Processing data ultra fast... ⚡"):
+            try:
+                # PANGGIL LOGIC PROCESS DI SINI
+                analysis_results = process_logistics_analytics(file_stock, file_permintaan)
+                
+                # OPER HASIL KE LOGIC MENAMPILKAN DASHBOARD
+                display_dashboard_metrics(analysis_results)
+                display_data_tables(analysis_results)
+                
+            except Exception as e:
+                st.error(f"Terjadi kesalahan pemrosesan data. Struktur file mungkin salah. Error: {e}")
+    else:
+        st.info("💡 Sila upload kedua file (All Stock & Permintaan FL) pada sidebar untuk memulai perhitungan persentase.")
+
+
+
+
 import pandas as pd
 import streamlit as st
 import requests
@@ -8161,7 +8377,7 @@ with st.sidebar:
     # --- KELOMPOK 5: EXTRAS ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">EXTRAS</p>', unsafe_allow_html=True)
     if is_dc:
-        m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display"]
+        m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display","Precentage Request FL to Store Stock"]
     else:
         m5_list = ["Precentage Display","Refill Toko"] # Menu Cabang
 
@@ -9749,6 +9965,9 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "Precentage Request FL to Store Stock":
+    run_store_request_analytics()
 
 # RUN PROGRAM UTAMA
 elif menu == "Stock Tracking Timeline":
