@@ -3333,7 +3333,7 @@ def render_premium_ui():
     st.markdown("""
         <style>
         /* Base Background */
-        .stApp { background-color: #0e1117; color: #ffffff; }
+        .stApp { background-color: #0e1117; color: #000000; }
         
         /* Title Header Banner */
         .hero-header {
