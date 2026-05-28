@@ -3148,7 +3148,7 @@ def main_menu_routing():
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {active_sku}")
 
-        # ==============================================================================
+       # ==============================================================================
         # 2. DOWNLOAD SINGLE ACTIVE SKU REPORT (INCLUDE DATA KETERANGAN)
         # ==============================================================================
         if df_download_target is not None and not df_download_target.empty:
@@ -3161,13 +3161,16 @@ def main_menu_routing():
                 import io
                 buffer_single = io.BytesIO()
                 safe_sheet_name = f"Timeline_{str(active_sku)}"[:30]
-                for char in ['\\', '/', '?', '*', '[', ']']: safe_sheet_name = safe_sheet_name.replace(char, '')
+                for char in ['\\', '/', '?', '*', '[', ']']: 
+                    safe_sheet_name = safe_sheet_name.replace(char, '')
                 
+                # Cukup biarkan block 'with' ini selesai untuk auto-save data ke buffer
                 with pd.ExcelWriter(buffer_single, engine='openpyxl') as writer:
                     df_download_target.to_excel(writer, index=False, sheet_name=safe_sheet_name)
-                    writer.flush()
                 
+                # 🔥 AMAN: Ambil value DI LUAR block 'with' (Setelah file tertutup sempurna)
                 processed_single_data = buffer_single.getvalue()
+                
                 st.download_button(
                     label=f"📥 Download Report SKU: {active_sku} (.xlsx)",
                     data=processed_single_data, 
@@ -3189,11 +3192,16 @@ def main_menu_routing():
                 import io
                 buffer_all = io.BytesIO()
                 
-                with pd.ExcelWriter(buffer_all, engine='openpyxl') as writer:
-                    df_all_dropdown_sku.to_excel(writer, index=False, sheet_name='All_Dropdown_SKU_Timeline')
-                    writer.flush()
+                # Bersihkan kolom database internal (Kolom bantuan J) biar report Excel lo tetep clean
+                df_excel_all_download = df_all_dropdown_sku.drop(columns=['Qty_Master_Col_J'], errors='ignore')
                 
+                # Cukup biarkan block 'with' ini selesai untuk auto-save data ke buffer
+                with pd.ExcelWriter(buffer_all, engine='openpyxl') as writer:
+                    df_excel_all_download.to_excel(writer, index=False, sheet_name='All_Dropdown_SKU_Timeline')
+                
+                # 🔥 AMAN: Ambil value DI LUAR block 'with' (Mencegah file kosong / corrupt)
                 processed_dropdown_data = buffer_all.getvalue()
+                
                 st.download_button(
                     label="📥 Download Master Report All SKU Dropdown (.xlsx)",
                     data=processed_dropdown_data, 
