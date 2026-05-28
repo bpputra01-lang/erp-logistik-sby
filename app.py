@@ -3372,23 +3372,28 @@ def render_main_uploaders():
 def display_dashboard_metrics(results: dict):
     col1, col2, col3 = st.columns(3)
     with col1:
+        # Ditambah int() agar 20.0 berubah menjadi 20
+        total_valid_int = int(results['total_valid'])
         st.markdown(f"""
             <div class="premium-card">
                 <div class="metric-title">📋 Total Permintaan Valid</div>
-                <div class="metric-value">{results['total_valid']:,}</div>
+                <div class="metric-value">{total_valid_int:,}</div>
                 <div class="metric-desc">Kolom T tidak kosong / bernilai</div>
             </div>
         """, unsafe_allow_html=True)
     with col2:
+        # Ditambah int() agar 3.0 berubah menjadi 3
+        total_bad_int = int(results['total_bad'])
         st.markdown(f"""
             <div class="premium-card">
                 <div class="metric-title">⚠️ Indikasi Over-Request</div>
-                <div class="metric-value" style="color: #FF4B4B;">{results['total_bad']:,}</div>
+                <div class="metric-value" style="color: #FF4B4B;">{total_bad_int:,}</div>
                 <div class="metric-desc">Minta ke DC padahal Stok Store > 2</div>
             </div>
         """, unsafe_allow_html=True)
     with col3:
         color_pct = "#FF4B4B" if results['percentage'] > 20 else "#C5A059"
+        # Untuk persentase tetap pertahankan format .2f agar akurat (misal 15.00%)
         st.markdown(f"""
             <div class="premium-card">
                 <div class="metric-title">🚨 Percentage Indikasi Buruk</div>
@@ -3396,7 +3401,6 @@ def display_dashboard_metrics(results: dict):
                 <div class="metric-desc">Semakin tinggi % = Efisiensi Alokasi Buruk</div>
             </div>
         """, unsafe_allow_html=True)
-
 
 def display_data_tables(results: dict):
     # Judul bagian tabel analitik
