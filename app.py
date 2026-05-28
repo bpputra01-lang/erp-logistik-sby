@@ -2673,24 +2673,24 @@ def load_data_safe(file_obj):
 
 
 def extract_sku_list(df_main):
-    """Fungsi logic untuk mengambil list unique SKU dari Kolom C (Index 2)"""
+    """Fungsi logic untuk mengambil list unique SKU dari Kolom C (Index 2) - FIXED SERIES ERROR"""
     try:
-        # Ambil kolom C, buang baris kosong
+        # 1. Ambil kolom C (Indeks 2), buang data yang kosong/blank bawaan Excel
         sku_col = df_main.iloc[:, 2].dropna()
         
-        # 🟢 PERBAIKAN: Ubah paksa angka murni (seperti 920340436) & huruf menjadi String teks
+        # 2. Paksa semua isi data menjadi string teks dan bersihkan spasi gaib di ujungnya
         sku_strings = sku_col.astype(str).str.strip()
         
-        # Bersihkan dari baris hantu/kosong
+        # 3. 🟢 PERBAIKAN: Gunakan .str.lower() untuk filter baris kotor bertuliskan 'nan' atau string kosong
         sku_strings = sku_strings[sku_strings != '']
-        sku_strings = sku_strings[sku_strings.lower() != 'nan']
+        sku_strings = sku_strings[sku_strings.str.lower() != 'nan']
         
-        # Sekarang sort dijamin 100% aman karena tipenya seragam (String vs String)
+        # 4. Ambil nilai uniknya saja, lalu urutkan secara aman
         return sorted(sku_strings.unique())
+        
     except Exception as e:
         st.error(f"Error extracting SKU from Main File: {e}")
         return []
-
 
 def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df_rto):
     """
