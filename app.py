@@ -2990,7 +2990,7 @@ def main_menu_routing():
         else:
             st.warning("⚠️ Menunggu semua file lengkap di-upload.")
 
-  # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
+# --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
     with tab_timeline:
         if not (file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto):
             st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
@@ -3008,14 +3008,17 @@ def main_menu_routing():
             df_track_raw = load_data_safe(file_tracking)
             df_rto_raw = load_data_safe(file_rto)
             
-            # 🔥 PROSES KOMPILASI MASAL: Loop otomatis SEMUA SKU yang ada di list dropdown lo
+            # 🔥 PROSES KOMPILASI MASAL + INJECT KOLOM SKU (ANTI KEYERROR)
             with st.spinner("⚡ Mengompilasi data transaksi untuk SEMUA SKU di dropdown... Harap tunggu..."):
                 list_compiled_df = []
                 for sku in list_sku:
                     sku_clean = str(sku).strip()
-                    # Ambil data timeline per SKU pake fungsi lo yang lama
                     df_temp = process_master_timeline(sku_clean, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
+                    
                     if df_temp is not None and not df_temp.empty:
+                        # 🛡️ FIX AMAN: Force buat atau overwrite kolom 'SKU' biar pandas kaga nyari-nyari lagi
+                        df_temp = df_temp.copy()
+                        df_temp['SKU'] = sku_clean
                         list_compiled_df.append(df_temp)
                 
                 # Gabungin semua hasil loop SKU dropdown tadi jadi satu Dataframe Raksasa
@@ -3039,24 +3042,29 @@ def main_menu_routing():
             active_sku = str(selected_sku).strip() if selected_sku else str(list_sku[0]).strip()
             
             # ==============================================================================
-            # 2. AREA VISUALISASI UTAMA TIMELINE (TINGGAL SLICE DARI HASIL GABUNGAN DI ATAS)
+            # 2. AREA VISUALISASI UTAMA TIMELINE (SINKRON & AMAN DARI KEYERROR)
             # ==============================================================================
             if active_sku and not df_all_dropdown_sku.empty:
-                # Potong data khusus SKU yang dipilih di dropdown biar tampil di grafik/tabel monitor
+                # Sekarang kolom 'SKU' dijamin ada karena udah di-inject pas looping di atas!
                 df_timeline = df_all_dropdown_sku[df_all_dropdown_sku['SKU'] == active_sku].reset_index(drop=True)
                 
                 if not df_timeline.empty:
                     total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
-                    current_end_stock = df_timeline['Running_Stock'].iloc[-1]
+                    current_end_stock = df_timeline['Running_Stock'].iloc[-1] if 'Running_Stock' in df_timeline.columns else 0
                     
                     # 📊 ADDON LOGIC lo (Real Qty, System Fallback Index 9, & AI Diagnosa Error)
-                    df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'REFUND', 'RETURN TO OFFICE (RTO)'])]
-                    real_qty = df_real['Qty'].sum()
+                    if 'Tipe' in df_timeline.columns and 'Qty' in df_timeline.columns:
+                        df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'REFUND', 'RETURN TO OFFICE (RTO)'])]
+                        real_qty = df_real['Qty'].sum()
+                        total_adj = df_timeline[df_timeline['Tipe'] == 'ADJUSTMENT']['Qty'].sum()
+                        total_rto = df_timeline[df_timeline['Tipe'] == 'RETURN TO OFFICE (RTO)']['Qty'].sum()
+                    else:
+                        real_qty, total_adj, total_rto = 0, 0, 0
                     
                     lbl_system = "🖥️ Stock System (Last)"
                     if current_end_stock == 0:
                         try:
-                            sku_row = df_main[df_main.iloc[:, 2] == active_sku]
+                            sku_row = df_main[df_main.iloc[:, 2].astype(str).str.strip() == active_sku]
                             if not sku_row.empty:
                                 master_qty_raw = sku_row.iloc[0, 9] # Kolom J = Indeks 9
                                 stock_system = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
@@ -3069,8 +3077,6 @@ def main_menu_routing():
                         stock_system = current_end_stock
                     
                     selisih = stock_system - real_qty
-                    total_adj = df_timeline[df_timeline['Tipe'] == 'ADJUSTMENT']['Qty'].sum()
-                    total_rto = df_timeline[df_timeline['Tipe'] == 'RETURN TO OFFICE (RTO)']['Qty'].sum()
                     
                     status_indikasi = "🟢 MATCH (Data Sinkron)"
                     detail_indikasi = "Kondisi aman, tidak terdeteksi adanya selisih fisik dan transaksi."
@@ -3106,7 +3112,7 @@ def main_menu_routing():
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {active_sku}")
 
             # ==============================================================================
-            # 3. 🔥 SAKTI BUTTON: DOWNLOAD ALL SKU IN DROPDOWN (SEKALI KLIK MAKSIMAL SINKRON)
+            # 3. 🔥 SAKTI BUTTON: DOWNLOAD ALL SKU IN DROPDOWN
             # ==============================================================================
             st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
             st.subheader("📊 Export Dropdown SKU Master Timeline Report")
@@ -3118,7 +3124,7 @@ def main_menu_routing():
                     import io
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                        # File Excel ini otomatis berisi kompilasi data SEMUA SKU yang ada di dropdown lo bro!
+                        # File Excel ini otomatis bersih dan rapi mencakup data seluruh SKU dropdown lo bro
                         df_all_dropdown_sku.to_excel(writer, index=False, sheet_name='All_Dropdown_SKU_Timeline')
                     processed_dropdown_data = buffer.getvalue()
 
