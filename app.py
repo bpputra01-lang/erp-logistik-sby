@@ -3233,13 +3233,16 @@ def main_menu_routing():
             else:
                 st.button("📊 Download Master Report (All SKU)", disabled=True, help="Data log transaksi kosong.")
 
+import streamlit as st
+import pandas as pd
+import numpy as np
+
 # ==============================================================================
-# 1. LOGIC PROCESS (BACKEND DATA ENGINE) - UPDATED V2 (KOLOM U UNTUK QTY PERMINTAAN)
+# 1. LOGIC PROCESS (BACKEND DATA ENGINE)
 # ==============================================================================
 def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     """
     Fungsi core untuk memproses data inventori dan permintaan.
-    Menggunakan Pandas murni agar performa ultra fast dan reusable.
     """
     # Read file All Stock
     if file_stock.name.endswith('.csv'):
@@ -3272,38 +3275,39 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
         (df_req_filtered['KOLOM_T'].notna())
     ]
     
-    # Bersihkan data QTY_REQUEST di file permintaan agar berupa angka
+    # Bersihkan data QTY_REQUEST
     df_req_filtered['QTY_REQUEST'] = pd.to_numeric(df_req_filtered['QTY_REQUEST'], errors='coerce').fillna(0)
-    
-    # Total seluruh qty permintaan yang valid (berdasarkan filter kolom T)
     total_qty_permintaan_valid = df_req_filtered['QTY_REQUEST'].sum()
 
-    # --- FILTER 2: Filter Stock Store Surabaya (BIN mengandung TOKO, GUDANG, STR) ---
+    # --- FILTER 2: Filter Stock Store Surabaya ---
     df_stock['BIN'] = df_stock['BIN'].astype(str).str.upper()
     bin_filter = df_stock['BIN'].str.contains('TOKO|GUDANG|STR', na=False)
     df_surabaya_stock = df_stock[bin_filter].copy()
     
-    # Bersihkan SKU & QTY Stock
     df_surabaya_stock['SKU'] = df_surabaya_stock['SKU'].astype(str).str.strip()
     df_surabaya_stock['QTY_STOCK'] = pd.to_numeric(df_surabaya_stock['QTY_STOCK'], errors='coerce').fillna(0)
     
-    # Groupby SKU untuk hitung total stok di store Surabaya
-    df_stock_grouped = df_surabaya_stock.groupby('SKU', as_index=False)['QTY_STOCK'].sum()
+    # Groupby All Stock Surabaya (Semua SKU tanpa filter > 2 dulu untuk keperluan Compare)
+    df_stock_all_grouped = df_surabaya_stock.groupby('SKU', as_index=False)['QTY_STOCK'].sum()
     
-    # Sesuai Aturan: Ambil yang QTY_STOCK > 2
-    df_stock_over_2 = df_stock_grouped[df_stock_grouped['QTY_STOCK'] > 2]
+    # Ambil yang QTY_STOCK > 2 untuk indikasi over-request
+    df_stock_over_2 = df_stock_all_grouped[df_stock_all_grouped['QTY_STOCK'] > 2]
 
     # --- FILTER 3: Cek Matching Data (Indikasi Over-Request) ---
     df_req_filtered['SKU'] = df_req_filtered['SKU'].astype(str).str.strip()
     df_bad_indications = df_req_filtered.merge(df_stock_over_2, on='SKU', how='inner')
-    
-    # Total qty permintaan yang masuk kategori buruk (Minta ke DC padahal stok store > 2)
     total_bad_qty_requests = df_bad_indications['QTY_REQUEST'].sum()
 
-    # --- Hitung Persentase Berdasarkan Volume QTY ---
+    # --- LOGIC BARU: COMPARE ALL SKU PERMINTAAN VS STOCK DATA ---
+    # Group total request per SKU di file permintaan FL
+    df_req_grouped = df_req_filtered.groupby('SKU', as_index=False)['QTY_REQUEST'].sum()
+    # Left join dengan data stock untuk melihat perbandingan real-time
+    df_compare_sku = df_req_grouped.merge(df_stock_all_grouped, on='SKU', how='left').fillna(0)
+    df_compare_sku.columns = ['SKU', 'Total QTY Diminta (DC)', 'Total QTY Tersedia (Store)']
+
+    # --- Hitung Persentase ---
     percentage_over = (total_bad_qty_requests / total_qty_permintaan_valid * 100) if total_qty_permintaan_valid > 0 else 0.0
 
-    # Kembalikan hasil dalam bentuk dictionary payload
     return {
         "total_valid": total_qty_permintaan_valid,
         "total_bad": total_bad_qty_requests,
@@ -3311,18 +3315,17 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
         "df_bad": df_bad_indications[['SKU', 'QTY_STOCK', 'QTY_REQUEST']].rename(
             columns={'QTY_STOCK': 'Current Stock di Store', 'QTY_REQUEST': 'QTY Diminta ke DC'}
         ),
-        "df_stock_over": df_stock_over_2.rename(columns={'QTY_STOCK': 'Total Stock Store'})
+        "df_compare": df_compare_sku
     }
+
+
 # ==============================================================================
-# 2. LOGIC MENU & LAYOUT (FRONTEND UI) - UPDATED UPLOADER DI MAIN PANEL
+# 2. LOGIC MENU & LAYOUT (FRONTEND UI)
 # ==============================================================================
 def render_premium_ui():
-    """
-    Fungsi untuk menangani seluruh layouting, dashboard styling, dan rendering menu.
-    """
     st.set_page_config(page_title="Store Request Analytics", layout="wide", initial_sidebar_state="collapsed")
 
-    # Inject Premium Dark Theme Stylesheet
+    # Inject Premium Dark Theme Stylesheet dengan fix warna text subheader
     st.markdown("""
         <style>
         .stApp { background-color: #0e1117; color: #ffffff; }
@@ -3341,13 +3344,10 @@ def render_premium_ui():
         .metric-value { font-size: 32px; font-weight: 700; color: #ffffff; margin-top: 5px; }
         .metric-desc { font-size: 12px; color: #a3b0c2; margin-top: 5px; }
         
-        /* Style tambahan untuk info box atas */
-        .info-container {
-            background-color: #111424;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 3px solid #1f2438;
+        /* FIX: Paksa warna text H3/Subheader di dark mode agar kontras dan tidak nge-blend dengan putih hancur */
+        .section-title h3 {
+            color: #111424 !important;
+            font-weight: 700 !important;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -3356,58 +3356,17 @@ def render_premium_ui():
 
 
 def render_main_uploaders():
-    """
-    Menangani menu interaksi uploader di Main Panel dengan layout kolom berdampingan.
-    """
-    
-    # Buat 2 kolom melebar di Main Panel
     col_left, col_right = st.columns(2)
-    
     with col_left:
         file_stock = st.file_uploader("📥 1. Upload File All Stock", type=["xlsx", "xls", "csv"])
-        
     with col_right:
         file_permintaan = st.file_uploader("📥 2. Upload File Permintaan FL", type=["xlsx", "xls", "csv"])
-        
     st.markdown("---")
     return file_stock, file_permintaan
 
 
-# ==============================================================================
-# 3. DISTINCT MAIN CONTROLLER (CUSTOM CONTROLLER RUNNER)
-# ==============================================================================
-def run_store_request_analytics():
-    """
-    Fungsi pengatur utama pengganti main() untuk menghindari konflik penamaan file.
-    """
-    # Panggil render UI dasar
-    render_premium_ui()
-    
-    # Sekarang ambil state input langsung dari Main Panel (Bukan sidebar lagi)
-    file_stock, file_permintaan = render_main_uploaders()
-    
-    # Jalankan proses jika kedua file sudah siap
-    if file_stock and file_permintaan:
-        with st.spinner("Processing data ultra fast... ⚡"):
-            try:
-                # PANGGIL LOGIC PROCESS DI SINI
-                analysis_results = process_logistics_analytics(file_stock, file_permintaan)
-                
-                # OPER HASIL KE LOGIC MENAMPILKAN DASHBOARD
-                display_dashboard_metrics(analysis_results)
-                display_data_tables(analysis_results)
-                
-            except Exception as e:
-                st.error(f"Terjadi kesalahan pemrosesan data. Struktur file mungkin salah. Error: {e}")
-    else:
-        st.warning("⚠️ Menunggu kedua file diunggah di atas untuk memulai kalkulasi...")
-
 def display_dashboard_metrics(results: dict):
-    """
-    Menampilkan metrik boxes premium di main dashboard panel.
-    """
     col1, col2, col3 = st.columns(3)
-    
     with col1:
         st.markdown(f"""
             <div class="premium-card">
@@ -3416,7 +3375,6 @@ def display_dashboard_metrics(results: dict):
                 <div class="metric-desc">Kolom T tidak kosong / bernilai</div>
             </div>
         """, unsafe_allow_html=True)
-        
     with col2:
         st.markdown(f"""
             <div class="premium-card">
@@ -3425,7 +3383,6 @@ def display_dashboard_metrics(results: dict):
                 <div class="metric-desc">Minta ke DC padahal Stok Store > 2</div>
             </div>
         """, unsafe_allow_html=True)
-        
     with col3:
         color_pct = "#FF4B4B" if results['percentage'] > 20 else "#C5A059"
         st.markdown(f"""
@@ -3438,11 +3395,13 @@ def display_dashboard_metrics(results: dict):
 
 
 def display_data_tables(results: dict):
-    """
-    Menampilkan data detail menggunakan elemen layouting Tabs.
-    """
-    st.markdown("### 🔍 Detail Analisis Data")
-    tab1, tab2 = st.tabs(["📋 SKU Terindikasi Over-Request", "📦 Ringkasan Stok Store (QTY > 2)"])
+    # Bungkus di container ber-class khusus agar font heading-nya tidak hilang kena warna putih background aplikasi
+    st.markdown('<div class="section-title">', unsafe_allow_html=True)
+    st.subheader("🔍 Detail Analisis Data")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Perubahan nama TAB KEDUA sesuai instruksi lu
+    tab1, tab2 = st.tabs(["📋 SKU Terindikasi Over-Request", "🔄 Compare SKU Permintaan FL vs All Stock"])
     
     with tab1:
         if not results['df_bad'].empty:
@@ -3451,36 +3410,29 @@ def display_data_tables(results: dict):
             st.success("Aman! Tidak ada store yang meminta barang ke DC saat stoknya masih melimpah.")
             
     with tab2:
-        st.dataframe(results['df_stock_over'], use_container_width=True)
+        # Menampilkan tabel komparasi real-time seluruh SKU permintaan FL vs All Stock data
+        st.dataframe(results['df_compare'], use_container_width=True)
 
 
 # ==============================================================================
-# 3. DISTINCT MAIN CONTROLLER (CUSTOM CONTROLLER RUNNER)
+# 3. DISTINCT MAIN CONTROLLER
 # ==============================================================================
 def run_store_request_analytics():
-    """
-    Fungsi pengatur utama pengganti main() untuk menghindari konflik penamaan file.
-    """
-    # Panggil render UI dasar
     render_premium_ui()
-    
-    # Sekarang ambil state input langsung dari Main Panel (Bukan sidebar lagi)
     file_stock, file_permintaan = render_main_uploaders()
     
-    # Jalankan proses jika kedua file sudah siap
     if file_stock and file_permintaan:
         with st.spinner("Processing data ultra fast... ⚡"):
             try:
-                # PANGGIL LOGIC PROCESS DI SINI
                 analysis_results = process_logistics_analytics(file_stock, file_permintaan)
-                
-                # OPER HASIL KE LOGIC MENAMPILKAN DASHBOARD
                 display_dashboard_metrics(analysis_results)
                 display_data_tables(analysis_results)
-                
             except Exception as e:
                 st.error(f"Terjadi kesalahan pemrosesan data. Struktur file mungkin salah. Error: {e}")
+    else:
+        st.warning("⚠️ Menunggu kedua file diunggah di atas untuk memulai kalkulasi...")
 
+    
 
 
 
