@@ -2675,7 +2675,18 @@ def load_data_safe(file_obj):
 def extract_sku_list(df_main):
     """Fungsi logic untuk mengambil list unique SKU dari Kolom C (Index 2)"""
     try:
-        return sorted(df_main.iloc[:, 2].dropna().unique())
+        # Ambil kolom C, buang baris kosong
+        sku_col = df_main.iloc[:, 2].dropna()
+        
+        # 🟢 PERBAIKAN: Ubah paksa angka murni (seperti 920340436) & huruf menjadi String teks
+        sku_strings = sku_col.astype(str).str.strip()
+        
+        # Bersihkan dari baris hantu/kosong
+        sku_strings = sku_strings[sku_strings != '']
+        sku_strings = sku_strings[sku_strings.lower() != 'nan']
+        
+        # Sekarang sort dijamin 100% aman karena tipenya seragam (String vs String)
+        return sorted(sku_strings.unique())
     except Exception as e:
         st.error(f"Error extracting SKU from Main File: {e}")
         return []
