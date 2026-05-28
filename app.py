@@ -2967,22 +2967,57 @@ def main_menu_routing():
 
     st.markdown('<div class="hero-header"><h1>STOCK TRACKING TIMELINE</h1></div>', unsafe_allow_html=True)
     
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **File Multiple Adjusment**
+            - Download File Multiple adjusment yang akan dianalisa SKU nya
+        - **File Purchase Order**
+            - Download File Purchase Order dari Power BI dengan ketentuan :
+                - Buka Power BI ➡️ Masuk ke Menu **LEADER**➡️ Masuk ke Menu **Inventory_Processing** ➡️ Pilih Tab **Purchase Order**
+                - **Periode Invoice** ➡️ Pilih All time
+                - **Periode ReceivedIN** ➡️ Pilih All time
+                - **Store** ➡️ Pilih Jez Surabaya
+        - **File Mutasi**
+            - Download File Mutasi dari Power BI dengan ketentuan :
+                - Buka Power BI ➡️ Masuk ke Menu **LEADER**➡️ Masuk ke Menu **Inventory_Processing** ➡️ Pilih Tab **Mutation Stock**
+                - **Store** ➡️ Pilih Jez Surabaya
+                - **Period** ➡️ Pilih All Time
+        - **File Adjusment**
+            - Download File Adjusment dari Power BI dengan ketentuan :
+                - Buka Power BI ➡️ Masuk ke Menu **LEADER**➡️ Masuk ke Menu **Inventory_Processing** ➡️ Pilih Tab **Adjusment**
+                - **Period** ➡️ Pilih All time
+                - **Warehouses** ➡️ Pilih Jez Surabaya
+        - **File RTO**
+            - Download File Adjusment dari Power BI dengan ketentuan :
+                - Buka Power BI ➡️ Masuk ke Menu **LEADER**➡️ Masuk ke Menu **Inventory_Processing** ➡️ Pilih Tab **Transfer Stock**
+                - **Status** ➡️ Pilih All
+                - **Period** ➡️ Pilih All time
+                - *Untuk Store Departure dan Store Destination pilih **ALL** saja*
+        - **File Stock Tracking**
+            - Download File Adjusment dari Power BI dengan ketentuan :
+                - Buka Power BI ➡️ Masuk ke Menu **LEADER**➡️ Masuk ke Menu **Sales_Transactions** ➡️ Pilih Tab **Cek Trx**
+                - **Period** ➡️ Pilih All Time
+                - **Warehouse** ➡️ Pilih Jez Surabaya
+                - **Store Adj** ➡️ Pilih All
+                - **PS :** ➡️ Setelah Download Stock Tracking pastikan COPY & PASTE di file yang baru karena file bawaan dari PBI akan Corrupt dan tidak bisa terbaca
+        """)
     # Init Tab Menu
     tab_uploader, tab_timeline = st.tabs(["📂 UPLOADER CENTRAL", "📊 STOCK TIMELINE DASHBOARD"])
     
     # --- MENU TAB 1: UPLOADER CENTRAL ---
     with tab_uploader:
-        st.subheader("📥 Upload & Konfigurasi File Sumber Data")
-        file_main = st.file_uploader("Upload File Master SKU (SKU Wajib di Kolom C)", type=["xlsx", "csv"], key="m")
+        st.subheader("📥 Upload Data")
+        file_main = st.file_uploader("Upload File Multiple Adjusment", type=["xlsx", "csv"], key="m")
         st.write("---")
         
         # Dipecah menjadi 5 kolom sejajar agar muat ditambahkan File RTO
         col1, col2, col3, col4, col5 = st.columns(5)
-        with col1: file_po = st.file_uploader("📄 File Purchase Order (A, D, G, L)", type=["xlsx", "csv"], key="p")
-        with col2: file_mutasi = st.file_uploader("🔄 File Mutasi (B, C, E, F, G, H)", type=["xlsx", "csv"], key="mu")
-        with col3: file_adj = st.file_uploader("🔧 File Adjustment (F, B, H, K, O, P)", type=["xlsx", "csv"], key="ad")
-        with col4: file_tracking = st.file_uploader("🛒 File Stock Tracking (C, H, S, W, AA)", type=["xlsx", "csv"], key="tr")
-        with col5: file_rto = st.file_uploader("🚛 File RTO (A, D, E, F, G, I, J)", type=["xlsx", "csv"], key="rt")
+        with col1: file_po = st.file_uploader("📄 File Purchase Order", type=["xlsx", "csv"], key="p")
+        with col2: file_mutasi = st.file_uploader("🔄 File Mutasi", type=["xlsx", "csv"], key="mu")
+        with col3: file_adj = st.file_uploader("🔧 File Adjustment", type=["xlsx", "csv"], key="ad")
+        with col4: file_tracking = st.file_uploader("🛒 File Stock Tracking", type=["xlsx", "csv"], key="tr")
+        with col5: file_rto = st.file_uploader("🚛 File RTO", type=["xlsx", "csv"], key="rt")
         
         # Validasi wajib menyertakan ke-5 file log transaksi + 1 master file
         if file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto:
@@ -3106,19 +3141,19 @@ def main_menu_routing():
                     # Logic Banner UI Indikasi
                     if selisih == 0:
                         status_indikasi = "🟢 MATCH (Data Sinkron)"
-                        detail_indikasi = "Kondisi aman, tidak terdeteksi adanya selisih fisik dan transaksi."
+                        detail_indikasi = "Kemungkinan Selisih dikarenakan ada barang yang tidak ditemukan sehingga dibuang ke Karantina."
                         warna_indikasi = "#2ecc71"
                     else:
                         warna_indikasi = "#e74c3c"
                         if "SALAH ADJUSTMENT" in status_singkat:
                             status_indikasi = "⚠️ INDIKASI: SALAH ADJUSTMENT"
-                            detail_indikasi = f"Terdeteksi selisih {int(selisih)} Pcs. Jumlah ini cocok dengan total history Adjustment sebesar {int(total_adj)} Pcs. Tim admin kemungkinan salah input adjustment atau double input data."
+                            detail_indikasi = f"Terdeteksi selisih {int(selisih)} Pcs. Jumlah ini cocok dengan total history Adjustment sebesar {int(total_adj)} Pcs."
                         elif "SALAH TERIMA ITEM RTO" in status_singkat:
                             status_indikasi = "⚠️ INDIKASI: SALAH TERIMA ITEM RTO"
-                            detail_indikasi = f"Terdeteksi minus stock {int(selisih)} Pcs. Ada transaksi RTO terdata, indikasi kuat tim inbound salah scan/salah verifikasi fisik barang retur masuk."
+                            detail_indikasi = f"Terdeteksi Selisih RTO {int(selisih)} Pcs.Perhitungan diatas hanya Indikasi awal karena tidak ditemukan pada kesalahan sistem/Adjusment."
                         else:
                             status_indikasi = "❌ INDIKASI: KESALAHAN SISTEM / LOGISTIK DATA"
-                            detail_indikasi = f"Terdapat selisih sebesar {int(selisih)} Pcs antara Real Hitungan Fisik Transaksi dan Angka System. Indikasi API delay, log transaksi hilang, atau salah mapping SKU."
+                            detail_indikasi = f"Terdapat selisih sebesar {int(selisih)} Pcs antara Real stock dengan stock System. Indikasi Adanya kesalahan sistem baik pergantian Article ataupun Kesalahan system di Web Utama (Jezpro)."
 
                     # =========================================================
                     # 🎨 UI DISPLAY RENDER
