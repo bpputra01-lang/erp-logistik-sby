@@ -2623,6 +2623,7 @@ def menu_Stock_Opname():
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import io
 
 st.set_page_config(layout="wide", page_title="Stock Timeline Tracking System")
 
@@ -2692,152 +2693,166 @@ def extract_sku_list(df_main):
         st.error(f"Error extracting SKU from Main File: {e}")
         return []
 
-def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df_rto):
+
+# 🔥 OPTIMASI CACHE: Melakukan compile data komprehensif untuk seluruh SKU hanya sekali saja
+@st.cache_data(show_spinner="Menyelaraskan Seluruh Log Transaksi Gudang ke Memori (Hanya Sekali)...")
+def compile_all_sku_timelines(df_po, df_mutasi, df_adj, df_track, df_rto):
     """
-    Fungsi logic utama untuk memproses, memfilter, mendisplay running total,
-    dan menggabungkan ke-5 log file transaksi menjadi 1 Master Dataframe Timeline kronologis.
+    Memproses dan menggabungkan ke-5 log file transaksi secara global untuk seluruh SKU 
+    sekaligus ke dalam memori cache agar dashboard dropdown bisa berjalan instan.
     """
-    timeline_events = []
+    all_events = []
 
-    # 1. Logic PO: A=No PO(0), D=SKU(3), G=DateTime(6), L=Qty(11)
+    # 1. Global Logic PO: A=No PO(0), D=SKU(3), G=DateTime(6), L=Qty(11)
     try:
-        po_filtered = df_po[df_po.iloc[:, 3] == selected_sku]
-        for _, row in po_filtered.iterrows():
-            timeline_events.append({
-                'Tanggal': pd.to_datetime(row.iloc[6]),
-                'Tipe': 'PURCHASE ORDER (IN)',
-                'Qty': float(row.iloc[11]),
-                'Keterangan': f"PO Baru Masuk No: {row.iloc[0]} | Qty: +{row.iloc[11]} Pcs"
-            })
+        if not df_po.empty:
+            for _, row in df_po.dropna(subset=[df_po.columns[3]]).iterrows():
+                all_events.append({
+                    'SKU': str(row.iloc[3]).strip(),
+                    'Tanggal': pd.to_datetime(row.iloc[6]),
+                    'Tipe': 'PURCHASE ORDER (IN)',
+                    'Qty': float(row.iloc[11]),
+                    'Keterangan': f"PO Baru Masuk No: {row.iloc[0]} | Qty: +{row.iloc[11]} Pcs"
+                })
     except Exception as e:
-        st.error(f"Error processing PO logic: {e}")
+        st.error(f"Error caching PO logic: {e}")
 
-   # 2. Logic Mutasi (SANITZED FOR HTML SAFETY)
+    # 2. Global Logic Mutasi
     try:
-        mutasi_filtered = df_mutasi[df_mutasi.iloc[:, 2] == selected_sku]
-        for _, row in mutasi_filtered.iterrows():
-            # Pastikan diclean dari NaN dan karakter yang bisa ngerusak HTML
-            bin_awal = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else "-"
-            bin_tujuan = str(row.iloc[5]).strip() if not pd.isna(row.iloc[5]) else "-"
-            pic_mutasi = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "No Name"
-            qty_mutasi = row.iloc[6]
-            
-            # Hilangkan karakter tulisan 'nan' atau simbol aneh
-            if bin_awal.lower() == 'nan': bin_awal = "-"
-            if bin_tujuan.lower() == 'nan': bin_tujuan = "-"
-            
-            # Bungkus string dengan aman tanpa tanda kutip ganda yang merusak f-string HTML
-            ket_text = f"Perpindahan BIN: {bin_awal} -> {bin_tujuan} | Qty: {qty_mutasi} Pcs | PIC: {pic_mutasi}"
-            # Ganti tanda panah emoji jika itu yang bikin crash
-            ket_text = ket_text.replace('➡️', '->').replace('"', "'") 
-            
-            timeline_events.append({
-                'Tanggal': pd.to_datetime(row.iloc[4]),
-                'Tipe': 'MUTASI INTERNAL',
-                'Qty': 0,
-                'Keterangan': ket_text
-            })
+        if not df_mutasi.empty:
+            for _, row in df_mutasi.dropna(subset=[df_mutasi.columns[2]]).iterrows():
+                bin_awal = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else "-"
+                bin_tujuan = str(row.iloc[5]).strip() if not pd.isna(row.iloc[5]) else "-"
+                pic_mutasi = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "No Name"
+                qty_mutasi = row.iloc[6]
+                
+                if bin_awal.lower() == 'nan': bin_awal = "-"
+                if bin_tujuan.lower() == 'nan': bin_tujuan = "-"
+                
+                ket_text = f"Perpindahan BIN: {bin_awal} -> {bin_tujuan} | Qty: {qty_mutasi} Pcs | PIC: {pic_mutasi}"
+                ket_text = ket_text.replace('➡️', '->').replace('"', "'") 
+                
+                all_events.append({
+                    'SKU': str(row.iloc[2]).strip(),
+                    'Tanggal': pd.to_datetime(row.iloc[4]),
+                    'Tipe': 'MUTASI INTERNAL',
+                    'Qty': 0,
+                    'Keterangan': ket_text
+                })
     except Exception as e:
-        st.error(f"Error processing Mutasi logic: {e}")
+        st.error(f"Error caching Mutasi logic: {e}")
 
-    # 3. Logic Adjustment: F=No Adj(5), B=DateTime Appr(1), H=SKU(7), K=Qty(10), O=Pembuat(14), P=Approval(15)
+    # 3. Global Logic Adjustment: F=No Adj(5), B=DateTime Appr(1), H=SKU(7), K=Qty(10), O=Pembuat(14), P=Approval(15)
     try:
-        adj_filtered = df_adj[df_adj.iloc[:, 7] == selected_sku]
-        for _, row in adj_filtered.iterrows():
-            qty_val = float(row.iloc[10])
-            prefix = "+" if qty_val > 0 else ""
-            timeline_events.append({
-                'Tanggal': pd.to_datetime(row.iloc[1]),
-                'Tipe': 'ADJUSTMENT',
-                'Qty': qty_val,
-                'Keterangan': f"Adj No: {row.iloc[5]} ({prefix}{qty_val} Pcs) | Dibuat: {row.iloc[14]} | Appr: {row.iloc[15]}"
-            })
+        if not df_adj.empty:
+            for _, row in df_adj.dropna(subset=[df_adj.columns[7]]).iterrows():
+                qty_val = float(row.iloc[10])
+                prefix = "+" if qty_val > 0 else ""
+                all_events.append({
+                    'SKU': str(row.iloc[7]).strip(),
+                    'Tanggal': pd.to_datetime(row.iloc[1]),
+                    'Tipe': 'ADJUSTMENT',
+                    'Qty': qty_val,
+                    'Keterangan': f"Adj No: {row.iloc[5]} ({prefix}{qty_val} Pcs) | Dibuat: {row.iloc[14]} | Appr: {row.iloc[15]}"
+                })
     except Exception as e:
-        st.error(f"Error processing Adjustment logic: {e}")
+        st.error(f"Error caching Adjustment logic: {e}")
 
-# 4. Logic Stock Tracking/Sales & Refund (SANITZED FOR HTML SAFETY - FIXED ABSOLUTE QTY)
+    # 4. Global Logic Stock Tracking/Sales & Refund
     try:
         if df_track is not None and not df_track.empty and df_track.shape[1] >= 27:
-            track_filtered = df_track[df_track.iloc[:, 26] == selected_sku]
-            for _, row in track_filtered.iterrows():
+            for _, row in df_track.dropna(subset=[df_track.columns[26]]).iterrows():
                 qty_raw = row.iloc[18]
                 if pd.isna(qty_raw) or str(qty_raw).strip().upper() == 'NAN':
                     continue
                     
-                # Ambil nilai mentah Qty dari Excel (Bisa minus/positif tergantung sistem log)
                 qty_out = float(qty_raw)
-                
-                # Ambil data Invoice (Indeks 7) dan Status (Indeks 22)
                 inv_val = str(row.iloc[7]).strip() if not pd.isna(row.iloc[7]) else "-"
                 status_val = str(row.iloc[22]).strip() if not pd.isna(row.iloc[22]) else "-"
                 
-                # 🔥 CEK LOGIKA STATUS & ARAH ARUS STOCK
                 if status_val.upper() == 'REFUND':
                     tipe_transaksi = 'REFUND'
                     txt_status = "Refund In"
-                    # Di Excel terdata minus (-1), kita paksa jadi positif (+1) karena barang retur MASUK gudang
                     final_qty = abs(qty_out)  
-                    display_qty = abs(qty_out) # Untuk tampilan teks keterangan agar rapi '+1 Pcs'
+                    display_qty = abs(qty_out)
                 else:
                     tipe_transaksi = 'STOCK TRACKING / SALES'
                     txt_status = "Sales Out"
-                    # Di Excel terdata positif (1), kita paksa jadi minus (-1) karena barang KELUAR terjual
                     final_qty = -abs(qty_out) 
                     display_qty = abs(qty_out)
                 
-                # Bungkus keterangan dengan aman
                 ket_track = f"{txt_status} | Inv: {inv_val} | Status: {status_val} | Qty: {display_qty} Pcs"
-                ket_track = ket_track.replace('"', "'") # Amankan dari double quotes HTML
+                ket_track = ket_track.replace('"', "'")
                 
-                # Masukkan ke array master dengan memanggil variabel secara dinamis
-                timeline_events.append({
+                all_events.append({
+                    'SKU': str(row.iloc[26]).strip(),
                     'Tanggal': pd.to_datetime(row.iloc[2]),
                     'Tipe': tipe_transaksi,
-                    'Qty': final_qty,       # Efek kumulatif running stock akan benar (+) untuk refund
+                    'Qty': final_qty,
                     'Keterangan': ket_track
                 })
     except Exception as e:
-        st.error(f"Error processing Stock Tracking & Refund logic: {e}")
+        st.error(f"Error caching Stock Tracking logic: {e}")
 
-    # 5. Logic RTO (Khusus Filter Surabaya): A=DateTime(0), D=No Transfer(3), E=Status(4), F=Store Awal(5), G=Store Akhir(6), I=SKU(8), J=Qty(9)
+    # 5. Global Logic RTO (Khusus Filter Surabaya)
     try:
         if df_rto is not None and not df_rto.empty:
-            rto_filtered = df_rto[df_rto.iloc[:, 8] == selected_sku]
-            for _, row in rto_filtered.iterrows():
+            for _, row in df_rto.dropna(subset=[df_rto.columns[8]]).iterrows():
                 store_awal = str(row.iloc[5]).upper()
                 store_akhir = str(row.iloc[6]).upper()
                 qty_raw = float(row.iloc[9])
                 
-                # Cek arah mutasi stock berdasarkan cabang SURABAYA
                 if "SURABAYA" in store_akhir:
-                    # Gudang tujuan ada kata SURABAYA -> Stock Masuk (+)
                     qty_final = abs(qty_raw)
-                    timeline_events.append({
+                    all_events.append({
+                        'SKU': str(row.iloc[8]).strip(),
                         'Tanggal': pd.to_datetime(row.iloc[0]),
                         'Tipe': 'RETURN TO OFFICE (RTO)',
                         'Qty': qty_final,
-                        'Keterangan': f"RTO Masuk (SBY) | No Transfer: {row.iloc[3]} | Asal: {row.iloc[5]} ➡️ Tujuan: {row.iloc[6]} | Status: {row.iloc[4]} | Qty: +{qty_final} Pcs"
+                        'Keterangan': f"RTO Masuk (SBY) | No Transfer: {row.iloc[3]} | Asal: {row.iloc[5]} -> Tujuan: {row.iloc[6]} | Status: {row.iloc[4]} | Qty: +{qty_final} Pcs"
                     })
                 elif "SURABAYA" in store_awal:
-                    # Gudang asal ada kata SURABAYA -> Stock Keluar (-)
                     qty_final = -abs(qty_raw)
-                    timeline_events.append({
+                    all_events.append({
+                        'SKU': str(row.iloc[8]).strip(),
                         'Tanggal': pd.to_datetime(row.iloc[0]),
                         'Tipe': 'RETURN TO OFFICE (RTO)',
                         'Qty': qty_final,
-                        'Keterangan': f"RTO Keluar (SBY) | No Transfer: {row.iloc[3]} | Asal: {row.iloc[5]} ➡️ Tujuan: {row.iloc[6]} | Status: {row.iloc[4]} | Qty: {qty_final} Pcs"
+                        'Keterangan': f"RTO Keluar (SBY) | No Transfer: {row.iloc[3]} | Asal: {row.iloc[5]} -> Tujuan: {row.iloc[6]} | Status: {row.iloc[4]} | Qty: {qty_final} Pcs"
                     })
     except Exception as e:
-        st.error(f"Error processing RTO logic: {e}")
+        st.error(f"Error caching RTO logic: {e}")
 
-    # Menggabungkan & mengurutkan secara kronologis
-    if timeline_events:
-        df_timeline = pd.DataFrame(timeline_events)
-        df_timeline = df_timeline.sort_values(by='Tanggal').reset_index(drop=True)
-        df_timeline['Running_Stock'] = df_timeline['Qty'].cumsum() # Hitung sisa stok berjalan
-        return df_timeline
+    if not all_events:
+        return pd.DataFrame()
+
+    # Gabung dan sorting kronologis per SKU group
+    df_master = pd.DataFrame(all_events)
+    df_master['SKU'] = df_master['SKU'].astype(str)
+    df_master = df_master.sort_values(by=['SKU', 'Tanggal']).reset_index(drop=True)
     
-    return pd.DataFrame()
+    # Hitung Running Stock per kelompok SKU secara simultan
+    df_master['Running_Stock'] = df_master.groupby('SKU')['Qty'].cumsum()
+    return df_master
+
+
+def generate_excel_download(df_compiled, list_sku):
+    """Membangun data buffer Excel multi-sheet berisi riwayat terpilah per SKU untuk fitur Export Report"""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        for sku in list_sku:
+            sku_str = str(sku).strip()
+            df_sku = df_compiled[df_compiled['SKU'] == sku_str].copy()
+            
+            if not df_sku.empty:
+                df_export = df_sku[['Tanggal', 'Tipe', 'Qty', 'Running_Stock', 'Keterangan']].copy()
+                df_export['Tanggal'] = df_export['Tanggal'].dt.strftime('%Y-%m-%d %H:%M:%S')
+                df_export.columns = ['Tanggal Transaksi', 'Tipe Dokumen', 'Perubahan Qty', 'Sisa Stock Berjalan', 'Keterangan Log']
+                
+                # Excel batasi nama sheet max 31 karakter dan dilarang mengandung simbol khusus / atau \
+                sheet_name = sku_str[:31].replace('/', '-').replace('\\', '-')
+                df_export.to_excel(writer, sheet_name=sheet_name, index=False)
+    return output.getvalue()
 
 
 # ==========================================
@@ -2990,31 +3005,48 @@ def main_menu_routing():
         else:
             st.warning("⚠️ Menunggu semua file lengkap di-upload.")
 
-   # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
+    # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
     with tab_timeline:
         if not (file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto):
             st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
             return
 
-        # Load File Dataframes
+        # Load File Dataframes awal
         df_main = load_data_safe(file_main)
         list_sku = extract_sku_list(df_main)
         
         if list_sku:
+            # Load seluruh dataset mentah untuk diserahkan ke compiler global
+            df_po_raw = load_data_safe(file_po)
+            df_mutasi_raw = load_data_safe(file_mutasi)
+            df_adj_raw = load_data_safe(file_adj)
+            df_track_raw = load_data_safe(file_tracking)
+            df_rto_raw = load_data_safe(file_rto)
+            
+            # 🔥 PROSES SEKALI SAJA: Jalankan mesin cache data global untuk seluruh SKU
+            df_all_compiled = compile_all_sku_timelines(df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
+            
+            # 📥 INPUT FITUR: Sediakan file excel download master yang dibuat instan dari memori cache
+            st.write("### 🗂️ Export Master Report")
+            excel_data = generate_excel_download(df_all_compiled, list_sku)
+            st.download_button(
+                label="📥 Download All SKU Timeline Report (.xlsx)",
+                data=excel_data,
+                file_name="Master_Timeline_All_SKU_Report.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            st.write("---")
+
+            # Dropdown menu lo diatur di sini
             c_select, _ = st.columns([2, 2])
             with c_select:
                 selected_sku = st.selectbox("🎯 Pilih SKU untuk Analisis Timeline:", list_sku)
             
             if selected_sku:
-                # Load semua data mentah
-                df_po_raw = load_data_safe(file_po)
-                df_mutasi_raw = load_data_safe(file_mutasi)
-                df_adj_raw = load_data_safe(file_adj)
-                df_track_raw = load_data_safe(file_tracking)
-                df_rto_raw = load_data_safe(file_rto)
+                sku_search = str(selected_sku).strip()
                 
-                # Jalankan fungsi gabungan pemrosesan timeline
-                df_timeline = process_master_timeline(selected_sku, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
+                # ⚡ EXTRACTION INSTAN (SLICING MEMORY): Potong data SKU yang dipilih dari hasil cache raksasa tanpa kalkulasi ulang
+                df_timeline = df_all_compiled[df_all_compiled['SKU'] == sku_search].reset_index(drop=True)
                 
                 if not df_timeline.empty:
                     total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
@@ -3033,7 +3065,7 @@ def main_menu_routing():
                     if current_end_stock == 0:
                         try:
                             # Cari baris SKU yang dipilih di df_main (Kolom C = Indeks 2)
-                            sku_row = df_main[df_main.iloc[:, 2] == selected_sku]
+                            sku_row = df_main[df_main.iloc[:, 2].astype(str).str.strip() == sku_search]
                             if not sku_row.empty:
                                 master_qty_raw = sku_row.iloc[0, 9] # Kolom J = Indeks 9
                                 stock_system = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
@@ -3119,7 +3151,7 @@ def main_menu_routing():
                     st.write("---")
                     st.write(f"### ⏳ Riwayat Kronologis SKU: {selected_sku}")
                     
-                    # Panggil langsung fungsi UI timeline lo yang udah aman kemarin
+                    # Panggil langsung fungsi UI timeline
                     render_html_timeline_ui(df_timeline)
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
