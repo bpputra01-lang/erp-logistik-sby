@@ -4177,17 +4177,6 @@ def main_menu_routing():
 
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
 
-
-apa yang menyebabkan refund judulnya masih stock tracking atau sales ?
-
-Penyebab utama kenapa data refund lo judulnya masih nyangkut sebagai STOCK TRACKING / SALES adalah karena di dalam fungsi process_master_timeline (tepatnya pada bagian # 4. Logic Stock Tracking/Sales), data tipenya masih dikunci manual (hardcoded) saat dimasukkan ke array timeline_events.
-
-Meskipun lo sudah membuat variabel penampung dinamis bernama tipe_transaksi, di bagian bawahnya data tipenya tidak dipanggil, melainkan langsung ditulis string mentah 'STOCK TRACKING / SALES'.
-🔍 Letak Kesalahan pada Kode Lo:
-
-Coba cek baris kode lo yang ini, bro:
-Python
-
                 # Cek apakah ada status REFUND di baris data tersebut
                 if str(row['Status']).upper() == 'REFUND':
                     tipe_transaksi = 'REFUND'
