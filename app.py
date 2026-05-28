@@ -3378,6 +3378,7 @@ def display_dashboard_metrics(results: dict):
             <div class="premium-card">
                 <div class="metric-title">📋 Total Permintaan Frontline</div>
                 <div class="metric-value">{total_valid_int:,}</div>
+                <div class="metric-desc">Total Request FL to DC</div>
             </div>
         """, unsafe_allow_html=True)
     with col2:
