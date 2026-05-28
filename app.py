@@ -2999,6 +2999,9 @@ def main_menu_routing():
         # Load File Dataframes
         df_main = load_data_safe(file_main)
         list_sku = extract_sku_list(df_main)
+
+        # 🛡️ DEKLARASI GLOBAL DI AWAL (ANTI NAMEERROR): Amankan variable sejak tab pertama kali diproses
+        df_download_target = None
         
         if list_sku:
             c_select, _ = st.columns([2, 2])
@@ -3123,8 +3126,8 @@ def main_menu_routing():
                     render_html_timeline_ui(df_timeline)
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
-                    # ==============================================================================
-            # 3. EXPORT MASTER REPORT (EKSPORT LOG SKU YANG SEDANG DIPILIH)
+                  # ==============================================================================
+            # 3. EXPORT SKU TIMELINE REPORT (AMAN DARI NAMEERROR)
             # ==============================================================================
             st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
             st.subheader("📦 Export SKU Timeline Report")
@@ -3132,12 +3135,11 @@ def main_menu_routing():
 
             col_btn, _ = st.columns([1, 2])
             with col_btn:
-                # Cek jika data filter SKU aktif dan tidak kosong
+                # Cek kondisi dengan aman karena target variable pasti terdefinisi di atas
                 if df_download_target is not None and not df_download_target.empty:
                     import io
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                        # Mengunduh MURNI data SKU terpilih saja
                         df_download_target.to_excel(writer, index=False, sheet_name=f'Timeline_{str(selected_sku)[:20]}')
                     processed_data = buffer.getvalue()
 
@@ -3150,7 +3152,6 @@ def main_menu_routing():
                     )
                 else:
                     st.warning("Silakan pilih SKU di dropdown atas terlebih dahulu untuk mendownload data report.")
-            
 import math
 import pandas as pd
 import streamlit as st
