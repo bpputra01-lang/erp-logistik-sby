@@ -3008,7 +3008,7 @@ def main_menu_routing():
             df_track_raw = load_data_safe(file_tracking)
             df_rto_raw = load_data_safe(file_rto)
             
-            # 🔥 PROSES KOMPILASI MASAL + INJECT SELURUH DATA KALKULASI BARU (BIAR IKUT KEDOWNLOAD DI EXCEL)
+           # 🔥 PROSES KOMPILASI MASAL + INJECT SELURUH DATA KALKULASI BARU (LOGIC FALLBACK AWAL LO)
             with st.spinner("⚡ Mengompilasi data transaksi & analisis kalkulasi untuk SEMUA SKU... Harap tunggu..."):
                 list_compiled_df = []
                 for sku in list_sku:
@@ -3022,19 +3022,19 @@ def main_menu_routing():
                         # --- 1. Hitung Stock Akhir Timeline ---
                         current_end_stock = df_temp['Running_Stock'].iloc[-1] if 'Running_Stock' in df_temp.columns else 0
                         
-                        # --- 2. Ambil nilai Qty System dari file master utama (Kolom J = Index 9) ---
-                        try:
-                            sku_row = df_main[df_main.iloc[:, 2].astype(str).str.strip() == sku_clean]
-                            if not sku_row.empty:
-                                master_qty_raw = sku_row.iloc[0, 9] # Kolom J
-                                stock_kolom_j = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
-                            else:
-                                stock_kolom_j = 0
-                        except Exception:
-                            stock_kolom_j = 0
-                        
-                        # --- 3. Hitung Rumus Baru ---
-                        stock_system_calc = current_end_stock + stock_kolom_j
+                        # --- 2. Balikin ke Logic Awal Lo (Pengecekan Fallback if 0) ---
+                        if current_end_stock == 0:
+                            try:
+                                sku_row = df_main[df_main.iloc[:, 2].astype(str).str.strip() == sku_clean]
+                                if not sku_row.empty:
+                                    master_qty_raw = sku_row.iloc[0, 9] # Kolom J
+                                    stock_system_calc = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
+                                else:
+                                    stock_system_calc = 0
+                            except Exception:
+                                stock_system_calc = 0
+                        else:
+                            stock_system_calc = current_end_stock
                         
                         # --- 4. Real Qty & Varian Transaksi ---
                         if 'Tipe' in df_temp.columns and 'Qty' in df_temp.columns:
