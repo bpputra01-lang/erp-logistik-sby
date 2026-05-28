@@ -3314,13 +3314,13 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
         "df_stock_over": df_stock_over_2.rename(columns={'QTY_STOCK': 'Total Stock Store'})
     }
 # ==============================================================================
-# 2. LOGIC MENU & LAYOUT (FRONTEND UI)
+# 2. LOGIC MENU & LAYOUT (FRONTEND UI) - UPDATED UPLOADER DI MAIN PANEL
 # ==============================================================================
 def render_premium_ui():
     """
     Fungsi untuk menangani seluruh layouting, dashboard styling, dan rendering menu.
     """
-    st.set_page_config(page_title="Store Request Analytics", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="Store Request Analytics", layout="wide", initial_sidebar_state="collapsed")
 
     # Inject Premium Dark Theme Stylesheet
     st.markdown("""
@@ -3340,29 +3340,68 @@ def render_premium_ui():
         .metric-title { font-size: 14px; color: #8c96a8; text-transform: uppercase; letter-spacing: 1px; }
         .metric-value { font-size: 32px; font-weight: 700; color: #ffffff; margin-top: 5px; }
         .metric-desc { font-size: 12px; color: #a3b0c2; margin-top: 5px; }
-        [data-testid="stSidebar"] { background-color: #111424; }
+        
+        /* Style tambahan untuk info box atas */
+        .info-container {
+            background-color: #111424;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 3px solid #1f2438;
+        }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="hero-header">📊 STORE TO DC REQUEST ANALYTICS (SURABAYA)</div>', unsafe_allow_html=True)
 
 
-def render_sidebar_menu():
+def render_main_uploaders():
     """
-    Menangani menu interaksi di sidebar (Uploader Menu).
+    Menangani menu interaksi uploader di Main Panel dengan layout kolom berdampingan.
     """
-    with st.sidebar:
-        st.markdown("### 📥 UPLOAD DATASET")
-        st.info("Pastikan format file sesuai dengan instruksi kolom.")
+    st.markdown('<div class="info-container">💡 <b>Petunjuk:</b> Pastikan format file sesuai dengan instruksi susunan kolom sebelum mengunggah.</div>', unsafe_allow_html=True)
+    
+    # Buat 2 kolom melebar di Main Panel
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        file_stock = st.file_uploader("📥 1. Upload File All Stock", type=["xlsx", "xls", "csv"])
         
-        file_stock = st.file_uploader("1. Upload File All Stock", type=["xlsx", "xls", "csv"])
-        file_permintaan = st.file_uploader("2. Upload File Permintaan FL", type=["xlsx", "xls", "csv"])
+    with col_right:
+        file_permintaan = st.file_uploader("📥 2. Upload File Permintaan FL", type=["xlsx", "xls", "csv"])
         
-        st.markdown("---")
-        st.caption("Developed for Logistics Data Optimization | Target: Surabaya Branch")
-        
+    st.markdown("---")
     return file_stock, file_permintaan
 
+
+# ==============================================================================
+# 3. DISTINCT MAIN CONTROLLER (CUSTOM CONTROLLER RUNNER)
+# ==============================================================================
+def run_store_request_analytics():
+    """
+    Fungsi pengatur utama pengganti main() untuk menghindari konflik penamaan file.
+    """
+    # Panggil render UI dasar
+    render_premium_ui()
+    
+    # Sekarang ambil state input langsung dari Main Panel (Bukan sidebar lagi)
+    file_stock, file_permintaan = render_main_uploaders()
+    
+    # Jalankan proses jika kedua file sudah siap
+    if file_stock and file_permintaan:
+        with st.spinner("Processing data ultra fast... ⚡"):
+            try:
+                # PANGGIL LOGIC PROCESS DI SINI
+                analysis_results = process_logistics_analytics(file_stock, file_permintaan)
+                
+                # OPER HASIL KE LOGIC MENAMPILKAN DASHBOARD
+                display_dashboard_metrics(analysis_results)
+                display_data_tables(analysis_results)
+                
+            except Exception as e:
+                st.error(f"Terjadi kesalahan pemrosesan data. Struktur file mungkin salah. Error: {e}")
+    else:
+        st.warning("⚠️ Menunggu kedua file diunggah di atas untuk memulai kalkulasi...")
 
 def display_dashboard_metrics(results: dict):
     """
@@ -3426,8 +3465,8 @@ def run_store_request_analytics():
     # Panggil render UI dasar
     render_premium_ui()
     
-    # Ambil state input dari menu sidebar
-    file_stock, file_permintaan = render_sidebar_menu()
+    # Sekarang ambil state input langsung dari Main Panel (Bukan sidebar lagi)
+    file_stock, file_permintaan = render_main_uploaders()
     
     # Jalankan proses jika kedua file sudah siap
     if file_stock and file_permintaan:
@@ -3443,7 +3482,7 @@ def run_store_request_analytics():
             except Exception as e:
                 st.error(f"Terjadi kesalahan pemrosesan data. Struktur file mungkin salah. Error: {e}")
     else:
-        st.info("💡 Sila upload kedua file (All Stock & Permintaan FL) pada sidebar untuk memulai perhitungan persentase.")
+        st.warning("⚠️ Menunggu kedua file diunggah di atas untuk memulai kalkulasi...")
 
 
 
