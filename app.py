@@ -3040,7 +3040,7 @@ def main_menu_routing():
         else:
             st.warning("⚠️ Menunggu semua file lengkap di-upload.")
 
-   # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
+    # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
     with tab_timeline:
         if not (file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto):
             st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
@@ -3060,117 +3060,6 @@ def main_menu_routing():
             
             # 🔥 PROSES SEKALI SAJA: Jalankan mesin cache data global untuk seluruh SKU
             df_all_compiled = compile_all_sku_timelines(df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
-            
-            # ==============================================================================
-            # 1. MENU DROPDOWN SKU (SEKARANG NAIK KE ATAS DASHBOARD)
-            # ==============================================================================
-            c_select, _ = st.columns([2, 2])
-            with c_select:
-                selected_sku = st.selectbox("🎯 Pilih SKU untuk Analisis Timeline:", list_sku)
-            
-            # ==============================================================================
-            # 2. AREA VISUALISASI UTAMA TIMELINE SKU
-            # ==============================================================================
-            if selected_sku:
-                sku_search = str(selected_sku).strip()
-                
-                # ⚡ EXTRACTION INSTAN (SLICING MEMORY): Potong data SKU dari hasil cache
-                df_timeline = df_all_compiled[df_all_compiled['SKU'] == sku_search].reset_index(drop=True)
-                
-                if not df_timeline.empty:
-                    total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
-                    current_end_stock = df_timeline['Running_Stock'].iloc[-1]
-                    
-                    # --- ADDON LOGIC: REAL QTY, SYSTEM STOCK (FALLBACK), & DIAGNOSA ERROR ---
-                    df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'REFUND', 'RETURN TO OFFICE (RTO)'])]
-                    real_qty = df_real['Qty'].sum()
-                    
-                    lbl_system = "🖥️ Stock System (Last)"
-                    if current_end_stock == 0:
-                        try:
-                            sku_row = df_main[df_main.iloc[:, 2].astype(str).str.strip() == sku_search]
-                            if not sku_row.empty:
-                                master_qty_raw = sku_row.iloc[0, 9] # Kolom J = Indeks 9
-                                stock_system = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
-                                lbl_system = "🖥️ Stock System (Web Utama)"
-                            else:
-                                stock_system = 0
-                        except Exception:
-                            stock_system = 0
-                    else:
-                        stock_system = current_end_stock
-                    
-                    selisih = stock_system - real_qty
-                    total_adj = df_timeline[df_timeline['Tipe'] == 'ADJUSTMENT']['Qty'].sum()
-                    total_rto = df_timeline[df_timeline['Tipe'] == 'RETURN TO OFFICE (RTO)']['Qty'].sum()
-                    
-                    status_indikasi = "🟢 MATCH (Data Sinkron)"
-                    detail_indikasi = "Kondisi aman, tidak terdeteksi adanya selisih fisik dan transaksi."
-                    warna_indikasi = "#2ecc71"
-                    
-                    if selisih != 0:
-                        warna_indikasi = "#e74c3c"
-                        if total_adj != 0 and abs(total_adj) == abs(selisih):
-                            status_indikasi = "⚠️ INDIKASI: SALAH ADJUSTMENT"
-                            detail_indikasi = f"Terdeteksi selisih {int(selisih)} Pcs. Jumlah ini cocok dengan total history Adjustment sebesar {int(total_adj)} Pcs. Tim admin kemungkinan salah input adjustment atau double input data."
-                        elif total_rto != 0 and selisih < 0:
-                            status_indikasi = "⚠️ INDIKASI: SALAH TERIMA ITEM RTO"
-                            detail_indikasi = f"Terdeteksi minus stock {int(selisih)} Pcs. Ada transaksi RTO terdata, indikasi kuat tim inbound salah scan/salah verifikasi fisik barang retur masuk."
-                        else:
-                            status_indikasi = "❌ INDIKASI: KESALAHAN SISTEM / LOGISTIK DATA"
-                            detail_indikasi = f"Terdapat selisih sebesar {int(selisih)} Pcs antara Real Hitungan Fisik Transaksi dan Angka System. Indikasi API delay, log transaksi hilang, atau salah mapping SKU."
-
-                    # --- UPDATE UI DISPLAY (Premium Layout) ---
-                    st.write("---")
-                    
-                    # Row 1: KPI Cards
-                    c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
-                    with c_kpi1: 
-                        st.markdown(f"<div class='m-box' style='border-left: 4px solid #9b59b6 !important;'><span class='m-lbl'>📦 Initial Qty PO</span><div class='m-val'>{int(total_initial_po)} Pcs</div></div>", unsafe_allow_html=True)
-                    with c_kpi2: 
-                        st.markdown(f"<div class='m-box' style='border-left: 4px solid #2ecc71 !important;'><span class='m-lbl'>📊 Real Qty (PO+Sales+RTO)</span><div class='m-val'>{int(real_qty)} Pcs</div></div>", unsafe_allow_html=True)
-                    with c_kpi3: 
-                        st.markdown(f"<div class='m-box' style='border-left: 4px solid #3498db !important;'><span class='m-lbl'>{lbl_system}</span><div class='m-val'>{int(stock_system)} Pcs</div></div>", unsafe_allow_html=True)
-                    with c_kpi4: 
-                        warna_var = "#2ecc71" if selisih == 0 else "#e74c3c"
-                        st.markdown(f"<div class='m-box' style='border-left: 4px solid {warna_var} !important;'><span class='m-lbl'>⚠️ Selisih Varian</span><div class='m-val'>{int(selisih)} Pcs</div></div>", unsafe_allow_html=True)
-                        
-                    # Row 2: Box Diagnosa
-                    st.markdown(f"""
-                        <div style='background: #1e1e2a; padding: 20px; border-radius: 10px; border: 1px solid #333; margin-top: 5px; margin-bottom: 20px;'>
-                            <h4 style='color: {warna_indikasi}; margin-top: 0; font-size: 16px; font-weight: bold;'>{status_indikasi}</h4>
-                            <p style='color: #b0b3c6; font-size: 14px; margin: 5px 0 0 0; line-height: 1.5;'>{detail_indikasi}</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Render Grafik & Timeline Visual
-                    render_chart_ui(df_timeline)
-                    st.write("---")
-                    st.write(f"### ⏳ Riwayat Kronologis SKU: {selected_sku}")
-                    render_html_timeline_ui(df_timeline)
-                else:
-                    st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
-
-            # ==============================================================================
-            # 3. EXPORT MASTER REPORT (KINI BENAR-BENAR DI BAWAH SENDIRI SECARA GLOBAL)
-            # ==============================================================================
-            st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
-            st.subheader("📦 Export Master Report")
-            st.caption("Unduh seluruh kompilasi log riwayat transaksi semua SKU yang telah diselaraskan ke dalam satu file Excel.")
-
-            col_btn, _ = st.columns([1, 2])
-            with col_btn:
-                # Kita cek df_all_compiled hasil mesin global cache di atas tadi
-                if df_all_compiled is not None and not df_all_compiled.empty:
-                    st.download_button(
-                        label="📥 Download All SKU Timeline Report (.xlsx)",
-                        data=bytes("Ganti dengan data excel/buffer lo", "utf-8"), # Taruh variable buffer excel lo di sini
-                        file_name="Master_Timeline_Report_Surabaya.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="btn_download_master_bottom"
-                    )
-                else:
-                    st.warning("Data Master belum siap atau file log belum di-upload.")
 
             # Dropdown menu lo diatur di sini
             c_select, _ = st.columns([2, 2])
@@ -3290,6 +3179,25 @@ def main_menu_routing():
                     render_html_timeline_ui(df_timeline)
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
+        # ==============================================================================
+            # 3. EXPORT MASTER REPORT (KINI BENAR-BENAR DI BAWAH SENDIRI SECARA GLOBAL)
+            # ==============================================================================
+            st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
+            st.subheader("📦 Export Master Report")
+            st.caption("Unduh seluruh kompilasi log riwayat transaksi semua SKU yang telah diselaraskan ke dalam satu file Excel.")
+
+            col_btn, _ = st.columns([1, 2])
+            with col_btn:
+                if df_all_compiled is not None and not df_all_compiled.empty:
+                    st.download_button(
+                        label="📥 Download All SKU Timeline Report (.xlsx)",
+                        data=bytes("Ganti dengan data excel/buffer lo", "utf-8"), # Taruh variable buffer excel lo di sini seperti semula
+                        file_name="Master_Timeline_Report_Surabaya.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_download_master_bottom_final_fixed"
+                    )
+                else:
+                    st.warning("Data Master belum siap atau file log belum di-upload.")
             
 import math
 import pandas as pd
