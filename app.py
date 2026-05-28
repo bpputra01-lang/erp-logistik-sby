@@ -3352,7 +3352,7 @@ def render_premium_ui():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header">STORE REQUEST TO DC TO STOCK STORE (SURABAYA)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">STORE REQUEST TO DC TO STOCK STORE</div>', unsafe_allow_html=True)
 
 
 def render_main_uploaders():
