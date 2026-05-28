@@ -3133,32 +3133,41 @@ def main_menu_routing():
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {active_sku}")
 
-            # ==============================================================================
-            # 3. EXPORT SKU TIMELINE REPORT (INTEGRATED & AUTOMATIC DI BAWAH KRONOLOGIS)
+           # ==============================================================================
+            # 3. 🔥 SAKTI BUTTON: DOWNLOAD ALL SKU IN DROPDOWN (DATA FULL TERKONDISI)
             # ==============================================================================
             st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
-            st.subheader("📦 Export SKU Timeline Report")
-            st.caption(f"Unduh log riwayat transaksi spesifik untuk SKU yang sedang aktif dianalisis di atas.")
+            st.subheader("📊 Export Dropdown SKU Master Timeline Report")
+            st.caption("Klik tombol di bawah untuk langsung mengunduh data gabungan riwayat transaksi dari **SEMUA SKU YANG ADA DI LIST DROPDOWN DI ATAS** sekaligus dalam satu file Excel.")
 
             col_btn, _ = st.columns([1, 2])
             with col_btn:
-                # Sekarang kondisi ini dijamin langsung bernilai TRUE karena df_download_target terisi otomatis sejak awal render
-                if df_download_target is not None and not df_download_target.empty:
+                if not df_all_dropdown_sku.empty:
                     import io
                     buffer = io.BytesIO()
+                    
+                    # Bersihkan kolom database internal (Kolom bantuan J) biar report Excel lo tetep clean & profesional
+                    df_excel_all_download = df_all_dropdown_sku.drop(columns=['Qty_Master_Col_J'], errors='ignore')
+                    
+                    # Tulis ke excel dengan engine openpyxl secara aman
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                        df_download_target.to_excel(writer, index=False, sheet_name=f'Timeline_{str(active_sku)[:20]}')
-                    processed_data = buffer.getvalue()
+                        # 🛠️ FIXED: File Excel mencakup kolom itungan rumus fallback lo bro!
+                        df_excel_all_download.to_excel(writer, index=False, sheet_name='All_Dropdown_SKU_Timeline')
+                        # FORCE: Pastikan writer nge-flush data ke buffer sebelum keluar block 'with'
+                        writer.flush()
+                    
+                    # 🔥 AMAN: Ambil value SETELAH proses kompresi berkas openpyxl selesai 100%
+                    processed_dropdown_data = buffer.getvalue()
 
                     st.download_button(
-                        label=f"📥 Download Report SKU: {active_sku} (.xlsx)",
-                        data=processed_data, 
-                        file_name=f"Timeline_Report_{str(active_sku).strip()}.xlsx",
+                        label="📥 Download Master Report All SKU Dropdown (.xlsx)",
+                        data=processed_dropdown_data, 
+                        file_name="Master_Timeline_All_Dropdown_SKU.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="btn_download_single_sku_fixed"
+                        key="btn_download_dropdown_sku_massive_final_fixed"
                     )
                 else:
-                    st.warning("Data log transaksi kosong atau file log uploader belum lengkap.")
+                    st.warning("Data log transaksi kosong atau list SKU dropdown tidak terdeteksi.")
 import pandas as pd
 import streamlit as st
 import requests
