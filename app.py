@@ -3238,11 +3238,14 @@ import pandas as pd
 import numpy as np
 
 # ==============================================================================
-# 1. LOGIC PROCESS (BACKEND DATA ENGINE)
+# 1. LOGIC PROCESS (BACKEND DATA ENGINE) - FIXED COLUMN INDEX MAPPING
 # ==============================================================================
 def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     """
     Fungsi core untuk memproses data inventori dan permintaan.
+    Sudah disesuaikan dengan mapping kolom terbaru:
+    - All Stock: B(Bin)=1, C(SKU)=2, J(Qty)=9
+    - Permintaan FL: E(SKU)=4, T(Kriteria)=19, U(Qty)=20
     """
     # Read file All Stock
     if file_stock.name.endswith('.csv'):
@@ -3256,15 +3259,18 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     else:
         df_permintaan_raw = pd.read_excel(file_permintaan)
 
-    # --- Standarisasi Kolom Berdasarkan Indeks ---
-    # All Stock: B=Bin(1), C=SKU(2), J=Qty(9)
+    # --- STANDARISASI KOLOM ALL STOCK ---
+    # B=Bin(Index 1), C=SKU(Index 2), J=Qty(Index 9)
     df_stock = df_stock_raw.iloc[:, [1, 2, 9]].copy()
     df_stock.columns = ['BIN', 'SKU', 'QTY_STOCK']
     
-    # Permintaan FL: Amankan index, ambil C=SKU(2), T=Kriteria_T(19), dan U=Qty_Permintaan(20)
+    # --- STANDARISASI KOLOM PERMINTAAN FL ---
+    # Amankan index agar fleksibel, ubah nama kolom sementara jadi col_x
     df_permintaan = df_permintaan_raw.copy()
     df_permintaan.columns = [f"col_{i}" for i in range(len(df_permintaan.columns))]
-    df_req_filtered = df_permintaan[['col_2', 'col_19', 'col_20']].copy()
+    
+    # FIX KOREKSI: Ambil E=SKU(col_4), T=Kriteria_T(col_19), dan U=Qty_Permintaan(col_20)
+    df_req_filtered = df_permintaan[['col_4', 'col_19', 'col_20']].copy()
     df_req_filtered.columns = ['SKU', 'KOLOM_T', 'QTY_REQUEST']
 
     # --- FILTER 1: Eliminasi Kolom T yang Blank / Empty ---
@@ -3287,10 +3293,10 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     df_surabaya_stock['SKU'] = df_surabaya_stock['SKU'].astype(str).str.strip()
     df_surabaya_stock['QTY_STOCK'] = pd.to_numeric(df_surabaya_stock['QTY_STOCK'], errors='coerce').fillna(0)
     
-    # Groupby All Stock Surabaya (Semua SKU tanpa filter > 2 dulu untuk keperluan Compare)
+    # Groupby All Stock Surabaya untuk keperluan Compare
     df_stock_all_grouped = df_surabaya_stock.groupby('SKU', as_index=False)['QTY_STOCK'].sum()
     
-    # Ambil yang QTY_STOCK > 2 untuk indikasi over-request
+    # Ambil yang QTY_STOCK > 2 untuk kriteria over-request
     df_stock_over_2 = df_stock_all_grouped[df_stock_all_grouped['QTY_STOCK'] > 2]
 
     # --- FILTER 3: Cek Matching Data (Indikasi Over-Request) ---
@@ -3298,10 +3304,8 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     df_bad_indications = df_req_filtered.merge(df_stock_over_2, on='SKU', how='inner')
     total_bad_qty_requests = df_bad_indications['QTY_REQUEST'].sum()
 
-    # --- LOGIC BARU: COMPARE ALL SKU PERMINTAAN VS STOCK DATA ---
-    # Group total request per SKU di file permintaan FL
+    # --- COMPARE ALL SKU PERMINTAAN VS STOCK DATA ---
     df_req_grouped = df_req_filtered.groupby('SKU', as_index=False)['QTY_REQUEST'].sum()
-    # Left join dengan data stock untuk melihat perbandingan real-time
     df_compare_sku = df_req_grouped.merge(df_stock_all_grouped, on='SKU', how='left').fillna(0)
     df_compare_sku.columns = ['SKU', 'Total QTY Diminta (DC)', 'Total QTY Tersedia (Store)']
 
