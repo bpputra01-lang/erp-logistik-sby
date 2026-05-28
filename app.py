@@ -3238,12 +3238,12 @@ import pandas as pd
 import numpy as np
 
 # ==============================================================================
-# 1. LOGIC PROCESS (BACKEND DATA ENGINE) - FIXED COLUMN INDEX MAPPING
+# 1. LOGIC PROCESS (BACKEND DATA ENGINE)
 # ==============================================================================
 def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     """
     Fungsi core untuk memproses data inventori dan permintaan.
-    Sudah disesuaikan dengan mapping kolom terbaru:
+    Mapping Kolom:
     - All Stock: B(Bin)=1, C(SKU)=2, J(Qty)=9
     - Permintaan FL: E(SKU)=4, T(Kriteria)=19, U(Qty)=20
     """
@@ -3265,11 +3265,10 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     df_stock.columns = ['BIN', 'SKU', 'QTY_STOCK']
     
     # --- STANDARISASI KOLOM PERMINTAAN FL ---
-    # Amankan index agar fleksibel, ubah nama kolom sementara jadi col_x
     df_permintaan = df_permintaan_raw.copy()
     df_permintaan.columns = [f"col_{i}" for i in range(len(df_permintaan.columns))]
     
-    # FIX KOREKSI: Ambil E=SKU(col_4), T=Kriteria_T(col_19), dan U=Qty_Permintaan(col_20)
+    # Ambil E=SKU(col_4), T=Kriteria_T(col_19), dan U=Qty_Permintaan(col_20)
     df_req_filtered = df_permintaan[['col_4', 'col_19', 'col_20']].copy()
     df_req_filtered.columns = ['SKU', 'KOLOM_T', 'QTY_REQUEST']
 
@@ -3286,8 +3285,9 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     total_qty_permintaan_valid = df_req_filtered['QTY_REQUEST'].sum()
 
     # --- FILTER 2: Filter Stock Store Surabaya ---
+    # UPDATE: Sekarang mendeteksi TOKO, GUDANG, STR, dan STORE
     df_stock['BIN'] = df_stock['BIN'].astype(str).str.upper()
-    bin_filter = df_stock['BIN'].str.contains('TOKO|GUDANG|STR', na=False)
+    bin_filter = df_stock['BIN'].str.contains('TOKO|GUDANG|STR|STORE', na=False)
     df_surabaya_stock = df_stock[bin_filter].copy()
     
     df_surabaya_stock['SKU'] = df_surabaya_stock['SKU'].astype(str).str.strip()
@@ -3329,16 +3329,21 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
 def render_premium_ui():
     st.set_page_config(page_title="Store Request Analytics", layout="wide", initial_sidebar_state="collapsed")
 
-    # Inject Premium Dark Theme Stylesheet dengan fix warna text subheader
+    # Inject Premium Dark Theme Stylesheet dengan paksaan warna judul subheader
     st.markdown("""
         <style>
+        /* Base Background */
         .stApp { background-color: #0e1117; color: #ffffff; }
+        
+        /* Title Header Banner */
         .hero-header {
             font-size: 28px; font-weight: 700; letter-spacing: 0.5px; color: #FFFFFF;
             background: linear-gradient(135deg, #1f2438 0%, #111424 100%);
             padding: 20px; border-radius: 10px; border-left: 5px solid #C5A059;
             margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
+        
+        /* Metric Card Boxes */
         .premium-card {
             background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
             border-left: 4px solid #C5A059 !important; border-radius: 8px;
@@ -3348,9 +3353,9 @@ def render_premium_ui():
         .metric-value { font-size: 32px; font-weight: 700; color: #ffffff; margin-top: 5px; }
         .metric-desc { font-size: 12px; color: #a3b0c2; margin-top: 5px; }
         
-        /* FIX: Paksa warna text H3/Subheader di dark mode agar kontras dan tidak nge-blend dengan putih hancur */
-        .section-title h3 {
-            color: #111424 !important;
+        /* FIX TOTAL: Hajar paksa semua heading teks agar berwarna PUTIH terang, kontras di dark mode */
+        h1, h2, h3, h4, h5, h6, .stMarkdown h2, .stMarkdown h3 {
+            color: #ffffff !important;
             font-weight: 700 !important;
         }
         </style>
@@ -3399,12 +3404,9 @@ def display_dashboard_metrics(results: dict):
 
 
 def display_data_tables(results: dict):
-    # Bungkus di container ber-class khusus agar font heading-nya tidak hilang kena warna putih background aplikasi
-    st.markdown('<div class="section-title">', unsafe_allow_html=True)
+    # Judul bagian tabel analitik
     st.subheader("🔍 Detail Analisis Data")
-    st.markdown('</div>', unsafe_allow_html=True)
     
-    # Perubahan nama TAB KEDUA sesuai instruksi lu
     tab1, tab2 = st.tabs(["📋 SKU Terindikasi Over-Request", "🔄 Compare SKU Permintaan FL vs All Stock"])
     
     with tab1:
@@ -3414,7 +3416,6 @@ def display_data_tables(results: dict):
             st.success("Aman! Tidak ada store yang meminta barang ke DC saat stoknya masih melimpah.")
             
     with tab2:
-        # Menampilkan tabel komparasi real-time seluruh SKU permintaan FL vs All Stock data
         st.dataframe(results['df_compare'], use_container_width=True)
 
 
@@ -3426,15 +3427,14 @@ def run_store_request_analytics():
     file_stock, file_permintaan = render_main_uploaders()
     
     if file_stock and file_permintaan:
-        with st.spinner("Processing data ultra fast... ⚡"):
+        with st.spinner("Processing data ..."):
             try:
                 analysis_results = process_logistics_analytics(file_stock, file_permintaan)
                 display_dashboard_metrics(analysis_results)
                 display_data_tables(analysis_results)
             except Exception as e:
                 st.error(f"Terjadi kesalahan pemrosesan data. Struktur file mungkin salah. Error: {e}")
-    else:
-        st.warning("⚠️ Menunggu kedua file diunggah di atas untuk memulai kalkulasi...")
+
 
     
 
