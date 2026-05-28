@@ -3352,14 +3352,13 @@ def render_premium_ui():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header">📊 STORE TO DC REQUEST ANALYTICS (SURABAYA)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">STORE REQUEST TO DC TO STOCK STORE (SURABAYA)</div>', unsafe_allow_html=True)
 
 
 def render_main_uploaders():
     """
     Menangani menu interaksi uploader di Main Panel dengan layout kolom berdampingan.
     """
-    st.markdown('<div class="info-container">💡 <b>Petunjuk:</b> Pastikan format file sesuai dengan instruksi susunan kolom sebelum mengunggah.</div>', unsafe_allow_html=True)
     
     # Buat 2 kolom melebar di Main Panel
     col_left, col_right = st.columns(2)
@@ -3481,8 +3480,6 @@ def run_store_request_analytics():
                 
             except Exception as e:
                 st.error(f"Terjadi kesalahan pemrosesan data. Struktur file mungkin salah. Error: {e}")
-    else:
-        st.warning("⚠️ Menunggu kedua file diunggah di atas untuk memulai kalkulasi...")
 
 
 
