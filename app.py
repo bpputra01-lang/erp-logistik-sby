@@ -3008,7 +3008,7 @@ def main_menu_routing():
             df_track_raw = load_data_safe(file_tracking)
             df_rto_raw = load_data_safe(file_rto)
             
-           # 🔥 PROSES KOMPILASI MASAL + INJECT SELURUH DATA KALKULASI BARU (LOGIC FALLBACK AWAL LO)
+          # 🔥 PROSES KOMPILASI MASAL + INJECT SELURUH DATA KALKULASI BARU (LOGIC FALLBACK AWAL LO)
             with st.spinner("⚡ Mengompilasi data transaksi & analisis kalkulasi untuk SEMUA SKU... Harap tunggu..."):
                 list_compiled_df = []
                 for sku in list_sku:
@@ -3036,7 +3036,7 @@ def main_menu_routing():
                         else:
                             stock_system_calc = current_end_stock
                         
-                        # --- 4. Real Qty & Varian Transaksi ---
+                        # --- 3. Real Qty & Varian Transaksi ---
                         if 'Tipe' in df_temp.columns and 'Qty' in df_temp.columns:
                             df_real = df_temp[df_temp['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'REFUND', 'RETURN TO OFFICE (RTO)'])]
                             real_qty_calc = df_real['Qty'].sum()
@@ -3047,7 +3047,7 @@ def main_menu_routing():
                         
                         selisih_calc = stock_system_calc - real_qty_calc
                         
-                        # --- 5. Tentukan Diagnosa Kasus ---
+                        # --- 4. Tentukan Diagnosa Kasus ---
                         status_indikasi_calc = "MATCH (Data Sinkron)"
                         if selisih_calc != 0:
                             if total_adj_calc != 0 and abs(total_adj_calc) == abs(selisih_calc):
@@ -3057,8 +3057,7 @@ def main_menu_routing():
                             else:
                                 status_indikasi_calc = "INDIKASI: KESALAHAN SISTEM / LOGISTIK DATA"
                                 
-                        # --- 6. Inject Semua Data Baru ke Dataframe sebagai Kolom Baru ---
-                        df_temp['Qty_Master_Col_J'] = stock_kolom_j
+                        # --- 5. Inject Semua Data ke Dataframe biar Masuk Excel ---
                         df_temp['Total_Stock_System'] = stock_system_calc
                         df_temp['Total_Real_Qty_Fisik'] = real_qty_calc
                         df_temp['Selisih_Varian'] = selisih_calc
