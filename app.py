@@ -3189,9 +3189,16 @@ def main_menu_routing():
             col_btn, _ = st.columns([1, 2])
             with col_btn:
                 if df_all_compiled is not None and not df_all_compiled.empty:
+                    # 🛠️ PROSES FIX COLOUMN EXCEL AGAR VALID (ANTI CORRUPT):
+                    import io
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                        df_all_compiled.to_excel(writer, index=False, sheet_name='Master_Timeline')
+                    processed_data = buffer.getvalue()
+
                     st.download_button(
                         label="📥 Download All SKU Timeline Report (.xlsx)",
-                        data=bytes("Ganti dengan data excel/buffer lo", "utf-8"), # Taruh variable buffer excel lo di sini seperti semula
+                        data=processed_data, 
                         file_name="Master_Timeline_Report_Surabaya.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="btn_download_master_bottom_final_fixed"
