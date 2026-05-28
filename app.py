@@ -3123,6 +3123,33 @@ def main_menu_routing():
                     render_html_timeline_ui(df_timeline)
                 else:
                     st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
+                    # ==============================================================================
+            # 3. EXPORT MASTER REPORT (EKSPORT LOG SKU YANG SEDANG DIPILIH)
+            # ==============================================================================
+            st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
+            st.subheader("📦 Export SKU Timeline Report")
+            st.caption(f"Unduh log riwayat transaksi spesifik untuk SKU yang sedang aktif dianalisis di atas.")
+
+            col_btn, _ = st.columns([1, 2])
+            with col_btn:
+                # Cek jika data filter SKU aktif dan tidak kosong
+                if df_download_target is not None and not df_download_target.empty:
+                    import io
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                        # Mengunduh MURNI data SKU terpilih saja
+                        df_download_target.to_excel(writer, index=False, sheet_name=f'Timeline_{str(selected_sku)[:20]}')
+                    processed_data = buffer.getvalue()
+
+                    st.download_button(
+                        label=f"📥 Download Report SKU: {selected_sku} (.xlsx)",
+                        data=processed_data, 
+                        file_name=f"Timeline_Report_{str(selected_sku).strip()}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="btn_download_single_sku_fixed"
+                    )
+                else:
+                    st.warning("Silakan pilih SKU di dropdown atas terlebih dahulu untuk mendownload data report.")
             
 import math
 import pandas as pd
