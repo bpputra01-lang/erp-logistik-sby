@@ -2990,7 +2990,7 @@ def main_menu_routing():
         else:
             st.warning("⚠️ Menunggu semua file lengkap di-upload.")
 
-   # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
+  # --- MENU TAB 2: STOCK TIMELINE DASHBOARD ---
     with tab_timeline:
         if not (file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto):
             st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
@@ -3000,7 +3000,7 @@ def main_menu_routing():
         df_main = load_data_safe(file_main)
         list_sku = extract_sku_list(df_main)
 
-        # 🛡️ DEKLARASI GLOBAL DI AWAL (ANTI NAMEERROR): Amankan variable sejak tab pertama kali diproses
+        # 🛡️ DEKLARASI GLOBAL DI AWAL (ANTI NAMEERROR)
         df_download_target = None
         
         if list_sku:
@@ -3008,7 +3008,10 @@ def main_menu_routing():
             with c_select:
                 selected_sku = st.selectbox("🎯 Pilih SKU untuk Analisis Timeline:", list_sku)
             
-            if selected_sku:
+            # 🔥 FIX OTOMATIS: Jika selected_sku belum ke-load sempurna, langsung force pakai SKU pertama dari list_sku
+            active_sku = str(selected_sku).strip() if selected_sku else str(list_sku[0]).strip()
+            
+            if active_sku:
                 # Load semua data mentah
                 df_po_raw = load_data_safe(file_po)
                 df_mutasi_raw = load_data_safe(file_mutasi)
@@ -3017,7 +3020,10 @@ def main_menu_routing():
                 df_rto_raw = load_data_safe(file_rto)
                 
                 # Jalankan fungsi gabungan pemrosesan timeline
-                df_timeline = process_master_timeline(selected_sku, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
+                df_timeline = process_master_timeline(active_sku, df_po_raw, df_mutasi_raw, df_adj_raw, df_track_raw, df_rto_raw)
+                
+                # 🔥 AMANKAN DATA: Langsung isi target download agar sinkron dan otomatis stand-by
+                df_download_target = df_timeline
                 
                 if not df_timeline.empty:
                     total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
@@ -3036,7 +3042,7 @@ def main_menu_routing():
                     if current_end_stock == 0:
                         try:
                             # Cari baris SKU yang dipilih di df_main (Kolom C = Indeks 2)
-                            sku_row = df_main[df_main.iloc[:, 2] == selected_sku]
+                            sku_row = df_main[df_main.iloc[:, 2] == active_sku]
                             if not sku_row.empty:
                                 master_qty_raw = sku_row.iloc[0, 9] # Kolom J = Indeks 9
                                 stock_system = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
@@ -3120,14 +3126,15 @@ def main_menu_routing():
                     # Render Grafik & Timeline Visual Akhir
                     render_chart_ui(df_timeline)
                     st.write("---")
-                    st.write(f"### ⏳ Riwayat Kronologis SKU: {selected_sku}")
+                    st.write(f"### ⏳ Riwayat Kronologis SKU: {active_sku}")
                     
-                    # Panggil langsung fungsi UI timeline lo yang udah aman kemarin
+                    # Panggil langsung fungsi UI timeline lo
                     render_html_timeline_ui(df_timeline)
                 else:
-                    st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {selected_sku}")
-                  # ==============================================================================
-            # 3. EXPORT SKU TIMELINE REPORT (AMAN DARI NAMEERROR)
+                    st.warning(f"Tidak ada data transaksi ditemukan untuk SKU: {active_sku}")
+
+            # ==============================================================================
+            # 3. EXPORT SKU TIMELINE REPORT (INTEGRATED & AUTOMATIC DI BAWAH KRONOLOGIS)
             # ==============================================================================
             st.markdown("<br><br><hr style='border-top: 1px dashed #252a3d;'>", unsafe_allow_html=True)
             st.subheader("📦 Export SKU Timeline Report")
@@ -3135,24 +3142,23 @@ def main_menu_routing():
 
             col_btn, _ = st.columns([1, 2])
             with col_btn:
-                # Cek kondisi dengan aman karena target variable pasti terdefinisi di atas
+                # Sekarang kondisi ini dijamin langsung bernilai TRUE karena df_download_target terisi otomatis sejak awal render
                 if df_download_target is not None and not df_download_target.empty:
                     import io
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                        df_download_target.to_excel(writer, index=False, sheet_name=f'Timeline_{str(selected_sku)[:20]}')
+                        df_download_target.to_excel(writer, index=False, sheet_name=f'Timeline_{str(active_sku)[:20]}')
                     processed_data = buffer.getvalue()
 
                     st.download_button(
-                        label=f"📥 Download Report SKU: {selected_sku} (.xlsx)",
+                        label=f"📥 Download Report SKU: {active_sku} (.xlsx)",
                         data=processed_data, 
-                        file_name=f"Timeline_Report_{str(selected_sku).strip()}.xlsx",
+                        file_name=f"Timeline_Report_{str(active_sku).strip()}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="btn_download_single_sku_fixed"
                     )
                 else:
-                    st.warning("Silakan pilih SKU di dropdown atas terlebih dahulu untuk mendownload data report.")
-import math
+                    st.warning("Data log transaksi kosong atau file log uploader belum lengkap.")
 import pandas as pd
 import streamlit as st
 import requests
