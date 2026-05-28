@@ -3376,9 +3376,8 @@ def display_dashboard_metrics(results: dict):
         total_valid_int = int(results['total_valid'])
         st.markdown(f"""
             <div class="premium-card">
-                <div class="metric-title">📋 Total Permintaan Valid</div>
+                <div class="metric-title">📋 Total Permintaan Frontline</div>
                 <div class="metric-value">{total_valid_int:,}</div>
-                <div class="metric-desc">Kolom T tidak kosong / bernilai</div>
             </div>
         """, unsafe_allow_html=True)
     with col2:
@@ -3388,7 +3387,7 @@ def display_dashboard_metrics(results: dict):
             <div class="premium-card">
                 <div class="metric-title">⚠️ Indikasi Over-Request</div>
                 <div class="metric-value" style="color: #FF4B4B;">{total_bad_int:,}</div>
-                <div class="metric-desc">Minta ke DC padahal Stok Store > 2</div>
+                <div class="metric-desc">Request Stock to DC with Qty Store >= 2 Pcs</div>
             </div>
         """, unsafe_allow_html=True)
     with col3:
@@ -3396,7 +3395,7 @@ def display_dashboard_metrics(results: dict):
         # Untuk persentase tetap pertahankan format .2f agar akurat (misal 15.00%)
         st.markdown(f"""
             <div class="premium-card">
-                <div class="metric-title">🚨 Percentage Indikasi Buruk</div>
+                <div class="metric-title">🚨 Percentage Indikasi Over Request</div>
                 <div class="metric-value" style="color: {color_pct};">{results['percentage']:.2f}%</div>
                 <div class="metric-desc">Semakin tinggi % = Efisiensi Alokasi Buruk</div>
             </div>
@@ -3411,7 +3410,7 @@ def display_data_tables(results: dict):
         if not results['df_bad'].empty:
             st.dataframe(results['df_bad'], use_container_width=True)
         else:
-            st.success("Aman! Tidak ada store yang meminta barang ke DC saat stoknya masih melimpah.")
+            st.success("Aman! Tidak Request dari FL yang saat Qty stock di store >= 2 Pcs.")
             
     with tab2:
         st.dataframe(results['df_compare'], use_container_width=True)
