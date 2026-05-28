@@ -3041,7 +3041,7 @@ def main_menu_routing():
             # Target aktif untuk visualisasi dashboard di monitor
             active_sku = str(selected_sku).strip() if selected_sku else str(list_sku[0]).strip()
             
-            # ==============================================================================
+           # ==============================================================================
             # 2. AREA VISUALISASI UTAMA TIMELINE (SINKRON & AMAN DARI KEYERROR)
             # ==============================================================================
             if active_sku and not df_all_dropdown_sku.empty:
@@ -3050,9 +3050,26 @@ def main_menu_routing():
                 
                 if not df_timeline.empty:
                     total_initial_po = df_timeline[df_timeline['Tipe'] == 'PURCHASE ORDER (IN)']['Qty'].sum()
+                    
+                    # 1. Ambil running stock baris terakhir dari data timeline lo
                     current_end_stock = df_timeline['Running_Stock'].iloc[-1] if 'Running_Stock' in df_timeline.columns else 0
                     
-                    # 📊 ADDON LOGIC lo (Real Qty, System Fallback Index 9, & AI Diagnosa Error)
+                    # 2. Ambil nilai Qty System dari file master utama (Kolom J = Index 9)
+                    try:
+                        sku_row = df_main[df_main.iloc[:, 2].astype(str).str.strip() == active_sku]
+                        if not sku_row.empty:
+                            master_qty_raw = sku_row.iloc[0, 9] # Kolom J
+                            stock_kolom_j = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
+                        else:
+                            stock_kolom_j = 0
+                    except Exception:
+                        stock_kolom_j = 0
+                    
+                    # 🔥 LOGIKAL UPDATE: Tambahkan perhitungan dari Timeline + Total Qty System Kolom J
+                    stock_system = current_end_stock + stock_kolom_j
+                    lbl_system = "🖥️ Stock System (Timeline + Col J)"
+                    
+                    # 📊 ADDON LOGIC lo (Real Qty & AI Diagnosa Error)
                     if 'Tipe' in df_timeline.columns and 'Qty' in df_timeline.columns:
                         df_real = df_timeline[df_timeline['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'REFUND', 'RETURN TO OFFICE (RTO)'])]
                         real_qty = df_real['Qty'].sum()
@@ -3060,21 +3077,6 @@ def main_menu_routing():
                         total_rto = df_timeline[df_timeline['Tipe'] == 'RETURN TO OFFICE (RTO)']['Qty'].sum()
                     else:
                         real_qty, total_adj, total_rto = 0, 0, 0
-                    
-                    lbl_system = "🖥️ Stock System (Last)"
-                    if current_end_stock == 0:
-                        try:
-                            sku_row = df_main[df_main.iloc[:, 2].astype(str).str.strip() == active_sku]
-                            if not sku_row.empty:
-                                master_qty_raw = sku_row.iloc[0, 9] # Kolom J = Indeks 9
-                                stock_system = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
-                                lbl_system = "🖥️ Stock System (Web Utama)"
-                            else:
-                                stock_system = 0
-                        except Exception:
-                            stock_system = 0
-                    else:
-                        stock_system = current_end_stock
                     
                     selisih = stock_system - real_qty
                     
@@ -3093,7 +3095,7 @@ def main_menu_routing():
                         else:
                             status_indikasi = "❌ INDIKASI: KESALAHAN SISTEM / LOGISTIK DATA"
                             detail_indikasi = f"Terdapat selisih sebesar {int(selisih)} Pcs antara Real Hitungan Fisik Transaksi dan Angka System."
-
+                            
                     # 🎨 DISPLAY UI METRIC BOXES & GRAPH
                     st.write("---")
                     c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
