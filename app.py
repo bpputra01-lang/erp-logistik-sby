@@ -7951,7 +7951,7 @@ def show_timbang_system():
             with col_kanan:
                 # Perubahan Menjadi Dropdown Terbatas
                 dari_in = st.selectbox("Pengiriman Dari", ["SURABAYA"])
-                ke_in = st.selectbox("Pengiriman Ke", ["SEMARANG", "HUB JAKARTA"])
+                ke_in = st.selectbox("Pengiriman Ke", ["SEMARANG", "HUB JAKARTA", "MALANG"])
             
             st.markdown("<br>", unsafe_allow_html=True)
             submit = st.form_submit_button("⚖️ SIMPAN DATA TIMBANG", use_container_width=True)
@@ -8008,7 +8008,7 @@ def show_timbang_system():
                 elif "ACCESS" in eksp and "HUB JAKARTA" in tujuan:
                     return berat * 2500
                 # Logic 3: ADEX + SEMARANG = Kg * 1.000
-                elif "ADEX" in eksp and "SEMARANG" in tujuan:
+                elif "ADEX" in eksp and ("SEMARANG" in tujuan or "MALANG" in tujuan):
                     return berat * 1000
                 # Logic 4: ADEX + HUB JAKARTA = Kg * 2.000
                 elif "ADEX" in eksp and "HUB JAKARTA" in tujuan:
