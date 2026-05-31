@@ -3163,7 +3163,7 @@ def main_menu_routing():
                     
                     # Logic Banner UI Indikasi
                     if selisih == 0:
-                        status_indikasi = "🟢 MATCH (Data Sinkron)"
+                        status_indikasi = "🔴STOCK LOSS (REAL & SYSTEM MATCH)"
                         detail_indikasi = "Kemungkinan Selisih dikarenakan ada barang yang tidak ditemukan sehingga dibuang ke Karantina."
                         warna_indikasi = "#2ecc71"
                     else:
