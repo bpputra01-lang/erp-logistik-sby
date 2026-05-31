@@ -3163,9 +3163,9 @@ def main_menu_routing():
                     
                     # Logic Banner UI Indikasi
                     if selisih == 0:
-                        status_indikasi = "🔴STOCK LOSS (REAL & SYSTEM MATCH)"
+                        status_indikasi = "🔴STOCK LOSS"
                         detail_indikasi = "Kemungkinan Selisih dikarenakan ada barang yang tidak ditemukan sehingga dibuang ke Karantina."
-                        warna_indikasi = "#2ecc71"
+                        warna_indikasi = "#e74c3c"
                     else:
                         warna_indikasi = "#e74c3c"
                         if "SALAH ADJUSTMENT" in status_singkat:
