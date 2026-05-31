@@ -3008,7 +3008,11 @@ def main_menu_routing():
     # --- MENU TAB 1: UPLOADER CENTRAL ---
     with tab_uploader:
         st.subheader("📥 Upload Data")
-        file_main = st.file_uploader("Upload File Multiple Adjusment", type=["xlsx", "csv"], key="m")
+        col_main1, col_main2 = st.columns(2)
+        with col_main1:
+            file_main = st.file_uploader("Upload File Multiple Adjustment (Main)", type=["xlsx", "csv"], key="m")
+        with col_main2:
+            file_all_stock = st.file_uploader("📦 Upload File All Data Stock (Current System Stock)", type=["xlsx", "csv"], key="ast")
         st.write("---")
         
         # Dipecah menjadi 5 kolom sejajar agar muat ditambahkan File RTO
@@ -3020,7 +3024,7 @@ def main_menu_routing():
         with col5: file_rto = st.file_uploader("🚛 File RTO", type=["xlsx", "csv"], key="rt")
         
         # Validasi wajib menyertakan ke-5 file log transaksi + 1 master file
-        if file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto:
+        if file_main and file_all_stock and file_po and file_mutasi and file_adj and file_tracking and file_rto:
             st.success("✅ Semua file termasuk file RTO sukses terunggah! Silahkan buka Tab **📊 STOCK TIMELINE DASHBOARD**.")
         else:
             st.warning("⚠️ Menunggu semua file lengkap di-upload.")
@@ -3031,7 +3035,7 @@ def main_menu_routing():
         df_all_dropdown_sku = pd.DataFrame()
         df_download_target = None
 
-        if not (file_main and file_po and file_mutasi and file_adj and file_tracking and file_rto):
+        if not (file_main and file_all_stock and file_po and file_mutasi and file_adj and file_tracking and file_rto):
             st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
             return
 
@@ -3061,12 +3065,15 @@ def main_menu_routing():
                         # --- 1. Hitung Stock Akhir Timeline ---
                         current_end_stock = df_temp['Running_Stock'].iloc[-1] if 'Running_Stock' in df_temp.columns else 0
                         
-                        # --- 2. Logic Fallback Awal Lo (Pengecekan if 0) ---
-                        if current_end_stock == 0:
+                        # Pastikan sebelum loop atau di awal Tab Dashboard sudah ada: df_all_stock = load_data_safe(file_all_stock)
+
+                            # --- 2. Logic Fallback Awal ---
                             try:
-                                sku_row = df_main[df_main.iloc[:, 2].astype(str).str.strip() == sku_clean]
-                                if not sku_row.empty:
-                                    master_qty_raw = sku_row.iloc[0, 9] # Kolom J
+                                # Cari baris SKU pada df_all_stock di Kolom C (Indeks posisi 2)
+                                sku_row_all_stock = df_all_stock[df_all_stock.iloc[:, 2].astype(str).str.strip() == sku_clean]
+                                if not sku_row_all_stock.empty:
+                                    # Ambil nilai Qty System dari Kolom J (Indeks posisi 9)
+                                    master_qty_raw = sku_row_all_stock.iloc[0, 9]
                                     stock_system_calc = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
                                 else:
                                     stock_system_calc = 0
