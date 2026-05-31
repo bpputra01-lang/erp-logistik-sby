@@ -3039,9 +3039,15 @@ def main_menu_routing():
             st.error("❌ Akses Ditolak. Harap upload seluruh file secara lengkap di menu tab **📂 UPLOADER CENTRAL**!")
             return
 
+       # ==============================================================================
+        # KODE REVISI: SEBELUM LOOP JALAN, WAJIB LOAD FILE_ALL_STOCK DULU!
+        # ==============================================================================
         # Load File Dataframes awal
         df_main = load_data_safe(file_main)
         list_sku = extract_sku_list(df_main)
+        
+        # 🔥 JANGAN CUMA KOMENTAR! LOAD DISINI COK!
+        df_all_stock = load_data_safe(file_all_stock)
         
         if list_sku:
             # Load seluruh dataset mentah di awal
@@ -3051,7 +3057,7 @@ def main_menu_routing():
             df_track_raw = load_data_safe(file_tracking)
             df_rto_raw = load_data_safe(file_rto)
             
-            # 🔥 PROSES KOMPILASI MASAL + INJECT SELURUH DATA KALKULASI BARU (BIAR IKUT KEDOWNLOAD)
+            # 🔥 PROSES KOMPILASI MASAL + INJECT SELURUH DATA KALKULASI BARU
             with st.spinner("⚡ Mengompilasi data transaksi & analisis kalkulasi untuk SEMUA SKU... Harap tunggu..."):
                 list_compiled_df = []
                 for sku in list_sku:
@@ -3065,34 +3071,34 @@ def main_menu_routing():
                         # --- 1. Hitung Stock Akhir Timeline ---
                         current_end_stock = df_temp['Running_Stock'].iloc[-1] if 'Running_Stock' in df_temp.columns else 0
                         
-                        # Pastikan sebelum loop atau di awal Tab Dashboard sudah ada: df_all_stock = load_data_safe(file_all_stock)
-
-                        # --- 2. Logic Fallback Awal ---
+                        # --- 2. Logic Fallback Baru (ANTI ZONK / ANTI GAGAL) ---
                         try:
-                            # 1. Bersihin text SKU dari dropdown (bikin uppercase + strip spasi)
+                            # Bersihin target SKU (bikin uppercase + string)
                             sku_target = str(sku_clean).strip().upper()
                             
-                            # 2. Filter Kolom C (Index 2) di file All Data Stock
-                            sku_row_all_stock = df_all_stock[df_all_stock.iloc[:, 2].astype(str).str.strip().str.upper() == sku_target]
+                            # Paksa seluruh kolom C (Index 2) di df_all_stock jadi string bersih tanpa desimal .0 gaib
+                            sku_column_cleaned = df_all_stock.iloc[:, 2].astype(str).str.strip().str.replace(r'\.0$', '', regex=True).str.upper()
                             
-                            if not sku_row_all_stock.empty:
-                                # 3. Ambil Kolom J (Index 9)
+                            # Filter baris yang beneran cocok
+                            sku_row_all_stock = df_all_stock[sku_column_cleaned == sku_target]
+                            
+                            if not sku_row_all_stock.empty and df_all_stock is not None:
+                                # Ambil nilai Kolom J (Index 9)
                                 master_qty_raw = sku_row_all_stock.iloc[0, 9]
                                 
-                                # 4. Validasi isi datanya biar ga crash pas di-convert ke int
                                 if pd.isna(master_qty_raw) or str(master_qty_raw).strip() == '':
                                     stock_system_calc = 0
                                 else:
-                                    # Handle kalau ada format float desimal kayak "10.0"
+                                    # Ubah ke float dulu baru ke int buat jaga-jaga kalau isinya format desimal
                                     stock_system_calc = int(float(str(master_qty_raw).strip()))
                             else:
                                 stock_system_calc = 0
                                 
                         except Exception as e:
-                            # Biar lo tau error aslinya apa di terminal, kagak langsung diem-diem jadi 0
-                            print(f"DEBUG ERROR SKU {sku_clean}: {e}")
+                            # Biar ketahuan di terminal kalau lo salah setup data/tipe kolom
+                            print(f"❌ DEBUG ERROR AMBIL STOCK UTK SKU {sku_clean}: {e}")
                             stock_system_calc = 0
-                        
+
                         # --- 3. Real Qty & Varian Transaksi ---
                         if 'Tipe' in df_temp.columns and 'Qty' in df_temp.columns:
                             df_real = df_temp[df_temp['Tipe'].isin(['PURCHASE ORDER (IN)', 'STOCK TRACKING / SALES', 'REFUND', 'RETURN TO OFFICE (RTO)'])]
