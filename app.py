@@ -3067,20 +3067,18 @@ def main_menu_routing():
                         
                         # Pastikan sebelum loop atau di awal Tab Dashboard sudah ada: df_all_stock = load_data_safe(file_all_stock)
 
-                            # --- 2. Logic Fallback Awal ---
-                            try:
-                                # Cari baris SKU pada df_all_stock di Kolom C (Indeks posisi 2)
-                                sku_row_all_stock = df_all_stock[df_all_stock.iloc[:, 2].astype(str).str.strip() == sku_clean]
-                                if not sku_row_all_stock.empty:
-                                    # Ambil nilai Qty System dari Kolom J (Indeks posisi 9)
-                                    master_qty_raw = sku_row_all_stock.iloc[0, 9]
-                                    stock_system_calc = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
-                                else:
-                                    stock_system_calc = 0
-                            except Exception:
+                        # --- 2. Logic Fallback Awal ---
+                        try:
+                            # Cari baris SKU pada df_all_stock di Kolom C (Indeks posisi 2)
+                            sku_row_all_stock = df_all_stock[df_all_stock.iloc[:, 2].astype(str).str.strip() == sku_clean]
+                            if not sku_row_all_stock.empty:
+                                # Ambil nilai Qty System dari Kolom J (Indeks posisi 9)
+                                master_qty_raw = sku_row_all_stock.iloc[0, 9]
+                                stock_system_calc = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
+                            else:
                                 stock_system_calc = 0
-                        else:
-                            stock_system_calc = current_end_stock
+                        except Exception:
+                            stock_system_calc = 0
                         
                         # --- 3. Real Qty & Varian Transaksi ---
                         if 'Tipe' in df_temp.columns and 'Qty' in df_temp.columns:
