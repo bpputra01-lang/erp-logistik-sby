@@ -3069,15 +3069,28 @@ def main_menu_routing():
 
                         # --- 2. Logic Fallback Awal ---
                         try:
-                            # Cari baris SKU pada df_all_stock di Kolom C (Indeks posisi 2)
-                            sku_row_all_stock = df_all_stock[df_all_stock.iloc[:, 2].astype(str).str.strip() == sku_clean]
+                            # 1. Bersihin text SKU dari dropdown (bikin uppercase + strip spasi)
+                            sku_target = str(sku_clean).strip().upper()
+                            
+                            # 2. Filter Kolom C (Index 2) di file All Data Stock
+                            sku_row_all_stock = df_all_stock[df_all_stock.iloc[:, 2].astype(str).str.strip().str.upper() == sku_target]
+                            
                             if not sku_row_all_stock.empty:
-                                # Ambil nilai Qty System dari Kolom J (Indeks posisi 9)
+                                # 3. Ambil Kolom J (Index 9)
                                 master_qty_raw = sku_row_all_stock.iloc[0, 9]
-                                stock_system_calc = int(float(master_qty_raw)) if not pd.isna(master_qty_raw) else 0
+                                
+                                # 4. Validasi isi datanya biar ga crash pas di-convert ke int
+                                if pd.isna(master_qty_raw) or str(master_qty_raw).strip() == '':
+                                    stock_system_calc = 0
+                                else:
+                                    # Handle kalau ada format float desimal kayak "10.0"
+                                    stock_system_calc = int(float(str(master_qty_raw).strip()))
                             else:
                                 stock_system_calc = 0
-                        except Exception:
+                                
+                        except Exception as e:
+                            # Biar lo tau error aslinya apa di terminal, kagak langsung diem-diem jadi 0
+                            print(f"DEBUG ERROR SKU {sku_clean}: {e}")
                             stock_system_calc = 0
                         
                         # --- 3. Real Qty & Varian Transaksi ---
