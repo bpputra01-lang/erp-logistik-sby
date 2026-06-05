@@ -473,7 +473,7 @@ div.stFormSubmitButton > button {
                 font-size: 14px; 
                 margin-bottom: 15px; 
                 text-align: center;
-            ">🟢Warehouse Management System Support Tools🟢</p>
+            ">🟢Warehouse Management System Supporting Tools🟢</p>
         """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
