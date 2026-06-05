@@ -3,19 +3,25 @@ import numpy as np
 import streamlit as st
 import io
 import math
-
-import pandas as pd
 from collections import defaultdict
-import streamlit as st
 from streamlit_autorefresh import st_autorefresh
+from PIL import Image  # Import library buat ngebaca logo gambar kustom
 
 # Jaga koneksi setiap 5 menit agar tidak timeout/refresh sendiri
 st_autorefresh(interval=300000, key="keepalive_session")
 
+# Load logo kustom lu di background
+try:
+    logo_icon = Image.open("image_981625.png")
+except:
+    logo_icon = "🚛"  # Fallback pake emoji truk kalau filenya ilang atau belum ke-upload
+
+# Set page config (Sekarang icon-nya udah pake logo merah hitam lu!)
 st.set_page_config(
     page_title="LogsbyERP.id",
-    page_icon="🚛",
-    layout="wide",)
+    page_icon=logo_icon,
+    layout="wide"
+)
   
 st.markdown("""
     <style>
