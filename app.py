@@ -5107,13 +5107,11 @@ def process_justification(df_case, df_tracking, df_all_stock):
     
     res['SKU_KEY_JOIN'] = res[sku_col_case].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-   # 2. Aggregasi Tracking Berdasarkan Struktur Kolom Baru (A-O)
-    sku_col_track = df_tracking.columns[2] # Kolom C = SKU
+  # 2. Aggregasi Tracking Berdasarkan Struktur Kolom Baru (A-O)
+    # Kolom C (Index 2) = SKU
+    sku_col_track = df_tracking.columns[2] 
     
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[0]: 'first', # A: Store
-        df_tracking.columns[1]: 'first', # B: Article ID
-        df_tracking.columns[3]: 'first', # D: Article Name
         df_tracking.columns[4]: 'sum',   # E: Beginning Stock
         df_tracking.columns[5]: 'sum',   # F: Stock In
         df_tracking.columns[6]: 'sum',   # G: Adjustment In
@@ -5127,12 +5125,13 @@ def process_justification(df_case, df_tracking, df_all_stock):
         df_tracking.columns[14]: 'sum'   # O: Current Stock
     }).reset_index()
 
-    # Rename kolom tracking agar mudah dipetakan
+    # Rename kolom tracking (Bersih dari Store, Article ID, Article Name)
     track_agg.columns = [
-        'SKU_KEY', 'STORE', 'ARTICLE ID', 'ARTICLE NAME', 'BEGINNING STOCK',
-        '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', 
-        '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', '_N_ENDING_STOCK', '_O_CURR_STOCK'
+        'SKU_KEY', 'BEGINNING STOCK', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', 
+        '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', 
+        '_N_ENDING_STOCK', '_O_CURR_STOCK'
     ]
+    track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
     # 3. Aggregasi All Data Stock (Berdasarkan Aturan: SKU Kolom C/Index 2, QTY System Kolom J/Index 9)
     sku_col_all = df_all_stock.columns[2]
@@ -5156,8 +5155,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res = res.merge(all_stock_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_ALL', how='left').fillna(0)
     res = res.merge(case_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_CASE', how='left').fillna(0)
 
-   # # 6. Pemetaan ke Nama Kolom Representatif / Final
-    # --- Kolom Identitas Produk dari Summary Stock Baru ---
+  # 6. Pemetaan ke Nama Kolom Representatif / Final
     res['BEGINNING STOCK']    = res['BEGINNING STOCK']
     res['ENDING STOCK']       = res['_N_ENDING_STOCK']
     res['CURRENT STOCK']      = res['_O_CURR_STOCK']
@@ -5216,26 +5214,24 @@ def process_justification(df_case, df_tracking, df_all_stock):
 
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
 
-    # 8. Susun Urutan Header Final (Disesuaikan dengan Kolom Summary Stock Baru A-O)
+   # 8. Susun Urutan Header Final (Tanpa Store, Article ID, dan Article Name)
     ordered_headers = [
-        # --- Data Identitas Produk ---
+        # --- Data Identitas Produk Asli File Multiple ---
         'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 
         'HARGA BELI', 'HARGA JUAL', 
         
         # --- Data Input / File Multiple ---
         'QTY SYSTEM', 'QTY SO', 
         
-        # --- Data Summary Stock Baru (Kolom A - O) ---
-        'STORE', 'ARTICLE ID', 'ARTICLE NAME', 'BEGINNING STOCK', 
-        'TOTAL_STOCKIN', 'TOTAL_ADJ_PLUS', 'TOTAL TRF_IN', 'TOTAL DRAFT_TRF_IN', 
-        'TOTAL SALES', 'TOTAL_ADJ_MINUS', 'TOTAL DRAFT_TRF_OUT', 'TOTAL TRF_OUT', 
-        'ENDING STOCK', 'CURRENT STOCK', 
+        # --- Data Summary Stock Baru ---
+        'BEGINNING STOCK', 'TOTAL_STOCKIN', 'TOTAL_ADJ_PLUS', 'TOTAL TRF_IN', 
+        'TOTAL DRAFT_TRF_IN', 'TOTAL SALES', 'TOTAL_ADJ_MINUS', 'TOTAL DRAFT_TRF_OUT', 
+        'TOTAL TRF_OUT', 'ENDING STOCK', 'CURRENT STOCK', 
         
         # --- Data Hasil Cross-Check & Perhitungan Sistem ---
         'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
     ]
 
-    # Ambil kolom yang benar-benar ada di DataFrame hasil merge
     final_cols = [col for col in ordered_headers if col in res.columns]
     return res[final_cols]
 
