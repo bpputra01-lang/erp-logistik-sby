@@ -8341,7 +8341,7 @@ with st.sidebar:
                     <img class="header-logo" src="https://raw.githubusercontent.com/bpputra01-lang/erp-logistik-sby/main/image_981625.png">
                 </td>
                 <td style="padding:0; border:none; vertical-align:middle; line-height:1.2;">
-                    ERP LOGISTIC<br>SURABAYA
+                    ZKN ERP LOGISTIC
                 </td>
             </tr>
         </table>
