@@ -5156,25 +5156,32 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res = res.merge(all_stock_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_ALL', how='left').fillna(0)
     res = res.merge(case_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_CASE', how='left').fillna(0)
 
-    # 6. Pemetaan ke Nama Kolom Representatif / Final
+   # # 6. Pemetaan ke Nama Kolom Representatif / Final
+    # --- Kolom Identitas Produk dari Summary Stock Baru ---
+    res['STORE']              = res['STORE']
+    res['ARTICLE ID']         = res['ARTICLE ID']
+    res['ARTICLE NAME']       = res['ARTICLE NAME']
+    res['BEGINNING STOCK']    = res['BEGINNING STOCK']
+    res['ENDING STOCK']       = res['_N_ENDING_STOCK']
     res['CURRENT STOCK']      = res['_O_CURR_STOCK']
-    res['TOTAL SALES']        = res['_J_SALES']
+    
+    # --- Kolom Mutasi Stock dari Summary Stock Baru ---
     res['TOTAL_STOCKIN']      = res['_F_STOCK_IN']
-    res['TOTAL_ADJ_MINUS']    = res['_K_ADJ_OUT']
     res['TOTAL_ADJ_PLUS']     = res['_G_ADJ_IN']
-    res['TOTAL DRAFT_TRF_IN'] = res['_I_DRAFT_IN']
-    res['TOTAL DRAFT_TRF_OUT']= res['_L_DRAFT_OUT']
     res['TOTAL TRF_IN']       = res['_H_TRF_IN']
+    res['TOTAL DRAFT_TRF_IN'] = res['_I_DRAFT_IN']
+    res['TOTAL SALES']        = res['_J_SALES']
+    res['TOTAL_ADJ_MINUS']    = res['_K_ADJ_OUT']
+    res['TOTAL DRAFT_TRF_OUT']= res['_L_DRAFT_OUT']
     res['TOTAL TRF_OUT']      = res['_M_TRF_OUT']
     
-    # Kolom Tambahan Hasil Mapping Baru
+    # --- Kolom Hasil Mapping Lintas File ---
     res['QTY SYSTEM ALL']     = res['_QTY_SYS_ALL']
     res['TOTAL QTY SO SKU']   = res['_TOTAL_QTY_SO_CASE']
-    res['ENDING STOCK'] = res['_N_ENDING_STOCK']
 
     # Hitung GAP ADJUSTMENT = G (ADJ IN) - K (ADJ OUT)
-    res['GAP ADJUSMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
-
+    res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
+    
     # 7. Update Logika Justifikasi Sesuai Instruksi Baru
     def run_formula(row):
         try:
