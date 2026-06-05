@@ -9466,12 +9466,26 @@ elif menu == "Justification SO":
 
     with st.expander("💡 Logic Thinking"):
         st.info("""
-        **Logic Justifikasi Terbaru:**
-        - **KESALAHAN ADJUSMENT**: Jika nilai **Gap Adjustment ≠ 0**.
-        - **KESALAHAN SYSTEM**: Jika **(Total QTY SO + QTY System All) = Current Stock** DAN **Gap Adjustment = 0**.
-        - **CEK HASIL REKONSILIASI**: Jika **QTY System All = Current Stock**.
-        - **KESALAHAN RTO**: Jika SKU terkait masih memiliki **Draft TRF In** atau **Draft TRF Out** (> 0).
-        - **UNDEFINED**: Kondisi di luar 4 aturan di atas.
+        **Logic Justifikasi Terbaru (Urutan Eksekusi Mutlak):**
+        
+        1. **KESALAHAN SYSTEM** (Dicek Paling Pertama):
+           * Jika **QTY SYSTEM > QTY SO** (File Adjustment), hitung `diff = QTY SYSTEM - QTY SO`. Masuk kategori jika: **(QTY System All - diff) = Current Stock**.
+           * Jika **QTY SYSTEM < QTY SO** (File Adjustment), hitung `diff = QTY SO - QTY SYSTEM`. Masuk kategori jika: **(QTY System All + diff) = Current Stock**.
+        
+        2. **KESALAHAN ADJUSMENT (+ / -)**:
+           * **KESALAHAN ADJUSMENT +**: Jika **QTY SYSTEM > QTY SO** DAN **Gap Adjustment > 0**.
+           * **KESALAHAN ADJUSMENT -**: Jika **QTY SYSTEM < QTY SO** DAN **Gap Adjustment < 0**.
+        
+        3. **CEK HASIL REKONSILIASI**:
+           * Jika **QTY System All (TANPA MEMPERHITUNGKAN FILE MULTIPLE) SUDAH = Current Stock** (Murni di background stock).
+        
+        4. **KESALAHAN RTO**:   
+           * Jika SKU terkait masih memiliki Pending RTO berupa **Draft TRF In > 0** atau **Draft TRF Out > 0**.
+        
+        5. **UNDEFINED**:
+           * Kondisi di luar semua aturan di atas dan perlu pengecekan lebih detail.
+        
+        *Catatan: Perhitungan QTY System All secara otomatis sudah mengecualikan (exclude) lokasi BIN yang mengandung kata 'KARANTINA'.*
         """)
 
     # Inisialisasi Session State
