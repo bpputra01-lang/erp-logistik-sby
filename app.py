@@ -1083,7 +1083,7 @@ def menu_cycle_count():
 
     st.markdown("---")
 
-    st.subheader("1️⃣ Upload & Run Compare")
+    st.subheader("1️⃣ Upload Data Scan & All Data Stock")
     c1, c2 = st.columns(2)
     with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
     with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
@@ -1140,7 +1140,7 @@ def menu_cycle_count():
         with t4: st.dataframe(d['system_plus'], use_container_width=True)
 
         st.markdown("---")
-        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
+        st.subheader("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)")
         up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="step2_cov")
         if up_bin_cov:
             if st.button("▶️ RUN ALLOCATION", use_container_width=True):
@@ -1193,7 +1193,7 @@ def menu_cycle_count():
             st.rerun()
 
     if st.session_state.recon_real_plus is not None:
-        st.markdown("#### 📋 REAL + RECON & SYSTEM OUTSTANDING")
+        st.markdown("#### 📋 REAL + RECON & SYSTEM + RECON")
         c_rec1, c_rec2 = st.columns(2)
         with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
         with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
@@ -1255,7 +1255,7 @@ def menu_cycle_count():
     # ⚙️ 5. SET UP KARANTINA GENERATOR
     # =========================================================
     st.markdown("<br>---", unsafe_allow_html=True)
-    st.subheader("5️⃣ SET UP KARANTINA GENERATOR")
+    st.subheader("5️⃣ RECON SYSTEM + PROCESS")
 
     col_k1, col_k2 = st.columns(2)
     with col_k1:
