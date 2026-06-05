@@ -5088,8 +5088,9 @@ def tampilkan_halaman_po():
             )        
 import pandas as pd
 import io
+import streamlit as None # Dipasangkan di script utama Anda
 
-def process_justification(df_case, df_tracking, df_po):
+def process_justification(df_case, df_tracking, df_all_stock):
     # 1. Copy data & Standarisasi Header ke Huruf Besar
     res = df_case.copy()
     res.columns = [str(c).upper().strip() for c in res.columns]
@@ -5097,93 +5098,115 @@ def process_justification(df_case, df_tracking, df_po):
     df_tracking = df_tracking.copy()
     df_tracking.columns = [str(c).upper().strip() for c in df_tracking.columns]
     
-    df_po = df_po.copy()
-    df_po.columns = [str(c).upper().strip() for c in df_po.columns]
+    df_all_stock = df_all_stock.copy()
+    df_all_stock.columns = [str(c).upper().strip() for c in df_all_stock.columns]
 
-    # 2. Aggregasi Tracking Berdasarkan Kolom Baru (A-M)
+    # Clean SKU di df_case (File Adjustment / Multiple)
+    # Berdasarkan info: SKU di Kolom C (Index 2), QTY SO di Kolom K (Index 10)
+    sku_col_case = res.columns[2]
+    qty_so_col_case = res.columns[10]
+    
+    res['SKU_KEY_JOIN'] = res[sku_col_case].astype(str).str.split('.').str[0].str.strip().str.upper()
+
+    # 2. Aggregasi Tracking Berdasarkan Struktur Kolom Baru (A-O)
     # Kolom C (Index 2) = SKU
     sku_col_track = df_tracking.columns[2] 
     
     track_agg = df_tracking.groupby(sku_col_track).agg({
-        df_tracking.columns[4]: 'sum',   # E: Current Stock
-        df_tracking.columns[5]: 'sum',   # F: Total_Stockin
-        df_tracking.columns[6]: 'sum',   # G: Total_adj_plus
-        df_tracking.columns[7]: 'sum',   # H: Total trf_in
-        df_tracking.columns[8]: 'sum',   # I: Total draft_trf_in
-        df_tracking.columns[9]: 'sum',   # J: Total Sales
-        df_tracking.columns[10]: 'sum',  # K: Total_adj_minus
-        df_tracking.columns[11]: 'sum',  # L: Total draft_trf_out
-        df_tracking.columns[12]: 'sum'   # M: Total trf_out
+        df_tracking.columns[5]: 'sum',   # F: Stock In
+        df_tracking.columns[6]: 'sum',   # G: Adjustment In
+        df_tracking.columns[7]: 'sum',   # H: Transfer In
+        df_tracking.columns[8]: 'sum',   # I: Draft Transfer In
+        df_tracking.columns[9]: 'sum',   # J: Sales
+        df_tracking.columns[10]: 'sum',  # K: Adjustment Out
+        df_tracking.columns[11]: 'sum',  # L: Draft Transfer Out
+        df_tracking.columns[12]: 'sum',  # M: Transfer Out
+        df_tracking.columns[14]: 'sum'   # O: Current Stock
     }).reset_index()
 
-    # Nama kolom sementara untuk proses join dan perhitungan
-    track_agg.columns = ['SKU_KEY', '_E_CURR', '_F_IN', '_G_ADJ_P', '_H_TRF_IN', '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_M', '_L_DRAFT_OUT', '_M_TRF_OUT']
-    
-    # Clean SKU agar formatnya sama
+    # Rename kolom tracking agar mudah dipetakan
+    track_agg.columns = [
+        'SKU_KEY', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', 
+        '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', '_O_CURR_STOCK'
+    ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
-    res['SKU_KEY_JOIN'] = res['SKU'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 3. Merge Data Case dengan Data Tracking
+    # 3. Aggregasi All Data Stock (Berdasarkan Aturan: SKU Kolom C/Index 2, QTY System Kolom J/Index 9)
+    sku_col_all = df_all_stock.columns[2]
+    qty_sys_col_all = df_all_stock.columns[9]
+    
+    all_stock_agg = df_all_stock.groupby(sku_col_all).agg({
+        qty_sys_col_all: 'sum'
+    }).reset_index()
+    
+    all_stock_agg.columns = ['SKU_KEY_ALL', '_QTY_SYS_ALL']
+    all_stock_agg['SKU_KEY_ALL'] = all_stock_agg['SKU_KEY_ALL'].astype(str).str.split('.').str[0].str.strip().str.upper()
+
+    # 4. Aggregasi Total QTY SO per SKU dari File Kasus/Adjustment (karena dasar logika membutuhkan nilai total per Unique SKU)
+    case_agg = res.groupby('SKU_KEY_JOIN').agg({
+        qty_so_col_case: 'sum'
+    }).reset_index()
+    case_agg.columns = ['SKU_KEY_CASE', '_TOTAL_QTY_SO_CASE']
+
+    # 5. Merge Semua Data Ke DataFrame Utama (res)
     res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
+    res = res.merge(all_stock_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_ALL', how='left').fillna(0)
+    res = res.merge(case_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_CASE', how='left').fillna(0)
 
-    # 4. Pemetaan ke Kolom Final
-    res['CURRENT STOCK']      = res['_E_CURR']
+    # 6. Pemetaan ke Nama Kolom Representatif / Final
+    res['CURRENT STOCK']      = res['_O_CURR_STOCK']
     res['TOTAL SALES']        = res['_J_SALES']
-    res['TOTAL_STOCKIN']      = res['_F_IN']
-    res['TOTAL_ADJ_MINUS']    = res['_K_ADJ_M']
-    res['TOTAL_ADJ_PLUS']     = res['_G_ADJ_P']
+    res['TOTAL_STOCKIN']      = res['_F_STOCK_IN']
+    res['TOTAL_ADJ_MINUS']    = res['_K_ADJ_OUT']
+    res['TOTAL_ADJ_PLUS']     = res['_G_ADJ_IN']
     res['TOTAL DRAFT_TRF_IN'] = res['_I_DRAFT_IN']
     res['TOTAL DRAFT_TRF_OUT']= res['_L_DRAFT_OUT']
     res['TOTAL TRF_IN']       = res['_H_TRF_IN']
     res['TOTAL TRF_OUT']      = res['_M_TRF_OUT']
-
-    # 5. Rumus Baru Sesuai Instruksi
-    # REAL QTY = (F + H + I) - (J + L + M)
-    res['REAL QTY'] = (res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN'] + res['TOTAL DRAFT_TRF_IN']) - \
-                      (res['TOTAL SALES'] + res['TOTAL DRAFT_TRF_OUT'] + res['TOTAL TRF_OUT'])
     
-    # GAP ADJUSMENT = G - K
+    # Kolom Tambahan Hasil Mapping Baru
+    res['QTY SYSTEM ALL']     = res['_QTY_SYS_ALL']
+    res['TOTAL QTY SO SKU']   = res['_TOTAL_QTY_SO_CASE']
+
+    # Hitung GAP ADJUSTMENT = G (ADJ IN) - K (ADJ OUT)
     res['GAP ADJUSMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    # 6. Update Logika Justifikasi
+    # 7. Update Logika Justifikasi Sesuai Instruksi Baru
     def run_formula(row):
         try:
-            j2 = round(float(row['QTY SYSTEM']), 2) 
-            k2 = round(float(row['QTY SO']), 2)     
-            l2 = round(float(row['CURRENT STOCK']), 2) 
-            m2 = round(float(row['TOTAL SALES']), 2)   
-            n2 = round(float(row['TOTAL_STOCKIN']), 2) 
-            r2 = round(float(row['TOTAL TRF_IN']), 2)
-            i2 = round(float(row['TOTAL DRAFT_TRF_IN']), 2) # Tambahan I2
-            t2 = round(float(row['REAL QTY']), 2)      
-            u2 = round(float(row['GAP ADJUSMENT']), 2) 
+            gap_adj = round(float(row['GAP ADJUSMENT']), 2)
+            curr_stock = round(float(row['CURRENT STOCK']), 2)
+            qty_sys_all = round(float(row['QTY SYSTEM ALL']), 2)
+            total_qty_so = round(float(row['TOTAL QTY SO SKU']), 2)
+            draft_in = round(float(row['TOTAL DRAFT_TRF_IN']), 2)
+            draft_out = round(float(row['TOTAL DRAFT_TRF_OUT']), 2)
 
-            # Logika Justifikasi
-            if (j2 > k2 and u2 > 0) or (j2 < k2 and u2 < 0):
+            # Logika A: KESALAHAN ADJUSMENT (Jika Gap Adj != 0)
+            # Ditaruh paling atas karena jika kondisi B atau C gap-nya tidak 0, otomatis masuk ke sini
+            if gap_adj != 0:
                 return "KESALAHAN ADJUSMENT"
-            
-            # Update: Memasukkan unsur Stockin Baru (F+H+I)
-            if (n2 + r2 + i2) < m2 or t2 < 0:
-                return "CEK SALES/RTO"
-            
-            if t2 == l2 and t2 != 0:
-                return "CEK ULANG HASIL REKON"
-            
-            if ((t2 == 0 and u2 == 0 and l2 != 0) or 
-                (j2 > k2 and l2 > t2) or 
-                (j2 < k2 and l2 != 0 and t2 != 0)):
-                return "INDIKASI BUG SISTEM"
-            
+
+            # Logika B: KESALAHAN SYSTEM
+            # Syarat: (Total QTY SO + QTY System All == Current Stock) DAN Gap Adj == 0
+            if round(total_qty_so + qty_sys_all, 2) == curr_stock and gap_adj == 0:
+                return "KESALAHAN SYSTEM"
+
+            # Logika C: CEK HASIL REKONSILIASI
+            # Syarat: (QTY System All == Current Stock) DAN mau Gap Adj 0 atau tidak, tetap Cek Hasil Rekon
+            if qty_sys_all == curr_stock:
+                return "CEK HASIL REKONSILIASI"
+
+            # Logika D: KESALAHAN RTO
+            # Syarat: Masih memiliki Draft In > 0 ATAU Draft Out > 0
+            if draft_in > 0 or draft_out > 0:
+                return "KESALAHAN RTO"
+
+            # Logika E: Kondisi lainnya
             return "UNDEFINED"
         except:
             return "ERROR DATA"
 
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
-
-    # 7. Hitung TOTAL PO IN
-    sku_col_po = df_po.columns[3]
-    po_counts = df_po[sku_col_po].astype(str).str.split('.').str[0].value_counts().to_dict()
-    res['TOTAL PO IN'] = res['SKU_KEY_JOIN'].apply(lambda x: po_counts.get(x, 0))
 
     # 8. Susun Urutan Header Final
     ordered_headers = [
@@ -5191,12 +5214,12 @@ def process_justification(df_case, df_tracking, df_po):
         'HARGA BELI', 'HARGA JUAL', 'QTY SYSTEM', 'QTY SO', 'CURRENT STOCK', 
         'TOTAL SALES', 'TOTAL_STOCKIN', 'TOTAL_ADJ_MINUS', 'TOTAL_ADJ_PLUS', 
         'TOTAL DRAFT_TRF_IN', 'TOTAL DRAFT_TRF_OUT', 'TOTAL TRF_IN', 'TOTAL TRF_OUT', 
-        'REAL QTY', 'GAP ADJUSMENT', 'JUSTIFICATION', 'TOTAL PO IN'
+        'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
     ]
 
     final_cols = [col for col in ordered_headers if col in res.columns]
     return res[final_cols]
-
+    
 import pandas as pd
 import numpy as np
 
@@ -9404,78 +9427,73 @@ elif menu == "FDR Update":
                     st.download_button(f"📥 {opt}", st.session_state.dict_kurir_fdr[opt].to_csv(index=False).encode('utf-8'), f"{opt}.csv", "text/csv")
                     st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
 
+# ==========================================
+# STREAMLIT UI INTERFACE
+# ==========================================
 elif menu == "Justification SO":
     st.markdown('<div class="hero-header"><h1>JUSTIFICATION ADJUSTMENT</h1></div>', unsafe_allow_html=True)
     
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **ADJUSTMENT FILE**: Gabungkan antara Adjustment **(Plus)** dan **(Minus)** dalam 1 File dan **QTY SO** yang telah terisi dengan qty yang akan diadjustment.
-        - **SUMMARY STOCK**: Download **SUMMARY STOCK** dari **POWER BI** (Store: **JEZ SURABAYA**).
-        - **PURCHASE ORDER**: Download **PURCHASE ORDER** dari **POWER BI**, Period Invoice & Receive IN: **ALL TIME** (Store: **JEZ SURABAYA**).
+        - **ADJUSTMENT FILE**: Gabungkan antara Adjustment **(Plus)** dan **(Minus)** dalam 1 File. SKU berada di Kolom C, QTY SO berada di Kolom K.
+        - **SUMMARY STOCK**: Download dari **POWER BI** (Store: **JEZ SURABAYA**). Pastikan kolom A-O sesuai template terbaru.
+        - **ALL DATA STOCK**: Upload file All Data Stock terbaru. SKU berada di Kolom C, QTY System berada di Kolom J.
         """)
 
     with st.expander("💡 Logic Thinking"):
         st.info("""
-        **Logic Justifikasi:**
-        - **Kesalahan Adjustment**
-            - **Kondisi 1:** Jika **QTY System > QTY SO (ADJ -)**, namun **Gap Adjustment bernilai (+)**.
-            - **Kondisi 2:** Jika **QTY System < QTY SO (ADJ +)**, namun **Gap Adjustment bernilai (-)**.
-        - **Perlu Cek Sales/RTO**
-            - Jika Total Sales > (Total PO IN + Total TF IN).
-        - **Cek Ulang Hasil Rekon**
-            - Jika **Real QTY** [(PO IN + TF IN) - (SALES + TF OUT + DRAFT TF)] hasilnya sama dengan (=) **Current Stock**.
-        - **Indikasi Bug Sistem**
-            - **Kondisi 1:** Jika (Real QTY = 0 AND Gap Adjustment = 0) tapi **Current Stock ≠ 0**.
-            - **Kondisi 2:** Jika QTY System > QTY SO AND Current Stock > Real QTY.
-            - **Kondisi 3:** Jika QTY System < QTY SO AND Current Stock < Real QTY (L2 & T2 ≠ 0).
-        - **UNDEFINED**
-            - **Kondisi dimana ke-4 Logic diatas tidak ada yang sesuai sehingga memerlukan analisa detail secara manual untuk cek justifikasinya.**
+        **Logic Justifikasi Terbaru:**
+        - **KESALAHAN ADJUSMENT**: Jika nilai **Gap Adjustment ≠ 0**.
+        - **KESALAHAN SYSTEM**: Jika **(Total QTY SO + QTY System All) = Current Stock** DAN **Gap Adjustment = 0**.
+        - **CEK HASIL REKONSILIASI**: Jika **QTY System All = Current Stock**.
+        - **KESALAHAN RTO**: Jika SKU terkait masih memiliki **Draft TRF In** atau **Draft TRF Out** (> 0).
+        - **UNDEFINED**: Kondisi di luar 4 aturan di atas.
         """)
-    # 1. Inisialisasi Session State biar data nggak hilang pas diklik
+
+    # Inisialisasi Session State
     if 'result_so' not in st.session_state:
         st.session_state.result_so = None
 
-    # UI Uploader - Dibagi 3 Kolom
+    # UI Uploader - Dibagi 3 Kolom (PO diganti All Data Stock)
     col1, col2, col3 = st.columns(3)
     with col1: 
         up_case = st.file_uploader("Upload FILE ADJUSMENT", type=['xlsx'], key="up_case_so")
     with col2: 
         up_tracking = st.file_uploader("Upload SUMMARY STOCK", type=['xlsx'], key="up_track_so")
     with col3: 
-        up_others = st.file_uploader("Upload PURCHASE ORDER", type=['xlsx'], key="up_po_so")
+        up_all_stock = st.file_uploader("Upload ALL DATA STOCK", type=['xlsx'], key="up_all_stock_so")
 
-    # 2. Logika Tombol Run
-    if up_case and up_tracking and up_others:
+    # Logika Tombol Run
+    if up_case and up_tracking and up_all_stock:
         if st.button("▶️ RUN COMPARE", use_container_width=True):
             with st.spinner("Processing Data..."):
                 df_c = pd.read_excel(up_case)
                 df_t = pd.read_excel(up_tracking)
-                df_p = pd.read_excel(up_others)
+                df_a = pd.read_excel(up_all_stock)
                 
-                # Panggil fungsi sakti lo
-                st.session_state.result_so = process_justification(df_c, df_t, df_p)
+                # Eksekusi fungsi pembaharuan
+                st.session_state.result_so = process_justification(df_c, df_t, df_a)
 
-    # 3. TAMPILAN OUTPUT (Hanya muncul kalau data sudah di-run)
+    # TAMPILAN OUTPUT
     if st.session_state.result_so is not None:
         result = st.session_state.result_so
         
-        # --- TAMPILAN METRIC BOX (STYLE M-BOX) ---
+        # --- TAMPILAN METRIC BOX ---
         st.divider()
         m1, m2, m3, m4, m5 = st.columns(5)
         
-        # Hitung angka buat box
         c_undef = len(result[result['JUSTIFICATION'] == "UNDEFINED"])
-        c_bug   = len(result[result['JUSTIFICATION'] == "INDIKASI BUG SISTEM"])
+        c_sys   = len(result[result['JUSTIFICATION'] == "KESALAHAN SYSTEM"])
         c_adj   = len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"])
-        c_sales = len(result[result['JUSTIFICATION'] == "CEK SALES/RTO"])
-        c_rekon = len(result[result['JUSTIFICATION'] == "CEK ULANG HASIL REKON"])
+        c_rto   = len(result[result['JUSTIFICATION'] == "KESALAHAN RTO"])
+        c_rekon = len(result[result['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"])
 
         m1.markdown(f'<div class="m-box"><span class="m-lbl">❓UNDEFINED</span><span class="m-val">{c_undef}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">💻BUG SISTEM</span><span class="m-val">{c_bug}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">💻SYS ERROR</span><span class="m-val">{c_sys}</span></div>', unsafe_allow_html=True)
         m3.markdown(f'<div class="m-box"><span class="m-lbl">❌KESALAHAN ADJ</span><span class="m-val">{c_adj}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">🗳️CEK SALES/RTO</span><span class="m-val">{c_sales}</span></div>', unsafe_allow_html=True)
-        m5.markdown(f'<div class="m-box"><span class="m-lbl">🔁CEK ULANG HASIL REKON</span><span class="m-val">{c_rekon}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box"><span class="m-lbl">🗳️KESALAHAN RTO</span><span class="m-val">{c_rto}</span></div>', unsafe_allow_html=True)
+        m5.markdown(f'<div class="m-box"><span class="m-lbl">🔁CEK REKON</span><span class="m-val">{c_rekon}</span></div>', unsafe_allow_html=True)
         
         # --- TAMPILAN TABEL ---
         st.divider()
@@ -9486,7 +9504,7 @@ elif menu == "Justification SO":
                 """, unsafe_allow_html=True)
         st.dataframe(result, use_container_width=True, height=450)
         
-        # --- DOWNLOAD BUTTON (DI LUAR BUTTON RUN AGAR STAY) ---
+        # --- DOWNLOAD BUTTON ---
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             result.to_excel(writer, index=False, sheet_name='Summary')
@@ -9495,106 +9513,11 @@ elif menu == "Justification SO":
             label="📥 DOWNLOAD HASIL REKON (.XLSX)",
             data=output.getvalue(),
             file_name="rekon_stock_so.xlsx",
+            file_name="rekon_stock_so.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
-            key="btn_download_so" # Key unik agar tidak reset
+            key="btn_download_so"
         )
-
-elif menu == "Compare System":
-    st.markdown('<div class="hero-header"><h1>STOCK COMPARATION</h1></div>', unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        **Format yang diharapkan:**
-        - **STOCK SYSTEM 1**: Download ALL DATA STOCK Sebelum jam operasional **Before Shift 0 (07:30)**
-        - **STOCK SYSTEM 2**: Download ALL DATA STOCK Setelah jam operasional **After Shift 2 (10:00)**
-        - **STOCK TRACKING** : Download sesuaikan dengan tanggal dan pilih hanya yang **DONE**
-        """)
-    with st.expander("💡Logic Thinking"):
-        st.info("""
-        **Alur Compare :**
-        - Untuk Compare hanya menggunakan logic rumus **SUMIFS** dimana akan dilakukan di kedua file sehingga mengetahui apakah terdapat perbedaan QTY saat tidak terjadi transaksi
-        - Untuk item yang berbeda akan dipisahkan dan akan dilakukan follow Up ke tim IT untuk dilakukan perbaikan
-        """)
-
-    # 1. INISIALISASI SESSION STATE (Biar data dikunci di memori browser)
-    if 'result_all' not in st.session_state:
-        st.session_state.result_all = None
-    if 'diff_only' not in st.session_state:
-        st.session_state.diff_only = None
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        # Ditambahkan key unik agar file uploader tidak ke-reset saat download
-        file_sys1 = st.file_uploader("Stock System Start Shift", type=['xlsx', 'csv'], key='uploader_sys1')
-    with col2:
-        file_sys2 = st.file_uploader("Stock System End Shift", type=['xlsx', 'csv'], key='uploader_sys2')
-    with col3:
-        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'], key='uploader_track')
-
-    # 2. PROSES LOGIKA HANYA DIJALANKAN PAS TOMBOL DIKLIK
-    if file_sys1 and file_sys2:
-        if st.button("▶️RUN COMPARE"):
-            try:
-                # Masukkan hasil perhitungan ke dalam session state, bukan variabel biasa
-                res_all, d_only = process_stock_comparison(file_sys1, file_sys2, file_tracking)
-                st.session_state.result_all = res_all
-                st.session_state.diff_only = d_only
-            except Exception as e:
-                st.error(f"Terjadi Kesalahan: {e}")
-
-    # 3. KELUARKAN LOGIKA TAMPILAN DARI TOMBOL (Jalan mandiri membaca session state)
-    if st.session_state.result_all is not None and st.session_state.diff_only is not None:
-        result_all = st.session_state.result_all
-        diff_only = st.session_state.diff_only
-
-        st.divider()
-
-        # --- HITUNG METRIK DATA UNTUK DITAMPILKAN ---
-        total_checked = len(result_all)
-        total_diff = len(diff_only)
-        
-        if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
-            match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("DONE TERJUAL|TERJUAL \(BIN MISSMATCH\)", na=False, case=False)])
-            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("UNMATCH", na=False, case=False)])
-            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO SALES", na=False, case=False)])
-        else:
-            match_count, unmatch_count, no_sales_count = 0, 0, 0
-
-        # --- RENDER 5 METRIC BOXES ELEGAN ---
-        m1, m2 = st.columns(2)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{total_checked} ROW</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ TOTAL ITEM SELISIH</span><span class="m-val">{total_diff} SKU</span></div>', unsafe_allow_html=True)
-        
-        st.write("") # Spacer
-        
-        m3, m4, m5 = st.columns(3)
-        m3.markdown(f'<div class="m-box" style="border-left: 5px solid #28a745;"><span class="m-lbl">✅ SELISIH & SALES MATCH</span><span class="m-val" style="color: #28a745;">{match_count} SKU</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box" style="border-left: 5px solid #dc3545;"><span class="m-lbl">❌ SELISIH & SALES UNMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
-        m5.markdown(f'<div class="m-box" style="border-left: 5px solid #ffc107;"><span class="m-lbl">🔍 TOTAL SELISIH NO SALES</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
-
-        st.write("")
-
-        if not diff_only.empty:
-            st.warning("Daftar Perbedaan Stok Beserta Hasil Cross-Check Tracking Penjualan:")
-            
-            ordered_cols = [
-                'BIN', 'SKU', 'QTY_Sys1', 'QTY_Sys2', 'DIFF', 
-                'TRACK_INVOICE', 'TRACK_BIN', 'TRACK_QTY_SALES', 'STATUS_CHECK'
-            ]
-            display_df = diff_only[[c for c in ordered_cols if c in diff_only.columns]]
-            
-            st.dataframe(display_df, use_container_width=True)
-            
-            csv = display_df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Hasil Selisih & Status",
-                data=csv,
-                file_name='selisih_stok_validated.csv',
-                mime='text/csv',
-                key='btn_download_compare' # Ditambahkan key unik agar tidak memicu error rerun
-            )
-        else:
-            st.success("✅ Tidak ada perbedaan stok! Semua BIN, SKU, dan QTY match.")
 
 import pandas as pd
 import random
