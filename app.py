@@ -8163,7 +8163,7 @@ def show_timbang_system():
                 
     
 with st.sidebar:
-       st.markdown("""
+    st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
@@ -8205,20 +8205,21 @@ with st.sidebar:
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
         }
         
-        /* --- ICON/Emoji dengan efek glow --- */
-        .elegant-header .header-icon {
+        /* --- LOGO KUSTOM DENGAN EFEK GLOW & ANIMASI --- */
+        .elegant-header .header-logo {
             display: inline-block;
-            font-size: 32px;
-            margin-right: 8px;
+            width: 42px; /* Ukuran pas disandingkan dengan teks 2 baris */
+            height: auto;
+            margin-right: 10px;
             vertical-align: middle;
             filter: drop-shadow(0 2px 8px rgba(197, 160, 89, 0.5));
-            animation: truck-bounce 2s ease-in-out infinite;
+            animation: logo-bounce 2s ease-in-out infinite;
         }
         
-        /* Animasi halus untuk icon */
-        @keyframes truck-bounce {
+        /* Animasi halus untuk logo baru */
+        @keyframes logo-bounce {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
+            50% { transform: translateY(-4px); }
         }
         
         /* --- SUBTITLE ELEGANT --- */
@@ -8232,8 +8233,6 @@ with st.sidebar:
             margin-top: -10px;
             margin-bottom: 20px;
             padding-left: 2px;
-            
-            /* Efek subtle glow */
             text-shadow: 0 0 10px rgba(197, 160, 89, 0.3);
         }
         
@@ -8335,21 +8334,25 @@ with st.sidebar:
         }
     </style>
     
-    <!-- JUDUL UTAMA DENGAN ICON -->
-    <div class="elegant-header" style="text-align: center; margin-bottom: 20px;">
-    <img src="app/static/image_981625.png" onerror="this.onerror=null; this.src='https://raw.githubusercontent.com/bpputra01-lang/erp-logistik-sby/main/image_981625.png';" style="width: 60px; height: auto; margin-bottom: 10px;"><br>
-    ERP LOGISTIC<br>SURABAYA
+    <div class="elegant-header">
+        <table style="border:none; background:transparent; margin:0; padding:0; border-collapse:collapse;">
+            <tr style="background:transparent; border:none;">
+                <td style="padding:0; border:none; vertical-align:middle;">
+                    <img class="header-logo" src="https://raw.githubusercontent.com/bpputra01-lang/erp-logistik-sby/main/image_981625.png">
+                </td>
+                <td style="padding:0; border:none; vertical-align:middle; line-height:1.2;">
+                    ERP LOGISTIC<br>SURABAYA
+                </td>
+            </tr>
+        </table>
     </div>
     
-    <!-- SUBTITLE -->
     <div class="elegant-subtitle">
         Warehouse Management System
     </div>
     
-    <!-- GARIS DEKORATIF -->
     <div class="elegant-divider"></div>
     
-    <!-- VERSION TAG -->
     <div class="version-tag">v2.1 PRO</div>
 """, unsafe_allow_html=True)
 
