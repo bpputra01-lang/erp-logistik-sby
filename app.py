@@ -9511,8 +9511,7 @@ elif menu == "Justification SO":
         st.download_button(
             label="📥 DOWNLOAD HASIL REKON (.XLSX)",
             data=output.getvalue(),
-            file_name="rekon_stock_so.xlsx",
-            file_name="rekon_stock_so.xlsx",
+            file_name="rekon_stock_so.xlsx", # Sudah diperbaiki, hanya tertulis 1 kali
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
             key="btn_download_so"
