@@ -5193,10 +5193,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
             # b. QTY SYSTEM < QTY SO dan GAP ADJUSMENT NEGATIF ( < 0 )
             if qty_sys_row < qty_so_row and gap_adj < 0:
                 return "KESALAHAN ADJUSMENT -"
-                
-            # Fallback untuk Kesalahan Adjustment umum jika ada kondisi gap miring lainnya
-            if gap_adj != 0:
-                return "KESALAHAN ADJUSMENT"
 
             # --- LOGIKA 2: KESALAHAN SYSTEM (Kondisi syarat Gap Adj harus == 0) ---
             if gap_adj == 0:
