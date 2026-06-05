@@ -9459,9 +9459,9 @@ elif menu == "Justification SO":
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **ADJUSTMENT FILE**: Gabungkan antara Adjustment **(Plus)** dan **(Minus)** dalam 1 File. SKU berada di Kolom C, QTY SO berada di Kolom K.
-        - **SUMMARY STOCK**: Download dari **POWER BI** (Store: **JEZ SURABAYA**). Pastikan kolom A-O sesuai template terbaru.
-        - **ALL DATA STOCK**: Upload file All Data Stock terbaru. SKU berada di Kolom C, QTY System berada di Kolom J.
+        - **ADJUSTMENT FILE**: Gabungkan antara Mulitple Adjustment **(Plus)** dan **(Minus)** dalam 1 File.
+        - **SUMMARY STOCK**: Download dari **JEZPRO** pada menu **Dashboard Asset** (Store: **JEZ SURABAYA**).
+        - **ALL DATA STOCK**: Upload file All data Stock (Multiple Adjusment) **HANYA ADA STOCK**.
         """)
 
     with st.expander("💡 Logic Thinking"):
