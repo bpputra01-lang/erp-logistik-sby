@@ -5158,9 +5158,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
 
    # # 6. Pemetaan ke Nama Kolom Representatif / Final
     # --- Kolom Identitas Produk dari Summary Stock Baru ---
-    res['STORE']              = res['STORE']
-    res['ARTICLE ID']         = res['ARTICLE ID']
-    res['ARTICLE NAME']       = res['ARTICLE NAME']
     res['BEGINNING STOCK']    = res['BEGINNING STOCK']
     res['ENDING STOCK']       = res['_N_ENDING_STOCK']
     res['CURRENT STOCK']      = res['_O_CURR_STOCK']
@@ -5181,7 +5178,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
 
     # Hitung GAP ADJUSTMENT = G (ADJ IN) - K (ADJ OUT)
     res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
-    
+
     # 7. Update Logika Justifikasi Sesuai Instruksi Baru
     def run_formula(row):
         try:
