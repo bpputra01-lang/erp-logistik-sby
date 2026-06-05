@@ -2088,7 +2088,7 @@ def menu_Stock_Opname():
     st.markdown("---")
 
     # STEP 1
-    st.subheader("1️⃣ Upload & Run Compare")
+    st.subheader("1️⃣ Upload Data Scan & All Data Stock")
     c1, c2 = st.columns(2)
     with c1: up_scan = st.file_uploader("📥 DATA SCAN", type=['xlsx','csv'], key="step1_scan")
     with c2: up_stock = st.file_uploader("📥 STOCK SYSTEM", type=['xlsx','csv'], key="step1_stock")
@@ -2133,7 +2133,7 @@ def menu_Stock_Opname():
         with t4: st.dataframe(d['system_plus'], use_container_width=True)
 
         st.markdown("---")
-        st.subheader("2️⃣ Upload BIN COVERAGE & Run Allocation")
+        st.subheader("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)")
         up_bin_cov = st.file_uploader("📥 FILE BIN COVERAGE", type=['xlsx','csv'], key="step2_cov")
         if up_bin_cov:
             if st.button("▶️ RUN ALLOCATION", use_container_width=True):
@@ -2186,7 +2186,7 @@ def menu_Stock_Opname():
             st.rerun()
 
     if st.session_state.recon_real_plus is not None:
-        st.markdown("#### 📋 REAL + RECON & SYSTEM OUTSTANDING")
+        st.markdown("#### 📋 REAL + RECON & SYSTEM + RECON")
         c_rec1, c_rec2 = st.columns(2)
         with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
         with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
@@ -2208,7 +2208,7 @@ def menu_Stock_Opname():
         with col_a: 
             up_r4 = st.file_uploader("1️⃣ Sheet REAL + RECON", type=['xlsx','csv'], key="u_r_final_fix")
         with col_b: 
-            up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ +", type=['xlsx', 'csv'], key="u_s_final_fix")
+            up_s4 = st.file_uploader("2️⃣ Sheet CEK STOCK ADJ + (New Multiple Adj.)", type=['xlsx', 'csv'], key="u_s_final_fix")
         with col_c: 
             up_m5 = st.file_uploader("3️⃣ File STAGGING INBOUND", type=['xlsx'], key="u_m_final_fix")
 
@@ -2356,14 +2356,14 @@ def menu_Stock_Opname():
     # ⚙️ 6. SET UP KARANTINA GENERATOR (DI DALAM FUNGSI MENU)
     # =========================================================
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
-    st.subheader("5️⃣ SET UP KARANTINA GENERATOR")
+    st.subheader("5️⃣ RECON SYSTEM + PROCESS")
 
     # Tambahkan dua uploader agar logic compare BIN|SKU bisa jalan
     col_k1, col_k2 = st.columns(2)
     with col_k1:
         up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
     with col_k2:
-        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
+        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT (New Multiple Adj.)", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
 
     if up_k6 and up_adj6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
