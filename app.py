@@ -5100,16 +5100,16 @@ def process_justification(df_case, df_tracking, df_all_stock):
     df_all_stock = df_all_stock.copy()
     df_all_stock.columns = [str(c).upper().strip() for c in df_all_stock.columns]
 
-    # Clean SKU di df_case (File Adjustment / Multiple)
-    # Berdasarkan info: SKU di Kolom C (Index 2), QTY SO di Kolom K (Index 10)
-    sku_col_case = res.columns[2]
-    qty_so_col_case = res.columns[10]
+    # Ambil index nama kolom penting dari file adjustment lu
+    sku_col_case = res.columns[2]       # Kolom C (SKU)
+    qty_sys_col_case = res.columns[9]   # Kolom J (QTY SYSTEM)
+    qty_so_col_case = res.columns[10]   # Kolom K (QTY SO)
     
+    # Standarisasi SKU internal untuk join data di background
     res['SKU_KEY_JOIN'] = res[sku_col_case].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-  # 2. Aggregasi Tracking Berdasarkan Struktur Kolom Baru (A-O)
-    # Kolom C (Index 2) = SKU
-    sku_col_track = df_tracking.columns[2] 
+    # 2. Aggregasi Tracking Berdasarkan Struktur Kolom Baru (A-O)
+    sku_col_track = df_tracking.columns[2] # Kolom C = SKU
     
     track_agg = df_tracking.groupby(sku_col_track).agg({
         df_tracking.columns[4]: 'sum',   # E: Beginning Stock
@@ -5125,7 +5125,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
         df_tracking.columns[14]: 'sum'   # O: Current Stock
     }).reset_index()
 
-    # Rename kolom tracking (Bersih dari Store, Article ID, Article Name)
     track_agg.columns = [
         'SKU_KEY', 'BEGINNING STOCK', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', 
         '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', 
@@ -5133,34 +5132,33 @@ def process_justification(df_case, df_tracking, df_all_stock):
     ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 3. Aggregasi All Data Stock (Berdasarkan Aturan: SKU Kolom C/Index 2, QTY System Kolom J/Index 9)
+    # 3. [PERBAIKAN 1] Aggregasi All Data Stock (EXCLUDE BIN KARANTINA)
+    # Kolom B (Index 1) adalah Kolom BIN, Kolom C (Index 2) adalah SKU, Kolom J (Index 9) adalah QTY SYSTEM
+    bin_col_all = df_all_stock.columns[1]
     sku_col_all = df_all_stock.columns[2]
     qty_sys_col_all = df_all_stock.columns[9]
     
-    all_stock_agg = df_all_stock.groupby(sku_col_all).agg({
+    # Filter buang BIN yang mengandung kata 'KARANTINA'
+    df_all_stock_filtered = df_all_stock[
+        ~df_all_stock[bin_col_all].astype(str).str.upper().str.contains('KARANTINA', na=False)
+    ]
+    
+    all_stock_agg = df_all_stock_filtered.groupby(sku_col_all).agg({
         qty_sys_col_all: 'sum'
     }).reset_index()
     
     all_stock_agg.columns = ['SKU_KEY_ALL', '_QTY_SYS_ALL']
     all_stock_agg['SKU_KEY_ALL'] = all_stock_agg['SKU_KEY_ALL'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 4. Aggregasi Total QTY SO per SKU dari File Kasus/Adjustment (karena dasar logika membutuhkan nilai total per Unique SKU)
-    case_agg = res.groupby('SKU_KEY_JOIN').agg({
-        qty_so_col_case: 'sum'
-    }).reset_index()
-    case_agg.columns = ['SKU_KEY_CASE', '_TOTAL_QTY_SO_CASE']
-
-    # 5. Merge Semua Data Ke DataFrame Utama (res)
+    # 4. Merge Data ke DataFrame Utama
     res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
     res = res.merge(all_stock_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_ALL', how='left').fillna(0)
-    res = res.merge(case_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_CASE', how='left').fillna(0)
 
-  # 6. Pemetaan ke Nama Kolom Representatif / Final
+    # 5. Pemetaan ke Nama Kolom Final
     res['BEGINNING STOCK']    = res['BEGINNING STOCK']
     res['ENDING STOCK']       = res['_N_ENDING_STOCK']
     res['CURRENT STOCK']      = res['_O_CURR_STOCK']
     
-    # --- Kolom Mutasi Stock dari Summary Stock Baru ---
     res['TOTAL_STOCKIN']      = res['_F_STOCK_IN']
     res['TOTAL_ADJ_PLUS']     = res['_G_ADJ_IN']
     res['TOTAL TRF_IN']       = res['_H_TRF_IN']
@@ -5170,67 +5168,81 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res['TOTAL DRAFT_TRF_OUT']= res['_L_DRAFT_OUT']
     res['TOTAL TRF_OUT']      = res['_M_TRF_OUT']
     
-    # --- Kolom Hasil Mapping Lintas File ---
     res['QTY SYSTEM ALL']     = res['_QTY_SYS_ALL']
-    res['TOTAL QTY SO SKU']   = res['_TOTAL_QTY_SO_CASE']
-
-    # Hitung GAP ADJUSTMENT = G (ADJ IN) - K (ADJ OUT)
     res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    # 7. Update Logika Justifikasi Sesuai Instruksi Baru
+    # 6. [PERBAIKAN 2 & 3] Update Logika Justifikasi Sesuai Aturan Baru
     def run_formula(row):
         try:
+            # Ambil nilai baris file adjustment lu
+            qty_sys_row = round(float(row[qty_sys_col_case]), 2)
+            qty_so_row = round(float(row[qty_so_col_case]), 2)
+            
+            # Ambil nilai hitungan background lintas file
             gap_adj = round(float(row['GAP ADJUSMENT']), 2)
             curr_stock = round(float(row['CURRENT STOCK']), 2)
             qty_sys_all = round(float(row['QTY SYSTEM ALL']), 2)
-            total_qty_so = round(float(row['TOTAL QTY SO SKU']), 2)
             draft_in = round(float(row['TOTAL DRAFT_TRF_IN']), 2)
             draft_out = round(float(row['TOTAL DRAFT_TRF_OUT']), 2)
 
-            # Logika A: KESALAHAN ADJUSMENT (Jika Gap Adj != 0)
-            # Ditaruh paling atas karena jika kondisi B atau C gap-nya tidak 0, otomatis masuk ke sini
+            # --- LOGIKA 3: KESALAHAN ADJUSMENT (+ / -) ---
+            # a. QTY SYSTEM > QTY SO dan GAP ADJUSMENT POSITIF ( > 0 )
+            if qty_sys_row > qty_so_row and gap_adj > 0:
+                return "KESALAHAN ADJUSMENT +"
+            
+            # b. QTY SYSTEM < QTY SO dan GAP ADJUSMENT NEGATIF ( < 0 )
+            if qty_sys_row < qty_so_row and gap_adj < 0:
+                return "KESALAHAN ADJUSMENT -"
+                
+            # Fallback untuk Kesalahan Adjustment umum jika ada kondisi gap miring lainnya
             if gap_adj != 0:
                 return "KESALAHAN ADJUSMENT"
 
-            # Logika B: KESALAHAN SYSTEM
-            # Syarat: (Total QTY SO + QTY System All == Current Stock) DAN Gap Adj == 0
-            if round(total_qty_so + qty_sys_all, 2) == curr_stock and gap_adj == 0:
-                return "KESALAHAN SYSTEM"
+            # --- LOGIKA 2: KESALAHAN SYSTEM (Kondisi syarat Gap Adj harus == 0) ---
+            if gap_adj == 0:
+                # a. JIKA QTY SYSTEM > QTY SO
+                if qty_sys_row > qty_so_row:
+                    diff = qty_sys_row - qty_so_row
+                    if round(qty_sys_all - diff, 2) == curr_stock:
+                        return "KESALAHAN SYSTEM"
+                
+                # b. JIKA QTY SYSTEM < QTY SO
+                elif qty_sys_row < qty_so_row:
+                    diff = qty_so_row - qty_sys_row
+                    if round(qty_sys_all + diff, 2) == curr_stock:
+                        return "KESALAHAN SYSTEM"
 
-            # Logika C: CEK HASIL REKONSILIASI
-            # Syarat: (QTY System All == Current Stock) DAN mau Gap Adj 0 atau tidak, tetap Cek Hasil Rekon
+            # --- LOGIKA KONDISI LAINNYA ---
+            # CEK HASIL REKONSILIASI
             if qty_sys_all == curr_stock:
                 return "CEK HASIL REKONSILIASI"
 
-            # Logika D: KESALAHAN RTO
-            # Syarat: Masih memiliki Draft In > 0 ATAU Draft Out > 0
+            # KESALAHAN RTO
             if draft_in > 0 or draft_out > 0:
                 return "KESALAHAN RTO"
 
-            # Logika E: Kondisi lainnya
             return "UNDEFINED"
         except:
             return "ERROR DATA"
 
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
 
-   # 8. Susun Urutan Header Final (Tanpa Store, Article ID, dan Article Name)
+    # 7. Susun Urutan Header Final
     ordered_headers = [
-        # --- Data Identitas Produk Asli File Multiple ---
         'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 
-        'HARGA BELI', 'HARGA JUAL', 
-        
-        # --- Data Input / File Multiple ---
-        'QTY SYSTEM', 'QTY SO', 
-        
-        # --- Data Summary Stock Baru ---
+        'HARGA BELI', 'HARGA JUAL', 'QTY SYSTEM', 'QTY SO', 
         'BEGINNING STOCK', 'TOTAL_STOCKIN', 'TOTAL_ADJ_PLUS', 'TOTAL TRF_IN', 
         'TOTAL DRAFT_TRF_IN', 'TOTAL SALES', 'TOTAL_ADJ_MINUS', 'TOTAL DRAFT_TRF_OUT', 
         'TOTAL TRF_OUT', 'ENDING STOCK', 'CURRENT STOCK', 
-        
-        # --- Data Hasil Cross-Check & Perhitungan Sistem ---
         'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
     ]
+
+    # Bersihkan sisa-sisa kolom background key internal agar output rapi
+    drop_cols = ['SKU_KEY_JOIN', 'SKU_KEY', 'SKU_KEY_ALL', 
+                 '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', 
+                 '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', 
+                 '_N_ENDING_STOCK', '_O_CURR_STOCK', '_QTY_SYS_ALL']
+    res = res.drop(columns=[c for c in drop_cols if c in res.columns], errors='ignore')
 
     final_cols = [col for col in ordered_headers if col in res.columns]
     return res[final_cols]
