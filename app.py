@@ -462,7 +462,7 @@ div.stFormSubmitButton > button {
                 font-family: 'Inter', sans-serif; 
                 font-weight: 800; 
                 text-align: center;
-            ">SURABAYA DISTRIBUTION
+            ">LOGISTIC DISTRIBUTION
             CENTER WAREHOUSE</h2>
         """, unsafe_allow_html=True)
         
@@ -473,7 +473,7 @@ div.stFormSubmitButton > button {
                 font-size: 14px; 
                 margin-bottom: 15px; 
                 text-align: center;
-            ">🟢Warehouse Management System🟢</p>
+            ">🟢Warehouse Management System Support Tools🟢</p>
         """, unsafe_allow_html=True)
 
        # BUNGKUS FORM
