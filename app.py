@@ -8336,9 +8336,9 @@ with st.sidebar:
     </style>
     
     <!-- JUDUL UTAMA DENGAN ICON -->
-    <div class="elegant-header">
-        <span class="header-icon">🚛</span>
-        ERP LOGISTIC<br>SURABAYA
+    <div class="elegant-header" style="text-align: center; margin-bottom: 20px;">
+    <img src="app/static/image_981625.png" onerror="this.onerror=null; this.src='https://raw.githubusercontent.com/bpputra01-lang/erp-logistik-sby/main/image_981625.png';" style="width: 60px; height: auto; margin-bottom: 10px;"><br>
+    ERP LOGISTIC<br>SURABAYA
     </div>
     
     <!-- SUBTITLE -->
