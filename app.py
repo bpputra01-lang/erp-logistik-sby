@@ -2365,7 +2365,7 @@ def menu_Stock_Opname():
                 if df_miss.empty:
                     st.info("Tidak ada item missing (Semua BIN|SKU terdaftar di sistem).")
                 else:
-                    st.warning(f"Ditemukan {len(df_miss)} baris barang yang ada di Fisik tapi TIDAK terdaftar di Sistem.")
+                    st.warning(f"Ditemukan {len(df_miss)} baris yang tidak ditemukan Lookup BIN dan SKU Match sehingga Qty Input di Inbound Menggunakan Qty Hasil Rekonsiliasi secara langsung.")
                     # Kita ambil kolom BIN, SKU, dan QTY (Biasanya index 0, 1, dan 6 sesuai logic awal lu)
                     df_miss_display = df_miss.copy()
                     st.dataframe(df_miss_display, use_container_width=True, hide_index=True)
