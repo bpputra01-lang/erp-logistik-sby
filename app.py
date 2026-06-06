@@ -9559,13 +9559,16 @@ elif menu == "Justification SO":
     if st.session_state.result_so is not None:
         result = st.session_state.result_so
         
-        # --- TAMPILAN METRIC BOX ---
+        # --- TAMPILAN METRIC BOX (SUDAH SINKRON) ---
         st.divider()
         m1, m2, m3, m4, m5 = st.columns(5)
         
         c_undef = len(result[result['JUSTIFICATION'] == "UNDEFINED"])
         c_sys   = len(result[result['JUSTIFICATION'] == "KESALAHAN SYSTEM"])
-        c_adj   = len(result[result['JUSTIFICATION'] == "KESALAHAN ADJUSMENT"])
+        
+        # PERBAIKAN: Hitung gabungan KESALAHAN ADJUSMENT + dan - biar sinkron
+        c_adj   = len(result[result['JUSTIFICATION'].isin(["KESALAHAN ADJUSMENT +", "KESALAHAN ADJUSMENT -"])])
+        
         c_rto   = len(result[result['JUSTIFICATION'] == "KESALAHAN RTO"])
         c_rekon = len(result[result['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"])
 
@@ -9592,7 +9595,7 @@ elif menu == "Justification SO":
         st.download_button(
             label="📥 DOWNLOAD HASIL REKON (.XLSX)",
             data=output.getvalue(),
-            file_name="rekon_stock_so.xlsx", # Sudah diperbaiki, hanya tertulis 1 kali
+            file_name="rekon_stock_so.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
             key="btn_download_so"
