@@ -1285,10 +1285,8 @@ def menu_cycle_count():
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
-    if st.session_state.df_karantina_6 is not None:
+if st.session_state.df_karantina_6 is not None:
     # --- METRIC BOXES KARANTINA ---
-    
-    # Letakkan di sini dan pastikan sejajar masuk ke dalam
     st.write("Daftar kolom yang ada saat ini:", st.session_state.df_karantina_6.columns.tolist())
     st.dataframe(st.session_state.df_karantina_6.head())
     
