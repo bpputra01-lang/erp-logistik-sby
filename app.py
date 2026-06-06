@@ -1286,9 +1286,14 @@ def menu_cycle_count():
                 st.error(f"❌ Error: {str(e)}")
 
     if st.session_state.df_karantina_6 is not None:
-        # --- METRIC BOXES KARANTINA ---
-        total_k_qty = int(st.session_state.df_karantina_6['QUANTITY'].sum())
-        total_k_sku = st.session_state.df_karantina_6['SKU'].nunique()
+    # --- METRIC BOXES KARANTINA ---
+    
+    # Letakkan di sini dan pastikan sejajar masuk ke dalam
+    st.write("Daftar kolom yang ada saat ini:", st.session_state.df_karantina_6.columns.tolist())
+    st.dataframe(st.session_state.df_karantina_6.head())
+    
+    total_k_qty = int(st.session_state.df_karantina_6['QUANTITY'].sum())
+    total_k_sku = st.session_state.df_karantina_6['SKU'].nunique()
         
         mk1, mk2 = st.columns(2)
         with mk1:
