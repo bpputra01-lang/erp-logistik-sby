@@ -5214,17 +5214,13 @@ def process_justification(df_case, df_tracking, df_all_stock):
 
             # --- LOGIKA 3: KESALAHAN ADJUSMENT (+ / -) DENGAN PENCEKAN RUMUS ---
             
-            # a. JIKA QTY SYSTEM > QTY SO (Potensi Kesalahan Adjustment +)
+           # a. JIKA QTY SYSTEM > QTY SO (Potensi Kesalahan Adjustment +)
             if qty_sys_row > qty_so_row and gap_adj > 0:
-                diff = qty_sys_row - qty_so_row
-                if round(qty_sys_all - diff, 2) == curr_stock:
-                    return "KESALAHAN ADJUSMENT +"
+                return "KESALAHAN ADJUSMENT +"
             
             # b. JIKA QTY SYSTEM < QTY SO (Potensi Kesalahan Adjustment -)
             elif qty_sys_row < qty_so_row and gap_adj < 0:
-                diff = qty_so_row - qty_sys_row
-                if round(qty_sys_all + diff, 2) == curr_stock:
-                    return "KESALAHAN ADJUSMENT -"
+                return "KESALAHAN ADJUSMENT -"
 
             # --- LOGIKA 2: KESALAHAN SYSTEM (Kondisi syarat Gap Adj harus == 0) ---
             if gap_adj == 0:
