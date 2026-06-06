@@ -662,34 +662,20 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
-
-def logic_setup_karantina_with_compare(df_outstanding, df_recon):
-    def clean_val(x):
-        if pd.isna(x): return ""
-        s = str(x).strip().upper()
-        if s.startswith("SPE"): s = s[3:].strip() 
-        if s.endswith('.0'): s = s[:-2]
-        return s
-
+# =====================================================================
+# 🛠️ 1. BACKEND LOGIC: TARIK LANGSUNG SECARA HORIZONTAL DARI FILE UTAMA
+# =====================================================================
+def logic_setup_karantina_with_compare(df_outstanding, df_recon=None):
     audit_results = []
     karantina_results = []
 
     if df_outstanding is not None and not df_outstanding.empty:
         df = df_outstanding.copy()
         
-        # --- FIX HEADER OTOMATIS ---
-        # Jika baris pertama kosong / nama kolom tidak terbaca, kita cari baris yang berisi 'SKU' atau 'BIN'
-        if df.columns.str.contains('Unnamed').any() or 'SKU' not in [str(c).upper().strip() for c in df.columns]:
-            for i, row in df.iterrows():
-                row_vals = [str(v).upper().strip() for v in row.values if not pd.isna(v)]
-                if 'SKU' in row_vals or 'QTY SYSTEM' in row_vals:
-                    df.columns = [str(c).strip().upper() for c in row.values]
-                    df = df.iloc[i+1:].reset_index(drop=True)
-                    break
-        else:
-            df.columns = df.columns.str.strip().str.upper()
+        # Bersihkan nama kolom dari spasi ghaib dan paksa huruf besar
+        df.columns = df.columns.str.strip().str.upper()
 
-        # --- CARI NAMA KOLOM SECARA DINAMIS ---
+        # Cari nama kolom asli berdasarkan teks (Dinamis, gak peduli urutan index keberapa)
         col_bin = next((c for c in df.columns if 'BIN' in str(c)), None)
         col_sku = next((c for c in df.columns if 'SKU' in str(c)), None)
         col_sys = next((c for c in df.columns if 'SYSTEM' in str(c)), None)
@@ -697,21 +683,22 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
 
         for _, row in df.iterrows():
             try:
-                # Ambil data BIN dan SKU menggunakan nama kolom, kalau gagal pakai urutan index
+                # Ambil text BIN dan SKU
                 bin_val = row[col_bin] if col_bin else row.iloc[1]
                 sku_val = row[col_sku] if col_sku else row.iloc[2]
                 
-                # Ambil nilai QTY SYSTEM dan HASIL REKONSILIASI berdasarkan nama kolom teksnya
+                # Tarik data angka QTY SYSTEM dan REKONSILIASI dari baris yang SAMA
                 q_system = pd.to_numeric(row[col_sys], errors='coerce') if col_sys else pd.to_numeric(row.iloc[9], errors='coerce')
                 q_recon = pd.to_numeric(row[col_rec], errors='coerce') if col_rec else pd.to_numeric(row.iloc[13], errors='coerce')
                 
+                # Jaga-jaga kalau cell kosong (NaN) diubah jadi 0
                 q_system = q_system if not pd.isna(q_system) else 0
                 q_recon = q_recon if not pd.isna(q_recon) else 0
                 
-                # RUMUS MATEMATIKA: QTY SYSTEM - HASIL REKONSILIASI
+                # HARUS POSITIF: 1 - 1 = 0 (Lolos / Gak masuk list audit)
                 diff = q_system - q_recon
 
-                # Masukkan ke tabel cek audit jika ada selisih (!= 0)
+                # Masukkan ke tabel cek audit HANYA jika ada selisih (!= 0)
                 if diff != 0:
                     audit_results.append({
                         'BIN': bin_val,
