@@ -694,21 +694,35 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                 recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
             except: continue
 
-    # 3. Proses Comparison
+  # =====================================================================
+# # 3. Proses Comparison (FIXED: LANGSUNG BACA HORIZONTAL PER BARIS)
+# =====================================================================
     df_master = df_outstanding.copy()
+    
+    # Paksa nama kolom jadi huruf kapital semua biar seragam
+    df_master.columns = df_master.columns.str.strip().str.upper()
+    
     audit_results = []
     karantina_results = []
 
     for _, row in df_master.iterrows():
+        # 1. Ambil data BIN dan SKU dari kolom index ke-1 dan ke-2
         bin_val = row.iloc[1]
         sku_val = row.iloc[2]
-        key = f"{clean_val(bin_val)}|{clean_val(sku_val)}"
         
-        q_system = sys_map.get(key, 0)
-        q_recon = recon_map.get(key, 0)
+        # 2. LANGSUNG NODONG NILAI DARI BARIS YANG SAMA (Index 9 dan 13)
+        # Tidak perlu pakai sys_map.get(key) atau recon_map.get(key) lagi!
+        q_system = pd.to_numeric(row.iloc[9], errors='coerce')
+        q_recon = pd.to_numeric(row.iloc[13], errors='coerce')
+        
+        # 3. Jaga-jaga kalau cell-nya kosong (NaN), ubah jadi 0
+        q_system = q_system if not pd.isna(q_system) else 0
+        q_recon = q_recon if not pd.isna(q_recon) else 0
+        
+        # 4. Hitung selisihnya secara horizontal (1 - 1 = 0)
         diff = q_system - q_recon
 
-        # TAB PENGECEKAN: Semua selisih (Plus/Minus) masuk sini buat audit
+        # TAB PENGECEKAN: Hanya tampilkan jika benar-benar ada selisih (!= 0)
         if diff != 0:
             audit_results.append({
                 'BIN': bin_val,
@@ -717,15 +731,14 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                 'QTY_RECON_N': q_recon,
                 'SELISIH': diff
             })
-
-            # TAB SET UP KARANTINA: HANYA YANG POSITIF (> 0)
-            # Nilai minus tidak akan dimasukkan ke list hasil karantina
+            
+            # Masukkan ke list karantina hanya jika selisih POSITIF (> 0)
             if diff > 0:
                 karantina_results.append({
                     "BIN AWAL": bin_val,
                     "BIN TUJUAN": "KARANTINA",
                     "SKU": sku_val,
-                    "QUANTITY": diff,
+                    "QUANTITY": int(diff),
                     "NOTES": "MISS LOCATION"
                 })
 
