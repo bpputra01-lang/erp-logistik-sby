@@ -1490,6 +1490,7 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     def super_clean(val):
         if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
         s = str(val).strip().upper()
+        if s.endswith('.0'): s = s[:-2]
         return s
 
     pivot_list = [] # Buat Multiple
@@ -1497,30 +1498,44 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
 
     # A. DARI STOCK (Yang Match BIN|SKU & Selisih Plus)
     df_s = df_stock_final.copy()
+    
+    # Deteksi posisi nama kolom secara dinamis
+    col_sku_stock = next((c for c in df_s.columns if 'SKU' in c.upper()), df_s.columns[2])
+    
     q_so = pd.to_numeric(df_s["QTY SO"], errors='coerce').fillna(0)
-    q_sys = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
+    q_sys = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0) if len(df_s.columns) > 9 else pd.to_numeric(df_s[df_s.columns[9]], errors='coerce').fillna(0)
     
     mask_plus = (q_so > q_sys) & (df_s["DIFF"].notna())
     if mask_plus.any():
         for idx, r in df_s[mask_plus].iterrows():
-            pivot_list.append({'SKU_KEY_TEMP': super_clean(r.iloc[2]), 'QTY_TOTAL': pd.to_numeric(r["DIFF"], errors='coerce')})
+            pivot_list.append({
+                'SKU_KEY_TEMP': super_clean(r[col_sku_stock]), 
+                'QTY_TOTAL': pd.to_numeric(r["DIFF"], errors='coerce')
+            })
 
-    # B. LOOKUP SKU MISSING KE INBOUND (Hanya cek SKU)
+    # B. LOOKUP SKU MISSING KE INBOUND
     inbound_master = df_staging_inbound.copy()
-    inbound_skus_set = {super_clean(x) for x in inbound_master.iloc[:, 2].unique() if super_clean(x)}
+    col_sku_inbound = next((c for c in inbound_master.columns if 'SKU' in c.upper()), inbound_master.columns[2])
+    
+    inbound_skus_set = {super_clean(x) for x in inbound_master[col_sku_inbound].unique() if super_clean(x)}
 
     if df_recon_missing is not None and not df_recon_missing.empty:
+        col_bin_miss = df_recon_missing.columns[0]
+        col_sku_miss = df_recon_missing.columns[1]
+        col_qty_miss = df_recon_missing.columns[6] if len(df_recon_missing.columns) > 6 else df_recon_missing.columns[-1]
+        
         for _, row in df_recon_missing.iterrows():
-            s_recon = super_clean(row.iloc[1])
-            q_recon = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-            if not s_recon or q_recon <= 0: continue
+            s_recon = super_clean(row[col_sku_miss])
+            q_recon = pd.to_numeric(row[col_qty_miss], errors='coerce') or 0
+            if not s_recon or q_recon <= 0: 
+                continue
 
             if s_recon in inbound_skus_set:
                 # KETEMU SKU DI INBOUND -> MASUK MULTIPLE
                 pivot_list.append({'SKU_KEY_TEMP': s_recon, 'QTY_TOTAL': q_recon})
             else:
-                # GAK ADA DI MANA-MANA -> SINGLE
-                single_list.append({'BIN': row.iloc[0], 'SKU': row.iloc[1], 'QTY ADJ': q_recon})
+                # GAK ADA DI MANA-MANA -> SINGLE / MISS LOOKUP
+                single_list.append({'BIN': row[col_bin_miss], 'SKU': row[col_sku_miss], 'QTY ADJ': q_recon})
 
     # C. PIVOT & MERGE KE MASTER INBOUND
     df_mult_res = pd.DataFrame()
@@ -1528,14 +1543,24 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
         df_p = pd.DataFrame(pivot_list)
         df_p_grouped = df_p.groupby('SKU_KEY_TEMP')['QTY_TOTAL'].sum().reset_index()
         
-        inbound_master['SKU_JOIN'] = inbound_master.iloc[:, 2].apply(super_clean)
+        inbound_master['SKU_JOIN'] = inbound_master[col_sku_inbound].apply(super_clean)
         m_clean = inbound_master.drop_duplicates(subset=['SKU_JOIN'])
         
+        # Merge data pivot dengan struktur inbound asli
         df_mult_res = df_p_grouped.merge(m_clean, left_on='SKU_KEY_TEMP', right_on='SKU_JOIN', how='left')
         
         if not df_mult_res.empty:
-            # Update QTY kolom terakhir (Inbound Format)
-            df_mult_res.iloc[:, -2] = df_mult_res['QTY_TOTAL']
+            # --- FIX NYA DI SINI: TEMBAK LANGSUNG KE KOLOM 'QTY SO' BAWAN LU ---
+            # Cari nama kolom yang mengandung kata 'SO' atau 'SCAN' di dataframe gabungan
+            col_target_so = next((c for c in df_mult_res.columns if 'QTY SO' in c.upper() or 'SO' in c.upper()), None)
+            
+            if col_target_so:
+                df_mult_res[col_target_so] = df_mult_res['QTY_TOTAL']
+            else:
+                # Gak ketemu? Kita paksa bikin kolom QTY SO pas di urutan aslinya
+                df_mult_res['QTY SO'] = df_mult_res['QTY_TOTAL']
+                
+            # Buang sampah kolom join bantuannya biar gak bikin struktur tabel rusak
             df_mult_res = df_mult_res.drop(columns=['SKU_KEY_TEMP', 'QTY_TOTAL', 'SKU_JOIN'], errors='ignore')
 
     df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
@@ -1906,6 +1931,7 @@ def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, 
     ]
 
     def get_active_df(current_df, uploaded_file):
+        # Jika ada file yang di-upload, baca file tersebut
         if uploaded_file is not None:
             try:
                 uploaded_file.seek(0)
@@ -1914,56 +1940,26 @@ def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, 
                 else:
                     return pd.read_csv(uploaded_file)
             except:
-                return current_df
-        return current_df
+                return current_df # Balik ke current jika file corrupt
+        return current_df # Pakai data aplikasi jika tidak ada upload
 
     def process_data(df, status):
         if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             return pd.DataFrame(columns=cols_header)
         
-        temp = pd.DataFrame()
-        df_cols = [str(c).upper().strip() for c in df.columns]
+        # Ambil kolom yang dibutuhkan (Indeks 1-10 sesuai standar VBA lu)
+        temp = df.iloc[:, 1:11].copy() 
+        temp.columns = cols_header[:10]
         
-        # Mapping pintar menggunakan pencarian kata kunci parsial (Anti-Slightly-Different-Header)
-        mapping_pintar = {
-            "BIN": next((c for c in df.columns if "BIN" in str(c).upper()), None),
-            "SKU": next((c for c in df.columns if "SKU" in str(c).upper()), None),
-            "BRAND": next((c for c in df.columns if "BRAND" in str(c).upper()), None),
-            "ITEM NAME": next((c for c in df.columns if "NAME" in str(c).upper() or "BARANG" in str(c).upper()), None),
-            "VARIANT": next((c for c in df.columns if "VAR" in str(c).upper() or "UKURAN" in str(c).upper()), None),
-            "SUB KATEGORI": next((c for c in df.columns if "KAT" in str(c).upper()), None),
-            "HARGA BELI": next((c for c in df.columns if "BELI" in str(c).upper() or "BUY" in str(c).upper() or "HARGA_B" in str(c).upper()), None),
-            "HARGA JUAL": next((c for c in df.columns if "JUAL" in str(c).upper() or "PRICE" in str(c).upper()), None),
-            # Cari QTY SO / QTY SCAN / HASIL RECONCILIATION
-            "QTY SO": next((c for c in df.columns if "SO" in str(c).upper() or "SCAN" in str(c).upper() or "RECON" in str(c).upper() or "FISIK" in str(c).upper()), None),
-            # Cari QTY SYSTEM
-            "QTY SYSTEM": next((c for c in df.columns if "SYS" in str(c).upper() or "STOK_S" in str(c).upper()), None)
-        }
-        
-        # Pindahkan data berdasarkan hasil mapping pintar
-        for target_col, source_col in mapping_pintar.items():
-            if source_col is not None:
-                temp[target_col] = df[source_col].copy()
-            else:
-                # Jika benar-benar tidak ketemu namanya, kasih fallback default kosong
-                temp[target_col] = 0 if "QTY" in target_col or "HARGA" in target_col else ""
-        
-        # Jika pemetaan gagal total (mungkin file kosongan tanpa header), gunakan fallback index standar
-        if temp["SKU"].astype(str).str.strip().eq("").all() or temp["SKU"].astype(str).str.strip().eq("0").all():
-            start_idx = 1 if "IDENTI" in df_cols[0] or len(df.columns) > 11 else 0
-            temp = df.iloc[:, start_idx:start_idx+10].copy()
-            temp.columns = cols_header[:10]
+        # Pastikan numerik untuk perhitungan
+        for col in ["HARGA BELI", "QTY SO", "QTY SYSTEM"]:
+            temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
 
-        # Pastikan tipe data numerik bersih total untuk kalkulasi mutasi harga
-        for col in ["HARGA BELI", "HARGA JUAL", "QTY SO", "QTY SYSTEM"]:
-            if col in temp.columns:
-                temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
-
-        # Hitung Value Adj secara akurat berdasar selisih asli fisik vs sistem
+        # Hitung Value Adj
         temp["VALUE ADJ"] = (temp["QTY SO"] - temp["QTY SYSTEM"]) * temp["HARGA BELI"]
         temp["STATUS ADJ"] = status
-        
         return temp
+
     # Pilih Sumber Data: Prioritas Upload > Current Data
     active_plus = get_active_df(df_plus_current, up_plus)
     active_minus = get_active_df(df_minus_current, up_minus)
@@ -1975,7 +1971,7 @@ def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, 
     # Gabung untuk report total
     df_final = pd.concat([df_adj_plus, df_adj_minus], ignore_index=True)
 
-    # --- HITUNG SUMMARY MUTASI ---
+    # --- HITUNG SUMMARY ---
     val_plus = df_adj_plus["VALUE ADJ"].sum() if not df_adj_plus.empty else 0
     val_minus = df_adj_minus["VALUE ADJ"].sum() if not df_adj_minus.empty else 0
     
@@ -2240,44 +2236,44 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system = outstanding
             st.rerun()
 
-    if st.session_state.recon_real_plus is not None:
-        st.markdown("#### 📋 REAL + RECON & SYSTEM + RECON")
-        c_rec1, c_rec2 = st.columns(2)
-        with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
-        with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
+   if st.session_state.recon_real_plus is not None:
+    st.markdown("#### 📋 REAL + RECON & SYSTEM + RECON")
+    c_rec1, c_rec2 = st.columns(2)
+    with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
+    with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
+    
+    st.markdown("---")
+    # --- PROSES PECAH JADI 2 FILE EXCEL ---
+    
+    # 1. Generate Buffer untuk REAL + RECON
+    out_real = io.BytesIO()
+    with pd.ExcelWriter(out_real, engine='xlsxwriter') as writer_real:
+        st.session_state.recon_real_plus.to_excel(writer_real, sheet_name='REAL + RECON', index=False)
         
-        st.markdown("---")
-        # --- PROSES PECAH JADI 2 FILE EXCEL ---
+    # 2. Generate Buffer untuk SYSTEM + RECON
+    out_sys = io.BytesIO()
+    with pd.ExcelWriter(out_sys, engine='xlsxwriter') as writer_sys:
+        st.session_state.outstanding_system.to_excel(writer_sys, sheet_name='SYSTEM + RECON', index=False)
         
-        # 1. Generate Buffer untuk REAL + RECON
-        out_real = io.BytesIO()
-        with pd.ExcelWriter(out_real, engine='xlsxwriter') as writer_real:
-            st.session_state.recon_real_plus.to_excel(writer_real, sheet_name='REAL + RECON', index=False)
-            
-        # 2. Generate Buffer untuk SYSTEM + RECON
-        out_sys = io.BytesIO()
-        with pd.ExcelWriter(out_sys, engine='xlsxwriter') as writer_sys:
-            st.session_state.outstanding_system.to_excel(writer_sys, sheet_name='SYSTEM + RECON', index=False)
-            
-        # --- MEMBUAT TOMBOL DOWNLOAD BERDAMPINGAN ---
-        btn_col1, btn_col2 = st.columns(2)
+    # --- MEMBUAT TOMBOL DOWNLOAD BERDAMPINGAN ---
+    btn_col1, btn_col2 = st.columns(2)
+    
+    with btn_col1:
+        st.download_button(
+            label="📥 DOWNLOAD REAL + RECON", 
+            data=out_real.getvalue(), 
+            file_name="Report_Real_Plus_Recon.xlsx", 
+            use_container_width=True
+        )
         
-        with btn_col1:
-            st.download_button(
-                label="📥 DOWNLOAD REAL + RECON", 
-                data=out_real.getvalue(), 
-                file_name="Report_Real_Plus_Recon.xlsx", 
-                use_container_width=True
-            )
-            
-        with btn_col2:
-            st.download_button(
-                label="📥 DOWNLOAD SYSTEM + RECON", 
-                data=out_sys.getvalue(), 
-                file_name="Report_System_Plus_Recon.xlsx", 
-                use_container_width=True
-            )
-    # ==========================================================
+    with btn_col2:
+        st.download_button(
+            label="📥 DOWNLOAD SYSTEM + RECON", 
+            data=out_sys.getvalue(), 
+            file_name="Report_System_Plus_Recon.xlsx", 
+            use_container_width=True
+        )
+# ==========================================================
         # 🚀 FINAL ADJUSTMENT PROCESSOR (FIX INDEX & LOOKUP)
         # ==========================================================
         st.markdown("<br><br><br>---", unsafe_allow_html=True)
