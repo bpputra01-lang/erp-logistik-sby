@@ -7181,7 +7181,7 @@ def tampilan_display_control():
             margin-top: 20px;
         }
         .metric-card {
-            background-color: #1E1E2E;
+            background: linear-gradient(135deg, #1A1D2E 0%, #252A3D 100%) !important;
             padding: 20px;
             border-radius: 12px;
             box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
@@ -7191,13 +7191,13 @@ def tampilan_display_control():
             margin-bottom: 10px;
         }
         .metric-value {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: bold;
             margin: 0;
             color: #FFFFFF;
         }
         .metric-label {
-            font-size: 12px;
+            font-size: 11px;
             color: #A0A0A0;
             text-transform: uppercase;
             margin-bottom: 8px;
@@ -7227,12 +7227,12 @@ def tampilan_display_control():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="hero-header"><p class="hero-text">PRECENTAGE DISPLAY CONTROL</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header"><p class="hero-text">PERCENTAGE DISPLAY CONTROL</p></div>', unsafe_allow_html=True)
     
     with st.expander("📋 Logika Penarikan Display"):
         st.info("""
-        **Filter Eksklusi (Tidak Dihitung):**
-        - Bin mengandung: *OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, STAGGING*.
+        **Filter Eksklusi (Tidak Dihitung di List Refill Utama):**
+        - Bin mengandung: *OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, STAGGING, KARANTINA, EVENT, BANDING, INB, OUT, PUTAWAY*.
         
         **Cara Kerja Pemantauan :**
         - **Source (Gudang):** Semua BIN aktif (selain area TOKO/DISPLAY & Area Eksklusi).
@@ -7328,34 +7328,48 @@ def tampilan_display_control():
             WHERE {f_target_toko} AND "{col_qty}" > 0
         """
 
+        # --- LOGIKA BARU: ARTICLE KOSONG DI TOKO TAPI ADA DI KARANTINA ---
+        q_karantina_logic = f"""
+            SELECT ARTICLE FROM stock_display_processed
+            GROUP BY ARTICLE
+            HAVING SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
+               AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%KARANTINA%' THEN "{col_qty}" ELSE 0 END) > 0
+        """
+
         with conn:
             q_data = pd.read_sql(f"""
                 SELECT  
                     (SELECT COUNT(DISTINCT ARTICLE) FROM ({q_art_on_display})) as On_Display,
-                    (SELECT COUNT(*) FROM ({q_need_display_logic})) as Need_Display
+                    (SELECT COUNT(*) FROM ({q_need_display_logic})) as Need_Display,
+                    (SELECT COUNT(*) FROM ({q_karantina_logic})) as Karantina_Lock
             """, conn).iloc[0]
 
         on_display = int(q_data['On_Display'])
         need_display = int(q_data['Need_Display'])
+        karantina_lock = int(q_data['Karantina_Lock'])
         total_art = on_display + need_display
 
         # --- 3. TAMPILAN DASHBOARD ---
         st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
         
-        c1, c2, c3 = st.columns(3)
+        # Dipecah menjadi 4 kolom secara presisi
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #7B61FF;"><p class="metric-label">🧥 Total Article</p><p class="metric-value">{total_art:,} Article</p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #7B61FF;"><p class="metric-label">🧥 Total Article</p><p class="metric-value">{total_art:,} Art</p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
         with c2:
             perc_display = (on_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,} Article</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Terpajang</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,} Art</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Pajang</p></div>', unsafe_allow_html=True)
         with c3:
             perc_need = (need_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 5px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,} Article</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,} Art</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
+        with c4:
+            # Metrics box tambahan untuk status Karantina
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina Lock</p><p class="metric-value">{karantina_lock:,} Art</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
         
-        # --- PERBAIKAN TOTAL: LOCK LEVEL ARTICLE, BUKAN SKU ---
+        # --- LOGIKA TABLE REFILL ---
         query_prioritas_refill = f"""
             WITH 
             ArticlesNeedDisplay AS (
@@ -7409,7 +7423,7 @@ def tampilan_display_control():
             
             FinalReguler AS (
                 SELECT Article, SKU, Deskripsi_Barang, Size_Display, Bin_Lokasi, Qty_In_Bin
-                FROM RegulerStock
+                FROM RegularStock
                 WHERE rn = 1
             ),
             
@@ -7447,7 +7461,6 @@ def tampilan_display_control():
 
     except Exception as e:
         st.error(f"Error pada sistem analisis: {e}")
-
 def process_picking_audit(file1, file2, file_tracking=None):
     try:
         # Load data utama
