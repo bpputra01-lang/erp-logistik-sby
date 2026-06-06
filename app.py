@@ -7364,7 +7364,7 @@ def tampilan_display_control():
             st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,} Art</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
         with c4:
             # Metrics box tambahan untuk status Karantina
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina Lock</p><p class="metric-value">{karantina_lock:,} Art</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina Art.</p><p class="metric-value">{karantina_lock:,} Art</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
