@@ -1286,39 +1286,48 @@ def menu_cycle_count():
                 st.error(f"❌ Error: {str(e)}")
 
     if st.session_state.df_karantina_6 is not None:
-        # --- METRIC BOXES KARANTINA ---
-        st.write("Daftar kolom yang ada saat ini:", st.session_state.df_karantina_6.columns.tolist())
-        st.dataframe(st.session_state.df_karantina_6.head())
-        
-        total_k_qty = int(st.session_state.df_karantina_6['QUANTITY'].sum())
-        total_k_sku = st.session_state.df_karantina_6['SKU'].nunique()
-        
-        mk1, mk2 = st.columns(2)
-        with mk1:
-            st.markdown(f"""
-                <div class="m-box">
-                    <span class="m-lbl">☣️ QTY TO KARANTINA</span>
-                    <span class="m-val" style="color: #FACA2B;">{total_k_qty} QTY</span>
-                </div>
-            """, unsafe_allow_html=True)
-        with mk2:
-            st.markdown(f"""
-                <div class="m-box">
-                    <span class="m-lbl">🏷️ SKU TO KARANTINA</span>
-                    <span class="m-val">{total_k_sku} SKU</span>
-                </div>
-            """, unsafe_allow_html=True)
+            # --- METRIC BOXES KARANTINA ---
+            # Jika dataframe kosong (0 baris/0 data), set langsung nilainya ke 0 agar tidak KeyError
+            if st.session_state.df_karantina_6.empty:
+                total_k_qty = 0
+                total_k_sku = 0
+            else:
+                total_k_qty = int(st.session_state.df_karantina_6['QUANTITY'].sum()) if 'QUANTITY' in st.session_state.df_karantina_6.columns else 0
+                total_k_sku = st.session_state.df_karantina_6['SKU'].nunique() if 'SKU' in st.session_state.df_karantina_6.columns else 0
+            
+            mk1, mk2 = st.columns(2)
+            with mk1:
+                st.markdown(f"""
+                    <div class="m-box">
+                        <span class="m-lbl">☣️ QTY TO KARANTINA</span>
+                        <span class="m-val" style="color: #FACA2B;">{total_k_qty} QTY</span>
+                    </div>
+                """, unsafe_allow_html=True)
+            with mk2:
+                st.markdown(f"""
+                    <div class="m-box">
+                        <span class="m-lbl">🏷️ SKU TO KARANTINA</span>
+                        <span class="m-val">{total_k_sku} SKU</span>
+                    </div>
+                """, unsafe_allow_html=True)
 
-        tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
-        with tab_res:
-            st.dataframe(st.session_state.df_karantina_6, use_container_width=True, hide_index=True)
-            out6 = io.BytesIO()
-            with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
-                st.session_state.df_karantina_6.to_excel(writer, index=False, sheet_name='Karantina')
-            st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
+            tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
+            with tab_res:
+                if st.session_state.df_karantina_6.empty:
+                    st.info("💡 Tidak ada data yang masuk kategori karantina (Semua data aman/balance).")
+                else:
+                    st.dataframe(st.session_state.df_karantina_6, use_container_width=True, hide_index=True)
+                    
+                out6 = io.BytesIO()
+                with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
+                    # Menggunakan dataframe kosong aman, tapi pastikan ada fallback jika benar-benar kosong tanpa kolom
+                    df_to_download = st.session_state.df_karantina_6 if not st.session_state.df_karantina_6.empty else pd.DataFrame(columns=['SKU', 'QUANTITY'])
+                    df_to_download.to_excel(writer, index=False, sheet_name='Karantina')
+                st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
 
-        with tab_chk:
-            st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
+            with tab_chk:
+                if st.session_state.df_check_6 is not None:
+                    st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
 
 # =========================================================
     # 📊 MISS LOCATION REPORT (FIXED RED ALERT)
