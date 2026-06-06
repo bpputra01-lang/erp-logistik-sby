@@ -5198,6 +5198,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
     # 6. [PERBAIKAN 2 & 3] Update Logika Justifikasi Sesuai Aturan Baru
+
     def run_formula(row):
         try:
             # Ambil nilai baris file adjustment lu
