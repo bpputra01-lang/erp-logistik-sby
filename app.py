@@ -674,25 +674,44 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     audit_results = []
     karantina_results = []
 
-    # Kita pakai df_outstanding sebagai master karena kolom J (10) dan N (14) ada di sini
     if df_outstanding is not None and not df_outstanding.empty:
-        for _, row in df_outstanding.iterrows():
+        df = df_outstanding.copy()
+        
+        # --- FIX HEADER OTOMATIS ---
+        # Jika baris pertama kosong / nama kolom tidak terbaca, kita cari baris yang berisi 'SKU' atau 'BIN'
+        if df.columns.str.contains('Unnamed').any() or 'SKU' not in [str(c).upper().strip() for c in df.columns]:
+            for i, row in df.iterrows():
+                row_vals = [str(v).upper().strip() for v in row.values if not pd.isna(v)]
+                if 'SKU' in row_vals or 'QTY SYSTEM' in row_vals:
+                    df.columns = [str(c).strip().upper() for c in row.values]
+                    df = df.iloc[i+1:].reset_index(drop=True)
+                    break
+        else:
+            df.columns = df.columns.str.strip().str.upper()
+
+        # --- CARI NAMA KOLOM SECARA DINAMIS ---
+        col_bin = next((c for c in df.columns if 'BIN' in str(c)), None)
+        col_sku = next((c for c in df.columns if 'SKU' in str(c)), None)
+        col_sys = next((c for c in df.columns if 'SYSTEM' in str(c)), None)
+        col_rec = next((c for c in df.columns if 'REKONSILIASI' in str(c) or 'RECON' in str(c)), None)
+
+        for _, row in df.iterrows():
             try:
-                bin_val = row.iloc[1] # Kolom B (BIN)
-                sku_val = row.iloc[2] # Kolom C (SKU)
+                # Ambil data BIN dan SKU menggunakan nama kolom, kalau gagal pakai urutan index
+                bin_val = row[col_bin] if col_bin else row.iloc[1]
+                sku_val = row[col_sku] if col_sku else row.iloc[2]
                 
-                # JANGAN TUKAR: Kolom J = index 9, Kolom N = index 13
-                q_system = pd.to_numeric(row.iloc[9], errors='coerce')
-                q_recon = pd.to_numeric(row.iloc[13], errors='coerce')
+                # Ambil nilai QTY SYSTEM dan HASIL REKONSILIASI berdasarkan nama kolom teksnya
+                q_system = pd.to_numeric(row[col_sys], errors='coerce') if col_sys else pd.to_numeric(row.iloc[9], errors='coerce')
+                q_recon = pd.to_numeric(row[col_rec], errors='coerce') if col_rec else pd.to_numeric(row.iloc[13], errors='coerce')
                 
-                # Pastikan jika NaN diubah jadi 0
                 q_system = q_system if not pd.isna(q_system) else 0
                 q_recon = q_recon if not pd.isna(q_recon) else 0
                 
-                # RUMUS: QTY SYSTEM (10) - HASIL REKONSILIASI (14)
+                # RUMUS MATEMATIKA: QTY SYSTEM - HASIL REKONSILIASI
                 diff = q_system - q_recon
 
-                # Masukkan ke TAB PENGECEKAN jika ada selisih (!= 0)
+                # Masukkan ke tabel cek audit jika ada selisih (!= 0)
                 if diff != 0:
                     audit_results.append({
                         'BIN': bin_val,
@@ -702,7 +721,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                         'SELISIH': diff
                     })
 
-                    # Masukkan ke TAB KARANTINA hanya jika selisih POSITIF (> 0)
+                    # Masukkan ke karantina hanya jika selisih POSITIF (> 0)
                     if diff > 0:
                         karantina_results.append({
                             "BIN AWAL": bin_val,
@@ -714,7 +733,6 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
             except: 
                 continue
 
-    # Output DataFrames dengan fallback kolom biar ga KeyError
     df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
 
