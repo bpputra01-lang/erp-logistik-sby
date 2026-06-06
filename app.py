@@ -7423,7 +7423,7 @@ def tampilan_display_control():
             
             FinalReguler AS (
                 SELECT Article, SKU, Deskripsi_Barang, Size_Display, Bin_Lokasi, Qty_In_Bin
-                FROM RegularStock
+                FROM RegulerStock
                 WHERE rn = 1
             ),
             
@@ -7461,6 +7461,7 @@ def tampilan_display_control():
 
     except Exception as e:
         st.error(f"Error pada sistem analisis: {e}")
+
 def process_picking_audit(file1, file2, file_tracking=None):
     try:
         # Load data utama
