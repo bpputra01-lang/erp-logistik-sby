@@ -6697,25 +6697,37 @@ def process_rto_logic(df_scan, df_tf):
 
     df_hasil = pd.DataFrame(hasil_alokasi)
 
-    # --- 2. LOGIKA KURANG TF (FIX: NO DOUBLE, OVER ALLOCATION SEBAGAI PRIORITAS) ---
+    # =====================================================================
+# # --- 2. LOGIKA KURANG TF (FIX: ANTI-DOUBLE, PRIORITAS OVER ALLOCATION) ---
+# =====================================================================
     selisih_kurang = comp[comp['QTY_SCAN'] > comp['QTY_TF']].copy().reset_index()
     selisih_kurang.rename(columns={selisih_kurang.columns[0]: 'SKU'}, inplace=True)
     
     if not selisih_kurang.empty:
-        # 1. Jalankan Logic Lama untuk dapet No Transfer yang valid (Inner Join biar yang 'TIDAK ADA' nggak masuk dulu)
-        df_kurang = pd.merge(selisih_kurang, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='inner')
-        df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
-        df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
-
-        # 2. Ambil semua baris Over Allocation dari hasil FIFO (Ini nangkep selisih & barang nyasar)
+        # 1. Ambil semua baris Over Allocation dari hasil FIFO terlebih dahulu
         extra_rows = df_hasil[df_hasil['Status Alokasi'] == 'Over Allocation'].copy()
         
+        # 2. KUNCI ANTI-DOUBLE: Ambil list SKU yang sudah masuk kategori Over Allocation
+        sku_over_allocated = extra_rows['SKU'].unique() if not extra_rows.empty else []
+
+        # 3. Filter tabel selisih: SKU yang sudah dihandle Over Allocation JANGAN MASUK ke inner join transfer valid
+        selisih_clean_tf = selisih_kurang[~selisih_kurang['SKU'].isin(sku_over_allocated)].copy()
+
+        # 4. Jalankan Logic Lama hanya untuk SKU yang belum tercover Over Allocation
+        if not selisih_clean_tf.empty:
+            df_kurang = pd.merge(selisih_clean_tf, df_tf[[col_tf_no, col_tf_sku]], left_on='SKU', right_on=col_tf_sku, how='inner')
+            df_kurang.rename(columns={col_tf_no: 'NO TRANSFER'}, inplace=True)
+            df_kurang = df_kurang[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]
+        else:
+            # Jika semua SKU selisih sudah tercover Over Allocation, siapkan df kosong bermata kolom
+            df_kurang = pd.DataFrame(columns=['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF'])
+
+        # 5. Gabungkan baris sisa TF valid tadi dengan data Over Allocation utama
         if not extra_rows.empty:
             extra_rows.rename(columns={'No Transfer': 'NO TRANSFER', 'Qty Alokasi': 'QTY_SCAN', 'Qty TF': 'QTY_TF'}, inplace=True)
-            # Gabungkan baris TF valid dengan baris Over Allocation
             df_kurang = pd.concat([df_kurang, extra_rows[['NO TRANSFER', 'SKU', 'QTY_SCAN', 'QTY_TF']]], ignore_index=True)
         
-        # 3. Cleanup & Update Metrics
+        # 6. Final Cleanup
         df_kurang = df_kurang.drop_duplicates()
         
         # Hitung metric dari selisih asli (biar angka di dashboard Surabaya lu bener)
