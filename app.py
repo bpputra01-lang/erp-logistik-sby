@@ -1246,25 +1246,22 @@ def menu_cycle_count():
     st.markdown("<br>---", unsafe_allow_html=True)
     st.subheader("5️⃣ RECON SYSTEM + PROCESS")
 
-    col_k1, col_k2 = st.columns(2)
-    with col_k1:
-        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
-    with col_k2:
-        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
+    # Diubah menjadi 1 uploader saja karena kolom J & N dibaca langsung dari file ini
+    up_k6 = st.file_uploader("📥 Upload SYSTEM + RECON (File Master Hasil Audit)", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
 
-    if up_k6 and up_adj6:
+    if up_k6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
             try:
                 up_k6.seek(0)
                 df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
-                up_adj6.seek(0)
-                df_recon6 = pd.read_excel(up_adj6) if up_adj6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_adj6)
                 
-                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, df_recon6)
+                # df_recon6 dikirim None karena fungsi back-end yang baru hanya memproses df_raw6
+                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, None)
                 
                 st.session_state.df_karantina_6 = df_final6
                 st.session_state.df_check_6 = df_check6
                 st.success("✅ Analisis Karantina Selesai!")
+                st.rerun() # Paksa refresh biar data langsung muncul lurus
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
