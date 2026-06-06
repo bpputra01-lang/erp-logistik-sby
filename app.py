@@ -2236,43 +2236,43 @@ def menu_Stock_Opname():
             st.session_state.outstanding_system = outstanding
             st.rerun()
 
-   if st.session_state.recon_real_plus is not None:
-    st.markdown("#### 📋 REAL + RECON & SYSTEM + RECON")
-    c_rec1, c_rec2 = st.columns(2)
-    with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
-    with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
-    
-    st.markdown("---")
-    # --- PROSES PECAH JADI 2 FILE EXCEL ---
-    
-    # 1. Generate Buffer untuk REAL + RECON
-    out_real = io.BytesIO()
-    with pd.ExcelWriter(out_real, engine='xlsxwriter') as writer_real:
-        st.session_state.recon_real_plus.to_excel(writer_real, sheet_name='REAL + RECON', index=False)
+    if st.session_state.recon_real_plus is not None:
+        st.markdown("#### 📋 REAL + RECON & SYSTEM + RECON")
+        c_rec1, c_rec2 = st.columns(2)
+        with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
+        with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
         
-    # 2. Generate Buffer untuk SYSTEM + RECON
-    out_sys = io.BytesIO()
-    with pd.ExcelWriter(out_sys, engine='xlsxwriter') as writer_sys:
-        st.session_state.outstanding_system.to_excel(writer_sys, sheet_name='SYSTEM + RECON', index=False)
+        st.markdown("---")
+        # --- PROSES PECAH JADI 2 FILE EXCEL ---
         
-    # --- MEMBUAT TOMBOL DOWNLOAD BERDAMPINGAN ---
-    btn_col1, btn_col2 = st.columns(2)
-    
-    with btn_col1:
-        st.download_button(
-            label="📥 DOWNLOAD REAL + RECON", 
-            data=out_real.getvalue(), 
-            file_name="Report_Real_Plus_Recon.xlsx", 
-            use_container_width=True
-        )
+        # 1. Generate Buffer untuk REAL + RECON
+        out_real = io.BytesIO()
+        with pd.ExcelWriter(out_real, engine='xlsxwriter') as writer_real:
+            st.session_state.recon_real_plus.to_excel(writer_real, sheet_name='REAL + RECON', index=False)
+            
+        # 2. Generate Buffer untuk SYSTEM + RECON
+        out_sys = io.BytesIO()
+        with pd.ExcelWriter(out_sys, engine='xlsxwriter') as writer_sys:
+            st.session_state.outstanding_system.to_excel(writer_sys, sheet_name='SYSTEM + RECON', index=False)
+            
+        # --- MEMBUAT TOMBOL DOWNLOAD BERDAMPINGAN ---
+        btn_col1, btn_col2 = st.columns(2)
         
-    with btn_col2:
-        st.download_button(
-            label="📥 DOWNLOAD SYSTEM + RECON", 
-            data=out_sys.getvalue(), 
-            file_name="Report_System_Plus_Recon.xlsx", 
-            use_container_width=True
-        )
+        with btn_col1:
+            st.download_button(
+                label="📥 DOWNLOAD REAL + RECON", 
+                data=out_real.getvalue(), 
+                file_name="Report_Real_Plus_Recon.xlsx", 
+                use_container_width=True
+            )
+            
+        with btn_col2:
+            st.download_button(
+                label="📥 DOWNLOAD SYSTEM + RECON", 
+                data=out_sys.getvalue(), 
+                file_name="Report_System_Plus_Recon.xlsx", 
+                use_container_width=True
+            )
 # ==========================================================
         # 🚀 FINAL ADJUSTMENT PROCESSOR (FIX INDEX & LOOKUP)
         # ==========================================================
