@@ -1271,36 +1271,32 @@ def menu_cycle_count():
     elif st.session_state.get('df_adj_final_4') is not None:
         st.dataframe(st.session_state.df_adj_final_4, use_container_width=True, hide_index=True)
     # =========================================================
-    # ⚙️ 5. SET UP KARANTINA GENERATOR
+    # ⚙️ 5. SET UP KARANTINA GENERATOR (UI FIXED - SINGLE FILE)
     # =========================================================
     st.markdown("<br>---", unsafe_allow_html=True)
     st.subheader("5️⃣ RECON SYSTEM + PROCESS")
 
-    col_k1, col_k2 = st.columns(2)
-    with col_k1:
-        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
-    with col_k2:
-        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
+    # Uploader disederhanakan jadi 1 file master saja, kolom adjusment dibuang
+    up_k6 = st.file_uploader("📥 Upload SYSTEM + RECON (File Master Hasil Audit)", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
 
-    if up_k6 and up_adj6:
+    if up_k6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
             try:
                 up_k6.seek(0)
                 df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
-                up_adj6.seek(0)
-                df_recon6 = pd.read_excel(up_adj6) if up_adj6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_adj6)
                 
-                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, df_recon6)
+                # Parameter kedua langsung diisi None karena data sudah lengkap di file pertama
+                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, None)
                 
                 st.session_state.df_karantina_6 = df_final6
                 st.session_state.df_check_6 = df_check6
                 st.success("✅ Analisis Karantina Selesai!")
+                st.rerun() # Memaksa halaman refresh agar state hantu langsung hilang
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
-    if st.session_state.df_karantina_6 is not None:
-            # --- METRIC BOXES KARANTINA ---
-            # Jika dataframe kosong (0 baris/0 data), set langsung nilainya ke 0 agar tidak KeyError
+    # Ganti pengecekan state agar tidak memicu AttributeError jika state belum terbentuk
+    if st.session_state.get('df_karantina_6') is not None:
             if st.session_state.df_karantina_6.empty:
                 total_k_qty = 0
                 total_k_sku = 0
@@ -1333,13 +1329,12 @@ def menu_cycle_count():
                     
                 out6 = io.BytesIO()
                 with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
-                    # Menggunakan dataframe kosong aman, tapi pastikan ada fallback jika benar-benar kosong tanpa kolom
                     df_to_download = st.session_state.df_karantina_6 if not st.session_state.df_karantina_6.empty else pd.DataFrame(columns=['SKU', 'QUANTITY'])
                     df_to_download.to_excel(writer, index=False, sheet_name='Karantina')
                 st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
 
             with tab_chk:
-                if st.session_state.df_check_6 is not None:
+                if st.session_state.get('df_check_6') is not None:
                     st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
 
 # =========================================================
