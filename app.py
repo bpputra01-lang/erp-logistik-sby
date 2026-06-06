@@ -667,12 +667,11 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
-        # Sesuai preferensi user: hapus prefix SPE jika ada
         if s.startswith("SPE"): s = s[3:].strip() 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT (Uploader 2) -> Kolom J (Index 9)
+    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT (df_recon) -> Kolom J (Index 9)
     sys_map = {}
     if df_recon is not None and not df_recon.empty:
         for _, row in df_recon.iterrows():
@@ -680,10 +679,11 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                 # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
                 k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
                 val_sys = pd.to_numeric(row.iloc[9], errors='coerce') 
-                sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
+                # Gunakan penjumlahan jika ada key yang duplikat agar data terakumulasi
+                sys_map[k_sys] = sys_map.get(k_sys, 0) + (val_sys if not pd.isna(val_sys) else 0)
             except: continue
 
-    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING (Uploader 1) -> Kolom N (Index 13)
+    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING (df_outstanding) -> Kolom N (Index 13)
     recon_map = {}
     if df_outstanding is not None and not df_outstanding.empty:
         for _, row in df_outstanding.iterrows():
@@ -691,24 +691,28 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                 # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
                 k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
                 val_rec = pd.to_numeric(row.iloc[13], errors='coerce') 
-                recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
+                recon_map[k_rec] = recon_map.get(k_rec, 0) + (val_rec if not pd.isna(val_rec) else 0)
             except: continue
 
-    # 3. Proses Comparison
-    df_master = df_outstanding.copy()
     audit_results = []
     karantina_results = []
+    
+    # 3. Ambil semua unique keys dari kedua belah pihak agar tidak ada data yang terlewat
+    all_keys = set(sys_map.keys()).union(set(recon_map.keys()))
 
-    for _, row in df_master.iterrows():
-        bin_val = row.iloc[1]
-        sku_val = row.iloc[2]
-        key = f"{clean_val(bin_val)}|{clean_val(sku_val)}"
+    for key in all_keys:
+        # Pecah kembali key menjadi BIN dan SKU untuk kebutuhan output tabel
+        parts = key.split('|')
+        bin_val = parts[0] if len(parts) > 0 else ""
+        sku_val = parts[1] if len(parts) > 1 else ""
         
         q_system = sys_map.get(key, 0)
         q_recon = recon_map.get(key, 0)
+        
+        # RUMUS STANDAR: SYSTEM - RECON
         diff = q_system - q_recon
 
-        # TAB PENGECEKAN: Semua selisih (Plus/Minus) masuk sini buat audit
+        # TAB PENGECEKAN: Masukkan semua yang selisihnya tidak nol (!= 0)
         if diff != 0:
             audit_results.append({
                 'BIN': bin_val,
@@ -718,21 +722,19 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                 'SELISIH': diff
             })
 
-            # TAB SET UP KARANTINA: HANYA YANG POSITIF (> 0)
-            # Nilai minus tidak akan dimasukkan ke list hasil karantina
+            # TAB SET UP KARANTINA: HANYA YANG BERSELISIH POSITIF (> 0)
+            # Karena mapping sudah benar, kondisi 'SYSTEM +' (Sistem > Fisik/Recon) akan bernilai positif
             if diff > 0:
                 karantina_results.append({
                     "BIN AWAL": bin_val,
                     "BIN TUJUAN": "KARANTINA",
                     "SKU": sku_val,
-                    "QUANTITY": diff,
+                    "QUANTITY": int(diff), # Pastikan berupa integer untuk sum()
                     "NOTES": "MISS LOCATION"
                 })
 
-    # 4. Output DataFrames
-    # Hasil Karantina sudah bersih dari minus
-    df_karantina = pd.DataFrame(karantina_results)
-    # Hasil Audit tetep lengkap
+    # 4. Output DataFrames dengan fallback kolom yang konsisten
+    df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
 
     return df_karantina, df_check
