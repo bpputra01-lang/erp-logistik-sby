@@ -2217,13 +2217,19 @@ def menu_Stock_Opname():
         with c_rec1: st.dataframe(st.session_state.recon_real_plus, use_container_width=True)
         with c_rec2: st.dataframe(st.session_state.outstanding_system, use_container_width=True)
         
+        # --- PERBAIKAN: HANYA DOWNLOAD DATA STEP 3 ---
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            st.session_state.compare_result['res_scan'].to_excel(writer, sheet_name='DATA SCAN', index=False)
-            st.session_state.set_up_real_plus.to_excel(writer, sheet_name='SET UP REAL +', index=False)
+            # Memasukkan data laporan rekonsiliasi langkah 3 saja
             st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
             st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
-        st.download_button("📥 DOWNLOAD ALL EXCEL (STEP 1-3)", data=output.getvalue(), file_name="Report_SO_Part1.xlsx", use_container_width=True)
+            
+        st.download_button(
+            label="📥 DOWNLOAD RECON REPORTS", 
+            data=output.getvalue(), 
+            file_name="Report_SO_Step3_Recon.xlsx", 
+            use_container_width=True
+        )
 # ==========================================================
         # 🚀 FINAL ADJUSTMENT PROCESSOR (FIX INDEX & LOOKUP)
         # ==========================================================
