@@ -2222,12 +2222,12 @@ def menu_Stock_Opname():
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             # Memasukkan data laporan rekonsiliasi langkah 3 saja
             st.session_state.recon_real_plus.to_excel(writer, sheet_name='REAL + RECON', index=False)
-            st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
+            st.session_state.outstanding_system.to_excel(writer, sheet_name='SYSTEM + RECON', index=False)
             
         st.download_button(
             label="📥 DOWNLOAD RECON REPORTS", 
             data=output.getvalue(), 
-            file_name="Report_SO_Step3_Recon.xlsx", 
+            file_name="All_Data_Recon.xlsx", 
             use_container_width=True
         )
 # ==========================================================
