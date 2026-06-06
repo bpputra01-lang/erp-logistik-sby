@@ -662,67 +662,77 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
-def logic_setup_karantina_with_compare(df_outstanding, df_recon=None):
-    # =================================================================
-    # FORCE PACKED: KITA BLOKIR TOTAL PENGGUNAAN FILE KEDUA (DF_RECON)
-    # =================================================================
+
+def logic_setup_karantina_with_compare(df_outstanding, df_recon):
+    def clean_val(x):
+        if pd.isna(x): return ""
+        s = str(x).strip().upper()
+        # Sesuai preferensi user: hapus prefix SPE jika ada
+        if s.startswith("SPE"): s = s[3:].strip() 
+        if s.endswith('.0'): s = s[:-2]
+        return s
+
+    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT (Uploader 2) -> Kolom J (Index 9)
+    sys_map = {}
+    if df_recon is not None and not df_recon.empty:
+        for _, row in df_recon.iterrows():
+            try:
+                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
+                k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
+                val_sys = pd.to_numeric(row.iloc[9], errors='coerce') 
+                sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
+            except: continue
+
+    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING (Uploader 1) -> Kolom N (Index 13)
+    recon_map = {}
+    if df_outstanding is not None and not df_outstanding.empty:
+        for _, row in df_outstanding.iterrows():
+            try:
+                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
+                k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
+                val_rec = pd.to_numeric(row.iloc[13], errors='coerce') 
+                recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
+            except: continue
+
+    # 3. Proses Comparison
+    df_master = df_outstanding.copy()
     audit_results = []
     karantina_results = []
 
-    # Kita hanya pakai df_outstanding (File Master Hasil Audit)
-    if df_outstanding is not None and not df_outstanding.empty:
-        df = df_outstanding.copy()
+    for _, row in df_master.iterrows():
+        bin_val = row.iloc[1]
+        sku_val = row.iloc[2]
+        key = f"{clean_val(bin_val)}|{clean_val(sku_val)}"
         
-        # Samakan format nama kolom (Hapus spasi, paksa huruf kapital)
-        df.columns = df.columns.str.strip().str.upper()
+        q_system = sys_map.get(key, 0)
+        q_recon = recon_map.get(key, 0)
+        diff = q_system - q_recon
 
-        # Deteksi otomatis nama kolom berdasarkan teks kata kunci
-        col_bin = next((c for c in df.columns if 'BIN' in str(c)), None)
-        col_sku = next((c for c in df.columns if 'SKU' in str(c)), None)
-        col_sys = next((c for c in df.columns if 'SYSTEM' in str(c)), None)
-        col_rec = next((c for c in df.columns if 'REKONSILIASI' in str(c) or 'RECON' in str(c)), None)
+        # TAB PENGECEKAN: Semua selisih (Plus/Minus) masuk sini buat audit
+        if diff != 0:
+            audit_results.append({
+                'BIN': bin_val,
+                'SKU': sku_val,
+                'QTY_SYSTEM_J': q_system,
+                'QTY_RECON_N': q_recon,
+                'SELISIH': diff
+            })
 
-        for _, row in df.iterrows():
-            try:
-                # Ambil data identitas barang
-                bin_val = row[col_bin] if col_bin else row.iloc[1]
-                sku_val = row[col_sku] if col_sku else row.iloc[2]
-                
-                # DI SINI KUNCINYA: Tarik QTY SYSTEM & REKONSILIASI dari BARIS YANG SAMA!
-                # Tidak ada lagi cerita ngambil dari df_recon atau file uploader lain.
-                q_system = pd.to_numeric(row[col_sys], errors='coerce') if col_sys else pd.to_numeric(row.iloc[9], errors='coerce')
-                q_recon = pd.to_numeric(row[col_rec], errors='coerce') if col_rec else pd.to_numeric(row.iloc[13], errors='coerce')
-                
-                # Ubah NaN jadi 0
-                q_system = q_system if not pd.isna(q_system) else 0
-                q_recon = q_recon if not pd.isna(q_recon) else 0
-                
-                # RUMUS HORIZONTAL: SYSTEM - REKONSILIASI
-                diff = q_system - q_recon
+            # TAB SET UP KARANTINA: HANYA YANG POSITIF (> 0)
+            # Nilai minus tidak akan dimasukkan ke list hasil karantina
+            if diff > 0:
+                karantina_results.append({
+                    "BIN AWAL": bin_val,
+                    "BIN TUJUAN": "KARANTINA",
+                    "SKU": sku_val,
+                    "QUANTITY": diff,
+                    "NOTES": "MISS LOCATION"
+                })
 
-                # Hanya tampilkan di TAB AUDIT jika benar-benar ada selisih (!= 0)
-                if diff != 0:
-                    audit_results.append({
-                        'BIN': bin_val,
-                        'SKU': sku_val,
-                        'QTY_SYSTEM_J': q_system,
-                        'QTY_RECON_N': q_recon,
-                        'SELISIH': diff
-                    })
-
-                    # Masukkan ke list karantina hanya jika selisih POSITIF (> 0)
-                    if diff > 0:
-                        karantina_results.append({
-                            "BIN AWAL": bin_val,
-                            "BIN TUJUAN": "KARANTINA",
-                            "SKU": sku_val,
-                            "QUANTITY": int(diff),
-                            "NOTES": "MISS LOCATION"
-                        })
-            except: 
-                continue
-
-    df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
+    # 4. Output DataFrames
+    # Hasil Karantina sudah bersih dari minus
+    df_karantina = pd.DataFrame(karantina_results)
+    # Hasil Audit tetep lengkap
     df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
 
     return df_karantina, df_check
@@ -1253,68 +1263,71 @@ def menu_cycle_count():
     st.markdown("<br>---", unsafe_allow_html=True)
     st.subheader("5️⃣ RECON SYSTEM + PROCESS")
 
-    # Diubah menjadi 1 uploader saja karena kolom J & N dibaca langsung dari file ini
-    up_k6 = st.file_uploader("📥 Upload SYSTEM + RECON (File Master Hasil Audit)", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
+    col_k1, col_k2 = st.columns(2)
+    with col_k1:
+        up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
+    with col_k2:
+        up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
 
-    if up_k6:
+    if up_k6 and up_adj6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
             try:
                 up_k6.seek(0)
                 df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
+                up_adj6.seek(0)
+                df_recon6 = pd.read_excel(up_adj6) if up_adj6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_adj6)
                 
-                # df_recon6 dikirim None karena fungsi back-end yang baru hanya memproses df_raw6
-                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, None)
+                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, df_recon6)
                 
                 st.session_state.df_karantina_6 = df_final6
                 st.session_state.df_check_6 = df_check6
                 st.success("✅ Analisis Karantina Selesai!")
-                st.rerun() # Paksa refresh biar data langsung muncul lurus
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
-    if st.session_state.df_karantina_6 is not None:
-            # --- METRIC BOXES KARANTINA ---
-            # Jika dataframe kosong (0 baris/0 data), set langsung nilainya ke 0 agar tidak KeyError
+   if st.session_state.df_karantina_6 is not None:
+        # --- METRIC BOXES KARANTINA ---
+        # Jika dataframe kosong (0 baris/0 data), set langsung nilainya ke 0 agar tidak KeyError
+        if st.session_state.df_karantina_6.empty:
+            total_k_qty = 0
+            total_k_sku = 0
+        else:
+            total_k_qty = int(st.session_state.df_karantina_6['QUANTITY'].sum()) if 'QUANTITY' in st.session_state.df_karantina_6.columns else 0
+            total_k_sku = st.session_state.df_karantina_6['SKU'].nunique() if 'SKU' in st.session_state.df_karantina_6.columns else 0
+        
+        mk1, mk2 = st.columns(2)
+        with mk1:
+            st.markdown(f"""
+                <div class="m-box">
+                    <span class="m-lbl">☣️ QTY TO KARANTINA</span>
+                    <span class="m-val" style="color: #FACA2B;">{total_k_qty} QTY</span>
+                </div>
+            """, unsafe_allow_html=True)
+        with mk2:
+            st.markdown(f"""
+                <div class="m-box">
+                    <span class="m-lbl">🏷️ SKU TO KARANTINA</span>
+                    <span class="m-val">{total_k_sku} SKU</span>
+                </div>
+            """, unsafe_allow_html=True)
+
+        tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
+        with tab_res:
             if st.session_state.df_karantina_6.empty:
-                total_k_qty = 0
-                total_k_sku = 0
+                st.info("💡 Tidak ada data yang masuk kategori karantina (Semua data aman/balance).")
             else:
-                total_k_qty = int(st.session_state.df_karantina_6['QUANTITY'].sum()) if 'QUANTITY' in st.session_state.df_karantina_6.columns else 0
-                total_k_sku = st.session_state.df_karantina_6['SKU'].nunique() if 'SKU' in st.session_state.df_karantina_6.columns else 0
-            
-            mk1, mk2 = st.columns(2)
-            with mk1:
-                st.markdown(f"""
-                    <div class="m-box">
-                        <span class="m-lbl">☣️ QTY TO KARANTINA</span>
-                        <span class="m-val" style="color: #FACA2B;">{total_k_qty} QTY</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            with mk2:
-                st.markdown(f"""
-                    <div class="m-box">
-                        <span class="m-lbl">🏷️ SKU TO KARANTINA</span>
-                        <span class="m-val">{total_k_sku} SKU</span>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.dataframe(st.session_state.df_karantina_6, use_container_width=True, hide_index=True)
+                
+            out6 = io.BytesIO()
+            with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
+                # Menggunakan dataframe kosong aman, tapi pastikan ada fallback jika benar-benar kosong tanpa kolom
+                df_to_download = st.session_state.df_karantina_6 if not st.session_state.df_karantina_6.empty else pd.DataFrame(columns=['SKU', 'QUANTITY'])
+                df_to_download.to_excel(writer, index=False, sheet_name='Karantina')
+            st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
 
-            tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
-            with tab_res:
-                if st.session_state.df_karantina_6.empty:
-                    st.info("💡 Tidak ada data yang masuk kategori karantina (Semua data aman/balance).")
-                else:
-                    st.dataframe(st.session_state.df_karantina_6, use_container_width=True, hide_index=True)
-                    
-                out6 = io.BytesIO()
-                with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
-                    # Menggunakan dataframe kosong aman, tapi pastikan ada fallback jika benar-benar kosong tanpa kolom
-                    df_to_download = st.session_state.df_karantina_6 if not st.session_state.df_karantina_6.empty else pd.DataFrame(columns=['SKU', 'QUANTITY'])
-                    df_to_download.to_excel(writer, index=False, sheet_name='Karantina')
-                st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
-
-            with tab_chk:
-                if st.session_state.df_check_6 is not None:
-                    st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
+        with tab_chk:
+            if st.session_state.df_check_6 is not None:
+                st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
 
 # =========================================================
     # 📊 MISS LOCATION REPORT (FIXED RED ALERT)
