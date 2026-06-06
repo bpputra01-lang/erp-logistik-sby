@@ -1906,7 +1906,6 @@ def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, 
     ]
 
     def get_active_df(current_df, uploaded_file):
-        # Jika ada file yang di-upload, baca file tersebut
         if uploaded_file is not None:
             try:
                 uploaded_file.seek(0)
@@ -1915,25 +1914,46 @@ def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, 
                 else:
                     return pd.read_csv(uploaded_file)
             except:
-                return current_df # Balik ke current jika file corrupt
-        return current_df # Pakai data aplikasi jika tidak ada upload
+                return current_df
+        return current_df
 
     def process_data(df, status):
         if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             return pd.DataFrame(columns=cols_header)
         
-        # Ambil kolom yang dibutuhkan (Indeks 1-10 sesuai standar VBA lu)
-        temp = df.iloc[:, 1:11].copy() 
-        temp.columns = cols_header[:10]
+        # --- PERBAIKAN UTAMA: Deteksi Kolom Berdasarkan Nama Teks ---
+        # Cari apakah nama kolom di df mengandung kata-kata kunci di cols_header
+        matched_cols = [c for c in df.columns if str(c).upper() in [h.upper() for h in cols_header]]
         
-        # Pastikan numerik untuk perhitungan
-        for col in ["HARGA BELI", "QTY SO", "QTY SYSTEM"]:
-            temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
+        if len(matched_cols) >= 5: # Jika nama kolom COCOK, pakai mapping nama teks langsung
+            temp = df[matched_cols].copy()
+            # Standarisasi nama kolom ke huruf kapital sesuai cols_header
+            rename_dict = {c: next(h for h in cols_header if h.upper() == str(c).upper()) for c in temp.columns}
+            temp = temp.rename(columns=rename_dict)
+            
+            # Lengkapi kolom yang kurang jika ada
+            for h in cols_header[:10]:
+                if h not in temp.columns:
+                    temp[h] = ""
+            temp = temp[cols_header[:10]] # Urutkan sesuai standar
+        else:
+            # Fallback: Jika struktur file polos tanpa header yang cocok, pakai iloc cadangan yang fleksibel
+            # Cek apakah kolom pertama adalah ID/Identify, kalau iya geser indeksnya
+            start_idx = 1 if "IDENTI" in str(df.columns[0]).upper() or len(df.columns) > 11 else 0
+            end_idx = start_idx + 10
+            temp = df.iloc[:, start_idx:end_idx].copy()
+            temp.columns = cols_header[:10]
+        
+        # Pastikan tipe data numerik bersih untuk kalkulasi laporan
+        for col in ["HARGA BELI", "HARGA JUAL", "QTY SO", "QTY SYSTEM"]:
+            if col in temp.columns:
+                temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
 
-        # Hitung Value Adj
+        # Hitung Value Adj secara akurat
         temp["VALUE ADJ"] = (temp["QTY SO"] - temp["QTY SYSTEM"]) * temp["HARGA BELI"]
         temp["STATUS ADJ"] = status
-        return temp
+        
+        return temp[[c for c in cols_header if c in temp.columns or c in ["VALUE ADJ", "STATUS ADJ"]]]
 
     # Pilih Sumber Data: Prioritas Upload > Current Data
     active_plus = get_active_df(df_plus_current, up_plus)
@@ -1946,7 +1966,7 @@ def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, 
     # Gabung untuk report total
     df_final = pd.concat([df_adj_plus, df_adj_minus], ignore_index=True)
 
-    # --- HITUNG SUMMARY ---
+    # --- HITUNG SUMMARY MUTASI ---
     val_plus = df_adj_plus["VALUE ADJ"].sum() if not df_adj_plus.empty else 0
     val_minus = df_adj_minus["VALUE ADJ"].sum() if not df_adj_minus.empty else 0
     
