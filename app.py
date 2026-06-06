@@ -5197,62 +5197,63 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res['QTY SYSTEM ALL']     = res['_QTY_SYS_ALL']
     res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    # 6. [PERBAIKAN 2 & 3] Update Logika Justifikasi Sesuai Aturan Baru (Validasi Mutlak)
-def run_formula(row):
-    try:
-        # Ambil nilai baris file adjustment lu
-        qty_sys_row = round(float(row[qty_sys_col_case]), 2)
-        qty_so_row = round(float(row[qty_so_col_case]), 2)
-        
-        # Ambil nilai hitungan background lintas file
-        gap_adj = round(float(row['GAP ADJUSMENT']), 2)
-        curr_stock = round(float(row['CURRENT STOCK']), 2)
-        qty_sys_all = round(float(row['QTY SYSTEM ALL']), 2)
-        draft_in = round(float(row['TOTAL DRAFT_TRF_IN']), 2)
-        draft_out = round(float(row['TOTAL DRAFT_TRF_OUT']), 2)
+    # 6. [PERBAIKAN 2 & 3] Update Logika Justifikasi Sesuai Aturan Baru
+    def run_formula(row):
+        try:
+            # Ambil nilai baris file adjustment lu
+            qty_sys_row = round(float(row[qty_sys_col_case]), 2)
+            qty_so_row = round(float(row[qty_so_col_case]), 2)
+            
+            # Ambil nilai hitungan background lintas file
+            gap_adj = round(float(row['GAP ADJUSMENT']), 2)
+            curr_stock = round(float(row['CURRENT STOCK']), 2)
+            qty_sys_all = round(float(row['QTY SYSTEM ALL']), 2)
+            draft_in = round(float(row['TOTAL DRAFT_TRF_IN']), 2)
+            draft_out = round(float(row['TOTAL DRAFT_TRF_OUT']), 2)
 
-        # --- LOGIKA 3: KESALAHAN ADJUSMENT (+ / -) DENGAN PENCEKAN RUMUS ---
-        
-        # a. JIKA QTY SYSTEM > QTY SO (Potensi Kesalahan Adjustment +)
-        if qty_sys_row > qty_so_row and gap_adj > 0:
-            diff = qty_sys_row - qty_so_row
-            if round(qty_sys_all - diff, 2) == curr_stock:
-                return "KESALAHAN ADJUSMENT +"
-        
-        # b. JIKA QTY SYSTEM < QTY SO (Potensi Kesalahan Adjustment -)
-        elif qty_sys_row < qty_so_row and gap_adj < 0:
-            diff = qty_so_row - qty_sys_row
-            if round(qty_sys_all + diff, 2) == curr_stock:
-                return "KESALAHAN ADJUSMENT -"
-
-        # --- LOGIKA 2: KESALAHAN SYSTEM (Kondisi syarat Gap Adj harus == 0) ---
-        if gap_adj == 0:
-            # a. JIKA QTY SYSTEM > QTY SO
-            if qty_sys_row > qty_so_row:
+            # --- LOGIKA 3: KESALAHAN ADJUSMENT (+ / -) DENGAN PENCEKAN RUMUS ---
+            
+            # a. JIKA QTY SYSTEM > QTY SO (Potensi Kesalahan Adjustment +)
+            if qty_sys_row > qty_so_row and gap_adj > 0:
                 diff = qty_sys_row - qty_so_row
                 if round(qty_sys_all - diff, 2) == curr_stock:
-                    return "KESALAHAN SYSTEM"
+                    return "KESALAHAN ADJUSMENT +"
             
-            # b. JIKA QTY SYSTEM < QTY SO
-            elif qty_sys_row < qty_so_row:
+            # b. JIKA QTY SYSTEM < QTY SO (Potensi Kesalahan Adjustment -)
+            elif qty_sys_row < qty_so_row and gap_adj < 0:
                 diff = qty_so_row - qty_sys_row
                 if round(qty_sys_all + diff, 2) == curr_stock:
-                    return "KESALAHAN SYSTEM"
+                    return "KESALAHAN ADJUSMENT -"
 
-        # --- LOGIKA KONDISI LAINNYA ---
-        # CEK HASIL REKONSILIASI
-        if qty_sys_all == curr_stock:
-            return "CEK HASIL REKONSILIASI"
+            # --- LOGIKA 2: KESALAHAN SYSTEM (Kondisi syarat Gap Adj harus == 0) ---
+            if gap_adj == 0:
+                # a. JIKA QTY SYSTEM > QTY SO
+                if qty_sys_row > qty_so_row:
+                    diff = qty_sys_row - qty_so_row
+                    if round(qty_sys_all - diff, 2) == curr_stock:
+                        return "KESALAHAN SYSTEM"
+                
+                # b. JIKA QTY SYSTEM < QTY SO
+                elif qty_sys_row < qty_so_row:
+                    diff = qty_so_row - qty_sys_row
+                    if round(qty_sys_all + diff, 2) == curr_stock:
+                        return "KESALAHAN SYSTEM"
 
-        # KESALAHAN RTO
-        if draft_in > 0 or draft_out > 0:
-            return "KESALAHAN RTO"
+            # --- LOGIKA KONDISI LAINNYA ---
+            # CEK HASIL REKONSILIASI
+            if qty_sys_all == curr_stock:
+                return "CEK HASIL REKONSILIASI"
 
-        return "UNDEFINED"
-    except:
-        return "ERROR DATA"
+            # KESALAHAN RTO
+            if draft_in > 0 or draft_out > 0:
+                return "KESALAHAN RTO"
 
-res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
+            return "UNDEFINED"
+        except:
+            return "ERROR DATA"
+
+    res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
+
     # 7. Susun Urutan Header Final
     ordered_headers = [
         'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 
