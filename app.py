@@ -2650,8 +2650,6 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-st.set_page_config(layout="wide", page_title="Stock Timeline Tracking System")
-
 # ==========================================
 # 🎨 1. CORE STYLE & CSS (PREMIUM DARK)
 # ==========================================
@@ -3411,7 +3409,6 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
 # 2. LOGIC MENU & LAYOUT (FRONTEND UI)
 # ==============================================================================
 def render_premium_ui():
-    st.set_page_config(page_title="Store Request Analytics", layout="wide", initial_sidebar_state="collapsed")
 
     # Inject Premium Dark Theme Stylesheet dengan paksaan warna judul subheader
     st.markdown("""
@@ -6576,8 +6573,6 @@ import pandas as pd
 import streamlit as st
 from io import BytesIO
 
-# --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="RTO Compare System", layout="wide")
 
 # --- 2. FUNGSI UI & CSS ---
 def apply_custom_ui():
