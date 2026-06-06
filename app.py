@@ -18,7 +18,7 @@ except:
 
 # Set page config (Sekarang icon-nya udah pake logo merah hitam lu!)
 st.set_page_config(
-    page_title="ZKN ERP.id",
+    page_title="ZKN ERP",
     page_icon=logo_icon,
     layout="wide"
 )
