@@ -1921,40 +1921,49 @@ def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, 
         if df is None or (isinstance(df, pd.DataFrame) and df.empty):
             return pd.DataFrame(columns=cols_header)
         
-        # --- PERBAIKAN UTAMA: Deteksi Kolom Berdasarkan Nama Teks ---
-        # Cari apakah nama kolom di df mengandung kata-kata kunci di cols_header
-        matched_cols = [c for c in df.columns if str(c).upper() in [h.upper() for h in cols_header]]
+        temp = pd.DataFrame()
+        df_cols = [str(c).upper().strip() for c in df.columns]
         
-        if len(matched_cols) >= 5: # Jika nama kolom COCOK, pakai mapping nama teks langsung
-            temp = df[matched_cols].copy()
-            # Standarisasi nama kolom ke huruf kapital sesuai cols_header
-            rename_dict = {c: next(h for h in cols_header if h.upper() == str(c).upper()) for c in temp.columns}
-            temp = temp.rename(columns=rename_dict)
-            
-            # Lengkapi kolom yang kurang jika ada
-            for h in cols_header[:10]:
-                if h not in temp.columns:
-                    temp[h] = ""
-            temp = temp[cols_header[:10]] # Urutkan sesuai standar
-        else:
-            # Fallback: Jika struktur file polos tanpa header yang cocok, pakai iloc cadangan yang fleksibel
-            # Cek apakah kolom pertama adalah ID/Identify, kalau iya geser indeksnya
-            start_idx = 1 if "IDENTI" in str(df.columns[0]).upper() or len(df.columns) > 11 else 0
-            end_idx = start_idx + 10
-            temp = df.iloc[:, start_idx:end_idx].copy()
+        # Mapping pintar menggunakan pencarian kata kunci parsial (Anti-Slightly-Different-Header)
+        mapping_pintar = {
+            "BIN": next((c for c in df.columns if "BIN" in str(c).upper()), None),
+            "SKU": next((c for c in df.columns if "SKU" in str(c).upper()), None),
+            "BRAND": next((c for c in df.columns if "BRAND" in str(c).upper()), None),
+            "ITEM NAME": next((c for c in df.columns if "NAME" in str(c).upper() or "BARANG" in str(c).upper()), None),
+            "VARIANT": next((c for c in df.columns if "VAR" in str(c).upper() or "UKURAN" in str(c).upper()), None),
+            "SUB KATEGORI": next((c for c in df.columns if "KAT" in str(c).upper()), None),
+            "HARGA BELI": next((c for c in df.columns if "BELI" in str(c).upper() or "BUY" in str(c).upper() or "HARGA_B" in str(c).upper()), None),
+            "HARGA JUAL": next((c for c in df.columns if "JUAL" in str(c).upper() or "PRICE" in str(c).upper()), None),
+            # Cari QTY SO / QTY SCAN / HASIL RECONCILIATION
+            "QTY SO": next((c for c in df.columns if "SO" in str(c).upper() or "SCAN" in str(c).upper() or "RECON" in str(c).upper() or "FISIK" in str(c).upper()), None),
+            # Cari QTY SYSTEM
+            "QTY SYSTEM": next((c for c in df.columns if "SYS" in str(c).upper() or "STOK_S" in str(c).upper()), None)
+        }
+        
+        # Pindahkan data berdasarkan hasil mapping pintar
+        for target_col, source_col in mapping_pintar.items():
+            if source_col is not None:
+                temp[target_col] = df[source_col].copy()
+            else:
+                # Jika benar-benar tidak ketemu namanya, kasih fallback default kosong
+                temp[target_col] = 0 if "QTY" in target_col or "HARGA" in target_col else ""
+        
+        # Jika pemetaan gagal total (mungkin file kosongan tanpa header), gunakan fallback index standar
+        if temp["SKU"].astype(str).str.strip().eq("").all() or temp["SKU"].astype(str).str.strip().eq("0").all():
+            start_idx = 1 if "IDENTI" in df_cols[0] or len(df.columns) > 11 else 0
+            temp = df.iloc[:, start_idx:start_idx+10].copy()
             temp.columns = cols_header[:10]
-        
-        # Pastikan tipe data numerik bersih untuk kalkulasi laporan
+
+        # Pastikan tipe data numerik bersih total untuk kalkulasi mutasi harga
         for col in ["HARGA BELI", "HARGA JUAL", "QTY SO", "QTY SYSTEM"]:
             if col in temp.columns:
                 temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
 
-        # Hitung Value Adj secara akurat
+        # Hitung Value Adj secara akurat berdasar selisih asli fisik vs sistem
         temp["VALUE ADJ"] = (temp["QTY SO"] - temp["QTY SYSTEM"]) * temp["HARGA BELI"]
         temp["STATUS ADJ"] = status
         
-        return temp[[c for c in cols_header if c in temp.columns or c in ["VALUE ADJ", "STATUS ADJ"]]]
-
+        return temp
     # Pilih Sumber Data: Prioritas Upload > Current Data
     active_plus = get_active_df(df_plus_current, up_plus)
     active_minus = get_active_df(df_minus_current, up_minus)
