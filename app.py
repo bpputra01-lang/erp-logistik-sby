@@ -5350,7 +5350,7 @@ def process_stock_comparison(file1, file2, file_tracking=None):
         data1 = prepare_sku_totals(df1)
         data2 = prepare_sku_totals(df2)
         
-        # Bersihkan juga leading zeros di file system utama biar makin aman
+        # Bersihkan leading zeros di file system utama biar aman
         data1['SKU'] = data1['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
         data2['SKU'] = data2['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
 
@@ -5376,7 +5376,7 @@ def process_stock_comparison(file1, file2, file_tracking=None):
             if df_track.shape[1] < 11:
                 raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K tidak ditemukan.")
             
-            # Mapping tracking + SIKAT ANGKA 0 DI DEPAN (.str.lstrip('0'))
+            # Mapping tracking + SIKAT ANGKA 0 DI DEPAN
             df_track_clean = pd.DataFrame({
                 'INVOICE': df_track.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
@@ -5410,7 +5410,7 @@ def process_stock_comparison(file1, file2, file_tracking=None):
                     track_bin_list.append("-")
                     track_qty_list.append(0)
                 else:
-                    # Filter tracking murni berdasarkan SKU yang sudah bersih dari 0
+                    # Filter tracking murni berdasarkan SKU
                     match_sku = df_track_clean[df_track_clean['SKU'] == target_sku]
                     
                     if match_sku.empty:
@@ -5423,16 +5423,19 @@ def process_stock_comparison(file1, file2, file_tracking=None):
                         bins_str = ", ".join(match_sku['BIN'].unique())
                         total_qty_sales = match_sku['QTY_SALES'].sum()
                         
-                        if total_qty_sales == target_diff:
+                        # --- PERUBAHAN LOGIKA DISINI (Aturan QTY SALES < DIFF) ---
+                        if total_qty_sales >= target_diff:
+                            # Kalau penjualan lebih besar atau sama dengan selisih, artinya barang aman terjual
                             status_list.append("DONE TERJUAL")
                         else:
+                            # Hanya unmatch ketika qty sales di tracking kurang dari total selisihnya
                             status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH")
                         
                         invoice_list.append(invoices_str)
                         track_bin_list.append(bins_str)
                         track_qty_list.append(total_qty_sales)
                         
-        # Ikat semua data yang diproses ke dalam dataframe utama
+        # Ikat semua data ke dataframe
         discrepancies['TRACK_INVOICE'] = invoice_list
         discrepancies['TRACK_BIN'] = track_bin_list
         discrepancies['TRACK_QTY_SALES'] = track_qty_list
