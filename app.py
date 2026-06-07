@@ -5349,6 +5349,10 @@ def process_stock_comparison(file1, file2, file_tracking=None):
 
         data1 = prepare_sku_totals(df1)
         data2 = prepare_sku_totals(df2)
+        
+        # Bersihkan juga leading zeros di file system utama biar makin aman
+        data1['SKU'] = data1['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
+        data2['SKU'] = data2['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
 
         # Gabungkan data murni berdasarkan SKU saja
         comparison = pd.merge(
@@ -5365,17 +5369,18 @@ def process_stock_comparison(file1, file2, file_tracking=None):
         discrepancies['TRACK_QTY_SALES'] = 0
         discrepancies['STATUS_CHECK'] = "Belum Dicek"
         
-        # Baca file tracking sekali di awal jika ada
+        # Baca file tracking jika di-upload
         df_track_clean = None
         if file_tracking is not None and not discrepancies.empty:
             df_track = load_data(file_tracking)
             if df_track.shape[1] < 11:
                 raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K tidak ditemukan.")
             
+            # Mapping tracking + SIKAT ANGKA 0 DI DEPAN (.str.lstrip('0'))
             df_track_clean = pd.DataFrame({
-                'INVOICE': df_track.iloc[:, 0].astype(str).str.strip(),
-                'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.upper(),
-                'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.upper(),
+                'INVOICE': df_track.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
+                'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
+                'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'QTY_SALES': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
             })
             
@@ -5385,28 +5390,27 @@ def process_stock_comparison(file1, file2, file_tracking=None):
         track_qty_list = []
         
         for idx, row in discrepancies.iterrows():
-            target_sku = str(row['SKU']).strip().upper()
+            target_sku = str(row['SKU']).strip().lstrip('0').upper()
             actual_diff = row['DIFF']
             
-            # --- LOGIKA BARU LU: JIKA STOK BERTAMBAH (Sys2 > Sys1) ---
+            # 1. JIKA STOK BERTAMBAH (Sys2 > Sys1)
             if actual_diff < 0:
                 status_list.append("TAMBAHAN DARI PO / RTO (PERLU CEK ULANG)")
                 invoice_list.append("-")
                 track_bin_list.append("-")
                 track_qty_list.append(0)
                 
-            # --- JIKA STOK BERKURANG (Sys1 > Sys2) -> CEK TRACKING ---
+            # 2. JIKA STOK BERKURANG (Sys1 > Sys2) -> CEK TRACKING
             else:
-                target_diff = abs(actual_diff) # Ambil nilai absolut pengurang untuk dicocokkan ke sales
+                target_diff = abs(actual_diff)
                 
-                if df_track_clean is dict or df_track_clean is None:
-                    # Jika file tracking gak diupload tapi stok berkurang
+                if df_track_clean is None:
                     status_list.append("STOK BERKURANG (BELUM UPLOAD TRACKING)")
                     invoice_list.append("-")
                     track_bin_list.append("-")
                     track_qty_list.append(0)
                 else:
-                    # Filter tracking murni berdasarkan SKU
+                    # Filter tracking murni berdasarkan SKU yang sudah bersih dari 0
                     match_sku = df_track_clean[df_track_clean['SKU'] == target_sku]
                     
                     if match_sku.empty:
