@@ -5376,7 +5376,7 @@ def process_stock_comparison(file1, file2, file_tracking=None):
             if df_track.shape[1] < 11:
                 raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K tidak ditemukan.")
             
-            # Mapping tracking + SIKAT ANGKA 0 DI DEPAN
+            # Mapping tracking + SIKAT ANGKA 0 DI DEPAN + dropna biar ga ada float NaN
             df_track_clean = pd.DataFrame({
                 'INVOICE': df_track.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
@@ -5419,16 +5419,15 @@ def process_stock_comparison(file1, file2, file_tracking=None):
                         track_bin_list.append("-")
                         track_qty_list.append(0)
                     else:
-                        invoices_str = ", ".join(match_sku['INVOICE'].unique())
-                        bins_str = ", ".join(match_sku['BIN'].unique())
+                        # === FIX ERROR DISINI: Ditambahkan map(str, ...) untuk bungkus data angka/NaN ===
+                        invoices_str = ", ".join(map(str, match_sku['INVOICE'].unique()))
+                        bins_str = ", ".join(map(str, match_sku['BIN'].unique()))
                         total_qty_sales = match_sku['QTY_SALES'].sum()
                         
-                        # --- PERUBAHAN LOGIKA DISINI (Aturan QTY SALES < DIFF) ---
+                        # Aturan QTY SALES < DIFF
                         if total_qty_sales >= target_diff:
-                            # Kalau penjualan lebih besar atau sama dengan selisih, artinya barang aman terjual
                             status_list.append("DONE TERJUAL")
                         else:
-                            # Hanya unmatch ketika qty sales di tracking kurang dari total selisihnya
                             status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH")
                         
                         invoice_list.append(invoices_str)
