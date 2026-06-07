@@ -5355,23 +5355,23 @@ def process_stock_comparison(file1, file2, file_tracking=None):
             data1, data2, on='SKU', how='outer', suffixes=('_Sys1', '_Sys2')
         ).fillna(0)
 
-        # Hitung Selisih total SKU antar system
+        # Hitung Selisih (Stok Awal - Stok Akhir)
         comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
-        # Tambahkan kolom tracking default
+        # Inisialisasi kolom tracking default
         discrepancies['TRACK_INVOICE'] = "-"
         discrepancies['TRACK_BIN'] = "-"
         discrepancies['TRACK_QTY_SALES'] = 0
-        discrepancies['STATUS_CHECK'] = "Belum Dicek (Upload Tracking)"
+        discrepancies['STATUS_CHECK'] = "Belum Dicek"
         
-        # === B. VALIDASI SILANG KE STOCK TRACKING ===
+        # Baca file tracking sekali di awal jika ada
+        df_track_clean = None
         if file_tracking is not None and not discrepancies.empty:
             df_track = load_data(file_tracking)
             if df_track.shape[1] < 11:
                 raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K tidak ditemukan.")
             
-            # Mapping tracking: A=Invoice, B=SKU, G=Bin, K=Qty
             df_track_clean = pd.DataFrame({
                 'INVOICE': df_track.iloc[:, 0].astype(str).str.strip(),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.upper(),
@@ -5379,47 +5379,61 @@ def process_stock_comparison(file1, file2, file_tracking=None):
                 'QTY_SALES': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
             })
             
-            status_list = []
-            invoice_list = []
-            track_bin_list = []
-            track_qty_list = []
+        status_list = []
+        invoice_list = []
+        track_bin_list = []
+        track_qty_list = []
+        
+        for idx, row in discrepancies.iterrows():
+            target_sku = str(row['SKU']).strip().upper()
+            actual_diff = row['DIFF']
             
-            for idx, row in discrepancies.iterrows():
-                target_sku = str(row['SKU']).strip().upper()
-                target_diff = abs(row['DIFF']) # Nilai absolut selisih untuk compare ke sales
+            # --- LOGIKA BARU LU: JIKA STOK BERTAMBAH (Sys2 > Sys1) ---
+            if actual_diff < 0:
+                status_list.append("TAMBAHAN DARI PO / RTO (PERLU CEK ULANG)")
+                invoice_list.append("-")
+                track_bin_list.append("-")
+                track_qty_list.append(0)
                 
-                # Filter tracking murni berdasarkan SKU
-                match_sku = df_track_clean[df_track_clean['SKU'] == target_sku]
+            # --- JIKA STOK BERKURANG (Sys1 > Sys2) -> CEK TRACKING ---
+            else:
+                target_diff = abs(actual_diff) # Ambil nilai absolut pengurang untuk dicocokkan ke sales
                 
-                if match_sku.empty:
-                    # Aturan 3: TOTAL SELISIH NO SALES
-                    status_list.append("NO SALES ➡️ PERLU CEK RTO")
+                if df_track_clean is dict or df_track_clean is None:
+                    # Jika file tracking gak diupload tapi stok berkurang
+                    status_list.append("STOK BERKURANG (BELUM UPLOAD TRACKING)")
                     invoice_list.append("-")
                     track_bin_list.append("-")
                     track_qty_list.append(0)
                 else:
-                    # Ambil akumulasi data sales untuk SKU ini
-                    invoices_str = ", ".join(match_sku['INVOICE'].unique())
-                    bins_str = ", ".join(match_sku['BIN'].unique())
-                    total_qty_sales = match_sku['QTY_SALES'].sum()
+                    # Filter tracking murni berdasarkan SKU
+                    match_sku = df_track_clean[df_track_clean['SKU'] == target_sku]
                     
-                    if total_qty_sales == target_diff:
-                        # Aturan 1: Total Selisih SKU cocok dengan Total Penjualan
-                        status_list.append("DONE TERJUAL")
+                    if match_sku.empty:
+                        status_list.append("NO SALES ➡️ PERLU CEK RTO")
+                        invoice_list.append("-")
+                        track_bin_list.append("-")
+                        track_qty_list.append(0)
                     else:
-                        # Aturan 2: SKU ketemu di sales tapi total QTY nya gak sinkron sama selisih
-                        status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH")
-                    
-                    invoice_list.append(invoices_str)
-                    track_bin_list.append(bins_str)
-                    track_qty_list.append(total_qty_sales)
-            
-            # Ikat data ke dataframe
-            discrepancies['TRACK_INVOICE'] = invoice_list
-            discrepancies['TRACK_BIN'] = track_bin_list
-            discrepancies['TRACK_QTY_SALES'] = track_qty_list
-            discrepancies['STATUS_CHECK'] = status_list
-            
+                        invoices_str = ", ".join(match_sku['INVOICE'].unique())
+                        bins_str = ", ".join(match_sku['BIN'].unique())
+                        total_qty_sales = match_sku['QTY_SALES'].sum()
+                        
+                        if total_qty_sales == target_diff:
+                            status_list.append("DONE TERJUAL")
+                        else:
+                            status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH")
+                        
+                        invoice_list.append(invoices_str)
+                        track_bin_list.append(bins_str)
+                        track_qty_list.append(total_qty_sales)
+                        
+        # Ikat semua data yang diproses ke dalam dataframe utama
+        discrepancies['TRACK_INVOICE'] = invoice_list
+        discrepancies['TRACK_BIN'] = track_bin_list
+        discrepancies['TRACK_QTY_SALES'] = track_qty_list
+        discrepancies['STATUS_CHECK'] = status_list
+        
         return comparison, discrepancies
         
     except Exception as e:
@@ -8765,17 +8779,18 @@ elif menu == "Compare System":
 
         st.divider()
 
-        # --- HITUNG METRIK DATA UNTUK DITAMPILKAN ---
+       # --- HITUNG METRIK DATA UNTUK DITAMPILKAN ---
         total_checked = len(result_all)
         total_diff = len(diff_only)
         
         if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
-            match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("DONE TERJUAL|TERJUAL \(BIN MISSMATCH\)", na=False, case=False)])
-            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("UNMATCH", na=False, case=False)])
-            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO SALES", na=False, case=False)])
+            match_count = len(diff_only[diff_only['STATUS_CHECK'] == "DONE TERJUAL"])
+            
+            # Gabungkan pencarian status unmatch atau status tambahan PO/RTO ke kolom unmatch/perlu cek
+            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("TIDAK MATCH|PO / RTO", na=False)])
+            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO SALES", na=False)])
         else:
             match_count, unmatch_count, no_sales_count = 0, 0, 0
-
         # --- RENDER 5 METRIC BOXES ELEGAN ---
         m1, m2 = st.columns(2)
         m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{total_checked} ROW</span></div>', unsafe_allow_html=True)
