@@ -5326,36 +5326,40 @@ def load_data(file):
     else:
         return pd.read_excel(file)
 
-def prepare_columns(df):
+def prepare_sku_totals(df):
     df_clean = df.copy()
     if df_clean.shape[1] < 10:
         raise ValueError(f"File System kurang dari 10 kolom (Kolom J tidak ada).")
     
+    # Ambil Kolom C (index 2) untuk SKU dan Kolom J (index 9) untuk QTY
     df_mapped = pd.DataFrame({
-        'BIN': df_clean.iloc[:, 1].astype(str).str.strip().str.upper(),
         'SKU': df_clean.iloc[:, 2].astype(str).str.strip().str.upper(),
         'QTY': pd.to_numeric(df_clean.iloc[:, 9], errors='coerce').fillna(0)
     })
-    return df_mapped
+    
+    # AGREGASI TOTAL QTY PER SKU (Abaikan BIN di Kolom B)
+    df_grouped = df_mapped.groupby('SKU', as_index=False)['QTY'].sum()
+    return df_grouped
 
 def process_stock_comparison(file1, file2, file_tracking=None):
     try:
-        # === A. COMPARE FILE SYSTEM 1 & 2 ===
+        # === A. COMPARE FILE SYSTEM 1 & 2 BY SKU ===
         df1 = load_data(file1)
         df2 = load_data(file2)
 
-        data1 = prepare_columns(df1)
-        data2 = prepare_columns(df2)
+        data1 = prepare_sku_totals(df1)
+        data2 = prepare_sku_totals(df2)
 
+        # Gabungkan data murni berdasarkan SKU saja
         comparison = pd.merge(
-            data1, data2, on=['BIN', 'SKU'], how='outer', suffixes=('_Sys1', '_Sys2')
+            data1, data2, on='SKU', how='outer', suffixes=('_Sys1', '_Sys2')
         ).fillna(0)
 
-        # Hitung Selisih
+        # Hitung Selisih total SKU antar system
         comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
-        # Tambahkan kolom tracking default yang lu minta
+        # Tambahkan kolom tracking default
         discrepancies['TRACK_INVOICE'] = "-"
         discrepancies['TRACK_BIN'] = "-"
         discrepancies['TRACK_QTY_SALES'] = 0
@@ -5367,7 +5371,7 @@ def process_stock_comparison(file1, file2, file_tracking=None):
             if df_track.shape[1] < 11:
                 raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K tidak ditemukan.")
             
-            # Mapping kolom tracking: A=Invoice, B=SKU, G=Bin, K=Qty
+            # Mapping tracking: A=Invoice, B=SKU, G=Bin, K=Qty
             df_track_clean = pd.DataFrame({
                 'INVOICE': df_track.iloc[:, 0].astype(str).str.strip(),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.upper(),
@@ -5382,54 +5386,35 @@ def process_stock_comparison(file1, file2, file_tracking=None):
             
             for idx, row in discrepancies.iterrows():
                 target_sku = str(row['SKU']).strip().upper()
-                target_bin = str(row['BIN']).strip().upper()
-                target_diff = abs(row['DIFF']) # Pakai nilai absolut untuk compare dengan QTY penjualan
+                target_diff = abs(row['DIFF']) # Nilai absolut selisih untuk compare ke sales
                 
-                # 1. Filter tracking berdasarkan SKU yang sama
+                # Filter tracking murni berdasarkan SKU
                 match_sku = df_track_clean[df_track_clean['SKU'] == target_sku]
                 
                 if match_sku.empty:
-                    # Aturan 4: TOTAL SELISIH NO SALES
+                    # Aturan 3: TOTAL SELISIH NO SALES
                     status_list.append("NO SALES ➡️ PERLU CEK RTO")
                     invoice_list.append("-")
                     track_bin_list.append("-")
                     track_qty_list.append(0)
                 else:
-                    # Ambil list invoice unik, bin unik, dan total qty terjual untuk info kolom tambahan
+                    # Ambil akumulasi data sales untuk SKU ini
                     invoices_str = ", ".join(match_sku['INVOICE'].unique())
                     bins_str = ", ".join(match_sku['BIN'].unique())
                     total_qty_sales = match_sku['QTY_SALES'].sum()
                     
-                    # 2. Cek apakah ada yang terjual dari BIN yang sama
-                    match_bin = match_sku[match_sku['BIN'] == target_bin]
-                    
-                    if not match_bin.empty:
-                        # Jika SKU dan BIN cocok, cek apakah nominal QTY sales akumulatifnya sama dengan DIFF
-                        total_qty_bin_sales = match_bin['QTY_SALES'].sum()
-                        
-                        if total_qty_bin_sales == target_diff:
-                            # Aturan 1: SKU, BIN, dan QTY Match Sempurna
-                            status_list.append("DONE TERJUAL")
-                        else:
-                            # Aturan 2: SKU & BIN cocok, tapi QTY/DIFF tidak match
-                            status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH")
-                        
-                        # Tarik data spesifik yang matching BIN-nya
-                        invoice_list.append(", ".join(match_bin['INVOICE'].unique()))
-                        track_bin_list.append(", ".join(match_bin['BIN'].unique()))
-                        track_qty_list.append(total_qty_bin_sales)
+                    if total_qty_sales == target_diff:
+                        # Aturan 1: Total Selisih SKU cocok dengan Total Penjualan
+                        status_list.append("DONE TERJUAL")
                     else:
-                        # Aturan 3: SKU dan QTY match, tapi BIN tidak cocok (BIN MISSMATCH)
-                        if total_qty_sales == target_diff:
-                            status_list.append("TERJUAL (BIN MISSMATCH)")
-                        else:
-                            status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH(BIN MISSMATCH)")
-                            
-                        invoice_list.append(invoices_str)
-                        track_bin_list.append(bins_str)
-                        track_qty_list.append(total_qty_sales)
+                        # Aturan 2: SKU ketemu di sales tapi total QTY nya gak sinkron sama selisih
+                        status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH")
+                    
+                    invoice_list.append(invoices_str)
+                    track_bin_list.append(bins_str)
+                    track_qty_list.append(total_qty_sales)
             
-            # Masukkan semua data yang berhasil di-track ke kolom dataframe hasil
+            # Ikat data ke dataframe
             discrepancies['TRACK_INVOICE'] = invoice_list
             discrepancies['TRACK_BIN'] = track_bin_list
             discrepancies['TRACK_QTY_SALES'] = track_qty_list
@@ -8826,7 +8811,7 @@ elif menu == "Compare System":
             )
         else:
             st.success("✅ Tidak ada perbedaan stok! Semua BIN, SKU, dan QTY match.")
-            
+
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     
