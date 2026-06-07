@@ -5414,7 +5414,7 @@ def process_stock_comparison(file1, file2, file_tracking=None):
                     match_sku = df_track_clean[df_track_clean['SKU'] == target_sku]
                     
                     if match_sku.empty:
-                        status_list.append("NO SALES ➡️ PERLU CEK RTO")
+                        status_list.append("NO SALES -> PERLU CEK RTO")
                         invoice_list.append("-")
                         track_bin_list.append("-")
                         track_qty_list.append(0)
