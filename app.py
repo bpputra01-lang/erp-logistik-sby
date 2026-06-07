@@ -8731,7 +8731,102 @@ if menu == "Putaway System":
             file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+elif menu == "Compare System":
+    st.markdown('<div class="hero-header"><h1>STOCK COMPARATION</h1></div>', unsafe_allow_html=True)
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan:**
+        - **STOCK SYSTEM 1**: Download ALL DATA STOCK Sebelum jam operasional **Before Shift 0 (07:30)**
+        - **STOCK SYSTEM 2**: Download ALL DATA STOCK Setelah jam operasional **After Shift 2 (10:00)**
+        - **STOCK TRACKING** : Download sesuaikan dengan tanggal dan pilih hanya yang **DONE**
+        """)
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Compare :**
+        - Untuk Compare hanya menggunakan logic rumus **SUMIFS** dimana akan dilakukan di kedua file sehingga mengetahui apakah terdapat perbedaan QTY saat tidak terjadi transaksi
+        - Untuk item yang berbeda akan dipisahkan dan akan dilakukan follow Up ke tim IT untuk dilakukan perbaikan
+        """)
 
+    # 1. INISIALISASI SESSION STATE (Biar data dikunci di memori browser)
+    if 'result_all' not in st.session_state:
+        st.session_state.result_all = None
+    if 'diff_only' not in st.session_state:
+        st.session_state.diff_only = None
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        # Ditambahkan key unik agar file uploader tidak ke-reset saat download
+        file_sys1 = st.file_uploader("Stock System Start Shift", type=['xlsx', 'csv'], key='uploader_sys1')
+    with col2:
+        file_sys2 = st.file_uploader("Stock System End Shift", type=['xlsx', 'csv'], key='uploader_sys2')
+    with col3:
+        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'], key='uploader_track')
+
+    # 2. PROSES LOGIKA HANYA DIJALANKAN PAS TOMBOL DIKLIK
+    if file_sys1 and file_sys2:
+        if st.button("▶️RUN COMPARE"):
+            try:
+                # Masukkan hasil perhitungan ke dalam session state, bukan variabel biasa
+                res_all, d_only = process_stock_comparison(file_sys1, file_sys2, file_tracking)
+                st.session_state.result_all = res_all
+                st.session_state.diff_only = d_only
+            except Exception as e:
+                st.error(f"Terjadi Kesalahan: {e}")
+
+    # 3. KELUARKAN LOGIKA TAMPILAN DARI TOMBOL (Jalan mandiri membaca session state)
+    if st.session_state.result_all is not None and st.session_state.diff_only is not None:
+        result_all = st.session_state.result_all
+        diff_only = st.session_state.diff_only
+
+        st.divider()
+
+        # --- HITUNG METRIK DATA UNTUK DITAMPILKAN ---
+        total_checked = len(result_all)
+        total_diff = len(diff_only)
+        
+        if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
+            match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("DONE TERJUAL|TERJUAL \(BIN MISSMATCH\)", na=False, case=False)])
+            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("UNMATCH", na=False, case=False)])
+            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO SALES", na=False, case=False)])
+        else:
+            match_count, unmatch_count, no_sales_count = 0, 0, 0
+
+        # --- RENDER 5 METRIC BOXES ELEGAN ---
+        m1, m2 = st.columns(2)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM DICEK</span><span class="m-val">{total_checked} ROW</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ TOTAL ITEM SELISIH</span><span class="m-val">{total_diff} SKU</span></div>', unsafe_allow_html=True)
+        
+        st.write("") # Spacer
+        
+        m3, m4, m5 = st.columns(3)
+        m3.markdown(f'<div class="m-box" style="border-left: 5px solid #28a745;"><span class="m-lbl">✅ SELISIH & SALES MATCH</span><span class="m-val" style="color: #28a745;">{match_count} SKU</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box" style="border-left: 5px solid #dc3545;"><span class="m-lbl">❌ SELISIH & SALES UNMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
+        m5.markdown(f'<div class="m-box" style="border-left: 5px solid #ffc107;"><span class="m-lbl">🔍 TOTAL SELISIH NO SALES</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
+
+        st.write("")
+
+        if not diff_only.empty:
+            st.warning("Daftar Perbedaan Stok Beserta Hasil Cross-Check Tracking Penjualan:")
+            
+            ordered_cols = [
+                'BIN', 'SKU', 'QTY_Sys1', 'QTY_Sys2', 'DIFF', 
+                'TRACK_INVOICE', 'TRACK_BIN', 'TRACK_QTY_SALES', 'STATUS_CHECK'
+            ]
+            display_df = diff_only[[c for c in ordered_cols if c in diff_only.columns]]
+            
+            st.dataframe(display_df, use_container_width=True)
+            
+            csv = display_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Hasil Selisih & Status",
+                data=csv,
+                file_name='selisih_stok_validated.csv',
+                mime='text/csv',
+                key='btn_download_compare' # Ditambahkan key unik agar tidak memicu error rerun
+            )
+        else:
+            st.success("✅ Tidak ada perbedaan stok! Semua BIN, SKU, dan QTY match.")
+            
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     
