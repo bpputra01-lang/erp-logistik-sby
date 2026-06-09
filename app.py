@@ -10648,14 +10648,14 @@ elif menu == "Refill Toko":
     with st.expander("💡 Cara Kerja & Logika"):
         st.info("""
         **Logika Refill:**
-        1. **Filter Data:** Mengabaikan item kategori: Shoes, Sandals, Jersey, Pants, Jacket, Baselayer, Short, Shirt, Underlayer, Set Apparel, Ball, Bag, dan **Footwear**.
+        1. **Filter Data:** Mengabaikan kategori: **Shoes, Sandals, Footwear**.
         2. **Identifikasi Stok:**
            - **Stok Toko:** Total qty di lokasi 'TOKO'.
-           - **Stok Gudang/Cadangan:** Total qty di semua lokasi selain 'TOKO' yang bukan merupakan bin Defect/Reject/Staging/dll.
+           - **Stok Gudang/Cadangan:** Total qty di semua lokasi selain 'TOKO' yang bukan bin Defect/Reject/Staging/dll.
         3. **Aturan Refill:**
            - Hanya muncul jika stok di gudang > 0.
            - **Lower Body:** Refill jika stok toko < 6.
-           - **Kategori Lain:** Refill jika stok toko < 3.
+           - **Kategori Lain:** Refill jika stok toko < 2.
         """)
 
     # CSS Custom untuk Metric Box
@@ -10677,23 +10677,29 @@ elif menu == "Refill Toko":
     up_refill = st.file_uploader("📥 Upload STOCK SYSTEM (Multiple Adjustment)", type=['xlsx','csv'], key="u_refill")
 
     if up_refill:
-        if st.button("▶️ GENERATE REFILL LIST", use_container_width=True):
-            try:
-                df_ref = pd.read_excel(up_refill) if up_refill.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_refill)
-                df_ref.columns = [f"col_{i}" for i in range(len(df_ref.columns))]
-                
-                # 1. FILTER SUB KATEGORI
-                exclude_kat = ["SHOES", "SANDALS", "FOOTWEAR"]
-                df_ref = df_ref[~df_ref['col_6'].astype(str).str.upper().isin(exclude_kat)]
+        try:
+            # Baca Data
+            df_raw = pd.read_excel(up_refill) if up_refill.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_refill)
+            df_raw.columns = [f"col_{i}" for i in range(len(df_raw.columns))]
+            
+            # 1. FILTER AWAL (Exclude Shoes, Sandals, Footwear)
+            exclude_kat = ["SHOES", "SANDALS", "FOOTWEAR"]
+            df_filtered = df_raw[~df_raw['col_6'].astype(str).str.upper().isin(exclude_kat)].copy()
+            
+            # 2. FILTER KATEGORI DINAMIS (Multiselect)
+            unique_cats = sorted(df_filtered['col_6'].dropna().unique().astype(str))
+            selected_cats = st.multiselect("🔍 Filter Sub Kategori:", options=unique_cats, default=unique_cats)
+            
+            if st.button("▶️ GENERATE REFILL LIST", use_container_width=True):
+                # Filter berdasarkan pilihan user
+                df_ref = df_filtered[df_filtered['col_6'].isin(selected_cats)].copy()
 
-                # 2. IDENTIFIKASI BIN
+                # 3. IDENTIFIKASI BIN
                 exclude_bin_pattern = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE|KARANTINA"
                 is_toko = df_ref['col_1'].astype(str).str.upper() == "TOKO"
-                
-                # Logika Baru: Semua yang bukan TOKO dan bukan kategori exclude, selama stok > 0
                 is_gudang = (~is_toko) & (~df_ref['col_1'].astype(str).str.upper().str.contains(exclude_bin_pattern, na=False))
 
-                # 3. PENGELOMPOKAN
+                # 4. PENGELOMPOKAN
                 df_toko = df_ref[is_toko].groupby('col_2')['col_9'].sum().reset_index()
                 df_toko.columns = ['col_2', 'qty_toko']
 
@@ -10707,7 +10713,7 @@ elif menu == "Refill Toko":
                 df_final = df_master.merge(df_toko, on='col_2', how='left').merge(df_gudang, on='col_2', how='left')
                 df_final[['qty_toko', 'qty_gudang']] = df_final[['qty_toko', 'qty_gudang']].fillna(0)
 
-                # 4. LOGIC REFILL
+                # 5. LOGIC REFILL
                 def check_refill(row):
                     if row['qty_gudang'] <= 0: return False
                     sub_kat = str(row['col_6']).upper()
@@ -10721,12 +10727,12 @@ elif menu == "Refill Toko":
                 df_res_refill.columns = ['SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY TOKO', 'QTY GUDANG', 'LOKASI BIN']
 
                 st.session_state.df_refill_toko = df_res_refill
-                st.success("✅ List Refill Berhasil Dibuat!")
                 st.rerun()
 
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
 
+    # --- DISPLAY HASIL ---
     if st.session_state.get('df_refill_toko') is not None:
         df_view = st.session_state.df_refill_toko
         r_c1, r_c2 = st.columns(2)
@@ -10746,10 +10752,3 @@ elif menu == "Refill Toko":
             if st.button("🗑️ RESET", use_container_width=True):
                 st.session_state.df_refill_toko = None
                 st.rerun()
-
-
-    
-
-
-
-
