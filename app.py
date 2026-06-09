@@ -663,100 +663,76 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
     
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
 
-def logic_setup_karantina_with_compare(df_outstanding, df_recon):
+def logic_setup_karantina_with_compare(df_master):
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
-        # Sesuai preferensi user: hapus prefix SPE jika ada
-        if s.startswith("SPE"): s = s[3:].strip() 
-        if s.endswith('.0'): s = s[:-2]
+        # Sesuai preferensi: hapus prefix SPE jika berada di awal kata saja
+        if s.startswith("SPE"): 
+            s = s[3:].strip() 
+        if s.endswith('.0'): 
+            s = s[:-2]
         return s
 
-    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT (Uploader 2) -> Kolom J (Index 9)
-    sys_map = {}
-    if df_recon is not None and not df_recon.empty:
-        for _, row in df_recon.iterrows():
-            try:
-                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
-                k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
-                val_sys = pd.to_numeric(row.iloc[9], errors='coerce') 
-                sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
-            except: continue
+    # Pastikan data tidak kosong
+    if df_master is None or df_master.empty:
+        df_check = pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
+        df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+        return df_karantina, df_check
 
-    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING (Uploader 1) -> Kolom N (Index 13)
-    recon_map = {}
-    if df_outstanding is not None and not df_outstanding.empty:
-        for _, row in df_outstanding.iterrows():
-            try:
-                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
-                k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
-                val_rec = pd.to_numeric(row.iloc[13], errors='coerce') 
-                recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
-            except: continue
-
-  # =====================================================================
-# # 3. Proses Comparison (FIXED: LANGSUNG BACA HORIZONTAL PER BARIS)
-# =====================================================================
-    df_master = df_outstanding.copy()
-    
     # Paksa nama kolom jadi huruf kapital semua biar seragam
     df_master.columns = df_master.columns.str.strip().str.upper()
     
     audit_results = []
     karantina_results = []
 
+    # Iterasi langsung secara horizontal dari file tunggal yang di-upload
     for _, row in df_master.iterrows():
-        # 1. Ambil data BIN dan SKU dari kolom index ke-1 dan ke-2
-        bin_val = row.iloc[1]
-        sku_val = row.iloc[2]
-        
-        # 2. LANGSUNG NODONG NILAI DARI BARIS YANG SAMA (Index 9 dan 13)
-        # Tidak perlu pakai sys_map.get(key) atau recon_map.get(key) lagi!
-        q_system = pd.to_numeric(row.iloc[9], errors='coerce')
-        q_recon = pd.to_numeric(row.iloc[13], errors='coerce')
-        
-        # 3. Jaga-jaga kalau cell-nya kosong (NaN), ubah jadi 0
-        q_system = q_system if not pd.isna(q_system) else 0
-        q_recon = q_recon if not pd.isna(q_recon) else 0
-        
-        # 4. Hitung selisihnya secara horizontal (1 - 1 = 0)
-        diff = q_system - q_recon
-
-        # TAB PENGECEKAN: Hanya tampilkan jika benar-benar ada selisih (!= 0)
-        if diff != 0:
-            audit_results.append({
-                'BIN': bin_val,
-                'SKU': sku_val,
-                'QTY_SYSTEM_J': q_system,
-                'QTY_RECON_N': q_recon,
-                'SELISIH': diff
-            })
+        try:
+            # 1. Ambil data BIN dan SKU dari kolom index ke-1 (B) dan ke-2 (C)
+            # Gunakan fungsi clean_val agar formatnya konsisten (Capital & tanpa .0)
+            bin_val = clean_val(row.iloc[1])
+            sku_val = clean_val(row.iloc[2])
             
-            # Masukkan ke list karantina hanya jika selisih POSITIF (> 0)
-            if diff > 0:
-                karantina_results.append({
-                    "BIN AWAL": bin_val,
-                    "BIN TUJUAN": "KARANTINA",
-                    "SKU": sku_val,
-                    "QUANTITY": int(diff),
-                    "NOTES": "MISS LOCATION"
-                })
+            # 2. Nodong nilai QTY dari baris yang sama (Index 9 -> Kolom J, Index 13 -> Kolom N)
+            q_system = pd.to_numeric(row.iloc[9], errors='coerce')
+            q_recon = pd.to_numeric(row.iloc[13], errors='coerce')
+            
+            # 3. Jaga-jaga kalau cell-nya kosong (NaN), ubah jadi 0
+            q_system = q_system if not pd.isna(q_system) else 0
+            q_recon = q_recon if not pd.isna(q_recon) else 0
+            
+            # 4. Hitung selisih secara horizontal (SYSTEM - RECON)
+            diff = q_system - q_recon
 
-    # 4. Output DataFrames
-    # Hasil Karantina sudah bersih dari minus
-    df_karantina = pd.DataFrame(karantina_results)
-    # Hasil Audit tetep lengkap
+            # TAB PENGECEKAN: Hanya tampilkan jika benar-benar ada selisih (!= 0)
+            if diff != 0:
+                audit_results.append({
+                    'BIN': bin_val,
+                    'SKU': sku_val,
+                    'QTY_SYSTEM_J': q_system,
+                    'QTY_RECON_N': q_recon,
+                    'SELISIH': diff
+                })
+                
+                # Masukkan ke list karantina hanya jika selisih POSITIF (> 0)
+                if diff > 0:
+                    karantina_results.append({
+                        "BIN AWAL": bin_val,
+                        "BIN TUJUAN": "KARANTINA",
+                        "SKU": sku_val,
+                        "QUANTITY": int(diff),
+                        "NOTES": "MISS LOCATION"
+                    })
+        except Exception as e:
+            # Mengabaikan baris yang corrupt/error saat parsing data numerik
+            continue
+
+    # 5. Output DataFrames
+    df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
     df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
 
     return df_karantina, df_check
-    
-def clean_sku_bin(series):
-    """Fungsi helper untuk memastikan SKU/BIN tetap string dan bersih."""
-    return (series.astype(str)
-            .str.replace(r'\.0$', '', regex=True) # Menghilangkan .0 di ujung SKU jika ada
-            .str.replace(r'\s+', ' ', regex=True) # Spasi ganda jadi tunggal
-            .str.strip() 
-            .str.upper())
 
 def logic_compare_scan_to_stock(df_scan, df_stock):
     # 1. Ambil kolom & Copy
