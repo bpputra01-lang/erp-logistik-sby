@@ -1245,31 +1245,31 @@ def menu_cycle_count():
     # Tampilkan ulang jika session state ada (biar gak ilang pas scroll)
     elif st.session_state.get('df_adj_final_4') is not None:
         st.dataframe(st.session_state.df_adj_final_4, use_container_width=True, hide_index=True)
-    # =========================================================
+# =========================================================
     # ⚙️ 5. SET UP KARANTINA GENERATOR (UI FIXED - SINGLE FILE)
     # =========================================================
     st.markdown("<br>---", unsafe_allow_html=True)
     st.subheader("5️⃣ RECON SYSTEM + PROCESS")
 
-    up_k6 = st.file_uploader("📥 Upload SYSTEM + RECON (File Master Hasil Audit)", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
+    # 🟢 BUAT TRACKING SEBAGAI KUNCI DINAMIS BIAR GA KENA CACHE GHOSTING
+    if 'uploader_key_step5' not in st.session_state:
+        st.session_state.uploader_key_step5 = "u6_karantina_init"
+
+    # Gunakan key dinamis dari session state
+    up_k6 = st.file_uploader("📥 Upload SYSTEM + RECON (File Master Hasil Audit)", type=['xlsx', 'xls', 'csv'], key=st.session_state.uploader_key_step5)
 
     if up_k6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
-            # 🟢 1. BANTAI MEMORI LAMA: Kosongkan state biar gak nampilin data siluman kalau gagal
-            st.session_state.df_karantina_6 = None
-            st.session_state.df_check_6 = None
-            
             try:
                 up_k6.seek(0)
-                # Paksa baca text murni biar SKU gak rusak/berubah format
                 if up_k6.name.endswith(('.xlsx', '.xls')):
                     df_raw6 = pd.read_excel(up_k6, dtype=str)
                 else:
                     df_raw6 = pd.read_csv(up_k6, dtype=str)
                 
+                # --- JALANKAN LOGIKA LOKAL ---
                 def local_setup_karantina(df_master):
                     df_master.columns = df_master.columns.str.strip().str.upper()
-                    
                     audit_results = []
                     karantina_results = []
                     
@@ -1277,23 +1277,16 @@ def menu_cycle_count():
                         try:
                             bin_raw = row.get('BIN')
                             sku_raw = row.get('SKU')
+                            if pd.isna(bin_raw) and pd.isna(sku_raw): continue
                             
-                            # Kalau baris kosong, skip
-                            if pd.isna(bin_raw) and pd.isna(sku_raw): 
-                                continue
+                            bin_val = str(bin_raw).strip().upper()
+                            sku_val = str(sku_raw).strip().upper()
                             
-                            bin_val = str(bin_raw).strip().upper() if not pd.isna(bin_raw) else ""
-                            sku_val = str(sku_raw).strip().upper() if not pd.isna(sku_raw) else ""
-                            
-                            # Bersihkan sisa .0 tanpa merusak string utama
                             if bin_val.endswith('.0'): bin_val = bin_val[:-2]
                             if sku_val.endswith('.0'): sku_val = sku_val[:-2]
-                            
-                            # Case SPE hanya di awal kata
                             if sku_val.startswith("SPE"): sku_val = sku_val[3:].strip()
                             if bin_val.startswith("SPE"): bin_val = bin_val[3:].strip()
                             
-                            # Ambil QTY untuk hitungan matematika
                             q_system = row.get('QTY SYSTEM', '0')
                             q_recon = row.get('QTY SO', '0')
                             
@@ -1307,36 +1300,31 @@ def menu_cycle_count():
                             
                             if diff != 0:
                                 audit_results.append({
-                                    'BIN': bin_val, 
-                                    'SKU': sku_val,
-                                    'QTY_SYSTEM_J': q_sys_num, 
-                                    'QTY_RECON_N': q_rec_num, 
-                                    'SELISIH': diff
+                                    'BIN': bin_val, 'SKU': sku_val,
+                                    'QTY_SYSTEM_J': q_sys_num, 'QTY_RECON_N': q_rec_num, 'SELISIH': diff
                                 })
                                 karantina_results.append({
-                                    "BIN AWAL": bin_val, 
-                                    "BIN TUJUAN": "KARANTINA", 
-                                    "SKU": sku_val,
-                                    "QUANTITY": int(abs(diff)), 
-                                    "NOTES": "MISS LOCATION"
+                                    "BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val,
+                                    "QUANTITY": int(abs(diff)), "NOTES": "MISS LOCATION"
                                 })
-                        except: 
-                            continue
-                    
-                    df_k = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
-                    df_c = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
-                    return df_k, df_c
+                        except: continue
+                    return pd.DataFrame(karantina_results), pd.DataFrame(audit_results)
 
-                # 🟢 2. ISI DENGAN DATA BARU YANG REAL
                 df_final6, df_check6 = local_setup_karantina(df_raw6)
                 
+                # Masukkan ke state
                 st.session_state.df_karantina_6 = df_final6
                 st.session_state.df_check_6 = df_check6
+                
+                # 🟢 PAKSA WIDGET UNTUK MERESET DIRINYA SENDIRI DENGAN MENGGANTI KEY
+                import time
+                st.session_state.uploader_key_step5 = f"u6_karantina_{int(time.time())}"
+                
                 st.success("✅ Analisis Karantina Selesai!")
                 st.rerun()
                 
             except Exception as e:
-                st.error(f"❌ Error Pas Proses Data: {str(e)}")
+                st.error(f"❌ Error: {str(e)}")
 
     # Ganti pengecekan state agar tidak memicu AttributeError jika state belum terbentuk
     if st.session_state.get('df_karantina_6') is not None:
