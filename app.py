@@ -1251,62 +1251,83 @@ def menu_cycle_count():
     st.markdown("<br>---", unsafe_allow_html=True)
     st.subheader("5️⃣ RECON SYSTEM + PROCESS")
 
-    # Uploader disederhanakan jadi 1 file master saja, kolom adjusment dibuang
     up_k6 = st.file_uploader("📥 Upload SYSTEM + RECON (File Master Hasil Audit)", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
 
-    # --- DI BAGIAN STEP 5 (RECON SYSTEM + PROCESS) ---
     if up_k6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
+            # 🟢 1. BANTAI MEMORI LAMA: Kosongkan state biar gak nampilin data siluman kalau gagal
+            st.session_state.df_karantina_6 = None
+            st.session_state.df_check_6 = None
+            
             try:
                 up_k6.seek(0)
-                df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
+                # Paksa baca text murni biar SKU gak rusak/berubah format
+                if up_k6.name.endswith(('.xlsx', '.xls')):
+                    df_raw6 = pd.read_excel(up_k6, dtype=str)
+                else:
+                    df_raw6 = pd.read_csv(up_k6, dtype=str)
                 
-                # --- OVERRIDE FUNGSI LANGSUNG DI SINI AGAR ANTI ERROR ARGUMEN ---
-                # Kita paksa definisikan ulang fungsinya secara lokal tepat sebelum dipanggil
                 def local_setup_karantina(df_master):
                     df_master.columns = df_master.columns.str.strip().str.upper()
+                    
                     audit_results = []
                     karantina_results = []
                     
                     for _, row in df_master.iterrows():
                         try:
-                            # Ambil data pakai nama kolom (Bebas geser & akurat)
-                            bin_raw = row.get('BIN', '')
-                            sku_raw = row.get('SKU', '')
-                            if pd.isna(bin_raw) and pd.isna(sku_raw): continue
+                            bin_raw = row.get('BIN')
+                            sku_raw = row.get('SKU')
                             
-                            # Fungsi clean lokal yang aman
-                            bin_val = str(bin_raw).strip().upper().replace('.0', '')
-                            sku_val = str(sku_raw).strip().upper().replace('.0', '')
+                            # Kalau baris kosong, skip
+                            if pd.isna(bin_raw) and pd.isna(sku_raw): 
+                                continue
+                            
+                            bin_val = str(bin_raw).strip().upper() if not pd.isna(bin_raw) else ""
+                            sku_val = str(sku_raw).strip().upper() if not pd.isna(sku_raw) else ""
+                            
+                            # Bersihkan sisa .0 tanpa merusak string utama
+                            if bin_val.endswith('.0'): bin_val = bin_val[:-2]
+                            if sku_val.endswith('.0'): sku_val = sku_val[:-2]
+                            
+                            # Case SPE hanya di awal kata
                             if sku_val.startswith("SPE"): sku_val = sku_val[3:].strip()
                             if bin_val.startswith("SPE"): bin_val = bin_val[3:].strip()
                             
-                            # Ambil QTY berdasarkan Nama Kolom asli di Excel kamu (Gambar 2)
-                            q_system = pd.to_numeric(row.get('QTY SYSTEM', 0), errors='coerce')
-                            q_recon = pd.to_numeric(row.get('QTY SO', 0), errors='coerce') # Sesuaikan kalau mau pakai 'HASIL REKONSILIASI'
+                            # Ambil QTY untuk hitungan matematika
+                            q_system = row.get('QTY SYSTEM', '0')
+                            q_recon = row.get('QTY SO', '0')
                             
-                            q_system = q_system if not pd.isna(q_system) else 0
-                            q_recon = q_recon if not pd.isna(q_recon) else 0
+                            q_sys_num = pd.to_numeric(q_system, errors='coerce')
+                            q_rec_num = pd.to_numeric(q_recon, errors='coerce')
                             
-                            diff = q_system - q_recon
+                            q_sys_num = q_sys_num if not pd.isna(q_sys_num) else 0
+                            q_rec_num = q_rec_num if not pd.isna(q_rec_num) else 0
+                            
+                            diff = q_sys_num - q_rec_num
                             
                             if diff != 0:
                                 audit_results.append({
-                                    'BIN': bin_val, 'SKU': sku_val,
-                                    'QTY_SYSTEM_J': q_system, 'QTY_RECON_N': q_recon, 'SELISIH': diff
+                                    'BIN': bin_val, 
+                                    'SKU': sku_val,
+                                    'QTY_SYSTEM_J': q_sys_num, 
+                                    'QTY_RECON_N': q_rec_num, 
+                                    'SELISIH': diff
                                 })
-                                # Gunakan abs() supaya minus tetap dihitung kuantitasnya ke karantina
                                 karantina_results.append({
-                                    "BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val,
-                                    "QUANTITY": int(abs(diff)), "NOTES": "MISS LOCATION"
+                                    "BIN AWAL": bin_val, 
+                                    "BIN TUJUAN": "KARANTINA", 
+                                    "SKU": sku_val,
+                                    "QUANTITY": int(abs(diff)), 
+                                    "NOTES": "MISS LOCATION"
                                 })
-                        except: continue
+                        except: 
+                            continue
                     
                     df_k = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
                     df_c = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
                     return df_k, df_c
 
-                # --- PANGGIL FUNGSI LOKAL BARU ---
+                # 🟢 2. ISI DENGAN DATA BARU YANG REAL
                 df_final6, df_check6 = local_setup_karantina(df_raw6)
                 
                 st.session_state.df_karantina_6 = df_final6
@@ -1315,7 +1336,7 @@ def menu_cycle_count():
                 st.rerun()
                 
             except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(f"❌ Error Pas Proses Data: {str(e)}")
 
     # Ganti pengecekan state agar tidak memicu AttributeError jika state belum terbentuk
     if st.session_state.get('df_karantina_6') is not None:
