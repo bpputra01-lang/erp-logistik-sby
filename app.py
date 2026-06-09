@@ -1245,6 +1245,15 @@ def menu_cycle_count():
     # Tampilkan ulang jika session state ada (biar gak ilang pas scroll)
     elif st.session_state.get('df_adj_final_4') is not None:
         st.dataframe(st.session_state.df_adj_final_4, use_container_width=True, hide_index=True)
+    # =========================================================
+    # ⚙️ 5. SET UP KARANTINA GENERATOR (UI FIXED - SINGLE FILE)
+    # =========================================================
+    st.markdown("<br>---", unsafe_allow_html=True)
+    st.subheader("5️⃣ RECON SYSTEM + PROCESS")
+
+    # Uploader disederhanakan jadi 1 file master saja, kolom adjusment dibuang
+    up_k6 = st.file_uploader("📥 Upload SYSTEM + RECON (File Master Hasil Audit)", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
+
     # --- DI BAGIAN STEP 5 (RECON SYSTEM + PROCESS) ---
     if up_k6:
         if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
