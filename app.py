@@ -10688,7 +10688,8 @@ elif menu == "Refill Toko":
             
             # 2. FILTER KATEGORI DINAMIS (Multiselect)
             unique_cats = sorted(df_filtered['col_6'].dropna().unique().astype(str))
-            selected_cats = st.multiselect("🔍 Filter Sub Kategori:", options=unique_cats, default=unique_cats)
+           # BARU (Awalnya kosong)
+            selected_cats = st.multiselect("🔍 Filter Sub Kategori:", options=unique_cats, default=[])
             
             if st.button("▶️ GENERATE REFILL LIST", use_container_width=True):
                 # Filter berdasarkan pilihan user
