@@ -10644,8 +10644,21 @@ elif menu == "Refill Toko":
     # ⚙️ REFILL TOKO ANALYZER
     # =========================================================
     st.markdown('<div class="hero-header">REFILL TOKO LIST</div>', unsafe_allow_html=True)
-    
-    # CSS Custom untuk Metric Box (Biar selaras sama Surabaya Dashboard)
+
+    with st.expander("💡 Cara Kerja & Logika"):
+        st.info("""
+        **Logika Refill:**
+        1. **Filter Data:** Mengabaikan item kategori: Shoes, Sandals, Jersey, Pants, Jacket, Baselayer, Short, Shirt, Underlayer, Set Apparel, Ball, Bag, dan **Footwear**.
+        2. **Identifikasi Stok:**
+           - **Stok Toko:** Total qty di lokasi 'TOKO'.
+           - **Stok Gudang/Cadangan:** Total qty di semua lokasi selain 'TOKO' yang bukan merupakan bin Defect/Reject/Staging/dll.
+        3. **Aturan Refill:**
+           - Hanya muncul jika stok di gudang > 0.
+           - **Lower Body:** Refill jika stok toko < 6.
+           - **Kategori Lain:** Refill jika stok toko < 3.
+        """)
+
+    # CSS Custom untuk Metric Box
     st.markdown("""
         <style>
         .m-box {
@@ -10663,71 +10676,50 @@ elif menu == "Refill Toko":
 
     up_refill = st.file_uploader("📥 Upload STOCK SYSTEM (Multiple Adjustment)", type=['xlsx','csv'], key="u_refill")
 
-    # Tombol Aksi
     if up_refill:
         if st.button("▶️ GENERATE REFILL LIST", use_container_width=True):
             try:
-                # Baca Data
                 df_ref = pd.read_excel(up_refill) if up_refill.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_refill)
-                
-                # Standarisasi Nama Kolom (Berdasarkan index agar aman)
-                # B=1 (BIN), C=2 (SKU), D=3 (Brand), E=4 (Name), F=5 (Variant), G=6 (SubKat), J=9 (Qty)
-                original_cols = df_ref.columns.tolist()
                 df_ref.columns = [f"col_{i}" for i in range(len(df_ref.columns))]
                 
-                # 1. FILTER SUB KATEGORI (Kecualikan Shoes, Sandals, dll)
-                exclude_kat = ["SHOES", "SANDALS", "JERSEY", "PANTS", "JACKET", "BASELAYER", "SHORT", "SHIRT", "UNDERLAYER", "SET APPAREL", "BALL", "BAG"]
+                # 1. FILTER SUB KATEGORI
+                exclude_kat = ["SHOES", "SANDALS", "JERSEY", "PANTS", "JACKET", "BASELAYER", "SHORT", "SHIRT", "UNDERLAYER", "SET APPAREL", "BALL", "BAG", "FOOTWEAR"]
                 df_ref = df_ref[~df_ref['col_6'].astype(str).str.upper().isin(exclude_kat)]
 
                 # 2. IDENTIFIKASI BIN
-                # Buat list BIN yang dikecualikan (Defect, Reject, dll)
                 exclude_bin_pattern = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE|KARANTINA"
-                
-                # Masking untuk BIN TOKO dan BIN GUDANG (Selain Toko & Selain Exclude)
                 is_toko = df_ref['col_1'].astype(str).str.upper() == "TOKO"
+                
+                # Logika Baru: Semua yang bukan TOKO dan bukan kategori exclude, selama stok > 0
                 is_gudang = (~is_toko) & (~df_ref['col_1'].astype(str).str.upper().str.contains(exclude_bin_pattern, na=False))
 
-                # 3. PENGELOMPOKAN DATA PER SKU
-                # Ambil QTY di TOKO
+                # 3. PENGELOMPOKAN
                 df_toko = df_ref[is_toko].groupby('col_2')['col_9'].sum().reset_index()
                 df_toko.columns = ['col_2', 'qty_toko']
 
-                # Ambil QTY di GUDANG (Selain Toko & Exclude) & List BIN-mana saja yang > 0
                 df_gudang = df_ref[is_gudang].groupby('col_2').agg({
                     'col_9': 'sum',
                     'col_1': lambda x: ", ".join(set(x[df_ref.loc[x.index, 'col_9'] > 0].astype(str)))
                 }).reset_index()
                 df_gudang.columns = ['col_2', 'qty_gudang', 'available_in_bins']
 
-                # Gabungkan dengan Master Data (Info SKU, Brand, dll)
                 df_master = df_ref[['col_2', 'col_3', 'col_4', 'col_5', 'col_6']].drop_duplicates('col_2')
-                
-                # Merge Semua
                 df_final = df_master.merge(df_toko, on='col_2', how='left').merge(df_gudang, on='col_2', how='left')
                 df_final[['qty_toko', 'qty_gudang']] = df_final[['qty_toko', 'qty_gudang']].fillna(0)
 
-                # 4. TERAPKAN LOGIC REFILL
+                # 4. LOGIC REFILL
                 def check_refill(row):
-                    # Hanya refill jika di gudang ada stok
-                    if row['qty_gudang'] <= 0:
-                        return False
-                    
+                    if row['qty_gudang'] <= 0: return False
                     sub_kat = str(row['col_6']).upper()
-                    # Logic Lower Body (Threshold < 6)
-                    if "LOWER BODY" in sub_kat:
-                        return row['qty_toko'] < 6
-                    # Logic Selain Lower Body (Threshold < 3)
-                    else:
-                        return row['qty_toko'] < 3
+                    if "LOWER BODY" in sub_kat: return row['qty_toko'] < 6
+                    else: return row['qty_toko'] < 3
 
                 df_final['is_refill'] = df_final.apply(check_refill, axis=1)
                 df_res_refill = df_final[df_final['is_refill'] == True].copy()
 
-                # Cleanup Kolom untuk Tampilan sesuai Request
                 df_res_refill = df_res_refill[['col_2', 'col_3', 'col_4', 'col_5', 'col_6', 'qty_toko', 'qty_gudang', 'available_in_bins']]
                 df_res_refill.columns = ['SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY TOKO', 'QTY GUDANG', 'LOKASI BIN']
 
-                # Simpan ke Session State
                 st.session_state.df_refill_toko = df_res_refill
                 st.success("✅ List Refill Berhasil Dibuat!")
                 st.rerun()
@@ -10735,11 +10727,8 @@ elif menu == "Refill Toko":
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
-    # --- DISPLAY HASIL ---
     if st.session_state.get('df_refill_toko') is not None:
         df_view = st.session_state.df_refill_toko
-        
-        # Row Metric Box
         r_c1, r_c2 = st.columns(2)
         with r_c1:
             st.markdown(f"""<div class="m-box"><span class="m-lbl">📦 SKU PERLU REFILL</span><span class="m-val">{len(df_view)}</span></div>""", unsafe_allow_html=True)
@@ -10747,10 +10736,8 @@ elif menu == "Refill Toko":
             priority_sku = len(df_view[df_view["QTY TOKO"] == 0])
             st.markdown(f"""<div class="m-box" style="border-left-color: #FACA2B !important;"><span class="m-lbl">📈 PRIORITY (QTY TOKO 0)</span><span class="m-val" style="color:#FACA2B;">{priority_sku}</span></div>""", unsafe_allow_html=True)
 
-        # Tabel Utama
         st.dataframe(df_view, use_container_width=True, hide_index=True)
         
-        # Download & Clear
         d_col1, d_col2 = st.columns([4, 1])
         with d_col1:
             csv_ref = df_view.to_csv(index=False).encode('utf-8')
