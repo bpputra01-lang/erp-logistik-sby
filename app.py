@@ -10712,7 +10712,7 @@ elif menu == "Refill Toko":
                     if row['qty_gudang'] <= 0: return False
                     sub_kat = str(row['col_6']).upper()
                     if "LOWER BODY" in sub_kat: return row['qty_toko'] < 6
-                    else: return row['qty_toko'] < 3
+                    else: return row['qty_toko'] < 2
 
                 df_final['is_refill'] = df_final.apply(check_refill, axis=1)
                 df_res_refill = df_final[df_final['is_refill'] == True].copy()
