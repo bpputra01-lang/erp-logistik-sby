@@ -10683,7 +10683,7 @@ elif menu == "Refill Toko":
                 df_ref.columns = [f"col_{i}" for i in range(len(df_ref.columns))]
                 
                 # 1. FILTER SUB KATEGORI
-                exclude_kat = ["SHOES", "SANDALS", "JERSEY", "PANTS", "JACKET", "BASELAYER", "SHORT", "SHIRT", "UNDERLAYER", "SET APPAREL", "BALL", "BAG", "FOOTWEAR"]
+                exclude_kat = ["SHOES", "SANDALS", "FOOTWEAR"]
                 df_ref = df_ref[~df_ref['col_6'].astype(str).str.upper().isin(exclude_kat)]
 
                 # 2. IDENTIFIKASI BIN
