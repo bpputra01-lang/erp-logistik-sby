@@ -678,40 +678,37 @@ def logic_setup_karantina_with_compare(df_master):
         df_karantina = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
         return df_karantina, df_check
 
-    # 1. Bersihkan nama kolom: Hapus spasi di ujung dan paksa HURUF KAPITAL
+    # Bersihkan nama kolom dari spasi dan paksa huruf besar
     df_master.columns = df_master.columns.str.strip().str.upper()
     
     audit_results = []
     karantina_results = []
 
-    # 2. Iterasi per baris menggunakan nama kolom langsung (Lebih Akurat daripada iloc)
     for _, row in df_master.iterrows():
         try:
-            # Menggunakan .get() agar aman jika kolom mendadak tidak ditemukan
+            # Ambil data menggunakan nama kolom langsung (Anti-geser / Anti-salah index)
             bin_raw = row.get('BIN', '')
             sku_raw = row.get('SKU', '')
             
-            # Jika kolom BIN atau SKU kosong di baris ini, skip ke baris berikutnya
             if pd.isna(bin_raw) and pd.isna(sku_raw):
                 continue
                 
             bin_val = clean_val(bin_raw)
             sku_val = clean_val(sku_raw)
             
-            # Ambil QTY langsung berdasarkan NAMA KOLOM di Excel kamu
+            # Ambil QTY berdasarkan Nama Kolom di Excel kamu
             q_system = pd.to_numeric(row.get('QTY SYSTEM', 0), errors='coerce')
             
-            # Sesuaikan target pembanding: pakai 'QTY SO' atau 'DIFF' atau 'HASIL REKONSILIASI'
-            # Di sini kita pakai 'QTY SO' sesuai gambar Excel kamu
+            # Jika di file kamu pembandingnya adalah kolom QTY SO, gunakan 'QTY SO'
+            # Jika pembandingnya adalah kolom HASIL REKONSILIASI, ganti string di bawah jadi 'HASIL REKONSILIASI'
             q_recon = pd.to_numeric(row.get('QTY SO', 0), errors='coerce') 
             
             q_system = q_system if not pd.isna(q_system) else 0
             q_recon = q_recon if not pd.isna(q_recon) else 0
             
-            # Hitung selisih horizontal
+            # Selisih horizontal
             diff = q_system - q_recon
 
-            # Ambil semua data yang ada selisihnya
             if diff != 0:
                 audit_results.append({
                     'BIN': bin_val,
@@ -721,7 +718,7 @@ def logic_setup_karantina_with_compare(df_master):
                     'SELISIH': diff
                 })
                 
-                # Masukkan ke list karantina (Gunakan abs agar nilai minus tetap terhitung jumlah kuantitasnya)
+                # Gunakan abs(diff) agar nilai minus/plus tetap terhitung jumlah kuantitasnya di Karantina
                 karantina_results.append({
                     "BIN AWAL": bin_val,
                     "BIN TUJUAN": "KARANTINA",
@@ -732,7 +729,6 @@ def logic_setup_karantina_with_compare(df_master):
         except Exception as e:
             continue
 
-    # 3. Output DataFrames
     df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
     df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
 
@@ -1264,8 +1260,7 @@ def menu_cycle_count():
                 up_k6.seek(0)
                 df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
                 
-                # Parameter kedua langsung diisi None karena data sudah lengkap di file pertama
-                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, None)
+                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6)
                 
                 st.session_state.df_karantina_6 = df_final6
                 st.session_state.df_check_6 = df_check6
