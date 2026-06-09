@@ -10678,29 +10678,26 @@ elif menu == "Refill Toko":
 
     if up_refill:
         try:
-            # Baca Data
+            # 1. Baca Data & Filter Awal
             df_raw = pd.read_excel(up_refill) if up_refill.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_refill)
             df_raw.columns = [f"col_{i}" for i in range(len(df_raw.columns))]
             
-            # 1. FILTER AWAL (Exclude Shoes, Sandals, Footwear)
             exclude_kat = ["SHOES", "SANDALS", "FOOTWEAR"]
             df_filtered = df_raw[~df_raw['col_6'].astype(str).str.upper().isin(exclude_kat)].copy()
             
-            # 2. FILTER KATEGORI DINAMIS (Multiselect)
+            # 2. Filter Kategori (Multiselect)
             unique_cats = sorted(df_filtered['col_6'].dropna().unique().astype(str))
-           # BARU (Awalnya kosong)
             selected_cats = st.multiselect("🔍 Filter Sub Kategori:", options=unique_cats, default=[])
             
-            if st.button("▶️ GENERATE REFILL LIST", use_container_width=True):
-                # Filter berdasarkan pilihan user
+            # Jika user sudah memilih kategori, langsung jalankan proses logic
+            if selected_cats:
                 df_ref = df_filtered[df_filtered['col_6'].isin(selected_cats)].copy()
 
-                # 3. IDENTIFIKASI BIN
+                # 3. IDENTIFIKASI BIN & GROUPING
                 exclude_bin_pattern = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE|KARANTINA"
                 is_toko = df_ref['col_1'].astype(str).str.upper() == "TOKO"
                 is_gudang = (~is_toko) & (~df_ref['col_1'].astype(str).str.upper().str.contains(exclude_bin_pattern, na=False))
 
-                # 4. PENGELOMPOKAN
                 df_toko = df_ref[is_toko].groupby('col_2')['col_9'].sum().reset_index()
                 df_toko.columns = ['col_2', 'qty_toko']
 
@@ -10714,7 +10711,7 @@ elif menu == "Refill Toko":
                 df_final = df_master.merge(df_toko, on='col_2', how='left').merge(df_gudang, on='col_2', how='left')
                 df_final[['qty_toko', 'qty_gudang']] = df_final[['qty_toko', 'qty_gudang']].fillna(0)
 
-                # 5. LOGIC REFILL
+                # 4. LOGIC REFILL
                 def check_refill(row):
                     if row['qty_gudang'] <= 0: return False
                     sub_kat = str(row['col_6']).upper()
@@ -10722,34 +10719,23 @@ elif menu == "Refill Toko":
                     else: return row['qty_toko'] < 2
 
                 df_final['is_refill'] = df_final.apply(check_refill, axis=1)
-                df_res_refill = df_final[df_final['is_refill'] == True].copy()
+                df_view = df_final[df_final['is_refill'] == True].copy()
 
-                df_res_refill = df_res_refill[['col_2', 'col_3', 'col_4', 'col_5', 'col_6', 'qty_toko', 'qty_gudang', 'available_in_bins']]
-                df_res_refill.columns = ['SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY TOKO', 'QTY GUDANG', 'LOKASI BIN']
+                df_view = df_view[['col_2', 'col_3', 'col_4', 'col_5', 'col_6', 'qty_toko', 'qty_gudang', 'available_in_bins']]
+                df_view.columns = ['SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY TOKO', 'QTY GUDANG', 'LOKASI BIN']
 
-                st.session_state.df_refill_toko = df_res_refill
-                st.rerun()
+                # 5. DISPLAY HASIL (Otomatis muncul tanpa tombol)
+                r_c1, r_c2 = st.columns(2)
+                with r_c1:
+                    st.markdown(f"""<div class="m-box"><span class="m-lbl">📦 SKU PERLU REFILL</span><span class="m-val">{len(df_view)}</span></div>""", unsafe_allow_html=True)
+                with r_c2:
+                    priority_sku = len(df_view[df_view["QTY TOKO"] == 0])
+                    st.markdown(f"""<div class="m-box" style="border-left-color: #FACA2B !important;"><span class="m-lbl">📈 PRIORITY (QTY TOKO 0)</span><span class="m-val" style="color:#FACA2B;">{priority_sku}</span></div>""", unsafe_allow_html=True)
+
+                st.dataframe(df_view, use_container_width=True, hide_index=True)
+                
+                csv_ref = df_view.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 DOWNLOAD LIST REFILL (CSV)", data=csv_ref, file_name="refill_toko_sby.csv", mime='text/csv', use_container_width=True)
 
         except Exception as e:
             st.error(f"❌ Error: {e}")
-
-    # --- DISPLAY HASIL ---
-    if st.session_state.get('df_refill_toko') is not None:
-        df_view = st.session_state.df_refill_toko
-        r_c1, r_c2 = st.columns(2)
-        with r_c1:
-            st.markdown(f"""<div class="m-box"><span class="m-lbl">📦 SKU PERLU REFILL</span><span class="m-val">{len(df_view)}</span></div>""", unsafe_allow_html=True)
-        with r_c2:
-            priority_sku = len(df_view[df_view["QTY TOKO"] == 0])
-            st.markdown(f"""<div class="m-box" style="border-left-color: #FACA2B !important;"><span class="m-lbl">📈 PRIORITY (QTY TOKO 0)</span><span class="m-val" style="color:#FACA2B;">{priority_sku}</span></div>""", unsafe_allow_html=True)
-
-        st.dataframe(df_view, use_container_width=True, hide_index=True)
-        
-        d_col1, d_col2 = st.columns([4, 1])
-        with d_col1:
-            csv_ref = df_view.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 DOWNLOAD LIST REFILL (CSV)", data=csv_ref, file_name="refill_toko_sby.csv", mime='text/csv', use_container_width=True)
-        with d_col2:
-            if st.button("🗑️ RESET", use_container_width=True):
-                st.session_state.df_refill_toko = None
-                st.rerun()
