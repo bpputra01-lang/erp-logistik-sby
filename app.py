@@ -10689,42 +10689,47 @@ elif menu == "Refill Toko":
             unique_cats = sorted(df_filtered['col_6'].dropna().unique().astype(str))
             selected_cats = st.multiselect("🔍 Filter Sub Kategori:", options=unique_cats, default=[])
             
-            # Jika user sudah memilih kategori, langsung jalankan proses logic
-            if selected_cats:
-                df_ref = df_filtered[df_filtered['col_6'].isin(selected_cats)].copy()
+            # --- PERBAIKAN LOGIKA DI SINI ---
+            # Jika user tidak memilih apapun, gunakan semua kategori yang ada
+            filter_to_use = selected_cats if selected_cats else unique_cats
+            
+            # Proses filtering berdasarkan filter_to_use
+            df_ref = df_filtered[df_filtered['col_6'].isin(filter_to_use)].copy()
 
-                # 3. IDENTIFIKASI BIN & GROUPING
-                exclude_bin_pattern = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE|KARANTINA"
-                is_toko = df_ref['col_1'].astype(str).str.upper() == "TOKO"
-                is_gudang = (~is_toko) & (~df_ref['col_1'].astype(str).str.upper().str.contains(exclude_bin_pattern, na=False))
+            # 3. IDENTIFIKASI BIN & GROUPING
+            exclude_bin_pattern = "DEFECT|REJECT|STAGING|STAGGING|BALANCING|PUTAWAY|EVENT|OFFLINE|KARANTINA"
+            is_toko = df_ref['col_1'].astype(str).str.upper() == "TOKO"
+            is_gudang = (~is_toko) & (~df_ref['col_1'].astype(str).str.upper().str.contains(exclude_bin_pattern, na=False))
 
-                df_toko = df_ref[is_toko].groupby('col_2')['col_9'].sum().reset_index()
-                df_toko.columns = ['col_2', 'qty_toko']
+            df_toko = df_ref[is_toko].groupby('col_2')['col_9'].sum().reset_index()
+            df_toko.columns = ['col_2', 'qty_toko']
 
-                df_gudang = df_ref[is_gudang].groupby('col_2').agg({
-                    'col_9': 'sum',
-                    'col_1': lambda x: ", ".join(set(x[df_ref.loc[x.index, 'col_9'] > 0].astype(str)))
-                }).reset_index()
-                df_gudang.columns = ['col_2', 'qty_gudang', 'available_in_bins']
+            df_gudang = df_ref[is_gudang].groupby('col_2').agg({
+                'col_9': 'sum',
+                'col_1': lambda x: ", ".join(set(x[df_ref.loc[x.index, 'col_9'] > 0].astype(str)))
+            }).reset_index()
+            df_gudang.columns = ['col_2', 'qty_gudang', 'available_in_bins']
 
-                df_master = df_ref[['col_2', 'col_3', 'col_4', 'col_5', 'col_6']].drop_duplicates('col_2')
-                df_final = df_master.merge(df_toko, on='col_2', how='left').merge(df_gudang, on='col_2', how='left')
-                df_final[['qty_toko', 'qty_gudang']] = df_final[['qty_toko', 'qty_gudang']].fillna(0)
+            df_master = df_ref[['col_2', 'col_3', 'col_4', 'col_5', 'col_6']].drop_duplicates('col_2')
+            df_final = df_master.merge(df_toko, on='col_2', how='left').merge(df_gudang, on='col_2', how='left')
+            df_final[['qty_toko', 'qty_gudang']] = df_final[['qty_toko', 'qty_gudang']].fillna(0)
 
-                # 4. LOGIC REFILL
-                def check_refill(row):
-                    if row['qty_gudang'] <= 0: return False
-                    sub_kat = str(row['col_6']).upper()
-                    if "LOWER BODY" in sub_kat: return row['qty_toko'] < 6
-                    else: return row['qty_toko'] < 2
+            # 4. LOGIC REFILL
+            def check_refill(row):
+                if row['qty_gudang'] <= 0: return False
+                sub_kat = str(row['col_6']).upper()
+                if "LOWER BODY" in sub_kat: return row['qty_toko'] < 6
+                else: return row['qty_toko'] < 2
 
-                df_final['is_refill'] = df_final.apply(check_refill, axis=1)
-                df_view = df_final[df_final['is_refill'] == True].copy()
+            df_final['is_refill'] = df_final.apply(check_refill, axis=1)
+            df_view = df_final[df_final['is_refill'] == True].copy()
 
+            # Hanya tampilkan jika ada data
+            if not df_view.empty:
                 df_view = df_view[['col_2', 'col_3', 'col_4', 'col_5', 'col_6', 'qty_toko', 'qty_gudang', 'available_in_bins']]
                 df_view.columns = ['SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI', 'QTY TOKO', 'QTY GUDANG', 'LOKASI BIN']
 
-                # 5. DISPLAY HASIL (Otomatis muncul tanpa tombol)
+                # 5. DISPLAY HASIL
                 r_c1, r_c2 = st.columns(2)
                 with r_c1:
                     st.markdown(f"""<div class="m-box"><span class="m-lbl">📦 SKU PERLU REFILL</span><span class="m-val">{len(df_view)}</span></div>""", unsafe_allow_html=True)
@@ -10736,6 +10741,8 @@ elif menu == "Refill Toko":
                 
                 csv_ref = df_view.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 DOWNLOAD LIST REFILL (CSV)", data=csv_ref, file_name="refill_toko_sby.csv", mime='text/csv', use_container_width=True)
+            else:
+                st.warning("Tidak ada SKU yang perlu direfill dengan filter saat ini.")
 
         except Exception as e:
             st.error(f"❌ Error: {e}")
