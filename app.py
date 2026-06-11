@@ -701,7 +701,7 @@ def logic_setup_karantina_with_compare(df_master):
             
             # Jika di file kamu pembandingnya adalah kolom QTY SO, gunakan 'QTY SO'
             # Jika pembandingnya adalah kolom HASIL REKONSILIASI, ganti string di bawah jadi 'HASIL REKONSILIASI'
-            q_recon = pd.to_numeric(row.get('QTY SO', 0), errors='coerce') 
+            q_recon = pd.to_numeric(row.get('HASIL REKONSILIASI', 0), errors='coerce')
             
             q_system = q_system if not pd.isna(q_system) else 0
             q_recon = q_recon if not pd.isna(q_recon) else 0
@@ -1288,7 +1288,7 @@ def menu_cycle_count():
                             if bin_val.startswith("SPE"): bin_val = bin_val[3:].strip()
                             
                             q_system = row.get('QTY SYSTEM', '0')
-                            q_recon = row.get('QTY SO', '0')
+                            q_recon = row.get('HASIL REKONSILIASI', '0')
                             
                             q_sys_num = pd.to_numeric(q_system, errors='coerce')
                             q_rec_num = pd.to_numeric(q_recon, errors='coerce')
