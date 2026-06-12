@@ -5353,6 +5353,8 @@ def process_justification(df_case, df_tracking, df_all_stock):
                 return "KESALAHAN RTO"
 
             return "UNDEFINED"
+        except:
+            return "ERROR DATA"
 
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
 
