@@ -5439,102 +5439,77 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             actual_diff = row['DIFF']
             needed_qty = abs(actual_diff)
             
-            # Variabel penampung hasil jika tidak ada yang langsung MATCH
-            final_status = "Belum Dicek"
-            final_doc = "-"
-            final_bin = "-"
-            final_qty = 0
+            docs_found = []
+            bins_found = []
+            accumulated_qty = 0
             
             # =========================================================================
-            # CASE 1: STOK BERTAMBAH (DIFF < 0) -> CEK MANDIRI PO ATAU RTO IN
+            # CASE 1: STOK BERTAMBAH (DIFF < 0) -> GABUNGAN PO + RTO IN
             # =========================================================================
             if actual_diff < 0:
-                # 1. Cek Purchase Order dulu
+                # Ambil data PO
                 if df_po_clean is not None:
                     match_po = df_po_clean[df_po_clean['SKU'] == target_sku]
                     if not match_po.empty:
-                        qty_po = match_po['QTY'].sum()
                         po_str = "/".join(map(str, match_po['NO_PO'].unique()))
-                        
-                        final_status = "DONE MASUK (MATCH PO)" if qty_po >= needed_qty else f"MASUK MISSMATCH (QTY PO KURANG)"
-                        final_doc = f"PO:{po_str}"
-                        final_bin = "-"
-                        final_qty = qty_po
-                        
-                        # Jika dari PO udah clear memenuhi/melebihi DIFF, langsung break/lanjut SKU lain
-                        if qty_po >= needed_qty:
-                            status_list.append(final_status)
-                            doc_reference_list.append(final_doc)
-                            track_bin_list.append(final_bin)
-                            total_found_qty_list.append(final_qty)
-                            continue
+                        docs_found.append(f"PO:{po_str}")
+                        accumulated_qty += match_po['QTY'].sum()
                 
-                # 2. Cek RTO IN (Jika PO tidak ada atau Qty PO tidak memenuhi)
+                # Ambil data RTO IN
                 if df_rto_in_clean is not None:
                     match_rto_in = df_rto_in_clean[df_rto_in_clean['SKU'] == target_sku]
                     if not match_rto_in.empty:
-                        qty_rto_in = match_rto_in['QTY'].sum()
                         tf_str = "/".join(map(str, match_rto_in['NO_TF'].unique()))
-                        
-                        # Jika RTO IN ternyata mencukupi (atau lebih baik dari status PO sebelumnya)
-                        if qty_rto_in >= needed_qty or final_qty == 0:
-                            final_status = "DONE MASUK (MATCH RTO IN)" if qty_rto_in >= needed_qty else f"MASUK MISSMATCH (QTY RTO IN KURANG)"
-                            final_doc = f"RTO_IN:{tf_str}"
-                            final_bin = "-"
-                            final_qty = qty_rto_in
-
-                # Jika di kedua dokumen bener-bener kosong melompong
-                if final_qty == 0:
+                        docs_found.append(f"RTO_IN:{tf_str}")
+                        accumulated_qty += match_rto_in['QTY'].sum()
+                
+                # LOGIKA UTAMA: Cukup lihat total Qty pencarian vs Selisih (needed_qty)
+                if accumulated_qty == 0:
                     final_status = "TAMBAHAN STOK TANPA DOKUMEN"
+                elif accumulated_qty >= needed_qty:
+                    final_status = "DONE MASUK"  # Pokoknya total qty mencukupi / lebih -> DONE!
+                else:
+                    final_status = f"MASUK MISSMATCH (KURANG -{int(needed_qty - accumulated_qty)})"
+
+                track_bin_list.append("-")
 
             # =========================================================================
-            # CASE 2: STOK BERKURANG (DIFF > 0) -> CEK MANDIRI SALES TRACKING ATAU RTO OUT
+            # CASE 2: STOK BERKURANG (DIFF > 0) -> GABUNGAN SALES + RTO OUT
             # =========================================================================
             else:
-                # 1. Cek Stock Tracking (Sales) dulu
+                # Ambil data Stock Tracking (Sales)
                 if df_track_clean is not None:
                     match_track = df_track_clean[df_track_clean['SKU'] == target_sku]
                     if not match_track.empty:
-                        qty_track = match_track['QTY'].sum()
                         inv_str = "/".join(map(str, match_track['INVOICE'].unique()))
                         bin_str = "/".join(map(str, match_track['BIN'].unique()))
-                        
-                        final_status = "DONE TERJUAL (MATCH)" if qty_track >= needed_qty else f"KELUAR MISSMATCH (QTY SALES KURANG)"
-                        final_doc = f"TRACK:{inv_str}"
-                        final_bin = bin_str if bin_str else "-"
-                        final_qty = qty_track
-                        
-                        # Jika dari sales tracking udah memenuhi/melebihi DIFF, langsung break ke SKU berikutnya
-                        if qty_track >= needed_qty:
-                            status_list.append(final_status)
-                            doc_reference_list.append(final_doc)
-                            track_bin_list.append(final_bin)
-                            total_found_qty_list.append(final_qty)
-                            continue
+                        docs_found.append(f"TRACK:{inv_str}")
+                        if bin_str: bins_found.append(bin_str)
+                        accumulated_qty += match_track['QTY'].sum()
                 
-                # 2. Cek RTO OUT (Jika Sales tidak ada atau Qty Sales tidak memenuhi)
+                # Ambil data RTO OUT
                 if df_rto_out_clean is not None:
                     match_rto_out = df_rto_out_clean[df_rto_out_clean['SKU'] == target_sku]
                     if not match_rto_out.empty:
-                        qty_rto_out = match_rto_out['QTY'].sum()
                         tf_out = "/".join(map(str, match_rto_out['NO_TF'].unique()))
-                        
-                        # Jika RTO OUT ternyata mencukupi (atau data sales sebelumnya zonk)
-                        if qty_rto_out >= needed_qty or final_qty == 0:
-                            final_status = "DONE KELUAR (MATCH RTO OUT)" if qty_rto_out >= needed_qty else f"KELUAR MISSMATCH (QTY RTO OUT KURANG)"
-                            final_doc = f"RTO_OUT:{tf_out}"
-                            final_bin = "RTO_OUT(NO BIN)"
-                            final_qty = qty_rto_out
-
-                # Jika di kedua dokumen bener-bener tidak ketemu
-                if final_qty == 0:
+                        docs_found.append(f"RTO_OUT:{tf_out}")
+                        bins_found.append("RTO_OUT(NO BIN)")
+                        accumulated_qty += match_rto_out['QTY'].sum()
+                
+                # LOGIKA UTAMA: Cukup lihat total Qty pencarian vs Selisih (needed_qty)
+                if accumulated_qty == 0:
                     final_status = "NO SALES (PERLU CEK ADJ)"
-            
-            # Masukkan hasil pengecekan final ke list utama
+                elif accumulated_qty >= needed_qty:
+                    final_status = "DONE TERJUAL"  # Kasus gambar lu: Qty 2 >= DIFF? Nanti gw jelasin di bawah.
+                else:
+                    final_status = f"KELUAR MISSMATCH (KURANG DOKUMEN -{int(needed_qty - accumulated_qty)})"
+                    
+                track_bin_list.append(", ".join(bins_found) if bins_found else "-")
+
+            # Masukkan ke list utama hasil loop
             status_list.append(final_status)
-            doc_reference_list.append(final_doc)
-            track_bin_list.append(final_bin)
-            total_found_qty_list.append(final_qty)
+            doc_reference_list.append(", ".join(docs_found) if docs_found else "-")
+            total_found_qty_list.append(accumulated_qty)
                         
         discrepancies['TRACK_INVOICE'] = doc_reference_list
         discrepancies['TRACK_BIN'] = track_bin_list
