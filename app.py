@@ -8802,12 +8802,12 @@ elif menu == "Compare System":
     with st.expander("📋 Informasi Format File & Kolom Mapping"):
         st.info("""
         **Kondisi Stok Berkurang (Sys1 > Sys2):**
-        1. **Stock Tracking**: Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty.
-        2. **RTO Out**: Kolom D=No TF, Kolom I=SKU, Kolom J=Qty.
+        1. **Stock Tracking**: Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty (Index 10).
+        2. **RTO Out**: Kolom D=No TF, Kolom I=SKU, Kolom J=Qty (Index 9).
         
         **Kondisi Stok Bertambah (Sys2 > Sys1):**
-        1. **Purchase Order**: Kolom A=No PO, Kolom D=SKU, Kolom L=Qty.
-        2. **RTO In**: Kolom D=No TF, Kolom I=SKU, Kolom J=Qty.
+        1. **Purchase Order**: Kolom A=No PO, Kolom D=SKU, Kolom L=Qty (Index 11).
+        2. **RTO In**: Kolom D=No TF, Kolom I=SKU, Kolom K=Qty (Index 10).
         """)
 
     if 'result_all' not in st.session_state:
@@ -8842,12 +8842,13 @@ elif menu == "Compare System":
     if file_sys1 and file_sys2:
         if st.button("▶️RUN COMPARE"):
             try:
-                # Menjalankan fungsi dengan parameter yang telah dipangkas (tanpa file_cross_order)
+                # Memanggil fungsi baru dengan parameter yang sudah bersih tanpa Cross Order
                 res_all, d_only = process_stock_comparison(
                     file_sys1, file_sys2, file_tracking, file_po, file_rto_in, file_rto_out
                 )
                 st.session_state.result_all = res_all
                 st.session_state.diff_only = d_only
+                st.success("⚡ Comparison Selesai!")
             except Exception as e:
                 st.error(f"Terjadi Kesalahan: {e}")
 
@@ -8857,14 +8858,14 @@ elif menu == "Compare System":
 
         st.divider()
 
-        # --- HITUNG METRIK DATA ---
+        # --- HITUNG METRIK DATA UNTUK PREMIUM CARDS ---
         total_checked = len(result_all)
         total_diff = len(diff_only)
         
         if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
             match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("DONE", na=False)])
-            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("TIDAK MATCH", na=False)])
-            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO SALES|TIDAK DIKETAHUI", na=False)])
+            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("MISSMATCH", na=False)])
+            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("TANPA DOKUMEN|NO SALES", na=False)])
         else:
             match_count, unmatch_count, no_sales_count = 0, 0, 0
             
@@ -8876,14 +8877,14 @@ elif menu == "Compare System":
         st.write("") 
         
         m3, m4, m5 = st.columns(3)
-        m3.markdown(f'<div class="m-box" style="border-left: 5px solid #28a745;"><span class="m-lbl">✅ SELISIH MATCH (DONE)</span><span class="m-val" style="color: #28a745;">{match_count} SKU</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box" style="border-left: 5px solid #dc3545;"><span class="m-lbl">⚠️ QTY DOKUMEN MISSMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
-        m5.markdown(f'<div class="m-box" style="border-left: 5px solid #ffc107;"><span class="m-lbl">🔍 SELISIH TANPA DOKUMEN</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box" style="border-left: 4px solid #C5A059;"><span class="m-lbl">✅ SELISIH MATCH (DONE)</span><span class="m-val" style="color: #C5A059;">{match_count} SKU</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box" style="border-left: 4px solid #dc3545;"><span class="m-lbl">⚠️ QTY DOKUMEN MISSMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
+        m5.markdown(f'<div class="m-box" style="border-left: 4px solid #ffc107;"><span class="m-lbl">🔍 SELISIH TANPA DOKUMEN</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
 
         st.write("")
 
         if not diff_only.empty:
-            st.warning("Daftar Perbedaan Stok Beserta Hasil Cross-Check Multi-Dokumen:")
+            st.warning("Daftar Perbedaan Stok Berdasarkan Validasi Mutlak Qty Dokumen:")
             
             ordered_cols = [
                 'BIN', 'SKU', 'QTY_Sys1', 'QTY_Sys2', 'DIFF', 
