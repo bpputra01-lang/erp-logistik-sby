@@ -5257,7 +5257,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
     res = res.merge(all_stock_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_ALL', how='left').fillna(0)
 
-    # 5. Pemetaan ke Nama Kolom Final
+   # 5. Pemetaan ke Nama Kolom Final
     res['BEGINNING STOCK']    = res['BEGINNING STOCK']
     res['ENDING STOCK']       = res['_N_ENDING_STOCK']
     res['CURRENT STOCK']      = res['_O_CURR_STOCK']
@@ -5273,6 +5273,12 @@ def process_justification(df_case, df_tracking, df_all_stock):
     
     res['QTY SYSTEM ALL']     = res['_QTY_SYS_ALL']
     res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
+
+    # --- TAMBAHKAN BARIS INI UNTUK KOLOM BARU LU ---
+    res['REAL QTY'] = (
+        res['BEGINNING STOCK'] + res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN'] 
+        - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
+    )
 
     # 6. Update Logika Justifikasi Sesuai Aturan Baru
     def run_formula(row):
@@ -5364,7 +5370,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
         'HARGA BELI', 'HARGA JUAL', 'QTY SYSTEM', 'QTY SO', 
         'BEGINNING STOCK', 'TOTAL_STOCKIN', 'TOTAL_ADJ_PLUS', 'TOTAL TRF_IN', 
         'TOTAL DRAFT_TRF_IN', 'TOTAL SALES', 'TOTAL_ADJ_MINUS', 'TOTAL DRAFT_TRF_OUT', 
-        'TOTAL TRF_OUT', 'ENDING STOCK', 'CURRENT STOCK', 
+        'TOTAL TRF_OUT', 'ENDING STOCK', 'REAL QTY', 'CURRENT STOCK', # <-- Taruh di sini bro
         'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
     ]
 
