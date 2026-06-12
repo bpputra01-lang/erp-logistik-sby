@@ -5467,11 +5467,11 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                         accumulated_qty += match_rto_in['QTY'].sum()
                 
                 if accumulated_qty == 0:
-                    final_status = "TAMBAHAN STOK TANPA DOKUMEN"
+                    final_status = "PENAMBAHAN STOK (NO HISTORY)"
                 elif accumulated_qty >= needed_qty:
                     final_status = "DONE MASUK"
                 else:
-                    final_status = f"MASUK MISSMATCH (KURANG -{int(needed_qty - accumulated_qty)})"
+                    final_status = f"MASUK QTY MISSMATCH"
 
                 track_bin_list.append("-")
 
@@ -5489,7 +5489,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                     match_rto_out = df_rto_out_clean[df_rto_out_clean['SKU'] == target_sku]
                     if not match_rto_out.empty:
                         docs_found.append(f"RTO_OUT:{'/'.join(map(str, match_rto_out['NO_TF'].unique()))}")
-                        bins_found.append("RTO_OUT(NO BIN)")
+                        bins_found.append("RTO_OUT")
                         accumulated_qty += match_rto_out['QTY'].sum()
                 
                 if accumulated_qty == 0:
@@ -5497,7 +5497,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 elif accumulated_qty >= needed_qty:
                     final_status = "DONE TERJUAL"
                 else:
-                    final_status = f"KELUAR MISSMATCH (KURANG DOKUMEN -{int(needed_qty - accumulated_qty)})"
+                    final_status = f"KELUAR QTY MISSMATCH"
                     
                 track_bin_list.append(", ".join(bins_found) if bins_found else "-")
 
@@ -5507,7 +5507,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                         
         discrepancies['TRACK_INVOICE'] = doc_reference_list
         discrepancies['TRACK_BIN'] = track_bin_list
-        discrepancies['TRACK_QTY_SALES'] = total_found_qty_list
+        discrepancies['TRACK_QTY'] = total_found_qty_list
         discrepancies['STATUS_CHECK'] = status_list
         
         return comparison, discrepancies
@@ -8887,17 +8887,17 @@ elif menu == "Compare System":
         
         m3, m4, m5 = st.columns(3)
         m3.markdown(f'<div class="m-box" style="border-left: 4px solid #C5A059;"><span class="m-lbl">✅ SELISIH MATCH (DONE)</span><span class="m-val" style="color: #C5A059;">{match_count} SKU</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box" style="border-left: 4px solid #dc3545;"><span class="m-lbl">⚠️ QTY DOKUMEN MISSMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
-        m5.markdown(f'<div class="m-box" style="border-left: 4px solid #ffc107;"><span class="m-lbl">🔍 SELISIH TANPA DOKUMEN</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box" style="border-left: 4px solid #dc3545;"><span class="m-lbl">⚠️ QTY SELISIH ≠ QTY FOUND (IN/OUT)</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
+        m5.markdown(f'<div class="m-box" style="border-left: 4px solid #ffc107;"><span class="m-lbl">🔍 SELISIH (NO HISTORY)</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
 
         st.write("")
 
         if not diff_only.empty:
-            st.warning("Daftar Perbedaan Stok Berdasarkan Validasi Mutlak Qty Dokumen:")
+            st.warning("Daftar Perbedaan Stok Berdasarkan Compare In & Out:")
             
             ordered_cols = [
                 'BIN', 'SKU', 'QTY_Sys1', 'QTY_Sys2', 'DIFF', 
-                'TRACK_INVOICE', 'TRACK_BIN', 'TRACK_QTY_SALES', 'STATUS_CHECK'
+                'TRACK_INVOICE', 'TRACK_BIN', 'TRACK_QTY', 'STATUS_CHECK'
             ]
             display_df = diff_only[[c for c in ordered_cols if c in diff_only.columns]]
             
