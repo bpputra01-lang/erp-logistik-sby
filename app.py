@@ -5374,205 +5374,167 @@ def prepare_sku_totals(df):
 
 def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=None, file_po=None, file_rto_in=None, file_rto_out=None):
     try:
-        # === A. COMPARE FILE SYSTEM 1 & 2 BY SKU ===
         df1 = load_data(file1)
         df2 = load_data(file2)
 
         data1 = prepare_sku_totals(df1)
         data2 = prepare_sku_totals(df2)
         
-        # Bersihkan leading zeros di file system utama biar aman
         data1['SKU'] = data1['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
         data2['SKU'] = data2['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
 
-        # Gabungkan data murni berdasarkan SKU saja
         comparison = pd.merge(
             data1, data2, on='SKU', how='outer', suffixes=('_Sys1', '_Sys2')
         ).fillna(0)
 
-        # Hitung Selisih (Stok Awal - Stok Akhir)
         comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
-        # Inisialisasi kolom tracking default
-        discrepancies['TRACK_INVOICE'] = "-"
-        discrepancies['TRACK_BIN'] = "-"
-        discrepancies['TRACK_QTY_SALES'] = 0
-        discrepancies['STATUS_CHECK'] = "Belum Dicek"
-        
-        # --- 1. BACA DATA PENDUKUNG (PENGURANGAN STOK) ---
+        # --- 1. BACA DATA PENDUKUNG (KELUAR) ---
         df_track_clean = None
         if file_tracking is not None and not discrepancies.empty:
             df_track = load_data(file_tracking)
-            if df_track.shape[1] < 11:
-                raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K tidak ditemukan.")
             df_track_clean = pd.DataFrame({
                 'INVOICE': df_track.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY_SALES': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
             })
 
         df_cross_clean = None
         if file_cross_order is not None and not discrepancies.empty:
             df_cross = load_data(file_cross_order)
-            if df_cross.shape[1] < 6:
-                raise ValueError("File Cross Order kurang dari 6 kolom. Kolom F tidak ditemukan.")
             df_cross_clean = pd.DataFrame({
                 'SKU': df_cross.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'INVOICE': df_cross.iloc[:, 4].astype(str).str.strip().str.lstrip('0'),
-                'QTY_CROSS': pd.to_numeric(df_cross.iloc[:, 5], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_cross.iloc[:, 5], errors='coerce').fillna(0)
             })
 
         df_rto_out_clean = None
         if file_rto_out is not None and not discrepancies.empty:
             df_rto_out_df = load_data(file_rto_out)
-            if df_rto_out_df.shape[1] < 10:
-                raise ValueError("File RTO Out kurang dari 10 kolom. Kolom J tidak ditemukan.")
             df_rto_out_clean = pd.DataFrame({
                 'NO_TF': df_rto_out_df.iloc[:, 3].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_rto_out_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY_RTO': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0)
             })
 
-        # --- 2. BACA DATA PENDUKUNG (PENAMBAHAN STOK) ---
+        # --- 2. BACA DATA PENDUKUNG (MASUK) ---
         df_po_clean = None
         if file_po is not None and not discrepancies.empty:
             df_po = load_data(file_po)
-            if df_po.shape[1] < 12:
-                raise ValueError("File Purchase Order kurang dari 12 kolom. Kolom L tidak ditemukan.")
             df_po_clean = pd.DataFrame({
                 'NO_PO': df_po.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_po.iloc[:, 3].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY_PO': pd.to_numeric(df_po.iloc[:, 11], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_po.iloc[:, 11], errors='coerce').fillna(0)
             })
 
         df_rto_in_clean = None
         if file_rto_in is not None and not discrepancies.empty:
             df_rto_in_df = load_data(file_rto_in)
-            if df_rto_in_df.shape[1] < 10:
-                raise ValueError("File RTO In kurang dari 10 kolom. Kolom J tidak ditemukan.")
             df_rto_in_clean = pd.DataFrame({
                 'NO_TF': df_rto_in_df.iloc[:, 3].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_rto_in_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY_RTO': pd.to_numeric(df_rto_in_df.iloc[:, 9], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 9], errors='coerce').fillna(0)
             })
             
         status_list = []
-        invoice_list = []
+        doc_reference_list = []
         track_bin_list = []
-        track_qty_list = []
+        total_found_qty_list = []
         
         for idx, row in discrepancies.iterrows():
             target_sku = str(row['SKU']).strip().lstrip('0').upper()
             actual_diff = row['DIFF']
+            needed_qty = abs(actual_diff)
+            
+            docs_found = []
+            bins_found = []
+            accumulated_qty = 0
             
             # =========================================================================
-            # CASE 1: JIKA STOK BERTAMBAH (Sys2 > Sys1 atau DIFF < 0) -> CEK PO & RTO IN
+            # CASE 1: STOK BERTAMBAH (DIFF < 0) -> ESTAFET PO -> RTO IN
             # =========================================================================
             if actual_diff < 0:
-                target_diff = abs(actual_diff)
+                # Step 1: Cek Purchase Order
+                if df_po_clean is not None:
+                    match_po = df_po_clean[df_po_clean['SKU'] == target_sku]
+                    if not match_po.empty:
+                        po_str = "/".join(map(str, match_po['NO_PO'].unique()))
+                        docs_found.append(f"PO:{po_str}")
+                        accumulated_qty += match_po['QTY'].sum()
                 
-                # A. Cek Purchase Order
-                match_po = df_po_clean[df_po_clean['SKU'] == target_sku] if df_po_clean is not None else pd.DataFrame()
-                # B. Cek RTO In
-                match_rto_in = df_rto_in_clean[df_rto_in_clean['SKU'] == target_sku] if df_rto_in_clean is not None else pd.DataFrame()
+                # Step 2: Jika belum cukup, estafet cek RTO IN
+                if accumulated_qty < needed_qty and df_rto_in_clean is not None:
+                    match_rto_in = df_rto_in_clean[df_rto_in_clean['SKU'] == target_sku]
+                    if not match_rto_in.empty:
+                        tf_str = "/".join(map(str, match_rto_in['NO_TF'].unique()))
+                        docs_found.append(f"RTO_IN:{tf_str}")
+                        accumulated_qty += match_rto_in['QTY'].sum()
                 
-                if not match_po.empty:
-                    po_str = ", ".join(map(str, match_po['NO_PO'].unique()))
-                    total_qty_po = match_po['QTY_PO'].sum()
-                    
-                    if total_qty_po >= target_diff:
-                        status_list.append("DONE MASUK (PURCHASE ORDER)")
-                    else:
-                        status_list.append("QTY PO TIDAK MATCH DENGAN SELISIH")
-                        
-                    invoice_list.append(po_str)
-                    track_bin_list.append("-")
-                    track_qty_list.append(total_qty_po)
-                    
-                elif not match_rto_in.empty:
-                    tf_str = ", ".join(map(str, match_rto_in['NO_TF'].unique()))
-                    total_qty_rto_in = match_rto_in['QTY_RTO'].sum()
-                    
-                    if total_qty_rto_in >= target_diff:
-                        status_list.append("DONE MASUK (RTO IN)")
-                    else:
-                        status_list.append("QTY RTO IN TIDAK MATCH DENGAN SELISIH")
-                        
-                    invoice_list.append(tf_str)
-                    track_bin_list.append("-")
-                    track_qty_list.append(total_qty_rto_in)
-                    
+                # Penentuan Status Akhir Masuk
+                if accumulated_qty == 0:
+                    status_list.append("TAMBAHAN STOK TANPA DOKUMEN")
+                elif accumulated_qty == needed_qty:
+                    status_list.append("DONE MASUK (MATCH)")
+                elif accumulated_qty > needed_qty:
+                    status_list.append(f"DONE MASUK (OVER STOK +{int(accumulated_qty - needed_qty)})")
                 else:
-                    status_list.append("TAMBAHAN STOK TIDAK DIKETAHUI (CEK PO/RTO IN)")
-                    invoice_list.append("-")
-                    track_bin_list.append("-")
-                    track_qty_list.append(0)
-            
+                    status_list.append(f"MASUK MISSMATCH (KURANG -{int(needed_qty - accumulated_qty)})")
+
+                track_bin_list.append("-")
+
             # =========================================================================
-            # CASE 2: JIKA STOK BERKURANG (Sys1 > Sys2 atau DIFF > 0) -> PRIORITY BERJENJANG
+            # CASE 2: STOK BERKURANG (DIFF > 0) -> ESTAFET TRACKING -> CROSS -> RTO OUT
             # =========================================================================
             else:
-                target_diff = abs(actual_diff)
+                # Step 1: Cek Stock Tracking (Sales Reguler)
+                if df_track_clean is not None:
+                    match_track = df_track_clean[df_track_clean['SKU'] == target_sku]
+                    if not match_track.empty:
+                        inv_str = "/".join(map(str, match_track['INVOICE'].unique()))
+                        bin_str = "/".join(map(str, match_track['BIN'].unique()))
+                        docs_found.append(f"TRACK:{inv_str}")
+                        if bin_str: bins_found.append(bin_str)
+                        accumulated_qty += match_track['QTY'].sum()
                 
-                # Urutan 1: Cek Stock Tracking (Sales Reguler)
-                match_sku = df_track_clean[df_track_clean['SKU'] == target_sku] if df_track_clean is not None else pd.DataFrame()
-                # Urutan 2: Cek Cross Order
-                match_cross = df_cross_clean[df_cross_clean['SKU'] == target_sku] if df_cross_clean is not None else pd.DataFrame()
-                # Urutan 3: Cek RTO Out
-                match_rto_out = df_rto_out_clean[df_rto_out_clean['SKU'] == target_sku] if df_rto_out_clean is not None else pd.DataFrame()
-                
-                if not match_sku.empty:
-                    invoices_str = ", ".join(map(str, match_sku['INVOICE'].unique()))
-                    bins_str = ", ".join(map(str, match_sku['BIN'].unique()))
-                    total_qty_sales = match_sku['QTY_SALES'].sum()
-                    
-                    if total_qty_sales >= target_diff:
-                        status_list.append("DONE TERJUAL")
-                    else:
-                        status_list.append("QTY SALES TIDAK MATCH DENGAN SELISIH")
-                    
-                    invoice_list.append(invoices_str)
-                    track_bin_list.append(bins_str)
-                    track_qty_list.append(total_qty_sales)
-                
-                elif not match_cross.empty:
-                    invoices_str = ", ".join(map(str, match_cross['INVOICE'].unique()))
-                    total_qty_cross = match_cross['QTY_CROSS'].sum()
-                    
-                    if total_qty_cross >= target_diff:
-                        status_list.append("DONE TERJUAL (CROSS ORDER)")
-                    else:
-                        status_list.append("QTY CROSS ORDER TIDAK MATCH DENGAN SELISIH")
+                # Step 2: Jika belum cukup, estafet cek Cross Order
+                if accumulated_qty < needed_qty and df_cross_clean is not None:
+                    match_cross = df_cross_clean[df_cross_clean['SKU'] == target_sku]
+                    if not match_cross.empty:
+                        inv_cross = "/".join(map(str, match_cross['INVOICE'].unique()))
+                        docs_found.append(f"CROSS:{inv_cross}")
+                        bins_found.append("CROSS(NO BIN)")
+                        accumulated_qty += match_cross['QTY'].sum()
                         
-                    invoice_list.append(invoices_str)
-                    track_bin_list.append("CROSS ORDER (NO BIN)")
-                    track_qty_list.append(total_qty_cross)
-                    
-                elif not match_rto_out.empty:
-                    tf_str = ", ".join(map(str, match_rto_out['NO_TF'].unique()))
-                    total_qty_rto_out = match_rto_out['QTY_RTO'].sum()
-                    
-                    if total_qty_rto_out >= target_diff:
-                        status_list.append("DONE KELUAR (RTO OUT)")
-                    else:
-                        status_list.append("QTY RTO OUT TIDAK MATCH DENGAN SELISIH")
-                        
-                    invoice_list.append(tf_str)
-                    track_bin_list.append("RTO OUT (NO BIN)")
-                    track_qty_list.append(total_qty_rto_out)
-                    
+                # Step 3: Jika masih belum cukup juga, estafet cek RTO Out
+                if accumulated_qty < needed_qty and df_rto_out_clean is not None:
+                    match_rto_out = df_rto_out_clean[df_rto_out_clean['SKU'] == target_sku]
+                    if not match_rto_out.empty:
+                        tf_out = "/".join(map(str, match_rto_out['NO_TF'].unique()))
+                        docs_found.append(f"RTO_OUT:{tf_out}")
+                        bins_found.append("RTO_OUT(NO BIN)")
+                        accumulated_qty += match_rto_out['QTY'].sum()
+                
+                # Penentuan Status Akhir Keluar
+                if accumulated_qty == 0:
+                    status_list.append("NO SALES (PERLU CEK ADJ)")
+                elif accumulated_qty == needed_qty:
+                    status_list.append("DONE TERJUAL (MATCH)")
+                elif accumulated_qty > needed_qty:
+                    status_list.append(f"DONE TERJUAL (OVER DOKUMEN +{int(accumulated_qty - needed_qty)})")
                 else:
-                    status_list.append("NO SALES -> PERLU CEK ADJ / RTO KELUAR")
-                    invoice_list.append("-")
-                    track_bin_list.append("-")
-                    track_qty_list.append(0)
+                    status_list.append(f"KELUAR MISSMATCH (KURANG DOKUMEN -{int(needed_qty - accumulated_qty)})")
+                    
+                track_bin_list.append(", ".join(bins_found) if bins_found else "-")
+
+            # Atur hasil mapping teks teks ke kolom penampung
+            doc_reference_list.append(", ".join(docs_found) if docs_found else "-")
+            total_found_qty_list.append(accumulated_qty)
                         
-        # Ikat semua data ke dataframe
-        discrepancies['TRACK_INVOICE'] = invoice_list
+        discrepancies['TRACK_INVOICE'] = doc_reference_list
         discrepancies['TRACK_BIN'] = track_bin_list
-        discrepancies['TRACK_QTY_SALES'] = track_qty_list
+        discrepancies['TRACK_QTY_SALES'] = total_found_qty_list
         discrepancies['STATUS_CHECK'] = status_list
         
         return comparison, discrepancies
