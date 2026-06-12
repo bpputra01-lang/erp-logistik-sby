@@ -8824,7 +8824,7 @@ elif menu == "Compare System":
     with row1_col2:
         file_sys2 = st.file_uploader("Stock System End Shift", type=['xlsx', 'csv'], key='uploader_sys2')
     with row2_col1:
-        file_tracking = st.file_uploader("Upload Stock Tracking (Opsional)", type=['xlsx', 'csv'], key='uploader_track')
+        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'], key='uploader_track')
     with row2_col2:
         file_cross_order = st.file_uploader("Upload Cross Order (Opsional)", type=['xlsx', 'csv'], key='uploader_cross')
 
