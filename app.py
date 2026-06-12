@@ -5311,13 +5311,20 @@ def process_justification(df_case, df_tracking, df_all_stock):
                 elif gap_adj == 0:
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
 
-            # =========================================================================
+           # =========================================================================
             # ORDER 2: ATURAN BARU - KESALAHAN SYSTEM (STOCK MATCH TAPI QTY SYS ALL KECIL)
-            # Syarat: SO > SYS, GAP & BEGIN == 0, Tiga nilai sama, dan QTY SYS ALL < salah satunya
+            # Kita paksa bungkus float() dan round() biar gak ada drama string vs angka
             # =========================================================================
             if qty_so_row > qty_sys_row and gap_adj == 0 and begin_stock == 0:
-                if ending_stock == real_qty == curr_stock:
-                    if qty_sys_all < ending_stock: # Cukup cek salah satu nilai karena ketiganya sama
+                # Bungkus murni ke float biar apple-to-apple saat dibandingin
+                v_ending = round(float(row['ENDING STOCK']), 2)
+                v_real   = round(float(row['REAL QTY']), 2)
+                v_curr   = round(float(row['CURRENT STOCK']), 2)
+                v_sys_all = round(float(row['QTY SYSTEM ALL']), 2)
+                
+                # Cek ulang dengan variabel bersih
+                if v_ending == v_real == v_curr:
+                    if v_sys_all < v_ending:
                         return "KESALAHAN SYSTEM"
 
             # =========================================================================
