@@ -9615,31 +9615,41 @@ elif menu == "Justification SO":
     with st.expander("📋 Informasi Format File"):
         st.info("""
         **Format yang diharapkan:**
-        - **ADJUSTMENT FILE**: Gabungkan antara Mulitple Adjustment **(Plus)** dan **(Minus)** dalam 1 File.
+        - **ADJUSTMENT FILE**: Gabungkan antara Multiple Adjustment **(Plus)** dan **(Minus)** dalam 1 File.
         - **SUMMARY STOCK**: Download dari **JEZPRO** pada menu **Dashboard Asset** (Store: **JEZ SURABAYA**).
-        - **ALL DATA STOCK**: Upload file All data Stock (Multiple Adjusment) **HANYA ADA STOCK**.
+        - **ALL DATA STOCK**: Upload file All data Stock (Multiple Adjustment) **HANYA ADA STOCK**.
         """)
 
     with st.expander("💡 Logic Thinking"):
         st.info("""
-        **Logic Justifikasi Terbaru (Urutan Eksekusi Mutlak):**
+        **Logic Justifikasi Terbaru (Urutan Eksekusi Mutlak ORDER 1 - 7):**
         
-        1. **KESALAHAN SYSTEM (BEGIN STOCK -)** [BARU]:
-           * Jika **QTY SO > QTY SYSTEM**, **Beginning Stock < 0**, dan **Gap Adjustment > 0** namun nilainya kurang dari nilai awal beginning stock.
-        2. **KESALAHAN SYSTEM (MUTASI BILANCE)** [BARU]:
-           * Jika **QTY SO > QTY SYSTEM**, **Beginning Stock == 0**, **Gap Adjustment == 0**, **Draft RTO In/Out == 0**, dan hasil `(Stock In + TF In) - (Sales + TF Out) != 0`.
-        3. **KESALAHAN SYSTEM**:
-           * Jika **QTY SYSTEM > QTY SO** (File Adjustment), hitung `diff = QTY SYSTEM - QTY SO`. Masuk kategori jika: **(QTY System All - diff) = Current Stock**.
-           * Jika **QTY SYSTEM < QTY SO** (File Adjustment), hitung `diff = QTY SO - QTY SYSTEM`. Masuk kategori jika: **(QTY System All + diff) = Current Stock**.
-        4. **KESALAHAN ADJUSMENT (+ / -)**:
-           * **KESALAHAN ADJUSMENT +**: Jika **QTY SYSTEM > QTY SO** DAN **Gap Adjustment > 0**.
-           * **KESALAHAN ADJUSMENT -**: Jika **QTY SYSTEM < QTY SO** DAN **Gap Adjustment < 0**.
-        5. **CEK HASIL REKONSILIASI**:
-           * Jika **QTY System All (TANPA MEMPERHITUNGKAN FILE MULTIPLE) SUDAH = Current Stock** (Murni di background stock).
-        6. **KESALAHAN RTO**:   
-           * Jika SKU terkait masih memiliki Pending RTO berupa **Draft TRF In > 0** atau **Draft TRF Out > 0**.
-        7. **UNDEFINED**:
-           * Kondisi di luar semua aturan di atas dan perlu pengecekan lebih detail.
+        1. **ORDER 1: KESALAHAN SYSTEM (BEGIN STOCK -)**:
+           * Jika **QTY SO > QTY SYSTEM**, **Beginning Stock < 0**, dan **Gap Adjustment >= 0** (Kondisi Gap 0 atau Gap lebih kecil dari nilai absolut Beginning Stock).
+        
+        2. **ORDER 2: KESALAHAN SYSTEM (STOCK MATCH TAPI QTY SYS ALL KECIL)** [BARU/FIXED]:
+           * Jika **Gap Adjustment == 0**, **Beginning Stock == 0**.
+           * Kondisi stock background sinkron kembar (**Ending Stock == Real QTY == Current Stock**), TETAPI nilai **QTY SYSTEM ALL < Ending Stock** (Master data system mendadak kosong/0 padahal mutasi fisik balance).
+        
+        3. **ORDER 3: KESALAHAN SYSTEM (BEGIN STOCK >= 0 + MUTASI TIDAK MATCH)**:
+           * Jika **QTY SO > QTY SYSTEM**, **Beginning Stock >= 0**, **Gap Adjustment == 0**, serta tidak ada pending draft RTO.
+           * Masuk kategori jika hitungan mutasi murni manual `Beginning Stock + (Stock In + TRF In) - (Sales + TRF Out)` **TIDAK SAMA DENGAN Ending Stock**.
+        
+        4. **ORDER 4: CEK HASIL REKONSILIASI**:
+           * Jika **QTY SYSTEM ALL sudah sama dengan Current Stock** (Murni aman di background stock).
+        
+        5. **ORDER 5: KESALAHAN ADJUSTMENT (+ / -)**:
+           * **KESALAHAN ADJUSTMENT +**: Jika **QTY SYSTEM > QTY SO** DAN **Gap Adjustment > 0**.
+           * **KESALAHAN ADJUSTMENT -**: Jika **QTY SYSTEM < QTY SO** DAN **Gap Adjustment < 0**.
+        
+        6. **ORDER 6: KESALAHAN SYSTEM (BAWAAN SELISIH DIFF)**:
+           * Kondisi jika **Gap Adjustment == 0**.
+           * Jika **QTY SYSTEM > QTY SO**, hitung `diff = QTY SYSTEM - QTY SO`. Masuk kategori jika: `(QTY SYSTEM ALL - diff) == Current Stock`.
+           * Jika **QTY SYSTEM < QTY SO**, hitung `diff = QTY SO - QTY SYSTEM`. Masuk kategori jika: `(QTY SYSTEM ALL + diff) == Current Stock`.
+        
+        7. **ORDER 7: KESALAHAN RTO & UNDEFINED**:
+           * **KESALAHAN RTO**: Jika SKU terkait masih memiliki transaksi menggantung berupa **Total Draft TRF In > 0** atau **Total Draft TRF Out > 0**.
+           * **UNDEFINED**: Pilihan terakhir jika data tidak memenuhi satu pun kriteria mutlak di atas (memerlukan audit manual).
         """)
 
     # Inisialisasi Session State
