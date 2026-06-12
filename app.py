@@ -5368,26 +5368,18 @@ def prepare_sku_totals(df):
         'QTY': pd.to_numeric(df_clean.iloc[:, 9], errors='coerce').fillna(0)
     })
     
-    # =========================================================================
-    # 🔥 FIX UTAMA: TENDANG DATA BARIS MINUS DI SINI SEBELUM DI-SUM!
-    # =========================================================================
-    df_mapped = df_mapped[df_mapped['QTY'] >= 0]
-    
-    # AGREGASI TOTAL QTY PER SKU (Sekarang murni hanya menjumlahkan data >= 0)
+    # AGREGASI TOTAL QTY PER SKU (Abaikan BIN di Kolom B)
     df_grouped = df_mapped.groupby('SKU', as_index=False)['QTY'].sum()
     return df_grouped
-
 
 def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, file_rto_in=None, file_rto_out=None):
     try:
         df1 = load_data(file1)
         df2 = load_data(file2)
 
-        # Menggunakan fungsi prepare baru yang sudah membuang baris kotor/minus
         data1 = prepare_sku_totals(df1)
         data2 = prepare_sku_totals(df2)
         
-        # Standardisasi format SKU agar saat merge presisi
         data1['SKU'] = data1['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
         data2['SKU'] = data2['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
 
@@ -5396,7 +5388,14 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             data1, data2, on='SKU', how='outer', suffixes=('_Sys1', '_Sys2')
         ).fillna(0)
 
-        # Hitung selisih murni dari Qty yang sudah dicleaning baris minusnya
+        # =========================================================================
+        # 🚨 FILTER ANTI-MINUS: ABAIKAN JIKA QTY SYSTEM ADALAH MINUS (< 0)
+        # =========================================================================
+        comparison = comparison[
+            (comparison['QTY_Sys1'] >= 0) & (comparison['QTY_Sys2'] >= 0)
+        ].copy()
+
+        # Baru hitung selisih setelah data minus dibuang murni
         comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
@@ -5515,7 +5514,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         
     except Exception as e:
         raise e
-
+        
 import streamlit as st
 import pandas as pd
 from st_supabase_connection import SupabaseConnection
