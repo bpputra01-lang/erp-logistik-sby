@@ -5189,10 +5189,6 @@ def tampilkan_halaman_po():
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )        
-import pandas as pd
-import io
-import streamlit as st
-
 def process_justification(df_case, df_tracking, df_all_stock):
     # 1. Copy data & Standarisasi Header ke Huruf Besar
     res = df_case.copy()
@@ -5236,12 +5232,11 @@ def process_justification(df_case, df_tracking, df_all_stock):
     ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 3. [PERBAIKAN 1] Aggregasi All Data Stock (EXCLUDE BIN KARANTINA)
+    # 3. Aggregasi All Data Stock (EXCLUDE BIN KARANTINA)
     bin_col_all = df_all_stock.columns[1]
     sku_col_all = df_all_stock.columns[2]
     qty_sys_col_all = df_all_stock.columns[9]
     
-    # Filter buang BIN yang mengandung kata 'KARANTINA'
     df_all_stock_filtered = df_all_stock[
         ~df_all_stock[bin_col_all].astype(str).str.upper().str.contains('KARANTINA', na=False)
     ]
@@ -5283,6 +5278,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
             
             # Ambil nilai hitungan background lintas file
             begin_stock = round(float(row['BEGINNING STOCK']), 2)
+            ending_stock = round(float(row['ENDING STOCK']), 2)
             stock_in = round(float(row['TOTAL_STOCKIN']), 2)
             trf_in = round(float(row['TOTAL TRF_IN']), 2)
             sales = round(float(row['TOTAL SALES']), 2)
@@ -5294,55 +5290,40 @@ def process_justification(df_case, df_tracking, df_all_stock):
             draft_in = round(float(row['TOTAL DRAFT_TRF_IN']), 2)
             draft_out = round(float(row['TOTAL DRAFT_TRF_OUT']), 2)
 
-            # =========================================================================
-            # ATURAN TAMBAHAN 1: KESALAHAN SYSTEM (BEGIN STOCK -)
-            # JIKA QTY SO > QTY SYSTEM DAN BEGINNING STOCK < 0 DAN GAP ADJUSMENT > 0 
-            # TETAPI NILAINYA KURANG DARI NILAI ABSOLUT BEGINNING STOCK
-            # =========================================================================
+            # --- ATURAN TAMBAHAN 1: KESALAHAN SYSTEM (BEGIN STOCK -) ---
             if qty_so_row > qty_sys_row and begin_stock < 0 and gap_adj > 0:
                 if gap_adj < abs(begin_stock):
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
 
-            # =========================================================================
-            # ATURAN TAMBAHAN 2: KESALAHAN SYSTEM (RUMUS TRANSAKSI MURNI)
-            # JIKA QTY SO > QTY SYSTEM, BEGINNING STOCK == 0, GAP ADJUSMENT == 0, 
-            # DRAFT IN & OUT == 0, DAN ADA SELISIH DI PENGURANGAN MUTASI TRANSAKSI
-            # =========================================================================
+            # --- ATURAN TAMBAHAN 2: KESALAHAN SYSTEM (MURNI MUTASI VS ENDING STOCK) ---
             if qty_so_row > qty_sys_row and begin_stock == 0 and gap_adj == 0 and draft_in == 0 and draft_out == 0:
-                # Menghitung (STOCK IN + TF IN) - (SALES + TF OUT)
-                mutasi_bersih = (stock_in + trf_in) - (sales + trf_out)
-                if mutasi_bersih != 0: # Jika hasilnya tidak balance/terjadi anomali pengurangan
+                # Rumus hitung mutasi murni transaksi
+                mutasi_bersih = round((stock_in + trf_in) - (sales + trf_out), 2)
+                # JIKA HASILNYA TIDAK SAMA DENGAN ENDING STOCK (KOLOM U)
+                if mutasi_bersih != ending_stock:
                     return "KESALAHAN SYSTEM"
 
-            # --- LOGIKA 3: KESALAHAN ADJUSMENT (+ / -) DENGAN PENCEKAN RUMUS ---
-            # a. JIKA QTY SYSTEM > QTY SO (Potensi Kesalahan Adjustment +)
+            # --- LOGIKA 3: KESALAHAN ADJUSMENT (+ / -) ---
             if qty_sys_row > qty_so_row and gap_adj > 0:
                 return "KESALAHAN ADJUSMENT +"
-            
-            # b. JIKA QTY SYSTEM < QTY SO (Potensi Kesalahan Adjustment -)
             elif qty_sys_row < qty_so_row and gap_adj < 0:
                 return "KESALAHAN ADJUSMENT -"
 
             # --- LOGIKA 2: KESALAHAN SYSTEM (Kondisi syarat Gap Adj harus == 0) ---
             if gap_adj == 0:
-                # a. JIKA QTY SYSTEM > QTY SO
                 if qty_sys_row > qty_so_row:
                     diff = qty_sys_row - qty_so_row
                     if round(qty_sys_all - diff, 2) == curr_stock:
                         return "KESALAHAN SYSTEM"
-                
-                # b. JIKA QTY SYSTEM < QTY SO
                 elif qty_sys_row < qty_so_row:
                     diff = qty_so_row - qty_sys_row
                     if round(qty_sys_all + diff, 2) == curr_stock:
                         return "KESALAHAN SYSTEM"
 
             # --- LOGIKA KONDISI LAINNYA ---
-            # CEK HASIL REKONSILIASI
             if qty_sys_all == curr_stock:
                 return "CEK HASIL REKONSILIASI"
 
-            # KESALAHAN RTO
             if draft_in > 0 or draft_out > 0:
                 return "KESALAHAN RTO"
 
@@ -5362,7 +5343,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
         'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
     ]
 
-    # Bersihkan sisa-sisa kolom background key internal agar output rapi
     drop_cols = ['SKU_KEY_JOIN', 'SKU_KEY', 'SKU_KEY_ALL', 
                  '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', 
                  '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', 
