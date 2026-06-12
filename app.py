@@ -5295,17 +5295,21 @@ def process_justification(df_case, df_tracking, df_all_stock):
             draft_out = round(float(row['TOTAL DRAFT_TRF_OUT']), 2)
             ending_stock = round(float(row['ENDING STOCK']), 2)
 
+           # =========================================================================
+            # ORDER 1: ATURAN KHUSUS - KESALAHAN SYSTEM (BEGIN STOCK -) [DITARUH PALING ATAS]
+            # Kita lepas syarat gap_adj > 0 di if utama agar gap_adj == 0 tetap ketangkap
             # =========================================================================
-            # ATURAN TAMBAHAN 1: KESALAHAN SYSTEM (BEGIN STOCK -)
-            # JIKA QTY SO > QTY SYSTEM DAN BEGINNING STOCK < 0 DAN GAP ADJUSMENT > 0 
-            # TETAPI NILAINYA KURANG DARI NILAI ABSOLUT BEGINNING STOCK
-            # =========================================================================
-            if qty_so_row > qty_sys_row and begin_stock < 0 and gap_adj > 0:
-                if gap_adj < abs(begin_stock):
+            if qty_so_row > qty_sys_row and begin_stock < 0:
+                # Kondisi A: Jika ada gap adj plus tapi nilainya tidak menutupi minusnya begin stock
+                if gap_adj > 0 and gap_adj < abs(begin_stock):
+                    return "KESALAHAN SYSTEM (BEGIN STOCK -)"
+                # Kondisi B: Kasus seperti di gambar lu (gap_adj == 0, padahal begin stock minus)
+                elif gap_adj == 0:
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
 
-            # --- ATURAN TAMBAHAN 2: KESALAHAN SYSTEM (MENGHITUNG BEGIN STOCK >= 0 + MUTASI) ---
-            # Syarat diubah: begin_stock >= 0 (tidak bernilai minus)
+            # =========================================================================
+            # ORDER 2: ATURAN KHUSUS - KESALAHAN SYSTEM (BEGIN STOCK >= 0 + MUTASI)
+            # =========================================================================
             if qty_so_row > qty_sys_row and begin_stock >= 0 and gap_adj == 0 and draft_in == 0 and draft_out == 0:
                 # Sekarang BEGINNING STOCK dimasukkan sebagai penambah di awal rumus
                 mutasi_bersih = round(begin_stock + (stock_in + trf_in) - (sales + trf_out), 2)
@@ -5314,41 +5318,41 @@ def process_justification(df_case, df_tracking, df_all_stock):
                 if mutasi_bersih != ending_stock:
                     return "KESALAHAN SYSTEM"
 
-            # --- LOGIKA 3: KESALAHAN ADJUSMENT (+ / -) DENGAN PENCEKAN RUMUS ---
-            # a. JIKA QTY SYSTEM > QTY SO (Potensi Kesalahan Adjustment +)
+            # =========================================================================
+            # ORDER 3: CEK HASIL REKONSILIASI (SETELAH FILTER ANOMALI KHUSUS)
+            # Jika lolos dari filter error di atas, baru cek apakah stock murni balance
+            # =========================================================================
+            if qty_sys_all == curr_stock:
+                return "CEK HASIL REKONSILIASI"
+
+            # =========================================================================
+            # ORDER 4: LOGIKA KESALAHAN ADJUSMENT (+ / -) 
+            # =========================================================================
             if qty_sys_row > qty_so_row and gap_adj > 0:
                 return "KESALAHAN ADJUSMENT +"
-            
-            # b. JIKA QTY SYSTEM < QTY SO (Potensi Kesalahan Adjustment -)
             elif qty_sys_row < qty_so_row and gap_adj < 0:
                 return "KESALAHAN ADJUSMENT -"
 
-            # --- LOGIKA 2: KESALAHAN SYSTEM (Kondisi syarat Gap Adj harus == 0) ---
+            # =========================================================================
+            # ORDER 5: LOGIKA KESALAHAN SYSTEM BAWAAN (Kondisi syarat Gap Adj harus == 0)
+            # =========================================================================
             if gap_adj == 0:
-                # a. JIKA QTY SYSTEM > QTY SO
                 if qty_sys_row > qty_so_row:
                     diff = qty_sys_row - qty_so_row
                     if round(qty_sys_all - diff, 2) == curr_stock:
                         return "KESALAHAN SYSTEM"
-                
-                # b. JIKA QTY SYSTEM < QTY SO
                 elif qty_sys_row < qty_so_row:
                     diff = qty_so_row - qty_sys_row
                     if round(qty_sys_all + diff, 2) == curr_stock:
                         return "KESALAHAN SYSTEM"
 
-            # --- LOGIKA KONDISI LAINNYA ---
-            # CEK HASIL REKONSILIASI
-            if qty_sys_all == curr_stock:
-                return "CEK HASIL REKONSILIASI"
-
-            # KESALAHAN RTO
+            # =========================================================================
+            # ORDER 6: KESALAHAN RTO & UNDEFINED (PILIHAN TERAKHIR)
+            # =========================================================================
             if draft_in > 0 or draft_out > 0:
                 return "KESALAHAN RTO"
 
             return "UNDEFINED"
-        except:
-            return "ERROR DATA"
 
     res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
 
