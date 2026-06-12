@@ -5372,7 +5372,7 @@ def prepare_sku_totals(df):
     df_grouped = df_mapped.groupby('SKU', as_index=False)['QTY'].sum()
     return df_grouped
 
-def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=None, file_po=None, file_rto_in=None, file_rto_out=None):
+def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, file_rto_in=None, file_rto_out=None):
     try:
         df1 = load_data(file1)
         df2 = load_data(file2)
@@ -5399,15 +5399,6 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'QTY': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
-            })
-
-        df_cross_clean = None
-        if file_cross_order is not None and not discrepancies.empty:
-            df_cross = load_data(file_cross_order)
-            df_cross_clean = pd.DataFrame({
-                'SKU': df_cross.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'INVOICE': df_cross.iloc[:, 4].astype(str).str.strip().str.lstrip('0'),
-                'QTY': pd.to_numeric(df_cross.iloc[:, 5], errors='coerce').fillna(0)
             })
 
         df_rto_out_clean = None
@@ -5485,10 +5476,10 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
                 track_bin_list.append("-")
 
             # =========================================================================
-            # CASE 2: STOK BERKURANG (DIFF > 0) -> ESTAFET TRACKING -> CROSS -> RTO OUT
+            # CASE 2: STOK BERKURANG (DIFF > 0) -> ESTAFET TRACKING -> RTO OUT
             # =========================================================================
             else:
-                # Step 1: Cek Stock Tracking (Sales Reguler)
+                # Step 1: Cek Stock Tracking (Sales Reguler + Cross Order)
                 if df_track_clean is not None:
                     match_track = df_track_clean[df_track_clean['SKU'] == target_sku]
                     if not match_track.empty:
@@ -5497,17 +5488,8 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
                         docs_found.append(f"TRACK:{inv_str}")
                         if bin_str: bins_found.append(bin_str)
                         accumulated_qty += match_track['QTY'].sum()
-                
-                # Step 2: Jika belum cukup, estafet cek Cross Order
-                if accumulated_qty < needed_qty and df_cross_clean is not None:
-                    match_cross = df_cross_clean[df_cross_clean['SKU'] == target_sku]
-                    if not match_cross.empty:
-                        inv_cross = "/".join(map(str, match_cross['INVOICE'].unique()))
-                        docs_found.append(f"CROSS:{inv_cross}")
-                        bins_found.append("CROSS(NO BIN)")
-                        accumulated_qty += match_cross['QTY'].sum()
                         
-                # Step 3: Jika masih belum cukup juga, estafet cek RTO Out
+                # Step 2: Jika masih belum cukup, langsung estafet cek RTO Out
                 if accumulated_qty < needed_qty and df_rto_out_clean is not None:
                     match_rto_out = df_rto_out_clean[df_rto_out_clean['SKU'] == target_sku]
                     if not match_rto_out.empty:
@@ -5528,7 +5510,6 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
                     
                 track_bin_list.append(", ".join(bins_found) if bins_found else "-")
 
-            # Atur hasil mapping teks teks ke kolom penampung
             doc_reference_list.append(", ".join(docs_found) if docs_found else "-")
             total_found_qty_list.append(accumulated_qty)
                         
@@ -8839,8 +8820,7 @@ elif menu == "Compare System":
         st.info("""
         **Kondisi Stok Berkurang (Sys1 > Sys2):**
         1. **Stock Tracking**: Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty.
-        2. **Cross Order**: Kolom B=SKU, Kolom E=Invoice, Kolom F=Qty.
-        3. **RTO Out**: Kolom D=No TF, Kolom I=SKU, Kolom J=Qty.
+        2. **RTO Out**: Kolom D=No TF, Kolom I=SKU, Kolom J=Qty.
         
         **Kondisi Stok Bertambah (Sys2 > Sys1):**
         1. **Purchase Order**: Kolom A=No PO, Kolom D=SKU, Kolom L=Qty.
@@ -8862,12 +8842,10 @@ elif menu == "Compare System":
 
     # --- BARIS 2: DOKUMEN PENDUKUNG KELUAR ---
     st.markdown("### 📤 2. Upload Dokumen Pendukung (Stok Berkurang)")
-    out1, out2, out3 = st.columns(3)
+    out1, out2 = st.columns(2)
     with out1:
         file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'], key='uploader_track')
     with out2:
-        file_cross_order = st.file_uploader("Upload Cross Order", type=['xlsx', 'csv'], key='uploader_cross')
-    with out3:
         file_rto_out = st.file_uploader("Upload RTO OUT", type=['xlsx', 'csv'], key='uploader_rto_out')
 
     # --- BARIS 3: DOKUMEN PENDUKUNG MASUK ---
@@ -8881,9 +8859,9 @@ elif menu == "Compare System":
     if file_sys1 and file_sys2:
         if st.button("▶️RUN COMPARE"):
             try:
-                # Menjalankan fungsi lengkap dengan 7 parameter file
+                # Menjalankan fungsi dengan parameter yang telah dipangkas (tanpa file_cross_order)
                 res_all, d_only = process_stock_comparison(
-                    file_sys1, file_sys2, file_tracking, file_cross_order, file_po, file_rto_in, file_rto_out
+                    file_sys1, file_sys2, file_tracking, file_po, file_rto_in, file_rto_out
                 )
                 st.session_state.result_all = res_all
                 st.session_state.diff_only = d_only
