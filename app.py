@@ -5372,7 +5372,7 @@ def prepare_sku_totals(df):
     df_grouped = df_mapped.groupby('SKU', as_index=False)['QTY'].sum()
     return df_grouped
 
-def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=None):
+def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=None, file_po=None, file_rto_in=None, file_rto_out=None):
     try:
         # === A. COMPARE FILE SYSTEM 1 & 2 BY SKU ===
         df1 = load_data(file1)
@@ -5400,13 +5400,12 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
         discrepancies['TRACK_QTY_SALES'] = 0
         discrepancies['STATUS_CHECK'] = "Belum Dicek"
         
-        # Baca file tracking reguler jika di-upload
+        # --- 1. BACA DATA PENDUKUNG (PENGURANGAN STOK) ---
         df_track_clean = None
         if file_tracking is not None and not discrepancies.empty:
             df_track = load_data(file_tracking)
             if df_track.shape[1] < 11:
                 raise ValueError("File Stock Tracking kurang dari 11 kolom. Kolom K tidak ditemukan.")
-            
             df_track_clean = pd.DataFrame({
                 'INVOICE': df_track.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
@@ -5414,18 +5413,49 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
                 'QTY_SALES': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
             })
 
-        # === TAMBAHAN LOGIK: BACA FILE CROSS ORDER ===
         df_cross_clean = None
         if file_cross_order is not None and not discrepancies.empty:
             df_cross = load_data(file_cross_order)
             if df_cross.shape[1] < 6:
-                raise ValueError("File Cross Order kurang dari 6 kolom (Kolom F tidak ditemukan).")
-            
-            # Kolom B (index 1) = SKU, Kolom E (index 4) = Invoice, Kolom F (index 5) = Qty
+                raise ValueError("File Cross Order kurang dari 6 kolom. Kolom F tidak ditemukan.")
             df_cross_clean = pd.DataFrame({
                 'SKU': df_cross.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'INVOICE': df_cross.iloc[:, 4].astype(str).str.strip().str.lstrip('0'),
                 'QTY_CROSS': pd.to_numeric(df_cross.iloc[:, 5], errors='coerce').fillna(0)
+            })
+
+        df_rto_out_clean = None
+        if file_rto_out is not None and not discrepancies.empty:
+            df_rto_out_df = load_data(file_rto_out)
+            if df_rto_out_df.shape[1] < 10:
+                raise ValueError("File RTO Out kurang dari 10 kolom. Kolom J tidak ditemukan.")
+            df_rto_out_clean = pd.DataFrame({
+                'NO_TF': df_rto_out_df.iloc[:, 3].astype(str).str.strip().str.lstrip('0'),
+                'SKU': df_rto_out_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
+                'QTY_RTO': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0)
+            })
+
+        # --- 2. BACA DATA PENDUKUNG (PENAMBAHAN STOK) ---
+        df_po_clean = None
+        if file_po is not None and not discrepancies.empty:
+            df_po = load_data(file_po)
+            if df_po.shape[1] < 12:
+                raise ValueError("File Purchase Order kurang dari 12 kolom. Kolom L tidak ditemukan.")
+            df_po_clean = pd.DataFrame({
+                'NO_PO': df_po.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
+                'SKU': df_po.iloc[:, 3].astype(str).str.strip().str.lstrip('0').str.upper(),
+                'QTY_PO': pd.to_numeric(df_po.iloc[:, 11], errors='coerce').fillna(0)
+            })
+
+        df_rto_in_clean = None
+        if file_rto_in is not None and not discrepancies.empty:
+            df_rto_in_df = load_data(file_rto_in)
+            if df_rto_in_df.shape[1] < 10:
+                raise ValueError("File RTO In kurang dari 10 kolom. Kolom J tidak ditemukan.")
+            df_rto_in_clean = pd.DataFrame({
+                'NO_TF': df_rto_in_df.iloc[:, 3].astype(str).str.strip().str.lstrip('0'),
+                'SKU': df_rto_in_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
+                'QTY_RTO': pd.to_numeric(df_rto_in_df.iloc[:, 9], errors='coerce').fillna(0)
             })
             
         status_list = []
@@ -5437,19 +5467,61 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
             target_sku = str(row['SKU']).strip().lstrip('0').upper()
             actual_diff = row['DIFF']
             
-            # 1. JIKA STOK BERTAMBAH (Sys2 > Sys1)
+            # =========================================================================
+            # CASE 1: JIKA STOK BERTAMBAH (Sys2 > Sys1 atau DIFF < 0) -> CEK PO & RTO IN
+            # =========================================================================
             if actual_diff < 0:
-                status_list.append("TAMBAHAN DARI PO / RTO (PERLU CEK ULANG)")
-                invoice_list.append("-")
-                track_bin_list.append("-")
-                track_qty_list.append(0)
+                target_diff = abs(actual_diff)
                 
-            # 2. JIKA STOK BERKURANG (Sys1 > Sys2) -> CEK TRACKING / CROSS ORDER
+                # A. Cek Purchase Order
+                match_po = df_po_clean[df_po_clean['SKU'] == target_sku] if df_po_clean is not None else pd.DataFrame()
+                # B. Cek RTO In
+                match_rto_in = df_rto_in_clean[df_rto_in_clean['SKU'] == target_sku] if df_rto_in_clean is not None else pd.DataFrame()
+                
+                if not match_po.empty:
+                    po_str = ", ".join(map(str, match_po['NO_PO'].unique()))
+                    total_qty_po = match_po['QTY_PO'].sum()
+                    
+                    if total_qty_po >= target_diff:
+                        status_list.append("DONE MASUK (PURCHASE ORDER)")
+                    else:
+                        status_list.append("QTY PO TIDAK MATCH DENGAN SELISIH")
+                        
+                    invoice_list.append(po_str)
+                    track_bin_list.append("-")
+                    track_qty_list.append(total_qty_po)
+                    
+                elif not match_rto_in.empty:
+                    tf_str = ", ".join(map(str, match_rto_in['NO_TF'].unique()))
+                    total_qty_rto_in = match_rto_in['QTY_RTO'].sum()
+                    
+                    if total_qty_rto_in >= target_diff:
+                        status_list.append("DONE MASUK (RTO IN)")
+                    else:
+                        status_list.append("QTY RTO IN TIDAK MATCH DENGAN SELISIH")
+                        
+                    invoice_list.append(tf_str)
+                    track_bin_list.append("-")
+                    track_qty_list.append(total_qty_rto_in)
+                    
+                else:
+                    status_list.append("TAMBAHAN STOK TIDAK DIKETAHUI (CEK PO/RTO IN)")
+                    invoice_list.append("-")
+                    track_bin_list.append("-")
+                    track_qty_list.append(0)
+            
+            # =========================================================================
+            # CASE 2: JIKA STOK BERKURANG (Sys1 > Sys2 atau DIFF > 0) -> PRIORITY BERJENJANG
+            # =========================================================================
             else:
                 target_diff = abs(actual_diff)
                 
-                # Cek ke Tracking Reguler Terlebih Dahulu
+                # Urutan 1: Cek Stock Tracking (Sales Reguler)
                 match_sku = df_track_clean[df_track_clean['SKU'] == target_sku] if df_track_clean is not None else pd.DataFrame()
+                # Urutan 2: Cek Cross Order
+                match_cross = df_cross_clean[df_cross_clean['SKU'] == target_sku] if df_cross_clean is not None else pd.DataFrame()
+                # Urutan 3: Cek RTO Out
+                match_rto_out = df_rto_out_clean[df_rto_out_clean['SKU'] == target_sku] if df_rto_out_clean is not None else pd.DataFrame()
                 
                 if not match_sku.empty:
                     invoices_str = ", ".join(map(str, match_sku['INVOICE'].unique()))
@@ -5465,8 +5537,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
                     track_bin_list.append(bins_str)
                     track_qty_list.append(total_qty_sales)
                 
-                # ALTERNATIF: Jika tidak ada di tracking reguler, cek di Cross Order
-                elif df_cross_clean is not None and not (match_cross := df_cross_clean[df_cross_clean['SKU'] == target_sku]).empty:
+                elif not match_cross.empty:
                     invoices_str = ", ".join(map(str, match_cross['INVOICE'].unique()))
                     total_qty_cross = match_cross['QTY_CROSS'].sum()
                     
@@ -5476,16 +5547,24 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_cross_order=
                         status_list.append("QTY CROSS ORDER TIDAK MATCH DENGAN SELISIH")
                         
                     invoice_list.append(invoices_str)
-                    track_bin_list.append("CROSS ORDER (NO BIN)") # Cross order umumnya tidak mencatat bin fisik asal di file tracking
+                    track_bin_list.append("CROSS ORDER (NO BIN)")
                     track_qty_list.append(total_qty_cross)
                     
-                else:
-                    # Jika data pendukung belum di-upload atau memang tidak ada match sales
-                    if df_track_clean is None and df_cross_clean is None:
-                        status_list.append("STOK BERKURANG (BELUM UPLOAD DATA PENDUKUNG)")
+                elif not match_rto_out.empty:
+                    tf_str = ", ".join(map(str, match_rto_out['NO_TF'].unique()))
+                    total_qty_rto_out = match_rto_out['QTY_RTO'].sum()
+                    
+                    if total_qty_rto_out >= target_diff:
+                        status_list.append("DONE KELUAR (RTO OUT)")
                     else:
-                        status_list.append("NO SALES -> PERLU CEK RTO")
+                        status_list.append("QTY RTO OUT TIDAK MATCH DENGAN SELISIH")
                         
+                    invoice_list.append(tf_str)
+                    track_bin_list.append("RTO OUT (NO BIN)")
+                    track_qty_list.append(total_qty_rto_out)
+                    
+                else:
+                    status_list.append("NO SALES -> PERLU CEK ADJ / RTO KELUAR")
                     invoice_list.append("-")
                     track_bin_list.append("-")
                     track_qty_list.append(0)
@@ -8794,20 +8873,16 @@ if menu == "Putaway System":
         )
 elif menu == "Compare System":
     st.markdown('<div class="hero-header"><h1>STOCK COMPARATION</h1></div>', unsafe_allow_html=True)
-    with st.expander("📋 Informasi Format File"):
+    with st.expander("📋 Informasi Format File & Kolom Mapping"):
         st.info("""
-        **Format yang diharapkan:**
-        - **STOCK SYSTEM 1**: Download ALL DATA STOCK Sebelum jam operasional **Before Shift 0 (07:30)**
-        - **STOCK SYSTEM 2**: Download ALL DATA STOCK Setelah jam operasional **After Shift 2 (10:00)**
-        - **STOCK TRACKING** : Download sesuaikan dengan tanggal dan pilih hanya yang **DONE**
-        - **CROSS ORDER** : File data Cross Order (Kolom B = SKU, Kolom E = Invoice, Kolom F = QTY)
-        """)
-    with st.expander("💡Logic Thinking"):
-        st.info("""
-        **Alur Compare :**
-        - Melakukan compare kuantitas sistem menggunakan kecocokan SKU.
-        - Jika ditemukan pengurangan stok, sistem akan memeriksa data **Stock Tracking** terlebih dahulu.
-        - Jika tidak ada di Stock Tracking, sistem otomatis beralih mencari kecocokan pada data **Cross Order**.
+        **Kondisi Stok Berkurang (Sys1 > Sys2):**
+        1. **Stock Tracking**: Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty.
+        2. **Cross Order**: Kolom B=SKU, Kolom E=Invoice, Kolom F=Qty.
+        3. **RTO Out**: Kolom D=No TF, Kolom I=SKU, Kolom J=Qty.
+        
+        **Kondisi Stok Bertambah (Sys2 > Sys1):**
+        1. **Purchase Order**: Kolom A=No PO, Kolom D=SKU, Kolom L=Qty.
+        2. **RTO In**: Kolom D=No TF, Kolom I=SKU, Kolom J=Qty.
         """)
 
     if 'result_all' not in st.session_state:
@@ -8815,24 +8890,39 @@ elif menu == "Compare System":
     if 'diff_only' not in st.session_state:
         st.session_state.diff_only = None
 
-    # Menggunakan layout grid 2x2 agar tampilan uploader tetap bersih dan simetris
-    row1_col1, row1_col2 = st.columns(2)
-    row2_col1, row2_col2 = st.columns(2)
-    
-    with row1_col1:
+    # --- BARIS 1: FILE UTAMA SYSTEM ---
+    st.markdown("### 📥 1. Upload File Utama Stock System")
+    c1, c2 = st.columns(2)
+    with c1:
         file_sys1 = st.file_uploader("Stock System Start Shift", type=['xlsx', 'csv'], key='uploader_sys1')
-    with row1_col2:
+    with c2:
         file_sys2 = st.file_uploader("Stock System End Shift", type=['xlsx', 'csv'], key='uploader_sys2')
-    with row2_col1:
+
+    # --- BARIS 2: DOKUMEN PENDUKUNG KELUAR ---
+    st.markdown("### 📤 2. Upload Dokumen Pendukung (Stok Berkurang)")
+    out1, out2, out3 = st.columns(3)
+    with out1:
         file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'], key='uploader_track')
-    with row2_col2:
-        file_cross_order = st.file_uploader("Upload Cross Order (Opsional)", type=['xlsx', 'csv'], key='uploader_cross')
+    with out2:
+        file_cross_order = st.file_uploader("Upload Cross Order", type=['xlsx', 'csv'], key='uploader_cross')
+    with out3:
+        file_rto_out = st.file_uploader("Upload RTO OUT", type=['xlsx', 'csv'], key='uploader_rto_out')
+
+    # --- BARIS 3: DOKUMEN PENDUKUNG MASUK ---
+    st.markdown("### 📥 3. Upload Dokumen Pendukung (Stok Bertambah)")
+    in1, in2 = st.columns(2)
+    with in1:
+        file_po = st.file_uploader("Upload Purchase Order (PO)", type=['xlsx', 'csv'], key='uploader_po')
+    with in2:
+        file_rto_in = st.file_uploader("Upload RTO IN", type=['xlsx', 'csv'], key='uploader_rto_in')
 
     if file_sys1 and file_sys2:
         if st.button("▶️RUN COMPARE"):
             try:
-                # Memanggil fungsi dengan tambahan argument file_cross_order
-                res_all, d_only = process_stock_comparison(file_sys1, file_sys2, file_tracking, file_cross_order)
+                # Menjalankan fungsi lengkap dengan 7 parameter file
+                res_all, d_only = process_stock_comparison(
+                    file_sys1, file_sys2, file_tracking, file_cross_order, file_po, file_rto_in, file_rto_out
+                )
                 st.session_state.result_all = res_all
                 st.session_state.diff_only = d_only
             except Exception as e:
@@ -8844,15 +8934,14 @@ elif menu == "Compare System":
 
         st.divider()
 
-        # --- HITUNG METRIK DATA UNTUK DITAMPILKAN ---
+        # --- HITUNG METRIK DATA ---
         total_checked = len(result_all)
         total_diff = len(diff_only)
         
         if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
-            # Mengakomodasi status baru dari cross order ke metrik MATCH
-            match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("DONE TERJUAL", na=False)])
-            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("TIDAK MATCH|PO / RTO", na=False)])
-            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO SALES", na=False)])
+            match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("DONE", na=False)])
+            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("TIDAK MATCH", na=False)])
+            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("NO SALES|TIDAK DIKETAHUI", na=False)])
         else:
             match_count, unmatch_count, no_sales_count = 0, 0, 0
             
@@ -8864,14 +8953,14 @@ elif menu == "Compare System":
         st.write("") 
         
         m3, m4, m5 = st.columns(3)
-        m3.markdown(f'<div class="m-box" style="border-left: 5px solid #28a745;"><span class="m-lbl">✅ SELISIH & SALES MATCH</span><span class="m-val" style="color: #28a745;">{match_count} SKU</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box" style="border-left: 5px solid #dc3545;"><span class="m-lbl">➕ PENAMBAHAN PO & RTO</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
-        m5.markdown(f'<div class="m-box" style="border-left: 5px solid #ffc107;"><span class="m-lbl">🔍 TOTAL SELISIH NO SALES</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box" style="border-left: 5px solid #28a745;"><span class="m-lbl">✅ SELISIH MATCH (DONE)</span><span class="m-val" style="color: #28a745;">{match_count} SKU</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box" style="border-left: 5px solid #dc3545;"><span class="m-lbl">⚠️ QTY DOKUMEN MISSMATCH</span><span class="m-val" style="color: #dc3545;">{unmatch_count} SKU</span></div>', unsafe_allow_html=True)
+        m5.markdown(f'<div class="m-box" style="border-left: 5px solid #ffc107;"><span class="m-lbl">🔍 SELISIH TANPA DOKUMEN</span><span class="m-val" style="color: #ffc107;">{no_sales_count} SKU</span></div>', unsafe_allow_html=True)
 
         st.write("")
 
         if not diff_only.empty:
-            st.warning("Daftar Perbedaan Stok Beserta Hasil Cross-Check Tracking Penjualan / Cross Order:")
+            st.warning("Daftar Perbedaan Stok Beserta Hasil Cross-Check Multi-Dokumen:")
             
             ordered_cols = [
                 'BIN', 'SKU', 'QTY_Sys1', 'QTY_Sys2', 'DIFF', 
@@ -8890,7 +8979,7 @@ elif menu == "Compare System":
                 key='btn_download_compare'
             )
         else:
-            st.success("✅ Tidak ada perbedaan stok! Semua BIN, SKU, dan QTY match.")
+            st.success("✅ Tidak ada perbedaan stok! Semua data match.")
                 
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
