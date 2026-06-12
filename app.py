@@ -5383,10 +5383,19 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         data1['SKU'] = data1['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
         data2['SKU'] = data2['SKU'].astype(str).str.strip().str.lstrip('0').str.upper()
 
+        # Gabungkan data System 1 dan System 2
         comparison = pd.merge(
             data1, data2, on='SKU', how='outer', suffixes=('_Sys1', '_Sys2')
         ).fillna(0)
 
+        # =========================================================================
+        # 🚨 FILTER ANTI-MINUS: ABAIKAN JIKA QTY SYSTEM ADALAH MINUS (< 0)
+        # =========================================================================
+        comparison = comparison[
+            (comparison['QTY_Sys1'] >= 0) & (comparison['QTY_Sys2'] >= 0)
+        ].copy()
+
+        # Baru hitung selisih setelah data minus dibuang murni
         comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
@@ -5398,7 +5407,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 'INVOICE': df_track.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0) # Kolom K (Index 10)
+                'QTY': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0) # Kolom K
             })
 
         df_rto_out_clean = None
@@ -5407,7 +5416,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             df_rto_out_clean = pd.DataFrame({
                 'NO_TF': df_rto_out_df.iloc[:, 3].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_rto_out_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0) # Kolom J (Index 9)
+                'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0) # Kolom J
             })
 
         # --- 2. BACA DATA PENDUKUNG (MASUK) ---
@@ -5417,7 +5426,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             df_po_clean = pd.DataFrame({
                 'NO_PO': df_po.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_po.iloc[:, 3].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY': pd.to_numeric(df_po.iloc[:, 11], errors='coerce').fillna(0) # Kolom L (Index 11)
+                'QTY': pd.to_numeric(df_po.iloc[:, 11], errors='coerce').fillna(0) # Kolom L
             })
 
         df_rto_in_clean = None
@@ -5426,7 +5435,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             df_rto_in_clean = pd.DataFrame({
                 'NO_TF': df_rto_in_df.iloc[:, 3].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_rto_in_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 10], errors='coerce').fillna(0) # Kolom K (Index 10)
+                'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 10], errors='coerce').fillna(0) # Kolom K
             })
             
         status_list = []
@@ -5505,7 +5514,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         
     except Exception as e:
         raise e
-
+        
 import streamlit as st
 import pandas as pd
 from st_supabase_connection import SupabaseConnection
