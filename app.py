@@ -5398,7 +5398,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 'INVOICE': df_track.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0) # Kolom K (Index 10)
             })
 
         df_rto_out_clean = None
@@ -5407,7 +5407,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             df_rto_out_clean = pd.DataFrame({
                 'NO_TF': df_rto_out_df.iloc[:, 3].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_rto_out_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0) # Kolom J (Index 9)
             })
 
         # --- 2. BACA DATA PENDUKUNG (MASUK) ---
@@ -5417,7 +5417,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             df_po_clean = pd.DataFrame({
                 'NO_PO': df_po.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_po.iloc[:, 3].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY': pd.to_numeric(df_po.iloc[:, 11], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_po.iloc[:, 11], errors='coerce').fillna(0) # Kolom L (Index 11)
             })
 
         df_rto_in_clean = None
@@ -5426,7 +5426,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             df_rto_in_clean = pd.DataFrame({
                 'NO_TF': df_rto_in_df.iloc[:, 3].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_rto_in_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
-                'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 9], errors='coerce').fillna(0)
+                'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 10], errors='coerce').fillna(0) # Kolom K (Index 10)
             })
             
         status_list = []
@@ -5443,70 +5443,55 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             bins_found = []
             accumulated_qty = 0
             
-            # =========================================================================
-            # CASE 1: STOK BERTAMBAH (DIFF < 0) -> GABUNGAN PO + RTO IN
-            # =========================================================================
+            # --- KONDISI MASUK (DIFF < 0) ---
             if actual_diff < 0:
-                # Ambil data PO
                 if df_po_clean is not None:
                     match_po = df_po_clean[df_po_clean['SKU'] == target_sku]
                     if not match_po.empty:
-                        po_str = "/".join(map(str, match_po['NO_PO'].unique()))
-                        docs_found.append(f"PO:{po_str}")
+                        docs_found.append(f"PO:{'/'.join(map(str, match_po['NO_PO'].unique()))}")
                         accumulated_qty += match_po['QTY'].sum()
                 
-                # Ambil data RTO IN
                 if df_rto_in_clean is not None:
                     match_rto_in = df_rto_in_clean[df_rto_in_clean['SKU'] == target_sku]
                     if not match_rto_in.empty:
-                        tf_str = "/".join(map(str, match_rto_in['NO_TF'].unique()))
-                        docs_found.append(f"RTO_IN:{tf_str}")
+                        docs_found.append(f"RTO_IN:{'/'.join(map(str, match_rto_in['NO_TF'].unique()))}")
                         accumulated_qty += match_rto_in['QTY'].sum()
                 
-                # LOGIKA UTAMA: Cukup lihat total Qty pencarian vs Selisih (needed_qty)
                 if accumulated_qty == 0:
                     final_status = "TAMBAHAN STOK TANPA DOKUMEN"
                 elif accumulated_qty >= needed_qty:
-                    final_status = "DONE MASUK"  # Pokoknya total qty mencukupi / lebih -> DONE!
+                    final_status = "DONE MASUK"
                 else:
                     final_status = f"MASUK MISSMATCH (KURANG -{int(needed_qty - accumulated_qty)})"
 
                 track_bin_list.append("-")
 
-            # =========================================================================
-            # CASE 2: STOK BERKURANG (DIFF > 0) -> GABUNGAN SALES + RTO OUT
-            # =========================================================================
+            # --- KONDISI KELUAR (DIFF > 0) ---
             else:
-                # Ambil data Stock Tracking (Sales)
                 if df_track_clean is not None:
                     match_track = df_track_clean[df_track_clean['SKU'] == target_sku]
                     if not match_track.empty:
-                        inv_str = "/".join(map(str, match_track['INVOICE'].unique()))
-                        bin_str = "/".join(map(str, match_track['BIN'].unique()))
-                        docs_found.append(f"TRACK:{inv_str}")
-                        if bin_str: bins_found.append(bin_str)
+                        docs_found.append(f"TRACK:{'/'.join(map(str, match_track['INVOICE'].unique()))}")
+                        if match_track['BIN'].any(): 
+                            bins_found.append("/".join(map(str, match_track['BIN'].unique())))
                         accumulated_qty += match_track['QTY'].sum()
                 
-                # Ambil data RTO OUT
                 if df_rto_out_clean is not None:
                     match_rto_out = df_rto_out_clean[df_rto_out_clean['SKU'] == target_sku]
                     if not match_rto_out.empty:
-                        tf_out = "/".join(map(str, match_rto_out['NO_TF'].unique()))
-                        docs_found.append(f"RTO_OUT:{tf_out}")
+                        docs_found.append(f"RTO_OUT:{'/'.join(map(str, match_rto_out['NO_TF'].unique()))}")
                         bins_found.append("RTO_OUT(NO BIN)")
                         accumulated_qty += match_rto_out['QTY'].sum()
                 
-                # LOGIKA UTAMA: Cukup lihat total Qty pencarian vs Selisih (needed_qty)
                 if accumulated_qty == 0:
                     final_status = "NO SALES (PERLU CEK ADJ)"
                 elif accumulated_qty >= needed_qty:
-                    final_status = "DONE TERJUAL"  # Kasus gambar lu: Qty 2 >= DIFF? Nanti gw jelasin di bawah.
+                    final_status = "DONE TERJUAL"
                 else:
                     final_status = f"KELUAR MISSMATCH (KURANG DOKUMEN -{int(needed_qty - accumulated_qty)})"
                     
                 track_bin_list.append(", ".join(bins_found) if bins_found else "-")
 
-            # Masukkan ke list utama hasil loop
             status_list.append(final_status)
             doc_reference_list.append(", ".join(docs_found) if docs_found else "-")
             total_found_qty_list.append(accumulated_qty)
