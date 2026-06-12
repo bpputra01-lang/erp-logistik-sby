@@ -5204,10 +5204,10 @@ def process_justification(df_case, df_tracking, df_all_stock):
     df_all_stock = df_all_stock.copy()
     df_all_stock.columns = [str(c).upper().strip() for c in df_all_stock.columns]
 
-    # Ambil index nama kolom penting dari file adjustment lu
-    sku_col_case = res.columns[2]       # Kolom C (SKU)
-    qty_sys_col_case = res.columns[9]   # Kolom J (QTY SYSTEM)
-    qty_so_col_case = res.columns[10]   # Kolom K (QTY SO)
+    # KUNCI LANGSUNG MENGGUNAKAN NAMA STRING (Anti-Geser akibat Merge)
+    sku_col_case = 'SKU'
+    qty_sys_col_case = 'QTY SYSTEM'
+    qty_so_col_case = 'QTY SO'
     
     # Standarisasi SKU internal untuk join data di background
     res['SKU_KEY_JOIN'] = res[sku_col_case].astype(str).str.split('.').str[0].str.strip().str.upper()
@@ -5236,12 +5236,11 @@ def process_justification(df_case, df_tracking, df_all_stock):
     ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 3. [PERBAIKAN 1] Aggregasi All Data Stock (EXCLUDE BIN KARANTINA)
+    # 3. Aggregasi All Data Stock (EXCLUDE BIN KARANTINA)
     bin_col_all = df_all_stock.columns[1]
     sku_col_all = df_all_stock.columns[2]
     qty_sys_col_all = df_all_stock.columns[9]
     
-    # Filter buang BIN yang mengandung kata 'KARANTINA'
     df_all_stock_filtered = df_all_stock[
         ~df_all_stock[bin_col_all].astype(str).str.upper().str.contains('KARANTINA', na=False)
     ]
@@ -5257,7 +5256,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
     res = res.merge(all_stock_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_ALL', how='left').fillna(0)
 
-   # 5. Pemetaan ke Nama Kolom Final
+    # 5. Pemetaan ke Nama Kolom Final
     res['BEGINNING STOCK']    = res['BEGINNING STOCK']
     res['ENDING STOCK']       = res['_N_ENDING_STOCK']
     res['CURRENT STOCK']      = res['_O_CURR_STOCK']
@@ -5274,7 +5273,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res['QTY SYSTEM ALL']     = res['_QTY_SYS_ALL']
     res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    # --- TAMBAHKAN BARIS INI UNTUK KOLOM BARU LU ---
     res['REAL QTY'] = (
         res['BEGINNING STOCK'] + res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN'] 
         - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
@@ -5283,11 +5281,9 @@ def process_justification(df_case, df_tracking, df_all_stock):
     # 6. Update Logika Justifikasi Sesuai Aturan Baru
     def run_formula(row):
         try:
-            # Ambil nilai baris file adjustment lu
             qty_sys_row = round(float(row[qty_sys_col_case]), 2)
             qty_so_row = round(float(row[qty_so_col_case]), 2)
             
-            # Ambil nilai hitungan background lintas file
             begin_stock = round(float(row['BEGINNING STOCK']), 2)
             stock_in = round(float(row['TOTAL_STOCKIN']), 2)
             trf_in = round(float(row['TOTAL TRF_IN']), 2)
@@ -5302,7 +5298,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
             ending_stock = round(float(row['ENDING STOCK']), 2)
             real_qty = round(float(row['REAL QTY']), 2)
 
-          # =========================================================================
+            # =========================================================================
             # ORDER 1: ATURAN KHUSUS - KESALAHAN SYSTEM (BEGIN STOCK -)
             # =========================================================================
             if qty_so_row > qty_sys_row and begin_stock < 0:
@@ -5311,20 +5307,13 @@ def process_justification(df_case, df_tracking, df_all_stock):
                 elif gap_adj == 0:
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
 
-           # =========================================================================
-            # ORDER 2: ATURAN BARU - KESALAHAN SYSTEM (STOCK MATCH TAPI QTY SYS ALL KECIL)
-            # Kita paksa bungkus float() dan round() biar gak ada drama string vs angka
             # =========================================================================
-            if qty_so_row > qty_sys_row and gap_adj == 0 and begin_stock == 0:
-                # Bungkus murni ke float biar apple-to-apple saat dibandingin
-                v_ending = round(float(row['ENDING STOCK']), 2)
-                v_real   = round(float(row['REAL QTY']), 2)
-                v_curr   = round(float(row['CURRENT STOCK']), 2)
-                v_sys_all = round(float(row['QTY SYSTEM ALL']), 2)
-                
-                # Cek ulang dengan variabel bersih
-                if v_ending == v_real == v_curr:
-                    if v_sys_all < v_ending:
+            # ORDER 2: ATURAN BARU (BYPASS PINTU DEPAN - ANTI BOCOR)
+            # Kasus lu: GAP & BEGIN == 0, Stock background kembar senilai 1, master ALL bernilai 0
+            # =========================================================================
+            if gap_adj == 0 and begin_stock == 0:
+                if ending_stock == real_qty == curr_stock:
+                    if qty_sys_all < ending_stock:
                         return "KESALAHAN SYSTEM"
 
             # =========================================================================
@@ -5350,7 +5339,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
                 return "KESALAHAN ADJUSMENT -"
 
             # =========================================================================
-            # ORDER 6: LOGIKA KESALAHAN SYSTEM BAWAAN (Kondisi syarat Gap Adj harus == 0)
+            # ORDER 6: LOGIKA KESALAHAN SYSTEM BAWAAN
             # =========================================================================
             if gap_adj == 0:
                 if qty_sys_row > qty_so_row:
@@ -5363,7 +5352,7 @@ def process_justification(df_case, df_tracking, df_all_stock):
                         return "KESALAHAN SYSTEM"
 
             # =========================================================================
-            # ORDER 7: KESALAHAN RTO & UNDEFINED (PILIHAN TERAKHIR)
+            # ORDER 7: KESALAHAN RTO & UNDEFINED
             # =========================================================================
             if draft_in > 0 or draft_out > 0:
                 return "KESALAHAN RTO"
@@ -5380,11 +5369,10 @@ def process_justification(df_case, df_tracking, df_all_stock):
         'HARGA BELI', 'HARGA JUAL', 'QTY SYSTEM', 'QTY SO', 
         'BEGINNING STOCK', 'TOTAL_STOCKIN', 'TOTAL_ADJ_PLUS', 'TOTAL TRF_IN', 
         'TOTAL DRAFT_TRF_IN', 'TOTAL SALES', 'TOTAL_ADJ_MINUS', 'TOTAL DRAFT_TRF_OUT', 
-        'TOTAL TRF_OUT', 'ENDING STOCK', 'REAL QTY', 'CURRENT STOCK', # <-- Taruh di sini bro
+        'TOTAL TRF_OUT', 'ENDING STOCK', 'REAL QTY', 'CURRENT STOCK', 
         'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
     ]
 
-    # Bersihkan sisa-sisa kolom background key internal agar output rapi
     drop_cols = ['SKU_KEY_JOIN', 'SKU_KEY', 'SKU_KEY_ALL', 
                  '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', 
                  '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', 
@@ -5393,7 +5381,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
 
     final_cols = [col for col in ordered_headers if col in res.columns]
     return res[final_cols]
-
 import pandas as pd
 import numpy as np
 
