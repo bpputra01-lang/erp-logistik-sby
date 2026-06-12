@@ -5304,13 +5304,14 @@ def process_justification(df_case, df_tracking, df_all_stock):
                 if gap_adj < abs(begin_stock):
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
 
-            # --- LOGIKA BARU YANG DIPERBAIKI ---
-            if qty_so_row > qty_sys_row and begin_stock == 0 and gap_adj == 0 and draft_in == 0 and draft_out == 0:
-                # Menghitung rumus mutasi murni: (STOCK IN + TF IN) - (SALES + TF OUT)
-                mutasi_bersih = round((stock_in + trf_in) - (sales + trf_out), 2)
+            # --- ATURAN TAMBAHAN 2: KESALAHAN SYSTEM (MENGHITUNG BEGIN STOCK >= 0 + MUTASI) ---
+            # Syarat diubah: begin_stock >= 0 (tidak bernilai minus)
+            if qty_so_row > qty_sys_row and begin_stock >= 0 and gap_adj == 0 and draft_in == 0 and draft_out == 0:
+                # Sekarang BEGINNING STOCK dimasukkan sebagai penambah di awal rumus
+                mutasi_bersih = round(begin_stock + (stock_in + trf_in) - (sales + trf_out), 2)
                 
-                # JIKA HASILNYA TIDAK SAMA DENGAN ENDING STOCK
-                if mutasi_bersih != ending_stock: 
+                # JIKA HASIL AKHIR MUTASI TIDAK MATCH DENGAN ENDING STOCK (KOLOM U)
+                if mutasi_bersih != ending_stock:
                     return "KESALAHAN SYSTEM"
 
             # --- LOGIKA 3: KESALAHAN ADJUSMENT (+ / -) DENGAN PENCEKAN RUMUS ---
