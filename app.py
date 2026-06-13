@@ -8946,6 +8946,167 @@ elif menu == "Compare System":
             )
         else:
             st.success("✅ Tidak ada perbedaan stok! Semua data match.")
+
+elif menu == "Scan Out Validation":
+    st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
+    
+    with st.expander("📋 Informasi Format File"):
+        st.info("""
+        **Format yang diharapkan :**
+
+        - **UPLOAD MENGGUNAKAN FILE DATA SCAN (APPSHEET)**: Kolom A = **BIN**, Kolom B = **SKU** (QTY akan dihitung otomatis)
+        - **UPLOAD MENGGUNAKAN DATA POWER BI**: Berikut cara download permintaan FL by PBI
+            - Buka Power BI
+            - Pilih Menu **Moving Stock**
+            - Pilih Tab atau Sheet **Detail**
+            - Lalu untuk Period pilih **YESTERDAY**
+            - Untuk Trx Type pilih **Yesterday**
+            - Untuk Store_stockadj pilih **JEZ SURABAYA (DC)**
+            - Setelah itu Download filenya
+            - **File tidak perlu diedit dan bisa langsung di Uplaod**
+        - **HISTORY SET UP**: Sesuai yang ada pada template Mutasi Set Up Jezpro
+        - **STOCK TRACKING**: Sesuai yang ada pada template Stock Tracking Jezpro
+        - **PS** ➡️ *Pilih salah satu mau menggunakan file data scan dari Appsheet atau dari file PBI*
+        """)
+        
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **Alur Compare Scan Out :**
+        - System akan melakukan compare antara BIN dan SKU yang ada di file data scan dengan file History Set Up dan Stock Tracking
+        - Jika BIN dan SKU akan langsung melakukan double cek di kedua file mana yang cocok dan sesuai dengan BIN dan SKU yang ada di data scan
+        - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking maka akan diberikan note **DONE AND MATCH SET UP**
+        - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking namun BIN tidak sesuai hanya SKUnya saja yang cocok maka akan diberikan note **DONE SETUP (BIN MISSMATCH)**
+        - Jika ditemukan di File Mutasi dan tidak ditemukan di file Stock Tracking namun QTY tidak sesuai hanya SKU dan BIN saja yang cocok maka akan diberikan note **DONE SET UP (QTY MISSMATCH)**
+        - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi maka akan diberikan note **ITEM TELAH TERJUAL**
+        - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi namun BIN tidak sesuai hanya SKUnya saja yang cocok maka akan diberikan note **ITEM TELAH TERJUAL (BIN MISSMATCH)**
+        - Jika ditemukan di File Stock Tracking dan tidak ditemukan di file Mutasi namun QTY tidak sesuai hanya SKU dan BIN saja yang cocok maka akan diberikan note **ITEM TELAH TERJUAL (QTY MISSMATCH)**
+        - Jika permintaan item ada > 1 item dan yang terjual hanya 1 maka akan dilakukan split row dimana akan dilakukan pengecekan di kedua file dan akan split note juga menyesuaikan kondisi hasil compare 
+        """)
+    
+   # Baris 1: Pilihan File Utama
+    st.markdown("### 📥 1. Upload File Data Scan (Pilih Salah Satu)")
+    uc1, uc2 = st.columns(2)
+    with uc1:
+        up_scan = st.file_uploader(
+            "Upload DATA SCAN (Format APPSHEET)", type=["xlsx", "csv"]
+        )
+    with uc2:
+        up_pbi = st.file_uploader("Upload DATA PBI (Format Power BI)", type=["xlsx", "csv"])
+
+    # Baris 2: File Pendukung
+    st.markdown("### 📥 2. Upload File Dokumen Pendukung")
+    col2, col3 = st.columns(2)
+    with col2:
+        up_hist = st.file_uploader("Upload HISTORY SET UP", type=["xlsx"])
+    with col3:
+        up_stock = st.file_uploader("Upload STOCK TRACKING", type=["xlsx"])
+    
+    if (up_scan or up_pbi) and up_hist and up_stock:
+        # 1. Inisialisasi Session State (Tempat penitipan data)
+        if "df_res" not in st.session_state:
+            st.session_state.df_res = None
+        if "df_draft" not in st.session_state:
+            st.session_state.df_draft = None
+
+        if st.button("▶️ COMPARE DATA SCAN OUT"):
+            try:
+                with st.spinner("🔄 Sedang memproses data..."):
+                    # LOGIKA BARU: Pilih proses berdasarkan file yang diupload
+                    if up_pbi is not None:
+                        df_s = pre_process_pbi_data(up_pbi)
+                        # Data PBI keluar dari fungsi sudah auto-standard (BIN & SKU)
+                        
+                    elif up_scan is not None:
+                        if up_scan.name.endswith(".csv"):
+                            df_s = pd.read_csv(up_scan)
+                        else:
+                            df_s = pd.read_excel(up_scan, engine="openpyxl")
+                        
+                        # PERBAIKAN: Taruh standardisasi kolom khusus untuk DATA SCAN langsung di sini
+                        df_s.columns = [str(col).strip().upper() for col in df_s.columns]
+                        
+                        if len(df_s.columns) < 2:
+                            st.error("❌ DATA SCAN harus memiliki minimal 2 kolom (BIN, SKU)")
+                            st.stop()
+                
+                # Baca file pendukung (Posisinya sejajar, di luar blok if/elif file utama)
+                df_h = pd.read_excel(up_hist, engine='openpyxl')
+                df_st = pd.read_excel(up_stock, engine='openpyxl')
+                
+                # Standardisasi kolom dokumen pendukung tetap jalan
+                df_h.columns = [str(col).strip().upper() for col in df_h.columns]
+                df_st.columns = [str(col).strip().upper() for col in df_st.columns]
+                
+                # HAPUS / KOMENTARI baris spinner ganda di bawah ini agar tidak redundant:
+                # with st.spinner('🔄 Sedang memproses data...'): 
+                
+                # Masukkan hasil ke session state
+                res, draft = process_scan_out(df_s, df_h, df_st)
+                st.session_state.df_res = res
+                st.session_state.df_draft = draft
+                
+                st.success("✅ Validasi Selesai!")
+                
+            except Exception as e:
+                st.error(f"❌ Error saat proses: {str(e)}")
+
+        # 2. Tampilkan Hasil jika data sudah ada di Session State
+        if st.session_state.df_res is not None:
+            df_res = st.session_state.df_res
+            df_draft = st.session_state.df_draft
+
+            # ========== STATISTIK (SAFE VERSION) ==========
+            st.divider()
+            st.markdown('<div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;"><h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3></div>', unsafe_allow_html=True)
+            
+            # Hitung statistik dengan proteksi tipe data
+            kets = df_res['Keterangan'].astype(str)
+            terjual_count = kets.apply(lambda x: 'TERJUAL' in x.upper()).sum()
+            mismatch_count = kets.apply(lambda x: 'MISSMATCH' in x.upper()).sum()
+            belum_count = kets.apply(lambda x: 'BELUM' in x.upper()).sum()
+            done_count = kets.apply(lambda x: 'DONE' in x.upper()).sum()
+            total_items = len(df_res)
+
+            sc1, sc2, sc3, sc4, sc5 = st.columns(5)
+            with sc1: st.markdown(f'''<div class="m-box"><span class="m-lbl">📦 Total Items</span><span class="m-val">{total_items}</span></div>''', unsafe_allow_html=True)
+            with sc2: st.markdown(f'''<div class="m-box"><span class="m-lbl">✅ DONE SETUP</span><span class="m-val">{done_count}</span></div>''', unsafe_allow_html=True)
+            with sc3: st.markdown(f'''<div class="m-box"><span class="m-lbl">📤 TERJUAL</span><span class="m-val">{terjual_count}</span></div>''', unsafe_allow_html=True)
+            with sc4: st.markdown(f'''<div class="m-box"><span class="m-lbl">⚠️ MISSMATCH</span><span class="m-val">{mismatch_count}</span></div>''', unsafe_allow_html=True)
+            with sc5: st.markdown(f'''<div class="m-box"><span class="m-lbl">❌ BELUM SETUP</span><span class="m-val">{belum_count}</span></div>''', unsafe_allow_html=True)
+            
+            st.divider()
+
+            # ========== TAMPILKAN DATAFRAME ==========
+            st.subheader("📋 DATA SCAN (COMPARED)")
+            def highlight_vba(val):
+                v = str(val).upper()
+                if 'MISSMATCH' in v or 'BELUM' in v: return 'color: red; font-weight: bold'
+                if 'DONE AND MATCH' in v: return 'color: green; font-weight: bold'
+                if 'TERJUAL' in v: return 'color: blue; font-weight: bold'
+                return ''
+
+            st.dataframe(df_res.style.map(highlight_vba, subset=['Keterangan']), use_container_width=True, height=400)
+            
+            if len(df_draft) > 0:
+                st.subheader("📝 DRAFT SET UP")
+                st.dataframe(df_draft, use_container_width=True, height=300)
+
+            # ========== DOWNLOAD SECTION ==========
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_res.to_excel(writer, sheet_name='DATA SCAN', index=False)
+                if len(df_draft) > 0:
+                    df_draft.to_excel(writer, sheet_name='DRAFT SET UP', index=False)
+                
+                # (Optional) Tambahkan formatting writer.book di sini jika perlu
+            
+            st.download_button(
+                label="📥 DOWNLOAD HASIL (DATA SCAN + DRAFT)",
+                data=output.getvalue(),
+                file_name="SCAN_OUT_RESULT.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
                 
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
