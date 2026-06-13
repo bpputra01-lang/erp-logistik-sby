@@ -8908,9 +8908,17 @@ elif menu == "Compare System":
         total_diff = len(diff_only)
         
         if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
-            match_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("DONE", na=False)])
-            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("MISSMATCH", na=False)])
-            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].str.contains("TANPA DOKUMEN|NO SALES", na=False)])
+            # 1. Menghitung semua yang berstatus DONE
+            match_count = len(diff_only[diff_only['STATUS_CHECK'].isin(["DONE MASUK", "DONE TERJUAL"])])
+            
+            # 2. Menghitung semua yang berstatus MISSMATCH (Sesuai output fungsi backend)
+            unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].isin(["MASUK QTY MISSMATCH", "KELUAR QTY MISSMATCH"])])
+            
+            # 3. Menghitung sisanya yang tidak ada dokumen/riwayat tracking
+            no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].isin(["PENAMBAHAN STOK (NO HISTORY)", "NO SALES (PERLU CEK ADJ)"])])
+            
+            # 🚨 SAFETY NET (OPSIONAL): Jika ada status lain yang belum tercover, 
+            # lu bisa masukkan ke no_sales_count atau buat handling tambahan agar totalnya selalu pas.
         else:
             match_count, unmatch_count, no_sales_count = 0, 0, 0
             
