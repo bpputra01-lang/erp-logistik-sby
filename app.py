@@ -5452,7 +5452,14 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0) # Kolom J
             })
 
-       df_po_clean = pd.DataFrame({
+       # --- 2. BACA DATA PENDUKUNG (MASUK) ---
+        df_po_clean = None
+        if file_po is not None and not discrepancies.empty:
+            df_po = load_data(file_po)
+            # =========================================================================
+            # 🔥 UPDATE: PO SKU DI KOLOM E (INDEX 4) & QTY DI KOLOM M (INDEX 12)
+            # =========================================================================
+            df_po_clean = pd.DataFrame({
                 'NO_PO': df_po.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
                 'SKU': df_po.iloc[:, 4].astype(str).str.strip().str.lstrip('0').str.upper(), # Kolom E (Index 4)
                 'QTY': pd.to_numeric(df_po.iloc[:, 12], errors='coerce').fillna(0)           # Kolom M (Index 12)
