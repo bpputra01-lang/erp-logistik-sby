@@ -9842,36 +9842,73 @@ elif menu == "Justification SO":
         - **ALL DATA STOCK**: Upload file All data Stock (Multiple Adjustment) **HANYA ADA STOCK**.
         """)
 
-    with st.expander("💡 Logic Thinking"):
-        st.info("""
-        **Logic Justifikasi Terbaru (Urutan Eksekusi Mutlak ORDER 1 - 7):**
+    with st.expander("💡 CARA MEMBACA LOGIKA JUSTIFIKASI (ATURAN REKONSILIASI)", expanded=False):
+        st.markdown("""
+       
         
-        1. **ORDER 1: KESALAHAN SYSTEM (BEGIN STOCK -)**:
-           * Jika **QTY SO > QTY SYSTEM**, **Beginning Stock < 0**, dan **Gap Adjustment >= 0** (Kondisi Gap 0 atau Gap lebih kecil dari nilai absolut Beginning Stock).
+        ### 🛑 1. Kesalahan System (Begin Stock Minus)
+        * **Kondisinya:** Stok SO lebih besar dari stok Sistem (ADJUSMENT +), Tetapi *Beginning Stock* bernilai minus (dibawah 0).
+        * **Artinya:** Sistem dari awal sudah eror/bocor datanya karena mencatat stok minus yang artinya memang perlu dilakukan *Adjusment +*
+        * **Contoh Kasus:**
+          | Stok SO | Stok Sistem | BEGINNING STOCK | GAP ADJUSMENT |
+          | :---: | :---: | :---: | :---: |
+          | 10 | 5 | **-2** | 0 |
         
-        2. **ORDER 2: KESALAHAN SYSTEM (STOCK MATCH TAPI QTY SYS ALL KECIL)** [BARU/FIXED]:
-           * Jika **Gap Adjustment == 0**, **Beginning Stock == 0**.
-           * Kondisi stock background sinkron kembar (**Ending Stock == Real QTY == Current Stock**), TETAPI nilai **QTY SYSTEM ALL < Ending Stock** (Master data system mendadak kosong/0 padahal mutasi fisik balance).
+        ### 🛡️ 2. Kesalahan System (Ending Stock ≠ Total Stock dari Multiple)
+        * **Kondisinya:** `GAP ADJUSTMENT` dan `BEGINNING STOCK` sama-sama nol, Total stock antara (`Ending Stock`, `Real Qty`, `Current Stock`) nilainya sama (senilai), tapi total stock di multiple (`QTY SYSTEM ALL`) malah lebih kecil dari stok akhir.
+        * **Artinya:** Ada miss match antara data di multiple dan summary sehingga menyebabkan adjusment +
+        * **Contoh Kasus:**
+          | GAP ADJ | BEGINNING STOCK | ENDING / REAL / CURR STOCK | QTY SYSTEM ALL |
+          | :---: | :---: | :---: | :---: |
+          | 0 | 0 | **10** (Kembar) | **3** (Lebih Kecil) |
         
-        3. **ORDER 3: KESALAHAN SYSTEM (BEGIN STOCK >= 0 + MUTASI TIDAK MATCH)**:
-           * Jika **QTY SO > QTY SYSTEM**, **Beginning Stock >= 0**, **Gap Adjustment == 0**, serta tidak ada pending draft RTO.
-           * Masuk kategori jika hitungan mutasi murni manual `Beginning Stock + (Stock In + TRF In) - (Sales + TRF Out)` **TIDAK SAMA DENGAN Ending Stock**.
+        ### ⚙️ 3. Kesalahan System (Miss Match Real QTY (Manually Counting) dengan Ending Stock/Current Stock)
+        * **Kondisinya:** Stok SO lebih besar dari stok Sistem (ADJUSMENT +), tidak ada transaksi gantung (`Draft TRF`), tidak ada `GAP ADJUSTMENT`, **TAPI** hasil hitungan manual tidak match dengan nilai `ENDING STOCK` di sistem.
+        * **Detail Hitungan Manual:** `BEGINNING STOCK` + (**`TOTAL_STOCKIN`** + **`TOTAL TRF_IN`**) - (**`TOTAL SALES`** + **`TOTAL TRF_OUT`**)
+        * **Artinya:** Sistem salah hitung mutasi barang (hasil gabungan barang masuk dan barang keluar tidak sinkron dengan stok akhir).
+        * **Contoh Kasus:**
+          | BEGINNING | STOCKIN + TRF_IN | SALES + TRF_OUT | Hitungan Manual | ENDING STOCK |
+          | :---: | :---: | :---: | :---: | :---: |
+          | 10 | + 5 | - 2 | **13** | **15** (Gak Match!) |
         
-        4. **ORDER 4: CEK HASIL REKONSILIASI**:
-           * Jika **QTY SYSTEM ALL sudah sama dengan Current Stock** (Murni aman di background stock).
+        ### 💻 4. Kesalahan System (Stock System Lost)
+        * **Kondisinya:** Tidak ada `GAP ADJUSTMENT` (`= 0`), tapi ada selisih antara Sistem dan SO. Ketika selisih itu ditambah/dikurang ke master `QTY SYSTEM ALL`, hasilnya pas dengan `CURRENT STOCK`.
+        * **Artinya:** Bug bawaan sistem yang bikin angka di layar tidak update.
+        * **Contoh Kasus:**
+          | QTY SO | QTY System | Selisih (Diff) | QTY SYSTEM ALL | CURRENT STOCK |
+          | :---: | :---: | :---: | :---: | :---: |
+          | 12 | 10 | **+2** | 15 | **17** *(15 + 2 Pas!)* |
+          | 8 | 10 | **-2** | 15 | **13** *(15 - 2 Pas!)* |
+
+        ### 🔍 5. Cek Hasil Rekonsiliasi
+        * **Kondisinya:** Total stock di multiple (`QTY SYSTEM ALL`) ternyata pas/sama persis dengan `CURRENT STOCK` / `ENDING STOCK`.
+        * **Artinya:** Data sebenarnya aman dan sinkron secara total keseluruhan.
+        * **Contoh Kasus:**
+          | QTY SYSTEM ALL | CURRENT STOCK | ENDING STOCK |
+          | :---: | :---: | :---: |
+          | **25** | **25** | **25** |
         
-        5. **ORDER 5: KESALAHAN ADJUSTMENT (+ / -)**:
-           * **KESALAHAN ADJUSTMENT +**: Jika **QTY SYSTEM > QTY SO** DAN **Gap Adjustment > 0**.
-           * **KESALAHAN ADJUSTMENT -**: Jika **QTY SYSTEM < QTY SO** DAN **Gap Adjustment < 0**.
+        ### ⚠️ 6. Kesalahan Adjustment (+ / -)
+        * **Kondisinya:** * Stok Sistem > Stok SO, tapi ada data `GAP ADJUSTMENT` positif (+).
+            * Stok Sistem < Stok SO, tapi ada data `GAP ADJUSTMENT` negatif (-).
+        * **Artinya:** Koreksi dari Proses Adjusment Sebelumnya (Reversal)
+        * **Contoh Kasus:**
+          | Kondisi Lapangan | GAP ADJUSMENT di Sistem | Keterangan |
+          | :--- | :---: | :--- |
+          | QTY Sistem (10) > QTY SO (5) | **+5** | *Ada Koreksi (Reversal)* |
+          | QTY Sistem (5) < QTY SO (10) | **-5** | *Ada Koreksi (Reversal)* |
         
-        6. **ORDER 6: KESALAHAN SYSTEM (BAWAAN SELISIH DIFF)**:
-           * Kondisi jika **Gap Adjustment == 0**.
-           * Jika **QTY SYSTEM > QTY SO**, hitung `diff = QTY SYSTEM - QTY SO`. Masuk kategori jika: `(QTY SYSTEM ALL - diff) == Current Stock`.
-           * Jika **QTY SYSTEM < QTY SO**, hitung `diff = QTY SO - QTY SYSTEM`. Masuk kategori jika: `(QTY SYSTEM ALL + diff) == Current Stock`.
+        ### 🚚 7. Kesalahan RTO (Barang Gantung)
+        * **Kondisinya:** Masih ada angka di kolom `TOTAL DRAFT TRF IN` atau `TOTAL DRAFT TRF OUT` yang menggantung (belum di-approve/finish).
+        * **Artinya:** Masalah klasik RTO/mutasi barang yang statusnya masih draf.
+        * **Contoh Kasus:**
+          | TOTAL DRAFT TRF IN | TOTAL DRAFT TRF OUT | Status |
+          | :---: | :---: | :---: |
+          | **5** | 0 | Ada barang gantung |
+          | 0 | **3** | Ada barang gantung |
         
-        7. **ORDER 7: KESALAHAN RTO & UNDEFINED**:
-           * **KESALAHAN RTO**: Jika SKU terkait masih memiliki transaksi menggantung berupa **Total Draft TRF In > 0** atau **Total Draft TRF Out > 0**.
-           * **UNDEFINED**: Pilihan terakhir jika data tidak memenuhi satu pun kriteria mutlak di atas (memerlukan audit manual).
+        > ❓ **Kenapa muncul UNDEFINED?** > Berarti kasus item tersebut tidak masuk ke dalam 7 kondisi di atas (butuh dicek manual).   
+        > ❓ **Kenapa muncul ERROR DATA?** > Ada kolom yang isinya kosong, teks rusak, atau tidak bisa dihitung angka.
         """)
 
     # Inisialisasi Session State
