@@ -2155,14 +2155,64 @@ def menu_Stock_Opname():
     
     if 'df_karantina_6' not in st.session_state: st.session_state.df_karantina_6 = None
 
+
+    # --- DICTIONARY MAPPING BIN PER BRANCH ---
+    BRANCH_BIN_MAPPING = {
+        "SURABAYA": [
+            "GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", 
+            "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
+            "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
+            "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "PUTAWAY", 
+            "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "BANDING"
+        ],
+        "MALANG": [
+            "GL1-BACKLINE", "GL1-C1", "GL1-C2", "GL1-C3-CTN", "GL1-C4-KL3", "GL1-KAVLING2", 
+            "DAU", "KAV2", "KAV7", "KAV8", "KAV9", "KAV10", "GL1-C0", "OFFLINE", "TOKO", 
+            "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "REFUND", "BANDING"
+        ],
+        "JEMBER": [
+            "GL2-JBR", "GUDANG", "GL2-JBR-KL1", "GL2-JBR-KL2", "GL2-JBR-CTN", "GL2-JBR-GKH", 
+            "GL2-JBR-KL3", "GL2-JBR-KOLI2", "EVENT", "GAGAL QC", "INBOUND", "PUTAWAY", 
+            "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING"
+        ],
+        "KEDIRI": [
+            "GL1-KDR-BACKLINE", "GL1-KDR", "GL2-KDR", "GL2-KDR-CTN", "GL3-KDR-KL1", 
+            "GL3-KDR-KL2", "GL3-KDR-KL3", "GL3-KOLI", "EVENT", "GAGAL QC", "INBOUND", 
+            "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING"
+        ],
+        "SIDOARJO": [
+            "GL2-SDA-RAK", "GL3-SDA", "GL3-SDA-BIN OFFLINE", "INBOUND", "PUTAWAY", 
+            "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"
+        ],
+        "SEMARANG": [
+            "GL2-SMG", "GL2-SMG-CTN-", "GUDANG LT 2", "INBOUND", "PUTAWAY", "REFUND", 
+            "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"
+        ]
+    }
+
     # --- FILTER SECTION ---
+
+    # 1. Filter Branch ditaruh di paling atas (Bisa pilih salah satu cabang)
+    selected_branch = st.selectbox(
+        "🏢 Pilih Cabang / Branch:", 
+        options=list(BRANCH_BIN_MAPPING.keys()),
+        index=0 # Default ke SURABAYA
+    )
+
+    # Ambil list BIN sesuai cabang yang dipilih secara dinamis
+    list_bin_stock = BRANCH_BIN_MAPPING[selected_branch]
+
+    # 2. Filter Baris Utama (3 Kolom)
     col_f1, col_f2, col_f3 = st.columns(3)
+
     with col_f1:
         list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
+
     with col_f2:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "GL3-KOLI", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTN-","GUDANG LT 2"]
-        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
+        # List di sini sekarang otomatis mengikuti 'list_bin_stock' hasil filter cabang di atas
+        selected_bin_sys = st.multiselect(f"🏭 BIN System ({selected_branch}):", list_bin_stock)
+
     with col_f3:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
         selected_bin_cov = st.multiselect("📡 BIN Coverage:", list_bin_cov)
