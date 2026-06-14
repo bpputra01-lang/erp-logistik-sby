@@ -9840,7 +9840,8 @@ elif menu == "Justification SO":
 
     with st.expander("💡 Logic Thinking (Justification)", expanded=False):
         st.info("""
-       
+
+        ** REAL QTY / HITUNGAN MANUAL ➡️ : `BEGINNING STOCK` + (**`TOTAL_STOCKIN`** + **`TOTAL TRF_IN`**) - (**`TOTAL SALES`** + **`TOTAL TRF_OUT`** + **`TOTAL DRAFT TRF_OUT`**)**
         **🛑 1. Kesalahan System (Begin Stock Minus)**
         * **Kondisinya:** Stok SO lebih besar dari stok Sistem (ADJUSMENT +), Tetapi *Beginning Stock* bernilai minus (dibawah 0).
         * **Artinya:** Sistem dari awal sudah eror/bocor datanya karena mencatat stok minus yang artinya memang perlu dilakukan *Adjusment +*
