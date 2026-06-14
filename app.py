@@ -9845,7 +9845,7 @@ elif menu == "Justification SO":
     with st.expander("💡 Logic Thinking (Justification)", expanded=False):
         st.info("""
        
-        ### 🛑 1. Kesalahan System (Begin Stock Minus)
+        🛑 1. Kesalahan System (Begin Stock Minus)
         * **Kondisinya:** Stok SO lebih besar dari stok Sistem (ADJUSMENT +), Tetapi *Beginning Stock* bernilai minus (dibawah 0).
         * **Artinya:** Sistem dari awal sudah eror/bocor datanya karena mencatat stok minus yang artinya memang perlu dilakukan *Adjusment +*
         * **Contoh Kasus:**
@@ -9853,7 +9853,7 @@ elif menu == "Justification SO":
           | :---: | :---: | :---: | :---: |
           | 10 | 5 | **-2** | 0 |
         
-        ### 🛡️ 2. Kesalahan System (Ending Stock ≠ Total Stock dari Multiple)
+        🛡️ 2. Kesalahan System (Ending Stock ≠ Total Stock dari Multiple)
         * **Kondisinya:** `GAP ADJUSTMENT` dan `BEGINNING STOCK` sama-sama nol, Total stock antara (`Ending Stock`, `Real Qty`, `Current Stock`) nilainya sama (senilai), tapi total stock di multiple (`QTY SYSTEM ALL`) malah lebih kecil dari stok akhir.
         * **Artinya:** Ada miss match antara data di multiple dan summary sehingga menyebabkan adjusment +
         * **Contoh Kasus:**
@@ -9861,7 +9861,7 @@ elif menu == "Justification SO":
           | :---: | :---: | :---: | :---: |
           | 0 | 0 | **10** (Kembar) | **3** (Lebih Kecil) |
         
-        ### ⚙️ 3. Kesalahan System (Miss Match Real QTY (Manually Counting) dengan Ending Stock/Current Stock)
+        ⚙️ 3. Kesalahan System (Miss Match Real QTY (Manually Counting) dengan Ending Stock/Current Stock)
         * **Kondisinya:** Stok SO lebih besar dari stok Sistem (ADJUSMENT +), tidak ada transaksi gantung (`Draft TRF`), tidak ada `GAP ADJUSTMENT`, **TAPI** hasil hitungan manual tidak match dengan nilai `ENDING STOCK` di sistem.
         * **Detail Hitungan Manual:** `BEGINNING STOCK` + (**`TOTAL_STOCKIN`** + **`TOTAL TRF_IN`**) - (**`TOTAL SALES`** + **`TOTAL TRF_OUT`**)
         * **Artinya:** Sistem salah hitung mutasi barang (hasil gabungan barang masuk dan barang keluar tidak sinkron dengan stok akhir).
@@ -9870,7 +9870,7 @@ elif menu == "Justification SO":
           | :---: | :---: | :---: | :---: | :---: |
           | 10 | + 5 | - 2 | **13** | **15** (Gak Match!) |
         
-        ### 💻 4. Kesalahan System (Stock System Lost)
+        💻 4. Kesalahan System (Stock System Lost)
         * **Kondisinya:** Tidak ada `GAP ADJUSTMENT` (`= 0`), tapi ada selisih antara Sistem dan SO. Ketika selisih itu ditambah/dikurang ke master `QTY SYSTEM ALL`, hasilnya pas dengan `CURRENT STOCK`.
         * **Artinya:** Bug bawaan sistem yang bikin angka di layar tidak update.
         * **Contoh Kasus:**
@@ -9879,7 +9879,7 @@ elif menu == "Justification SO":
           | 12 | 10 | **+2** | 15 | **17** *(15 + 2 Pas!)* |
           | 8 | 10 | **-2** | 15 | **13** *(15 - 2 Pas!)* |
 
-        ### 🔍 5. Cek Hasil Rekonsiliasi
+        🔍 5. Cek Hasil Rekonsiliasi
         * **Kondisinya:** Total stock di multiple (`QTY SYSTEM ALL`) ternyata pas/sama persis dengan `CURRENT STOCK` / `ENDING STOCK`.
         * **Artinya:** Data sebenarnya aman dan sinkron secara total keseluruhan.
         * **Contoh Kasus:**
@@ -9887,7 +9887,7 @@ elif menu == "Justification SO":
           | :---: | :---: | :---: |
           | **25** | **25** | **25** |
         
-        ### ⚠️ 6. Kesalahan Adjustment (+ / -)
+        ⚠️ 6. Kesalahan Adjustment (+ / -)
         * **Kondisinya:** * Stok Sistem > Stok SO, tapi ada data `GAP ADJUSTMENT` positif (+).
             * Stok Sistem < Stok SO, tapi ada data `GAP ADJUSTMENT` negatif (-).
         * **Artinya:** Koreksi dari Proses Adjusment Sebelumnya (Reversal)
@@ -9897,7 +9897,7 @@ elif menu == "Justification SO":
           | QTY Sistem (10) > QTY SO (5) | **+5** | *Ada Koreksi (Reversal)* |
           | QTY Sistem (5) < QTY SO (10) | **-5** | *Ada Koreksi (Reversal)* |
         
-        ### 🚚 7. Kesalahan RTO (Barang Gantung)
+        🚚 7. Kesalahan RTO (Barang Gantung)
         * **Kondisinya:** Masih ada angka di kolom `TOTAL DRAFT TRF IN` atau `TOTAL DRAFT TRF OUT` yang menggantung (belum di-approve/finish).
         * **Artinya:** Masalah klasik RTO/mutasi barang yang statusnya masih draf.
         * **Contoh Kasus:**
