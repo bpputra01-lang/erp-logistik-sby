@@ -2056,14 +2056,14 @@ def menu_Stock_Opname():
             - **STOCK SYSTEM**
                 - Download All stock dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
         - **BIN COVERAGE**
-            - Download Bin Coverage  dari **Multiple Adjusment**
+            - Download Bin Coverage (ALL BIN DEFAULT & KARANTINA) dari **Multiple Adjusment**
             - Pilih stocknya **Hanya ada di stock**
         - **FINAL ADJUSMENT + PROCESS**
             - **REAL + RECON**
                 - Upload file Recon Real + yang sudah diupload dari step sebelumnya pastikan **KOLOM A** bukan berisi **NUMBER** ➡️ jika berisi Number maka hapus dulu kolomnya sebelum diupload
             - **CEK STOCK ADJ +**
                 - Download Stock System yang terbaru dari **Multiple Adjusment** dan pilih **Termasuk yang sudah habis**
-            - **STOCK ADJ + (MASTER)**
+            - **File Stagging Inbound**
                 - Download Stock System dan pilih hanya *BIN STAGGING INBOUND* dan pilih **Termasuk yang sudah habis**
         - **SET UP KARANTINA GENERATOR**
             - **SYTEM + RECON**
