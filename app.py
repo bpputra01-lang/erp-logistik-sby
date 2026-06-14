@@ -5371,12 +5371,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
                     return "KESALAHAN SYSTEM"
 
             # =========================================================================
-            # ORDER 4: CEK HASIL REKONSILIASI
-            # =========================================================================
-            if qty_sys_all == curr_stock:
-                return "CEK HASIL REKONSILIASI"
-
-            # =========================================================================
             # ORDER 5: LOGIKA KESALAHAN ADJUSMENT (+ / -) 
             # =========================================================================
             if qty_sys_row > qty_so_row and gap_adj > 0:
@@ -5402,6 +5396,12 @@ def process_justification(df_case, df_tracking, df_all_stock):
             # =========================================================================
             if draft_in > 0 or draft_out > 0:
                 return "KESALAHAN RTO"
+            
+             # =========================================================================
+            # ORDER 4: CEK HASIL REKONSILIASI
+            # =========================================================================
+            if qty_sys_all == curr_stock:
+                return "CEK HASIL REKONSILIASI"
 
             return "UNDEFINED"
         except:
