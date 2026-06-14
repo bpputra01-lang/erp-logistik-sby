@@ -5286,16 +5286,12 @@ def process_justification(df_case, df_tracking, df_all_stock):
     ]
     track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
 
-    # 3. Aggregasi All Data Stock (EXCLUDE BIN KARANTINA)
-    bin_col_all = df_all_stock.columns[1]
+    # 3. Aggregasi All Data Stock (TERMASUK BIN KARANTINA)
     sku_col_all = df_all_stock.columns[2]
     qty_sys_col_all = df_all_stock.columns[9]
     
-    df_all_stock_filtered = df_all_stock[
-        ~df_all_stock[bin_col_all].astype(str).str.upper().str.contains('KARANTINA', na=False)
-    ]
-    
-    all_stock_agg = df_all_stock_filtered.groupby(sku_col_all).agg({
+    # Langsung group by dari df_all_stock tanpa ada yang dibuang
+    all_stock_agg = df_all_stock.groupby(sku_col_all).agg({
         qty_sys_col_all: 'sum'
     }).reset_index()
     
