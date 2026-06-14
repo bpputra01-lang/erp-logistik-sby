@@ -9842,7 +9842,7 @@ elif menu == "Justification SO":
         - **ALL DATA STOCK**: Upload file All data Stock (Multiple Adjustment) **HANYA ADA STOCK**.
         """)
 
-    with st.expander("💡 CARA MEMBACA LOGIKA JUSTIFIKASI (ATURAN REKONSILIASI)", expanded=False):
+    with st.expander("💡 Logic Thinking (Justification)", expanded=False):
         st.markdown("""
        
         
