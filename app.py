@@ -635,7 +635,7 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
                     "BIN TUJUAN": bin_tujuan,
                     "SKU": sku_key,
                     "QUANTITY": diff_val.iloc[i],
-                    "NOTES": "RELOCATION"
+                    "NOTES": "MISS LOCATION"
                 })
                 seen_entry.add(f"{sku_key}|{bin_tujuan}")
 
@@ -724,7 +724,7 @@ def logic_setup_karantina_with_compare(df_master):
                     "BIN TUJUAN": "KARANTINA",
                     "SKU": sku_val,
                     "QUANTITY": int(abs(diff)), 
-                    "NOTES": "MISS LOCATION"
+                    "NOTES": "NOT FOUND"
                 })
         except Exception as e:
             continue
@@ -1635,7 +1635,7 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
                     "BIN TUJUAN": bin_tujuan,
                     "SKU": sku_key,
                     "QUANTITY": diff_val.iloc[i],
-                    "NOTES": "RELOCATION"
+                    "NOTES": "MISS LOCATION"
                 })
                 seen_entry.add(f"{sku_key}|{bin_tujuan}")
 
@@ -1726,7 +1726,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                     "BIN TUJUAN": "KARANTINA",
                     "SKU": sku_val,
                     "QUANTITY": diff,
-                    "NOTES": "MISS LOCATION"
+                    "NOTES": "NOT FOUND"
                 })
 
     # 4. Output DataFrames
