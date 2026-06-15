@@ -905,7 +905,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
 def generate_set_up_real_plus(allocated_data):
     filtered = allocated_data[allocated_data['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
     if not filtered.empty:
-        filtered['BIN AWAL'], filtered['BIN TUJUAN'], filtered['QUANTITY'], filtered['NOTES'] = filtered['BIN ALOKASI'], filtered['BIN'], filtered['QTY ALLOCATION'], "RELOCATION"
+        filtered['BIN AWAL'], filtered['BIN TUJUAN'], filtered['QUANTITY'], filtered['NOTES'] = filtered['BIN ALOKASI'], filtered['BIN'], filtered['QTY ALLOCATION'], "MISS LOCATION"
         return filtered[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']]
     return pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
 
@@ -1917,7 +1917,7 @@ def logic_run_allocation(df_real_plus, df_system_plus, df_bin_coverage):
 def generate_set_up_real_plus(allocated_data):
     filtered = allocated_data[allocated_data['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
     if not filtered.empty:
-        filtered['BIN AWAL'], filtered['BIN TUJUAN'], filtered['QUANTITY'], filtered['NOTES'] = filtered['BIN ALOKASI'], filtered['BIN'], filtered['QTY ALLOCATION'], "RELOCATION"
+        filtered['BIN AWAL'], filtered['BIN TUJUAN'], filtered['QUANTITY'], filtered['NOTES'] = filtered['BIN ALOKASI'], filtered['BIN'], filtered['QTY ALLOCATION'], "MISS LOCATION"
         return filtered[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']]
     return pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
 
