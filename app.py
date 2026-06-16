@@ -1526,13 +1526,11 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    pivot_list = [] # Buat menampung data yang berpotensi masuk Multiple
-    single_list = [] # Buat menampung data Single / Miss Lookup
+    pivot_list = [] 
+    single_list = [] 
 
     # A. DARI STOCK (Yang Match BIN|SKU & Selisih Plus)
     df_s = df_stock_final.copy()
-    
-    # Deteksi posisi nama kolom secara dinamid
     col_sku_stock = next((c for c in df_s.columns if 'SKU' in c.upper()), df_s.columns[2])
     
     q_so = pd.to_numeric(df_s["QTY SO"], errors='coerce').fillna(0)
@@ -1549,40 +1547,51 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     # B. PREPARASI MASTER INBOUND
     inbound_master = df_staging_inbound.copy()
     col_sku_inbound = next((c for c in inbound_master.columns if 'SKU' in c.upper()), inbound_master.columns[2])
-    
     inbound_master['SKU_JOIN'] = inbound_master[col_sku_inbound].apply(super_clean)
     m_clean = inbound_master.drop_duplicates(subset=['SKU_JOIN'])
     inbound_skus_set = set(m_clean['SKU_JOIN'].unique())
 
-    # C. LOOKUP SKU MISSING KE INBOUND
+    # C. LOOKUP SKU MISSING KE INBOUND (DENGAN HITUNG MANDIRI SEBELUM MASUK MISS LOOKUP)
     if df_recon_missing is not None and not df_recon_missing.empty:
         col_bin_miss = df_recon_missing.columns[0]
         col_sku_miss = df_recon_missing.columns[1]
-        col_qty_miss = df_recon_missing.columns[6] if len(df_recon_missing.columns) > 6 else df_recon_missing.columns[-1]
+        
+        # Deteksi nama kolom secara dinamis berdasarkan screenshot Anda
+        col_qty_recon = next((c for c in df_recon_missing.columns if 'RECONCILIATION' in c.upper() or 'HASIL' in c.upper()), None)
+        col_qty_sys = next((c for c in df_recon_missing.columns if 'SYSTEM' in c.upper()), None)
         
         for _, row in df_recon_missing.iterrows():
             s_recon = super_clean(row[col_sku_miss])
-            q_recon = pd.to_numeric(row[col_qty_miss], errors='coerce') or 0
-            if not s_recon or q_recon <= 0: 
+            if not s_recon:
+                continue
+                
+            # Ambil nilai angka secara aman, jika kolom tidak ketemu default ke 0
+            q_recon_val = pd.to_numeric(row[col_qty_recon], errors='coerce') if col_qty_recon else 0
+            q_sys_val = pd.to_numeric(row[col_qty_sys], errors='coerce') if col_qty_sys else 0
+            
+            # --- LOGIKA HITUNG PENGURANGAN LANGSUNG ---
+            # Menghitung selisih mutlak atau murni (Hasil Recon - Qty System)
+            qty_calc = q_recon_val - q_sys_val
+            
+            # Jika hasil kalkulasi adjustment tidak menghasilkan selisih positif (> 0), SKIP!
+            # Berdasarkan screenshot Anda: Hasil Recon (0) - Qty System (0) = 0 -> Otomatis lolos/Skip.
+            if qty_calc <= 0:
                 continue
 
+            # Jika ternyata ada sisa selisih kuantitas baru dicek jalurnya
             if s_recon in inbound_skus_set:
-                # KETEMU SKU DI INBOUND -> MASUK ANTRIAN MULTIPLE
-                pivot_list.append({'SKU_KEY_TEMP': s_recon, 'QTY_TOTAL': q_recon})
+                pivot_list.append({'SKU_KEY_TEMP': s_recon, 'QTY_TOTAL': qty_calc})
             else:
-                # GAK ADA DI MANA-MANA -> SINGLE / MISS LOOKUP
-                single_list.append({'BIN': row[col_bin_miss], 'SKU': row[col_sku_miss], 'QTY ADJ': q_recon})
+                single_list.append({'BIN': row[col_bin_miss], 'SKU': row[col_sku_miss], 'QTY ADJ': qty_calc})
 
-    # D. PIVOT & MERGE KE MASTER INBOUND (DENGAN PROTEKSI DATA KOTOR)
+    # D. PIVOT & MERGE KE MASTER INBOUND
     df_mult_res = pd.DataFrame()
     if pivot_list:
         df_p = pd.DataFrame(pivot_list)
         df_p_grouped = df_p.groupby('SKU_KEY_TEMP')['QTY_TOTAL'].sum().reset_index()
         
-        # --- PROTEKSI: Pisahkan SKU dari Stock yang ternyata tidak ada di Master Inbound ---
         mask_has_master = df_p_grouped['SKU_KEY_TEMP'].isin(inbound_skus_set)
         
-        # 1. Lempar yang tidak punya master ke single_list (Miss Lookup) agar tidak jadi baris None
         df_no_master = df_p_grouped[~mask_has_master]
         for _, row in df_no_master.iterrows():
             single_list.append({
@@ -1591,14 +1600,10 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
                 'QTY ADJ': row['QTY_TOTAL']
             })
             
-        # 2. Hanya proses data yang VALID memiliki master untuk masuk ke tabel MULTIPLE
         df_p_valid = df_p_grouped[mask_has_master]
         
         if not df_p_valid.empty:
-            # Menggunakan how='inner' untuk jaminan 100% tidak ada baris berekor 'None'
             df_mult_res = df_p_valid.merge(m_clean, left_on='SKU_KEY_TEMP', right_on='SKU_JOIN', how='inner')
-            
-            # Cari nama kolom yang mengandung kata 'SO' atau 'SCAN' di dataframe gabungan
             col_target_so = next((c for c in df_mult_res.columns if 'QTY SO' in c.upper() or 'SO' in c.upper()), None)
             
             if col_target_so:
@@ -1606,7 +1611,6 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
             else:
                 df_mult_res['QTY SO'] = df_mult_res['QTY_TOTAL']
                 
-            # Bersihkan kolom temporary helper
             df_mult_res = df_mult_res.drop(columns=['SKU_KEY_TEMP', 'QTY_TOTAL', 'SKU_JOIN'], errors='ignore')
 
     df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
