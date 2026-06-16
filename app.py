@@ -1479,6 +1479,7 @@ def get_yellow_skus(file, column_index):
 
 def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_s = df_stock_adj.copy()
+    df_r = df_recon.copy()
     
     def super_clean(val):
         if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
@@ -1486,21 +1487,27 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Bikin Key BIN|SKU di Stock
+    # 1. Bikin Key BIN|SKU di Stock & Recon
     df_s['JOIN_KEY'] = df_s.iloc[:, 1].fillna('').astype(str).apply(super_clean) + "|" + \
                        df_s.iloc[:, 2].fillna('').astype(str).apply(super_clean)
+                       
+    df_r['JOIN_KEY'] = df_r.iloc[:, 0].fillna('').astype(str).apply(super_clean) + "|" + \
+                       df_r.iloc[:, 1].fillna('').astype(str).apply(super_clean)
 
-    # 2. Map Recon (BIN|SKU -> QTY)
+    # 2. Map Recon (BIN|SKU -> QTY) - Sertakan yang nilainya 0 agar bisa dihitung impas
     recon_map = {}
-    for _, row in df_recon.iterrows():
+    for _, row in df_r.iterrows():
         b, s = super_clean(row.iloc[0]), super_clean(row.iloc[1])
-        q = pd.to_numeric(row.iloc[6], errors='coerce') or 0
-        if b and s and q > 0:
+        q = pd.to_numeric(row.iloc[6], errors='coerce')
+        q = 0 if pd.isna(q) else q
+        if b and s:
             recon_map[f"{b}|{s}"] = q
 
-    # 3. Hitung QTY SO & DIFF
+    # 3. Hitung QTY SO & DIFF untuk Stock
     new_qty_so = df_s['JOIN_KEY'].map(recon_map)
     sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
+    
+    # Hitung selisih mutlak jika data hasil scan terdeteksi ada
     new_diff = np.where(new_qty_so.notna(), (sys_qty - new_qty_so.fillna(0)).abs(), np.nan)
 
     # --- JALUR PAKSA: HAPUS & TEMPEL (Fix Error Dtype Str) ---
@@ -1511,10 +1518,16 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
 
     # 4. Kumpulin SKU "Missing" (Yang BIN|SKU-nya gak match di Stock)
     matched_keys = set(df_s[new_qty_so.notna()]['JOIN_KEY'])
-    df_missing = df_recon[df_recon.apply(lambda x: f"{super_clean(x.iloc[0])}|{super_clean(x.iloc[1])}" not in matched_keys, axis=1)].copy()
+    df_missing = df_r[~df_r['JOIN_KEY'].isin(matched_keys)].copy()
+
+    # --- FIX CRITICAL: Kunci mati nama kolom penanda QTY agar fungsi kedua tidak melesat ---
+    df_missing['FINAL_RECON_QTY'] = pd.to_numeric(df_missing.iloc[:, 6], errors='coerce').fillna(0)
+    df_missing['QTY_SYSTEM'] = 0 # Default 0 karena tidak ada di stock awal untuk BIN|SKU ini
 
     if 'JOIN_KEY' in df_final_stock.columns:
         df_final_stock = df_final_stock.drop(columns=['JOIN_KEY'])
+    if 'JOIN_KEY' in df_missing.columns:
+        df_missing = df_missing.drop(columns=['JOIN_KEY'])
 
     return df_final_stock, df_missing
 
@@ -1551,34 +1564,34 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     m_clean = inbound_master.drop_duplicates(subset=['SKU_JOIN'])
     inbound_skus_set = set(m_clean['SKU_JOIN'].unique())
 
-    # C. LOOKUP SKU MISSING KE INBOUND (DENGAN HITUNG MANDIRI SEBELUM MASUK MISS LOOKUP)
+    # C. LOOKUP SKU MISSING KE INBOUND (DENGAN GEBUKAN FILTER KETAT)
     if df_recon_missing is not None and not df_recon_missing.empty:
         col_bin_miss = df_recon_missing.columns[0]
         col_sku_miss = df_recon_missing.columns[1]
         
-        # Deteksi nama kolom secara dinamis berdasarkan screenshot Anda
-        col_qty_recon = next((c for c in df_recon_missing.columns if 'RECONCILIATION' in c.upper() or 'HASIL' in c.upper()), None)
-        col_qty_sys = next((c for c in df_recon_missing.columns if 'SYSTEM' in c.upper()), None)
+        # Deteksi kolom secara aman (Prioritas utama menggunakan kolom kunci dari fungsi pertama)
+        col_qty_recon = 'FINAL_RECON_QTY' if 'FINAL_RECON_QTY' in df_recon_missing.columns else next((c for c in df_recon_missing.columns if 'RECONCILIATION' in c.upper() or 'HASIL' in c.upper()), df_recon_missing.columns[6])
+        col_qty_sys = 'QTY_SYSTEM' if 'QTY_SYSTEM' in df_recon_missing.columns else next((c for c in df_recon_missing.columns if 'SYSTEM' in c.upper()), None)
         
         for _, row in df_recon_missing.iterrows():
             s_recon = super_clean(row[col_sku_miss])
             if not s_recon:
                 continue
                 
-            # Ambil nilai angka secara aman, jika kolom tidak ketemu default ke 0
-            q_recon_val = pd.to_numeric(row[col_qty_recon], errors='coerce') if col_qty_recon else 0
+            q_recon_val = pd.to_numeric(row[col_qty_recon], errors='coerce') or 0
             q_sys_val = pd.to_numeric(row[col_qty_sys], errors='coerce') if col_qty_sys else 0
             
-            # --- LOGIKA HITUNG PENGURANGAN LANGSUNG ---
-            # Menghitung selisih mutlak atau murni (Hasil Recon - Qty System)
+            # Bersihkan nilai NaN hasil parsing ilegal
+            q_recon_val = 0 if pd.isna(q_recon_val) else q_recon_val
+            q_sys_val = 0 if pd.isna(q_sys_val) else q_sys_val
+            
+            # --- FORMULA PENGURANGAN LANGSUNG ---
             qty_calc = q_recon_val - q_sys_val
             
-            # Jika hasil kalkulasi adjustment tidak menghasilkan selisih positif (> 0), SKIP!
-            # Berdasarkan screenshot Anda: Hasil Recon (0) - Qty System (0) = 0 -> Otomatis lolos/Skip.
-            if qty_calc <= 0:
+            # JIKA HASIL ADJ <= 0 ATAU MEMANG HASIL REKON-NYA NYATA-NYATA 0 -> PANCUNG / JANGAN LOLOSKAN!
+            if qty_calc <= 0 or q_recon_val == 0:
                 continue
 
-            # Jika ternyata ada sisa selisih kuantitas baru dicek jalurnya
             if s_recon in inbound_skus_set:
                 pivot_list.append({'SKU_KEY_TEMP': s_recon, 'QTY_TOTAL': qty_calc})
             else:
