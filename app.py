@@ -2963,7 +2963,7 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
                 qty_raw = float(row.iloc[9])
                 
                 # Cek arah mutasi stock berdasarkan cabang SURABAYA
-                if "MALANG" in store_akhir:
+                if "SURABAYA" in store_akhir:
                     # Gudang tujuan ada kata SURABAYA -> Stock Masuk (+)
                     qty_final = abs(qty_raw)
                     timeline_events.append({
@@ -2972,7 +2972,7 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
                         'Qty': qty_final,
                         'Keterangan': f"RTO Masuk (SBY) | No Transfer: {row.iloc[3]} | Asal: {row.iloc[5]} ➡️ Tujuan: {row.iloc[6]} | Status: {row.iloc[4]} | Qty: +{qty_final} Pcs"
                     })
-                elif "MALANG" in store_awal:
+                elif "SURABAYA" in store_awal:
                     # Gudang asal ada kata SURABAYA -> Stock Keluar (-)
                     qty_final = -abs(qty_raw)
                     timeline_events.append({
