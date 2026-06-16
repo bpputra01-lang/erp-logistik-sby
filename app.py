@@ -1710,7 +1710,6 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
         return pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
     
     return result_df[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]]
-
 def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
         if pd.isna(x): return ""
@@ -1738,11 +1737,11 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                 recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
             except: continue
 
-    # 3. Proses Comparison & Aliran Data
+    # 3. Proses Comparison Berdasarkan Rumus User (QTY SYSTEM - HASIL REKON)
     df_master = df_outstanding.copy()
     audit_results = []
     karantina_results = []
-    real_plus_results = [] # Tampungan baru untuk hasil minus
+    real_plus_results = [] 
 
     for _, row in df_master.iterrows():
         bin_val = row.iloc[1]
@@ -1751,10 +1750,12 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
         
         q_system = sys_map.get(key, 0)
         q_recon = recon_map.get(key, 0)
-        diff = q_system - q_recon
+        
+        # 🔥 RUMUS FIX: QTY SYSTEM - HASIL REKONSIALSI
+        diff = q_system - q_recon 
 
         if diff != 0:
-            # ALL AUDIT TAB
+            # TAB AUDIT (Catat history asli)
             audit_results.append({
                 'BIN': bin_val,
                 'SKU': sku_val,
@@ -1763,24 +1764,24 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                 'SELISIH': diff
             })
 
-            # KONDISI 1: JIKA SELISIH POSITIF -> MASUK KARANTINA (NOT FOUND)
+            # KONDISI 1: JIKA HASILNYA > 0 -> MASUK MUTASI KARANTINA
             if diff > 0:
                 karantina_results.append({
                     "BIN AWAL": bin_val,
                     "BIN TUJUAN": "KARANTINA",
                     "SKU": sku_val,
-                    "QUANTITY": diff,
+                    "QUANTITY": diff, # Nilainya otomatis sudah positif murni
                     "NOTES": "NOT FOUND"
                 })
             
-            # KONDISI 2: JIKA SELISIH NEGATIF -> MASUK REAL PLUS (SURPLUS BARANG)
+            # KONDISI 2: JIKA HASILNYA < 0 -> MASUK TAB REAL +
             elif diff < 0:
                 real_plus_results.append({
                     "BIN": bin_val,
                     "SKU": sku_val,
                     "BRAND": row.iloc[3] if len(row) > 3 else "",
                     "ITEM NAME": row.iloc[4] if len(row) > 4 else "",
-                    "QTY REAL +": abs(diff), # Dipositifkan angkanya untuk inputan real +
+                    "QTY REAL +": abs(diff), # Minus diubah jadi positif murni untuk input up-stok
                     "NOTES": "SURPLUS RECON"
                 })
 
