@@ -1494,7 +1494,7 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
     df_r['JOIN_KEY'] = df_r.iloc[:, 0].fillna('').astype(str).apply(super_clean) + "|" + \
                        df_r.iloc[:, 1].fillna('').astype(str).apply(super_clean)
 
-    # 2. Map Recon (BIN|SKU -> QTY) - Sertakan yang nilainya 0 agar bisa dihitung impas
+    # 2. Map Recon (BIN|SKU -> QTY)
     recon_map = {}
     for _, row in df_r.iterrows():
         b, s = super_clean(row.iloc[0]), super_clean(row.iloc[1])
@@ -1503,14 +1503,12 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
         if b and s:
             recon_map[f"{b}|{s}"] = q
 
-    # 3. Hitung QTY SO & DIFF untuk Stock
+    # 3. Hitung QTY SO & DIFF untuk tabel Stock Utama
     new_qty_so = df_s['JOIN_KEY'].map(recon_map)
     sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
-    
-    # Hitung selisih mutlak jika data hasil scan terdeteksi ada
     new_diff = np.where(new_qty_so.notna(), (sys_qty - new_qty_so.fillna(0)).abs(), np.nan)
 
-    # --- JALUR PAKSA: HAPUS & TEMPEL (Fix Error Dtype Str) ---
+    # --- JALUR PAKSA: HAPUS & TEMPEL ---
     cols_to_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11]]
     df_final_stock = df_s.iloc[:, cols_to_keep].copy()
     df_final_stock.insert(10, "QTY SO", new_qty_so.fillna(0))
@@ -1518,16 +1516,35 @@ def logic_cek_adjustment_final(df_recon, df_stock_adj):
 
     # 4. Kumpulin SKU "Missing" (Yang BIN|SKU-nya gak match di Stock)
     matched_keys = set(df_s[new_qty_so.notna()]['JOIN_KEY'])
-    df_missing = df_r[~df_r['JOIN_KEY'].isin(matched_keys)].copy()
+    df_missing_raw = df_r[~df_r['JOIN_KEY'].isin(matched_keys)].copy()
 
-    # --- FIX CRITICAL: Kunci mati nama kolom penanda QTY agar fungsi kedua tidak melesat ---
-    df_missing['FINAL_RECON_QTY'] = pd.to_numeric(df_missing.iloc[:, 6], errors='coerce').fillna(0)
-    df_missing['QTY_SYSTEM'] = 0 # Default 0 karena tidak ada di stock awal untuk BIN|SKU ini
+    # --- 🔥 GEBUKAN UTAMA: FILTER SEBELUM MASUK DF_MISSING 🔥 ---
+    valid_missing_rows = []
+    for idx, row in df_missing_raw.iterrows():
+        # Ambil nilai Hasil Recon (Kolom ke-6) dan Qty System (karena gak ada di stock, default 0)
+        q_recon_val = pd.to_numeric(row.iloc[6], errors='coerce')
+        q_recon_val = 0 if pd.isna(q_recon_val) else q_recon_val
+        q_sys_val = 0 # Default 0 karena item tidak ditemukan di BIN stock tersebut
+        
+        # LOGIKA COK: Kalau Hasil Recon dikurang Qty System hasilnya 0 atau minus, BUANG!
+        if (q_recon_val - q_sys_val) <= 0 or q_recon_val == 0:
+            continue
+            
+        valid_missing_rows.append(row)
+
+    # Re-create df_missing hanya dengan data yang benar-benar punya nilai selisih murni > 0
+    if valid_missing_rows:
+        df_missing = pd.DataFrame(valid_missing_rows)
+        df_missing['FINAL_RECON_QTY'] = pd.to_numeric(df_missing.iloc[:, 6], errors='coerce').fillna(0)
+        df_missing['QTY_SYSTEM'] = 0
+    else:
+        # Kalau kosong, bikin dataframe template kosong biar gak crash
+        df_missing = pd.DataFrame(columns=df_r.columns.tolist() + ['FINAL_RECON_QTY', 'QTY_SYSTEM'])
 
     if 'JOIN_KEY' in df_final_stock.columns:
         df_final_stock = df_final_stock.drop(columns=['JOIN_KEY'])
     if 'JOIN_KEY' in df_missing.columns:
-        df_missing = df_missing.drop(columns=['JOIN_KEY'])
+        df_missing = df_missing.drop(columns=['JOIN_KEY'], errors='ignore')
 
     return df_final_stock, df_missing
 
@@ -1564,14 +1581,13 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
     m_clean = inbound_master.drop_duplicates(subset=['SKU_JOIN'])
     inbound_skus_set = set(m_clean['SKU_JOIN'].unique())
 
-    # C. LOOKUP SKU MISSING KE INBOUND (DENGAN GEBUKAN FILTER KETAT)
+    # C. LOOKUP SKU MISSING KE INBOUND
     if df_recon_missing is not None and not df_recon_missing.empty:
         col_bin_miss = df_recon_missing.columns[0]
         col_sku_miss = df_recon_missing.columns[1]
         
-        # Deteksi kolom secara aman (Prioritas utama menggunakan kolom kunci dari fungsi pertama)
-        col_qty_recon = 'FINAL_RECON_QTY' if 'FINAL_RECON_QTY' in df_recon_missing.columns else next((c for c in df_recon_missing.columns if 'RECONCILIATION' in c.upper() or 'HASIL' in c.upper()), df_recon_missing.columns[6])
-        col_qty_sys = 'QTY_SYSTEM' if 'QTY_SYSTEM' in df_recon_missing.columns else next((c for c in df_recon_missing.columns if 'SYSTEM' in c.upper()), None)
+        col_qty_recon = 'FINAL_RECON_QTY' if 'FINAL_RECON_QTY' in df_recon_missing.columns else df_recon_missing.columns[6]
+        col_qty_sys = 'QTY_SYSTEM' if 'QTY_SYSTEM' in df_recon_missing.columns else None
         
         for _, row in df_recon_missing.iterrows():
             s_recon = super_clean(row[col_sku_miss])
@@ -1581,14 +1597,9 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
             q_recon_val = pd.to_numeric(row[col_qty_recon], errors='coerce') or 0
             q_sys_val = pd.to_numeric(row[col_qty_sys], errors='coerce') if col_qty_sys else 0
             
-            # Bersihkan nilai NaN hasil parsing ilegal
-            q_recon_val = 0 if pd.isna(q_recon_val) else q_recon_val
-            q_sys_val = 0 if pd.isna(q_sys_val) else q_sys_val
-            
-            # --- FORMULA PENGURANGAN LANGSUNG ---
             qty_calc = q_recon_val - q_sys_val
             
-            # JIKA HASIL ADJ <= 0 ATAU MEMANG HASIL REKON-NYA NYATA-NYATA 0 -> PANCUNG / JANGAN LOLOSKAN!
+            # Filter double safety di fungsi kedua
             if qty_calc <= 0 or q_recon_val == 0:
                 continue
 
@@ -1627,6 +1638,11 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
             df_mult_res = df_mult_res.drop(columns=['SKU_KEY_TEMP', 'QTY_TOTAL', 'SKU_JOIN'], errors='ignore')
 
     df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+
+    # --- 🔥 LAST CLEANUP: Hilangkan baris berekor 'None' dari tabel Multiple jika ada data corrupt ---
+    if not df_mult_res.empty:
+        df_mult_res = df_mult_res.dropna(subset=[df_mult_res.columns[0], df_mult_res.columns[1]])
+        df_mult_res = df_mult_res[~df_mult_res.iloc[:, 0].astype(str).str.strip().str.upper().isin(['NONE', 'NAN', ''])]
 
     return df_mult_res, df_sing_res
 
