@@ -1715,37 +1715,34 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
     def clean_val(x):
         if pd.isna(x): return ""
         s = str(x).strip().upper()
-        # Sesuai preferensi user: hapus prefix SPE jika ada
-        if s.startswith("SPE"): s = s[3:].strip() 
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT (Uploader 2) -> Kolom J (Index 9)
+    # 1. Mapping QTY SYSTEM dari file CEK ADJUSTMENT -> Kolom J (Index 9)
     sys_map = {}
     if df_recon is not None and not df_recon.empty:
         for _, row in df_recon.iterrows():
             try:
-                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
                 k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
                 val_sys = pd.to_numeric(row.iloc[9], errors='coerce') 
                 sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
             except: continue
 
-    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING (Uploader 1) -> Kolom N (Index 13)
+    # 2. Mapping QTY RECON dari file SYSTEM + OUTSTANDING -> Kolom N (Index 13)
     recon_map = {}
     if df_outstanding is not None and not df_outstanding.empty:
         for _, row in df_outstanding.iterrows():
             try:
-                # Key: BIN (Kolom B/Index 1) | SKU (Kolom C/Index 2)
                 k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}" 
                 val_rec = pd.to_numeric(row.iloc[13], errors='coerce') 
                 recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
             except: continue
 
-    # 3. Proses Comparison
+    # 3. Proses Comparison & Aliran Data
     df_master = df_outstanding.copy()
     audit_results = []
     karantina_results = []
+    real_plus_results = [] # Tampungan baru untuk hasil minus
 
     for _, row in df_master.iterrows():
         bin_val = row.iloc[1]
@@ -1756,8 +1753,8 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
         q_recon = recon_map.get(key, 0)
         diff = q_system - q_recon
 
-        # TAB PENGECEKAN: Semua selisih (Plus/Minus) masuk sini buat audit
         if diff != 0:
+            # ALL AUDIT TAB
             audit_results.append({
                 'BIN': bin_val,
                 'SKU': sku_val,
@@ -1766,8 +1763,7 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                 'SELISIH': diff
             })
 
-            # TAB SET UP KARANTINA: HANYA YANG POSITIF (> 0)
-            # Nilai minus tidak akan dimasukkan ke list hasil karantina
+            # KONDISI 1: JIKA SELISIH POSITIF -> MASUK KARANTINA (NOT FOUND)
             if diff > 0:
                 karantina_results.append({
                     "BIN AWAL": bin_val,
@@ -1776,14 +1772,24 @@ def logic_setup_karantina_with_compare(df_outstanding, df_recon):
                     "QUANTITY": diff,
                     "NOTES": "NOT FOUND"
                 })
+            
+            # KONDISI 2: JIKA SELISIH NEGATIF -> MASUK REAL PLUS (SURPLUS BARANG)
+            elif diff < 0:
+                real_plus_results.append({
+                    "BIN": bin_val,
+                    "SKU": sku_val,
+                    "BRAND": row.iloc[3] if len(row) > 3 else "",
+                    "ITEM NAME": row.iloc[4] if len(row) > 4 else "",
+                    "QTY REAL +": abs(diff), # Dipositifkan angkanya untuk inputan real +
+                    "NOTES": "SURPLUS RECON"
+                })
 
     # 4. Output DataFrames
-    # Hasil Karantina sudah bersih dari minus
-    df_karantina = pd.DataFrame(karantina_results)
-    # Hasil Audit tetep lengkap
+    df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=["BIN AWAL","BIN TUJUAN","SKU","QUANTITY","NOTES"])
+    df_real_plus = pd.DataFrame(real_plus_results) if real_plus_results else pd.DataFrame(columns=["BIN","SKU","BRAND","ITEM NAME","QTY REAL +","NOTES"])
     df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
 
-    return df_karantina, df_check
+    return df_karantina, df_real_plus, df_check
     
 def clean_sku_bin(series):
     """Fungsi helper untuk memastikan SKU/BIN tetap string dan bersih."""
@@ -2562,7 +2568,7 @@ def menu_Stock_Opname():
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.subheader("5️⃣ RECON SYSTEM + PROCESS")
 
-    # Tambahkan dua uploader agar logic compare BIN|SKU bisa jalan
+    # Uploader dual file
     col_k1, col_k2 = st.columns(2)
     with col_k1:
         up_k6 = st.file_uploader("📥 1. Upload SYSTEM + RECON", type=['xlsx', 'xls', 'csv'], key="u6_karantina")
@@ -2570,40 +2576,51 @@ def menu_Stock_Opname():
         up_adj6 = st.file_uploader("📥 2. Upload STOCK CEK ADJUSMENT (New Multiple Adj.)", type=['xlsx', 'xls', 'csv'], key="u6_adj_compare")
 
     if up_k6 and up_adj6:
-        if st.button("▶️ GENERATE KARANTINA", use_container_width=True):
+        if st.button("▶️ GENERATE ANALYSIS", use_container_width=True):
             try:
-                # 1. Baca File Outstanding
                 up_k6.seek(0)
                 df_raw6 = pd.read_excel(up_k6) if up_k6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_k6)
                 
-                # 2. Baca File Recon (Cek Adjustment)
                 up_adj6.seek(0)
                 df_recon6 = pd.read_excel(up_adj6) if up_adj6.name.endswith(('.xlsx', '.xls')) else pd.read_csv(up_adj6)
                 
-                # 3. Jalankan Logic Baru dengan Compare BIN|SKU
-                df_final6, df_check6 = logic_setup_karantina_with_compare(df_raw6, df_recon6)
+                # Eksekusi fungsi penampung 3 data sekaligus
+                df_final6, df_real_plus6, df_check6 = logic_setup_karantina_with_compare(df_raw6, df_recon6)
                 
-                # 4. Simpan ke Session State
+                # Simpan semuanya ke Session State
                 st.session_state.df_karantina_6 = df_final6
-                st.session_state.df_check_6 = df_check6 # Simpan juga data pengecekannya
+                st.session_state.df_real_plus_6 = df_real_plus6
+                st.session_state.df_check_6 = df_check6 
                 
-                st.success("✅ Analisis Karantina Selesai!")
+                st.success("✅ Analisis Selesai! Data berhasil dipisahkan.")
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
     # Tampilkan Hasil Jika Sudah Diproses
-    if st.session_state.df_karantina_6 is not None:
-        tab_res, tab_chk = st.tabs(["📦 HASIL KARANTINA", "🔍 DATA PENGECEKAN (AUDIT)"])
+    if st.session_state.get('df_karantina_6') is not None:
+        # Inisialisasi 3 Tab Baru
+        tab_res, tab_real, tab_chk = st.tabs(["📦 HASIL KARANTINA", "➕ SET UP REAL + (MINUS)", "🔍 DATA PENGECEKAN (AUDIT)"])
         
+        # TAB 1: HASIL KARANTINA (Selisih Positif)
         with tab_res:
             st.dataframe(st.session_state.df_karantina_6, use_container_width=True, hide_index=True)
             
-            # Download Button (Excel)
             out6 = io.BytesIO()
             with pd.ExcelWriter(out6, engine='xlsxwriter') as writer:
                 st.session_state.df_karantina_6.to_excel(writer, index=False, sheet_name='Karantina')
-            st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina.xlsx", key="dl_k6")
+            st.download_button("📥 DOWNLOAD HASIL KARANTINA", data=out6.getvalue(), file_name="Karantina_Setup.xlsx", key="dl_k6")
 
+        # TAB 2: SET UP REAL + (Selisih Negatif / Barang Lebih)
+        with tab_real:
+            st.warning("⚠️ Menampilkan item dengan indikasi Kelebihan Barang (System < Hasil Rekon). Qty telah diubah menjadi positif murni.")
+            st.dataframe(st.session_state.df_real_plus_6, use_container_width=True, hide_index=True)
+            
+            out_real = io.BytesIO()
+            with pd.ExcelWriter(out_real, engine='xlsxwriter') as writer:
+                st.session_state.df_real_plus_6.to_excel(writer, index=False, sheet_name='Real_Plus')
+            st.download_button("📥 DOWNLOAD DATA REAL PLUS", data=out_real.getvalue(), file_name="Real_Plus_Setup.xlsx", key="dl_real6")
+
+        # TAB 3: DATA PENGECEKAN (Seluruh Log Audit)
         with tab_chk:
             st.info("Tabel ini menunjukkan perbandingan QTY SYSTEM vs HASIL RECON per BIN|SKU.")
             st.dataframe(st.session_state.df_check_6, use_container_width=True, hide_index=True)
