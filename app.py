@@ -1969,21 +1969,18 @@ def generate_set_up_real_plus(allocated_data):
         return filtered[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']]
     return pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
 
-def generate_real_plus_recon(allocated_data, stock_system_df):
-    # 1. Tetap filter data yang STATUS-nya "NO ALLOCATION"
+def generate_real_plus_recon(allocated_data):
+    # 1. Filter data yang STATUS-nya "NO ALLOCATION"
     filtered = allocated_data[allocated_data['STATUS'] == "NO ALLOCATION"].copy()
     
     if not filtered.empty:
-        # 2. Hapus dulu kolom 'ITEM NAME' bawaan allocated_data agar tidak duplikat/bentrok saat merge
-        if 'ITEM NAME' in filtered.columns:
-            filtered = filtered.drop(columns=['ITEM NAME'])
-            
-        # 3. Lookup ITEM NAME dari stock_system_df berdasarkan key 'SKU'
-        # Pastikan di stock_system_df nama kolomnya adalah 'SKU' dan 'ITEM NAME'
-        stock_lookup = stock_system_df[['SKU', 'ITEM NAME']].drop_duplicates(subset=['SKU'])
-        filtered = pd.merge(filtered, stock_lookup, on='SKU', how='left')
+        # 2. Ambil map_dict dari session state hasil upload STEP 1
+        if st.session_state.compare_result and 'map_dict' in st.session_state.compare_result:
+            map_dict = st.session_state.compare_result['map_dict']
+            # Lookup ulang ITEM NAME berdasarkan SKU menggunakan map_dict stock system
+            filtered['ITEM NAME'] = filtered['SKU'].astype(str).map(map_dict)
         
-        # 4. Ambil kolom yang dibutuhkan sesuai logic awal lu
+        # 3. Ambil kolom yang dibutuhkan sesuai format lu
         recon_df = filtered[['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF']].copy()
         recon_df['HASIL RECONCILIATION'] = ""
         return recon_df
