@@ -5409,6 +5409,13 @@ def process_justification(df_case, df_tracking, df_all_stock):
                 if ending_stock == real_qty == curr_stock:
                     if qty_sys_all < ending_stock:
                         return "KESALAHAN SYSTEM"
+            # =========================================================================
+            # ORDER 5: LOGIKA KESALAHAN ADJUSMENT (+ / -) 
+            # =========================================================================
+            if qty_sys_row > qty_so_row and gap_adj > 0:
+                return "KESALAHAN ADJUSMENT +"
+            elif qty_sys_row < qty_so_row and gap_adj < 0:
+                return "KESALAHAN ADJUSMENT -"
 
             # =========================================================================
             # ORDER 3: ATURAN KHUSUS - KESALAHAN SYSTEM (BEGIN STOCK >= 0 + MUTASI)
@@ -5417,14 +5424,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
                 mutasi_bersih = round(begin_stock + (stock_in + trf_in) - (sales + trf_out), 2)
                 if mutasi_bersih != ending_stock:
                     return "KESALAHAN SYSTEM"
-
-            # =========================================================================
-            # ORDER 5: LOGIKA KESALAHAN ADJUSMENT (+ / -) 
-            # =========================================================================
-            if qty_sys_row > qty_so_row and gap_adj > 0:
-                return "KESALAHAN ADJUSMENT +"
-            elif qty_sys_row < qty_so_row and gap_adj < 0:
-                return "KESALAHAN ADJUSMENT -"
 
             # =========================================================================
             # ORDER 6: LOGIKA KESALAHAN SYSTEM BAWAAN
