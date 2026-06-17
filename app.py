@@ -1969,12 +1969,25 @@ def generate_set_up_real_plus(allocated_data):
         return filtered[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']]
     return pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
 
-def generate_real_plus_recon(allocated_data):
+def generate_real_plus_recon(allocated_data, stock_system_df):
+    # 1. Tetap filter data yang STATUS-nya "NO ALLOCATION"
     filtered = allocated_data[allocated_data['STATUS'] == "NO ALLOCATION"].copy()
+    
     if not filtered.empty:
+        # 2. Hapus dulu kolom 'ITEM NAME' bawaan allocated_data agar tidak duplikat/bentrok saat merge
+        if 'ITEM NAME' in filtered.columns:
+            filtered = filtered.drop(columns=['ITEM NAME'])
+            
+        # 3. Lookup ITEM NAME dari stock_system_df berdasarkan key 'SKU'
+        # Pastikan di stock_system_df nama kolomnya adalah 'SKU' dan 'ITEM NAME'
+        stock_lookup = stock_system_df[['SKU', 'ITEM NAME']].drop_duplicates(subset=['SKU'])
+        filtered = pd.merge(filtered, stock_lookup, on='SKU', how='left')
+        
+        # 4. Ambil kolom yang dibutuhkan sesuai logic awal lu
         recon_df = filtered[['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF']].copy()
         recon_df['HASIL RECONCILIATION'] = ""
         return recon_df
+        
     return pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY SCAN', 'QTY SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
 
 def logic_miss_location_report(df_setup_real):
