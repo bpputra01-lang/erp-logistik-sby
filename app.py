@@ -2369,10 +2369,7 @@ def menu_Stock_Opname():
         st.markdown("---")
         st.subheader("3️⃣ RECON REPORTS")
         if st.button("📊 Generate All RECON", use_container_width=True):
-            st.session_state.recon_real_plus = generate_real_plus_recon(
-                st.session_state.allocation_result, 
-                st.session_state.df_stock_system  # <-- MASUKIN VARIABEL STOCK SYSTEM LU DI SINI
-            )
+            st.session_state.recon_real_plus = generate_real_plus_recon(st.session_state.allocation_result)
             outstanding = st.session_state.sys_updated_result[st.session_state.sys_updated_result['DIFF'] != 0].copy()
             outstanding['HASIL REKONSILIASI'] = ""
             st.session_state.outstanding_system = outstanding
