@@ -1646,6 +1646,175 @@ def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing)
 
     return df_mult_res, df_sing_res
 
+def logic_cek_adjustment_final(df_recon, df_stock_adj):
+    df_s = df_stock_adj.copy()
+    df_r = df_recon.copy()
+    
+    def super_clean(val):
+        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
+        s = str(val).strip().upper()
+        if s.endswith('.0'): s = s[:-2]
+        return s
+
+    # 1. Bikin Key BIN|SKU di Stock & Recon
+    df_s['JOIN_KEY'] = df_s.iloc[:, 1].fillna('').astype(str).apply(super_clean) + "|" + \
+                       df_s.iloc[:, 2].fillna('').astype(str).apply(super_clean)
+                       
+    df_r['JOIN_KEY'] = df_r.iloc[:, 0].fillna('').astype(str).apply(super_clean) + "|" + \
+                       df_r.iloc[:, 1].fillna('').astype(str).apply(super_clean)
+
+    # 2. Map Recon (BIN|SKU -> QTY)
+    recon_map = {}
+    for _, row in df_r.iterrows():
+        b, s = super_clean(row.iloc[0]), super_clean(row.iloc[1])
+        q = pd.to_numeric(row.iloc[6], errors='coerce')
+        q = 0 if pd.isna(q) else q
+        if b and s:
+            recon_map[f"{b}|{s}"] = q
+
+    # 3. Hitung QTY SO & DIFF untuk tabel Stock Utama
+    new_qty_so = df_s['JOIN_KEY'].map(recon_map)
+    sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
+    new_diff = np.where(new_qty_so.notna(), (sys_qty - new_qty_so.fillna(0)).abs(), np.nan)
+
+    # --- JALUR PAKSA: HAPUS & TEMPEL ---
+    cols_to_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11]]
+    df_final_stock = df_s.iloc[:, cols_to_keep].copy()
+    df_final_stock.insert(10, "QTY SO", new_qty_so.fillna(0))
+    df_final_stock.insert(11, "DIFF", new_diff)
+
+    # 4. Kumpulin SKU "Missing" (Yang BIN|SKU-nya gak match di Stock)
+    matched_keys = set(df_s[new_qty_so.notna()]['JOIN_KEY'])
+    df_missing_raw = df_r[~df_r['JOIN_KEY'].isin(matched_keys)].copy()
+
+    # --- 🔥 GEBUKAN UTAMA: FILTER SEBELUM MASUK DF_MISSING 🔥 ---
+    valid_missing_rows = []
+    for idx, row in df_missing_raw.iterrows():
+        # Ambil nilai Hasil Recon (Kolom ke-6) dan Qty System (karena gak ada di stock, default 0)
+        q_recon_val = pd.to_numeric(row.iloc[6], errors='coerce')
+        q_recon_val = 0 if pd.isna(q_recon_val) else q_recon_val
+        q_sys_val = 0 # Default 0 karena item tidak ditemukan di BIN stock tersebut
+        
+        # LOGIKA COK: Kalau Hasil Recon dikurang Qty System hasilnya 0 atau minus, BUANG!
+        if (q_recon_val - q_sys_val) <= 0 or q_recon_val == 0:
+            continue
+            
+        valid_missing_rows.append(row)
+
+    # Re-create df_missing hanya dengan data yang benar-benar punya nilai selisih murni > 0
+    if valid_missing_rows:
+        df_missing = pd.DataFrame(valid_missing_rows)
+        df_missing['FINAL_RECON_QTY'] = pd.to_numeric(df_missing.iloc[:, 6], errors='coerce').fillna(0)
+        df_missing['QTY_SYSTEM'] = 0
+    else:
+        # Kalau kosong, bikin dataframe template kosong biar gak crash
+        df_missing = pd.DataFrame(columns=df_r.columns.tolist() + ['FINAL_RECON_QTY', 'QTY_SYSTEM'])
+
+    if 'JOIN_KEY' in df_final_stock.columns:
+        df_final_stock = df_final_stock.drop(columns=['JOIN_KEY'])
+    if 'JOIN_KEY' in df_missing.columns:
+        df_missing = df_missing.drop(columns=['JOIN_KEY'], errors='ignore')
+
+    return df_final_stock, df_missing
+
+
+def logic_pivot_adjustment(df_stock_final, df_staging_inbound, df_recon_missing):
+    def super_clean(val):
+        if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
+        s = str(val).strip().upper()
+        if s.endswith('.0'): s = s[:-2]
+        return s
+
+    pivot_list = [] 
+    single_list = [] 
+
+    # A. DARI STOCK (Yang Match BIN|SKU & Selisih Plus)
+    df_s = df_stock_final.copy()
+    col_sku_stock = next((c for c in df_s.columns if 'SKU' in c.upper()), df_s.columns[2])
+    
+    q_so = pd.to_numeric(df_s["QTY SO"], errors='coerce').fillna(0)
+    q_sys = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0) if len(df_s.columns) > 9 else pd.to_numeric(df_s[df_s.columns[9]], errors='coerce').fillna(0)
+    
+    mask_plus = (q_so > q_sys) & (df_s["DIFF"].notna())
+    if mask_plus.any():
+        for idx, r in df_s[mask_plus].iterrows():
+            pivot_list.append({
+                'SKU_KEY_TEMP': super_clean(r[col_sku_stock]), 
+                'QTY_TOTAL': pd.to_numeric(r["DIFF"], errors='coerce')
+            })
+
+    # B. PREPARASI MASTER INBOUND
+    inbound_master = df_staging_inbound.copy()
+    col_sku_inbound = next((c for c in inbound_master.columns if 'SKU' in c.upper()), inbound_master.columns[2])
+    inbound_master['SKU_JOIN'] = inbound_master[col_sku_inbound].apply(super_clean)
+    m_clean = inbound_master.drop_duplicates(subset=['SKU_JOIN'])
+    inbound_skus_set = set(m_clean['SKU_JOIN'].unique())
+
+    # C. LOOKUP SKU MISSING KE INBOUND
+    if df_recon_missing is not None and not df_recon_missing.empty:
+        col_bin_miss = df_recon_missing.columns[0]
+        col_sku_miss = df_recon_missing.columns[1]
+        
+        col_qty_recon = 'FINAL_RECON_QTY' if 'FINAL_RECON_QTY' in df_recon_missing.columns else df_recon_missing.columns[6]
+        col_qty_sys = 'QTY_SYSTEM' if 'QTY_SYSTEM' in df_recon_missing.columns else None
+        
+        for _, row in df_recon_missing.iterrows():
+            s_recon = super_clean(row[col_sku_miss])
+            if not s_recon:
+                continue
+                
+            q_recon_val = pd.to_numeric(row[col_qty_recon], errors='coerce') or 0
+            q_sys_val = pd.to_numeric(row[col_qty_sys], errors='coerce') if col_qty_sys else 0
+            
+            qty_calc = q_recon_val - q_sys_val
+            
+            # Filter double safety di fungsi kedua
+            if qty_calc <= 0 or q_recon_val == 0:
+                continue
+
+            if s_recon in inbound_skus_set:
+                pivot_list.append({'SKU_KEY_TEMP': s_recon, 'QTY_TOTAL': qty_calc})
+            else:
+                single_list.append({'BIN': row[col_bin_miss], 'SKU': row[col_sku_miss], 'QTY ADJ': qty_calc})
+
+    # D. PIVOT & MERGE KE MASTER INBOUND
+    df_mult_res = pd.DataFrame()
+    if pivot_list:
+        df_p = pd.DataFrame(pivot_list)
+        df_p_grouped = df_p.groupby('SKU_KEY_TEMP')['QTY_TOTAL'].sum().reset_index()
+        
+        mask_has_master = df_p_grouped['SKU_KEY_TEMP'].isin(inbound_skus_set)
+        
+        df_no_master = df_p_grouped[~mask_has_master]
+        for _, row in df_no_master.iterrows():
+            single_list.append({
+                'BIN': 'STAGING INBOUND (MISS MASTER)', 
+                'SKU': row['SKU_KEY_TEMP'], 
+                'QTY ADJ': row['QTY_TOTAL']
+            })
+            
+        df_p_valid = df_p_grouped[mask_has_master]
+        
+        if not df_p_valid.empty:
+            df_mult_res = df_p_valid.merge(m_clean, left_on='SKU_KEY_TEMP', right_on='SKU_JOIN', how='inner')
+            col_target_so = next((c for c in df_mult_res.columns if 'QTY SO' in c.upper() or 'SO' in c.upper()), None)
+            
+            if col_target_so:
+                df_mult_res[col_target_so] = df_mult_res['QTY_TOTAL']
+            else:
+                df_mult_res['QTY SO'] = df_mult_res['QTY_TOTAL']
+                
+            df_mult_res = df_mult_res.drop(columns=['SKU_KEY_TEMP', 'QTY_TOTAL', 'SKU_JOIN'], errors='ignore')
+
+    df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+
+    # --- 🔥 LAST CLEANUP: Hilangkan baris berekor 'None' dari tabel Multiple jika ada data corrupt ---
+    if not df_mult_res.empty:
+        df_mult_res = df_mult_res.dropna(subset=[df_mult_res.columns[0], df_mult_res.columns[1]])
+        df_mult_res = df_mult_res[~df_mult_res.iloc[:, 0].astype(str).str.strip().str.upper().isin(['NONE', 'NAN', ''])]
+
+    return df_mult_res, df_sing_res
+
 def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing=None):
     def clean_val(x):
         if pd.isna(x): return ""
@@ -1654,14 +1823,13 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
         if s.endswith('.0'): s = s[:-2]
         return s
 
-    # 1. Dictionary dari MULTIPLE ADJ + (Untuk validasi barang ijin masuk)
-    dict_multi = {}
+    # 1. Cukup jadikan SET untuk mencatat SKU apa saja yang valid/diizinkan (Approved SKU)
+    # Tidak perlu simpan BIN asalnya di sini karena rawan tertimpa kalau multi-bin
+    allowed_skus = set()
     if not df_multiple_adj_plus.empty:
-        for _, row in df_multiple_adj_plus.iterrows():
-            sku = clean_val(row.iloc[2])
-            bin_asal = row.iloc[1]
-            if sku != "" and sku not in dict_multi:
-                dict_multi[sku] = bin_asal
+        # Cari kolom SKU di df_multiple_adj_plus (biasanya kolom ke-2 atau ke-3 tergantung struktur master)
+        col_sku_multi = df_multiple_adj_plus.columns[2] if len(df_multiple_adj_plus.columns) > 2 else df_multiple_adj_plus.columns[0]
+        allowed_skus = set(df_multiple_adj_plus[col_sku_multi].apply(clean_val).unique())
 
     setup_real_data = []
     seen_entry = set()
@@ -1677,12 +1845,20 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
             sku_key = clean_val(df_stock.iloc[i, 2])
             bin_tujuan = df_stock.iloc[i, 1]
             
-            if sku_key in dict_multi:
+            # Ambil QTY Selisih murni dari baris stock ini (bukan dari total pivot)
+            qty_mutasi = diff_val.iloc[i] 
+            
+            # Validasi: Apakah SKU ini ada di list inbound/multiple?
+            if sku_key in allowed_skus:
+                # Untuk "BIN AWAL", kita ambil default atau dinamis dari staging inbound 
+                # karena di multiple_adj data aslinya sudah melebur jadi satu master inbound.
+                bin_awal = "STAGING INBOUND" 
+                
                 setup_real_data.append({
-                    "BIN AWAL": dict_multi[sku_key],
+                    "BIN AWAL": bin_awal,
                     "BIN TUJUAN": bin_tujuan,
                     "SKU": sku_key,
-                    "QUANTITY": diff_val.iloc[i],
+                    "QUANTITY": qty_mutasi, # Hasilnya akan presisi: Baris A1-1 dapet 10, Baris A1-2 dapet 5
                     "NOTES": "MISS LOCATION"
                 })
                 seen_entry.add(f"{sku_key}|{bin_tujuan}")
@@ -1690,15 +1866,14 @@ def logic_setup_real_plus(df_stock_final, df_multiple_adj_plus, df_recon_missing
     # --- B. AMBIL DARI TAB MISSING (Data Ghaib di Sistem) ---
     if df_recon_missing is not None and not df_recon_missing.empty:
         for _, row_m in df_recon_missing.iterrows():
-            bin_tujuan_m = row_m.iloc[0] # Kolom BIN
-            sku_raw_m = row_m.iloc[1]    # Kolom SKU
+            bin_tujuan_m = row_m.iloc[0] 
+            sku_raw_m = row_m.iloc[1]    
             sku_key_m = clean_val(sku_raw_m)
             qty_m = pd.to_numeric(row_m.iloc[6], errors='coerce') or 0
 
-            # Cek jika SKU ada di daftar ijin tapi belum masuk di proses A
-            if sku_key_m in dict_multi and f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry:
+            if sku_key_m in allowed_skus and f"{sku_key_m}|{bin_tujuan_m}" not in seen_entry:
                 setup_real_data.append({
-                    "BIN AWAL": "STAGING INBOUND", # Default asal buat item missing
+                    "BIN AWAL": "STAGING INBOUND", 
                     "BIN TUJUAN": bin_tujuan_m,
                     "SKU": sku_key_m,
                     "QUANTITY": qty_m,
