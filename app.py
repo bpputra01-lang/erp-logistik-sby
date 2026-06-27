@@ -711,11 +711,9 @@ def menu_matching_karantina():
     col_sys, col_real = st.columns(2)
     
     with col_sys:
-        st.markdown("#### 🏪 1. Data System (+)")
         file_sys = st.file_uploader("Upload Laporan System (Excel/CSV)", type=["xlsx", "csv"], key="uploader_sys")
         
     with col_real:
-        st.markdown("#### 📦 2. Data Real (+)")
         file_real = st.file_uploader("Upload Laporan Real Aktual (Excel/CSV)", type=["xlsx", "csv"], key="uploader_real")
     
     # Proses running hanya jika kedua file sudah lengkap diupload
