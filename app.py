@@ -629,9 +629,6 @@ def process_matching(df):
     
     return pd.DataFrame(matched_details), metrics
 
-import streamlit as st
-import pandas as pd
-
 def menu_matching_karantina():
     st.markdown("""
         <style>
@@ -716,9 +713,13 @@ def menu_matching_karantina():
     with col_real:
         file_real = st.file_uploader("Upload Laporan Real Aktual (Excel/CSV)", type=["xlsx", "csv"], key="uploader_real")
     
+    # Inisialisasi jangkar status running agar memori terkunci aman
+    if 'process_triggered' not in st.session_state:
+        st.session_state['process_triggered'] = False
+    
     # Proses running hanya jika kedua file sudah lengkap diupload
     if file_sys is not None and file_real is not None:
-        st.success("🎉 Kedua data berhasil di-upload! Memulai kalkulasi...")
+        st.success("🎉 Kedua data berhasil di-upload! Siap diproses.")
         
         # Load File System
         if file_sys.name.endswith('.xlsx'):
@@ -732,10 +733,6 @@ def menu_matching_karantina():
         else:
             df_real_raw = pd.read_csv(file_real)
             
-        # ==========================================
-        # CORE LOGIC PROCESS (2 SOURCE MATCHING)
-        # ==========================================
-        
         # Standardisasi Data System (Kolom A=0, D=3, K=10)
         df_sys = pd.DataFrame()
         df_sys['Cabang'] = df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper()
@@ -748,8 +745,9 @@ def menu_matching_karantina():
         df_real['SKU_Real'] = df_real_raw.iloc[:, 4].astype(str).str.strip().str.upper()
         df_real['Qty_Real'] = pd.to_numeric(df_real_raw.iloc[:, 12], errors='coerce').fillna(0)
 
-        # Tambahkan Tombol Run Process di sini, Bos!
+        # Tombol Run Process
         if st.button("🚀 Run Process", use_container_width=True):
+            st.session_state['process_triggered'] = True
             
             # Bangun Pool System berdasarkan df_sys
             system_pool = {}
@@ -822,18 +820,17 @@ def menu_matching_karantina():
                     })
 
             total_system_left = sum(sum(skus.values()) for skus in system_pool.values())
-            df_result = pd.DataFrame(matched_details)
-
-            # Simpan hasil perhitungan ke session state agar tidak hilang saat dropdown di-klik
-            st.session_state['df_result'] = df_result
+            
+            # Simpan data permanen ke session state
+            st.session_state['df_result'] = pd.DataFrame(matched_details)
             st.session_state['metrics'] = {
                 'total_real': total_real_qty,
                 'total_allocated': total_allocated_qty,
                 'system_left': total_system_left
             }
 
-        # Render output jika data sudah pernah di-proses
-        if 'df_result' in st.session_state:
+        # --- RENDERING OUTPUT (Aman di luar blok IF BUTTON) ---
+        if st.session_state['process_triggered'] and 'df_result' in st.session_state:
             res_df = st.session_state['df_result']
             mtr = st.session_state['metrics']
 
@@ -885,6 +882,10 @@ def menu_matching_karantina():
                 file_name="hasil_matching_cabang.csv",
                 mime="text/csv"
             )
+    else:
+        # Bersihkan status penanda jika file dilepas/di-reset
+        st.session_state['process_triggered'] = False
+        st.info("Silakan upload kedua file (Data System + Data Real) di atas untuk memproses pencocokan stok.")
 # =========================================================
 # 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
 # =========================================================
