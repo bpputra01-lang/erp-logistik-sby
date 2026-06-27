@@ -533,7 +533,359 @@ import re
 from collections import defaultdict
 
 
+import pandas as pd
+import streamlit as st
+import io
+from openpyxl import load_workbook
+from collections import defaultdict
 
+# ==========================================
+# 1. LOGIC PROSES (LANGSUNG DI SINI)
+# ==========================================
+def process_matching(df):
+    """
+    Fungsi untuk mencocokan SKU Real + Cabang vs SKU System + Cabang
+    Serta menghitung metrics data.
+    """
+    # Bersihkan & Standarkan Data (Kolom A, D, E, K, M)
+    df['A'] = df.iloc[:, 0].astype(str).str.strip().str.upper()   # Cabang
+    df['D'] = df.iloc[:, 3].astype(str).str.strip().str.upper()   # SKU System
+    df['E'] = df.iloc[:, 4].astype(str).str.strip().str.upper()   # SKU Real
+    df['K'] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # Qty System
+    df['M'] = pd.to_numeric(df.iloc[:, 12], errors='coerce').fillna(0) # Qty Real
+
+    # Bangun Pool System (Grup berdasarkan Cabang & SKU System)
+    system_pool = {}
+    for idx, row in df.iterrows():
+        cabang = row['A']
+        sku_sys = row['D']
+        qty_sys = row['K']
+        
+        if sku_sys and qty_sys > 0:
+            if cabang not in system_pool:
+                system_pool[cabang] = {}
+            if sku_sys not in system_pool[cabang]:
+                system_pool[cabang][sku_sys] = 0
+            system_pool[cabang][sku_sys] += qty_sys
+
+    # Proses Alokasi/Matching dari Data Real
+    matched_details = []
+    total_real_qty = 0
+    total_allocated_qty = 0
+
+    for idx, row in df.iterrows():
+        cabang_real = row['A']
+        sku_real = row['E']
+        qty_real_sisa = row['M']
+        
+        if not sku_real or qty_real_sisa <= 0:
+            continue
+            
+        total_real_qty += qty_real_sisa
+
+        # Cari pasangannya lintas cabang yang punya SKU System tersebut
+        for cabang_sys, skus in system_pool.items():
+            if sku_real in skus and skus[sku_real] > 0:
+                qty_sys_avail = skus[sku_real]
+                
+                # Hitung berapa yang bisa dialokasikan
+                allocated_qty = min(qty_real_sisa, qty_sys_avail)
+                
+                # Kurangi pool system dan sisa real
+                system_pool[cabang_sys][sku_real] -= allocated_qty
+                qty_real_sisa -= allocated_qty
+                total_allocated_qty += allocated_qty
+                
+                matched_details.append({
+                    "SKU": sku_real,
+                    "Cabang Real": cabang_real,
+                    "Cabang System": cabang_sys,
+                    "Qty Match": allocated_qty,
+                    "Status": "MATCH PERFECT" if cabang_real == cabang_sys else "MATCH CROSS-BRANCH"
+                })
+                
+                if qty_real_sisa <= 0:
+                    break # Qty Real baris ini sudah habis terpenuhi
+        
+        # Jika kuota system habis / tidak ketemu pasangannya
+        if qty_real_sisa > 0:
+            matched_details.append({
+                "SKU": sku_real,
+                "Cabang Real": cabang_real,
+                "Cabang System": "TIDAK KETEMU / SYSTEM HABIS",
+                "Qty Match": qty_real_sisa,
+                "Status": "UNMATCHED / NO SYSTEM QTY"
+            })
+
+    # Hitung Sisa System yang Tidak Terserap
+    total_system_left = sum(sum(skus.values()) for skus in system_pool.values())
+
+    metrics = {
+        "total_real": total_real_qty,
+        "total_match": total_allocated_qty,
+        "total_unmatch": total_real_qty - total_allocated_qty,
+        "system_left": total_system_left
+    }
+    
+    return pd.DataFrame(matched_details), metrics
+
+def menu_matching_karantina():
+    st.markdown("""
+        <style>
+        /* Hero Header Blue Gradient Style */
+        .hero-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: bold;
+            padding: 18px 25px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            letter-spacing: 0.5px;
+        }
+        
+        /* Metric Card Container & Cards */
+        .metric-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            margin-bottom: 25px;
+        }
+        .metric-card {
+            flex: 1;
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            border-left: 4px solid #C5A059 !important;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .metric-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #8c96a8;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 1. Render Hero Header
+    st.markdown('<div class="hero-header">SYSTEM & REAL MATCHING</div>', unsafe_allow_html=True)
+
+    # 2. Tambahkan st.expander Informasi & Logic
+    with st.expander("📋 Informasi Format File", expanded=False):
+        st.markdown("""
+        **Ketentuan Kolom untuk Masing-masing File Uploader:**
+        
+        * **📂 FILE SYSTEM (+)**
+            * **Kolom A:** Cabang
+            * **Kolom D:** SKU System
+            * **Kolom K:** Qty System
+            
+        * **📂 FILE REAL (+)**
+            * **Kolom A:** Cabang
+            * **Kolom E:** SKU Real
+            * **Kolom M:** Qty Real
+        """)
+
+    with st.expander("💡 Logic Thinking", expanded=False):
+        st.markdown("""
+        **Alur Alokasi Stok Lintas Cabang (Cross-Branch):**
+        1. **Pool Lock System:** Seluruh data dari *Uploader System* akan dikunci kuotanya berdasarkan kombinasi **Cabang + SKU System**.
+        2. **Pencarian Pasangan:** Data dari *Uploader Real* akan discan baris demi baris, lalu diprioritaskan mencari kecocokan di cabang asalnya dulu (**MATCH PERFECT**).
+        3. **Alokasi Lintas Cabang:** Jika kuota system di cabang asalnya habis, sistem akan otomatis mencarikan sisa kuota ke cabang lain (**MATCH CROSS-BRANCH**).
+        4. **Kontrol Kuota:** Jika kuota system di semua cabang sudah habis, sisa qty real tidak dialokasikan lagi (**UNMATCHED / SYSTEM HABIS**).
+        """)
+
+    # 3. Area Layout 2 Uploaders (Dibagi Jadi 2 Kolom)
+    col_sys, col_real = st.columns(2)
+    
+    with col_sys:
+        file_sys = st.file_uploader("Upload Laporan System (Excel/CSV)", type=["xlsx", "csv"], key="uploader_sys")
+        
+    with col_real:
+        file_real = st.file_uploader("Upload Laporan Real Aktual (Excel/CSV)", type=["xlsx", "csv"], key="uploader_real")
+    
+    # Inisialisasi jangkar status running agar memori terkunci aman
+    if 'process_triggered' not in st.session_state:
+        st.session_state['process_triggered'] = False
+    
+    # Proses running hanya jika kedua file sudah lengkap diupload
+    if file_sys is not None and file_real is not None:
+        st.success("🎉 Kedua data berhasil di-upload! Siap diproses.")
+        
+        # Load File System
+        if file_sys.name.endswith('.xlsx'):
+            df_sys_raw = pd.read_excel(file_sys)
+        else:
+            df_sys_raw = pd.read_csv(file_sys)
+            
+        # Load File Real
+        if file_real.name.endswith('.xlsx'):
+            df_real_raw = pd.read_excel(file_real)
+        else:
+            df_real_raw = pd.read_csv(file_real)
+            
+        # Standardisasi Data System (Kolom A=0, D=3, K=10)
+        df_sys = pd.DataFrame()
+        df_sys['Cabang'] = df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper()
+        df_sys['SKU_Sys'] = df_sys_raw.iloc[:, 3].astype(str).str.strip().str.upper()
+        df_sys['Qty_Sys'] = pd.to_numeric(df_sys_raw.iloc[:, 10], errors='coerce').fillna(0)
+        
+        # Standardisasi Data Real (Kolom A=0, E=4, M=12)
+        df_real = pd.DataFrame()
+        df_real['Cabang'] = df_real_raw.iloc[:, 0].astype(str).str.strip().str.upper()
+        df_real['SKU_Real'] = df_real_raw.iloc[:, 4].astype(str).str.strip().str.upper()
+        df_real['Qty_Real'] = pd.to_numeric(df_real_raw.iloc[:, 12], errors='coerce').fillna(0)
+
+        # Tombol Run Process
+        if st.button("🚀 Run Process", use_container_width=True):
+            st.session_state['process_triggered'] = True
+            
+            # Bangun Pool System berdasarkan df_sys
+            system_pool = {}
+            for idx, row in df_sys.iterrows():
+                cabang = row['Cabang']
+                sku_sys = row['SKU_Sys']
+                qty_sys = row['Qty_Sys']
+                if sku_sys and qty_sys > 0:
+                    if cabang not in system_pool:
+                        system_pool[cabang] = {}
+                    if sku_sys not in system_pool[cabang]:
+                        system_pool[cabang][sku_sys] = 0
+                    system_pool[cabang][sku_sys] += qty_sys
+
+            # Proses Alokasi berdasarkan df_real
+            matched_details = []
+            total_real_qty = df_real['Qty_Real'].sum()
+            total_allocated_qty = 0
+
+            for idx, row in df_real.iterrows():
+                cabang_real = row['Cabang']
+                sku_real = row['SKU_Real']
+                qty_real_sisa = row['Qty_Real']
+                
+                if not sku_real or qty_real_sisa <= 0:
+                    continue
+
+                # 1. Cek di Cabang Sendiri Dulu (Perfect Match)
+                if cabang_real in system_pool and sku_real in system_pool[cabang_real] and system_pool[cabang_real][sku_real] > 0:
+                    allocated_qty = min(qty_real_sisa, system_pool[cabang_real][sku_real])
+                    system_pool[cabang_real][sku_real] -= allocated_qty
+                    qty_real_sisa -= allocated_qty
+                    total_allocated_qty += allocated_qty
+                    
+                    matched_details.append({
+                        "SKU": sku_real,
+                        "Cabang Real": cabang_real,
+                        "Cabang System": cabang_real,
+                        "Qty Match": allocated_qty,
+                        "Status": "MATCH PERFECT"
+                    })
+
+                # 2. Jika Masih Sisa Real-nya, Cari Lintas Cabang Lain
+                if qty_real_sisa > 0:
+                    for cabang_sys, skus in system_pool.items():
+                        if sku_real in skus and skus[sku_real] > 0:
+                            allocated_qty = min(qty_real_sisa, skus[sku_real])
+                            system_pool[cabang_sys][sku_real] -= allocated_qty
+                            qty_real_sisa -= allocated_qty
+                            total_allocated_qty += allocated_qty
+                            
+                            matched_details.append({
+                                "SKU": sku_real,
+                                "Cabang Real": cabang_real,
+                                "Cabang System": cabang_sys,
+                                "Qty Match": allocated_qty,
+                                "Status": "MATCH CROSS-BRANCH"
+                            })
+                            if qty_real_sisa <= 0:
+                                break 
+                
+                # 3. Jika Tetap Sisa Berarti Kuota System untuk SKU tersebut Habis
+                if qty_real_sisa > 0:
+                    matched_details.append({
+                        "SKU": sku_real,
+                        "Cabang Real": cabang_real,
+                        "Cabang System": "TIDAK KETEMU / SYSTEM HABIS",
+                        "Qty Match": qty_real_sisa,
+                        "Status": "UNMATCHED / NO SYSTEM QTY"
+                    })
+
+            total_system_left = sum(sum(skus.values()) for skus in system_pool.values())
+            
+            # Simpan data permanen ke session state
+            st.session_state['df_result'] = pd.DataFrame(matched_details)
+            st.session_state['metrics'] = {
+                'total_real': total_real_qty,
+                'total_allocated': total_allocated_qty,
+                'system_left': total_system_left
+            }
+
+        # --- RENDERING OUTPUT (Aman di luar blok IF BUTTON) ---
+        if st.session_state['process_triggered'] and 'df_result' in st.session_state:
+            res_df = st.session_state['df_result']
+            mtr = st.session_state['metrics']
+
+            # --- METRIC BOXES PREMIUM CARD ---
+            st.markdown(f"""
+            <div class="metric-container">
+                <div class="metric-card">
+                    <div class="metric-title">📦 Total Qty Real +</div>
+                    <div class="metric-value">{int(mtr['total_real']):,}</div>
+                </div>
+                <div class="metric-card" style="border-left-color: #2ecc71 !important;">
+                    <div class="metric-title">✅ Total Qty Real + (Match)</div>
+                    <div class="metric-value">{int(mtr['total_allocated']):,}</div>
+                </div>
+                <div class="metric-card" style="border-left-color: #e74c3c !important;">
+                    <div class="metric-title">⚠️ Total Qty Real + (Unmatched)</div>
+                    <div class="metric-value">{int(mtr['total_real'] - mtr['total_allocated']):,}</div>
+                </div>
+                <div class="metric-card" style="border-left-color: #3498db !important;">
+                    <div class="metric-title">🏪 Sisa Qty System (Karantina)</div>
+                    <div class="metric-value">{int(mtr['system_left']):,}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # --- TABEL DETAIL ---
+            st.subheader("📋 Detail Alokasi Lintas Cabang")
+            
+            # Dropdown dikosongkan secara default (default=[])
+            status_filter = st.multiselect(
+                "Filter Status Laporan (Kosongkan untuk menampilkan semua):", 
+                options=res_df["Status"].unique(), 
+                default=[]
+            )
+            
+            # Logic: Jika dropdown kosong, munculkan SEMUA DETAIL data terlebih dahulu
+            if not status_filter:
+                filtered_result = res_df
+            else:
+                filtered_result = res_df[res_df["Status"].isin(status_filter)]
+                
+            st.dataframe(filtered_result, use_container_width=True, hide_index=True)
+            
+            # Download Button
+            csv = filtered_result.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Hasil Matching (.csv)",
+                data=csv,
+                file_name="hasil_matching_cabang.csv",
+                mime="text/csv"
+            )
+    else:
+        # Bersihkan status penanda jika file dilepas/di-reset
+        st.session_state['process_triggered'] = False
+        st.info("Silakan upload kedua file (Data System + Data Real) di atas untuk memproses pencocokan stok.")
 # =========================================================
 # 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
 # =========================================================
