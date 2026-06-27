@@ -841,15 +841,15 @@ def menu_matching_karantina():
             st.markdown(f"""
             <div class="metric-container">
                 <div class="metric-card">
-                    <div class="metric-title">📦 Total Qty Real</div>
+                    <div class="metric-title">📦 Total Qty Real +</div>
                     <div class="metric-value">{int(mtr['total_real']):,}</div>
                 </div>
                 <div class="metric-card" style="border-left-color: #2ecc71 !important;">
-                    <div class="metric-title">✅ Total Qty Match</div>
+                    <div class="metric-title">✅ Total Qty Real + (Match)</div>
                     <div class="metric-value">{int(mtr['total_allocated']):,}</div>
                 </div>
                 <div class="metric-card" style="border-left-color: #e74c3c !important;">
-                    <div class="metric-title">⚠️ Total Qty Unmatched</div>
+                    <div class="metric-title">⚠️ Total Qty Real + (Unmatched)</div>
                     <div class="metric-value">{int(mtr['total_real'] - mtr['total_allocated']):,}</div>
                 </div>
                 <div class="metric-card" style="border-left-color: #3498db !important;">
