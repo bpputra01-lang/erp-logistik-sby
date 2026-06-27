@@ -680,7 +680,7 @@ def menu_matching_karantina():
     """, unsafe_allow_html=True)
 
     # 1. Render Hero Header sesuai gambar
-    st.markdown('<div class="hero-header">STOCK OPNAME ANALYZER</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">System & Real Matching</div>', unsafe_allow_html=True)
 
     # 2. Tambahkan st.expander Laporan
     with st.expander("📋 Informasi Format File", expanded=False):
