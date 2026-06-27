@@ -679,58 +679,84 @@ def menu_matching_karantina():
         </style>
     """, unsafe_allow_html=True)
 
-    # 1. Render Hero Header sesuai gambar
-    st.markdown('<div class="hero-header">System & Real Matching</div>', unsafe_allow_html=True)
+    # 1. Render Hero Header
+    st.markdown('<div class="hero-header">STOCK OPNAME ANALYZER</div>', unsafe_allow_html=True)
 
-    # 2. Tambahkan st.expander Laporan
+    # 2. Tambahkan st.expander Informasi & Logic
     with st.expander("📋 Informasi Format File", expanded=False):
         st.markdown("""
-        **Pastikan file Excel / CSV yang Anda upload memiliki struktur kolom sebagai berikut:**
-        * **Kolom A:** Nama Cabang (Asal data)
-        * **Kolom D:** SKU System (+)
-        * **Kolom E:** SKU Real (+)
-        * **Kolom K:** Qty System (+)
-        * **Kolom M:** Qty Real (+)
+        **Ketentuan Kolom untuk Masing-masing File Uploader:**
         
-        *Sistem otomatis melakukan pembersihan whitespace dan menyamakan huruf menjadi KAPITAL saat proses scanning.*
+        * **📂 FILE SYSTEM (+)**
+            * **Kolom A:** Cabang
+            * **Kolom D:** SKU System
+            * **Kolom K:** Qty System
+            
+        * **📂 FILE REAL (+)**
+            * **Kolom A:** Cabang
+            * **Kolom E:** SKU Real
+            * **Kolom M:** Qty Real
         """)
 
     with st.expander("💡 Logic Thinking", expanded=False):
         st.markdown("""
         **Alur Alokasi Stok Lintas Cabang (Cross-Branch):**
-        1. **Pool Lock System:** Sistem mengunci total kuota stok `Qty System` yang tersedia per Cabang dan per SKU.
-        2. **Pencarian Pasangan:** Data `SKU Real` akan dicocokkan terlebih dahulu dengan `SKU System` di cabang yang sama (**MATCH PERFECT**).
-        3. **Alokasi Lintas Cabang:** Jika kuota di cabang sendiri kurang/habis, sistem akan menyisir cabang lain yang masih memiliki sisa kuota system (**MATCH CROSS-BRANCH**).
-        4. **Kontrol Kuota:** Jika `Qty System` di seluruh cabang sudah habis teralokasikan, maka baris data Real berikutnya tidak akan mendapatkan alokasi lagi (**UNMATCHED / SYSTEM HABIS**).
+        1. **Pool Lock System:** Seluruh data dari *Uploader System* akan dikunci kuotanya berdasarkan kombinasi **Cabang + SKU System**.
+        2. **Pencarian Pasangan:** Data dari *Uploader Real* akan discan baris demi baris, lalu diprioritaskan mencari kecocokan di cabang asalnya dulu (**MATCH PERFECT**).
+        3. **Alokasi Lintas Cabang:** Jika kuota system di cabang asalnya habis, sistem akan otomatis mencarikan sisa kuota ke cabang lain (**MATCH CROSS-BRANCH**).
+        4. **Kontrol Kuota:** Jika kuota system di semua cabang sudah habis, sisa qty real tidak dialokasikan lagi (**UNMATCHED / SYSTEM HABIS**).
         """)
 
-    # 3. Area Upload File Laporan
-    st.markdown("### 📥 Upload Data Sumber")
-    uploaded_file = st.file_uploader("Upload Laporan Excel / CSV", type=["xlsx", "csv"], key="stock_match_uploader")
+    # 3. Area Layout 2 Uploaders (Dibagi Jadi 2 Kolom)
+    st.markdown("### 📥 Input Sumber Data")
+    col_sys, col_real = st.columns(2)
     
-    if uploaded_file is not None:
-        if uploaded_file.name.endswith('.xlsx'):
-            df = pd.read_excel(uploaded_file)
-        else:
-            df = pd.read_csv(uploaded_file)
-            
-        st.success("🎉 Data Berhasil Di-upload!")
+    with col_sys:
+        st.markdown("#### 🏪 1. Data System (+)")
+        file_sys = st.file_uploader("Upload Laporan System (Excel/CSV)", type=["xlsx", "csv"], key="uploader_sys")
         
+    with col_real:
+        st.markdown("#### 📦 2. Data Real (+)")
+        file_real = st.file_uploader("Upload Laporan Real Aktual (Excel/CSV)", type=["xlsx", "csv"], key="uploader_real")
+    
+    # Proses running hanya jika kedua file sudah lengkap diupload
+    if file_sys is not None and file_real is not None:
+        st.success("🎉 Kedua data berhasil di-upload! Memulai kalkulasi...")
+        
+        # Load File System
+        if file_sys.name.endswith('.xlsx'):
+            df_sys_raw = pd.read_excel(file_sys)
+        else:
+            df_sys_raw = pd.read_csv(file_sys)
+            
+        # Load File Real
+        if file_real.name.endswith('.xlsx'):
+            df_real_raw = pd.read_excel(file_real)
+        else:
+            df_real_raw = pd.read_csv(file_real)
+            
         # ==========================================
-        # CORE LOGIC PROCESS
+        # CORE LOGIC PROCESS (2 SOURCE MATCHING)
         # ==========================================
-        df['A'] = df.iloc[:, 0].astype(str).str.strip().str.upper()   
-        df['D'] = df.iloc[:, 3].astype(str).str.strip().str.upper()   
-        df['E'] = df.iloc[:, 4].astype(str).str.strip().str.upper()   
-        df['K'] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) 
-        df['M'] = pd.to_numeric(df.iloc[:, 12], errors='coerce').fillna(0) 
+        
+        # Standardisasi Data System (Kolom A=0, D=3, K=10)
+        df_sys = pd.DataFrame()
+        df_sys['Cabang'] = df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper()
+        df_sys['SKU_Sys'] = df_sys_raw.iloc[:, 3].astype(str).str.strip().str.upper()
+        df_sys['Qty_Sys'] = pd.to_numeric(df_sys_raw.iloc[:, 10], errors='coerce').fillna(0)
+        
+        # Standardisasi Data Real (Kolom A=0, E=4, M=12)
+        df_real = pd.DataFrame()
+        df_real['Cabang'] = df_real_raw.iloc[:, 0].astype(str).str.strip().str.upper()
+        df_real['SKU_Real'] = df_real_raw.iloc[:, 4].astype(str).str.strip().str.upper()
+        df_real['Qty_Real'] = pd.to_numeric(df_real_raw.iloc[:, 12], errors='coerce').fillna(0)
 
-        # Bangun Pool System
+        # Bangun Pool System berdasarkan df_sys
         system_pool = {}
-        for idx, row in df.iterrows():
-            cabang = row['A']
-            sku_sys = row['D']
-            qty_sys = row['K']
+        for idx, row in df_sys.iterrows():
+            cabang = row['Cabang']
+            sku_sys = row['SKU_Sys']
+            qty_sys = row['Qty_Sys']
             if sku_sys and qty_sys > 0:
                 if cabang not in system_pool:
                     system_pool[cabang] = {}
@@ -738,22 +764,20 @@ def menu_matching_karantina():
                     system_pool[cabang][sku_sys] = 0
                 system_pool[cabang][sku_sys] += qty_sys
 
-        # Proses Alokasi
+        # Proses Alokasi berdasarkan df_real
         matched_details = []
-        total_real_qty = 0
+        total_real_qty = df_real['Qty_Real'].sum()
         total_allocated_qty = 0
 
-        for idx, row in df.iterrows():
-            cabang_real = row['A']
-            sku_real = row['E']
-            qty_real_sisa = row['M']
+        for idx, row in df_real.iterrows():
+            cabang_real = row['Cabang']
+            sku_real = row['SKU_Real']
+            qty_real_sisa = row['Qty_Real']
             
             if not sku_real or qty_real_sisa <= 0:
                 continue
-                
-            total_real_qty += qty_real_sisa
 
-            # 1. Cek di Cabang Sendiri Dulu (Biar Perfect Match didahulukan)
+            # 1. Cek di Cabang Sendiri Dulu (Perfect Match)
             if cabang_real in system_pool and sku_real in system_pool[cabang_real] and system_pool[cabang_real][sku_real] > 0:
                 allocated_qty = min(qty_real_sisa, system_pool[cabang_real][sku_real])
                 system_pool[cabang_real][sku_real] -= allocated_qty
@@ -768,7 +792,7 @@ def menu_matching_karantina():
                     "Status": "MATCH PERFECT"
                 })
 
-            # 2. Jika Masih Sisa, Cari Lintas Cabang Lain
+            # 2. Jika Masih Sisa Real-nya, Cari Lintas Cabang Lain
             if qty_real_sisa > 0:
                 for cabang_sys, skus in system_pool.items():
                     if sku_real in skus and skus[sku_real] > 0:
@@ -787,7 +811,7 @@ def menu_matching_karantina():
                         if qty_real_sisa <= 0:
                             break 
             
-            # 3. Jika Tetap Sisa Berarti System Habis
+            # 3. Jika Tetap Sisa Berarti Kuota System untuk SKU tersebut Habis
             if qty_real_sisa > 0:
                 matched_details.append({
                     "SKU": sku_real,
@@ -842,7 +866,7 @@ def menu_matching_karantina():
             mime="text/csv"
         )
     else:
-        st.info("Silakan upload file Excel atau CSV untuk memproses pencocokan stok.")
+        st.info("Silakan upload kedua file (Data System + Data Real) di atas untuk memproses pencocokan stok.")
 # =========================================================
 # 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
 # =========================================================
