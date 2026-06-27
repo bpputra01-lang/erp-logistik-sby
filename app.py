@@ -539,20 +539,22 @@ import io
 from openpyxl import load_workbook
 from collections import defaultdict
 
+# ==========================================
+# 1. LOGIC PROSES (LANGSUNG DI SINI)
+# ==========================================
 def process_matching(df):
     """
     Fungsi untuk mencocokan SKU Real + Cabang vs SKU System + Cabang
     Serta menghitung metrics data.
     """
-    # 1. Bersihkan & Standarkan Data (Menghindari error whitespace/case)
+    # Bersihkan & Standarkan Data (Kolom A, D, E, K, M)
     df['A'] = df.iloc[:, 0].astype(str).str.strip().str.upper()   # Cabang
     df['D'] = df.iloc[:, 3].astype(str).str.strip().str.upper()   # SKU System
     df['E'] = df.iloc[:, 4].astype(str).str.strip().str.upper()   # SKU Real
     df['K'] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # Qty System
     df['M'] = pd.to_numeric(df.iloc[:, 12], errors='coerce').fillna(0) # Qty Real
 
-    # 2. Bangun Pool System (Grup berdasarkan Cabang & SKU System)
-    # Ini untuk melacak sisa Qty System yang tersedia
+    # Bangun Pool System (Grup berdasarkan Cabang & SKU System)
     system_pool = {}
     for idx, row in df.iterrows():
         cabang = row['A']
@@ -566,7 +568,7 @@ def process_matching(df):
                 system_pool[cabang][sku_sys] = 0
             system_pool[cabang][sku_sys] += qty_sys
 
-    # 3. Proses Alokasi/Matching dari Data Real
+    # Proses Alokasi/Matching dari Data Real
     matched_details = []
     total_real_qty = 0
     total_allocated_qty = 0
@@ -580,9 +582,8 @@ def process_matching(df):
             continue
             
         total_real_qty += qty_real_sisa
-        row_allocated = False
 
-        # Cari pasangannya di seluruh cabang yang punya SKU System tersebut
+        # Cari pasangannya lintas cabang yang punya SKU System tersebut
         for cabang_sys, skus in system_pool.items():
             if sku_real in skus and skus[sku_real] > 0:
                 qty_sys_avail = skus[sku_real]
@@ -594,9 +595,7 @@ def process_matching(df):
                 system_pool[cabang_sys][sku_real] -= allocated_qty
                 qty_real_sisa -= allocated_qty
                 total_allocated_qty += allocated_qty
-                row_allocated = True
                 
-                # Masukkan ke detail report
                 matched_details.append({
                     "SKU": sku_real,
                     "Cabang Real": cabang_real,
@@ -608,7 +607,7 @@ def process_matching(df):
                 if qty_real_sisa <= 0:
                     break # Qty Real baris ini sudah habis terpenuhi
         
-        # Jika sampai akhir tidak ketemu pasangannya / system sudah habis
+        # Jika kuota system habis / tidak ketemu pasangannya
         if qty_real_sisa > 0:
             matched_details.append({
                 "SKU": sku_real,
@@ -618,10 +617,9 @@ def process_matching(df):
                 "Status": "UNMATCHED / NO SYSTEM QTY"
             })
 
-    # 4. Hitung Sisa System yang Tidak Terserap
+    # Hitung Sisa System yang Tidak Terserap
     total_system_left = sum(sum(skus.values()) for skus in system_pool.values())
 
-    # 5. Bungkus Hasil Metrics
     metrics = {
         "total_real": total_real_qty,
         "total_match": total_allocated_qty,
@@ -631,86 +629,142 @@ def process_matching(df):
     
     return pd.DataFrame(matched_details), metrics
 
-import os
+import streamlit as st
 import pandas as pd
-from logic import process_matching
-
-def tampilkan_metrics_box(metrics):
-    """Fungsi khusus untuk mencetak kotak metrik biar scannable"""
-    print("\n" + "═"*50)
-    print(" 📊 METRIX BOX (SUMMARY LAPORAN STOCK MATCHING) ")
-    print("═"*50)
-    print(f" 📦 Total Qty Real      : {int(metrics['total_real']):,}")
-    print(f" ✅ Total Qty Match     : {int(metrics['total_match']):,}")
-    print(f" ⚠️ Total Qty Unmatched : {int(metrics['total_unmatch']):,}")
-    print(f" 🏪 Sisa Qty System     : {int(metrics['system_left']):,}")
-    print("═"*50 + "\n")
 
 def menu_matching_karantina():
-    """Fungsi utama untuk kontrol menu interaktif user"""
-    while True:
-        print("="*45)
-        print(" 🔥 CROSS-BRANCH STOCK MATCHING SYSTEM 🔥 ")
-        print("="*45)
-        print(" 1. Upload & Proses File Laporan (Excel/CSV)")
-        print(" 2. Keluar Aplikasi")
-        print("="*45)
-        
-        pilihan = input("Pilih Menu (1-2): ").strip()
-        
-        if pilihan == '1':
-            file_path = input("\n📝 Masukkan nama/path file (Contoh: data.xlsx atau data.csv): ").strip()
+    """
+    Modul Menu Stock Matching Lintas Cabang.
+    Bisa dipanggil langsung di dalam branching 'elif' di file utama app.py.
+    """
+    st.markdown('<div class="main-header">🔄 CROSS-BRANCH STOCK MATCHING SYSTEM</div>', unsafe_allow_html=True)
+    
+    # Input File ditaruh di area main body atau sidebar (sesuai kebutuhan menu)
+    st.subheader("📥 Upload Data Sumber")
+    uploaded_file = st.file_uploader("Upload Laporan Excel / CSV", type=["xlsx", "csv"], key="stock_match_uploader")
+    
+    if uploaded_file is not None:
+        if uploaded_file.name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file)
+        else:
+            df = pd.read_csv(uploaded_file)
             
-            # Validasi file ada atau kagak
-            if not os.path.exists(file_path):
-                print("❌ File kaga ketemu, Bos! Periksa lagi penulisannya.\n")
+        st.success("🎉 Data Berhasil Di-upload!")
+        
+        # ==========================================
+        # CORE LOGIC PROCESS (INNER FUNCTION)
+        # ==========================================
+        # Bersihkan & Standarkan Data (Kolom A=0, D=3, E=4, K=10, M=12)
+        df['A'] = df.iloc[:, 0].astype(str).str.strip().str.upper()   
+        df['D'] = df.iloc[:, 3].astype(str).str.strip().str.upper()   
+        df['E'] = df.iloc[:, 4].astype(str).str.strip().str.upper()   
+        df['K'] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) 
+        df['M'] = pd.to_numeric(df.iloc[:, 12], errors='coerce').fillna(0) 
+
+        # Bangun Pool System
+        system_pool = {}
+        for idx, row in df.iterrows():
+            cabang = row['A']
+            sku_sys = row['D']
+            qty_sys = row['K']
+            
+            if sku_sys and qty_sys > 0:
+                if cabang not in system_pool:
+                    system_pool[cabang] = {}
+                if sku_sys not in system_pool[cabang]:
+                    system_pool[cabang][sku_sys] = 0
+                system_pool[cabang][sku_sys] += qty_sys
+
+        # Proses Alokasi FIFO Lintas Cabang
+        matched_details = []
+        total_real_qty = 0
+        total_allocated_qty = 0
+
+        for idx, row in df.iterrows():
+            cabang_real = row['A']
+            sku_real = row['E']
+            qty_real_sisa = row['M']
+            
+            if not sku_real or qty_real_sisa <= 0:
                 continue
                 
-            print("\n🔄 Sedang menghitung alokasi lintas cabang secara akurat...")
-            try:
-                # Load file sesuai ekstensinya
-                if file_path.endswith('.xlsx'):
-                    df = pd.read_excel(file_path)
-                else:
-                    df = pd.read_csv(file_path)
-                
-                # Eksekusi Logic Proses
-                df_result, metrics = process_matching(df)
-                
-                # 1. Cetak Metrix Box
-                tampilkan_metrics_box(metrics)
-                
-                # 2. Cetak Detail Informasi sesuai Request Lu
-                print("📋 DETAIL INFORMASI MATCHING:")
-                print("-" * 90)
-                for idx, row in df_result.iterrows():
-                    sku = row['SKU']
-                    c_real = row['Cabang Real']
-                    c_sys = row['Cabang System']
-                    qty = int(row['Qty Match'])
-                    
-                    if row['Status'] == "MATCH PERFECT":
-                        print(f"   [PERFECT MATCH] -> SKU {sku} Real ada di {c_real} ketemu di System {c_sys} sejumlah {qty} pcs.")
-                    elif row['Status'] == "MATCH CROSS-BRANCH":
-                        print(f"   [CROSS BRANCH]  -> SKU {sku} Real ada di {c_real} dialokasikan ke System {c_sys} sejumlah {qty} pcs.")
-                    else:
-                        print(f"   [⚠️ UNMATCHED]   -> SKU {sku} Real ada di {c_real} TIDAK DAPAT ALOKASI (System Habis/Tidak Ada) sisa {qty} pcs.")
-                print("-" * 90)
-                
-                # 3. Auto-save Hasil Akhir
-                output_name = "hasil_matching_stok.csv"
-                df_result.to_csv(output_name, index=False)
-                print(f"💾 File hasil lengkap berhasil disimpan dengan nama: {output_name}\n")
-                
-            except Exception as e:
-                print(f"❌ Terjadi error saat membaca file: {e}\n")
-                
-        elif pilihan == '2':
-            print("\nOkey Bos, Program dimatikan. Thank you!")
-            break
-        else:
-            print("❌ Input salah, pilih angka 1 atau 2 aja, Bos.\n")
+            total_real_qty += qty_real_sisa
 
+            for cabang_sys, skus in system_pool.items():
+                if sku_real in skus and skus[sku_real] > 0:
+                    qty_sys_avail = skus[sku_real]
+                    allocated_qty = min(qty_real_sisa, qty_sys_avail)
+                    
+                    system_pool[cabang_sys][sku_real] -= allocated_qty
+                    qty_real_sisa -= allocated_qty
+                    total_allocated_qty += allocated_qty
+                    
+                    matched_details.append({
+                        "SKU": sku_real,
+                        "Cabang Real": cabang_real,
+                        "Cabang System": cabang_sys,
+                        "Qty Match": allocated_qty,
+                        "Status": "MATCH PERFECT" if cabang_real == cabang_sys else "MATCH CROSS-BRANCH"
+                    })
+                    
+                    if qty_real_sisa <= 0:
+                        break 
+            
+            if qty_real_sisa > 0:
+                matched_details.append({
+                    "SKU": sku_real,
+                    "Cabang Real": cabang_real,
+                    "Cabang System": "TIDAK KETEMU / SYSTEM HABIS",
+                    "Qty Match": qty_real_sisa,
+                    "Status": "UNMATCHED / NO SYSTEM QTY"
+                })
+
+        total_system_left = sum(sum(skus.values()) for skus in system_pool.values())
+        df_result = pd.DataFrame(matched_details)
+
+        # --- METRIC BOXES PREMIUM ---
+        st.markdown(f"""
+        <div class="metric-container">
+            <div class="metric-card">
+                <div class="metric-title">📦 Total Qty Real</div>
+                <div class="metric-value">{int(total_real_qty):,}</div>
+            </div>
+            <div class="metric-card" style="border-left-color: #2ecc71 !important;">
+                <div class="metric-title">✅ Total Qty Match</div>
+                <div class="metric-value">{int(total_allocated_qty):,}</div>
+            </div>
+            <div class="metric-card" style="border-left-color: #e74c3c !important;">
+                <div class="metric-title">⚠️ Total Qty Unmatched</div>
+                <div class="metric-value">{int(total_real_qty - total_allocated_qty):,}</div>
+            </div>
+            <div class="metric-card" style="border-left-color: #3498db !important;">
+                <div class="metric-title">🏪 Sisa Qty System</div>
+                <div class="metric-value">{int(total_system_left):,}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # --- TABEL DETAIL ---
+        st.subheader("📋 Detail Alokasi Lintas Cabang")
+        status_filter = st.multiselect(
+            "Filter Status Laporan:", 
+            options=df_result["Status"].unique(), 
+            default=df_result["Status"].unique()
+        )
+        
+        filtered_result = df_result[df_result["Status"].isin(status_filter)]
+        st.dataframe(filtered_result, use_container_width=True, hide_index=True)
+        
+        # Download Button
+        csv = filtered_result.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Hasil Matching (.csv)",
+            data=csv,
+            file_name="hasil_matching_cabang.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("Silakan upload file Excel atau CSV untuk memproses pencocokan stok.")
 # =========================================================
 # 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
 # =========================================================
