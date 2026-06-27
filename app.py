@@ -633,14 +633,79 @@ import streamlit as st
 import pandas as pd
 
 def menu_matching_karantina():
-    """
-    Modul Menu Stock Matching Lintas Cabang.
-    Bisa dipanggil langsung di dalam branching 'elif' di file utama app.py.
-    """
-    st.markdown('<div class="main-header">🔄 CROSS-BRANCH STOCK MATCHING SYSTEM</div>', unsafe_allow_html=True)
-    
-    # Input File ditaruh di area main body atau sidebar (sesuai kebutuhan menu)
-    st.subheader("📥 Upload Data Sumber")
+    st.markdown("""
+        <style>
+        /* Hero Header Blue Gradient Style */
+        .hero-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: bold;
+            padding: 18px 25px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            letter-spacing: 0.5px;
+        }
+        
+        /* Metric Card Container & Cards */
+        .metric-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            margin-bottom: 25px;
+        }
+        .metric-card {
+            flex: 1;
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            border-left: 4px solid #C5A059 !important;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .metric-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #8c96a8;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 1. Render Hero Header sesuai gambar
+    st.markdown('<div class="hero-header">STOCK OPNAME ANALYZER</div>', unsafe_allow_html=True)
+
+    # 2. Tambahkan st.expander Laporan
+    with st.expander("📋 Informasi Format File", expanded=False):
+        st.markdown("""
+        **Pastikan file Excel / CSV yang Anda upload memiliki struktur kolom sebagai berikut:**
+        * **Kolom A:** Nama Cabang (Asal data)
+        * **Kolom D:** SKU System (+)
+        * **Kolom E:** SKU Real (+)
+        * **Kolom K:** Qty System (+)
+        * **Kolom M:** Qty Real (+)
+        
+        *Sistem otomatis melakukan pembersihan whitespace dan menyamakan huruf menjadi KAPITAL saat proses scanning.*
+        """)
+
+    with st.expander("💡 Logic Thinking", expanded=False):
+        st.markdown("""
+        **Alur Alokasi Stok Lintas Cabang (Cross-Branch):**
+        1. **Pool Lock System:** Sistem mengunci total kuota stok `Qty System` yang tersedia per Cabang dan per SKU.
+        2. **Pencarian Pasangan:** Data `SKU Real` akan dicocokkan terlebih dahulu dengan `SKU System` di cabang yang sama (**MATCH PERFECT**).
+        3. **Alokasi Lintas Cabang:** Jika kuota di cabang sendiri kurang/habis, sistem akan menyisir cabang lain yang masih memiliki sisa kuota system (**MATCH CROSS-BRANCH**).
+        4. **Kontrol Kuota:** Jika `Qty System` di seluruh cabang sudah habis teralokasikan, maka baris data Real berikutnya tidak akan mendapatkan alokasi lagi (**UNMATCHED / SYSTEM HABIS**).
+        """)
+
+    # 3. Area Upload File Laporan
+    st.markdown("### 📥 Upload Data Sumber")
     uploaded_file = st.file_uploader("Upload Laporan Excel / CSV", type=["xlsx", "csv"], key="stock_match_uploader")
     
     if uploaded_file is not None:
@@ -652,9 +717,8 @@ def menu_matching_karantina():
         st.success("🎉 Data Berhasil Di-upload!")
         
         # ==========================================
-        # CORE LOGIC PROCESS (INNER FUNCTION)
+        # CORE LOGIC PROCESS
         # ==========================================
-        # Bersihkan & Standarkan Data (Kolom A=0, D=3, E=4, K=10, M=12)
         df['A'] = df.iloc[:, 0].astype(str).str.strip().str.upper()   
         df['D'] = df.iloc[:, 3].astype(str).str.strip().str.upper()   
         df['E'] = df.iloc[:, 4].astype(str).str.strip().str.upper()   
@@ -667,7 +731,6 @@ def menu_matching_karantina():
             cabang = row['A']
             sku_sys = row['D']
             qty_sys = row['K']
-            
             if sku_sys and qty_sys > 0:
                 if cabang not in system_pool:
                     system_pool[cabang] = {}
@@ -675,7 +738,7 @@ def menu_matching_karantina():
                     system_pool[cabang][sku_sys] = 0
                 system_pool[cabang][sku_sys] += qty_sys
 
-        # Proses Alokasi FIFO Lintas Cabang
+        # Proses Alokasi
         matched_details = []
         total_real_qty = 0
         total_allocated_qty = 0
@@ -690,26 +753,41 @@ def menu_matching_karantina():
                 
             total_real_qty += qty_real_sisa
 
-            for cabang_sys, skus in system_pool.items():
-                if sku_real in skus and skus[sku_real] > 0:
-                    qty_sys_avail = skus[sku_real]
-                    allocated_qty = min(qty_real_sisa, qty_sys_avail)
-                    
-                    system_pool[cabang_sys][sku_real] -= allocated_qty
-                    qty_real_sisa -= allocated_qty
-                    total_allocated_qty += allocated_qty
-                    
-                    matched_details.append({
-                        "SKU": sku_real,
-                        "Cabang Real": cabang_real,
-                        "Cabang System": cabang_sys,
-                        "Qty Match": allocated_qty,
-                        "Status": "MATCH PERFECT" if cabang_real == cabang_sys else "MATCH CROSS-BRANCH"
-                    })
-                    
-                    if qty_real_sisa <= 0:
-                        break 
+            # 1. Cek di Cabang Sendiri Dulu (Biar Perfect Match didahulukan)
+            if cabang_real in system_pool and sku_real in system_pool[cabang_real] and system_pool[cabang_real][sku_real] > 0:
+                allocated_qty = min(qty_real_sisa, system_pool[cabang_real][sku_real])
+                system_pool[cabang_real][sku_real] -= allocated_qty
+                qty_real_sisa -= allocated_qty
+                total_allocated_qty += allocated_qty
+                
+                matched_details.append({
+                    "SKU": sku_real,
+                    "Cabang Real": cabang_real,
+                    "Cabang System": cabang_real,
+                    "Qty Match": allocated_qty,
+                    "Status": "MATCH PERFECT"
+                })
+
+            # 2. Jika Masih Sisa, Cari Lintas Cabang Lain
+            if qty_real_sisa > 0:
+                for cabang_sys, skus in system_pool.items():
+                    if sku_real in skus and skus[sku_real] > 0:
+                        allocated_qty = min(qty_real_sisa, skus[sku_real])
+                        system_pool[cabang_sys][sku_real] -= allocated_qty
+                        qty_real_sisa -= allocated_qty
+                        total_allocated_qty += allocated_qty
+                        
+                        matched_details.append({
+                            "SKU": sku_real,
+                            "Cabang Real": cabang_real,
+                            "Cabang System": cabang_sys,
+                            "Qty Match": allocated_qty,
+                            "Status": "MATCH CROSS-BRANCH"
+                        })
+                        if qty_real_sisa <= 0:
+                            break 
             
+            # 3. Jika Tetap Sisa Berarti System Habis
             if qty_real_sisa > 0:
                 matched_details.append({
                     "SKU": sku_real,
@@ -722,7 +800,7 @@ def menu_matching_karantina():
         total_system_left = sum(sum(skus.values()) for skus in system_pool.values())
         df_result = pd.DataFrame(matched_details)
 
-        # --- METRIC BOXES PREMIUM ---
+        # --- METRIC BOXES PREMIUM CARD ---
         st.markdown(f"""
         <div class="metric-container">
             <div class="metric-card">
