@@ -853,7 +853,7 @@ def menu_matching_karantina():
                     <div class="metric-value">{int(mtr['total_real'] - mtr['total_allocated']):,}</div>
                 </div>
                 <div class="metric-card" style="border-left-color: #3498db !important;">
-                    <div class="metric-title">🏪 Sisa Qty System</div>
+                    <div class="metric-title">🏪 Sisa Qty System (Karantina)</div>
                     <div class="metric-value">{int(mtr['system_left']):,}</div>
                 </div>
             </div>
