@@ -5893,12 +5893,18 @@ import pandas as pd
 import numpy as np
 
 def load_data(file):
+    # Pengaman jika file ternyata None / tidak di-upload
+    if file is None:
+        return pd.DataFrame()
     if file.name.endswith('.csv'):
         return pd.read_csv(file, header=None if pd.read_csv(file).empty else 0)
     else:
         return pd.read_excel(file)
 
 def prepare_sku_totals(df):
+    if df.empty:
+        return pd.DataFrame(columns=['SKU', 'QTY'])
+        
     df_clean = df.copy()
     if df_clean.shape[1] < 10:
         raise ValueError(f"File System kurang dari 10 kolom (Kolom J tidak ada).")
@@ -5941,7 +5947,6 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
         # --- 1. BACA DATA PENDUKUNG (KELUAR) ---
-        df_track_clean = None
         if file_tracking is not None and not discrepancies.empty:
             df_track = load_data(file_tracking)
             df_track_clean = pd.DataFrame({
@@ -5950,8 +5955,9 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'QTY': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0) # Kolom K
             })
+        else:
+            df_track_clean = pd.DataFrame(columns=['INVOICE', 'SKU', 'BIN', 'QTY'])
 
-        df_rto_out_clean = None
         if file_rto_out is not None and not discrepancies.empty:
             df_rto_out_df = load_data(file_rto_out)
             df_rto_out_clean = pd.DataFrame({
@@ -5959,21 +5965,20 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 'SKU': df_rto_out_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0) # Kolom J
             })
+        else:
+            df_rto_out_clean = pd.DataFrame(columns=['NO_TF', 'SKU', 'QTY'])
 
-       # --- 2. BACA DATA PENDUKUNG (MASUK) ---
-        df_po_clean = None
+        # --- 2. BACA DATA PENDUKUNG (MASUK) ---
         if file_po is not None and not discrepancies.empty:
             df_po = load_data(file_po)
-            # =========================================================================
-            # 🔥 UPDATE: PO SKU DI KOLOM E (INDEX 4) & QTY DI KOLOM M (INDEX 12)
-            # =========================================================================
             df_po_clean = pd.DataFrame({
                 'NO_PO': df_po.iloc[:, 0].astype(str).str.strip().str.lstrip('0'),
-                'SKU': df_po.iloc[:, 4].astype(str).str.strip().str.lstrip('0').str.upper(), # Kolom E (Index 4)
-                'QTY': pd.to_numeric(df_po.iloc[:, 12], errors='coerce').fillna(0)           # Kolom M (Index 12)
+                'SKU': df_po.iloc[:, 4].astype(str).str.strip().str.lstrip('0').str.upper(), # Kolom E
+                'QTY': pd.to_numeric(df_po.iloc[:, 12], errors='coerce').fillna(0)           # Kolom M
             })
+        else:
+            df_po_clean = pd.DataFrame(columns=['NO_PO', 'SKU', 'QTY'])
 
-        df_rto_in_clean = None
         if file_rto_in is not None and not discrepancies.empty:
             df_rto_in_df = load_data(file_rto_in)
             df_rto_in_clean = pd.DataFrame({
@@ -5981,6 +5986,8 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 'SKU': df_rto_in_df.iloc[:, 8].astype(str).str.strip().str.lstrip('0').str.upper(),
                 'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 10], errors='coerce').fillna(0) # Kolom K
             })
+        else:
+            df_rto_in_clean = pd.DataFrame(columns=['NO_TF', 'SKU', 'QTY'])
             
         status_list = []
         doc_reference_list = []
@@ -5998,13 +6005,13 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             
             # --- KONDISI MASUK (DIFF < 0) ---
             if actual_diff < 0:
-                if df_po_clean is not None:
+                if not df_po_clean.empty:
                     match_po = df_po_clean[df_po_clean['SKU'] == target_sku]
                     if not match_po.empty:
                         docs_found.append(f"PO:{'/'.join(map(str, match_po['NO_PO'].unique()))}")
                         accumulated_qty += match_po['QTY'].sum()
                 
-                if df_rto_in_clean is not None:
+                if not df_rto_in_clean.empty:
                     match_rto_in = df_rto_in_clean[df_rto_in_clean['SKU'] == target_sku]
                     if not match_rto_in.empty:
                         docs_found.append(f"RTO_IN:{'/'.join(map(str, match_rto_in['NO_TF'].unique()))}")
@@ -6015,13 +6022,13 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 elif accumulated_qty >= needed_qty:
                     final_status = "DONE MASUK"
                 else:
-                    final_status = f"MASUK QTY MISSMATCH"
+                    final_status = "MASUK QTY MISSMATCH"
 
                 track_bin_list.append("-")
 
             # --- KONDISI KELUAR (DIFF > 0) ---
             else:
-                if df_track_clean is not None:
+                if not df_track_clean.empty:
                     match_track = df_track_clean[df_track_clean['SKU'] == target_sku]
                     if not match_track.empty:
                         docs_found.append(f"TRACK:{'/'.join(map(str, match_track['INVOICE'].unique()))}")
@@ -6029,7 +6036,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                             bins_found.append("/".join(map(str, match_track['BIN'].unique())))
                         accumulated_qty += match_track['QTY'].sum()
                 
-                if df_rto_out_clean is not None:
+                if not df_rto_out_clean.empty:
                     match_rto_out = df_rto_out_clean[df_rto_out_clean['SKU'] == target_sku]
                     if not match_rto_out.empty:
                         docs_found.append(f"RTO_OUT:{'/'.join(map(str, match_rto_out['NO_TF'].unique()))}")
@@ -6041,7 +6048,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                 elif accumulated_qty >= needed_qty:
                     final_status = "DONE TERJUAL"
                 else:
-                    final_status = f"KELUAR QTY MISSMATCH"
+                    final_status = "KELUAR QTY MISSMATCH"
                     
                 track_bin_list.append(", ".join(bins_found) if bins_found else "-")
 
