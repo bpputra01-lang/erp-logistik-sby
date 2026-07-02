@@ -5943,7 +5943,6 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         data2 = prepare_sku_totals(df2)
         
         if data1.empty or data2.empty:
-            st.error("🚨 File Utama (System Awal/Akhir) kosong setelah di-load!")
             return pd.DataFrame(), pd.DataFrame()
         
         data1['SKU'] = data1['SKU'].astype(str).str.strip().str.upper()
@@ -5960,24 +5959,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
         discrepancies = comparison[comparison['DIFF'] != 0].copy()
         
-        # =========================================================================
-        # 🔍 INSPEKSI / DEBUG DATA TRACKING (KOTAK HITAM)
-        # =========================================================================
-        st.markdown("### 🛠️ KOTAK HITAM DEBUGGING TRACKING")
-        
-        if file_tracking is None:
-            st.warning("⚠️ `file_tracking` terbaca NONE oleh Streamlit (Uploader tidak menangkap file).")
-        else:
-            df_track_raw = load_data(file_tracking)
-            st.info(f"📂 File tracking berhasil masuk ke Backend. Ukuran shape asli: {df_track_raw.shape} (Baris, Kolom)")
-            
-            if df_track_raw.empty:
-                st.error("🚨 Pandas membaca file tracking lu sebagai DATAFRAME KOSONG!")
-            else:
-                st.write("📋 **5 Baris Teratas File Tracking Asli (Cek Letak Kolom Lu):**")
-                st.dataframe(df_track_raw.head(5), use_container_width=True)
-        
-        # --- PROCESS TRACKING RE-MAPPING ---
+        # --- 1. BACA DATA PENDUKUNG (KELUAR) ---
         df_track_clean = pd.DataFrame(columns=['INVOICE', 'SKU', 'BIN', 'QTY'])
         if file_tracking is not None and not discrepancies.empty:
             df_track = load_data(file_tracking)
@@ -5988,25 +5970,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                     'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.upper(),
                     'QTY': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
                 })
-        
-        # Tampilkan hasil setelah di-cleaning oleh Pandas
-        st.write(f"🔄 **Hasil Mapping df_track_clean:** {len(df_track_clean)} baris berhasil diekstrak.")
-        if not df_track_clean.empty and not discrepancies.empty:
-            st.write("🔹 Sampel SKU di Data Tracking Lu:", df_track_clean['SKU'].head(5).tolist())
-            st.write("🔸 Sampel SKU Selisih yang dicari:", discrepancies['SKU'].head(5).tolist())
-            
-            # Cek irisan (apakah ada SKU yang sama di antara kedua data)
-            irisan = set(df_track_clean['SKU']).intersection(set(discrepancies['SKU']))
-            st.write(f"🎯 **Match Finder:** Ada {len(irisan)} SKU yang kodenya SAMA PERSIS antara tracking dan selisih.")
-            if len(irisan) > 0:
-                st.success(f"SKU yang match: {list(irisan)[:5]}")
-            else:
-                st.error("❌ TIDAK ADA SATUPUN SKU yang sama persis kodenya antara data tracking dan selisih!")
-        
-        st.markdown("---")
-        # =========================================================================
-        
-        # --- BACA DATA PENDUKUNG LAINNYA (TETAP AMAN) ---
+
         df_rto_out_clean = pd.DataFrame(columns=['NO_TF', 'SKU', 'QTY'])
         if file_rto_out is not None and not discrepancies.empty:
             df_rto_out_df = load_data(file_rto_out)
@@ -6017,6 +5981,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                     'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0)
                 })
 
+        # --- 2. BACA DATA PENDUKUNG (MASUK) ---
         df_po_clean = pd.DataFrame(columns=['NO_PO', 'SKU', 'QTY'])
         if file_po is not None and not discrepancies.empty:
             df_po = load_data(file_po)
@@ -6051,6 +6016,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
             bins_found = []
             accumulated_qty = 0
             
+            # --- KONDISI MASUK (DIFF < 0) ---
             if actual_diff < 0:
                 if not df_po_clean.empty:
                     match_po = df_po_clean[df_po_clean['SKU'] == target_sku]
@@ -6072,6 +6038,7 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                     final_status = "MASUK QTY MISSMATCH"
                 track_bin_list.append("-")
 
+            # --- KONDISI KELUAR (DIFF > 0) ---
             else:
                 if not df_track_clean.empty:
                     match_track = df_track_clean[df_track_clean['SKU'] == target_sku]
