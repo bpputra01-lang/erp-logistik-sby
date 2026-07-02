@@ -1379,32 +1379,78 @@ def menu_cycle_count():
         - Total miss loc diambil dari berapa banyak SKU dan QTY yang memiliki note **FULL ALLOCATION & PARTIAL ALLOCATION** pada logic Alloacation real +
         """)
 
-    # --- INITIALIZE ALL SESSION STATES ---
+   # --- INITIALIZE ALL SESSION STATES ---
     if 'compare_result' not in st.session_state: st.session_state.compare_result = None
     if 'allocation_result' not in st.session_state: st.session_state.allocation_result = None
     if 'set_up_real_plus' not in st.session_state: st.session_state.set_up_real_plus = None
     if 'sys_updated_result' not in st.session_state: st.session_state.sys_updated_result = None
     if 'recon_real_plus' not in st.session_state: st.session_state.recon_real_plus = None
     if 'outstanding_system' not in st.session_state: st.session_state.outstanding_system = None
-    
+
     if 'df_res_lookup' not in st.session_state: st.session_state.df_res_lookup = None
     if 'df_missing_lookup' not in st.session_state: st.session_state.df_missing_lookup = None
     if 'step4_done' not in st.session_state: st.session_state.step4_done = False
-    
+
     if 'df_mult_5' not in st.session_state: st.session_state.df_mult_5 = None
     if 'df_sing_5' not in st.session_state: st.session_state.df_sing_5 = None
     if 'step5_done' not in st.session_state: st.session_state.step5_done = False
-    
+
     if 'df_karantina_6' not in st.session_state: st.session_state.df_karantina_6 = None
 
- # --- FILTER SECTION ---
-    col_f1, col_f2, col_f3, col_f4 = st.columns(4) # Diubah menjadi 4 kolom
+    # --- DICTIONARY MAPPING BIN PER BRANCH ---
+    BRANCH_BIN_MAPPING = {
+        "SURABAYA": [
+            "GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", 
+            "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", 
+            "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", 
+            "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "PUTAWAY", 
+            "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "BANDING"
+        ],
+        "MALANG": [
+            "GL1-BACKLINE", "GL1-C1", "GL1-C2", "GL1-C3-CTN", "GL1-C4-KL3", "GL1-KAVLING2", 
+            "DAU", "KAV2", "KAV7", "KAV8", "KAV9", "KAV10", "GL1-C0", "OFFLINE", "TOKO", 
+            "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "REFUND", "BANDING"
+        ],
+        "JEMBER": [
+            "GL2-JBR", "GUDANG", "GL2-JBR-KL1", "GL2-JBR-KL2", "GL2-JBR-CTN", "GL2-JBR-GKH", 
+            "GL2-JBR-KL3", "GL2-JBR-KOLI2", "EVENT", "GAGAL QC", "INBOUND", "PUTAWAY", 
+            "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING"
+        ],
+        "KEDIRI": [
+            "GL1-KDR-BACKLINE", "GL1-KDR", "GL2-KDR", "GL2-KDR-CTN", "GL3-KDR-KL1", 
+            "GL3-KDR-KL2", "GL3-KDR-KL3", "GL3-KOLI", "EVENT", "GAGAL QC", "INBOUND", 
+            "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING"
+        ],
+        "SIDOARJO": [
+            "GL2-SDA-RAK", "GL3-SDA", "GL3-SDA-BIN OFFLINE", "INBOUND", "PUTAWAY", 
+            "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"
+        ],
+        "SEMARANG": [
+            "GL2-SMG", "GL2-SMG-CTN-", "GUDANG LT 2", "INBOUND", "PUTAWAY", "REFUND", 
+            "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"
+        ]
+    }
+
+    # --- FILTER SECTION ---
+
+    # 1. Filter Branch ditaruh di paling atas
+    selected_branch = st.selectbox(
+        "🏢 Pilih Cabang / Branch:", 
+        options=list(BRANCH_BIN_MAPPING.keys()),
+        index=0 # Default ke SURABAYA
+    )
+
+    # Ambil list BIN sesuai cabang yang dipilih secara dinamis
+    list_bin_stock_dynamic = BRANCH_BIN_MAPPING[selected_branch]
+
+    # Multi-kolom untuk filter lainnya
+    col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+
     with col_f1:
         list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
         selected_sub = st.multiselect("🗂️ Sub Kategori:", list_sub_kat)
-    
+
     with col_f2:
-        # List brand berdasarkan data yang Anda berikan
         list_brand = [
             "MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", 
             "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", 
@@ -1415,8 +1461,8 @@ def menu_cycle_count():
         selected_brand = st.multiselect("🏷️ Brand:", list_brand)
 
     with col_f3:
-        list_bin_stock = ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "DAU", "KAV-2", "KAV-7", "KAV-8", "KAV-9", "KAV-10", "C-0", "KDR", "GL3-KOLI", "JBR", "GUDANG", "SDA", "GL2-SMG", "GL2-SMG-CTN-","GUDANG LT 2"]
-        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock)
+        # 🌟 SEKARANG DIGANTI PAKAI VARIABEL DINAMIS HASIL FILTER ATAS
+        selected_bin_sys = st.multiselect("🏭 BIN System:", list_bin_stock_dynamic)
         
     with col_f4:
         list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
