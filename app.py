@@ -5893,13 +5893,28 @@ import pandas as pd
 import numpy as np
 
 def load_data(file):
-    # Pengaman jika file ternyata None / tidak di-upload
+    # 1. Pengaman jika file ternyata None (tidak di-upload)
     if file is None:
         return pd.DataFrame()
-    if file.name.endswith('.csv'):
-        return pd.read_csv(file, header=None if pd.read_csv(file).empty else 0)
-    else:
-        return pd.read_excel(file)
+        
+    try:
+        if file.name.endswith('.csv'):
+            # Baca file sekali saja dengan aman
+            df_temp = pd.read_csv(file)
+            if df_temp.empty:
+                return pd.DataFrame()
+            return df_temp
+        else:
+            return pd.read_excel(file)
+            
+    except pd.errors.EmptyDataError:
+        # Menangani jika file CSV bener-bener kosong tanpa baris/kolom sama sekali
+        return pd.DataFrame()
+    except ValueError as e:
+        # Menangani error "No columns to parse from file" agar dibalikkan jadi DataFrame kosong
+        if "No columns to parse" in str(e):
+            return pd.DataFrame()
+        raise e
 
 def prepare_sku_totals(df):
     if df.empty:
