@@ -1428,6 +1428,10 @@ def menu_cycle_count():
         "SEMARANG": [
             "GL2-SMG", "GL2-SMG-CTN-", "GUDANG LT 2", "INBOUND", "PUTAWAY", "REFUND", 
             "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"
+        ],
+        "HUB JAKARTA": [
+            "GL1-JKT-A", "GL1-JKT-B", "GL1-JKT-C", "GL1-JKT-D","GL1-JKT-E", "INBOUND", "PUTAWAY", "REFUND", "GAGAL QC",
+            "RU HUB"
         ]
     }
 
