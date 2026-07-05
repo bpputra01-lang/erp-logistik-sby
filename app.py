@@ -5974,11 +5974,11 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         df_rto_out_clean = pd.DataFrame(columns=['NO_TF', 'SKU', 'QTY'])
         if file_rto_out is not None and not discrepancies.empty:
             df_rto_out_df = load_data(file_rto_out)
-            if not df_rto_out_df.empty and df_rto_out_df.shape[1] >= 10:
+            if not df_rto_out_df.empty and df_rto_out_df.shape[1] >= 8: # Minimal sampai kolom H (8 kolom)
                 df_rto_out_clean = pd.DataFrame({
-                    'NO_TF': df_rto_out_df.iloc[:, 3].astype(str).str.strip(),
-                    'SKU': df_rto_out_df.iloc[:, 8].astype(str).str.strip().str.upper(),
-                    'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 9], errors='coerce').fillna(0)
+                    'NO_TF': df_rto_out_df.iloc[:, 0].astype(str).str.strip(),          # Kolom A (Indeks 0)
+                    'SKU': df_rto_out_df.iloc[:, 3].astype(str).str.strip().str.upper(), # Kolom D (Indeks 3)
+                    'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 7], errors='coerce').fillna(0) # Kolom H (Indeks 7)
                 })
 
         # --- 2. BACA DATA PENDUKUNG (MASUK) ---
@@ -5995,11 +5995,11 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         df_rto_in_clean = pd.DataFrame(columns=['NO_TF', 'SKU', 'QTY'])
         if file_rto_in is not None and not discrepancies.empty:
             df_rto_in_df = load_data(file_rto_in)
-            if not df_rto_in_df.empty and df_rto_in_df.shape[1] >= 11:
+            if not df_rto_in_df.empty and df_rto_in_df.shape[1] >= 8: # Minimal sampai kolom H (8 kolom)
                 df_rto_in_clean = pd.DataFrame({
-                    'NO_TF': df_rto_in_df.iloc[:, 3].astype(str).str.strip(),
-                    'SKU': df_rto_in_df.iloc[:, 8].astype(str).str.strip().str.upper(),
-                    'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 10], errors='coerce').fillna(0)
+                    'NO_TF': df_rto_in_df.iloc[:, 0].astype(str).str.strip(),          # Kolom A (Indeks 0)
+                    'SKU': df_rto_in_df.iloc[:, 3].astype(str).str.strip().str.upper(), # Kolom D (Indeks 3)
+                    'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 7], errors='coerce').fillna(0) # Kolom H (Indeks 7)
                 })
             
         status_list = []
