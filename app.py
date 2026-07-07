@@ -541,6 +541,11 @@ import numpy as np
 import streamlit as st
 import io
 
+import pandas as pd
+import numpy as np
+import streamlit as st
+import io
+
 def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc):
     """
     Engine pemrosesan data logistik menggunakan Pandas (Ultra Fast Hashing - Ironclad Anti-Crash Version).
@@ -566,7 +571,7 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     df_sby[sku_col_sby] = df_sby[sku_col_sby].astype(str).str.strip()
     
     # BERSIHKAN TOTAL DARI STRING 'NaN' ATALAH DATA CACAT
-    df_sby[qty_col_sby] = df_sby[qty_col_sby].astype(str).str.replace('NaN', '0').str.replace('nan', '0')
+    df_sby[qty_col_sby] = df_sby[qty_col_sby].astype(str).str.replace('NaN', '0', case=False).str.replace('nan', '0', case=False)
     df_sby[qty_col_sby] = pd.to_numeric(df_sby[qty_col_sby], errors='coerce').fillna(0).astype(float)
     
     sby_grouped = df_sby.groupby(sku_col_sby).agg({
@@ -583,10 +588,9 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     df_smg[sku_col_smg] = df_smg[sku_col_smg].astype(str).str.strip()
     
     # Bersihkan total string 'NaN' di Semarang
-    df_smg[qty_col_smg] = df_smg[qty_col_smg].astype(str).str.replace('NaN', '0').str.replace('nan', '0')
+    df_smg[qty_col_smg] = df_smg[qty_col_smg].astype(str).str.replace('NaN', '0', case=False).str.replace('nan', '0', case=False)
     df_smg[qty_col_smg] = pd.to_numeric(df_smg[qty_col_smg], errors='coerce').fillna(0).astype(float)
     
-    # Gunakan fungsi sum numpy yang lebih aman terhadap mixed-type data
     smg_grouped = df_smg.groupby(sku_col_smg).agg({qty_col_smg: 'sum'}).reset_index()
     smg_grouped.columns = ['SKU', 'QTY SEMARANG']
 
@@ -597,7 +601,7 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     df_sales[sku_col_sales] = df_sales[sku_col_sales].astype(str).str.strip()
     
     # Bersihkan total string 'NaN' di Sales
-    df_sales[qty_col_sales] = df_sales[qty_col_sales].astype(str).str.replace('NaN', '0').str.replace('nan', '0')
+    df_sales[qty_col_sales] = df_sales[qty_col_sales].astype(str).str.replace('NaN', '0', case=False).str.replace('nan', '0', case=False)
     df_sales[qty_col_sales] = pd.to_numeric(df_sales[qty_col_sales], errors='coerce').fillna(0).astype(float)
     
     sales_grouped = df_sales.groupby(sku_col_sales).agg({qty_col_sales: 'sum'}).reset_index()
@@ -628,11 +632,22 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
 
     # AMANKAN KEMBALI DAN BERSIHKAN SEBELUM DI-CONVERT KE INTEGER STANDARD PYTHONS
     for col in ['QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d']:
-        # Konversi paksa string atau pecahan sisa-sisa merge agar aman
-        final_df[col] = final_df[col].astype(str).str.replace('NaN', '0').str.replace('nan', '0')
+        # Sikat paksa jika ada string teks tulisan "NaN" / "nan" akibat kegagalan join tabel master
+        final_df[col] = final_df[col].astype(str).str.replace('NaN', '0', case=False).str.replace('nan', '0', case=False).str.strip()
         final_df[col] = pd.to_numeric(final_df[col], errors='coerce').fillna(0)
-        # Gunakan pemformatan astype('int64') bawaan numpy yang jauh lebih solid
-        final_df[col] = final_df[col].astype('int64')
+        
+        # --- FITUR DETEKSI DAN PELACAK JUSTRU KETIKA PROSES ITERASI AKHIR ---
+        try:
+            final_df[col] = final_df[col].astype('int64')
+        except ValueError:
+            # Jika proses casting biner numpy int64 gagal, kita lacak baris persisnya
+            for idx, cell_val in enumerate(final_df[col]):
+                try:
+                    int(float(cell_val))
+                except:
+                    sku_error = final_df.iloc[idx]['SKU']
+                    item_error = final_df.iloc[idx]['ITEM NAME']
+                    raise ValueError(f"Data Rusak Terdeteksi pada Kolom [{col}] di baris SKU: {sku_error} ({item_error}). Konten error: '{cell_val}'")
 
     final_df = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
     return final_df
@@ -760,7 +775,7 @@ def render_menu_compare():
                         
                 except Exception as e:
                     st.error(f"❌ Terjadi kesalahan struktur file saat membaca data: {str(e)}")
-                    st.info("💡 Pastikan urutan letak kolom di file excel Anda tidak berubah dari template awal.")
+                    st.info("💡 Sistem otomatis memetakan letak data rusak di atas agar Anda bisa langsung memperbaikinya di file asal.")
     else:
         # State awal sebelum user pencet tombol run
         st.info("💡 Menunggu berkas diunggah pada panel di atas. Silakan upload file lalu klik 'INTEGRATE & COMPARE DATA'.")
