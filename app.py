@@ -621,10 +621,10 @@ def process_matching(df):
     }
     
     return pd.DataFrame(matched_details), metrics
+
 def render_menu_compare():
     """
-    Fungsi Menu UI Premium untuk Komparasi File Logistik.
-    Bisa langsung dipanggil di dalam block elif menu == '...' Anda.
+    Fungsi Menu UI Premium dengan Layout Horizontal (File Upload di atas, Hasil di bawah).
     """
     # Custom CSS Styling Premium Zebra & All Column Centered
     st.markdown("""
@@ -640,6 +640,9 @@ def render_menu_compare():
         .hero-title { color: #ffffff; font-family: 'Segoe UI', sans-serif; font-size: 26px; font-weight: 700; margin: 0; }
         .hero-subtitle { color: #a1a8c3; font-size: 14px; margin-top: 5px; }
         div[data-testid="stMetricValue"] { font-size: 28px; font-weight: bold; color: #C5A059 !important; }
+        
+        /* Mengurangi padding file uploader agar lebih compact saat sejajar */
+        div[data-testid="stFileUploader"] { padding: 5px; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -651,81 +654,102 @@ def render_menu_compare():
         </div>
     """, unsafe_allow_html=True)
 
-    # Layout Menu 2 Kolom
-    col_panel, col_display = st.columns([1, 2], gap="large")
-
-    with col_panel:
-        st.subheader("📤 Upload Source Files")
-        
+    # ==========================================
+    # SECTION 1: UPLOAD PANEL (RATA KESAMPING / HORIZONTAL)
+    # ==========================================
+    st.subheader("📤 Upload Source Files")
+    
+    # Buat 4 kolom sejajar ke samping
+    up_col1, up_col2, up_col3, up_col4 = st.columns(4, gap="medium")
+    
+    with up_col1:
         file_sby = st.file_uploader("1. Stock Surabaya (Master)", type=["xlsx", "xls"])
+    
+    with up_col2:
         file_smg = st.file_uploader("2. Stock Semarang", type=["xlsx", "xls"])
+        
+    with up_col3:
         file_sales = st.file_uploader("3. Sales 60d Report", type=["xlsx", "xls"])
+        
+    with up_col4:
         file_toc = st.file_uploader("4. ToC Master Sheet", type=["xlsx", "xls"])
         
-        st.markdown("---")
-        btn_process = st.button("🚀 INTEGRATE & COMPARE DATA", use_container_width=True, type="primary")
+    st.markdown("###") # Jarak kecil
+    
+    # Tombol trigger proses ditaruh di tengah/penuh di bawah uploader
+    btn_process = st.button("🚀 INTEGRATE & COMPARE DATA", use_container_width=True, type="primary")
+    st.markdown("---")
 
-    with col_display:
-        st.subheader("📋 Output & Analysis Preview")
-        
-        if btn_process:
-            if not (file_sby and file_smg and file_sales and file_toc):
-                st.error("❌ Gagal memproses! Harap upload ke-4 file logistik terlebih dahulu.")
-            else:
-                with st.spinner("Processing dataset via Ultra-Fast Engine..."):
-                    try:
-                        # Memanggil nama fungsi baru yang sudah diganti
-                        result_df = execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc)
-                        
-                        if not result_df.empty:
-                            # Render Summary Cards
-                            m1, m2, m3 = st.columns(3)
-                            m1.metric("Total Unique SKU", f"{len(result_df):,}")
-                            m2.metric("Total Qty Surabaya", f"{result_df['QTY SURABAYA'].sum():,}")
-                            m3.metric("Total Qty Semarang", f"{result_df['QTY SEMARANG'].sum():,}")
-                            
-                            st.markdown("### Preview Hasil Tabel")
-                            
-                            # Force rata tengah (xlCenter equivalent) & Segoe UI font style
-                            styled_df = result_df.style.set_properties(**{
-                                'text-align': 'center',
-                                'font-family': 'Segoe UI',
-                                'font-size': '13px'
-                            }).set_table_styles([
-                                {'selector': 'th', 'props': [('background-color', '#262b3d'), ('color', 'white'), ('text-align', 'center')]}
-                            ])
-                            
-                            # Penerapan Warna Zebra Tebal/Tegas Kontras (RGB 220, 225, 230 -> #dcE1E6)
-                            def apply_zebra_theme(x):
-                                df_styler = pd.DataFrame('', index=x.index, columns=x.columns)
-                                df_styler.iloc[1::2, :] = 'background-color: #dcE1E6; color: #1e1e1e;'
-                                df_styler.iloc[0::2, :] = 'background-color: #ffffff; color: #1e1e1e;'
-                                return df_styler
-                            
-                            styled_df = styled_df.apply(apply_zebra_theme, axis=None)
-                            st.dataframe(styled_df, use_container_width=True, height=450)
-                            
-                            # Generate Download Buffer Excel
-                            output = io.BytesIO()
-                            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                                result_df.to_excel(writer, index=False, sheet_name='HASIL COMPARE')
-                            processed_data = output.getvalue()
-                            
-                            st.success("🔥 Data berhasil dicocokkan!")
-                            st.download_button(
-                                label="📥 DOWNLOAD EXCEL HASIL COMPARE",
-                                data=processed_data,
-                                file_name="HASIL_COMPARE_LOGISTIK.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                use_container_width=True
-                            )
-                        else:
-                            st.warning("⚠️ Tidak ada SKU yang lolos filter (Qty Surabaya & Semarang bernilai 0).")
-                            
-                    except Exception as e:
-                        st.error(f"❌ Terjadi kesalahan struktur file saat membaca data: {str(e)}")
+    # ==========================================
+    # SECTION 2: OUTPUT PANEL (DIBAWAHNYA / FULL WIDTH)
+    # ==========================================
+    st.subheader("📋 Output & Analysis Preview")
+    
+    if btn_process:
+        if not (file_sby and file_smg and file_sales and file_toc):
+            st.error("❌ Gagal memproses! Harap upload ke-4 file logistik di atas terlebih dahulu.")
         else:
-            st.info("Menunggu berkas diunggah. Klik tombol 'INTEGRATE & COMPARE DATA' untuk memulai kalkulasi.")
+            with st.spinner("Processing dataset via Ultra-Fast Engine..."):
+                try:
+                    # Memanggil backend pandas logic
+                    result_df = execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc)
+                    
+                    if not result_df.empty:
+                        # Render Summary Cards (3 Kolom Sejajar untuk Ringkasan Data)
+                        m1, m2, m3 = st.columns(3)
+                        m1.metric("Total Unique SKU", f"{len(result_df):,}")
+                        m2.metric("Total Qty Surabaya", f"{result_df['QTY SURABAYA'].sum():,}")
+                        m3.metric("Total Qty Semarang", f"{result_df['QTY SEMARANG'].sum():,}")
+                        
+                        st.markdown("###") # Jarak
+                        
+                        # --- TOMBOL EXPORT EXCEL (DITAROH DI ATAS TABEL BIAR GAMPANG) ---
+                        output = io.BytesIO()
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                            result_df.to_excel(writer, index=False, sheet_name='HASIL COMPARE')
+                        processed_data = output.getvalue()
+                        
+                        st.download_button(
+                            label="📥 EXPORT TO EXCEL (DOWNLOAD HASIL COMPARE)",
+                            data=processed_data,
+                            file_name="HASIL_COMPARE_LOGISTIK.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                        
+                        st.markdown("### Detail Data Hasil Gabungan")
+                        
+                        # Force rata tengah (xlCenter) & Font Style
+                        styled_df = result_df.style.set_properties(**{
+                            'text-align': 'center',
+                            'font-family': 'Segoe UI',
+                            'font-size': '13px'
+                        }).set_table_styles([
+                            {'selector': 'th', 'props': [('background-color', '#262b3d'), ('color', 'white'), ('text-align', 'center')]}
+                        ])
+                        
+                        # Penerapan Garis Zebra Abu-abu Tua / Tegas Kontras (RGB 220, 225, 230 -> #dcE1E6)
+                        def apply_zebra_theme(x):
+                            df_styler = pd.DataFrame('', index=x.index, columns=x.columns)
+                            df_styler.iloc[1::2, :] = 'background-color: #dcE1E6; color: #1e1e1e;'
+                            df_styler.iloc[0::2, :] = 'background-color: #ffffff; color: #1e1e1e;'
+                            return df_styler
+                        
+                        styled_df = styled_df.apply(apply_zebra_theme, axis=None)
+                        
+                        # Tampilkan Tabel secara penuh (Full Width)
+                        st.dataframe(styled_df, use_container_width=True, height=500)
+                        st.success(f"🔥 Selesai! {len(result_df):,} SKU berhasil dicocokkan.")
+                        
+                    else:
+                        st.warning("⚠️ Tidak ada SKU yang lolos filter (Qty Surabaya & Semarang bernilai 0).")
+                        
+                except Exception as e:
+                    st.error(f"❌ Terjadi kesalahan struktur file saat membaca data: {str(e)}")
+                    st.info("💡 Pastikan urutan letak kolom di file excel Anda tidak berubah dari template awal.")
+    else:
+        # State awal sebelum user pencet tombol run
+        st.info("💡 Menunggu berkas diunggah pada panel di atas. Silakan upload file lalu klik 'INTEGRATE & COMPARE DATA'.")
 
 
 def menu_matching_karantina():
