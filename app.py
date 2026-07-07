@@ -651,13 +651,12 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     return final_df
 
 
-# ==============================================================================
-# UI RENDER INTERFACE (PREMIUM DARK MODE)
-# ==============================================================================
 def render_menu_compare():
     """
-    Fungsi Menu UI Premium dengan Layout Horizontal (File Upload di atas, Hasil di bawah).
+    Fungsi Menu UI Premium dengan Layout Horizontal.
+    Tombol Export dipindahkan ke paling bawah dengan style premium card elegan.
     """
+    # Custom CSS Styling Premium
     st.markdown("""
         <style>
         .hero-header {
@@ -669,6 +668,27 @@ def render_menu_compare():
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         .hero-title { color: #ffffff; font-family: 'Segoe UI', sans-serif; font-size: 26px; font-weight: 700; margin: 0; }
+        
+        /* Premium Card untuk Tombol Export di Paling Bawah */
+        .export-container {
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid #C5A059 !important;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+            text-align: center;
+        }
+        .export-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-family: 'Segoe UI', sans-serif;
+            letter-spacing: 0.5px;
+        }
+        
         div[data-testid="stMetricValue"] { font-size: 28px; font-weight: bold; color: #C5A059 !important; }
         div[data-testid="stFileUploader"] { padding: 5px; }
         </style>
@@ -682,7 +702,7 @@ def render_menu_compare():
     up_col1, up_col2, up_col3, up_col4 = st.columns(4, gap="medium")
     
     with up_col1:
-        file_sby = st.file_uploader("1. Stock Surabaya (Master)", type=["xlsx", "xls"])
+        file_sby = st.file_uploader("1. Stock Surabaya", type=["xlsx", "xls"])
     with up_col2:
         file_smg = st.file_uploader("2. Stock Semarang", type=["xlsx", "xls"])
     with up_col3:
@@ -691,7 +711,7 @@ def render_menu_compare():
         file_toc = st.file_uploader("4. ToC Master Sheet", type=["xlsx", "xls"])
         
     st.markdown("###") 
-    btn_process = st.button("🚀 INTEGRATE & COMPARE DATA", use_container_width=True, type="primary")
+    btn_process = st.button("▶️RUN PROCESS", use_container_width=True, type="primary")
     st.markdown("---")
 
     # SECTION 2: OUTPUT PANEL
@@ -701,12 +721,12 @@ def render_menu_compare():
         if not (file_sby and file_smg and file_sales and file_toc):
             st.error("❌ Gagal memproses! Harap upload ke-4 file logistik di atas terlebih dahulu.")
         else:
-            with st.spinner("Processing dataset via Ultra-Fast Safe Engine..."):
+            with st.spinner("Processing Data, Please Wait..."):
                 try:
                     result_df = execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc)
                     
                     if not result_df.empty:
-                        # Render Summary Cards
+                        # 1. Render Summary Cards (Metrix) di Atas
                         m1, m2, m3 = st.columns(3)
                         m1.metric("Total Unique SKU", f"{len(result_df):,}")
                         m2.metric("Total Qty Surabaya", f"{result_df['QTY SURABAYA'].sum():,}")
@@ -714,20 +734,7 @@ def render_menu_compare():
                         
                         st.markdown("###") 
                         
-                        # TOMBOL EXPORT EXCEL
-                        output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                            result_df.to_excel(writer, index=False, sheet_name='HASIL COMPARE')
-                        processed_data = output.getvalue()
-                        
-                        st.download_button(
-                            label="📥 EXPORT TO EXCEL (DOWNLOAD HASIL COMPARE)",
-                            data=processed_data,
-                            file_name="HASIL_COMPARE_LOGISTIK.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
-                        
+                        # 2. Render Detail Data Hasil Gabungan (Tabel) di Tengah
                         st.markdown("### Detail Data Hasil Gabungan")
                         
                         styled_df = result_df.style.set_properties(**{
@@ -745,9 +752,29 @@ def render_menu_compare():
                             return df_styler
                         
                         styled_df = styled_df.apply(apply_zebra_theme, axis=None)
-                        
                         st.dataframe(styled_df, use_container_width=True, height=500)
-                        st.success(f"🔥 Selesai! {len(result_df):,} SKU berhasil dicocokkan.")
+                        
+                        # 3. Render Tombol Export Premium di Paling Bawah
+                        output = io.BytesIO()
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                            result_df.to_excel(writer, index=False, sheet_name='HASIL COMPARE')
+                        processed_data = output.getvalue()
+                        
+                        st.markdown(f"""
+                            <div class="export-container">
+                                <div class="export-title">📊 DATA READY FOR EXPORT ({len(result_df):,} SKUs)</div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.download_button(
+                            label="📥 DOWNLOAD HASIL COMPARE (EXCEL)",
+                            data=processed_data,
+                            file_name="HASIL_COMPARE_LOGISTIK.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                        
+                        st.success(f"🔥 Sukses! Data berhasil dikompilasi secara presisi.")
                         
                     else:
                         st.warning("⚠️ Tidak ada SKU yang lolos filter (Qty Surabaya & Semarang bernilai 0).")
@@ -756,7 +783,6 @@ def render_menu_compare():
                     st.error(f"Terjadi kesalahan pemrosesan: {str(e)}")
     else:
         st.info("💡 Menunggu berkas diunggah pada panel di atas. Silakan upload file lalu klik 'INTEGRATE & COMPARE DATA'.")
-
 def menu_matching_karantina():
     st.markdown("""
         <style>
