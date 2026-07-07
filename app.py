@@ -551,218 +551,97 @@ import numpy as np
 import streamlit as st
 import io
 
-import pandas as pd
-import numpy as np
-import streamlit as st
-import io
-
 def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc):
     """
-    Engine pemrosesan data logistik menggunakan Pandas (Ironclad Anti-Crash Version 3.0).
-    Menjamin eliminasi total eror 'invalid literal for int() with base 10: NaN'.
+    Engine pemrosesan data logistik (Python Streamlit x Pandas).
+    Sudah diselaraskan 100% presisi dengan logic Macro VBA Excel.
     """
-    # 1. Load Data secara individual dengan try-except untuk melacak file rusak
-    try:
-        df_sby = pd.read_excel(file_sby)
-    except Exception as e:
-        raise Exception(f"💥 CRASH SAAT MEMBACA FILE: [1. Stock Surabaya (Master)]. Detail: {str(e)}")
-
-    try:
-        df_smg = pd.read_excel(file_smg)
-    except Exception as e:
-        raise Exception(f"💥 CRASH SAAT MEMBACA FILE: [2. Stock Semarang]. Detail: {str(e)}")
-
-    try:
-        df_sales = pd.read_excel(file_sales)
-    except Exception as e:
-        raise Exception(f"💥 CRASH SAAT MEMBACA FILE: [3. Sales 60d Report]. Detail: {str(e)}")
-
-    try:
-        df_toc = pd.read_excel(file_toc)
-    except Exception as e:
-        raise Exception(f"💥 CRASH SAAT MEMBACA FILE: [4. ToC Master Sheet]. Detail: {str(e)}")
+    # 1. AMBIL DATA SEBAGAI STRING (dtype=str) - Anti-Crash Nuklir 'NaN'
+    df_sby = pd.read_excel(file_sby, dtype=str)
+    df_smg = pd.read_excel(file_smg, dtype=str)
+    df_sales = pd.read_excel(file_sales, dtype=str)
+    df_toc = pd.read_excel(file_toc, dtype=str)
     
-    # Standardisasi nama kolom (Menghapus spasi berlebih)
+    # Trim spasi di nama kolom biar ga ada mismatch
     for df in [df_sby, df_smg, df_sales, df_toc]:
         df.columns = df.columns.str.strip()
 
-    # --- SBY PROCESS ---
-    sku_col_sby = df_sby.columns[2]   # Kolom C
-    name_col_sby = df_sby.columns[4]  # Kolom E
-    var_col_sby = df_sby.columns[5]   # Kolom F
-    qty_col_sby = df_sby.columns[9]   # Kolom J
+    # ==========================================
+    # 2. PROSES SHEET STOCK SURABAYA (Master)
+    # ==========================================
+    sku_col_sby = df_sby.columns[2]   # Kolom C (Index 2) -> SKU
+    name_col_sby = df_sby.columns[4]  # Kolom E (Index 4) -> Item Name
+    var_col_sby = df_sby.columns[5]   # Kolom F (Index 5) -> Variant
+    qty_col_sby = df_sby.columns[9]   # Kolom J (Index 9) -> Qty (Sesuai arrSby(i, 10) di VBA)
     
-    df_sby[sku_col_sby] = df_sby[sku_col_sby].astype(str).str.strip()
+    # Bersihkan SKU & QTY (Setara CDbl + On Error Resume Next di VBA)
+    df_sby[sku_col_sby] = df_sby[sku_col_sby].fillna('').astype(str).str.strip()
+    df_sby[qty_col_sby] = pd.to_numeric(df_sby[qty_col_sby], errors='coerce').fillna(0)
     
-    # Double Protection untuk Qty SBY
-    df_sby[qty_col_sby] = df_sby[qty_col_sby].astype(str).str.replace('NaN', '0', case=False).str.replace('nan', '0', case=False).str.strip()
-    df_sby[qty_col_sby] = pd.to_numeric(df_sby[qty_col_sby], errors='coerce').fillna(0).round().astype('int64')
-    
+    # Grouping (Sum Qty Akumulasi & Ambil First Item Name/Variant sesuai logic VBA)
     sby_grouped = df_sby.groupby(sku_col_sby).agg({
         name_col_sby: 'first',
         var_col_sby: 'first',
         qty_col_sby: 'sum'
     }).reset_index()
     sby_grouped.columns = ['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA']
+    # Filter internal: hapus baris yang SKU-nya kosong ("")
+    sby_grouped = sby_grouped[sby_grouped['SKU'] != '']
 
-    # --- SEMARANG PROCESS ---
-    sku_col_smg = df_smg.columns[2]   # Kolom C
-    qty_col_smg = df_smg.columns[9]   # Kolom J
+    # ==========================================
+    # 3. PROSES SHEET STOCK SEMARANG 
+    # ==========================================
+    sku_col_smg = df_smg.columns[2]   # Kolom C (Index 2) -> SKU
+    qty_col_smg = df_smg.columns[9]   # Kolom J (Index 9) -> Qty
     
-    df_smg[sku_col_smg] = df_smg[sku_col_smg].astype(str).str.strip()
-    
-    # Double Protection untuk Qty Semarang
-    df_smg[qty_col_smg] = df_smg[qty_col_smg].astype(str).str.replace('NaN', '0', case=False).str.replace('nan', '0', case=False).str.strip()
-    df_smg[qty_col_smg] = pd.to_numeric(df_smg[qty_col_smg], errors='coerce').fillna(0).round().astype('int64')
+    df_smg[sku_col_smg] = df_smg[sku_col_smg].fillna('').astype(str).str.strip()
+    df_smg[qty_col_smg] = pd.to_numeric(df_smg[qty_col_smg], errors='coerce').fillna(0)
     
     smg_grouped = df_smg.groupby(sku_col_smg).agg({qty_col_smg: 'sum'}).reset_index()
     smg_grouped.columns = ['SKU', 'QTY SEMARANG']
 
-    # --- SALES PROCESS ---
-    sku_col_sales = df_sales.columns[17] # Kolom R
-    qty_col_sales = df_sales.columns[25] # Kolom Z
+    # ==========================================
+    # 4. PROSES SHEET SALES 60d
+    # ==========================================
+    sku_col_sales = df_sales.columns[17] # Kolom R (Index 17) -> SKU
+    qty_col_sales = df_sales.columns[25] # Kolom Z (Index 25) -> Sales Qty
     
-    df_sales[sku_col_sales] = df_sales[sku_col_sales].astype(str).str.strip()
-    
-    # Double Protection untuk Qty Sales
-    df_sales[qty_col_sales] = df_sales[qty_col_sales].astype(str).str.replace('NaN', '0', case=False).str.replace('nan', '0', case=False).str.strip()
-    df_sales[qty_col_sales] = pd.to_numeric(df_sales[qty_col_sales], errors='coerce').fillna(0).round().astype('int64')
+    df_sales[sku_col_sales] = df_sales[sku_col_sales].fillna('').astype(str).str.strip()
+    df_sales[qty_col_sales] = pd.to_numeric(df_sales[qty_col_sales], errors='coerce').fillna(0)
     
     sales_grouped = df_sales.groupby(sku_col_sales).agg({qty_col_sales: 'sum'}).reset_index()
     sales_grouped.columns = ['SKU', 'SALES 60d']
 
-    # --- ToC PROCESS ---
-    art_col_toc = df_toc.columns[2] # Kolom C (Article)
-    toc_col_toc = df_toc.columns[7] # Kolom H (ToC)
-    df_toc[art_col_toc] = df_toc[art_col_toc].astype(str).str.strip()
-    toc_lookup = df_toc[[art_col_toc, toc_col_toc]].drop_duplicates(subset=[art_col_toc])
+    # ==========================================
+    # 5. PROSES SHEET ToC (Lookup Master)
+    # ==========================================
+    art_col_toc = df_toc.columns[2] # Kolom C (Index 2) -> Article / Item Name
+    toc_col_toc = df_toc.columns[7] # Kolom H (Index 7) -> ToC
+    
+    df_toc[art_col_toc] = df_toc[art_col_toc].fillna('').astype(str).str.strip()
+    
+    # SELARAS MACRO VBA: Menggunakan keep='last' karena dictionary VBA menimpa data lama (Last Row Win)
+    toc_lookup = df_toc[[art_col_toc, toc_col_toc]].drop_duplicates(subset=[art_col_toc], keep='last')
     toc_lookup.columns = ['ITEM NAME', 'ToC']
 
-    # --- COMPILATION & MERGING ---
+    # ==========================================
+    # 6. PENYUSUNAN HASIL COMPARE (LEFT JOIN)
+    # ==========================================
+    # Loop/Merge berdasarkan Unique SKU dari Surabaya (Sama seperti For Each key In dictSby.Keys)
     compiled = pd.merge(sby_grouped, smg_grouped, on='SKU', how='left')
     compiled = pd.merge(compiled, sales_grouped, on='SKU', how='left')
     
-    # Amankan nilai kosong akibat dari Left Join tabel
-    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].fillna(0).astype('int64')
-    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0).astype('int64')
-    compiled['SALES 60d'] = compiled['SALES 60d'].fillna(0).astype('int64')
+    # Isi data kosong hasil left join dengan 0 (Setara pengecekan .Exists di VBA)
+    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].fillna(0)
+    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0)
+    compiled['SALES 60d'] = compiled['SALES 60d'].fillna(0)
     
-    # FILTER LOGIC: Skip jika QTY SBY dan QTY SMG bernilai 0
+    # FILTER LOGIC: Jika Surabaya DAN Semarang bernilai 0, SKIP (qtySby <> 0 Or qtySmg <> 0)
     compiled = compiled[(compiled['QTY SURABAYA'] != 0) | (compiled['QTY SEMARANG'] != 0)]
 
-    # Lookup ToC berdasarkan ITEM NAME
+    # Lookup ke tabel ToC berdasarkan ITEM NAME
     final_df = pd.merge(compiled, toc_lookup, on='ITEM NAME', how='left')
-    final_df['ToC'] = final_df['ToC'].fillna('-')
-
-    final_df = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
-    return final_df
-
-def render_menu_compare():
-    """
-    Fungsi Menu UI Premium dengan Layout Horizontal (File Upload di atas, Hasil di bawah).
-    """
-    # Custom CSS Styling Premium Zebra & All Column Centered
-    st.markdown("""
-        <style>
-        .hero-header {
-            background: linear-gradient(135deg, #1f2438 0%, #2c324b 100%);
-            padding: 25px;
-            border-radius: 12px;
-            border-left: 4px solid #C5A059 !important;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        .hero-title { color: #ffffff; font-family: 'Segoe UI', sans-serif; font-size: 26px; font-weight: 700; margin: 0; }
-        div[data-testid="stMetricValue"] { font-size: 28px; font-weight: bold; color: #C5A059 !important; }
-        div[data-testid="stFileUploader"] { padding: 5px; }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # Render Hero Header
-    st.markdown('<div class="hero-header"><div class="hero-title">🏬 STORE LEADER RTO DECISSION</div></div>', unsafe_allow_html=True)
-
-    # SECTION 1: UPLOAD PANEL
-    st.subheader("📤 Upload Source Files")
-    up_col1, up_col2, up_col3, up_col4 = st.columns(4, gap="medium")
-    
-    with up_col1:
-        file_sby = st.file_uploader("1. Stock Surabaya (Master)", type=["xlsx", "xls"])
-    with up_col2:
-        file_smg = st.file_uploader("2. Stock Semarang", type=["xlsx", "xls"])
-    with up_col3:
-        file_sales = st.file_uploader("3. Sales 60d Report", type=["xlsx", "xls"])
-    with up_col4:
-        file_toc = st.file_uploader("4. ToC Master Sheet", type=["xlsx", "xls"])
-        
-    st.markdown("###") 
-    btn_process = st.button("🚀 INTEGRATE & COMPARE DATA", use_container_width=True, type="primary")
-    st.markdown("---")
-
-    # SECTION 2: OUTPUT PANEL
-    st.subheader("📋 Output & Analysis Preview")
-    
-    if btn_process:
-        if not (file_sby and file_smg and file_sales and file_toc):
-            st.error("❌ Gagal memproses! Harap upload ke-4 file logistik di atas terlebih dahulu.")
-        else:
-            with st.spinner("Processing dataset via Ultra-Fast Safe Engine..."):
-                try:
-                    # Memanggil backend pandas logic
-                    result_df = execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc)
-                    
-                    if not result_df.empty:
-                        # Render Summary Cards
-                        m1, m2, m3 = st.columns(3)
-                        m1.metric("Total Unique SKU", f"{len(result_df):,}")
-                        m2.metric("Total Qty Surabaya", f"{result_df['QTY SURABAYA'].sum():,}")
-                        m3.metric("Total Qty Semarang", f"{result_df['QTY SEMARANG'].sum():,}")
-                        
-                        st.markdown("###") 
-                        
-                        # TOMBOL EXPORT EXCEL
-                        output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                            result_df.to_excel(writer, index=False, sheet_name='HASIL COMPARE')
-                        processed_data = output.getvalue()
-                        
-                        st.download_button(
-                            label="📥 EXPORT TO EXCEL (DOWNLOAD HASIL COMPARE)",
-                            data=processed_data,
-                            file_name="HASIL_COMPARE_LOGISTIK.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
-                        
-                        st.markdown("### Detail Data Hasil Gabungan")
-                        
-                        styled_df = result_df.style.set_properties(**{
-                            'text-align': 'center',
-                            'font-family': 'Segoe UI',
-                            'font-size': '13px'
-                        }).set_table_styles([
-                            {'selector': 'th', 'props': [('background-color', '#262b3d'), ('color', 'white'), ('text-align', 'center')]}
-                        ])
-                        
-                        def apply_zebra_theme(x):
-                            df_styler = pd.DataFrame('', index=x.index, columns=x.columns)
-                            df_styler.iloc[1::2, :] = 'background-color: #dcE1E6; color: #1e1e1e;'
-                            df_styler.iloc[0::2, :] = 'background-color: #ffffff; color: #1e1e1e;'
-                            return df_styler
-                        
-                        styled_df = styled_df.apply(apply_zebra_theme, axis=None)
-                        
-                        # Tampilkan Tabel secara penuh (Full Width)
-                        st.dataframe(styled_df, use_container_width=True, height=500)
-                        st.success(f"🔥 Selesai! {len(result_df):,} SKU berhasil dicocokkan.")
-                        
-                    else:
-                        st.warning("⚠️ Tidak ada SKU yang lolos filter (Qty Surabaya & Semarang bernilai 0).")
-                        
-                except Exception as e:
-                    st.error(f"{str(e)}")
-                    st.info("💡 Jika eror menyebut nama berkas tertentu, periksa kolom Qty berkas tersebut dari baris kosong bermasalah.")
-    else:
-        st.info("💡 Menunggu berkas diunggah pada panel di atas. Silakan upload file lalu klik 'INTEGRATE & COMPARE DATA'.")
+    final_df['ToC'] = final_df
 
 def menu_matching_karantina():
     st.markdown("""
