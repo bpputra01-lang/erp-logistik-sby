@@ -532,13 +532,6 @@ from openpyxl import load_workbook
 import re
 from collections import defaultdict
 
-
-import pandas as pd
-import streamlit as st
-import io
-from openpyxl import load_workbook
-from collections import defaultdict
-
 # ==========================================
 # 1. LOGIC PROSES (LANGSUNG DI SINI)
 # ==========================================
@@ -628,6 +621,112 @@ def process_matching(df):
     }
     
     return pd.DataFrame(matched_details), metrics
+def render_menu_compare():
+    """
+    Fungsi Menu UI Premium untuk Komparasi File Logistik.
+    Bisa langsung dipanggil di dalam block elif menu == '...' Anda.
+    """
+    # Custom CSS Styling Premium Zebra & All Column Centered
+    st.markdown("""
+        <style>
+        .hero-header {
+            background: linear-gradient(135deg, #1f2438 0%, #2c324b 100%);
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 4px solid #C5A059 !important;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .hero-title { color: #ffffff; font-family: 'Segoe UI', sans-serif; font-size: 26px; font-weight: 700; margin: 0; }
+        .hero-subtitle { color: #a1a8c3; font-size: 14px; margin-top: 5px; }
+        div[data-testid="stMetricValue"] { font-size: 28px; font-weight: bold; color: #C5A059 !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Render Hero Header
+    st.markdown("""
+        <div class="hero-header">
+            <div class="hero-title">☣️ STOCK COMPARE INTEGRATOR SYSTEM</div>
+            <div class="hero-subtitle">Bandingkan stock multi-cabang secara instan menggunakan file upload.</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Layout Menu 2 Kolom
+    col_panel, col_display = st.columns([1, 2], gap="large")
+
+    with col_panel:
+        st.subheader("📤 Upload Source Files")
+        
+        file_sby = st.file_uploader("1. Stock Surabaya (Master)", type=["xlsx", "xls"])
+        file_smg = st.file_uploader("2. Stock Semarang", type=["xlsx", "xls"])
+        file_sales = st.file_uploader("3. Sales 60d Report", type=["xlsx", "xls"])
+        file_toc = st.file_uploader("4. ToC Master Sheet", type=["xlsx", "xls"])
+        
+        st.markdown("---")
+        btn_process = st.button("🚀 INTEGRATE & COMPARE DATA", use_container_width=True, type="primary")
+
+    with col_display:
+        st.subheader("📋 Output & Analysis Preview")
+        
+        if btn_process:
+            if not (file_sby and file_smg and file_sales and file_toc):
+                st.error("❌ Gagal memproses! Harap upload ke-4 file logistik terlebih dahulu.")
+            else:
+                with st.spinner("Processing dataset via Ultra-Fast Engine..."):
+                    try:
+                        # Memanggil nama fungsi baru yang sudah diganti
+                        result_df = execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc)
+                        
+                        if not result_df.empty:
+                            # Render Summary Cards
+                            m1, m2, m3 = st.columns(3)
+                            m1.metric("Total Unique SKU", f"{len(result_df):,}")
+                            m2.metric("Total Qty Surabaya", f"{result_df['QTY SURABAYA'].sum():,}")
+                            m3.metric("Total Qty Semarang", f"{result_df['QTY SEMARANG'].sum():,}")
+                            
+                            st.markdown("### Preview Hasil Tabel")
+                            
+                            # Force rata tengah (xlCenter equivalent) & Segoe UI font style
+                            styled_df = result_df.style.set_properties(**{
+                                'text-align': 'center',
+                                'font-family': 'Segoe UI',
+                                'font-size': '13px'
+                            }).set_table_styles([
+                                {'selector': 'th', 'props': [('background-color', '#262b3d'), ('color', 'white'), ('text-align', 'center')]}
+                            ])
+                            
+                            # Penerapan Warna Zebra Tebal/Tegas Kontras (RGB 220, 225, 230 -> #dcE1E6)
+                            def apply_zebra_theme(x):
+                                df_styler = pd.DataFrame('', index=x.index, columns=x.columns)
+                                df_styler.iloc[1::2, :] = 'background-color: #dcE1E6; color: #1e1e1e;'
+                                df_styler.iloc[0::2, :] = 'background-color: #ffffff; color: #1e1e1e;'
+                                return df_styler
+                            
+                            styled_df = styled_df.apply(apply_zebra_theme, axis=None)
+                            st.dataframe(styled_df, use_container_width=True, height=450)
+                            
+                            # Generate Download Buffer Excel
+                            output = io.BytesIO()
+                            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                                result_df.to_excel(writer, index=False, sheet_name='HASIL COMPARE')
+                            processed_data = output.getvalue()
+                            
+                            st.success("🔥 Data berhasil dicocokkan!")
+                            st.download_button(
+                                label="📥 DOWNLOAD EXCEL HASIL COMPARE",
+                                data=processed_data,
+                                file_name="HASIL_COMPARE_LOGISTIK.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True
+                            )
+                        else:
+                            st.warning("⚠️ Tidak ada SKU yang lolos filter (Qty Surabaya & Semarang bernilai 0).")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Terjadi kesalahan struktur file saat membaca data: {str(e)}")
+        else:
+            st.info("Menunggu berkas diunggah. Klik tombol 'INTEGRATE & COMPARE DATA' untuk memulai kalkulasi.")
+
 
 def menu_matching_karantina():
     st.markdown("""
@@ -1856,6 +1955,76 @@ import io
 from openpyxl import load_workbook
 from collections import defaultdict
 
+import pandas as pd
+import numpy as np
+
+def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc):
+    """
+    Engine pemrosesan data logistik menggunakan Pandas (Ultra Fast Hashing).
+    Menerima file pointer dari Streamlit dan mengembalikan DataFrame hasil akhir.
+    """
+    # 1. Load Data dengan engine openpyxl secara cepat
+    df_sby = pd.read_excel(file_sby)
+    df_smg = pd.read_excel(file_smg)
+    df_sales = pd.read_excel(file_sales)
+    df_toc = pd.read_excel(file_toc)
+    
+    # Standardisasi nama kolom (Menghapus spasi berlebih)
+    for df in [df_sby, df_smg, df_sales, df_toc]:
+        df.columns = df.columns.str.strip()
+
+    # --- SBY PROCESS ---
+    sku_col_sby = df_sby.columns[2]   # Kolom C
+    name_col_sby = df_sby.columns[4]  # Kolom E
+    var_col_sby = df_sby.columns[5]   # Kolom F
+    qty_col_sby = df_sby.columns[9]   # Kolom J
+    
+    df_sby[sku_col_sby] = df_sby[sku_col_sby].astype(str).str.strip()
+    sby_grouped = df_sby.groupby(sku_col_sby).agg({
+        name_col_sby: 'first',
+        var_col_sby: 'first',
+        qty_col_sby: 'sum'
+    }).reset_index()
+    sby_grouped.columns = ['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA']
+
+    # --- SEMARANG PROCESS ---
+    sku_col_smg = df_smg.columns[2]   # Kolom C
+    qty_col_smg = df_smg.columns[9]   # Kolom J
+    df_smg[sku_col_smg] = df_smg[sku_col_smg].astype(str).str.strip()
+    smg_grouped = df_smg.groupby(sku_col_smg)[qty_col_smg].sum().reset_index()
+    smg_grouped.columns = ['SKU', 'QTY SEMARANG']
+
+    # --- SALES PROCESS ---
+    sku_col_sales = df_sales.columns[17] # Kolom R
+    qty_col_sales = df_sales.columns[25] # Kolom Z
+    df_sales[sku_col_sales] = df_sales[sku_col_sales].astype(str).str.strip()
+    sales_grouped = df_sales.groupby(sku_col_sales)[qty_col_sales].sum().reset_index()
+    sales_grouped.columns = ['SKU', 'SALES 60d']
+
+    # --- ToC PROCESS ---
+    art_col_toc = df_toc.columns[2] # Kolom C (Article)
+    toc_col_toc = df_toc.columns[7] # Kolom H (ToC)
+    df_toc[art_col_toc] = df_toc[art_col_toc].astype(str).str.strip()
+    toc_lookup = df_toc[[art_col_toc, toc_col_toc]].drop_duplicates(subset=[art_col_toc])
+    toc_lookup.columns = ['ITEM NAME', 'ToC']
+
+    # --- COMPILATION & MERGING ---
+    compiled = pd.merge(sby_grouped, smg_grouped, on='SKU', how='left')
+    compiled = pd.merge(compiled, sales_grouped, on='SKU', how='left')
+    
+    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0).astype(int)
+    compiled['SALES 60d'] = compiled['SALES 60d'].fillna(0).astype(int)
+    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].astype(int)
+
+    # FILTER LOGIC: Skip jika QTY SBY dan QTY SMG bernilai 0
+    compiled = compiled[(compiled['QTY SURABAYA'] != 0) | (compiled['QTY SEMARANG'] != 0)]
+
+    # Lookup ToC berdasarkan ITEM NAME
+    final_df = pd.merge(compiled, toc_lookup, on='ITEM NAME', how='left')
+    final_df['ToC'] = final_df['ToC'].fillna('-')
+
+    final_df = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
+    return final_df
 # =========================================================
 # 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
 # =========================================================
@@ -9211,7 +9380,7 @@ with st.sidebar:
     if is_dc:
         m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display","Precentage Request FL to Store Stock", "Refill Toko"]
     else:
-        m5_list = ["Precentage Display","Refill Toko"] # Menu Cabang
+        m5_list = ["Precentage Display","Refill Toko","Store Leader RTO Decission"] # Menu Cabang
 
     idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else None
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=sync_menu, args=("m5_key",), label_visibility="collapsed")
@@ -10874,6 +11043,9 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "Store Leader RTO Decission"
+    render_menu_compare()
 
 elif menu == "Match Real & System":
     menu_matching_karantina()
