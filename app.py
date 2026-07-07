@@ -532,12 +532,13 @@ from openpyxl import load_workbook
 import re
 from collections import defaultdict
 
+import pandas as pd
+import numpy as np
 
 def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc):
     """
-    Engine pemrosesan data logistik menggunakan Pandas (Ultra Fast Hashing).
-    Menerima file pointer dari Streamlit dan mengembalikan DataFrame hasil akhir.
-    Sudah difiksasi dari eror 'invalid literal for int() with base 10: NaN'.
+    Engine pemrosesan data logistik menggunakan Pandas (Ultra Fast Hashing - Anti Crash Version).
+    Mencegah eror 'invalid literal for int() with base 10: NaN' secara total.
     """
     # 1. Load Data dengan engine openpyxl secara cepat
     df_sby = pd.read_excel(file_sby)
@@ -555,10 +556,11 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     var_col_sby = df_sby.columns[5]   # Kolom F
     qty_col_sby = df_sby.columns[9]   # Kolom J
     
+    # Bersihkan SKU ke String murni
     df_sby[sku_col_sby] = df_sby[sku_col_sby].astype(str).str.strip()
     
-    # Pastikan qty sby diisi 0 jika ada yang kosong sebelum di-sum
-    df_sby[qty_col_sby] = pd.to_numeric(df_sby[qty_col_sby], errors='coerce').fillna(0)
+    # PAKSA QTY JADI NUMERIK DI AWAL (Teks/Kosong otomatis jadi 0)
+    df_sby[qty_col_sby] = pd.to_numeric(df_sby[qty_col_sby], errors='coerce').fillna(0).astype(float)
     
     sby_grouped = df_sby.groupby(sku_col_sby).agg({
         name_col_sby: 'first',
@@ -570,10 +572,10 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     # --- SEMARANG PROCESS ---
     sku_col_smg = df_smg.columns[2]   # Kolom C
     qty_col_smg = df_smg.columns[9]   # Kolom J
-    df_smg[sku_col_smg] = df_smg[sku_col_smg].astype(str).str.strip()
     
-    # Antisipasi nilai non-numeric/blank di qty semarang
-    df_smg[qty_col_smg] = pd.to_numeric(df_smg[qty_col_smg], errors='coerce').fillna(0)
+    df_smg[sku_col_smg] = df_smg[sku_col_smg].astype(str).str.strip()
+    # Paksa Qty Semarang jadi numerik di awal
+    df_smg[qty_col_smg] = pd.to_numeric(df_smg[qty_col_smg], errors='coerce').fillna(0).astype(float)
     
     smg_grouped = df_smg.groupby(sku_col_smg)[qty_col_smg].sum().reset_index()
     smg_grouped.columns = ['SKU', 'QTY SEMARANG']
@@ -581,10 +583,10 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     # --- SALES PROCESS ---
     sku_col_sales = df_sales.columns[17] # Kolom R
     qty_col_sales = df_sales.columns[25] # Kolom Z
-    df_sales[sku_col_sales] = df_sales[sku_col_sales].astype(str).str.strip()
     
-    # Antisipasi nilai non-numeric/blank di qty sales
-    df_sales[qty_col_sales] = pd.to_numeric(df_sales[qty_col_sales], errors='coerce').fillna(0)
+    df_sales[sku_col_sales] = df_sales[sku_col_sales].astype(str).str.strip()
+    # Paksa Qty Sales jadi numerik di awal
+    df_sales[qty_col_sales] = pd.to_numeric(df_sales[qty_col_sales], errors='coerce').fillna(0).astype(float)
     
     sales_grouped = df_sales.groupby(sku_col_sales)[qty_col_sales].sum().reset_index()
     sales_grouped.columns = ['SKU', 'SALES 60d']
@@ -600,10 +602,10 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     compiled = pd.merge(sby_grouped, smg_grouped, on='SKU', how='left')
     compiled = pd.merge(compiled, sales_grouped, on='SKU', how='left')
     
-    # Gunakan Int64 (Nullable Integer) agar kebal dari eror NaN bawaan merge
-    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].fillna(0).astype('Int64')
-    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0).astype('Int64')
-    compiled['SALES 60d'] = compiled['SALES 60d'].fillna(0).astype('Int64')
+    # Isi data kosong pasca-merge dengan angka 0 murni
+    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].fillna(0)
+    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0)
+    compiled['SALES 60d'] = compiled['SALES 60d'].fillna(0)
 
     # FILTER LOGIC: Skip jika QTY SBY dan QTY SMG bernilai 0
     compiled = compiled[(compiled['QTY SURABAYA'] != 0) | (compiled['QTY SEMARANG'] != 0)]
@@ -612,9 +614,13 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     final_df = pd.merge(compiled, toc_lookup, on='ITEM NAME', how='left')
     final_df['ToC'] = final_df['ToC'].fillna('-')
 
+    # SEBELUM DI-RETURN, KITA AMANKAN FORMAT AKHIR KE INT TANPA ERROR INT64
+    # Kita bulatkan dulu ke integer terdekat, baru dicasting ke standard integer Python
+    for col in ['QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d']:
+        final_df[col] = np.round(final_df[col]).astype(int)
+
     final_df = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
     return final_df
-
 def render_menu_compare():
     """
     Fungsi Menu UI Premium dengan Layout Horizontal (File Upload di atas, Hasil di bawah).
