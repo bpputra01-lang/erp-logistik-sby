@@ -650,7 +650,6 @@ def render_menu_compare():
     st.markdown("""
         <div class="hero-header">
             <div class="hero-title">🏬STORE LEADER RTO DECISSION</div>
-            <div class="hero-subtitle">Bandingkan stock multi-cabang secara instan menggunakan file upload.</div>
         </div>
     """, unsafe_allow_html=True)
 
