@@ -760,12 +760,6 @@ def render_menu_compare():
                             result_df.to_excel(writer, index=False, sheet_name='HASIL COMPARE')
                         processed_data = output.getvalue()
                         
-                        st.markdown(f"""
-                            <div class="export-container">
-                                <div class="export-title">📊 DATA READY FOR EXPORT ({len(result_df):,} SKUs)</div>
-                            </div>
-                        """, unsafe_allow_html=True)
-                        
                         st.download_button(
                             label="📥 DOWNLOAD HASIL COMPARE (EXCEL)",
                             data=processed_data,
@@ -773,8 +767,6 @@ def render_menu_compare():
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             use_container_width=True
                         )
-                        
-                        st.success(f"🔥 Sukses! Data berhasil dikompilasi secara presisi.")
                         
                     else:
                         st.warning("⚠️ Tidak ada SKU yang lolos filter (Qty Surabaya & Semarang bernilai 0).")
