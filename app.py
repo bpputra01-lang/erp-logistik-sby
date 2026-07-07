@@ -532,95 +532,88 @@ from openpyxl import load_workbook
 import re
 from collections import defaultdict
 
-# ==========================================
-# 1. LOGIC PROSES (LANGSUNG DI SINI)
-# ==========================================
-def process_matching(df):
+
+def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc):
     """
-    Fungsi untuk mencocokan SKU Real + Cabang vs SKU System + Cabang
-    Serta menghitung metrics data.
+    Engine pemrosesan data logistik menggunakan Pandas (Ultra Fast Hashing).
+    Menerima file pointer dari Streamlit dan mengembalikan DataFrame hasil akhir.
+    Sudah difiksasi dari eror 'invalid literal for int() with base 10: NaN'.
     """
-    # Bersihkan & Standarkan Data (Kolom A, D, E, K, M)
-    df['A'] = df.iloc[:, 0].astype(str).str.strip().str.upper()   # Cabang
-    df['D'] = df.iloc[:, 3].astype(str).str.strip().str.upper()   # SKU System
-    df['E'] = df.iloc[:, 4].astype(str).str.strip().str.upper()   # SKU Real
-    df['K'] = pd.to_numeric(df.iloc[:, 10], errors='coerce').fillna(0) # Qty System
-    df['M'] = pd.to_numeric(df.iloc[:, 12], errors='coerce').fillna(0) # Qty Real
-
-    # Bangun Pool System (Grup berdasarkan Cabang & SKU System)
-    system_pool = {}
-    for idx, row in df.iterrows():
-        cabang = row['A']
-        sku_sys = row['D']
-        qty_sys = row['K']
-        
-        if sku_sys and qty_sys > 0:
-            if cabang not in system_pool:
-                system_pool[cabang] = {}
-            if sku_sys not in system_pool[cabang]:
-                system_pool[cabang][sku_sys] = 0
-            system_pool[cabang][sku_sys] += qty_sys
-
-    # Proses Alokasi/Matching dari Data Real
-    matched_details = []
-    total_real_qty = 0
-    total_allocated_qty = 0
-
-    for idx, row in df.iterrows():
-        cabang_real = row['A']
-        sku_real = row['E']
-        qty_real_sisa = row['M']
-        
-        if not sku_real or qty_real_sisa <= 0:
-            continue
-            
-        total_real_qty += qty_real_sisa
-
-        # Cari pasangannya lintas cabang yang punya SKU System tersebut
-        for cabang_sys, skus in system_pool.items():
-            if sku_real in skus and skus[sku_real] > 0:
-                qty_sys_avail = skus[sku_real]
-                
-                # Hitung berapa yang bisa dialokasikan
-                allocated_qty = min(qty_real_sisa, qty_sys_avail)
-                
-                # Kurangi pool system dan sisa real
-                system_pool[cabang_sys][sku_real] -= allocated_qty
-                qty_real_sisa -= allocated_qty
-                total_allocated_qty += allocated_qty
-                
-                matched_details.append({
-                    "SKU": sku_real,
-                    "Cabang Real": cabang_real,
-                    "Cabang System": cabang_sys,
-                    "Qty Match": allocated_qty,
-                    "Status": "MATCH PERFECT" if cabang_real == cabang_sys else "MATCH CROSS-BRANCH"
-                })
-                
-                if qty_real_sisa <= 0:
-                    break # Qty Real baris ini sudah habis terpenuhi
-        
-        # Jika kuota system habis / tidak ketemu pasangannya
-        if qty_real_sisa > 0:
-            matched_details.append({
-                "SKU": sku_real,
-                "Cabang Real": cabang_real,
-                "Cabang System": "TIDAK KETEMU / SYSTEM HABIS",
-                "Qty Match": qty_real_sisa,
-                "Status": "UNMATCHED / NO SYSTEM QTY"
-            })
-
-    # Hitung Sisa System yang Tidak Terserap
-    total_system_left = sum(sum(skus.values()) for skus in system_pool.values())
-
-    metrics = {
-        "total_real": total_real_qty,
-        "total_match": total_allocated_qty,
-        "total_unmatch": total_real_qty - total_allocated_qty,
-        "system_left": total_system_left
-    }
+    # 1. Load Data dengan engine openpyxl secara cepat
+    df_sby = pd.read_excel(file_sby)
+    df_smg = pd.read_excel(file_smg)
+    df_sales = pd.read_excel(file_sales)
+    df_toc = pd.read_excel(file_toc)
     
-    return pd.DataFrame(matched_details), metrics
+    # Standardisasi nama kolom (Menghapus spasi berlebih)
+    for df in [df_sby, df_smg, df_sales, df_toc]:
+        df.columns = df.columns.str.strip()
+
+    # --- SBY PROCESS ---
+    sku_col_sby = df_sby.columns[2]   # Kolom C
+    name_col_sby = df_sby.columns[4]  # Kolom E
+    var_col_sby = df_sby.columns[5]   # Kolom F
+    qty_col_sby = df_sby.columns[9]   # Kolom J
+    
+    df_sby[sku_col_sby] = df_sby[sku_col_sby].astype(str).str.strip()
+    
+    # Pastikan qty sby diisi 0 jika ada yang kosong sebelum di-sum
+    df_sby[qty_col_sby] = pd.to_numeric(df_sby[qty_col_sby], errors='coerce').fillna(0)
+    
+    sby_grouped = df_sby.groupby(sku_col_sby).agg({
+        name_col_sby: 'first',
+        var_col_sby: 'first',
+        qty_col_sby: 'sum'
+    }).reset_index()
+    sby_grouped.columns = ['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA']
+
+    # --- SEMARANG PROCESS ---
+    sku_col_smg = df_smg.columns[2]   # Kolom C
+    qty_col_smg = df_smg.columns[9]   # Kolom J
+    df_smg[sku_col_smg] = df_smg[sku_col_smg].astype(str).str.strip()
+    
+    # Antisipasi nilai non-numeric/blank di qty semarang
+    df_smg[qty_col_smg] = pd.to_numeric(df_smg[qty_col_smg], errors='coerce').fillna(0)
+    
+    smg_grouped = df_smg.groupby(sku_col_smg)[qty_col_smg].sum().reset_index()
+    smg_grouped.columns = ['SKU', 'QTY SEMARANG']
+
+    # --- SALES PROCESS ---
+    sku_col_sales = df_sales.columns[17] # Kolom R
+    qty_col_sales = df_sales.columns[25] # Kolom Z
+    df_sales[sku_col_sales] = df_sales[sku_col_sales].astype(str).str.strip()
+    
+    # Antisipasi nilai non-numeric/blank di qty sales
+    df_sales[qty_col_sales] = pd.to_numeric(df_sales[qty_col_sales], errors='coerce').fillna(0)
+    
+    sales_grouped = df_sales.groupby(sku_col_sales)[qty_col_sales].sum().reset_index()
+    sales_grouped.columns = ['SKU', 'SALES 60d']
+
+    # --- ToC PROCESS ---
+    art_col_toc = df_toc.columns[2] # Kolom C (Article)
+    toc_col_toc = df_toc.columns[7] # Kolom H (ToC)
+    df_toc[art_col_toc] = df_toc[art_col_toc].astype(str).str.strip()
+    toc_lookup = df_toc[[art_col_toc, toc_col_toc]].drop_duplicates(subset=[art_col_toc])
+    toc_lookup.columns = ['ITEM NAME', 'ToC']
+
+    # --- COMPILATION & MERGING ---
+    compiled = pd.merge(sby_grouped, smg_grouped, on='SKU', how='left')
+    compiled = pd.merge(compiled, sales_grouped, on='SKU', how='left')
+    
+    # Gunakan Int64 (Nullable Integer) agar kebal dari eror NaN bawaan merge
+    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].fillna(0).astype('Int64')
+    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0).astype('Int64')
+    compiled['SALES 60d'] = compiled['SALES 60d'].fillna(0).astype('Int64')
+
+    # FILTER LOGIC: Skip jika QTY SBY dan QTY SMG bernilai 0
+    compiled = compiled[(compiled['QTY SURABAYA'] != 0) | (compiled['QTY SEMARANG'] != 0)]
+
+    # Lookup ToC berdasarkan ITEM NAME
+    final_df = pd.merge(compiled, toc_lookup, on='ITEM NAME', how='left')
+    final_df['ToC'] = final_df['ToC'].fillna('-')
+
+    final_df = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
+    return final_df
 
 def render_menu_compare():
     """
