@@ -649,7 +649,7 @@ def render_menu_compare():
     # Render Hero Header
     st.markdown("""
         <div class="hero-header">
-            <div class="hero-title">☣️ STOCK COMPARE INTEGRATOR SYSTEM</div>
+            <div class="hero-title">🏬STORE LEADER RTO DECISSION</div>
             <div class="hero-subtitle">Bandingkan stock multi-cabang secara instan menggunakan file upload.</div>
         </div>
     """, unsafe_allow_html=True)
