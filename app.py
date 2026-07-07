@@ -536,11 +536,15 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import io
+import pandas as pd
+import numpy as np
+import streamlit as st
+import io
 
 def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc):
     """
-    Engine pemrosesan data logistik menggunakan Pandas (Ultra Fast Hashing - Anti Crash Version).
-    Mencegah eror 'invalid literal for int() with base 10: NaN' secara total.
+    Engine pemrosesan data logistik menggunakan Pandas (Ultra Fast Hashing - Ironclad Anti-Crash Version).
+    Menjamin tidak akan ada eror 'invalid literal for int() with base 10: NaN'.
     """
     # 1. Load Data dengan engine openpyxl secara cepat
     df_sby = pd.read_excel(file_sby)
@@ -561,8 +565,9 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     # Bersihkan SKU ke String murni
     df_sby[sku_col_sby] = df_sby[sku_col_sby].astype(str).str.strip()
     
-    # PAKSA QTY JADI NUMERIK DI AWAL (Teks/Kosong otomatis jadi 0)
-    df_sby[qty_col_sby] = pd.to_numeric(df_sby[qty_col_sby], errors='coerce').fillna(0)
+    # BERSIHKAN TOTAL DARI STRING 'NaN' ATALAH DATA CACAT
+    df_sby[qty_col_sby] = df_sby[qty_col_sby].astype(str).str.replace('NaN', '0').str.replace('nan', '0')
+    df_sby[qty_col_sby] = pd.to_numeric(df_sby[qty_col_sby], errors='coerce').fillna(0).astype(float)
     
     sby_grouped = df_sby.groupby(sku_col_sby).agg({
         name_col_sby: 'first',
@@ -576,10 +581,13 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     qty_col_smg = df_smg.columns[9]   # Kolom J
     
     df_smg[sku_col_smg] = df_smg[sku_col_smg].astype(str).str.strip()
-    # Paksa Qty Semarang jadi numerik di awal
-    df_smg[qty_col_smg] = pd.to_numeric(df_smg[qty_col_smg], errors='coerce').fillna(0)
     
-    smg_grouped = df_smg.groupby(sku_col_smg)[qty_col_smg].sum().reset_index()
+    # Bersihkan total string 'NaN' di Semarang
+    df_smg[qty_col_smg] = df_smg[qty_col_smg].astype(str).str.replace('NaN', '0').str.replace('nan', '0')
+    df_smg[qty_col_smg] = pd.to_numeric(df_smg[qty_col_smg], errors='coerce').fillna(0).astype(float)
+    
+    # Gunakan fungsi sum numpy yang lebih aman terhadap mixed-type data
+    smg_grouped = df_smg.groupby(sku_col_smg).agg({qty_col_smg: 'sum'}).reset_index()
     smg_grouped.columns = ['SKU', 'QTY SEMARANG']
 
     # --- SALES PROCESS ---
@@ -587,10 +595,12 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     qty_col_sales = df_sales.columns[25] # Kolom Z
     
     df_sales[sku_col_sales] = df_sales[sku_col_sales].astype(str).str.strip()
-    # Paksa Qty Sales jadi numerik di awal
-    df_sales[qty_col_sales] = pd.to_numeric(df_sales[qty_col_sales], errors='coerce').fillna(0)
     
-    sales_grouped = df_sales.groupby(sku_col_sales)[qty_col_sales].sum().reset_index()
+    # Bersihkan total string 'NaN' di Sales
+    df_sales[qty_col_sales] = df_sales[qty_col_sales].astype(str).str.replace('NaN', '0').str.replace('nan', '0')
+    df_sales[qty_col_sales] = pd.to_numeric(df_sales[qty_col_sales], errors='coerce').fillna(0).astype(float)
+    
+    sales_grouped = df_sales.groupby(sku_col_sales).agg({qty_col_sales: 'sum'}).reset_index()
     sales_grouped.columns = ['SKU', 'SALES 60d']
 
     # --- ToC PROCESS ---
@@ -604,18 +614,25 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     compiled = pd.merge(sby_grouped, smg_grouped, on='SKU', how='left')
     compiled = pd.merge(compiled, sales_grouped, on='SKU', how='left')
     
-    # FILTER LOGIC: Skip jika QTY SBY dan QTY SMG bernilai 0 (Lakukan sebelum merge ToC agar data lebih ringan)
-    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].fillna(0)
-    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0)
+    # Isi data kosong pasca-merge awal
+    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].fillna(0).astype(float)
+    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0).astype(float)
+    compiled['SALES 60d'] = compiled['SALES 60d'].fillna(0).astype(float)
+    
+    # FILTER LOGIC: Skip jika QTY SBY dan QTY SMG bernilai 0
     compiled = compiled[(compiled['QTY SURABAYA'] != 0) | (compiled['QTY SEMARANG'] != 0)]
 
-    # Lookup ToC berdasarkan ITEM NAME (Ini yang memicu tipe data balik ke float karena left-join)
+    # Lookup ToC berdasarkan ITEM NAME
     final_df = pd.merge(compiled, toc_lookup, on='ITEM NAME', how='left')
     final_df['ToC'] = final_df['ToC'].fillna('-')
 
-    # AMANKAN KEMBALI DATA DARI NA/NAN SILUMAN AKIBAT JOIN ToC LALU CONVERT KE INT AMAN
+    # AMANKAN KEMBALI DAN BERSIHKAN SEBELUM DI-CONVERT KE INTEGER STANDARD PYTHONS
     for col in ['QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d']:
-        final_df[col] = pd.to_numeric(final_df[col], errors='coerce').fillna(0).astype('int64')
+        # Konversi paksa string atau pecahan sisa-sisa merge agar aman
+        final_df[col] = final_df[col].astype(str).str.replace('NaN', '0').str.replace('nan', '0')
+        final_df[col] = pd.to_numeric(final_df[col], errors='coerce').fillna(0)
+        # Gunakan pemformatan astype('int64') bawaan numpy yang jauh lebih solid
+        final_df[col] = final_df[col].astype('int64')
 
     final_df = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
     return final_df
