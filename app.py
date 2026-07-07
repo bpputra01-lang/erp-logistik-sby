@@ -11044,7 +11044,7 @@ if menu == "Logistic Schedule":
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
-elif menu == "Store Leader RTO Decission"
+elif menu == "Store Leader RTO Decission":
     render_menu_compare()
 
 elif menu == "Match Real & System":
