@@ -6105,17 +6105,18 @@ def process_justification(df_case, df_tracking, df_all_stock):
 
     final_cols = [col for col in ordered_headers if col in res.columns]
     return res[final_cols]
+
+
 import pandas as pd
 import numpy as np
+import streamlit as streamlit as st # Pastikan streamlit di-import jika dalam satu file
 
 def load_data(file):
-    # 1. Pengaman jika file ternyata None (tidak di-upload)
     if file is None:
         return pd.DataFrame()
         
     try:
         if file.name.endswith('.csv'):
-            # Baca file sekali saja dengan aman
             df_temp = pd.read_csv(file)
             if df_temp.empty:
                 return pd.DataFrame()
@@ -6124,10 +6125,8 @@ def load_data(file):
             return pd.read_excel(file)
             
     except pd.errors.EmptyDataError:
-        # Menangani jika file CSV bener-bener kosong tanpa baris/kolom sama sekali
         return pd.DataFrame()
     except ValueError as e:
-        # Menangani error "No columns to parse from file" agar dibalikkan jadi DataFrame kosong
         if "No columns to parse" in str(e):
             return pd.DataFrame()
         raise e
@@ -6140,17 +6139,16 @@ def prepare_sku_totals(df):
     if df_clean.shape[1] < 10:
         raise ValueError(f"File System kurang dari 10 kolom (Kolom J tidak ada).")
     
-    # Ambil Kolom C (index 2) untuk SKU dan Kolom J (index 9) untuk QTY
     df_mapped = pd.DataFrame({
         'SKU': df_clean.iloc[:, 2].astype(str).str.strip().str.upper(),
         'QTY': pd.to_numeric(df_clean.iloc[:, 9], errors='coerce').fillna(0)
     })
     
-    # AGREGASI TOTAL QTY PER SKU (Abaikan BIN di Kolom B)
     df_grouped = df_mapped.groupby('SKU', as_index=False)['QTY'].sum()
     return df_grouped
 
-def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, file_rto_in=None, file_rto_out=None):
+# --- UPDATE: Menambahkan parameter file_refund ---
+def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, file_rto_in=None, file_rto_out=None, file_refund=None):
     try:
         df1 = load_data(file1)
         df2 = load_data(file2)
@@ -6190,11 +6188,11 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         df_rto_out_clean = pd.DataFrame(columns=['NO_TF', 'SKU', 'QTY'])
         if file_rto_out is not None and not discrepancies.empty:
             df_rto_out_df = load_data(file_rto_out)
-            if not df_rto_out_df.empty and df_rto_out_df.shape[1] >= 8: # Minimal sampai kolom H (8 kolom)
+            if not df_rto_out_df.empty and df_rto_out_df.shape[1] >= 8:
                 df_rto_out_clean = pd.DataFrame({
-                    'NO_TF': df_rto_out_df.iloc[:, 0].astype(str).str.strip(),          # Kolom A (Indeks 0)
-                    'SKU': df_rto_out_df.iloc[:, 3].astype(str).str.strip().str.upper(), # Kolom D (Indeks 3)
-                    'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 7], errors='coerce').fillna(0) # Kolom H (Indeks 7)
+                    'NO_TF': df_rto_out_df.iloc[:, 0].astype(str).str.strip(),
+                    'SKU': df_rto_out_df.iloc[:, 3].astype(str).str.strip().str.upper(),
+                    'QTY': pd.to_numeric(df_rto_out_df.iloc[:, 7], errors='coerce').fillna(0)
                 })
 
         # --- 2. BACA DATA PENDUKUNG (MASUK) ---
@@ -6211,11 +6209,21 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         df_rto_in_clean = pd.DataFrame(columns=['NO_TF', 'SKU', 'QTY'])
         if file_rto_in is not None and not discrepancies.empty:
             df_rto_in_df = load_data(file_rto_in)
-            if not df_rto_in_df.empty and df_rto_in_df.shape[1] >= 8: # Minimal sampai kolom H (8 kolom)
+            if not df_rto_in_df.empty and df_rto_in_df.shape[1] >= 8:
                 df_rto_in_clean = pd.DataFrame({
-                    'NO_TF': df_rto_in_df.iloc[:, 0].astype(str).str.strip(),          # Kolom A (Indeks 0)
-                    'SKU': df_rto_in_df.iloc[:, 3].astype(str).str.strip().str.upper(), # Kolom D (Indeks 3)
-                    'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 7], errors='coerce').fillna(0) # Kolom H (Indeks 7)
+                    'NO_TF': df_rto_in_df.iloc[:, 0].astype(str).str.strip(),
+                    'SKU': df_rto_in_df.iloc[:, 3].astype(str).str.strip().str.upper(),
+                    'QTY': pd.to_numeric(df_rto_in_df.iloc[:, 7], errors='coerce').fillna(0)
+                })
+
+        # --- UPDATE: BACA DATA MUTASI REFUND ---
+        df_refund_clean = pd.DataFrame(columns=['SKU', 'QTY'])
+        if file_refund is not None and not discrepancies.empty:
+            df_refund_df = load_data(file_refund)
+            if not df_refund_df.empty and df_refund_df.shape[1] >= 11: # Kolom K adalah indeks 10
+                df_refund_clean = pd.DataFrame({
+                    'SKU': df_refund_df.iloc[:, 3].astype(str).str.strip().str.upper(),  # Kolom D (Indeks 3)
+                    'QTY': pd.to_numeric(df_refund_df.iloc[:, 10], errors='coerce').fillna(0) # Kolom K (Indeks 10)
                 })
             
         status_list = []
@@ -6245,6 +6253,13 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
                     if not match_rto_in.empty:
                         docs_found.append(f"RTO_IN:{'/'.join(map(str, match_rto_in['NO_TF'].unique()))}")
                         accumulated_qty += match_rto_in['QTY'].sum()
+
+                # --- UPDATE: Pengecekan Mutasi Refund ---
+                if not df_refund_clean.empty:
+                    match_refund = df_refund_clean[df_refund_clean['SKU'] == target_sku]
+                    if not match_refund.empty:
+                        docs_found.append(f"REFUND:Found")
+                        accumulated_qty += match_refund['QTY'].sum()
                 
                 if accumulated_qty == 0:
                     final_status = "PENAMBAHAN STOK (NO HISTORY)"
@@ -9595,6 +9610,7 @@ elif menu == "Compare System":
         **Kondisi Stok Bertambah (Sys2 > Sys1):**
         1. **Purchase Order**: Kolom A=No PO, Kolom D=SKU, Kolom L=Qty (Index 11).
         2. **RTO In**: Kolom D=No TF, Kolom I=SKU, Kolom K=Qty (Index 10).
+        3. **Mutasi Refund**: Kolom D=SKU (Index 3), Kolom K=Qty (Index 10).
         """)
 
     if 'result_all' not in st.session_state:
@@ -9620,18 +9636,21 @@ elif menu == "Compare System":
 
     # --- BARIS 3: DOKUMEN PENDUKUNG MASUK ---
     st.markdown("### 📥 3. Upload Dokumen Pendukung (Stok Bertambah)")
-    in1, in2 = st.columns(2)
+    # UPDATE: Mengubah kolom menjadi 3 untuk menampung uploader Refund
+    in1, in2, in3 = st.columns(3)
     with in1:
         file_po = st.file_uploader("Upload Purchase Order (PO)", type=['xlsx', 'csv'], key='uploader_po')
     with in2:
         file_rto_in = st.file_uploader("Upload RTO IN", type=['xlsx', 'csv'], key='uploader_rto_in')
+    with in3:
+        file_refund = st.file_uploader("Upload Mutasi REFUND", type=['xlsx', 'csv'], key='uploader_refund')
 
     if file_sys1 and file_sys2:
         if st.button("▶️RUN COMPARE"):
             try:
-                # Memanggil fungsi baru dengan parameter yang sudah bersih tanpa Cross Order
+                # UPDATE: Menambahkan parameter file_refund ke fungsi pemanggil
                 res_all, d_only = process_stock_comparison(
-                    file_sys1, file_sys2, file_tracking, file_po, file_rto_in, file_rto_out
+                    file_sys1, file_sys2, file_tracking, file_po, file_rto_in, file_rto_out, file_refund
                 )
                 st.session_state.result_all = res_all
                 st.session_state.diff_only = d_only
@@ -9650,17 +9669,9 @@ elif menu == "Compare System":
         total_diff = len(diff_only)
         
         if not diff_only.empty and 'STATUS_CHECK' in diff_only.columns:
-            # 1. Menghitung semua yang berstatus DONE
             match_count = len(diff_only[diff_only['STATUS_CHECK'].isin(["DONE MASUK", "DONE TERJUAL"])])
-            
-            # 2. Menghitung semua yang berstatus MISSMATCH (Sesuai output fungsi backend)
             unmatch_count = len(diff_only[diff_only['STATUS_CHECK'].isin(["MASUK QTY MISSMATCH", "KELUAR QTY MISSMATCH"])])
-            
-            # 3. Menghitung sisanya yang tidak ada dokumen/riwayat tracking
             no_sales_count = len(diff_only[diff_only['STATUS_CHECK'].isin(["PENAMBAHAN STOK (NO HISTORY)", "NO SALES (PERLU CEK ADJ)"])])
-            
-            # 🚨 SAFETY NET (OPSIONAL): Jika ada status lain yang belum tercover, 
-            # lu bisa masukkan ke no_sales_count atau buat handling tambahan agar totalnya selalu pas.
         else:
             match_count, unmatch_count, no_sales_count = 0, 0, 0
             
