@@ -547,7 +547,7 @@ import streamlit as st
 import io
 
 # ==============================================================================
-# BACKEND ENGINE (SUDAH 100% SELARAS DENGAN MACRO VBA & ANTI-CRASH)
+# LOGIC PROSES MENU "STORE LEADER RTO DECISSION"
 # ==============================================================================
 def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc):
     """
@@ -650,7 +650,9 @@ def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_t
     final_df = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
     return final_df
 
-
+# ==============================================================================
+# INTERFACE PROSES MENU "STORE LEADER RTO DECISSION"
+# ==============================================================================
 def render_menu_compare():
     """
     Fungsi Menu UI Premium dengan Layout Horizontal.
@@ -775,6 +777,12 @@ def render_menu_compare():
                     st.error(f"Terjadi kesalahan pemrosesan: {str(e)}")
     else:
         st.info("💡 Menunggu berkas diunggah pada panel di atas. Silakan upload file lalu klik 'INTEGRATE & COMPARE DATA'.")
+
+
+
+# ==============================================================================
+# LOGIC PROCESS & INTERFACE MENU "MATCH REAL & SYSTEM"
+# ==============================================================================
 def menu_matching_karantina():
     st.markdown("""
         <style>
@@ -1032,9 +1040,12 @@ def menu_matching_karantina():
         # Bersihkan status penanda jika file dilepas/di-reset
         st.session_state['process_triggered'] = False
         st.info("Silakan upload kedua file (Data System + Data Real) di atas untuk memproses pencocokan stok.")
-# =========================================================
-# 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
-# =========================================================
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "CYCLE COUNT"
+# ==============================================================================
 
 def get_yellow_skus(file, column_index):
     yellow_set = set()
@@ -1432,10 +1443,9 @@ def logic_miss_location_report(df_setup_real):
 
 
 
-# =========================================================
-# 2. MENU UTAMA & STATE MANAGEMENT
-# =========================================================
-
+# ==============================================================================
+# INTERFACE MENU "CYCLE COUNT"
+# ==============================================================================
 def menu_cycle_count():
     st.markdown("""
         <style>
@@ -1976,105 +1986,11 @@ def menu_cycle_count():
 
     st.markdown("<br><hr>", unsafe_allow_html=True)
 
-# Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
-import pandas as pd
-import numpy as np
-import math
 
 
-import pandas as pd
-import streamlit as st
-import io
-import openpyxl
-from openpyxl import load_workbook
-
-import streamlit as st
-import pandas as pd
-import io
-from openpyxl import load_workbook
-import re
-from collections import defaultdict
-
-
-import pandas as pd
-import streamlit as st
-import io
-from openpyxl import load_workbook
-from collections import defaultdict
-
-import pandas as pd
-import numpy as np
-
-def execute_ultra_fast_logistics_matching(file_sby, file_smg, file_sales, file_toc):
-    """
-    Engine pemrosesan data logistik menggunakan Pandas (Ultra Fast Hashing).
-    Menerima file pointer dari Streamlit dan mengembalikan DataFrame hasil akhir.
-    """
-    # 1. Load Data dengan engine openpyxl secara cepat
-    df_sby = pd.read_excel(file_sby)
-    df_smg = pd.read_excel(file_smg)
-    df_sales = pd.read_excel(file_sales)
-    df_toc = pd.read_excel(file_toc)
-    
-    # Standardisasi nama kolom (Menghapus spasi berlebih)
-    for df in [df_sby, df_smg, df_sales, df_toc]:
-        df.columns = df.columns.str.strip()
-
-    # --- SBY PROCESS ---
-    sku_col_sby = df_sby.columns[2]   # Kolom C
-    name_col_sby = df_sby.columns[4]  # Kolom E
-    var_col_sby = df_sby.columns[5]   # Kolom F
-    qty_col_sby = df_sby.columns[9]   # Kolom J
-    
-    df_sby[sku_col_sby] = df_sby[sku_col_sby].astype(str).str.strip()
-    sby_grouped = df_sby.groupby(sku_col_sby).agg({
-        name_col_sby: 'first',
-        var_col_sby: 'first',
-        qty_col_sby: 'sum'
-    }).reset_index()
-    sby_grouped.columns = ['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA']
-
-    # --- SEMARANG PROCESS ---
-    sku_col_smg = df_smg.columns[2]   # Kolom C
-    qty_col_smg = df_smg.columns[9]   # Kolom J
-    df_smg[sku_col_smg] = df_smg[sku_col_smg].astype(str).str.strip()
-    smg_grouped = df_smg.groupby(sku_col_smg)[qty_col_smg].sum().reset_index()
-    smg_grouped.columns = ['SKU', 'QTY SEMARANG']
-
-    # --- SALES PROCESS ---
-    sku_col_sales = df_sales.columns[17] # Kolom R
-    qty_col_sales = df_sales.columns[25] # Kolom Z
-    df_sales[sku_col_sales] = df_sales[sku_col_sales].astype(str).str.strip()
-    sales_grouped = df_sales.groupby(sku_col_sales)[qty_col_sales].sum().reset_index()
-    sales_grouped.columns = ['SKU', 'SALES 60d']
-
-    # --- ToC PROCESS ---
-    art_col_toc = df_toc.columns[2] # Kolom C (Article)
-    toc_col_toc = df_toc.columns[7] # Kolom H (ToC)
-    df_toc[art_col_toc] = df_toc[art_col_toc].astype(str).str.strip()
-    toc_lookup = df_toc[[art_col_toc, toc_col_toc]].drop_duplicates(subset=[art_col_toc])
-    toc_lookup.columns = ['ITEM NAME', 'ToC']
-
-    # --- COMPILATION & MERGING ---
-    compiled = pd.merge(sby_grouped, smg_grouped, on='SKU', how='left')
-    compiled = pd.merge(compiled, sales_grouped, on='SKU', how='left')
-    
-    compiled['QTY SEMARANG'] = compiled['QTY SEMARANG'].fillna(0).astype(int)
-    compiled['SALES 60d'] = compiled['SALES 60d'].fillna(0).astype(int)
-    compiled['QTY SURABAYA'] = compiled['QTY SURABAYA'].astype(int)
-
-    # FILTER LOGIC: Skip jika QTY SBY dan QTY SMG bernilai 0
-    compiled = compiled[(compiled['QTY SURABAYA'] != 0) | (compiled['QTY SEMARANG'] != 0)]
-
-    # Lookup ToC berdasarkan ITEM NAME
-    final_df = pd.merge(compiled, toc_lookup, on='ITEM NAME', how='left')
-    final_df['ToC'] = final_df['ToC'].fillna('-')
-
-    final_df = final_df[['SKU', 'ITEM NAME', 'VARIANT', 'QTY SURABAYA', 'QTY SEMARANG', 'SALES 60d', 'ToC']]
-    return final_df
-# =========================================================
-# 1. FUNGSI PENDUKUNG & LOGIC (UTUH TANPA DIPOTONG)
-# =========================================================
+# ==============================================================================
+# LOGIC PROSES MENU "STOCK OPNAME"
+# ==============================================================================
 
 def get_yellow_skus(file, column_index):
     yellow_set = set()
@@ -2702,9 +2618,12 @@ def logic_sum_adjustment_final(df_plus_current, df_minus_current, up_plus=None, 
     })
 
     return df_final, df_sum
-# =========================================================
-# 2. MENU UTAMA & STATE MANAGEMENT
-# =========================================================
+
+
+
+# ==============================================================================
+# INTERFACE MENU "STOCK OPNAME"
+# ==============================================================================
 
 def menu_Stock_Opname():
     st.markdown("""
@@ -3459,9 +3378,9 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# ==========================================
-# 🎨 1. CORE STYLE & CSS (PREMIUM DARK)
-# ==========================================
+# ==============================================================================
+# LOGIC PROSES MENU "STOCK TRACKING TIMELINE"
+# ==============================================================================
 st.markdown("""
     <style>
     .reportview-container { background: #0e1117; }
@@ -3673,9 +3592,9 @@ def process_master_timeline(selected_sku, df_po, df_mutasi, df_adj, df_track, df
     return pd.DataFrame()
 
 
-# ==========================================
-# 🖥️ 3. FUNGSI MENU & UI RENDERING
-# ==========================================
+# ==============================================================================
+# INTERFACE MENU "STOCK TRACKING TIMELINE"
+# ==============================================================================
 
 def render_chart_ui(df_timeline):
     """Fungsi UI untuk merender grafik garis Plotly"""
