@@ -8093,6 +8093,12 @@ def tampilan_balancing_stock():
     finally:
         conn.close()
 
+
+
+# ==============================================================================
+# LOGIC PROSES & MENU "PRECENTAGE DISPLAY"
+# ==============================================================================
+
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -8400,91 +8406,13 @@ def tampilan_display_control():
     except Exception as e:
         st.error(f"Error pada sistem analisis: {e}")
 
-def process_picking_audit(file1, file2, file_tracking=None):
-    try:
-        # Load data utama
-        df1 = load_data(file1)
-        df2 = load_data(file2)
 
-        data1 = prepare_columns(df1)
-        data2 = prepare_columns(df2)
 
-        # 1. Gabungkan data System 1 & System 2
-        comparison = pd.merge(
-            data1, 
-            data2, 
-            on=['BIN', 'SKU'], 
-            how='outer', 
-            suffixes=('_Sys1', '_Sys2')
-        ).fillna(0)
 
-        comparison['DIFF'] = comparison['QTY_Sys1'] - comparison['QTY_Sys2']
-        discrepancies = comparison[comparison['DIFF'] != 0].copy()
 
-        # 2. Jika ada file tracking, lakukan investigasi selisih
-        if file_tracking is not None and not discrepancies.empty:
-            df_track = pd.read_excel(file_tracking) 
-            
-            # AMANKAN DISINI: Paksa astype(str) sebelum di-upper
-            df_track_clean = pd.DataFrame({
-                'INVOICE': df_track.iloc[:, 0].astype(str),
-                'SKU': df_track.iloc[:, 1].astype(str).str.strip().str.upper(),
-                'BIN': df_track.iloc[:, 6].astype(str).str.strip().str.upper(),
-                'QTY_TRACK': pd.to_numeric(df_track.iloc[:, 10], errors='coerce').fillna(0)
-            })
-
-            resolved_list = []
-            
-            for idx, row in discrepancies.iterrows():
-                # Pastikan data pembanding juga dipaksa jadi string & upper
-                sku_val = str(row['SKU']).strip().upper()
-                bin_sys = str(row['BIN']).strip().upper()
-                diff_val = abs(float(row['DIFF']))
-                
-                # Filter tracking berdasarkan SKU
-                match_sku = df_track_clean[df_track_clean['SKU'] == sku_val]
-                
-                if not match_sku.empty:
-                    # 1. Kumpulkan semua Invoice unik
-                    all_inv = ", ".join(match_sku['INVOICE'].unique())
-                    
-                    # 2. Cek apakah ada baris yang BIN-nya cocok
-                    match_bin = match_sku[match_sku['BIN'] == bin_sys]
-                    
-                    # 3. TOTAL QTY di tracking untuk SKU tersebut
-                    total_qty_track = abs(match_sku['QTY_TRACK'].sum())
-                    
-                    bin_exists = not match_bin.empty
-                    qty_matches = (total_qty_track == diff_val)
-                    
-                    if bin_exists and qty_matches:
-                        status = "Terjual (Match)"
-                    elif bin_exists and not qty_matches:
-                        status = f"Terjual tapi qty masih selisih (Track Total: {total_qty_track})"
-                    elif not bin_exists and qty_matches:
-                        status = "Terjual tapi BIN masih selisih"
-                    else:
-                        status = "Terjual tapi BIN & QTY tidak sesuai"
-                    
-                    inv_display = all_inv
-                else:
-                    inv_display = "-"
-                    status = "Tidak ditemukan di Tracking"
-                
-                resolved_list.append({'INVOICE': inv_display, 'KETERANGAN': status})
-            
-            res_df = pd.DataFrame(resolved_list)
-            discrepancies['INVOICE'] = res_df['INVOICE'].values
-            discrepancies['KETERANGAN'] = res_df['KETERANGAN'].values
-        
-        elif file_tracking is None and not discrepancies.empty:
-            discrepancies['INVOICE'] = "-"
-            discrepancies['KETERANGAN'] = "File Tracking tidak diupload"
-
-        return comparison, discrepancies
-
-    except Exception as e:
-        raise Exception(f"Gagal memproses data: {str(e)}")
+# ==============================================================================
+# LOGIC PROSES & MENU "DATABASE ONGKIR IN/OUT"
+# ==============================================================================
 
 import streamlit as st
 from supabase import create_client, Client
@@ -8833,6 +8761,12 @@ def show_database_ongkir():
         else:
             st.info("Data masih kosong.")
 
+
+
+
+# ==============================================================================
+# LOGIC PROSES & MENU "DATA TIMBANG ONGKIR"
+# ==============================================================================
 import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime, timezone, timedelta
@@ -9441,7 +9375,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     if is_dc:
-        m3_list = ["Stock Opname","Match Real & System","Cycle Count", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Picking Audit"]
+        m3_list = ["Stock Opname","Match Real & System","Cycle Count", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina"]
     else:
         m3_list = ["Stock Minus","Cycle Count"] # Menu Cabang
 
@@ -9498,6 +9432,12 @@ import io
 if 'putaway_results' not in st.session_state:
     st.session_state['putaway_results'] = None
 
+
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "PUTAWAY SYSTEM"
+# ==============================================================================
 # --- UI APP ---
 if menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
@@ -9620,6 +9560,11 @@ if menu == "Putaway System":
             file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "COMPARE SYSTEM"
+# ==============================================================================
 elif menu == "Compare System":
     st.markdown('<div class="hero-header"><h1>STOCK COMPARATION</h1></div>', unsafe_allow_html=True)
     with st.expander("📋 Informasi Format File & Kolom Mapping"):
@@ -9732,6 +9677,11 @@ elif menu == "Compare System":
         else:
             st.success("✅ Tidak ada perbedaan stok! Semua data match.")
 
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "SCAN OUT VALIDATION"
+# ==============================================================================
 elif menu == "Scan Out Validation":
     st.markdown('<div class="hero-header"><h1> COMPARE AND ANALYZE ITEM SCAN OUT</h1></div>', unsafe_allow_html=True)
     
@@ -9892,7 +9842,11 @@ elif menu == "Scan Out Validation":
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-                
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "REFILL & OVERSTOCK"
+# ==============================================================================
 elif menu == "Refill & Overstock":
     st.markdown('<div class="hero-header"><h1>REFILL & OVERSTOCK SYSTEM</h1></div>', unsafe_allow_html=True)
     
@@ -9987,6 +9941,10 @@ elif menu == "Refill & Overstock":
                     
             except Exception as e: 
                 st.error(f"Terjadi kesalahan saat memproses data: {e}")
+
+                
+
+
 elif menu == "Database Master":
     # Link Google Sheets lo yang sudah dikunci
     SHEET_URL = "https://docs.google.com/spreadsheets/d/1tuGnu7jKvRkw9MmF92U-5pOoXjUOeTMoL3EvrOzcrQY/edit?usp=sharing"
@@ -10034,6 +9992,11 @@ elif menu == "Database Master":
         st.error(f"⚠️ Gagal terhubung ke Google Sheets. Pastikan aksesnya sudah 'Anyone with the link'. Error: {e}")
 
 
+
+
+# ==============================================================================
+# LOGIC PROCESS & INTERFACE MENU "STOCK MINUS"
+# ==============================================================================
 elif menu == "Stock Minus":
     st.markdown('<div class="hero-header"><h1>STOCK MINUS CLEARANCE</h1></div>', unsafe_allow_html=True)
     
@@ -10191,6 +10154,11 @@ elif menu == "Stock Minus":
         except Exception as e:
             st.error(f"Gagal: {e}")
 
+
+  
+# ==============================================================================
+# LOGIC INTERFACE MENU "COMPARE RTO"
+# ==============================================================================
 if menu == "Compare RTO":
     st.markdown('<div class="hero-header"><h1>RTO GATEWAY SYSTEM</h1></div>', unsafe_allow_html=True)
     st.markdown("""<style>.m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; }.m-lbl { display: block; font-size: 14px; color: #555; font-weight: bold; }.m-val { display: block; font-size: 24px; color: #ff4b4b; font-weight: bold; }</style>""", unsafe_allow_html=True)
@@ -10389,11 +10357,10 @@ if menu == "Compare RTO":
                 csv_new = new_draft.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Download New Draft", csv_new, "NEW_DRAFT_RTO.csv", "text/csv", use_container_width=True)
 
-## MENU: FDR UPDATE (YANG DIPERBAIKI & LENGKAP)
-# =====================================================
-# =========================================================
-# 3. MENU: FDR UPDATE (DENGAN TOMBOL RUN)
-# =========================================================
+
+# ==============================================================================
+# LOGIC PROCESS & INTERFACE MENU "FDR UPDATE"
+# ==============================================================================
 elif menu == "FDR Update":
     # --- CSS & HEADER ---
     st.markdown('<div class="hero-header"><h1>FDR UPDATE - MANIFEST CHECKER</h1></div>', unsafe_allow_html=True)
@@ -10552,9 +10519,12 @@ elif menu == "FDR Update":
                     st.download_button(f"📥 {opt}", st.session_state.dict_kurir_fdr[opt].to_csv(index=False).encode('utf-8'), f"{opt}.csv", "text/csv")
                     st.dataframe(st.session_state.dict_kurir_fdr[opt], use_container_width=True, hide_index=True)
 
-# ==========================================
-# STREAMLIT UI INTERFACE
-# ==========================================
+
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "JUSTIFICATION SO"
+# ==============================================================================
 elif menu == "Justification SO":
     st.markdown('<div class="hero-header"><h1>JUSTIFICATION ADJUSTMENT</h1></div>', unsafe_allow_html=True)
     
@@ -10705,6 +10675,13 @@ elif menu == "Justification SO":
             key="btn_download_so"
         )
 
+
+
+
+
+# ==============================================================================
+# LOGIC PROCESS & INTERFACE MENU "LOGISTIC SCHEDULE"
+# ==============================================================================
 import pandas as pd
 import random
 from datetime import datetime, timedelta
@@ -11178,6 +11155,13 @@ elif menu == "Cycle Count":
 elif menu == "Precentage Display":
     tampilan_display_control()
 
+
+
+
+# ==============================================================================
+# LOGIC PROCESS & INTERFACE MENU "REPORTING & PIC"
+# ==============================================================================
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -11490,74 +11474,12 @@ if menu == "Reporting & PIC":
                     st.session_state.todo_page = curr_p + 1
                     st.rerun()
 
-elif menu == "Picking Audit":
-    st.markdown('<div class="hero-header"><h1>PICKING AUDIT</h1></div>', unsafe_allow_html=True)
-    
-    with st.expander("📋 Informasi Format File"):
-        st.info("""
-        - **STOCK SYSTEM 1**: Data Awal Shift 0 (07.:30)
-        - **STOCK SYSTEM 2**: Data End Shift 2 (21:30 - 22.00)
-        - **STOCK TRACKING**: Download Stock Tracking **(TODAY)**, Pilih Statusnya **DONE**
-        """)
 
-    # --- 1. INISIALISASI (Taruh di paling atas menu) ---
-    if 'audit_results' not in st.session_state:
-        st.session_state.audit_results = None
-    if 'audit_diff' not in st.session_state:
-        st.session_state.audit_diff = None
 
-    # --- 2. LAYOUT UPLOADER ---
-    u1, u2, u3 = st.columns(3)
-    with u1:
-        file_sys1 = st.file_uploader("Upload Stock System 1", type=['xlsx', 'csv'])
-    with u2:
-        file_sys2 = st.file_uploader("Upload Stock System 2", type=['xlsx', 'csv'])
-    with u3:
-        file_tracking = st.file_uploader("Upload Stock Tracking", type=['xlsx', 'csv'])
 
-    # --- 3. PROSES DATA (Hanya untuk simpan ke memory) ---
-    if file_sys1 and file_sys2:
-        if st.button("▶️ RUN COMPARE"):
-            try:
-                # Simpan hasil ke session_state agar tidak hilang
-                all_data, diff_data = process_picking_audit(file_sys1, file_sys2, file_tracking)
-                st.session_state.audit_results = all_data
-                st.session_state.audit_diff = diff_data
-            except Exception as e:
-                st.error(f"Terjadi Kesalahan: {e}")
-
-    # --- 4. TAMPILKAN HASIL (DI LUAR BLOK BUTTON) ---
-    # Ini kuncinya! Selama session_state ada isinya, data bakal tetap muncul di layar
-    if st.session_state.audit_results is not None:
-        result_all = st.session_state.audit_results
-        diff_only = st.session_state.audit_diff
-
-        st.divider()
-
-        # Summary Metrics
-        m1, m2, m3 = st.columns(3)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">📦 TOTAL ITEM</span><span class="m-val">{len(result_all)}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">⚠️ SELISIH</span><span class="m-val">{len(diff_only)}</span></div>', unsafe_allow_html=True)
-        
-        if 'KETERANGAN' in diff_only.columns:
-            sold_count = len(diff_only[diff_only['KETERANGAN'].str.contains("Terjual", na=False)])
-            m3.markdown(f'<div class="m-box"><span class="m-lbl">📑 ITEM TERJUAL</span><span class="m-val">{sold_count}</span></div>', unsafe_allow_html=True)
-
-        if not diff_only.empty:
-            st.warning("Hasil Analisis Perbedaan Stok:")
-            st.dataframe(diff_only, use_container_width=True)
-            
-            # Button download ditaruh di sini
-            csv = diff_only.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Report Selisih",
-                data=csv,
-                file_name='hasil_Pick_stok.csv',
-                mime='text/csv',
-                key="download_audit_final" # Tambah key unik
-            )
-        else:
-            st.success("✅ Tidak ada perbedaan stok!")
+# ==============================================================================
+# LOGIC PROCESS & INTERFACE INTERFACE MENU "REFILL TOKO"
+# ==============================================================================
 
 elif menu == "Refill Toko":
     # =========================================================
