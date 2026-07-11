@@ -4043,6 +4043,11 @@ def main_menu_routing():
             else:
                 st.button("📊 Download Master Report (All SKU)", disabled=True, help="Data log transaksi kosong.")
 
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "PRECENTAGE REQUEST FL TO STORE STOCK"
+# ==============================================================================
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -4134,7 +4139,7 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
 
 
 # ==============================================================================
-# 2. LOGIC MENU & LAYOUT (FRONTEND UI)
+# LOGIC INTERFACE MENU "PRECENTAGE REQUEST FL TO STORE STOCK"
 # ==============================================================================
 def render_premium_ui():
 
@@ -4245,7 +4250,9 @@ def run_store_request_analytics():
 
     
 
-
+# ==============================================================================
+# LOGIC PROSES & MENU "REFILL & WITHDRAW"
+# ==============================================================================
 
 import pandas as pd
 import streamlit as st
@@ -4469,6 +4476,11 @@ def menu_refill_withdraw():
                     requests.post(url, json=data_json)
                     st.toast("WITHDRAW UPLOADED!")
 
+
+
+# ==============================================================================
+# LOGIC PROSES & MENU "LIST BIN CYCLE COUNT"
+# ==============================================================================
 import streamlit as st
 import pandas as pd
 
@@ -4696,6 +4708,12 @@ def tarik_data_cycle_count():
         st.info("💡 Silakan upload file data scan terlebih dahulu untuk memunculkan filter dan ringkasan Metric Box.")
 
     st.markdown("---")
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "COMPARE RTO"
+# ==============================================================================
 
 import pandas as pd
 import numpy as np
@@ -4960,6 +4978,12 @@ def engine_generate_new_draft(df_compared):
     res = pd.DataFrame([{'BIN': k.split('|')[0], 'SKU': k.split('|')[1], 'QUANTITY': v} for k, v in dict_final.items()])
     return res.sort_values(['BIN', 'SKU']).reset_index(drop=True) if not res.empty else res
 
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "REFILL & OVERSTOCK"
+# ==============================================================================
 import pandas as pd
 import math
 
@@ -5074,6 +5098,12 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
         print(f"Error caught: {e}")
 
     return df_gl3, df_gl4, df_refill_final, df_overstock_final
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "PUTAWAY SYSTEM"
+# ==============================================================================
 def putaway_system(df_ds, df_asal):
     if df_ds is None or df_asal is None:
         empty = pd.DataFrame()
@@ -5185,6 +5215,12 @@ def putaway_system(df_ds, df_asal):
         empty = pd.DataFrame()
         return empty, empty, empty, empty, empty, empty
 
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "SCAN OUT VALIDATION"
+# ==============================================================================
 def pre_process_pbi_data(uploaded_pbi_file):
     # Baca tanpa header dulu agar aman filter teks bawaan
     df_pbi = pd.read_excel(uploaded_pbi_file, header=None)
@@ -5375,7 +5411,13 @@ def process_scan_out(df_scan, df_history, df_stock):
     df_res = df_res[['BIN AWAL', 'SKU', 'QTY SCAN', 'Keterangan', 'Total Qty Setup/Terjual', 'Bin After Set Up', 'Invoice']]
     
     return df_res, df_draft
-    
+
+
+
+
+# ==============================================================================
+# LOGIC PROSES & MENU "LIST RETUR OUT"
+# ==============================================================================
 import pandas as pd
 import streamlit as st
 from datetime import datetime
@@ -5581,6 +5623,12 @@ def menu_retur_out_system():
     except Exception as e:
         st.error(f"Sistem Gagal Memuat Cloud Database: {e}")
 
+
+
+
+# ==============================================================================
+# LOGIC PROSES & MENU "PURCHASE ORDER RECEIVING"
+# ==============================================================================
 import pandas as pd
 import streamlit as st
 from io import BytesIO
@@ -5836,7 +5884,14 @@ def tampilkan_halaman_po():
                 file_name=f"REKAP_PO_{selected_po}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
-            )        
+            )   
+
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "JUSTIFICATION SO"
+# ==============================================================================
 import pandas as pd
 import io
 import streamlit as st
@@ -6026,6 +6081,11 @@ def process_justification(df_case, df_tracking, df_all_stock):
     return res[final_cols]
 
 
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "COMPARE SYSTEM"
+# ==============================================================================
 import pandas as pd
 import numpy as np
 
@@ -6225,7 +6285,13 @@ def process_stock_comparison(file1, file2, file_tracking=None, file_po=None, fil
         
     except Exception as e:
         raise e
-        
+
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "REJECT/DEFECT LIST"
+# ==============================================================================
 import streamlit as st
 import pandas as pd
 from st_supabase_connection import SupabaseConnection
@@ -6264,7 +6330,12 @@ def mark_as_done(sku_list):
     # Mengubah status SKU yang terpilih menjadi DONE di Supabase
     if sku_list:
         conn.table("reject_list").update({"status": "DONE"}).in_("sku", sku_list).execute()
-# --- 2. UI MENU ---
+
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "REJECT/DEFECT LIST"
+# ==============================================================================
 def menu_reject_defect():
     # --- CSS AREA (WAJIB LENGKAP - TIDAK ADA YANG DIPOTONG) ---
     st.markdown("""
@@ -6730,6 +6801,12 @@ def menu_reject_defect():
         else:
             st.info("ℹ️ Tidak ada data yang ditemukan di Cloud.")
 
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "PENGAJUAN REJECT/DEFECT"
+# ==============================================================================
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -6787,6 +6864,9 @@ def convert_all_to_excel(df):
                 
     return output.getvalue()
 
+# ==============================================================================
+# LOGIC INTERFACE MENU "PENGAJUAN REJECT/DEFECT"
+# ==============================================================================
 def project_approval_reject():
     # --- CSS CUSTOM --- 
     st.markdown(""" 
@@ -7055,6 +7135,12 @@ def project_approval_reject():
                                     supabase.table("submissions").delete().eq("id", row['id']).execute()
                                     st.rerun() 
 
+
+
+
+# ==============================================================================
+# LOGIC PROSES & MENU "PENGAJUAN MUTASI KARANTINA"
+# ==============================================================================
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -7404,6 +7490,13 @@ def project_mutasi_karantina():
 
             if st.button("🔄 Refresh Working List", key="btn_refresh_work"):
                 st.rerun()
+
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "COMPARE PENERIMAAN RTO"
+# ==============================================================================
 import pandas as pd
 import streamlit as st
 from io import BytesIO
@@ -7590,7 +7683,12 @@ def process_rto_logic(df_scan, df_tf):
     
     return df_hasil, df_split_detail, df_kurang, df_lebih, metrics
 
-# --- 4. MAIN APP ---
+
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "COMPARE PENERIMAAN RTO"
+# ==============================================================================
 def main():
     apply_custom_ui()
     with st.expander("📋 Informasi Format File"):
@@ -7731,6 +7829,11 @@ def main():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
+
+
+# ==============================================================================
+# LOGIC PROSES & MENU "BALANCING STOCK"
+# ==============================================================================
 import streamlit as st
 import pandas as pd
 import sqlite3
