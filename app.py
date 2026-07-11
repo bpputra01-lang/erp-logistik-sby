@@ -4052,15 +4052,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# ==============================================================================
-# 1. LOGIC PROCESS (BACKEND DATA ENGINE)
-# ==============================================================================
 def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     """
     Fungsi core untuk memproses data inventori dan permintaan.
-    Mapping Kolom:
+    Mapping Kolom (UPDATED):
     - All Stock: B(Bin)=1, C(SKU)=2, J(Qty)=9
-    - Permintaan FL: E(SKU)=4, T(Kriteria)=19, U(Qty)=20
+    - Permintaan FL: E(SKU)=4, V(Kriteria)=21, W(Qty)=22
     """
     # Read file All Stock
     if file_stock.name.endswith('.csv'):
@@ -4083,11 +4080,11 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     df_permintaan = df_permintaan_raw.copy()
     df_permintaan.columns = [f"col_{i}" for i in range(len(df_permintaan.columns))]
     
-    # Ambil E=SKU(col_4), T=Kriteria_T(col_19), dan U=Qty_Permintaan(col_20)
-    df_req_filtered = df_permintaan[['col_4', 'col_19', 'col_20']].copy()
-    df_req_filtered.columns = ['SKU', 'KOLOM_T', 'QTY_REQUEST']
+    # PERBAIKAN: Ambil E=SKU(col_4), V=Kriteria_V(col_21), dan W=Qty_Permintaan(col_22)
+    df_req_filtered = df_permintaan[['col_4', 'col_21', 'col_22']].copy()
+    df_req_filtered.columns = ['SKU', 'KOLOM_T', 'QTY_REQUEST'] # Nama alias tetap agar logika di bawahnya tidak rusak
 
-    # --- FILTER 1: Eliminasi Kolom T yang Blank / Empty ---
+    # --- FILTER 1: Eliminasi Kolom T (Sekarang Kolom V) yang Blank / Empty ---
     df_req_filtered['KOLOM_T'] = df_req_filtered['KOLOM_T'].astype(str).str.strip()
     df_req_filtered = df_req_filtered[
         (df_req_filtered['KOLOM_T'] != '') & 
@@ -4100,7 +4097,6 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     total_qty_permintaan_valid = df_req_filtered['QTY_REQUEST'].sum()
 
     # --- FILTER 2: Filter Stock Store Surabaya ---
-    # UPDATE: Sekarang mendeteksi TOKO, GUDANG, STR, dan STORE
     df_stock['BIN'] = df_stock['BIN'].astype(str).str.upper()
     bin_filter = df_stock['BIN'].str.contains('TOKO|GUDANG|STR|STORE', na=False)
     df_surabaya_stock = df_stock[bin_filter].copy()
@@ -4111,7 +4107,7 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
     # Groupby All Stock Surabaya untuk keperluan Compare
     df_stock_all_grouped = df_surabaya_stock.groupby('SKU', as_index=False)['QTY_STOCK'].sum()
     
-    # Ambil yang QTY_STOCK > 2 untuk kriteria over-request
+    # Ambil yang QTY_STOCK >= 2 untuk kriteria over-request
     df_stock_over_2 = df_stock_all_grouped[df_stock_all_grouped['QTY_STOCK'] >= 2]
 
     # --- FILTER 3: Cek Matching Data (Indikasi Over-Request) ---
@@ -4136,7 +4132,6 @@ def process_logistics_analytics(file_stock, file_permintaan) -> dict:
         ),
         "df_compare": df_compare_sku
     }
-
 
 # ==============================================================================
 # LOGIC INTERFACE MENU "PRECENTAGE REQUEST FL TO STORE STOCK"
