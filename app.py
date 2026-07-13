@@ -4583,56 +4583,18 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
 # LOGIC INTERFACE MENU "RELOKASI KOLI TO KOLI / REFILL"
 # ==============================================================================
 
-st.markdown("""
-    <style>
-    .stApp { background-color: #0e1117; color: #e0e0e0; }
-    .hero-header {
-        font-size: 28px; font-weight: 700; color: #ffffff;
-        background: linear-gradient(135deg, #1f2438 0%, #111424 100%);
-        padding: 20px; border-radius: 10px; border-left: 5px solid #C5A059;
-        margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
-    .metric-container { display: flex; gap: 15px; margin-bottom: 25px; }
-    .metric-card {
-        flex: 1; background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
-        border-left: 4px solid #C5A059 !important; padding: 20px; border-radius: 8px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-    .metric-label { font-size: 13px; text-transform: uppercase; color: #8c96b5; margin-bottom: 5px; }
-    .metric-value { font-size: 24px; font-weight: 700; color: #ffffff; }
-    .section-title { font-size: 18px; font-weight: 600; color: #C5A059; margin-top: 20px; margin-bottom: 10px; text-transform: uppercase; }
-    
-    /* Style untuk custom Sidebar/Menu */
-    [data-testid="stSidebar"] {
-        background-color: #111424 !important;
-        border-right: 1px solid #C5A059;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-
-# 2. SAMPLE DATA LOAD
-@st.cache_data
-def load_sample_data():
-    return pd.DataFrame({
-        'BIN': ['KL2-A1-1', 'KL1-A2-3', 'KL1-A2-4', 'KL1-B1-1', 'KL2-B2-1', 'KL1-C1-1', 'KL2-C2-2'],
-        'SKU': ['SKU-999', 'SKU-999', 'SKU-999', 'SKU-888', 'SKU-888', 'SKU-777', 'SKU-555'],
-        'QTY': [9, 2, 1, 3, 8, 2, 5]
-    })
-
-
-# 3. DEF FUNGSI UNTUK TIAP HALAMAN / MENU
+# Fungsi Render Dashboard Utama
 def render_dashboard(df_master):
-    """Menampilkan Dashboard Utama, Metriks, dan Tabel Hasil Konsolidasi & Refill"""
-    st.markdown('<div class="hero-header">KOLI CONSOLIDATION</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">📦 KOLI CONSOLIDATION</div>', unsafe_allow_html=True)
     
-    # Jalankan core logic dari engine
+    if df_master is None:
+        st.info("💡 Silakan upload file Excel koli terlebih dahulu di sidebar.")
+        return
+        
     df_conso, df_refill = process_koli_consolidation(df_master)
-    
-    # Hitung total yang tidak genap untuk matriks visual
     total_not_genap = len(df_master[df_master.apply(lambda r: ('KL1' in str(r['BIN']).upper() and r['QTY'] < 5) or ('KL2' in str(r['BIN']).upper() and r['QTY'] < 11), axis=1)])
     
-    # Render Metric Boxes Premium
+    # Premium Metric Boxes (Tetap pakai CSS milik lu)
     st.markdown(f"""
         <div class="metric-container">
             <div class="metric-card">
@@ -4650,54 +4612,49 @@ def render_dashboard(df_master):
         </div>
     """, unsafe_allow_html=True)
     
-    # Render Split Tables
     col_left, col_right = st.columns(2)
-    
     with col_left:
         st.markdown('<div class="section-title">📋 JOB DELEGATION: PENGGENAPAN KOLI</div>', unsafe_allow_html=True)
-        if not df_conso.empty:
-            st.dataframe(df_conso, use_container_width=True, hide_index=True)
-        else:
-            st.info("Tidak ada koli yang bisa digenapkan dengan kombinasi max 2 BIN.")
+        st.dataframe(df_conso, use_container_width=True, hide_index=True)
             
     with col_right:
         st.markdown('<div class="section-title">🚨 JOB DELEGATION: REFILL GUDANG LT.3</div>', unsafe_allow_html=True)
-        if not df_refill.empty:
-            st.dataframe(df_refill, use_container_width=True, hide_index=True)
-        else:
-            st.success("Aman! Tidak ada item yang perlu di-refill manual ke Lt.3.")
+        st.dataframe(df_refill, use_container_width=True, hide_index=True)
 
-
+# Fungsi Render Master Data
 def render_master_data(df_master):
-    """Menampilkan Menu Management / Preview Data Mentah"""
     st.markdown('<div class="hero-header">🔍 MASTER DATA INVENTORY TRACKER</div>', unsafe_allow_html=True)
+    if df_master is None:
+        st.info("💡 Belum ada data aktif yang masuk.")
+        return
     st.markdown('<div class="section-title">Semua Data Aktif (Kolom B, C, J)</div>', unsafe_allow_html=True)
-    
-    # Tampilkan full data editor/viewer
     st.dataframe(df_master, use_container_width=True, hide_index=True)
 
-
-# 4. DEF MAIN MENU CONTROLLER
-def main_menu_koli():
-    """Fungsi Router Utama untuk Mengatur Navigasi Menggunakan Sidebar"""
-    st.sidebar.markdown("<h2 style='color:#C5A059; text-align:center;'>NAVIGASI MENU</h2>", unsafe_allow_html=True)
-    st.sidebar.markdown("---")
-    
-    # Pilihan Menu Navigasi
-    menu_select = st.sidebar.radio(
-        "Pilih Halaman:",
-        ["Dashboard Analisis", "Lihat Data Master"],
-        index=0
+# CORE MENU UTAMA - Pake Native Component Tanpa Custom HTML/CSS Sidebar
+def main_menu_koli(df_master=None):
+    """
+    Router Menu Koli. 
+    Bisa menerima df_master langsung jika uploader-nya ada di luar (halaman utama).
+    """
+    # 1. Navigation Controller (Murni Native Streamlit)
+    menu_select = st.sidebar.selectbox(
+        "Menu Koli:",
+        ["Dashboard Analisis", "Lihat Data Master"]
     )
     
-    # Load data master sekali saja di level root menu
-    df_master = load_sample_data()
-    
-    # Routing Halaman berdasarkan pilihan user
-    if menu_select == "Dashboard Analisis":
-        render_dashboard(df_master)
-    elif menu_select == "Lihat Data Master":
-        render_master_data(df_master)
+    # 2. Kondisi jika uploader mau ditaruh di dalam menu koli ini
+    if df_master is None:
+        file_excel = st.sidebar.file_uploader("Upload Excel Gudang (.xlsx)", type=["xlsx"])
+        if file_excel:
+            try:
+                df = pd.read_excel(file_excel)
+                df_master = pd.DataFrame({
+                    'BIN': df.iloc[:, 1],
+                    'SKU': df.iloc[:, 2],
+                    'QTY': pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0).astype(int)
+                }).dropna(subset=['BIN', 'SKU'])
+            except:
+                st.error("Gagal membaca file.")
 
 
 # ==============================================================================
