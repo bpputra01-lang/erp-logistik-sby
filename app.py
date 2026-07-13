@@ -4474,134 +4474,171 @@ def menu_refill_withdraw():
 
 
 # ==============================================================================
-# LOGIC PROSES MENU "RELOKASI KOLI TO KOLI / REFILL"
+# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI: GLOBAL BIN & MIX MAX 2 SKU)
 # ==============================================================================
 def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Core Logic Engine untuk Konsolidasi Koli & Refill Lt.3
-    Kolom Input Wajib: BIN (B), SKU (C), QTY (J)
+    Core Engine: Mengelompokkan data per nama BIN (bukan SKU), 
+    sehingga bisa mencari pasangan kombinasi lintas SKU dengan limit maksimal 2 SKU per BIN.
     """
     df_clean = df.copy()
     
     # 1. Identifikasi kapasitas Max berdasarkan nama BIN
-    def get_max_qty(bin_name):
-        if 'KL1' in str(bin_name).upper(): return 6
-        if 'KL2' in str(bin_name).upper(): return 12
-        return 0
-
-    df_clean['MAX_QTY'] = df_clean['BIN'].apply(get_max_qty)
+    df_clean['MAX_QTY'] = df_clean['BIN'].apply(lambda x: 6 if 'KL1' in str(x).upper() else (12 if 'KL2' in str(x).upper() else 0))
     
-    # 2. Cek status ketidakgenapan (KL1 < 5, KL2 < 11)
-    def is_not_genap(row):
-        if 'KL1' in str(row['BIN']).upper() and row['QTY'] < 5: return True
-        if 'KL2' in str(row['BIN']).upper() and row['QTY'] < 11: return True
-        return False
+    # 2. Cek status ketidakgenapan awal per baris data
+    df_clean['NOT_GENAP'] = df_clean.apply(
+        lambda r: True if ('KL1' in str(r['BIN']).upper() and r['QTY'] < 5) or ('KL2' in str(r['BIN']).upper() and r['QTY'] < 11) else False, 
+        axis=1
+    )
 
-    df_clean['NOT_GENAP'] = df_clean.apply(is_not_genap, axis=1)
+    # 3. Agregasi data ke level BIN agar bisa menampung SKU campuran
+    bin_contents = {}
+    for _, row in df_clean.iterrows():
+        b = row['BIN']
+        if b not in bin_contents:
+            bin_contents[b] = {
+                'BIN': b,
+                'SKUS': [],
+                'QTY': 0,
+                'MAX_QTY': row['MAX_QTY'],
+                'NOT_GENAP': False
+            }
+        if row['QTY'] > 0:
+            bin_contents[b]['SKUS'].append(str(row['SKU']))
+            bin_contents[b]['QTY'] += row['QTY']
+        if row['NOT_GENAP']:
+            bin_contents[b]['NOT_GENAP'] = True
 
-    # Tracker data agar tidak duplikasi
+    # Hilangkan duplikasi list SKU awal di tiap BIN
+    for b in bin_contents:
+        bin_contents[b]['SKUS'] = list(set(bin_contents[b]['SKUS']))
+
     used_bins = set()
     consolidation_results = []
-    refill_list = []
-    
-    # 3. Pengelompokan per SKU untuk pencarian pasangan
-    for sku, group in df_clean.groupby('SKU'):
-        # Ambil yang tidak genap, urutkan dari QTY terbesar (calon BIN TUJUAN)
-        unbalanced = group[group['NOT_GENAP'] == True].sort_values(by='QTY', ascending=False).to_dict('records')
+
+    # Ambil list BIN target yang tidak genap dan masih ber-stok
+    target_bins = [v for k, v in bin_contents.items() if v['NOT_GENAP'] and v['QTY'] > 0]
+    # Urutkan dari QTY terbesar agar cepat penuh saat dijadikan BIN TUJUAN
+    target_bins.sort(key=lambda x: x['QTY'], reverse=True)
+
+    for target in target_bins:
+        if target['BIN'] in used_bins:
+            continue
+            
+        needed_qty = target['MAX_QTY'] - target['QTY']
         
-        for target_bin in unbalanced:
-            if target_bin['BIN'] in used_bins:
-                continue
-                
-            max_capacity = target_bin['MAX_QTY']
-            current_qty = target_bin['QTY']
-            needed_qty = max_capacity - current_qty
-            
-            # Cari kandidat BIN AWAL (Urut dari QTY terkecil agar efisien menggenapi)
-            candidates = [b for b in unbalanced if b['BIN'] != target_bin['BIN'] and b['BIN'] not in used_bins]
-            candidates.sort(key=lambda x: x['QTY'])
-            
-            found_match = False
-            
-            # CASE 1: Cek kecocokan dengan 1 BIN AWAL
-            for b1 in candidates:
-                if b1['QTY'] == needed_qty:
+        # Cari kandidat sumber penggenap (BIN AWAL) yang belum terpakai
+        candidates = [v for k, v in bin_contents.items() if v['BIN'] != target['BIN'] and v['BIN'] not in used_bins and v['QTY'] > 0]
+        candidates.sort(key=lambda x: x['QTY']) 
+
+        found_match = False
+
+        # CASE 1: Pasangkan dengan 1 BIN AWAL
+        for b1 in candidates:
+            if b1['QTY'] == needed_qty:
+                combined_skus = list(set(target['SKUS'] + b1['SKUS']))
+                if len(combined_skus) <= 2: # Batasan Maksimal 2 SKU berbeda
                     consolidation_results.append({
-                        'SKU': sku,
-                        'BIN TUJUAN': target_bin['BIN'],
-                        'QTY SEKARANG': current_qty,
+                        'SKU': ", ".join(target['SKUS']),
+                        'BIN TUJUAN': target['BIN'],
+                        'QTY SEKARANG': target['QTY'],
                         'BIN AWAL 1': b1['BIN'],
                         'QTY AWAL 1': b1['QTY'],
                         'BIN AWAL 2': '-',
                         'QTY AWAL 2': 0,
-                        'TOTAL AKHIR': current_qty + b1['QTY']
+                        'TOTAL AKHIR': target['QTY'] + b1['QTY'],
+                        'SKU GABUNGAN': ", ".join(combined_skus)
                     })
-                    used_bins.add(target_bin['BIN'])
-                    used_bins.add(b1['BIN'])
+                    used_bins.update([target['BIN'], b1['BIN']])
                     found_match = True
                     break
-            
-            # CASE 2: Cek kecocokan kombinasi maksimal 2 BIN AWAL
-            if not found_match and len(candidates) >= 2:
-                for idx_a in range(len(candidates)):
-                    for idx_b in range(idx_a + 1, len(candidates)):
-                        b1 = candidates[idx_a]
-                        b2 = candidates[idx_b]
-                        
-                        if b1['QTY'] + b2['QTY'] == needed_qty:
+
+        # CASE 2: Pasangkan dengan Kombinasi 2 BIN AWAL
+        if not found_match and len(candidates) >= 2:
+            for idx_a in range(len(candidates)):
+                for idx_b in range(idx_a + 1, len(candidates)):
+                    b1 = candidates[idx_a]
+                    b2 = candidates[idx_b]
+                    
+                    if b1['QTY'] + b2['QTY'] == needed_qty:
+                        combined_skus = list(set(target['SKUS'] + b1['SKUS'] + b2['SKUS']))
+                        if len(combined_skus) <= 2: # Batasan Maksimal 2 SKU berbeda
                             consolidation_results.append({
-                                'SKU': sku,
-                                'BIN TUJUAN': target_bin['BIN'],
-                                'QTY SEKARANG': current_qty,
+                                'SKU': ", ".join(target['SKUS']),
+                                'BIN TUJUAN': target['BIN'],
+                                'QTY SEKARANG': target['QTY'],
                                 'BIN AWAL 1': b1['BIN'],
                                 'QTY AWAL 1': b1['QTY'],
                                 'BIN AWAL 2': b2['BIN'],
                                 'QTY AWAL 2': b2['QTY'],
-                                'TOTAL AKHIR': current_qty + b1['QTY'] + b2['QTY']
+                                'TOTAL AKHIR': target['QTY'] + b1['QTY'] + b2['QTY'],
+                                'SKU GABUNGAN': ", ".join(combined_skus)
                             })
-                            used_bins.add(target_bin['BIN'])
-                            used_bins.add(b1['BIN'])
-                            used_bins.add(b2['BIN'])
+                            used_bins.update([target['BIN'], b1['BIN'], b2['BIN']])
                             found_match = True
                             break
-                    if found_match: break
+                if found_match: break
 
-    # 4. Filter BIN sisa yang tidak dapet pasangan -> Masuk REFILL LT.3
-    for _, row in df_clean[df_clean['NOT_GENAP'] == True].iterrows():
-        if row['BIN'] not in used_bins:
+    # 4. Sisa BIN yang unmatch -> Masuk List REFILL LT.3
+    refill_list = []
+    for b_name, v in bin_contents.items():
+        if v['NOT_GENAP'] and b_name not in used_bins:
             refill_list.append({
-                'BIN': row['BIN'],
-                'SKU': row['SKU'],
-                'QTY SEKARANG': row['QTY'],
-                'REFILL NEEDED': row['MAX_QTY'] - row['QTY'],
+                'BIN': b_name,
+                'SKU': ", ".join(v['SKUS']) if v['SKUS'] else "-",
+                'QTY SEKARANG': v['QTY'],
+                'REFILL NEEDED': v['MAX_QTY'] - v['QTY'],
                 'REFILL TO': 'GUDANG LT.3'
             })
 
     return pd.DataFrame(consolidation_results), pd.DataFrame(refill_list)
 
+
 # ==============================================================================
 # LOGIC INTERFACE MENU "RELOKASI KOLI TO KOLI / REFILL"
 # ==============================================================================
-
-# ==============================================================================
-# INTERFACE & LOGIC PROCESS MENU "REFILL KOLI TO KOLI/REFILL"
-# ==============================================================================
 def main_menu_koli():
+    st.markdown("""
+        <style>
+        .hero-header {
+            font-size: 28px; font-weight: 700; color: #ffffff;
+            background: linear-gradient(135deg, #1f2438 0%, #111424 100%);
+            padding: 20px; border-radius: 10px; border-left: 5px solid #C5A059;
+            margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .metric-container { display: flex; gap: 15px; margin-bottom: 25px; }
+        .metric-card {
+            flex: 1; background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            border-left: 4px solid #C5A059 !important; padding: 20px; border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;
+        }
+        .metric-label { font-size: 13px; text-transform: uppercase; color: #8c96b5; margin-bottom: 8px; font-weight: 600; }
+        .metric-value { font-size: 26px; font-weight: 700; color: #ffffff; margin-bottom: 4px; }
+        .metric-sub { font-size: 14px; font-weight: 600; }
+        .sub-blue { color: #5c7cfa; }
+        .sub-green { color: #40c057; }
+        .sub-gold { color: #C5A059; }
+        
+        .section-title { font-size: 18px; font-weight: 600; color: #C5A059; margin-top: 20px; margin-bottom: 10px; text-transform: uppercase; }
+        </style>
+    """, unsafe_allow_html=True)
+
     # 1. Render Title / Header
     st.markdown('<div class="hero-header">📦 KOLI CONSOLIDATION</div>', unsafe_allow_html=True)
 
-    # 2. Kotak Uploader Langsung di Halaman Utama (Tengah Layar)
+    # 2. Kotak Uploader Langsung di Tengah Layar
     file_excel = st.file_uploader(
         "Upload Excel Gudang (.xlsx)", 
         type=["xlsx"],
         key="koli_excel_uploader_main"
     )
 
-    # 3. Logic Read & Mapping Data Internal (Kolom B, C, J)
     if file_excel is None:
         st.info("💡 Silakan upload file Excel koli terlebih dahulu di atas.")
         return
 
+    # 3. Reading Excel Data (Kolom B, C, J)
     try:
         df = pd.read_excel(file_excel, header=0)
         if df.shape[1] < 10:
@@ -4618,107 +4655,42 @@ def main_menu_koli():
         st.error(f"❌ Gagal membaca file: {str(e)}")
         return
 
-    # ==========================================================================
-    # CORE LOGIC ENGINE (Ditanam langsung di sini biar bebas dari ModuleNotFoundError)
-    # ==========================================================================
-    df_clean = df_master.copy()
+    # 4. Panggil Core Logic Engine yang di atas
+    df_conso, df_refill = process_koli_consolidation(df_master)
     
-    # Identifikasi kapasitas Max berdasarkan nama BIN
-    df_clean['MAX_QTY'] = df_clean['BIN'].apply(lambda x: 6 if 'KL1' in str(x).upper() else (12 if 'KL2' in str(x).upper() else 0))
-    
-    # Cek status ketidakgenapan
-    df_clean['NOT_GENAP'] = df_clean.apply(
-        lambda r: True if ('KL1' in str(r['BIN']).upper() and r['QTY'] < 5) or ('KL2' in str(r['BIN']).upper() and r['QTY'] < 11) else False, 
-        axis=1
-    )
-
-    used_bins = set()
-    consolidation_results = []
-    refill_list = []
-    
-    # Pengelompokan per SKU untuk pencarian pasangan
-    for sku, group in df_clean.groupby('SKU'):
-        unbalanced = group[group['NOT_GENAP'] == True].sort_values(by='QTY', ascending=False).to_dict('records')
-        
-        for target_bin in unbalanced:
-            if target_bin['BIN'] in used_bins:
-                continue
-                
-            max_capacity = target_bin['MAX_QTY']
-            current_qty = target_bin['QTY']
-            needed_qty = max_capacity - current_qty
-            
-            candidates = [b for b in unbalanced if b['BIN'] != target_bin['BIN'] and b['BIN'] not in used_bins]
-            candidates.sort(key=lambda x: x['QTY'])
-            
-            found_match = False
-            
-            # CASE 1: 1 BIN AWAL
-            for b1 in candidates:
-                if b1['QTY'] == needed_qty:
-                    consolidation_results.append({
-                        'SKU': sku, 'BIN TUJUAN': target_bin['BIN'], 'QTY SEKARANG': current_qty,
-                        'BIN AWAL 1': b1['BIN'], 'QTY AWAL 1': b1['QTY'], 'BIN AWAL 2': '-', 'QTY AWAL 2': 0,
-                        'TOTAL AKHIR': current_qty + b1['QTY']
-                    })
-                    used_bins.update([target_bin['BIN'], b1['BIN']])
-                    found_match = True
-                    break
-            
-            # CASE 2: Kombinasi 2 BIN AWAL
-            if not found_match and len(candidates) >= 2:
-                for idx_a in range(len(candidates)):
-                    for idx_b in range(idx_a + 1, len(candidates)):
-                        b1 = candidates[idx_a]
-                        b2 = candidates[idx_b]
-                        if b1['QTY'] + b2['QTY'] == needed_qty:
-                            consolidation_results.append({
-                                'SKU': sku, 'BIN TUJUAN': target_bin['BIN'], 'QTY SEKARANG': current_qty,
-                                'BIN AWAL 1': b1['BIN'], 'QTY AWAL 1': b1['QTY'], 'BIN AWAL 2': b2['BIN'], 'QTY AWAL 2': b2['QTY'],
-                                'TOTAL AKHIR': current_qty + b1['QTY'] + b2['QTY']
-                            })
-                            used_bins.update([target_bin['BIN'], b1['BIN'], b2['BIN']])
-                            found_match = True
-                            break
-                    if found_match: break
-
-    # Filter BIN sisa -> Masuk REFILL LT.3
-    for _, row in df_clean[df_clean['NOT_GENAP'] == True].iterrows():
-        if row['BIN'] not in used_bins:
-            refill_list.append({
-                'BIN': row['BIN'], 'SKU': row['SKU'], 'QTY SEKARANG': row['QTY'],
-                'REFILL NEEDED': row['MAX_QTY'] - row['QTY'], 'REFILL TO': 'GUDANG LT.3'
-            })
-
-    df_conso = pd.DataFrame(consolidation_results)
-    df_refill = pd.DataFrame(refill_list)
-    
-    # Hitung total koli tidak genap untuk matriks visual
-    total_not_genap = len(df_clean[df_clean['NOT_GENAP'] == True])
+    # Hitung total koli tidak genap awal dari master data untuk info metriks
+    # Menggunakan logic penentu ketidakgenapan koli
+    total_not_genap = len(df_master[df_master.apply(
+        lambda r: True if ('KL1' in str(r['BIN']).upper() and r['QTY'] < 5) or ('KL2' in str(r['BIN']).upper() and r['QTY'] < 11) else False, axis=1
+    )].groupby('BIN'))
 
     # ==========================================================================
-    # OUTPUT RENDERING DASHBOARD
+    # OUTPUT RENDERING DASHBOARD VISUAL (MODEL BARU LU)
     # ==========================================================================
     st.markdown(f"""
         <div class="metric-container">
             <div class="metric-card">
                 <div class="metric-label">⚠️ Total Koli Tidak Genap</div>
                 <div class="metric-value">{total_not_genap} BIN</div>
+                <div class="metric-sub sub-blue">Gudang Utama</div>
             </div>
             <div class="metric-card">
-                <div class="metric-label">🔄 Plan Penggenapan (Max 2 Bin Awal)</div>
+                <div class="metric-label">🔄 Plan Penggenapan (Max 2 SKU Mix)</div>
                 <div class="metric-value">{len(df_conso)} Perintah</div>
+                <div class="metric-sub sub-green">↑ Optimal Koli</div>
             </div>
             <div class="metric-card">
                 <div class="metric-label">🛗 Wajib Refill Ke Lt.3</div>
                 <div class="metric-value">{len(df_refill)} BIN</div>
+                <div class="metric-sub sub-gold">Sisa Unmatched</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
+    # Render Hasil Output Kerja Lapangan
     col_left, col_right = st.columns(2)
     with col_left:
-        st.markdown('<div class="section-title">📋 JOB DELEGATION: PENGGENAPAN KOLI</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📋 JOB DELEGATION: PENGGENAPAN KOLI (MIX SKU OK)</div>', unsafe_allow_html=True)
         st.dataframe(df_conso, use_container_width=True, hide_index=True)
             
     with col_right:
