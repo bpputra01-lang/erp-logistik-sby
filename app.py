@@ -4472,6 +4472,7 @@ def menu_refill_withdraw():
                     st.toast("WITHDRAW UPLOADED!")
 
 
+
 # ==============================================================================
 # LOGIC PROSES MENU "RELOKASI KOLI TO KOLI / REFILL"
 # ==============================================================================
@@ -4578,13 +4579,9 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
 
     return pd.DataFrame(consolidation_results), pd.DataFrame(refill_list)
 
-# app.py
-import streamlit as st
-import pandas as pd
-from engine import process_koli_consolidation
-
-# 1. STYLE CONFIG (Premium Dark Mode Dashboard)
-st.set_page_config(page_title="Consolidation System", layout="wide")
+# ==============================================================================
+# LOGIC INTERFACE MENU "RELOKASI KOLI TO KOLI / REFILL"
+# ==============================================================================
 
 st.markdown("""
     <style>
@@ -4627,7 +4624,7 @@ def load_sample_data():
 # 3. DEF FUNGSI UNTUK TIAP HALAMAN / MENU
 def render_dashboard(df_master):
     """Menampilkan Dashboard Utama, Metriks, dan Tabel Hasil Konsolidasi & Refill"""
-    st.markdown('<div class="hero-header">📦 KOLI CONSOLIDATION & REFILL SYSTEM</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-header">KOLI CONSOLIDATION</div>', unsafe_allow_html=True)
     
     # Jalankan core logic dari engine
     df_conso, df_refill = process_koli_consolidation(df_master)
