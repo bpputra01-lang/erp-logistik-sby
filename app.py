@@ -4719,7 +4719,18 @@ def main_menu_koli():
             </div>
         </div>
     """, unsafe_allow_html=True)
-
+# === TAMBAHKAN DI SINI (DI BAWAH METRIC BOX, DI ATAS COLUMNS) ===
+    with st.expander("💡 INFORMASI & RULES MUTASI GUDANG (KL1 / KL2 / LT.3)"):
+        st.markdown("""
+        **1. Aturan Penggenapan & Konsolidasi:**
+        * BIN `KL1` (Max Cap: 6) dan `KL2` (Max Cap: 12) yang sudah genap atau sukses dipasangkan **otomatis hilang** dari daftar kerja.
+        * Konsolidasi strictly dibatasi **maksimal 2 SKU campuran** dalam satu BIN.
+        
+        **2. Aturan Mutasi & Refill (Khusus Stok di bawah 9):**
+        * **QTY 6 sampai 8:** Diambil **6 unit** untuk diturunkan fungsinya mengisi full 1 Koli `KL1`. Sisa barangnya (`QTY Sekarang - 6`) dilempar ke **Gudang Lt.3**.
+        * **QTY di bawah 6 (3, 4, 5):** Karena tidak cukup barang untuk membuat 1 koli `KL1` full, maka **seluruh isi barang disapu bersih ke Gudang Lt.3** agar BIN tersebut kosong/reset.
+        * Sisa BIN yang total gabungan QTY-nya masih **9 ke atas** tidak akan muncul di list karena dianggap masih aman/mendekati kapasitas.
+        """)
     col_left, col_right = st.columns(2)
     
     # --- KOLOM KIRI: PENGGENAPAN KOLI ---
