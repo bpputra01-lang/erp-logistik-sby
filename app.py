@@ -4474,22 +4474,23 @@ def menu_refill_withdraw():
 
 
 # ==============================================================================
-# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI TOTAL: ACUAN MURNI GABUNGAN BIN)
+# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI: STRUKTUR KOLOM MUTASI MANDIRI)
 # ==============================================================================
 def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Core Engine: Menggunakan total QTY gabungan per BIN sebagai acuan utama ketidakgenapan.
-    SKU hanya digunakan sebagai informasi konten dan pembatas maksimal 2 SKU saat konsolidasi.
+    Core Engine: Memproses BIN KL1 & KL2.
+    Revisi Refill: Hanya memproses BIN dengan QTY < 9. 
+    Kolom tujuan mutasi dipecah menjadi KL1 dan Gudang Lt.3 secara terpisah.
     """
     df_clean = df.copy()
     
-    # 1. STRICT FILTER: Hanya proses BIN yang ada unsur KL1 atau KL2
+    # 1. STRICT FILTER: Hanya proses BIN area KL1 atau KL2
     df_clean = df_clean[df_clean['BIN'].astype(str).str.upper().str.contains('KL1|KL2', na=False)]
     
     if df_clean.empty:
         return pd.DataFrame(), pd.DataFrame()
 
-    # 2. AGREGASI AWAL: Gabungkan data murni berdasarkan level BIN
+    # 2. AGREGASI AWAL: Ringkas data murni berbasis nama BIN
     bin_groups = df_clean.groupby('BIN').agg({
         'SKU': lambda x: list(set(x.dropna().astype(str))),
         'QTY': 'sum'
@@ -4501,17 +4502,14 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
         qty_total = int(row['QTY'])
         skus_list = row['SKU']
         
-        # Tentukan kapasitas Max
         max_cap = 6 if 'KL1' in str(b_name).upper() else (12 if 'KL2' in str(b_name).upper() else 0)
         
-        # CRITICAL REVISI: Cek status tidak genap berdasarkan TOTAL GABUNGAN QTY BIN
         is_not_genap = False
         if 'KL1' in str(b_name).upper() and qty_total < 5:
             is_not_genap = True
         elif 'KL2' in str(b_name).upper() and qty_total < 11:
             is_not_genap = True
             
-        # BIN yang QTY-nya 0 juga diabaikan dari target penggenapan
         if qty_total <= 0:
             is_not_genap = False
 
@@ -4526,9 +4524,8 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
     used_bins = set()
     consolidation_results = []
 
-    # 3. KONSOLIDASI: Ambil target BIN yang benar-benar TIDAK GENAP
+    # 3. KONSOLIDASI: Cari pasangan kombinasi (Maksimal 2 SKU gabungan)
     target_bins = [v for k, v in bin_contents.items() if v['NOT_GENAP']]
-    # Urutkan dari QTY terbesar agar optimal jadi BIN TUJUAN
     target_bins.sort(key=lambda x: x['QTY'], reverse=True)
 
     for target in target_bins:
@@ -4537,7 +4534,6 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
             
         needed_qty = target['MAX_QTY'] - target['QTY']
         
-        # Cari kandidat BIN AMBIL (Bisa yang statusnya NOT_GENAP maupun yang GENAP tapi mau di-nol-kan)
         candidates = [v for k, v in bin_contents.items() if v['BIN'] != target['BIN'] and v['BIN'] not in used_bins and v['QTY'] > 0]
         candidates.sort(key=lambda x: x['QTY']) 
 
@@ -4547,7 +4543,7 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
         for b1 in candidates:
             if b1['QTY'] == needed_qty:
                 combined_skus = list(set(target['SKUS'] + b1['SKUS']))
-                if len(combined_skus) <= 2: # Acuan: Maksimal gabungan isi adalah 2 SKU
+                if len(combined_skus) <= 2:
                     consolidation_results.append({
                         'SKU TUJUAN': ", ".join(target['SKUS']),
                         'BIN TUJUAN': target['BIN'],
@@ -4573,7 +4569,7 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
                     
                     if b1['QTY'] + b2['QTY'] == needed_qty:
                         combined_skus = list(set(target['SKUS'] + b1['SKUS'] + b2['SKUS']))
-                        if len(combined_skus) <= 2: # Acuan: Maksimal gabungan isi adalah 2 SKU
+                        if len(combined_skus) <= 2:
                             consolidation_results.append({
                                 'SKU TUJUAN': ", ".join(target['SKUS']),
                                 'BIN TUJUAN': target['BIN'],
@@ -4591,33 +4587,39 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
                             break
                 if found_match: break
 
-    # 4. GENERATE DATA REFILL / MUTASI
+    # 4. GENERATE DATA REFILL / MUTASI (REVISI STRUKTUR & FILTER BARU)
     refill_list = []
     for b_name, v in bin_contents.items():
-        # REVISI UTAMA: Jika murni sudah GENAP sejak awal atau sudah sukses masuk plan konsolidasi -> KICK!
-        if not v['NOT_GENAP'] or b_name in used_bins:
+        # Lewati jika sudah sukses dikonsolidasi
+        if b_name in used_bins:
             continue
             
         qty_skrg = v['QTY']
+        
+        # ATURAN REVISI 1: Jika QTY masih di atas atau sama dengan 9, KICK dari list!
+        if qty_skrg >= 9:
+            continue
+            
         max_cap = v['MAX_QTY']
         needed = max_cap - qty_skrg
         
-        action_dest = "GUDANG LT.3"
+        # ATURAN REVISI 2: Jika QTY di bawah 9, jalankan logic breakdown kolom
+        qty_ke_kl1 = 0
+        qty_ke_lt3 = 0
         
-        # Aturan Khusus jika BIN KL2 jeblok di bawah 9 koli
-        if 'KL2' in b_name.upper() and qty_skrg < 9:
-            sisa_lt3 = needed - 6
-            if sisa_lt3 > 0:
-                action_dest = f"PINDAH 6 KE KL1, REFILL {sisa_lt3} KE LT.3"
-            else:
-                action_dest = "PINDAH 6 KE KL1 SAJA"
-                
+        if 'KL2' in b_name.upper():
+            qty_ke_kl1 = 6
+            qty_ke_lt3 = max(0, needed - 6)
+        else:
+            # Jika dia bawaan BIN KL1 asli, maka seluruh kekurangan diarahkan ke Lt.3
+            qty_ke_lt3 = needed
+
         refill_list.append({
             'BIN': b_name,
             'SKU': ", ".join(v['SKUS']) if v['SKUS'] else "-",
             'QTY SEKARANG': qty_skrg,
-            'REFILL NEEDED': needed,
-            'REFILL TO / ACTION': action_dest
+            'MUTASI KE KL1': qty_ke_kl1,
+            'MUTASI KE GUDANG LT.3': qty_ke_lt3
         })
 
     return pd.DataFrame(consolidation_results), pd.DataFrame(refill_list)
@@ -4680,10 +4682,10 @@ def main_menu_koli():
         st.error(f"❌ Gagal membaca file: {str(e)}")
         return
 
-    # Jalankan core engine baru
+    # Panggil Core Engine
     df_conso, df_refill = process_koli_consolidation(df_master)
     
-    # Hitung metriks "Total Koli Tidak Genap" awal berdasarkan akumulasi per BIN
+    # Hitung total koli tidak genap awal area KL1 & KL2 untuk informasi metriks
     df_filtered_count = df_master[df_master['BIN'].astype(str).str.upper().str.contains('KL1|KL2', na=False)]
     if not df_filtered_count.empty:
         bg = df_filtered_count.groupby('BIN')['QTY'].sum().reset_index()
@@ -4709,9 +4711,9 @@ def main_menu_koli():
                 <div class="metric-sub sub-green">↑ Optimal Koli</div>
             </div>
             <div class="metric-card">
-                <div class="metric-label">🛗 Daftar Aksi Refill</div>
+                <div class="metric-label">🛗 Daftar Aksi Mutasi Gudang</div>
                 <div class="metric-value">{len(df_refill)} BIN</div>
-                <div class="metric-sub sub-gold">Sisa Unmatched</div>
+                <div class="metric-sub sub-gold">Qty Koli < 9</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
