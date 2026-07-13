@@ -4474,16 +4474,16 @@ def menu_refill_withdraw():
 
 
 # ==============================================================================
-# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI: STRUKTUR KOLOM & STRICT FILTER KL1/KL2)
+# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI: PECAH STRATEGI REFILL LT.3 & KL1)
 # ==============================================================================
 def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Core Engine: Hanya memproses BIN yang mengandung unsur nama 'KL1' atau 'KL2'.
-    Struktur kolom disesuaikan untuk kebutuhan lapangan: Tujuan vs Ambil 1 vs Ambil 2.
+    Core Engine: Memproses BIN KL1 dan KL2.
+    Revisi Refill: BIN genap diabaikan. Jika KL2 dengan QTY < 9, muatan dipecah ke KL1 dan Lt.3.
     """
     df_clean = df.copy()
     
-    # 1. STRICT FILTER: Buang semua BIN yang TIDAK mengandung kata KL1 atau KL2!
+    # 1. STRICT FILTER: Murni hanya memproses BIN KL1 atau KL2
     df_clean = df_clean[df_clean['BIN'].astype(str).str.upper().str.contains('KL1|KL2', na=False)]
     
     if df_clean.empty:
@@ -4534,7 +4534,7 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
             
         needed_qty = target['MAX_QTY'] - target['QTY']
         
-        # Cari kandidat sumber penggenap (BIN AWAL/AMBIL) yang belum terpakai
+        # Cari kandidat sumber penggenap (BIN AMBIL) yang belum terpakai
         candidates = [v for k, v in bin_contents.items() if v['BIN'] != target['BIN'] and v['BIN'] not in used_bins and v['QTY'] > 0]
         candidates.sort(key=lambda x: x['QTY']) 
 
@@ -4544,7 +4544,7 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
         for b1 in candidates:
             if b1['QTY'] == needed_qty:
                 combined_skus = list(set(target['SKUS'] + b1['SKUS']))
-                if len(combined_skus) <= 2: # Batasan Maksimal 2 SKU berbeda
+                if len(combined_skus) <= 2: 
                     consolidation_results.append({
                         'SKU TUJUAN': ", ".join(target['SKUS']),
                         'BIN TUJUAN': target['BIN'],
@@ -4570,7 +4570,7 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
                     
                     if b1['QTY'] + b2['QTY'] == needed_qty:
                         combined_skus = list(set(target['SKUS'] + b1['SKUS'] + b2['SKUS']))
-                        if len(combined_skus) <= 2: # Batasan Maksimal 2 SKU berbeda
+                        if len(combined_skus) <= 2: 
                             consolidation_results.append({
                                 'SKU TUJUAN': ", ".join(target['SKUS']),
                                 'BIN TUJUAN': target['BIN'],
@@ -4588,17 +4588,35 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
                             break
                 if found_match: break
 
-    # 5. Sisa BIN yang unmatch -> Masuk List REFILL LT.3 (Murni terfilter KL1/KL2 dari atas)
+    # 5. GENERATE DATA REFILL & ACTIONS (ATURAN REVISI BARU)
     refill_list = []
     for b_name, v in bin_contents.items():
-        if v['NOT_GENAP'] and b_name not in used_bins:
-            refill_list.append({
-                'BIN': b_name,
-                'SKU': ", ".join(v['SKUS']) if v['SKUS'] else "-",
-                'QTY SEKARANG': v['QTY'],
-                'REFILL NEEDED': v['MAX_QTY'] - v['QTY'],
-                'REFILL TO': 'GUDANG LT.3'
-            })
+        # REVISI 1: Jika sudah genap (NOT_GENAP == False) atau sudah sukses terkonsolidasi -> SKIP total!
+        if not v['NOT_GENAP'] or b_name in used_bins:
+            continue
+            
+        qty_skrg = v['QTY']
+        max_cap = v['MAX_QTY']
+        needed = max_cap - qty_skrg
+        
+        # Inisialisasi variabel default string keterangan
+        action_dest = "GUDANG LT.3"
+        
+        # REVISI 2: Logic Split Khusus untuk BIN KL2 dengan QTY di bawah 9
+        if 'KL2' in b_name.upper() and qty_skrg < 9:
+            sisa_lt3 = needed - 6
+            if sisa_lt3 > 0:
+                action_dest = f"PINDAH 6 KE KL1, REFILL {sisa_lt3} KE LT.3"
+            else:
+                action_dest = "PINDAH 6 KE KL1 SAJA"
+                
+        refill_list.append({
+            'BIN': b_name,
+            'SKU': ", ".join(v['SKUS']) if v['SKUS'] else "-",
+            'QTY SEKARANG': qty_skrg,
+            'REFILL NEEDED': needed,
+            'REFILL TO / ACTION': action_dest
+        })
 
     return pd.DataFrame(consolidation_results), pd.DataFrame(refill_list)
 
@@ -4660,10 +4678,10 @@ def main_menu_koli():
         st.error(f"❌ Gagal membaca file: {str(e)}")
         return
 
-    # Eksekusi Engine Utama
+    # Jalankan core engine
     df_conso, df_refill = process_koli_consolidation(df_master)
     
-    # Perhitungan Total Koli Tidak Genap (Strict KL1/KL2)
+    # Hitung total koli tidak genap murni area KL1 & KL2 awal
     df_filtered_count = df_master[df_master['BIN'].astype(str).str.upper().str.contains('KL1|KL2', na=False)]
     if not df_filtered_count.empty:
         total_not_genap = len(df_filtered_count[df_filtered_count.apply(
@@ -4673,7 +4691,7 @@ def main_menu_koli():
         total_not_genap = 0
 
     # ==========================================================================
-    # OUTPUT RENDERING DASHBOARD
+    # OUTPUT RENDERING DASHBOARD VISUAL
     # ==========================================================================
     st.markdown(f"""
         <div class="metric-container">
@@ -4688,7 +4706,7 @@ def main_menu_koli():
                 <div class="metric-sub sub-green">↑ Optimal Koli</div>
             </div>
             <div class="metric-card">
-                <div class="metric-label">🛗 Wajib Refill Ke Lt.3</div>
+                <div class="metric-label">🛗 Daftar Aksi Refill</div>
                 <div class="metric-value">{len(df_refill)} BIN</div>
                 <div class="metric-sub sub-gold">Sisa Unmatched</div>
             </div>
@@ -4701,7 +4719,7 @@ def main_menu_koli():
         st.dataframe(df_conso, use_container_width=True, hide_index=True)
             
     with col_right:
-        st.markdown('<div class="section-title">🚨 JOB DELEGATION: REFILL GUDANG LT.3</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">🚨 JOB DELEGATION: ACTION REFILL / MUTASI</div>', unsafe_allow_html=True)
         st.dataframe(df_refill, use_container_width=True, hide_index=True)
 # ==============================================================================
 # LOGIC PROSES & MENU "LIST BIN CYCLE COUNT"
