@@ -4583,79 +4583,141 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
 # LOGIC INTERFACE MENU "RELOKASI KOLI TO KOLI / REFILL"
 # ==============================================================================
 
-# Fungsi Render Dashboard Utama
-def render_dashboard(df_master):
-    st.markdown('<div class="hero-header">📦 KOLI CONSOLIDATION</div>', unsafe_allow_html=True)
-    
-    if df_master is None:
-        st.info("💡 Silakan upload file Excel koli terlebih dahulu di sidebar.")
-        return
+def main_menu_koli():
+    st.markdown("""
+        <style>
+        /* Hero Header Gold Border Style (Sesuai tema lu) */
+        .hero-header {
+            font-size: 28px; 
+            font-weight: 700; 
+            color: #ffffff;
+            background: linear-gradient(135deg, #1f2438 0%, #111424 100%);
+            padding: 20px; 
+            border-radius: 10px; 
+            border-left: 5px solid #C5A059;
+            margin-bottom: 25px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
         
-    df_conso, df_refill = process_koli_consolidation(df_master)
-    total_not_genap = len(df_master[df_master.apply(lambda r: ('KL1' in str(r['BIN']).upper() and r['QTY'] < 5) or ('KL2' in str(r['BIN']).upper() and r['QTY'] < 11), axis=1)])
-    
-    # Premium Metric Boxes (Tetap pakai CSS milik lu)
-    st.markdown(f"""
-        <div class="metric-container">
-            <div class="metric-card">
-                <div class="metric-label">⚠️ Total Koli Tidak Genap</div>
-                <div class="metric-value">{total_not_genap} BIN</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">🔄 Plan Penggenapan (Max 2 Bin Awal)</div>
-                <div class="metric-value">{len(df_conso)} Perintah</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">🛗 Wajib Refill Ke Lt.3</div>
-                <div class="metric-value">{len(df_refill)} BIN</div>
-            </div>
-        </div>
+        /* Metric Card Container & Cards Premium */
+        .metric-container { 
+            display: flex; 
+            gap: 15px; 
+            margin-bottom: 25px; 
+        }
+        .metric-card {
+            flex: 1; 
+            background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+            border-left: 4px solid #C5A059 !important; 
+            padding: 20px; 
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .metric-label { 
+            font-size: 13px; 
+            text-transform: uppercase; 
+            color: #8c96b5; 
+            margin-bottom: 5px; 
+        }
+        .metric-value { 
+            font-size: 24px; 
+            font-weight: 700; 
+            color: #ffffff; 
+        }
+        
+        /* Section Title Style */
+        .section-title { 
+            font-size: 18px; 
+            font-weight: 600; 
+            color: #C5A059; 
+            margin-top: 20px; 
+            margin-bottom: 10px; 
+            text-transform: uppercase; 
+        }
+        </style>
     """, unsafe_allow_html=True)
-    
-    col_left, col_right = st.columns(2)
-    with col_left:
-        st.markdown('<div class="section-title">📋 JOB DELEGATION: PENGGENAPAN KOLI</div>', unsafe_allow_html=True)
-        st.dataframe(df_conso, use_container_width=True, hide_index=True)
-            
-    with col_right:
-        st.markdown('<div class="section-title">🚨 JOB DELEGATION: REFILL GUDANG LT.3</div>', unsafe_allow_html=True)
-        st.dataframe(df_refill, use_container_width=True, hide_index=True)
 
-# Fungsi Render Master Data
-def render_master_data(df_master):
-    st.markdown('<div class="hero-header">🔍 MASTER DATA INVENTORY TRACKER</div>', unsafe_allow_html=True)
-    if df_master is None:
-        st.info("💡 Belum ada data aktif yang masuk.")
-        return
-    st.markdown('<div class="section-title">Semua Data Aktif (Kolom B, C, J)</div>', unsafe_allow_html=True)
-    st.dataframe(df_master, use_container_width=True, hide_index=True)
-
-# CORE MENU UTAMA - Pake Native Component Tanpa Custom HTML/CSS Sidebar
-def main_menu_koli(df_master=None):
-    """
-    Router Menu Koli. 
-    Bisa menerima df_master langsung jika uploader-nya ada di luar (halaman utama).
-    """
-    # 1. Navigation Controller (Murni Native Streamlit)
+    # 1. Navigation Sub-Menu (Murni Native Component, Aman dari bentrok CSS)
     menu_select = st.sidebar.selectbox(
-        "Menu Koli:",
-        ["Dashboard Analisis", "Lihat Data Master"]
+        "Sub-Menu Koli:",
+        ["Dashboard Analisis", "Lihat Data Master"],
+        key="sub_menu_koli_selectbox"
     )
-    
-    # 2. Kondisi jika uploader mau ditaruh di dalam menu koli ini
-    if df_master is None:
-        file_excel = st.sidebar.file_uploader("Upload Excel Gudang (.xlsx)", type=["xlsx"])
-        if file_excel:
-            try:
-                df = pd.read_excel(file_excel)
+
+    # 2. Internal File Uploader (Murni Native Component di Sidebar)
+    file_excel = st.sidebar.file_uploader(
+        "Upload Excel Gudang (.xlsx)", 
+        type=["xlsx"],
+        key="koli_excel_uploader_native"
+    )
+
+    # 3. Logic Read & Mapping Data internal (B, C, J)
+    df_master = None
+    if file_excel is not None:
+        try:
+            df = pd.read_excel(file_excel, header=0)
+            if df.shape[1] >= 10:
                 df_master = pd.DataFrame({
                     'BIN': df.iloc[:, 1],
                     'SKU': df.iloc[:, 2],
                     'QTY': pd.to_numeric(df.iloc[:, 9], errors='coerce').fillna(0).astype(int)
                 }).dropna(subset=['BIN', 'SKU'])
-            except:
-                st.error("Gagal membaca file.")
+            else:
+                st.error("❌ Excel lu kurang dari 10 kolom! Pastikan koordinat data ada di Kolom B, C, dan J.")
+        except Exception as e:
+            st.error(f"❌ Gagal membaca file: {str(e)}")
 
+    # 4. Routing Action Halaman
+    if menu_select == "Dashboard Analisis":
+        st.markdown('<div class="hero-header">📦 KOLI CONSOLIDATION</div>', unsafe_allow_html=True)
+        
+        if df_master is None:
+            st.info("💡 Silakan upload file Excel koli terlebih dahulu di sidebar.")
+            return
+
+        # Eksekusi engine logic
+        df_conso, df_refill = process_koli_consolidation(df_master)
+        
+        # Hitung total koli tidak genap untuk matriks visual
+        total_not_genap = len(df_master[df_master.apply(lambda r: ('KL1' in str(r['BIN']).upper() and r['QTY'] < 5) or ('KL2' in str(r['BIN']).upper() and r['QTY'] < 11), axis=1)])
+
+        # Render Metric Boxes Premium
+        st.markdown(f"""
+            <div class="metric-container">
+                <div class="metric-card">
+                    <div class="metric-label">⚠️ Total Koli Tidak Genap</div>
+                    <div class="metric-value">{total_not_genap} BIN</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">🔄 Plan Penggenapan (Max 2 Bin Awal)</div>
+                    <div class="metric-value">{len(df_conso)} Perintah</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">🛗 Wajib Refill Ke Lt.3</div>
+                    <div class="metric-value">{len(df_refill)} BIN</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Render Split Tables Job Delegation
+        col_left, col_right = st.columns(2)
+        with col_left:
+            st.markdown('<div class="section-title">📋 JOB DELEGATION: PENGGENAPAN KOLI</div>', unsafe_allow_html=True)
+            st.dataframe(df_conso, use_container_width=True, hide_index=True)
+                
+        with col_right:
+            st.markdown('<div class="section-title">🚨 JOB DELEGATION: REFILL GUDANG LT.3</div>', unsafe_allow_html=True)
+            st.dataframe(df_refill, use_container_width=True, hide_index=True)
+
+    elif menu_select == "Lihat Data Master":
+        st.markdown('<div class="hero-header">🔍 MASTER DATA INVENTORY TRACKER</div>', unsafe_allow_html=True)
+        
+        if df_master is None:
+            st.info("💡 Belum ada data aktif. Silakan upload file Excel koli di sidebar.")
+            return
+            
+        st.markdown('<div class="section-title">Semua Data Aktif (Kolom B, C, J)</div>', unsafe_allow_html=True)
+        st.dataframe(df_master, use_container_width=True, hide_index=True)
 
 # ==============================================================================
 # LOGIC PROSES & MENU "LIST BIN CYCLE COUNT"
