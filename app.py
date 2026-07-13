@@ -4474,13 +4474,12 @@ def menu_refill_withdraw():
 
 
 # ==============================================================================
-# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI: STRUKTUR KOLOM MUTASI MANDIRI)
+# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI LOGIC MUTASI REALISTIS)
 # ==============================================================================
 def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Core Engine: Memproses BIN KL1 & KL2.
-    Revisi Refill: Hanya memproses BIN dengan QTY < 9. 
-    Kolom tujuan mutasi dipecah menjadi KL1 dan Gudang Lt.3 secara terpisah.
+    Core Engine: Memproses konsolidasi BIN KL1 & KL2.
+    Fix Mutasi: Jumlah barang yang dimutasi keluar tidak boleh melebihi QTY SEKARANG!
     """
     df_clean = df.copy()
     
@@ -4587,32 +4586,34 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
                             break
                 if found_match: break
 
-    # 4. GENERATE DATA REFILL / MUTASI (REVISI STRUKTUR & FILTER BARU)
+    # 4. GENERATE DATA REFILL / MUTASI (REALISTIS BERDASARKAN STOK YANG ADA)
     refill_list = []
     for b_name, v in bin_contents.items():
-        # Lewati jika sudah sukses dikonsolidasi
         if b_name in used_bins:
             continue
             
         qty_skrg = v['QTY']
         
-        # ATURAN REVISI 1: Jika QTY masih di atas atau sama dengan 9, KICK dari list!
+        # ATURAN STRICT: Jika QTY gabungan >= 9, jangan dimasukkan list
         if qty_skrg >= 9:
             continue
             
-        max_cap = v['MAX_QTY']
-        needed = max_cap - qty_skrg
-        
-        # ATURAN REVISI 2: Jika QTY di bawah 9, jalankan logic breakdown kolom
         qty_ke_kl1 = 0
         qty_ke_lt3 = 0
         
         if 'KL2' in b_name.upper():
-            qty_ke_kl1 = 6
-            qty_ke_lt3 = max(0, needed - 6)
+            # Jika barangnya ada 6 atau lebih (6, 7, 8), bisa kita split bikin 1 koli KL1 penuh
+            if qty_skrg >= 6:
+                qty_ke_kl1 = 6
+                qty_ke_lt3 = qty_skrg - 6  # Sisanya baru dibuang ke Lt.3
+            else:
+                # Kalo barangnya di bawah 6 (misal 3, 4, 5), ga bisa dapet koli KL1 full.
+                # Semua fisik barang disapu bersih langsung ke Lt.3 untuk ngosongin BIN
+                qty_ke_kl1 = 0
+                qty_ke_lt3 = qty_skrg
         else:
-            # Jika dia bawaan BIN KL1 asli, maka seluruh kekurangan diarahkan ke Lt.3
-            qty_ke_lt3 = needed
+            # Bawaan BIN KL1 asli yang bocor langsung dikosongin/dibuang ke Lt.3 sebesar fisik yang ada
+            qty_ke_lt3 = qty_skrg
 
         refill_list.append({
             'BIN': b_name,
@@ -4623,7 +4624,6 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
         })
 
     return pd.DataFrame(consolidation_results), pd.DataFrame(refill_list)
-
 
 # ==============================================================================
 # LOGIC INTERFACE MENU "RELOKASI KOLI TO KOLI / REFILL"
