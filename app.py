@@ -4474,15 +4474,22 @@ def menu_refill_withdraw():
 
 
 # ==============================================================================
-# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI: GLOBAL BIN & MIX MAX 2 SKU)
+# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI: HANYA PROSES BIN KL1 & KL2)
 # ==============================================================================
 def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Core Engine: Mengelompokkan data per nama BIN (bukan SKU), 
-    sehingga bisa mencari pasangan kombinasi lintas SKU dengan limit maksimal 2 SKU per BIN.
+    Core Engine: Hanya memproses BIN yang mengandung unsur nama 'KL1' atau 'KL2'.
+    BIN di luar itu (seperti BIN Rak, Meja Packing, dll) akan diabaikan total.
     """
     df_clean = df.copy()
     
+    # PENTING: Filter awal, buang semua BIN yang TIDAK mengandung kata KL1 atau KL2!
+    df_clean = df_clean[df_clean['BIN'].astype(str).str.upper().str.contains('KL1|KL2', na=False)]
+    
+    # Jika setelah difilter datanya kosong, langsung balikin dataframe kosong biar ga error
+    if df_clean.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
     # 1. Identifikasi kapasitas Max berdasarkan nama BIN
     df_clean['MAX_QTY'] = df_clean['BIN'].apply(lambda x: 6 if 'KL1' in str(x).upper() else (12 if 'KL2' in str(x).upper() else 0))
     
@@ -4658,14 +4665,14 @@ def main_menu_koli():
     # 4. Panggil Core Logic Engine yang di atas
     df_conso, df_refill = process_koli_consolidation(df_master)
     
-    # Hitung total koli tidak genap awal dari master data untuk info metriks
-    # Menggunakan logic penentu ketidakgenapan koli
-    total_not_genap = len(df_master[df_master.apply(
+    # Hitung total koli tidak genap (Hanya hitung data master yang valid KL1/KL2)
+    df_filtered_count = df_master[df_master['BIN'].astype(str).str.upper().str.contains('KL1|KL2', na=False)]
+    total_not_genap = len(df_filtered_count[df_filtered_count.apply(
         lambda r: True if ('KL1' in str(r['BIN']).upper() and r['QTY'] < 5) or ('KL2' in str(r['BIN']).upper() and r['QTY'] < 11) else False, axis=1
     )].groupby('BIN'))
 
     # ==========================================================================
-    # OUTPUT RENDERING DASHBOARD VISUAL (MODEL BARU LU)
+    # OUTPUT RENDERING DASHBOARD VISUAL
     # ==========================================================================
     st.markdown(f"""
         <div class="metric-container">
