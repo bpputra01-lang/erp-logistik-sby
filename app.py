@@ -4472,6 +4472,236 @@ def menu_refill_withdraw():
                     st.toast("WITHDRAW UPLOADED!")
 
 
+# ==============================================================================
+# LOGIC PROSES MENU "RELOKASI KOLI TO KOLI / REFILL"
+# ==============================================================================
+def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Core Logic Engine untuk Konsolidasi Koli & Refill Lt.3
+    Kolom Input Wajib: BIN (B), SKU (C), QTY (J)
+    """
+    df_clean = df.copy()
+    
+    # 1. Identifikasi kapasitas Max berdasarkan nama BIN
+    def get_max_qty(bin_name):
+        if 'KL1' in str(bin_name).upper(): return 6
+        if 'KL2' in str(bin_name).upper(): return 12
+        return 0
+
+    df_clean['MAX_QTY'] = df_clean['BIN'].apply(get_max_qty)
+    
+    # 2. Cek status ketidakgenapan (KL1 < 5, KL2 < 11)
+    def is_not_genap(row):
+        if 'KL1' in str(row['BIN']).upper() and row['QTY'] < 5: return True
+        if 'KL2' in str(row['BIN']).upper() and row['QTY'] < 11: return True
+        return False
+
+    df_clean['NOT_GENAP'] = df_clean.apply(is_not_genap, axis=1)
+
+    # Tracker data agar tidak duplikasi
+    used_bins = set()
+    consolidation_results = []
+    refill_list = []
+    
+    # 3. Pengelompokan per SKU untuk pencarian pasangan
+    for sku, group in df_clean.groupby('SKU'):
+        # Ambil yang tidak genap, urutkan dari QTY terbesar (calon BIN TUJUAN)
+        unbalanced = group[group['NOT_GENAP'] == True].sort_values(by='QTY', ascending=False).to_dict('records')
+        
+        for target_bin in unbalanced:
+            if target_bin['BIN'] in used_bins:
+                continue
+                
+            max_capacity = target_bin['MAX_QTY']
+            current_qty = target_bin['QTY']
+            needed_qty = max_capacity - current_qty
+            
+            # Cari kandidat BIN AWAL (Urut dari QTY terkecil agar efisien menggenapi)
+            candidates = [b for b in unbalanced if b['BIN'] != target_bin['BIN'] and b['BIN'] not in used_bins]
+            candidates.sort(key=lambda x: x['QTY'])
+            
+            found_match = False
+            
+            # CASE 1: Cek kecocokan dengan 1 BIN AWAL
+            for b1 in candidates:
+                if b1['QTY'] == needed_qty:
+                    consolidation_results.append({
+                        'SKU': sku,
+                        'BIN TUJUAN': target_bin['BIN'],
+                        'QTY SEKARANG': current_qty,
+                        'BIN AWAL 1': b1['BIN'],
+                        'QTY AWAL 1': b1['QTY'],
+                        'BIN AWAL 2': '-',
+                        'QTY AWAL 2': 0,
+                        'TOTAL AKHIR': current_qty + b1['QTY']
+                    })
+                    used_bins.add(target_bin['BIN'])
+                    used_bins.add(b1['BIN'])
+                    found_match = True
+                    break
+            
+            # CASE 2: Cek kecocokan kombinasi maksimal 2 BIN AWAL
+            if not found_match and len(candidates) >= 2:
+                for idx_a in range(len(candidates)):
+                    for idx_b in range(idx_a + 1, len(candidates)):
+                        b1 = candidates[idx_a]
+                        b2 = candidates[idx_b]
+                        
+                        if b1['QTY'] + b2['QTY'] == needed_qty:
+                            consolidation_results.append({
+                                'SKU': sku,
+                                'BIN TUJUAN': target_bin['BIN'],
+                                'QTY SEKARANG': current_qty,
+                                'BIN AWAL 1': b1['BIN'],
+                                'QTY AWAL 1': b1['QTY'],
+                                'BIN AWAL 2': b2['BIN'],
+                                'QTY AWAL 2': b2['QTY'],
+                                'TOTAL AKHIR': current_qty + b1['QTY'] + b2['QTY']
+                            })
+                            used_bins.add(target_bin['BIN'])
+                            used_bins.add(b1['BIN'])
+                            used_bins.add(b2['BIN'])
+                            found_match = True
+                            break
+                    if found_match: break
+
+    # 4. Filter BIN sisa yang tidak dapet pasangan -> Masuk REFILL LT.3
+    for _, row in df_clean[df_clean['NOT_GENAP'] == True].iterrows():
+        if row['BIN'] not in used_bins:
+            refill_list.append({
+                'BIN': row['BIN'],
+                'SKU': row['SKU'],
+                'QTY SEKARANG': row['QTY'],
+                'REFILL NEEDED': row['MAX_QTY'] - row['QTY'],
+                'REFILL TO': 'GUDANG LT.3'
+            })
+
+    return pd.DataFrame(consolidation_results), pd.DataFrame(refill_list)
+
+# app.py
+import streamlit as st
+import pandas as pd
+from engine import process_koli_consolidation
+
+# 1. STYLE CONFIG (Premium Dark Mode Dashboard)
+st.set_page_config(page_title="Consolidation System", layout="wide")
+
+st.markdown("""
+    <style>
+    .stApp { background-color: #0e1117; color: #e0e0e0; }
+    .hero-header {
+        font-size: 28px; font-weight: 700; color: #ffffff;
+        background: linear-gradient(135deg, #1f2438 0%, #111424 100%);
+        padding: 20px; border-radius: 10px; border-left: 5px solid #C5A059;
+        margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .metric-container { display: flex; gap: 15px; margin-bottom: 25px; }
+    .metric-card {
+        flex: 1; background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important;
+        border-left: 4px solid #C5A059 !important; padding: 20px; border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    .metric-label { font-size: 13px; text-transform: uppercase; color: #8c96b5; margin-bottom: 5px; }
+    .metric-value { font-size: 24px; font-weight: 700; color: #ffffff; }
+    .section-title { font-size: 18px; font-weight: 600; color: #C5A059; margin-top: 20px; margin-bottom: 10px; text-transform: uppercase; }
+    
+    /* Style untuk custom Sidebar/Menu */
+    [data-testid="stSidebar"] {
+        background-color: #111424 !important;
+        border-right: 1px solid #C5A059;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
+# 2. SAMPLE DATA LOAD
+@st.cache_data
+def load_sample_data():
+    return pd.DataFrame({
+        'BIN': ['KL2-A1-1', 'KL1-A2-3', 'KL1-A2-4', 'KL1-B1-1', 'KL2-B2-1', 'KL1-C1-1', 'KL2-C2-2'],
+        'SKU': ['SKU-999', 'SKU-999', 'SKU-999', 'SKU-888', 'SKU-888', 'SKU-777', 'SKU-555'],
+        'QTY': [9, 2, 1, 3, 8, 2, 5]
+    })
+
+
+# 3. DEF FUNGSI UNTUK TIAP HALAMAN / MENU
+def render_dashboard(df_master):
+    """Menampilkan Dashboard Utama, Metriks, dan Tabel Hasil Konsolidasi & Refill"""
+    st.markdown('<div class="hero-header">📦 KOLI CONSOLIDATION & REFILL SYSTEM</div>', unsafe_allow_html=True)
+    
+    # Jalankan core logic dari engine
+    df_conso, df_refill = process_koli_consolidation(df_master)
+    
+    # Hitung total yang tidak genap untuk matriks visual
+    total_not_genap = len(df_master[df_master.apply(lambda r: ('KL1' in str(r['BIN']).upper() and r['QTY'] < 5) or ('KL2' in str(r['BIN']).upper() and r['QTY'] < 11), axis=1)])
+    
+    # Render Metric Boxes Premium
+    st.markdown(f"""
+        <div class="metric-container">
+            <div class="metric-card">
+                <div class="metric-label">⚠️ Total Koli Tidak Genap</div>
+                <div class="metric-value">{total_not_genap} BIN</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">🔄 Plan Penggenapan (Max 2 Bin Awal)</div>
+                <div class="metric-value">{len(df_conso)} Perintah</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">🛗 Wajib Refill Ke Lt.3</div>
+                <div class="metric-value">{len(df_refill)} BIN</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Render Split Tables
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        st.markdown('<div class="section-title">📋 JOB DELEGATION: PENGGENAPAN KOLI</div>', unsafe_allow_html=True)
+        if not df_conso.empty:
+            st.dataframe(df_conso, use_container_width=True, hide_index=True)
+        else:
+            st.info("Tidak ada koli yang bisa digenapkan dengan kombinasi max 2 BIN.")
+            
+    with col_right:
+        st.markdown('<div class="section-title">🚨 JOB DELEGATION: REFILL GUDANG LT.3</div>', unsafe_allow_html=True)
+        if not df_refill.empty:
+            st.dataframe(df_refill, use_container_width=True, hide_index=True)
+        else:
+            st.success("Aman! Tidak ada item yang perlu di-refill manual ke Lt.3.")
+
+
+def render_master_data(df_master):
+    """Menampilkan Menu Management / Preview Data Mentah"""
+    st.markdown('<div class="hero-header">🔍 MASTER DATA INVENTORY TRACKER</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Semua Data Aktif (Kolom B, C, J)</div>', unsafe_allow_html=True)
+    
+    # Tampilkan full data editor/viewer
+    st.dataframe(df_master, use_container_width=True, hide_index=True)
+
+
+# 4. DEF MAIN MENU CONTROLLER
+def main_menu_koli():
+    """Fungsi Router Utama untuk Mengatur Navigasi Menggunakan Sidebar"""
+    st.sidebar.markdown("<h2 style='color:#C5A059; text-align:center;'>NAVIGASI MENU</h2>", unsafe_allow_html=True)
+    st.sidebar.markdown("---")
+    
+    # Pilihan Menu Navigasi
+    menu_select = st.sidebar.radio(
+        "Pilih Halaman:",
+        ["Dashboard Analisis", "Lihat Data Master"],
+        index=0
+    )
+    
+    # Load data master sekali saja di level root menu
+    df_master = load_sample_data()
+    
+    # Routing Halaman berdasarkan pilihan user
+    if menu_select == "Dashboard Analisis":
+        render_dashboard(df_master)
+    elif menu_select == "Lihat Data Master":
+        render_master_data(df_master)
+
 
 # ==============================================================================
 # LOGIC PROSES & MENU "LIST BIN CYCLE COUNT"
@@ -9370,7 +9600,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     if is_dc:
-        m3_list = ["Stock Opname","Match Real & System","Cycle Count", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina"]
+        m3_list = ["Stock Opname","Match Real & System","Cycle Count", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill"]
     else:
         m3_list = ["Stock Minus","Cycle Count"] # Menu Cabang
 
@@ -11094,6 +11324,9 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "Refill Koli to Koli/Refill":
+    main_menu_koli()
 
 elif menu == "Store Leader RTO Decission":
     render_menu_compare()
