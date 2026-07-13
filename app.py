@@ -4474,7 +4474,7 @@ def menu_refill_withdraw():
 
 
 # ==============================================================================
-# ENGINE CORE LOGIC - KOLI CONSOLIDATION (REVISI LOGIC MUTASI REALISTIS)
+# LOGIC PROCESS MENU "REFILL KOLI TO KOLI / REFILL"
 # ==============================================================================
 def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -4625,6 +4625,8 @@ def process_koli_consolidation(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
 
     return pd.DataFrame(consolidation_results), pd.DataFrame(refill_list)
 
+
+
 # ==============================================================================
 # LOGIC INTERFACE MENU "RELOKASI KOLI TO KOLI / REFILL"
 # ==============================================================================
@@ -4719,13 +4721,44 @@ def main_menu_koli():
     """, unsafe_allow_html=True)
 
     col_left, col_right = st.columns(2)
+    
+    # --- KOLOM KIRI: PENGGENAPAN KOLI ---
     with col_left:
         st.markdown('<div class="section-title">📋 JOB DELEGATION: PENGGENAPAN KOLI (MIX SKU OK)</div>', unsafe_allow_html=True)
         st.dataframe(df_conso, use_container_width=True, hide_index=True)
+        
+        # Tombol Download Penggenapan Koli
+        if not df_conso.empty:
+            buffer_conso = io.BytesIO()
+            with pd.ExcelWriter(buffer_conso, engine='xlsxwriter') as writer:
+                df_conso.to_excel(writer, index=False, sheet_name='Plan Penggenapan')
             
+            st.download_button(
+                label="📥 Download Plan Penggenapan Excel",
+                data=buffer_conso.getvalue(),
+                file_name="plan_penggenapan_koli.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="btn_download_conso"
+            )
+            
+    # --- KOLOM KANAN: ACTION REFILL / MUTASI ---
     with col_right:
         st.markdown('<div class="section-title">🚨 JOB DELEGATION: ACTION REFILL / MUTASI</div>', unsafe_allow_html=True)
         st.dataframe(df_refill, use_container_width=True, hide_index=True)
+        
+        # Tombol Download Action Refill / Mutasi
+        if not df_refill.empty:
+            buffer_refill = io.BytesIO()
+            with pd.ExcelWriter(buffer_refill, engine='xlsxwriter') as writer:
+                df_refill.to_excel(writer, index=False, sheet_name='Action Mutasi')
+            
+            st.download_button(
+                label="📥 Download List Mutasi & Refill Excel",
+                data=buffer_refill.getvalue(),
+                file_name="action_mutasi_refill.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="btn_download_refill"
+            )
 # ==============================================================================
 # LOGIC PROSES & MENU "LIST BIN CYCLE COUNT"
 # ==============================================================================
