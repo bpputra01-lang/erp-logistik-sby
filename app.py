@@ -8935,8 +8935,8 @@ def show_database_ongkir():
                                         fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                     else:
                                         try:
-                                            # Memakai pandas to_datetime untuk auto-parse berbagai format tanggal
-                                            fix_dt = pd.to_datetime(tgl_jam_raw).strftime("%Y-%m-%d %H:%M:%S")
+                                            # Mengunci parsing agar mendahulukan Hari (Day) sebelum Bulan (Month)
+                                            fix_dt = pd.to_datetime(tgl_jam_raw, dayfirst=True).strftime("%Y-%m-%d %H:%M:%S")
                                         except:
                                             error_rows.append(f"Baris {idx+2}: Format tanggal '{tgl_jam_raw}' tidak valid.")
                                             continue
