@@ -8912,19 +8912,68 @@ def show_database_ongkir():
                         if st.button("▶️ UPLOAD BULK ONGKIR"):
                             with st.spinner('Processing...'):
                                 batch_data = []
-                                for _, row in df_mass.iterrows():
+                                error_rows = []
+                                
+                                for idx, row in df_mass.iterrows():
+                                    # Handle Supplier & Ekspedisi
+                                    sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
+                                    eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
+                                    
+                                    # Handle Total Koli (Pastikan integer valid)
+                                    try:
+                                        koli = int(float(row["TOTAL KOLI"])) if not pd.isna(row["TOTAL KOLI"]) else 0
+                                    except:
+                                        koli = 0
+                                        
+                                    # Handle Ongkir
+                                    ongkir = clean_currency(row["ONGKIR"])
+                                    
+                                    # Handle Tanggal Jam (Konversi otomatis ke format ISO Standar)
+                                    tgl_jam_raw = row["TANGGAL_JAM"]
+                                    if pd.isna(tgl_jam_raw) or str(tgl_jam_raw).strip() == "":
+                                        # Fallback ke waktu sekarang jika kosong
+                                        fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    else:
+                                        try:
+                                            # Memakai pandas to_datetime untuk auto-parse berbagai format tanggal
+                                            fix_dt = pd.to_datetime(tgl_jam_raw).strftime("%Y-%m-%d %H:%M:%S")
+                                        except:
+                                            error_rows.append(f"Baris {idx+2}: Format tanggal '{tgl_jam_raw}' tidak valid.")
+                                            continue
+
+                                    if not sup:
+                                        error_rows.append(f"Baris {idx+2}: Nama Supplier kosong.")
+                                        continue
+
                                     batch_data.append({
-                                        "supplier": str(row["SUPPLIER"]).upper(), 
-                                        "ekspedisi": str(row["EKSPEDISI"]).upper(), 
-                                        "total_koli": int(row["TOTAL KOLI"]), 
-                                        "total_ongkir": clean_currency(row["ONGKIR"]),
-                                        "created_at": str(row["TANGGAL_JAM"])
+                                        "supplier": sup, 
+                                        "ekspedisi": eks, 
+                                        "total_koli": koli, 
+                                        "total_ongkir": ongkir,
+                                        "created_at": fix_dt
                                     })
-                                supabase.table("shipping_costs").insert(batch_data).execute()
-                            st.success("Berhasil diinput!")
-                            st.rerun()
+                                
+                                # Jika ada error parsing sebelum ke database
+                                if error_rows:
+                                    st.error("Gagal memproses file. Silakan perbaiki baris berikut:")
+                                    for err in error_rows[:10]: # Tampilkan max 10 error
+                                        st.text(err)
+                                    if len(error_rows) > 10:
+                                        st.text(f"...dan {len(error_rows) - 10} baris lainnya.")
+                                else:
+                                    # Eksekusi ke Supabase dengan aman
+                                    try:
+                                        if batch_data:
+                                            supabase.table("shipping_costs").insert(batch_data).execute()
+                                            st.success(f"Berhasil menginput {len(batch_data)} data!")
+                                            st.rerun()
+                                        else:
+                                            st.warning("Tidak ada data valid yang bisa diupload.")
+                                    except Exception as db_err:
+                                        st.error(f"Gagal menyimpan ke Database Supabase: {db_err}")
+                                        st.info("💡 Pastikan nama kolom di database sesuai dengan key script (supplier, ekspedisi, total_koli, total_ongkir, created_at) dan tidak melanggar constraint database.")
                     else:
-                        st.error(f"Format salah! Harus: {required}")
+                        st.error(f"Format salah! Harus mengandung kolom: {required}")
 
     with tab_summary:
         if not df_raw.empty:
