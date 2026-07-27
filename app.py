@@ -4158,7 +4158,7 @@ def menu_putaway_audit_list():
             
             # 2. Ambil berdasarkan posisi index kolom D (ke-3), J (ke-9), L (ke-11)
             # iloc[:, [3, 9, 11]] dipake supaya tidak peduli apa nama header di Excel-nya
-            df_raw = df_raw.iloc[:, [3, 9, 11]]
+            df_raw = df_raw.iloc[:, [3, 8, 12]]
             
             # 3. Rename nama kolomnya langsung
             df_raw.columns = ['SKU', 'BIN AWAL', 'BIN TUJUAN']
