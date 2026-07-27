@@ -8688,7 +8688,7 @@ def tampilan_display_control():
             st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF9800;"><p class="metric-label">🏬 From Store</p><p class="metric-value">{need_gudang:,}</p><p class="metric-arrow" style="color: #FF9800;">STORE</p></div>', unsafe_allow_html=True)
         
         with c5:
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00BCD4;"><p class="metric-label">🏭 From DC</p><p class="metric-value">{need_dc:,}</p><p class="metric-arrow" style="color: #00BCD4;">Bin DC</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00BCD4;"><p class="metric-label">🏭 From DC</p><p class="metric-value">{need_dc:,}</p><p class="metric-arrow" style="color: #00BCD4;">DC</p></div>', unsafe_allow_html=True)
         
         with c6:
             st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina</p><p class="metric-value">{karantina_lock:,}</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
