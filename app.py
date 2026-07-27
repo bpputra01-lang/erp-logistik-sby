@@ -4108,34 +4108,48 @@ def process_mutation_chain(df):
 def menu_putaway_audit_list():
     """
     Fungsi utama untuk menampilkan interface & logic Putaway Audit List.
-    Panggil fungsi ini di router menu / main file Streamlit kamu.
+    Judul disesuaikan dengan gaya tombol biru bulat di gambar referensi.
     """
     
-    # Custom Styling (Dark Mode Accent & Metric Box)
+    # 1. Custom Styling CSS
     st.markdown("""
         <style>
-            .main-title {
-                font-size: 24px;
+            /* Gaya Judul Utama (Header bergaya Tombol Biru sesuai Gambar) */
+            .header-badge {
+                background: linear-gradient(180deg, #2D58A6 0%, #1A3C78 100%); /* Gradien Biru */
+                color: white;
+                font-family: 'Source Sans Pro', sans-serif; /* Font default Streamlit yang mirip */
+                font-size: 26px;
                 font-weight: 700;
-                color: #C5A059;
-                margin-bottom: 4px;
+                padding: 15px 30px;
+                border-radius: 12px; /* Rounded corners */
+                display: inline-block;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3); /* Bayangan soft */
+                letter-spacing: 0.5px;
+                text-transform: uppercase; /* Force uppercase seperti di gambar */
             }
-            .sub-title {
-                font-size: 13px;
+
+            /* Sub-title style (opsional, di luar badge) */
+            .sub-title-text {
+                font-size: 14px;
                 color: #A0AABF;
-                margin-bottom: 18px;
+                margin-bottom: 20px;
+                display: block;
             }
+
+            /* Penyesuaian warna Metric */
             div[data-testid="stMetricValue"] {
-                font-size: 22px;
-                color: #4CAF50;
+                font-size: 24px;
+                color: #4CAF50; /* Hijau untuk angka */
             }
         </style>
     """, unsafe_allow_html=True)
 
-    # 1. Header
-    st.markdown('<div class="main-title">📦 UPLOAD & AUDIT PUTAWAY MUTASI</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">Pelacak rantai mutasi SKU berdasarkan keterhubungan BIN Awal & BIN Tujuan.</div>', unsafe_allow_html=True)
-
+    # 2. Tampilkan Judul dengan Gaya Baru (Badge)
+    # Teks disesuaikan menjadi "PUTAWAY AUDIT LIST"
+    st.markdown('<div class="header-badge">PUTAWAY AUDIT LIST</div>', unsafe_allow_html=True)
+    
     # 2. Inisialisasi Session State agar data tidak hilang saat re-run
     if 'df_audit_result' not in st.session_state:
         st.session_state['df_audit_result'] = None
