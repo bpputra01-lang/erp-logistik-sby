@@ -4048,12 +4048,6 @@ def main_menu_routing():
 # LOGIC PROSES MENU "PUTAWAY AUDIT LIST"
 # ==============================================================================
 
-import streamlit as st
-import pandas as pd
-
-# ==============================================================================
-# ENGINE LOGIKA PERJALANAN MUTASI
-# ==============================================================================
 def process_mutation_chain(df):
     """
     Memproses rantai perjalanan SKU berdasarkan urutan transaksi.
@@ -4108,131 +4102,103 @@ def process_mutation_chain(df):
 def menu_putaway_audit_list():
     """
     Fungsi utama untuk menampilkan interface & logic Putaway Audit List.
-    Judul disesuaikan dengan gaya tombol biru bulat di gambar referensi.
     """
     
-    # 1. Custom Styling CSS
+    # Custom Styling Header Badge
     st.markdown("""
         <style>
-            /* Gaya Judul Utama (Header bergaya Tombol Biru sesuai Gambar) */
             .header-badge {
-                background: linear-gradient(180deg, #2D58A6 0%, #1A3C78 100%); /* Gradien Biru */
+                background: linear-gradient(180deg, #2D58A6 0%, #1A3C78 100%);
                 color: white;
-                font-family: 'Source Sans Pro', sans-serif; /* Font default Streamlit yang mirip */
+                font-family: 'Source Sans Pro', sans-serif;
                 font-size: 26px;
                 font-weight: 700;
                 padding: 15px 30px;
-                border-radius: 12px; /* Rounded corners */
+                border-radius: 12px;
                 display: inline-block;
                 margin-bottom: 20px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.3); /* Bayangan soft */
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
                 letter-spacing: 0.5px;
-                text-transform: uppercase; /* Force uppercase seperti di gambar */
+                text-transform: uppercase;
             }
-
-            /* Sub-title style (opsional, di luar badge) */
             .sub-title-text {
                 font-size: 14px;
                 color: #A0AABF;
                 margin-bottom: 20px;
                 display: block;
             }
-
-            /* Penyesuaian warna Metric */
             div[data-testid="stMetricValue"] {
                 font-size: 24px;
-                color: #4CAF50; /* Hijau untuk angka */
+                color: #4CAF50;
             }
         </style>
     """, unsafe_allow_html=True)
 
-    # 2. Tampilkan Judul dengan Gaya Baru (Badge)
-    # Teks disesuaikan menjadi "PUTAWAY AUDIT LIST"
+    # 1. Header dengan Badge Blue Style
     st.markdown('<div class="header-badge">PUTAWAY AUDIT LIST</div>', unsafe_allow_html=True)
-    
-    # 2. Inisialisasi Session State agar data tidak hilang saat re-run
+    st.markdown('<span class="sub-title-text">Sistem pelacak rantai mutasi SKU berdasarkan urutan BIN Awal ke BIN Tujuan.</span>', unsafe_allow_html=True)
+
+    # Inisialisasi Session State
     if 'df_audit_result' not in st.session_state:
         st.session_state['df_audit_result'] = None
-    if 'df_raw_preview' not in st.session_state:
-        st.session_state['df_raw_preview'] = None
 
-    # 3. Sidebar/Form Pengaturan Kolom (Default D=3, J=9, L=11)
-    with st.expander("⚙️ Pengaturan Index Kolom Excel (Default: D, J, L)", expanded=False):
-        col_c1, col_c2, col_c3 = st.columns(3)
-        col_sku_idx = col_c1.number_input("Index Kolom SKU (D=3)", value=3, min_value=0)
-        col_bin_awal_idx = col_c2.number_input("Index Kolom BIN AWAL (J=9)", value=9, min_value=0)
-        col_bin_tujuan_idx = col_c3.number_input("Index Kolom BIN TUJUAN (L=11)", value=11, min_value=0)
-
-    # 4. File Uploader
+    # 2. File Uploader
     uploaded_file = st.file_uploader("Upload File Mutasi (Excel .xlsx / CSV)", type=["xlsx", "xls", "csv"])
 
     if uploaded_file is not None:
         try:
-            target_cols = [int(col_sku_idx), int(col_bin_awal_idx), int(col_bin_tujuan_idx)]
+            # Langsung ambil Kolom D (index 3), J (index 9), L (index 11)
+            target_cols = [3, 9, 11]
             
-            # Read File (CSV vs Excel)
             if uploaded_file.name.endswith('.csv'):
                 df_raw = pd.read_csv(uploaded_file, usecols=target_cols, header=None)
             else:
                 df_raw = pd.read_excel(uploaded_file, usecols=target_cols, header=None)
             
-            # Rename Kolom untuk Standarisasi
             df_raw.columns = ['SKU', 'BIN AWAL', 'BIN TUJUAN']
             
-            # Clean Header jika baris 1 berisi judul teks
+            # Clean Header jika baris pertama berisi text header
             first_row_sku = str(df_raw.iloc[0]['SKU']).upper()
             if "SKU" in first_row_sku or "ITEM" in first_row_sku:
                 df_raw = df_raw.iloc[1:].reset_index(drop=True)
                 
             df_raw = df_raw.dropna(subset=['SKU', 'BIN AWAL', 'BIN TUJUAN'])
-            st.session_state['df_raw_preview'] = df_raw
 
-            # Expander Preview Raw Data
+            # Preview Raw Data
             with st.expander("👀 Preview Raw Data Ter-upload", expanded=False):
                 st.dataframe(df_raw.head(15), use_container_width=True)
 
-            # Tombol Eksekusi Processing
+            # Tombol Eksekusi
             if st.button("🚀 JALANKAN AUDIT PUTAWAY", type="primary"):
                 with st.spinner("Sedang merantai alur mutasi & menentukan Last Bin..."):
                     df_res = process_mutation_chain(df_raw)
-                    
-                    # Deduplikasi hasil akhir jika ada alur yang benar-benar identik
-                    df_res_unique = df_res.drop_duplicates().reset_index(drop=True)
-                    st.session_state['df_audit_result'] = df_res_unique
+                    st.session_state['df_audit_result'] = df_res.drop_duplicates().reset_index(drop=True)
                     st.success("✅ Audit Mutasi Selesai Diproses!")
 
         except Exception as e:
-            st.error(f"Gagal memproses file. Pastikan susunan kolom sesuai! Error: {e}")
+            st.error(f"Gagal memproses file. Pastikan struktur file valid! Error: {e}")
 
-    # 5. Tampilkan Hasil Audit (Jika Data Sudah Ada)
+    # 3. Tampilkan Hasil Audit
     if st.session_state['df_audit_result'] is not None:
         df_res = st.session_state['df_audit_result']
-
         st.divider()
         
-        # Summary Metrics
         m1, m2, m3 = st.columns(3)
         m1.metric("Total SKU Unik", df_res['SKU'].nunique())
         m2.metric("Total Rantai Mutasi", len(df_res))
-        m3.metric("Max Perpindahan Rantai", df_res['TOTAL PERJALANAN'].max())
+        m3.metric("Max Perpindahan", df_res['TOTAL PERJALANAN'].max())
 
         st.subheader("🎯 HASIL AUDIT PUTAWAY (UNIQUE LAST BIN)")
-
-        # Filter Quick Search
-        sku_search = st.text_input("🔍 Cari SKU / BIN Spesifik:", "")
+        
+        # Search Bar
+        sku_search = st.text_input("🔍 Cari SKU Spesifik:", "")
         if sku_search:
-            mask = (
-                df_res['SKU'].astype(str).str.contains(sku_search, case=False, na=False) |
-                df_res['LAST BIN MUTASI'].astype(str).str.contains(sku_search, case=False, na=False)
-            )
-            df_display = df_res[mask]
+            df_display = df_res[df_res['SKU'].astype(str).str.contains(sku_search, case=False, na=False)]
         else:
             df_display = df_res
 
-        # Tabel Utama Hasil Audit
         st.dataframe(df_display, use_container_width=True)
 
-        # Download CSV
         csv_data = df_res.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="📥 Download Hasil Audit Putaway (CSV)",
@@ -4240,6 +4206,7 @@ def menu_putaway_audit_list():
             file_name="Audit_Putaway_Last_Bin.csv",
             mime="text/csv"
         )
+
 
 
 
