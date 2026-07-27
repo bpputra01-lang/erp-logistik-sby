@@ -4150,22 +4150,27 @@ def menu_putaway_audit_list():
 
     if uploaded_file is not None:
         try:
-            # Langsung ambil Kolom D (index 3), J (index 9), L (index 11)
-            target_cols = [3, 9, 11]
-            
+            # 1. Baca file dengan mengasumsikan baris pertama adalah header bawaan Excel
             if uploaded_file.name.endswith('.csv'):
-                df_raw = pd.read_csv(uploaded_file, usecols=target_cols, header=None)
+                df_raw = pd.read_csv(uploaded_file)
             else:
-                df_raw = pd.read_excel(uploaded_file, usecols=target_cols, header=None)
+                df_raw = pd.read_excel(uploaded_file)
             
+            # 2. Ambil berdasarkan posisi index kolom D (ke-3), J (ke-9), L (ke-11)
+            # iloc[:, [3, 9, 11]] dipake supaya tidak peduli apa nama header di Excel-nya
+            df_raw = df_raw.iloc[:, [3, 9, 11]]
+            
+            # 3. Rename nama kolomnya langsung
             df_raw.columns = ['SKU', 'BIN AWAL', 'BIN TUJUAN']
             
-            # Clean Header jika baris pertama berisi text header
-            first_row_sku = str(df_raw.iloc[0]['SKU']).upper()
-            if "SKU" in first_row_sku or "ITEM" in first_row_sku:
-                df_raw = df_raw.iloc[1:].reset_index(drop=True)
-                
-            df_raw = df_raw.dropna(subset=['SKU', 'BIN AWAL', 'BIN TUJUAN'])
+            # 4. Bersihkan data kosong / string 'nan'
+            df_raw = df_raw.dropna(subset=['SKU'])
+            df_raw['BIN AWAL'] = df_raw['BIN AWAL'].fillna('')
+            df_raw['BIN TUJUAN'] = df_raw['BIN TUJUAN'].fillna('')
+            
+            # Filter baris yang benar-benar punya BIN AWAL dan BIN TUJUAN
+            df_raw = df_raw[(df_raw['BIN AWAL'].astype(str).str.strip() != '') & 
+                            (df_raw['BIN TUJUAN'].astype(str).str.strip() != '')]
 
             # Preview Raw Data
             with st.expander("👀 Preview Raw Data Ter-upload", expanded=False):
@@ -4179,7 +4184,7 @@ def menu_putaway_audit_list():
                     st.success("✅ Audit Mutasi Selesai Diproses!")
 
         except Exception as e:
-            st.error(f"Gagal memproses file. Pastikan struktur file valid! Error: {e}")
+            st.error(f"Gagal memproses file. Pastikan file memiliki minimal 12 kolom (A sampai L)! Error: {e}")
 
     # 3. Tampilkan Hasil Audit
     if st.session_state['df_audit_result'] is not None:
