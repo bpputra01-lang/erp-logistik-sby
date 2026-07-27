@@ -4093,6 +4093,9 @@ def process_mutation_chain(df):
                 'ALUR MUTASI': " ➔ ".join(chain['history'])
             })
             
+    if not processed_records:
+        return pd.DataFrame(columns=['SKU', 'BIN INITIAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
+        
     return pd.DataFrame(processed_records)
 
 
