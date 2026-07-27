@@ -8668,10 +8668,11 @@ def tampilan_display_control():
 
         total_art = on_display + need_display
 
-        # --- 3. TAMPILAN DASHBOARD ---
+       # --- 3. TAMPILAN DASHBOARD ---
         st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
         
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        # BARIS 1: Metrics Utama (Total, On Display, Need Display)
+        c1, c2, c3 = st.columns(3)
         
         with c1:
             st.markdown(f'<div class="metric-card" style="border-left: 4px solid #7B61FF;"><p class="metric-label">🧥 Total Art.</p><p class="metric-value">{total_art:,}</p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
@@ -8684,6 +8685,9 @@ def tampilan_display_control():
             perc_need = (need_display / total_art * 100) if total_art > 0 else 0
             st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
         
+        # BARIS 2: Breakdown Lokasi (From Store, From DC, Karantina)
+        c4, c5, c6 = st.columns(3)
+
         with c4:
             st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF9800;"><p class="metric-label">🏬 From Store</p><p class="metric-value">{need_gudang:,}</p><p class="metric-arrow" style="color: #FF9800;">STORE</p></div>', unsafe_allow_html=True)
         
