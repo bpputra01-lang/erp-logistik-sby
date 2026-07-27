@@ -4044,6 +4044,193 @@ def main_menu_routing():
                 st.button("📊 Download Master Report (All SKU)", disabled=True, help="Data log transaksi kosong.")
 
 
+# ==============================================================================
+# LOGIC PROSES MENU "PUTAWAY AUDIT LIST"
+# ==============================================================================
+
+import streamlit as st
+import pandas as pd
+
+# ==============================================================================
+# ENGINE LOGIKA PERJALANAN MUTASI
+# ==============================================================================
+def process_mutation_chain(df):
+    """
+    Memproses rantai perjalanan SKU berdasarkan urutan transaksi.
+    Menghubungkan Bin Tujuan sebelumnya ke Bin Awal berikutnya.
+    """
+    processed_records = []
+    
+    # Grouping per SKU
+    for sku, group in df.groupby('SKU', sort=False):
+        active_chains = []
+        
+        for idx, row in group.iterrows():
+            bin_awal = str(row['BIN AWAL']).strip()
+            bin_tujuan = str(row['BIN TUJUAN']).strip()
+            
+            # Abaikan jika data kosong atau NaN
+            if not bin_awal or not bin_tujuan or bin_awal == 'nan' or bin_tujuan == 'nan':
+                continue
+                
+            matched = False
+            # Cek apakah BIN AWAL mutasi ini tersambung dengan LAST BIN dari rantai yang aktif
+            for chain in active_chains:
+                if chain['current_bin'] == bin_awal:
+                    chain['current_bin'] = bin_tujuan
+                    chain['history'].append(bin_tujuan)
+                    matched = True
+                    break
+            
+            # Jika BIN AWAL beda/tidak tersambung, buat rantai mutasi baru (batch/barang beda)
+            if not matched:
+                active_chains.append({
+                    'current_bin': bin_tujuan,
+                    'history': [bin_awal, bin_tujuan]
+                })
+        
+        # Ekstrak hasil akhir per rantai
+        for chain in active_chains:
+            processed_records.append({
+                'SKU': sku,
+                'BIN INITIAL': chain['history'][0],
+                'LAST BIN MUTASI': chain['current_bin'],
+                'TOTAL PERJALANAN': len(chain['history']) - 1,
+                'ALUR MUTASI': " ➔ ".join(chain['history'])
+            })
+            
+    return pd.DataFrame(processed_records)
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "PUTAWAY AUDIT LIST"
+# ==============================================================================
+def menu_putaway_audit_list():
+    """
+    Fungsi utama untuk menampilkan interface & logic Putaway Audit List.
+    Panggil fungsi ini di router menu / main file Streamlit kamu.
+    """
+    
+    # Custom Styling (Dark Mode Accent & Metric Box)
+    st.markdown("""
+        <style>
+            .main-title {
+                font-size: 24px;
+                font-weight: 700;
+                color: #C5A059;
+                margin-bottom: 4px;
+            }
+            .sub-title {
+                font-size: 13px;
+                color: #A0AABF;
+                margin-bottom: 18px;
+            }
+            div[data-testid="stMetricValue"] {
+                font-size: 22px;
+                color: #4CAF50;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # 1. Header
+    st.markdown('<div class="main-title">📦 UPLOAD & AUDIT PUTAWAY MUTASI</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Pelacak rantai mutasi SKU berdasarkan keterhubungan BIN Awal & BIN Tujuan.</div>', unsafe_allow_html=True)
+
+    # 2. Inisialisasi Session State agar data tidak hilang saat re-run
+    if 'df_audit_result' not in st.session_state:
+        st.session_state['df_audit_result'] = None
+    if 'df_raw_preview' not in st.session_state:
+        st.session_state['df_raw_preview'] = None
+
+    # 3. Sidebar/Form Pengaturan Kolom (Default D=3, J=9, L=11)
+    with st.expander("⚙️ Pengaturan Index Kolom Excel (Default: D, J, L)", expanded=False):
+        col_c1, col_c2, col_c3 = st.columns(3)
+        col_sku_idx = col_c1.number_input("Index Kolom SKU (D=3)", value=3, min_value=0)
+        col_bin_awal_idx = col_c2.number_input("Index Kolom BIN AWAL (J=9)", value=9, min_value=0)
+        col_bin_tujuan_idx = col_c3.number_input("Index Kolom BIN TUJUAN (L=11)", value=11, min_value=0)
+
+    # 4. File Uploader
+    uploaded_file = st.file_uploader("Upload File Mutasi (Excel .xlsx / CSV)", type=["xlsx", "xls", "csv"])
+
+    if uploaded_file is not None:
+        try:
+            target_cols = [int(col_sku_idx), int(col_bin_awal_idx), int(col_bin_tujuan_idx)]
+            
+            # Read File (CSV vs Excel)
+            if uploaded_file.name.endswith('.csv'):
+                df_raw = pd.read_csv(uploaded_file, usecols=target_cols, header=None)
+            else:
+                df_raw = pd.read_excel(uploaded_file, usecols=target_cols, header=None)
+            
+            # Rename Kolom untuk Standarisasi
+            df_raw.columns = ['SKU', 'BIN AWAL', 'BIN TUJUAN']
+            
+            # Clean Header jika baris 1 berisi judul teks
+            first_row_sku = str(df_raw.iloc[0]['SKU']).upper()
+            if "SKU" in first_row_sku or "ITEM" in first_row_sku:
+                df_raw = df_raw.iloc[1:].reset_index(drop=True)
+                
+            df_raw = df_raw.dropna(subset=['SKU', 'BIN AWAL', 'BIN TUJUAN'])
+            st.session_state['df_raw_preview'] = df_raw
+
+            # Expander Preview Raw Data
+            with st.expander("👀 Preview Raw Data Ter-upload", expanded=False):
+                st.dataframe(df_raw.head(15), use_container_width=True)
+
+            # Tombol Eksekusi Processing
+            if st.button("🚀 JALANKAN AUDIT PUTAWAY", type="primary"):
+                with st.spinner("Sedang merantai alur mutasi & menentukan Last Bin..."):
+                    df_res = process_mutation_chain(df_raw)
+                    
+                    # Deduplikasi hasil akhir jika ada alur yang benar-benar identik
+                    df_res_unique = df_res.drop_duplicates().reset_index(drop=True)
+                    st.session_state['df_audit_result'] = df_res_unique
+                    st.success("✅ Audit Mutasi Selesai Diproses!")
+
+        except Exception as e:
+            st.error(f"Gagal memproses file. Pastikan susunan kolom sesuai! Error: {e}")
+
+    # 5. Tampilkan Hasil Audit (Jika Data Sudah Ada)
+    if st.session_state['df_audit_result'] is not None:
+        df_res = st.session_state['df_audit_result']
+
+        st.divider()
+        
+        # Summary Metrics
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total SKU Unik", df_res['SKU'].nunique())
+        m2.metric("Total Rantai Mutasi", len(df_res))
+        m3.metric("Max Perpindahan Rantai", df_res['TOTAL PERJALANAN'].max())
+
+        st.subheader("🎯 HASIL AUDIT PUTAWAY (UNIQUE LAST BIN)")
+
+        # Filter Quick Search
+        sku_search = st.text_input("🔍 Cari SKU / BIN Spesifik:", "")
+        if sku_search:
+            mask = (
+                df_res['SKU'].astype(str).str.contains(sku_search, case=False, na=False) |
+                df_res['LAST BIN MUTASI'].astype(str).str.contains(sku_search, case=False, na=False)
+            )
+            df_display = df_res[mask]
+        else:
+            df_display = df_res
+
+        # Tabel Utama Hasil Audit
+        st.dataframe(df_display, use_container_width=True)
+
+        # Download CSV
+        csv_data = df_res.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Hasil Audit Putaway (CSV)",
+            data=csv_data,
+            file_name="Audit_Putaway_Last_Bin.csv",
+            mime="text/csv"
+        )
+
+
+
+
+
 
 # ==============================================================================
 # LOGIC PROSES MENU "PRECENTAGE REQUEST FL TO STORE STOCK"
@@ -11462,6 +11649,9 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "Putaway Audit List":
+    menu_putaway_audit_list()
 
 elif menu == "Refill Koli to Koli/Refill":
     main_menu_koli()
