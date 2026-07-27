@@ -4172,16 +4172,13 @@ def menu_putaway_audit_list():
             df_raw = df_raw[(df_raw['BIN AWAL'].astype(str).str.strip() != '') & 
                             (df_raw['BIN TUJUAN'].astype(str).str.strip() != '')]
 
-            # Preview Raw Data
-            with st.expander("👀 Preview Raw Data Ter-upload", expanded=False):
-                st.dataframe(df_raw.head(15), use_container_width=True)
 
             # Tombol Eksekusi
-            if st.button("🚀 JALANKAN AUDIT PUTAWAY", type="primary"):
-                with st.spinner("Sedang merantai alur mutasi & menentukan Last Bin..."):
+            if st.button("▶️ RUN PROCESS", type="primary"):
+                with st.spinner("Sedang Memproses Data..."):
                     df_res = process_mutation_chain(df_raw)
                     st.session_state['df_audit_result'] = df_res.drop_duplicates().reset_index(drop=True)
-                    st.success("✅ Audit Mutasi Selesai Diproses!")
+                    st.success("✅ Putaway Audit Selesai Diproses!")
 
         except Exception as e:
             st.error(f"Gagal memproses file. Pastikan file memiliki minimal 12 kolom (A sampai L)! Error: {e}")
@@ -4190,13 +4187,8 @@ def menu_putaway_audit_list():
     if st.session_state['df_audit_result'] is not None:
         df_res = st.session_state['df_audit_result']
         st.divider()
-        
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Total SKU Unik", df_res['SKU'].nunique())
-        m2.metric("Total Rantai Mutasi", len(df_res))
-        m3.metric("Max Perpindahan", df_res['TOTAL PERJALANAN'].max())
 
-        st.subheader("🎯 HASIL AUDIT PUTAWAY (UNIQUE LAST BIN)")
+        st.subheader("🎯 DETAIL PUTAWAY AUDIT LIST")
         
         # Search Bar
         sku_search = st.text_input("🔍 Cari SKU Spesifik:", "")
