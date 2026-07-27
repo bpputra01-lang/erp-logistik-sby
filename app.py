@@ -8560,21 +8560,18 @@ def tampilan_display_control():
                AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%OUT%' THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
-        # --- LOGIKA BREAKDOWN NEED DISPLAY ---
-        # 1. Need Display dari Gudang Lt. 2 Store (STR, STORE, GUDANG)
+            # Hitung yang lokasi utamanya ada di Gudang Store (STR / STORE / GUDANG)
         q_need_display_gudang = f"""
-            SELECT ARTICLE FROM stock_display_processed
-            WHERE ARTICLE IN ({q_need_display_logic})
-            GROUP BY ARTICLE
-            HAVING SUM(CASE WHEN (UPPER("{col_bin}") LIKE '%STR%' OR UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%GUDANG%') THEN "{col_qty}" ELSE 0 END) > 0
+            SELECT Article FROM ({query_prioritas_refill})
+            WHERE UPPER("Bin Lokasi") LIKE '%STR%' 
+            OR UPPER("Bin Lokasi") LIKE '%STORE%' 
+            OR UPPER("Bin Lokasi") LIKE '%GUDANG%'
         """
 
-        # 2. Need Display dari DC (DC)
+        # Hitung sisanya yang lokasi utamanya ada di DC
         q_need_display_dc = f"""
-            SELECT ARTICLE FROM stock_display_processed
-            WHERE ARTICLE IN ({q_need_display_logic})
-            GROUP BY ARTICLE
-            HAVING SUM(CASE WHEN UPPER("{col_bin}") LIKE '%DC%' THEN "{col_qty}" ELSE 0 END) > 0
+            SELECT Article FROM ({query_prioritas_refill})
+            WHERE UPPER("Bin Lokasi") LIKE '%DC%'
         """
 
         # --- LOGIKA SINKRONISASI METRIK ---
@@ -8623,13 +8620,13 @@ def tampilan_display_control():
         
         with c3:
             perc_need = (need_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">⚠️ Total Need</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
         
         with c4:
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF9800;"><p class="metric-label">🏬 Need (Gdg Lt.2)</p><p class="metric-value">{need_gudang:,}</p><p class="metric-arrow" style="color: #FF9800;">STR / STORE / GUDANG</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF9800;"><p class="metric-label">🏬 Display From Store</p><p class="metric-value">{need_gudang:,}</p><p class="metric-arrow" style="color: #FF9800;">STR / STORE / GUDANG</p></div>', unsafe_allow_html=True)
         
         with c5:
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00BCD4;"><p class="metric-label">🏭 Need (DC)</p><p class="metric-value">{need_dc:,}</p><p class="metric-arrow" style="color: #00BCD4;">Bin DC</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00BCD4;"><p class="metric-label">🏭 Display From DC</p><p class="metric-value">{need_dc:,}</p><p class="metric-arrow" style="color: #00BCD4;">Bin DC</p></div>', unsafe_allow_html=True)
         
         with c6:
             st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina</p><p class="metric-value">{karantina_lock:,}</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
