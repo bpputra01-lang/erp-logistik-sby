@@ -8396,8 +8396,11 @@ import pandas as pd
 import sqlite3
 
 def init_db():
+    # Database fisik untuk menyimpan data upload
     conn = sqlite3.connect('database_display_control.db', check_same_thread=False, timeout=30.0)
+    # Mode WAL aktif agar pembacaan (read) tidak memblokir penulisan (write)
     conn.execute('PRAGMA journal_mode=WAL;')
+    # Memaksa sistem untuk menyelesaikan proses antrean write secepat mungkin
     conn.execute('PRAGMA synchronous=NORMAL;')
     return conn
 
@@ -8415,7 +8418,7 @@ def tampilan_display_control():
         }
         .metric-card {
             background: linear-gradient(135deg, #1A1D2E 0%, #252A3D 100%) !important;
-            padding: 20px;
+            padding: 18px 12px;
             border-radius: 12px;
             box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
             text-align: center;
@@ -8430,11 +8433,11 @@ def tampilan_display_control():
             color: #FFFFFF;
         }
         .metric-label {
-            font-size: 10px;
+            font-size: 11px;
             color: #A0A0A0;
             text-transform: uppercase;
             margin-bottom: 8px;
-            letter-spacing: 1px;
+            letter-spacing: 0.8px;
         }
         .metric-arrow {
             font-size: 11px;
@@ -8468,12 +8471,15 @@ def tampilan_display_control():
         - Bin mengandung: *OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, STAGGING, KARANTINA, EVENT, BANDING, INB, OUT, PUTAWAY*.
         
         **Cara Kerja Pemantauan :**
-        - **Source (Gudang Lt. 2):** BIN mengandung 'STR', 'STORE', atau 'GUDANG'.
-        - **Source (DC):** BIN mengandung kata 'DC'.
-        - **Target (Toko):** BIN yang mengandung kata 'TOKO', 'STORE', atau 'DISPLAY'.
+        - **Source (Gudang Store / DC):** Semua BIN aktif selain area Toko & Eksklusi.
+          - **Gudang Lt. 2 Store:** BIN mengandung kata `STR`, `STORE`, atau `GUDANG`.
+          - **DC (Distribution Center):** BIN mengandung kata `DC`.
+        - **Target (Toko):** BIN yang mengandung kata `TOKO` atau `DISPLAY`.
         - **Aturan Proteksi OUT:** Jika Article / SKU sudah berada di bin **'OUT'** dengan Qty > 0, otomatis **dihapus dari list penarikan**.
+        - **Logic:** Jika SKU memiliki **Stok > 0 di Gudang/DC** tapi **Stok = 0 di Toko**, maka SKU wajib tambah display.
         """)
 
+    # Handle Upload Data dengan Koneksi Mandiri Istimewa (Bebas Lock)
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="display_upload")
 
     if uploaded_file:
@@ -8481,6 +8487,7 @@ def tampilan_display_control():
             df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df_upload.columns = [str(c).strip() for c in df_upload.columns]
             
+            # Buka koneksi khusus tulis, lakukan isolasi bertipe IMMEDIATE agar query read lain mengalah
             write_conn = sqlite3.connect('database_display_control.db', timeout=30.0)
             write_conn.execute('PRAGMA journal_mode=WAL;')
             write_conn.execute('BEGIN IMMEDIATE;')
@@ -8497,6 +8504,7 @@ def tampilan_display_control():
         except Exception as e:
             st.error(f"Gagal upload: {e}")
 
+    # Buka koneksi utama untuk proses Analisis & Tampilan Dashboard
     conn = init_db()
 
     # --- 2. LOGIKA ANALISIS ---
@@ -8512,15 +8520,16 @@ def tampilan_display_control():
         col_bin = next((c for c in cols if 'BIN' in c.upper()), cols[1])
         col_sku = next((c for c in cols if 'SKU' in c.upper()), cols[2])
         col_qty = next((c for c in cols if 'QTY' in c.upper() or 'SYSTEM' in c.upper()), cols[9])
-        col_desc = cols[4]
-        col_size = cols[5]
+        col_desc = cols[4] # Kolom E
+        col_size = cols[5] # Kolom F
 
+        # 1. Tambah Kolom Article ke database sementara
         with conn:
             df_raw = pd.read_sql("SELECT * FROM stock_display_raw", conn)
             df_raw['ARTICLE'] = df_raw[col_desc].astype(str).apply(lambda x: x.split(' ')[0])
             df_raw.to_sql('stock_display_processed', conn, index=False, if_exists='replace')
 
-        # FILTER EKSKLUSI
+        # --- PENYEMPURNAAN FILTER EKSKLUSI ---
         excl_condition = f"""
             UPPER("{col_bin}") NOT LIKE '%OFFLINE%' AND 
             UPPER("{col_bin}") NOT LIKE '%ONLINE%' AND 
@@ -8538,46 +8547,43 @@ def tampilan_display_control():
             UPPER("{col_bin}") NOT LIKE '%PUTAWAY%'
         """
 
-        f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
-        f_source_gudang_lt2 = f"(UPPER(\"{col_bin}\") LIKE '%STR%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%GUDANG%')"
-        f_source_dc = f"(UPPER(\"{col_bin}\") LIKE '%DC%')"
-        f_source_gudang_all = f"(NOT ({f_target_toko})) AND ({excl_condition})"
+        f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
+        f_source_gudang = f"(NOT ({f_target_toko})) AND ({excl_condition})"
 
-        # Logic Total Need Display
+        # Kunci Ringkasan Atas: Hanya Article yang bersih dari target toko dan bin OUT
         q_need_display_logic = f"""
             SELECT ARTICLE FROM stock_display_processed 
             WHERE {excl_condition}
             GROUP BY ARTICLE
-            HAVING SUM(CASE WHEN {f_source_gudang_all} THEN "{col_qty}" ELSE 0 END) > 0
+            HAVING SUM(CASE WHEN {f_source_gudang} THEN "{col_qty}" ELSE 0 END) > 0
                AND SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
                AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%OUT%' THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
-        # Logic Need Display Gudang Lt. 2 Store
-        q_need_display_lt2 = f"""
-            SELECT ARTICLE FROM stock_display_processed 
-            WHERE {excl_condition}
+        # --- LOGIKA BREAKDOWN NEED DISPLAY ---
+        # 1. Need Display dari Gudang Lt. 2 Store (STR, STORE, GUDANG)
+        q_need_display_gudang = f"""
+            SELECT ARTICLE FROM stock_display_processed
+            WHERE ARTICLE IN ({q_need_display_logic})
             GROUP BY ARTICLE
-            HAVING SUM(CASE WHEN {f_source_gudang_lt2} AND NOT ({f_target_toko}) THEN "{col_qty}" ELSE 0 END) > 0
-               AND SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
-               AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%OUT%' THEN "{col_qty}" ELSE 0 END) <= 0
+            HAVING SUM(CASE WHEN (UPPER("{col_bin}") LIKE '%STR%' OR UPPER("{col_bin}") LIKE '%STORE%' OR UPPER("{col_bin}") LIKE '%GUDANG%') THEN "{col_qty}" ELSE 0 END) > 0
         """
 
-        # Logic Need Display DC
+        # 2. Need Display dari DC (DC)
         q_need_display_dc = f"""
-            SELECT ARTICLE FROM stock_display_processed 
-            WHERE {excl_condition}
+            SELECT ARTICLE FROM stock_display_processed
+            WHERE ARTICLE IN ({q_need_display_logic})
             GROUP BY ARTICLE
-            HAVING SUM(CASE WHEN {f_source_dc} THEN "{col_qty}" ELSE 0 END) > 0
-               AND SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
-               AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%OUT%' THEN "{col_qty}" ELSE 0 END) <= 0
+            HAVING SUM(CASE WHEN UPPER("{col_bin}") LIKE '%DC%' THEN "{col_qty}" ELSE 0 END) > 0
         """
 
+        # --- LOGIKA SINKRONISASI METRIK ---
         q_art_on_display = f"""
             SELECT DISTINCT ARTICLE FROM stock_display_processed 
             WHERE {f_target_toko} AND "{col_qty}" > 0
         """
 
+        # --- LOGIKA ARTICLE KOSONG DI TOKO TAPI ADA DI KARANTINA ---
         q_karantina_logic = f"""
             SELECT ARTICLE FROM stock_display_processed
             GROUP BY ARTICLE
@@ -8590,14 +8596,14 @@ def tampilan_display_control():
                 SELECT  
                     (SELECT COUNT(DISTINCT ARTICLE) FROM ({q_art_on_display})) as On_Display,
                     (SELECT COUNT(*) FROM ({q_need_display_logic})) as Need_Display,
-                    (SELECT COUNT(*) FROM ({q_need_display_lt2})) as Need_Display_Lt2,
+                    (SELECT COUNT(*) FROM ({q_need_display_gudang})) as Need_Display_Gudang,
                     (SELECT COUNT(*) FROM ({q_need_display_dc})) as Need_Display_DC,
                     (SELECT COUNT(*) FROM ({q_karantina_logic})) as Karantina_Lock
             """, conn).iloc[0]
 
         on_display = int(q_data['On_Display'])
         need_display = int(q_data['Need_Display'])
-        need_lt2 = int(q_data['Need_Display_Lt2'])
+        need_gudang = int(q_data['Need_Display_Gudang'])
         need_dc = int(q_data['Need_Display_DC'])
         karantina_lock = int(q_data['Karantina_Lock'])
         total_art = on_display + need_display
@@ -8605,19 +8611,28 @@ def tampilan_display_control():
         # --- 3. TAMPILAN DASHBOARD ---
         st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
         
-        # Dipecah menjadi 5 kolom secara presisi
-        c1, c2, c3, c4, c5 = st.columns(5)
+        # Dipecah menjadi 6 kolom presisi
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        
         with c1:
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #7B61FF;"><p class="metric-label">🧥 Total Article</p><p class="metric-value">{total_art:,}</p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #7B61FF;"><p class="metric-label">🧥 Total Art.</p><p class="metric-value">{total_art:,}</p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
+        
         with c2:
             perc_display = (on_display / total_art * 100) if total_art > 0 else 0
             st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Pajang</p></div>', unsafe_allow_html=True)
+        
         with c3:
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">🏬 Need (Gudang Lt.2)</p><p class="metric-value">{need_lt2:,}</p><p class="metric-arrow" style="color: #FF5252;">STR / Store / Gudang</p></div>', unsafe_allow_html=True)
+            perc_need = (need_display / total_art * 100) if total_art > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">⚠️ Total Need</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
+        
         with c4:
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF9800;"><p class="metric-label">📦 Need (DC)</p><p class="metric-value">{need_dc:,}</p><p class="metric-arrow" style="color: #FF9800;">Lokasi Bin DC</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF9800;"><p class="metric-label">🏬 Need (Gdg Lt.2)</p><p class="metric-value">{need_gudang:,}</p><p class="metric-arrow" style="color: #FF9800;">STR / STORE / GUDANG</p></div>', unsafe_allow_html=True)
+        
         with c5:
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina Art.</p><p class="metric-value">{karantina_lock:,}</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00BCD4;"><p class="metric-label">🏭 Need (DC)</p><p class="metric-value">{need_dc:,}</p><p class="metric-arrow" style="color: #00BCD4;">Bin DC</p></div>', unsafe_allow_html=True)
+        
+        with c6:
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina</p><p class="metric-value">{karantina_lock:,}</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
 
         st.divider()
         st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
@@ -8629,6 +8644,7 @@ def tampilan_display_control():
                 {q_need_display_logic}
             ),
             
+            -- Cari tahu SKU mana saja yang sudah nangkring di BIN OUT (Qty > 0)
             SKUInBinOut AS (
                 SELECT DISTINCT "{col_sku}" as Out_SKU 
                 FROM stock_display_processed
@@ -8645,11 +8661,13 @@ def tampilan_display_control():
                     "{col_qty}" as Qty_In_Bin
                 FROM stock_display_processed
                 WHERE ARTICLE IN (SELECT ARTICLE FROM ArticlesNeedDisplay)
-                  AND {f_source_gudang_all}
+                  AND {f_source_gudang}
                   AND "{col_qty}" > 0
+                  -- PROTEKSI UTAMA: Buang SKU jika terdaftar sudah ada di bin OUT!
                   AND "{col_sku}" NOT IN (SELECT Out_SKU FROM SKUInBinOut)
             ),
             
+            -- Prioritas Utama: Cari 1 baris terbaik per ARTICLE yang ada di GUDANG / STR / STORE
             PrioritasStock AS (
                 SELECT *,
                        ROW_NUMBER() OVER (PARTITION BY Article ORDER BY Qty_In_Bin DESC) as rn
@@ -8663,6 +8681,7 @@ def tampilan_display_control():
                 WHERE rn = 1
             ),
             
+            -- Reguler: Cari alternatif 1 baris terbaik per ARTICLE jika tidak ada di GUDANG / STR / STORE (misal dari DC)
             RegulerStock AS (
                 SELECT *,
                        ROW_NUMBER() OVER (PARTITION BY Article ORDER BY Qty_In_Bin DESC) as rn
