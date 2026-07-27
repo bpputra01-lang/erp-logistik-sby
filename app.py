@@ -4050,25 +4050,25 @@ def main_menu_routing():
 
 def process_mutation_chain(df):
     """
-    Memproses rantai perjalanan SKU berdasarkan urutan transaksi.
-    Menghubungkan Bin Tujuan sebelumnya ke Bin Awal berikutnya.
+    Memproses rantai perjalanan SKU berdasarkan urutan waktu kronologis.
     """
     processed_records = []
     
     # Grouping per SKU
     for sku, group in df.groupby('SKU', sort=False):
+        # Pastikan di dalam group sudah urut berdasarkan Waktu
+        group_sorted = group.sort_values(by='WAKTU', ascending=True)
         active_chains = []
         
-        for idx, row in group.iterrows():
+        for idx, row in group_sorted.iterrows():
             bin_awal = str(row['BIN AWAL']).strip()
             bin_tujuan = str(row['BIN TUJUAN']).strip()
             
-            # Abaikan jika data kosong atau NaN
-            if not bin_awal or not bin_tujuan or bin_awal == 'nan' or bin_tujuan == 'nan':
+            if not bin_awal or not bin_tujuan or bin_awal.lower() == 'nan' or bin_tujuan.lower() == 'nan':
                 continue
                 
             matched = False
-            # Cek apakah BIN AWAL mutasi ini tersambung dengan LAST BIN dari rantai yang aktif
+            # Cek apakah BIN AWAL tersambung dengan LAST BIN dari rantai yang aktif
             for chain in active_chains:
                 if chain['current_bin'] == bin_awal:
                     chain['current_bin'] = bin_tujuan
@@ -4076,14 +4076,14 @@ def process_mutation_chain(df):
                     matched = True
                     break
             
-            # Jika BIN AWAL beda/tidak tersambung, buat rantai mutasi baru (batch/barang beda)
+            # Jika tidak tersambung, buat rantai mutasi baru
             if not matched:
                 active_chains.append({
                     'current_bin': bin_tujuan,
                     'history': [bin_awal, bin_tujuan]
                 })
         
-        # Ekstrak hasil akhir per rantai
+        # Ekstrak hasil akhir
         for chain in active_chains:
             processed_records.append({
                 'SKU': sku,
@@ -4149,28 +4149,29 @@ def menu_putaway_audit_list():
 
     if uploaded_file is not None:
         try:
-            # 1. Baca file dengan mengasumsikan baris pertama adalah header bawaan Excel
+            # 1. Baca file
             if uploaded_file.name.endswith('.csv'):
                 df_raw = pd.read_csv(uploaded_file)
             else:
                 df_raw = pd.read_excel(uploaded_file)
             
-            # 2. Ambil berdasarkan posisi index kolom D (ke-3), J (ke-9), L (ke-11)
-            # iloc[:, [3, 9, 11]] dipake supaya tidak peduli apa nama header di Excel-nya
-            df_raw = df_raw.iloc[:, [3, 8, 12]]
+            # 2. Ambil Kolom A (Waktu/Index 0), D (SKU/Index 3), I (BIN AWAL/Index 8), M (BIN TUJUAN/Index 12)
+            df_raw = df_raw.iloc[:, [0, 3, 8, 12]]
             
-            # 3. Rename nama kolomnya langsung
-            df_raw.columns = ['SKU', 'BIN AWAL', 'BIN TUJUAN']
+            # 3. Rename nama kolom
+            df_raw.columns = ['WAKTU', 'SKU', 'BIN AWAL', 'BIN TUJUAN']
             
-            # 4. Bersihkan data kosong / string 'nan'
+            # 4. Parsing Waktu ke Datetime & Sorting dari Waktu Terlama -> Terbaru
+            df_raw['WAKTU'] = pd.to_datetime(df_raw['WAKTU'], errors='coerce')
+            df_raw = df_raw.sort_values(by=['SKU', 'WAKTU'], ascending=[True, True]).reset_index(drop=True)
+            
+            # 5. Bersihkan data kosong
             df_raw = df_raw.dropna(subset=['SKU'])
             df_raw['BIN AWAL'] = df_raw['BIN AWAL'].fillna('')
             df_raw['BIN TUJUAN'] = df_raw['BIN TUJUAN'].fillna('')
             
-            # Filter baris yang benar-benar punya BIN AWAL dan BIN TUJUAN
             df_raw = df_raw[(df_raw['BIN AWAL'].astype(str).str.strip() != '') & 
                             (df_raw['BIN TUJUAN'].astype(str).str.strip() != '')]
-
 
             # Tombol Eksekusi
             if st.button("▶️ RUN PROCESS", type="primary"):
@@ -4180,7 +4181,7 @@ def menu_putaway_audit_list():
                     st.success("✅ Putaway Audit Selesai Diproses!")
 
         except Exception as e:
-            st.error(f"Gagal memproses file. Pastikan file memiliki minimal 12 kolom (A sampai L)! Error: {e}")
+            st.error(f"Gagal memproses file! Error: {e}")
 
     # 3. Tampilkan Hasil Audit
     if st.session_state['df_audit_result'] is not None:
