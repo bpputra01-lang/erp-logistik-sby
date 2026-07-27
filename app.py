@@ -9760,13 +9760,11 @@ with st.sidebar:
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=sync_menu, args=("m5_key",), label_visibility="collapsed")
 
     # --- KELOMPOK 6: PICK & PUTAWAY AUDIT ---
-    st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">PICKING & PUTAWAY AUDIT</p>', unsafe_allow_html=True)
     if is_dc:
+        st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">PICKING & PUTAWAY AUDIT</p>', unsafe_allow_html=True)
         m6_list = ["Picking Audit List", "Putaway Audit List", "Compare Picking Audit", "Compare Putaway Audit"]
-
-    idx6 = m6_list.index(st.session_state.main_menu) if st.session_state.main_menu in m6_list else None
-    st.radio("M6", m6_list, index=idx6, key="m6_key", on_change=sync_menu, args=("m6_key",), label_visibility="collapsed")
-
+        idx6 = m6_list.index(st.session_state.main_menu) if st.session_state.main_menu in m6_list else None
+        st.radio("M6", m6_list, index=idx6, key="m6_key", on_change=sync_menu, args=("m6_key",), label_visibility="collapsed")
     st.divider()
     
     # Tombol Logout (Tetap di bawah)
