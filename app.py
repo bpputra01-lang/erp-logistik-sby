@@ -4218,37 +4218,32 @@ def menu_putaway_audit_list():
                 )
 
             # ------------------------------------------------------------------
-            # TAB 2: UNIQUE LAST BIN
+            # TAB 2: UNIQUE LAST BIN SAJA
             # ------------------------------------------------------------------
             with tab2:
-                st.subheader("🎯 REKAP UNIQUE LAST BIN PER SKU")
+                st.subheader("🎯 LIST UNIQUE LAST BIN")
                 
-                # Olah data unik berdasarkan SKU & LAST BIN MUTASI
-                df_unique = df_res[['SKU', 'LAST BIN MUTASI']].drop_duplicates().reset_index(drop=True)
+                # Ambil daftar Last Bin unik saja tanpa SKU
+                df_unique_bin = df_res[['LAST BIN MUTASI']].drop_duplicates().reset_index(drop=True)
                 
-                # Tampilkan Ringkasan Metrik
-                m1, m2 = st.columns(2)
-                m1.metric("Total Unique Bin Lokasi", df_unique['LAST BIN MUTASI'].nunique())
-                m2.metric("Total SKU Merekap", df_unique['SKU'].nunique())
-                
-                # Search Bar Tab 2
-                bin_search = st.text_input("🔍 Cari SKU atau Last Bin Spesifik:", "", key="search_tab2")
+                # Search Bar khusus Last Bin
+                bin_search = st.text_input("🔍 Cari Last Bin Spesifik:", "", key="search_tab2")
                 if bin_search:
-                    df_display_2 = df_unique[
-                        df_unique['SKU'].astype(str).str.contains(bin_search, case=False, na=False) |
-                        df_unique['LAST BIN MUTASI'].astype(str).str.contains(bin_search, case=False, na=False)
+                    df_display_2 = df_unique_bin[
+                        df_unique_bin['LAST BIN MUTASI'].astype(str).str.contains(bin_search, case=False, na=False)
                     ]
                 else:
-                    df_display_2 = df_unique
+                    df_display_2 = df_unique_bin
 
+                # Tampilkan tabel murni Last Bin
                 st.dataframe(df_display_2, use_container_width=True)
 
                 # Tombol Download khusus Tab 2
-                csv_data_2 = df_unique.to_csv(index=False).encode('utf-8')
+                csv_data_2 = df_unique_bin.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📥 Download Unique Last Bin (CSV)",
                     data=csv_data_2,
-                    file_name="Summary_Unique_Last_Bin.csv",
+                    file_name="Unique_Last_Bin.csv",
                     mime="text/csv",
                     key="dl_tab2"
                 )
