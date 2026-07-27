@@ -4186,26 +4186,72 @@ def menu_putaway_audit_list():
     # 3. Tampilkan Hasil Audit
     if st.session_state['df_audit_result'] is not None:
         df_res = st.session_state['df_audit_result']
-        st.divider()
-
-        st.subheader("🎯 DETAIL PUTAWAY AUDIT LIST")
         
-        # Search Bar
-        sku_search = st.text_input("🔍 Cari SKU Spesifik:", "")
-        if sku_search:
-            df_display = df_res[df_res['SKU'].astype(str).str.contains(sku_search, case=False, na=False)]
-        else:
-            df_display = df_res
+        if not df_res.empty and 'SKU' in df_res.columns:
+            st.divider()
+            
+            # --- TAB INTERFACE ---
+            tab1, tab2 = st.tabs(["📋 DETAIL PUTAWAY AUDIT", "🎯 SUMMARY UNIQUE LAST BIN"])
+            
+            # ------------------------------------------------------------------
+            # TAB 1: DETAIL LENGKAP (Sesuai Gambar)
+            # ------------------------------------------------------------------
+            with tab1:
+                st.subheader("📋 DETAIL PUTAWAY AUDIT LIST")
+                
+                # Search Bar Tab 1
+                sku_search = st.text_input("🔍 Cari SKU Spesifik (Detail):", "", key="search_tab1")
+                if sku_search:
+                    df_display_1 = df_res[df_res['SKU'].astype(str).str.contains(sku_search, case=False, na=False)]
+                else:
+                    df_display_1 = df_res
 
-        st.dataframe(df_display, use_container_width=True)
+                st.dataframe(df_display_1, use_container_width=True)
 
-        csv_data = df_res.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Hasil Audit Putaway (CSV)",
-            data=csv_data,
-            file_name="Audit_Putaway_Last_Bin.csv",
-            mime="text/csv"
-        )
+                csv_data_1 = df_res.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Detail Audit (CSV)",
+                    data=csv_data_1,
+                    file_name="Detail_Putaway_Audit.csv",
+                    mime="text/csv",
+                    key="dl_tab1"
+                )
+
+            # ------------------------------------------------------------------
+            # TAB 2: UNIQUE LAST BIN
+            # ------------------------------------------------------------------
+            with tab2:
+                st.subheader("🎯 REKAP UNIQUE LAST BIN PER SKU")
+                
+                # Olah data unik berdasarkan SKU & LAST BIN MUTASI
+                df_unique = df_res[['SKU', 'LAST BIN MUTASI']].drop_duplicates().reset_index(drop=True)
+                
+                # Tampilkan Ringkasan Metrik
+                m1, m2 = st.columns(2)
+                m1.metric("Total Unique Bin Lokasi", df_unique['LAST BIN MUTASI'].nunique())
+                m2.metric("Total SKU Merekap", df_unique['SKU'].nunique())
+                
+                # Search Bar Tab 2
+                bin_search = st.text_input("🔍 Cari SKU atau Last Bin Spesifik:", "", key="search_tab2")
+                if bin_search:
+                    df_display_2 = df_unique[
+                        df_unique['SKU'].astype(str).str.contains(bin_search, case=False, na=False) |
+                        df_unique['LAST BIN MUTASI'].astype(str).str.contains(bin_search, case=False, na=False)
+                    ]
+                else:
+                    df_display_2 = df_unique
+
+                st.dataframe(df_display_2, use_container_width=True)
+
+                # Tombol Download khusus Tab 2
+                csv_data_2 = df_unique.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Unique Last Bin (CSV)",
+                    data=csv_data_2,
+                    file_name="Summary_Unique_Last_Bin.csv",
+                    mime="text/csv",
+                    key="dl_tab2"
+                )
 
 
 
