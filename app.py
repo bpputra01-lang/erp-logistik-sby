@@ -4139,7 +4139,6 @@ def menu_putaway_audit_list():
 
     # 1. Header dengan Badge Blue Style
     st.markdown('<div class="header-badge">PUTAWAY AUDIT LIST</div>', unsafe_allow_html=True)
-    st.markdown('<span class="sub-title-text">Sistem pelacak rantai mutasi SKU berdasarkan urutan BIN Awal ke BIN Tujuan.</span>', unsafe_allow_html=True)
 
     # Inisialisasi Session State
     if 'df_audit_result' not in st.session_state:
