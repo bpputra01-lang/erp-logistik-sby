@@ -4316,12 +4316,27 @@ def process_picking_audit(df_sales_raw, df_rto_raw):
     # 1. Olah Data Sales (Jika Ada)
     if df_sales_raw is not None:
         try:
-            # Validasi minimal 11 kolom (kolom K = index 10)
             if df_sales_raw.shape[1] > 10:
                 # Ambil Kolom B (1), G (6), K (10)
                 df_sales = df_sales_raw.iloc[:, [1, 6, 10]].copy()
                 df_sales.columns = ['SKU', 'BIN', 'QTY']
+                
+                # Cleaning ringan sebelum di-sum
+                df_sales['SKU'] = df_sales['SKU'].astype(str).str.strip()
+                df_sales['BIN'] = df_sales['BIN'].astype(str).str.strip()
+                df_sales['QTY'] = pd.to_numeric(df_sales['QTY'], errors='coerce').fillna(0)
+                
+                # Hapus baris kosong / header terbawa
+                df_sales = df_sales[
+                    (df_sales['SKU'] != '') & 
+                    (df_sales['BIN'] != '') & 
+                    (df_sales['SKU'].str.upper() != 'SKU')
+                ]
+                
+                # SUM QTY jika ada SKU & BIN yang sama di file Sales
+                df_sales = df_sales.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
                 df_sales['SOURCE'] = 'SALES'
+                
                 combined_list.append(df_sales)
             else:
                 st.error("File Sales kurang kolom (butuh minimal hingga Kolom K).")
@@ -4331,17 +4346,28 @@ def process_picking_audit(df_sales_raw, df_rto_raw):
     # 2. Olah Data RTO (Jika Ada)
     if df_rto_raw is not None:
         try:
-            # Validasi minimal 9 kolom (kolom I = index 8)
             if df_rto_raw.shape[1] > 8:
-                # Ambil Kolom D (index 3), H (index 7), I (index 8)
+                # Ambil Kolom D (3), H (7), I (8)
                 df_rto = df_rto_raw.iloc[:, [3, 7, 8]].copy()
-                
-                # PERBAIKAN: Penamaan kolom disesuaikan dengan urutan iloc (SKU, QTY, BIN)
                 df_rto.columns = ['SKU', 'QTY', 'BIN']
-                
-                # Susun ulang urutan kolom agar seragam (SKU, BIN, QTY)
                 df_rto = df_rto[['SKU', 'BIN', 'QTY']]
+                
+                # Cleaning ringan sebelum di-sum
+                df_rto['SKU'] = df_rto['SKU'].astype(str).str.strip()
+                df_rto['BIN'] = df_rto['BIN'].astype(str).str.strip()
+                df_rto['QTY'] = pd.to_numeric(df_rto['QTY'], errors='coerce').fillna(0)
+                
+                # Hapus baris kosong / header terbawa
+                df_rto = df_rto[
+                    (df_rto['SKU'] != '') & 
+                    (df_rto['BIN'] != '') & 
+                    (df_rto['SKU'].str.upper() != 'SKU')
+                ]
+                
+                # SUM QTY jika ada SKU & BIN yang sama di file RTO
+                df_rto = df_rto.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
                 df_rto['SOURCE'] = 'RTO'
+                
                 combined_list.append(df_rto)
             else:
                 st.error("File RTO kurang kolom (butuh minimal hingga Kolom I).")
@@ -4351,27 +4377,11 @@ def process_picking_audit(df_sales_raw, df_rto_raw):
     if not combined_list:
         return pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
 
-    # 3. Gabungkan Data Sales & RTO
-    df_combined = pd.concat(combined_list, ignore_index=True)
+    # 3. Gabungkan Data Sales & RTO yang masing-masing sudah di-sum QTY-nya
+    df_final = pd.concat(combined_list, ignore_index=True)
 
-    # 4. Cleaning Data
-    df_combined = df_combined.dropna(subset=['SKU', 'BIN'])
-    
-    # Format Tipe Data & Pembersihan Spasi
-    df_combined['SKU'] = df_combined['SKU'].astype(str).str.strip()
-    df_combined['BIN'] = df_combined['BIN'].astype(str).str.strip()
-    df_combined['QTY'] = pd.to_numeric(df_combined['QTY'], errors='coerce').fillna(0)
-
-    # Hapus entry kosong atau baris header tabel jika terbawa
-    df_combined = df_combined[
-        (df_combined['SKU'] != '') & 
-        (df_combined['BIN'] != '') & 
-        (df_combined['SKU'].str.upper() != 'SKU') &
-        (df_combined['BIN'].str.upper() != 'BIN')
-    ]
-
-    # Grouping untuk rekap QTY per SKU, BIN, & SOURCE
-    df_final = df_combined.groupby(['SKU', 'BIN', 'SOURCE'], as_index=False)['QTY'].sum()
+    # 4. Filter akhir: Hapus QTY yang bernilai 0 atau kurang
+    df_final = df_final[df_final['QTY'] > 0].reset_index(drop=True)
     
     return df_final
 # ==============================================================================
