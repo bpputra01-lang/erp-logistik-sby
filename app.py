@@ -4378,11 +4378,9 @@ def menu_picking_audit_list():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.info("🛒 **File Sales**\n- SKU: Kolom B\n- BIN: Kolom G\n- QTY: Kolom K")
         file_sales = st.file_uploader("Upload File Sales (Excel / CSV)", type=["xlsx", "xls", "csv"], key="sales_uploader")
 
     with col2:
-        st.info("🔄 **File RTO**\n- SKU: Kolom D\n- QTY: Kolom H\n- BIN: Kolom I")
         file_rto = st.file_uploader("Upload File RTO (Excel / CSV)", type=["xlsx", "xls", "csv"], key="rto_uploader")
 
     # Button Eksekusi Process
