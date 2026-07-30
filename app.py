@@ -4316,26 +4316,37 @@ def process_picking_audit(df_sales_raw, df_rto_raw):
     # 1. Olah Data Sales (Jika Ada)
     if df_sales_raw is not None:
         try:
-            # Ambil Kolom B (1), G (6), K (10)
-            df_sales = df_sales_raw.iloc[:, [1, 6, 10]].copy()
-            df_sales.columns = ['SKU', 'BIN', 'QTY']
-            df_sales['SOURCE'] = 'SALES'
-            combined_list.append(df_sales)
+            # Validasi minimal 11 kolom (kolom K = index 10)
+            if df_sales_raw.shape[1] > 10:
+                # Ambil Kolom B (1), G (6), K (10)
+                df_sales = df_sales_raw.iloc[:, [1, 6, 10]].copy()
+                df_sales.columns = ['SKU', 'BIN', 'QTY']
+                df_sales['SOURCE'] = 'SALES'
+                combined_list.append(df_sales)
+            else:
+                st.error("File Sales kurang kolom (butuh minimal hingga Kolom K).")
         except Exception as e:
-            st.error(f"Format file Sales tidak sesuai/kurang kolom! Error: {e}")
+            st.error(f"Gagal memproses file Sales! Error: {e}")
 
     # 2. Olah Data RTO (Jika Ada)
     if df_rto_raw is not None:
         try:
-            # Ambil Kolom D (3), H (7), I (8)
-            df_rto = df_rto_raw.iloc[:, [3, 7, 8]].copy()
-            # Susun ulang agar urutannya: SKU, BIN, QTY
-            df_rto = df_rto[['SKU', 'BIN', 'QTY']]
-            df_rto.columns = ['SKU', 'BIN', 'QTY']
-            df_rto['SOURCE'] = 'RTO'
-            combined_list.append(df_rto)
+            # Validasi minimal 9 kolom (kolom I = index 8)
+            if df_rto_raw.shape[1] > 8:
+                # Ambil Kolom D (index 3), H (index 7), I (index 8)
+                df_rto = df_rto_raw.iloc[:, [3, 7, 8]].copy()
+                
+                # PERBAIKAN: Penamaan kolom disesuaikan dengan urutan iloc (SKU, QTY, BIN)
+                df_rto.columns = ['SKU', 'QTY', 'BIN']
+                
+                # Susun ulang urutan kolom agar seragam (SKU, BIN, QTY)
+                df_rto = df_rto[['SKU', 'BIN', 'QTY']]
+                df_rto['SOURCE'] = 'RTO'
+                combined_list.append(df_rto)
+            else:
+                st.error("File RTO kurang kolom (butuh minimal hingga Kolom I).")
         except Exception as e:
-            st.error(f"Format file RTO tidak sesuai/kurang kolom! Error: {e}")
+            st.error(f"Gagal memproses file RTO! Error: {e}")
 
     if not combined_list:
         return pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
@@ -4351,18 +4362,18 @@ def process_picking_audit(df_sales_raw, df_rto_raw):
     df_combined['BIN'] = df_combined['BIN'].astype(str).str.strip()
     df_combined['QTY'] = pd.to_numeric(df_combined['QTY'], errors='coerce').fillna(0)
 
-    # Hapus entry kosong atau header teks jika terbawa
+    # Hapus entry kosong atau baris header tabel jika terbawa
     df_combined = df_combined[
         (df_combined['SKU'] != '') & 
         (df_combined['BIN'] != '') & 
-        (df_combined['SKU'].str.upper() != 'SKU')
+        (df_combined['SKU'].str.upper() != 'SKU') &
+        (df_combined['BIN'].str.upper() != 'BIN')
     ]
 
     # Grouping untuk rekap QTY per SKU, BIN, & SOURCE
     df_final = df_combined.groupby(['SKU', 'BIN', 'SOURCE'], as_index=False)['QTY'].sum()
     
     return df_final
-
 # ==============================================================================
 # LOGIC INTERFACE MENU "PICKING AUDIT LIST"
 # ==============================================================================
