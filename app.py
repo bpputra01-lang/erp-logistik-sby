@@ -10213,7 +10213,7 @@ with st.sidebar:
     # --- KELOMPOK 6: PICK & PUTAWAY AUDIT ---
     if is_dc:
         st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">PICKING & PUTAWAY AUDIT</p>', unsafe_allow_html=True)
-        m6_list = ["Picking Audit List", "Putaway Audit List", "Compare Picking Audit", "Compare Putaway Audit"]
+        m6_list = ["Picking Audit List", "Putaway Audit List"]
         idx6 = m6_list.index(st.session_state.main_menu) if st.session_state.main_menu in m6_list else None
         st.radio("M6", m6_list, index=idx6, key="m6_key", on_change=sync_menu, args=("m6_key",), label_visibility="collapsed")
     st.divider()
