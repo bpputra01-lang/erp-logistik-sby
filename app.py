@@ -4424,13 +4424,6 @@ def menu_picking_audit_list():
 
         if not df_res.empty:
             st.divider()
-
-            # Display Ringkasan Metric
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Total SKU Unik", f"{df_res['SKU'].nunique():,}")
-            m2.metric("Total Unique BIN", f"{df_res['BIN'].nunique():,}")
-            m3.metric("Total QTY Picking", f"{int(df_res['QTY'].sum()):,}")
-
             st.markdown("<br>", unsafe_allow_html=True)
 
             # --- TAB INTERFACE ---
