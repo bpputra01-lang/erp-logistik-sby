@@ -4087,14 +4087,14 @@ def process_mutation_chain(df):
         for chain in active_chains:
             processed_records.append({
                 'SKU': sku,
-                'BIN INITIAL': chain['history'][0],
+                'BIN AWAL': chain['history'][0],
                 'LAST BIN MUTASI': chain['current_bin'],
                 'TOTAL PERJALANAN': len(chain['history']) - 1,
                 'ALUR MUTASI': " ➔ ".join(chain['history'])
             })
             
     if not processed_records:
-        return pd.DataFrame(columns=['SKU', 'BIN INITIAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
+        return pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
         
     return pd.DataFrame(processed_records)
 
