@@ -11354,7 +11354,7 @@ elif menu == "Justification SO":
         - **ADJUSTMENT FILE**: Gabungkan antara Multiple Adjustment **(Plus)** dan **(Minus)** dalam 1 File.
         - **SUMMARY STOCK**: Download dari **JEZPRO** pada menu **Dashboard Asset** (Store: **JEZ SURABAYA**).
         - **ALL DATA STOCK**: Upload file All data Stock (Multiple Adjustment) **HANYA ADA STOCK**.
-        - **DATA SCAN (Opsional)**: Format Excel dengan SKU di Kolom B dan QTY di Kolom C.
+        - **DATA SCAN (Opsional)**: Jika diupload maka perhitungan **Real QTY** akan mengambil qty dari data scan dan apabila tidak dipload maka akan kembali perhitungan awal.
         """)
 
     with st.expander("💡 Logic Thinking (Justification)", expanded=False):
