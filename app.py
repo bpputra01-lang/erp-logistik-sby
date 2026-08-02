@@ -6639,7 +6639,7 @@ import pandas as pd
 import io
 import streamlit as st
 
-def process_justification(df_case, df_tracking, df_all_stock):
+def process_justification(df_case, df_tracking, df_all_stock, df_scan=None):
     # 1. Copy data & Standarisasi Header ke Huruf Besar
     res = df_case.copy()
     res.columns = [str(c).upper().strip() for c in res.columns]
@@ -6686,7 +6686,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
     sku_col_all = df_all_stock.columns[2]
     qty_sys_col_all = df_all_stock.columns[9]
     
-    # Langsung group by dari df_all_stock tanpa ada yang dibuang
     all_stock_agg = df_all_stock.groupby(sku_col_all).agg({
         qty_sys_col_all: 'sum'
     }).reset_index()
@@ -6715,12 +6714,33 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res['QTY SYSTEM ALL']     = res['_QTY_SYS_ALL']
     res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    res['REAL QTY'] = (
-        res['BEGINNING STOCK'] + res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN'] 
-        - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
-    )
+    # --- PERHITUNGAN REAL QTY ---
+    if df_scan is not None and not df_scan.empty:
+        # PENGOLAHAN FILE DATA SCAN (KOLOM B = SKU, KOLOM C = QTY)
+        df_scan_copy = df_scan.copy()
+        sku_col_scan = df_scan_copy.columns[1] # Kolom B (index 1)
+        qty_col_scan = df_scan_copy.columns[2] # Kolom C (index 2)
+        
+        # Aggregasi berdasarkan SKU Scan
+        scan_agg = df_scan_copy.groupby(sku_col_scan).agg({
+            qty_col_scan: 'sum'
+        }).reset_index()
+        
+        scan_agg.columns = ['SKU_KEY_SCAN', 'REAL_QTY_SCAN']
+        scan_agg['SKU_KEY_SCAN'] = scan_agg['SKU_KEY_SCAN'].astype(str).str.split('.').str[0].str.strip().str.upper()
+        
+        # Merge data scan ke dataframe utama
+        res = res.merge(scan_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_SCAN', how='left').fillna(0)
+        res['REAL QTY'] = res['REAL_QTY_SCAN']
+        res = res.drop(columns=['SKU_KEY_SCAN', 'REAL_QTY_SCAN'], errors='ignore')
+    else:
+        # RUMUS LAMA (JIKA TDK ADA SCAN) - TIDAK DIUBAH SAMA SEKALI
+        res['REAL QTY'] = (
+            res['BEGINNING STOCK'] + res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN'] 
+            - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
+        )
 
-    # 6. Update Logika Justifikasi Sesuai Aturan Baru
+    # 6. Update Logika Justifikasi Sesuai Aturan
     def run_formula(row):
         try:
             qty_sys_row = round(float(row[qty_sys_col_case]), 2)
@@ -6740,42 +6760,32 @@ def process_justification(df_case, df_tracking, df_all_stock):
             ending_stock = round(float(row['ENDING STOCK']), 2)
             real_qty = round(float(row['REAL QTY']), 2)
 
-            # =========================================================================
             # ORDER 1: ATURAN KHUSUS - KESALAHAN SYSTEM (BEGIN STOCK -)
-            # =========================================================================
             if qty_so_row > qty_sys_row and begin_stock < 0:
                 if gap_adj > 0 and gap_adj < abs(begin_stock):
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
                 elif gap_adj == 0:
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
 
-            # =========================================================================
             # ORDER 2: ATURAN BARU (BYPASS PINTU DEPAN - ANTI BOCOR)
-            # Kasus lu: GAP & BEGIN == 0, Stock background kembar senilai 1, master ALL bernilai 0
-            # =========================================================================
             if gap_adj == 0 and begin_stock == 0:
                 if ending_stock == real_qty == curr_stock:
                     if qty_sys_all < ending_stock:
                         return "KESALAHAN SYSTEM"
-            # =========================================================================
+
             # ORDER 5: LOGIKA KESALAHAN ADJUSMENT (+ / -) 
-            # =========================================================================
             if qty_sys_row > qty_so_row and gap_adj > 0:
                 return "KESALAHAN ADJUSMENT +"
             elif qty_sys_row < qty_so_row and gap_adj < 0:
                 return "KESALAHAN ADJUSMENT -"
 
-            # =========================================================================
             # ORDER 3: ATURAN KHUSUS - KESALAHAN SYSTEM (BEGIN STOCK >= 0 + MUTASI)
-            # =========================================================================
             if qty_so_row > qty_sys_row and begin_stock >= 0 and gap_adj == 0 and draft_in == 0 and draft_out == 0:
                 mutasi_bersih = round(begin_stock + (stock_in + trf_in) - (sales + trf_out), 2)
                 if mutasi_bersih != ending_stock:
                     return "KESALAHAN SYSTEM"
 
-            # =========================================================================
             # ORDER 6: LOGIKA KESALAHAN SYSTEM BAWAAN
-            # =========================================================================
             if gap_adj == 0:
                 if qty_sys_row > qty_so_row:
                     diff = qty_sys_row - qty_so_row
@@ -6786,15 +6796,11 @@ def process_justification(df_case, df_tracking, df_all_stock):
                     if round(qty_sys_all + diff, 2) == curr_stock:
                         return "KESALAHAN SYSTEM"
 
-            # =========================================================================
             # ORDER 7: KESALAHAN RTO & UNDEFINED
-            # =========================================================================
             if draft_in > 0 or draft_out > 0:
                 return "KESALAHAN RTO"
             
-             # =========================================================================
             # ORDER 4: CEK HASIL REKONSILIASI
-            # =========================================================================
             if qty_sys_all == curr_stock:
                 return "CEK HASIL REKONSILIASI"
 
@@ -11348,90 +11354,28 @@ elif menu == "Justification SO":
         - **ADJUSTMENT FILE**: Gabungkan antara Multiple Adjustment **(Plus)** dan **(Minus)** dalam 1 File.
         - **SUMMARY STOCK**: Download dari **JEZPRO** pada menu **Dashboard Asset** (Store: **JEZ SURABAYA**).
         - **ALL DATA STOCK**: Upload file All data Stock (Multiple Adjustment) **HANYA ADA STOCK**.
+        - **DATA SCAN (Opsional)**: Format Excel dengan SKU di Kolom B dan QTY di Kolom C.
         """)
 
     with st.expander("💡 Logic Thinking (Justification)", expanded=False):
         st.info("""
-
-        **REAL QTY / HITUNGAN MANUAL ➡️ : `BEGINNING STOCK` + (**`TOTAL_STOCKIN`** + **`TOTAL TRF_IN`**) - (**`TOTAL SALES`** + **`TOTAL TRF_OUT`** + **`TOTAL DRAFT TRF_OUT`**)**
-
-        **🛑 1. Kesalahan System (Begin Stock Minus)**
-        * **Kondisinya:** Stok SO lebih besar dari stok Sistem (ADJUSMENT +), Tetapi *Beginning Stock* bernilai minus (dibawah 0).
-        * **Artinya:** Sistem dari awal sudah eror/bocor datanya karena mencatat stok minus yang artinya memang perlu dilakukan *Adjusment +*
-        * **Contoh Kasus:**
-          | Stok SO | Stok Sistem | BEGINNING STOCK | GAP ADJUSMENT |
-          | :---: | :---: | :---: | :---: |
-          | 10 | 5 | **-2** | 0 |
-        
-        **🛡️ 2. Kesalahan System (Ending Stock ≠ Total Stock dari Multiple)**
-        * **Kondisinya:** `GAP ADJUSTMENT` dan `BEGINNING STOCK` sama-sama nol, Total stock antara (`Ending Stock`, `Real Qty`, `Current Stock`) nilainya sama (senilai), tapi total stock di multiple (`QTY SYSTEM ALL`) malah lebih kecil dari stok akhir.
-        * **Artinya:** Ada miss match antara data di multiple dan summary sehingga menyebabkan adjusment +
-        * **Contoh Kasus:**
-          | GAP ADJ | BEGINNING STOCK | ENDING / REAL / CURR STOCK | QTY SYSTEM ALL |
-          | :---: | :---: | :---: | :---: |
-          | 0 | 0 | **10** (Kembar) | **3** (Lebih Kecil) |
-        
-        **⚙️ 3. Kesalahan System (Miss Match Real QTY (Manually Counting) dengan Ending Stock/Current Stock)**
-        * **Kondisinya:** Stok SO lebih besar dari stok Sistem (ADJUSMENT +), tidak ada transaksi gantung (`Draft TRF`), tidak ada `GAP ADJUSTMENT`, **TAPI** hasil hitungan manual tidak match dengan nilai `ENDING STOCK` di sistem.
-        * **Detail Hitungan Manual:** `BEGINNING STOCK` + (**`TOTAL_STOCKIN`** + **`TOTAL TRF_IN`**) - (**`TOTAL SALES`** + **`TOTAL TRF_OUT`**)
-        * **Artinya:** Sistem salah hitung mutasi barang (hasil gabungan barang masuk dan barang keluar tidak sinkron dengan stok akhir).
-        * **Contoh Kasus:**
-          | BEGINNING | STOCKIN + TRF_IN | SALES + TRF_OUT | Hitungan Manual | ENDING STOCK |
-          | :---: | :---: | :---: | :---: | :---: |
-          | 10 | + 5 | - 2 | **13** | **15** (Gak Match!) |
-        
-        **💻 4. Kesalahan System (Stock System Lost)**
-        * **Kondisinya:** Tidak ada `GAP ADJUSTMENT` (`= 0`), tapi ada selisih antara Sistem dan SO. Ketika selisih itu ditambah/dikurang ke master `QTY SYSTEM ALL`, hasilnya pas dengan `CURRENT STOCK`.
-        * **Artinya:** Bug bawaan sistem yang bikin angka di layar tidak update.
-        * **Contoh Kasus:**
-          | QTY SO | QTY System | Selisih (Diff) | QTY SYSTEM ALL | CURRENT STOCK |
-          | :---: | :---: | :---: | :---: | :---: |
-          | 12 | 10 | **+2** | 15 | **17** *(15 + 2 Pas!)* |
-          | 8 | 10 | **-2** | 15 | **13** *(15 - 2 Pas!)* |
-
-        **🔍 5. Cek Hasil Rekonsiliasi**
-        * **Kondisinya:** Total stock di multiple (`QTY SYSTEM ALL`) ternyata pas/sama persis dengan `CURRENT STOCK` / `ENDING STOCK`.
-        * **Artinya:** Data sebenarnya aman dan sinkron secara total keseluruhan.
-        * **Contoh Kasus:**
-          | QTY SYSTEM ALL | CURRENT STOCK | ENDING STOCK |
-          | :---: | :---: | :---: |
-          | **25** | **25** | **25** |
-        
-        **⚠️ 6. Kesalahan Adjustment (+ / -)**
-        * **Kondisinya:** * Stok Sistem > Stok SO, tapi ada data `GAP ADJUSTMENT` positif (+).
-            * Stok Sistem < Stok SO, tapi ada data `GAP ADJUSTMENT` negatif (-).
-        * **Artinya:** Koreksi dari Proses Adjusment Sebelumnya (Reversal)
-        * **Contoh Kasus:**
-          | Kondisi Lapangan | GAP ADJUSMENT di Sistem | Keterangan |
-          | :--- | :---: | :--- |
-          | QTY Sistem (10) > QTY SO (5) | **+5** | *Ada Koreksi (Reversal)* |
-          | QTY Sistem (5) < QTY SO (10) | **-5** | *Ada Koreksi (Reversal)* |
-        
-        **🚚 7. Kesalahan RTO (Barang Gantung)**
-        * **Kondisinya:** Masih ada angka di kolom `TOTAL DRAFT TRF IN` atau `TOTAL DRAFT TRF OUT` yang menggantung (belum di-approve/finish).
-        * **Artinya:** Masalah klasik RTO/mutasi barang yang statusnya masih draf.
-        * **Contoh Kasus:**
-          | TOTAL DRAFT TRF IN | TOTAL DRAFT TRF OUT | Status |
-          | :---: | :---: | :---: |
-          | **5** | 0 | Ada barang gantung |
-          | 0 | **3** | Ada barang gantung |
-        
-        > ❓ **Kenapa muncul UNDEFINED?** > Berarti kasus item tersebut tidak masuk ke dalam 7 kondisi di atas (butuh dicek manual).   
-        > ❓ **Kenapa muncul ERROR DATA?** > Ada kolom yang isinya kosong, teks rusak, atau tidak bisa dihitung angka.
+        **REAL QTY / HITUNGAN MANUAL ➡️ : `BEGINNING STOCK` + (`TOTAL_STOCKIN` + `TOTAL TRF_IN`) - (`TOTAL SALES` + `TOTAL TRF_OUT` + `TOTAL DRAFT TRF_OUT`)** *(Atau disesuaikan dari Data Scan jika diupload)*
         """)
 
     # Inisialisasi Session State
     if 'result_so' not in st.session_state:
         st.session_state.result_so = None
 
-    # UI Uploader
-    col1, col2, col3 = st.columns(3)
+    # UI Uploader - Dibagi 4 Kolom
+    col1, col2, col3, col4 = st.columns(4)
     with col1: 
         up_case = st.file_uploader("Upload FILE ADJUSMENT", type=['xlsx'], key="up_case_so")
     with col2: 
         up_tracking = st.file_uploader("Upload SUMMARY STOCK", type=['xlsx'], key="up_track_so")
     with col3: 
         up_all_stock = st.file_uploader("Upload ALL DATA STOCK", type=['xlsx'], key="up_all_stock_so")
+    with col4:
+        up_scan = st.file_uploader("Upload DATA SCAN (Opsional)", type=['xlsx'], key="up_scan_so")
 
     # Logika Tombol Run
     if up_case and up_tracking and up_all_stock:
@@ -11440,22 +11384,20 @@ elif menu == "Justification SO":
                 df_c = pd.read_excel(up_case)
                 df_t = pd.read_excel(up_tracking)
                 df_a = pd.read_excel(up_all_stock)
+                df_s = pd.read_excel(up_scan) if up_scan else None
                 
-                st.session_state.result_so = process_justification(df_c, df_t, df_a)
+                st.session_state.result_so = process_justification(df_c, df_t, df_a, df_s)
 
     # TAMPILAN OUTPUT
     if st.session_state.result_so is not None:
         result = st.session_state.result_so
         
-        # --- TAMPILAN METRIC BOX (SUDAH SINKRON) ---
+        # --- TAMPILAN METRIC BOX ---
         st.divider()
         m1, m2, m3, m4, m5 = st.columns(5)
         
         c_undef = len(result[result['JUSTIFICATION'] == "UNDEFINED"])
-        
-        # PERBAIKAN METRIK: Menggabungkan "KESALAHAN SYSTEM" biasa dan "KESALAHAN SYSTEM (BEGIN STOCK -)" ke dalam SYS ERROR
         c_sys   = len(result[result['JUSTIFICATION'].isin(["KESALAHAN SYSTEM", "KESALAHAN SYSTEM (BEGIN STOCK -)"])])
-        
         c_adj   = len(result[result['JUSTIFICATION'].isin(["KESALAHAN ADJUSMENT +", "KESALAHAN ADJUSMENT -"])])
         c_rto   = len(result[result['JUSTIFICATION'] == "KESALAHAN RTO"])
         c_rekon = len(result[result['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"])
@@ -11469,10 +11411,10 @@ elif menu == "Justification SO":
         # --- TAMPILAN TABEL ---
         st.divider()
         st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
-                </div>
-                """, unsafe_allow_html=True)
+            <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+            <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
+            </div>
+            """, unsafe_allow_html=True)
         st.dataframe(result, use_container_width=True, height=450)
         
         # --- DOWNLOAD BUTTON ---
@@ -11488,7 +11430,6 @@ elif menu == "Justification SO":
             use_container_width=True,
             key="btn_download_so"
         )
-
 
 
 
