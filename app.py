@@ -9787,26 +9787,30 @@ def show_timbang_system():
                     (df_filtered['created_at'].dt.month == now_jkt.month)
                 ]
 
-            # --- LOGIKAL PERHITUNGAN HARGA TARIF ---
+           # --- LOGIKAL PERHITUNGAN HARGA TARIF ---
             def hitung_harga(row):
                 eksp = str(row['ekspedisi']).upper()
                 tujuan = str(row['pengiriman_ke']).upper()
                 koli = row['total_koli']
                 berat = row['berat_total_timbang']
                 
-                # Logic 1: ACCESS + SEMARANG = Koli * 40.000
+                harga = 0
+                
+                # Logic 1: ACCESS + SEMARANG = (Koli * 40.000) * 3.2
                 if "ACCESS" in eksp and "SEMARANG" in tujuan:
-                    return koli * 40000
-                # Logic 2: ACCESS + HUB JAKARTA = Kg * 2.500
+                    harga = koli * 40000
+                # Logic 2: ACCESS + HUB JAKARTA = (Kg * 2.500) * 3.2
                 elif "ACCESS" in eksp and "HUB JAKARTA" in tujuan:
-                    return berat * 2500
-                # Logic 3: ADEX + SEMARANG = Kg * 1.000
+                    harga = berat * 2500
+                # Logic 3: ADEX + SEMARANG / MALANG = (Kg * 1.000) * 3.2
                 elif "ADEX" in eksp and ("SEMARANG" in tujuan or "MALANG" in tujuan):
-                    return berat * 1000
-                # Logic 4: ADEX + HUB JAKARTA = Kg * 2.000
+                    harga = berat * 1000
+                # Logic 4: ADEX + HUB JAKARTA = (Kg * 2.000) * 3.2
                 elif "ADEX" in eksp and "HUB JAKARTA" in tujuan:
-                    return berat * 2000
-                return 0
+                    harga = berat * 2000
+                
+                # Kalikan hasil akhir dengan 3.2
+                return harga * 3.2
 
             # Daftarkan kolom harga baru secara dinamis
             if not df_filtered.empty:
