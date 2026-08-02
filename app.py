@@ -9794,23 +9794,19 @@ def show_timbang_system():
                 koli = row['total_koli']
                 berat = row['berat_total_timbang']
                 
-                harga = 0
-                
-                # Logic 1: ACCESS + SEMARANG = (Koli * 40.000) * 3.2
+                # Logic 1: ACCESS + SEMARANG = Koli * 40.000 * 3.2
                 if "ACCESS" in eksp and "SEMARANG" in tujuan:
-                    harga = koli * 40000
-                # Logic 2: ACCESS + HUB JAKARTA = (Kg * 2.500) * 3.2
+                    return koli * 40000 * 3.2
+                # Logic 2: ACCESS + HUB JAKARTA = Kg * 2.500 * 3.2
                 elif "ACCESS" in eksp and "HUB JAKARTA" in tujuan:
-                    harga = berat * 2500
-                # Logic 3: ADEX + SEMARANG / MALANG = (Kg * 1.000) * 3.2
+                    return berat * 2500 * 3.2
+                # Logic 3: ADEX + SEMARANG / MALANG = Kg * 1.000 * 3.2
                 elif "ADEX" in eksp and ("SEMARANG" in tujuan or "MALANG" in tujuan):
-                    harga = berat * 1000
-                # Logic 4: ADEX + HUB JAKARTA = (Kg * 2.000) * 3.2
+                    return berat * 1000 * 3.2
+                # Logic 4: ADEX + HUB JAKARTA = Kg * 2.000 * 3.2
                 elif "ADEX" in eksp and "HUB JAKARTA" in tujuan:
-                    harga = berat * 2000
-                
-                # Kalikan hasil akhir dengan 3.2
-                return harga * 3.2
+                    return berat * 2000 * 3.2
+                return 0
 
             # Daftarkan kolom harga baru secara dinamis
             if not df_filtered.empty:
