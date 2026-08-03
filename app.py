@@ -10111,7 +10111,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     if is_dc:
-        m3_list = ["Stock Opname","Match Real & System","Cycle Count", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill"]
+        m3_list = ["Stock Opname","Match Real & System","Cycle Count","Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill"]
     else:
         m3_list = ["Stock Minus","Cycle Count"] # Menu Cabang
 
@@ -10138,14 +10138,7 @@ with st.sidebar:
     idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else None
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=sync_menu, args=("m5_key",), label_visibility="collapsed")
 
-    # --- KELOMPOK 6: PICK & PUTAWAY AUDIT ---
-    if is_dc:
-        st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">PICKING & PUTAWAY AUDIT</p>', unsafe_allow_html=True)
-        m6_list = ["Putaway & Picking Audit List"]
-        idx6 = m6_list.index(st.session_state.main_menu) if st.session_state.main_menu in m6_list else None
-        st.radio("M6", m6_list, index=idx6, key="m6_key", on_change=sync_menu, args=("m6_key",), label_visibility="collapsed")
-    st.divider()
-    
+
     # Tombol Logout (Tetap di bawah)
     if st.button("🔴 Logout", key="simple_logout"):
         st.session_state.logged_in = False
@@ -11777,7 +11770,7 @@ if menu == "Logistic Schedule":
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
-elif menu == "Putaway & Picking Audit":
+elif menu == "Putaway & Picking Audit List":
     menu_picking_putaway_audit()
 
 elif menu == "Refill Koli to Koli/Refill":
