@@ -4044,19 +4044,29 @@ def main_menu_routing():
                 st.button("📊 Download Master Report (All SKU)", disabled=True, help="Data log transaksi kosong.")
 
 
+
 # ==============================================================================
-# LOGIC PROSES MENU "PUTAWAY AUDIT LIST"
+# LOGIC PROSES MENU "PUTAWAY & PICKING AUDIT LIST"
 # ==============================================================================
 
+def read_file(uploaded_file, header_mode=None):
+    """Membaca file CSV atau Excel"""
+    try:
+        if uploaded_file.name.endswith('.csv'):
+            return pd.read_csv(uploaded_file, header=header_mode)
+        else:
+            return pd.read_excel(uploaded_file, header=header_mode)
+    except Exception as e:
+        st.error(f"Gagal membaca file {uploaded_file.name}: {e}")
+        return None
+
+
 def process_mutation_chain(df):
-    """
-    Memproses rantai perjalanan SKU berdasarkan urutan waktu kronologis.
-    """
+    """Memproses rantai perjalanan SKU berdasarkan urutan waktu kronologis (Putaway Audit)."""
     processed_records = []
     
     # Grouping per SKU
     for sku, group in df.groupby('SKU', sort=False):
-        # Pastikan di dalam group sudah urut berdasarkan Waktu
         group_sorted = group.sort_values(by='WAKTU', ascending=True)
         active_chains = []
         
@@ -4068,7 +4078,6 @@ def process_mutation_chain(df):
                 continue
                 
             matched = False
-            # Cek apakah BIN AWAL tersambung dengan LAST BIN dari rantai yang aktif
             for chain in active_chains:
                 if chain['current_bin'] == bin_awal:
                     chain['current_bin'] = bin_tujuan
@@ -4076,14 +4085,12 @@ def process_mutation_chain(df):
                     matched = True
                     break
             
-            # Jika tidak tersambung, buat rantai mutasi baru
             if not matched:
                 active_chains.append({
                     'current_bin': bin_tujuan,
                     'history': [bin_awal, bin_tujuan]
                 })
         
-        # Ekstrak hasil akhir
         for chain in active_chains:
             processed_records.append({
                 'SKU': sku,
@@ -4099,15 +4106,79 @@ def process_mutation_chain(df):
     return pd.DataFrame(processed_records)
 
 
-# ==============================================================================
-# LOGIC INTERFACE MENU "PUTAWAY AUDIT LIST"
-# ==============================================================================
-def menu_putaway_audit_list():
-    """
-    Fungsi utama untuk menampilkan interface & logic Putaway Audit List.
-    """
+def process_picking_audit(df_sales_raw, df_rto_raw):
+    """Memproses data Sales & RTO (Picking Audit)."""
+    combined_list = []
     
-    # Custom Styling Header Badge
+    # 1. Olah Data Sales
+    if df_sales_raw is not None:
+        try:
+            if df_sales_raw.shape[1] > 10:
+                df_sales = df_sales_raw.iloc[:, [1, 6, 10]].copy()
+                df_sales.columns = ['SKU', 'BIN', 'QTY']
+                
+                df_sales['SKU'] = df_sales['SKU'].astype(str).str.strip()
+                df_sales['BIN'] = df_sales['BIN'].astype(str).str.strip()
+                df_sales['QTY'] = pd.to_numeric(df_sales['QTY'], errors='coerce').fillna(0)
+                
+                df_sales = df_sales[
+                    (df_sales['SKU'] != '') & 
+                    (df_sales['BIN'] != '') & 
+                    (df_sales['SKU'].str.upper() != 'SKU')
+                ]
+                
+                df_sales = df_sales.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                df_sales['SOURCE'] = 'SALES'
+                combined_list.append(df_sales)
+            else:
+                st.error("File Sales kurang kolom (butuh minimal hingga Kolom K).")
+        except Exception as e:
+            st.error(f"Gagal memproses file Sales! Error: {e}")
+
+    # 2. Olah Data RTO
+    if df_rto_raw is not None:
+        try:
+            if df_rto_raw.shape[1] > 8:
+                df_rto = df_rto_raw.iloc[:, [3, 7, 8]].copy()
+                df_rto.columns = ['SKU', 'QTY', 'BIN']
+                df_rto = df_rto[['SKU', 'BIN', 'QTY']]
+                
+                df_rto['SKU'] = df_rto['SKU'].astype(str).str.strip()
+                df_rto['BIN'] = df_rto['BIN'].astype(str).str.strip()
+                df_rto['QTY'] = pd.to_numeric(df_rto['QTY'], errors='coerce').fillna(0)
+                
+                df_rto = df_rto[
+                    (df_rto['SKU'] != '') & 
+                    (df_rto['BIN'] != '') & 
+                    (df_rto['SKU'].str.upper() != 'SKU')
+                ]
+                
+                df_rto = df_rto.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                df_rto['SOURCE'] = 'RTO'
+                combined_list.append(df_rto)
+            else:
+                st.error("File RTO kurang kolom (butuh minimal hingga Kolom I).")
+        except Exception as e:
+            st.error(f"Gagal memproses file RTO! Error: {e}")
+
+    if not combined_list:
+        return pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
+
+    df_final = pd.concat(combined_list, ignore_index=True)
+    df_final = df_final[df_final['QTY'] > 0].reset_index(drop=True)
+    return df_final
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "PUTAWAY & PICKING AUDIT LIST"
+# ==============================================================================
+
+def menu_picking_putaway_audit():
+    """
+    Fungsi utama menu Integrated Picking & Putaway Audit.
+    Mencakup 3 Uploader (Sales, RTO, Mutasi) & 5 Tab Hasil Analisis.
+    """
+    # Styling Header Badge & Metric
     st.markdown("""
         <style>
             .header-badge {
@@ -4124,373 +4195,224 @@ def menu_putaway_audit_list():
                 letter-spacing: 0.5px;
                 text-transform: uppercase;
             }
-            .sub-title-text {
-                font-size: 14px;
-                color: #A0AABF;
-                margin-bottom: 20px;
-                display: block;
-            }
-            div[data-testid="stMetricValue"] {
-                font-size: 24px;
-                color: #4CAF50;
+            .stMetric {
+                background-color: #f8f9fa;
+                padding: 10px;
+                border-radius: 8px;
+                border: 1px solid #e9ecef;
             }
         </style>
     """, unsafe_allow_html=True)
 
-    # 1. Header dengan Badge Blue Style
-    st.markdown('<div class="header-badge">PUTAWAY AUDIT LIST</div>', unsafe_allow_html=True)
+    # Header
+    st.markdown('<div class="header-badge">PUTAWAY & PICKING AUDIT LIST</div>', unsafe_allow_html=True)
 
     # Inisialisasi Session State
-    if 'df_audit_result' not in st.session_state:
-        st.session_state['df_audit_result'] = None
+    if 'df_picking_res' not in st.session_state:
+        st.session_state['df_picking_res'] = None
+    if 'df_putaway_res' not in st.session_state:
+        st.session_state['df_putaway_res'] = None
 
-    # 2. File Uploader
-    uploaded_file = st.file_uploader("Upload File Mutasi (Excel .xlsx / CSV)", type=["xlsx", "xls", "csv"])
+    # --------------------------------------------------------------------------
+    # SECTION 1: TRIPLE FILE UPLOADER (Sales, RTO, Mutasi)
+    # --------------------------------------------------------------------------
+    col_up1, col_up2, col_up3 = st.columns(3)
 
-    if uploaded_file is not None:
-        try:
-            # 1. Baca file
-            if uploaded_file.name.endswith('.csv'):
-                df_raw = pd.read_csv(uploaded_file)
-            else:
-                df_raw = pd.read_excel(uploaded_file)
-            
-            # 2. Ambil Kolom A (Waktu/Index 0), D (SKU/Index 3), I (BIN AWAL/Index 8), M (BIN TUJUAN/Index 12)
-            df_raw = df_raw.iloc[:, [0, 3, 8, 12]]
-            
-            # 3. Rename nama kolom
-            df_raw.columns = ['WAKTU', 'SKU', 'BIN AWAL', 'BIN TUJUAN']
-            
-            # 4. Parsing Waktu ke Datetime & Sorting dari Waktu Terlama -> Terbaru
-            df_raw['WAKTU'] = pd.to_datetime(df_raw['WAKTU'], errors='coerce')
-            df_raw = df_raw.sort_values(by=['SKU', 'WAKTU'], ascending=[True, True]).reset_index(drop=True)
-            
-            # 5. Bersihkan data kosong
-            df_raw = df_raw.dropna(subset=['SKU'])
-            df_raw['BIN AWAL'] = df_raw['BIN AWAL'].fillna('')
-            df_raw['BIN TUJUAN'] = df_raw['BIN TUJUAN'].fillna('')
-            
-            df_raw = df_raw[(df_raw['BIN AWAL'].astype(str).str.strip() != '') & 
-                            (df_raw['BIN TUJUAN'].astype(str).str.strip() != '')]
+    with col_up1:
+        file_sales = st.file_uploader("1. File Sales (Excel / CSV)", type=["xlsx", "xls", "csv"], key="sales_up")
 
-            # Tombol Eksekusi
-            if st.button("▶️ RUN PROCESS", type="primary"):
-                with st.spinner("Sedang Memproses Data..."):
-                    df_res = process_mutation_chain(df_raw)
-                    st.session_state['df_audit_result'] = df_res.drop_duplicates().reset_index(drop=True)
-                    st.success("✅ Putaway Audit Selesai Diproses!")
+    with col_up2:
+        file_rto = st.file_uploader("2. File RTO (Excel / CSV)", type=["xlsx", "xls", "csv"], key="rto_up")
 
-        except Exception as e:
-            st.error(f"Gagal memproses file! Error: {e}")
+    with col_up3:
+        file_mutasi = st.file_uploader("3. File Mutasi (Excel / CSV)", type=["xlsx", "xls", "csv"], key="mutasi_up")
 
-    # 3. Tampilkan Hasil Audit
-    if st.session_state['df_audit_result'] is not None:
-        df_res = st.session_state['df_audit_result']
-        
-        if not df_res.empty and 'SKU' in df_res.columns:
-            st.divider()
-            
-            # --- TAB INTERFACE ---
-            tab1, tab2 = st.tabs(["📋 DETAIL PUTAWAY AUDIT", "🎯 SUMMARY UNIQUE LAST BIN"])
-            
-            # ------------------------------------------------------------------
-            # TAB 1: DETAIL LENGKAP (Sesuai Gambar)
-            # ------------------------------------------------------------------
-            with tab1:
-                st.subheader("📋 DETAIL PUTAWAY AUDIT LIST")
-                
-                # Search Bar Tab 1
-                sku_search = st.text_input("🔍 Cari SKU Spesifik (Detail):", "", key="search_tab1")
-                if sku_search:
-                    df_display_1 = df_res[df_res['SKU'].astype(str).str.contains(sku_search, case=False, na=False)]
-                else:
-                    df_display_1 = df_res
-
-                st.dataframe(df_display_1, use_container_width=True)
-
-                csv_data_1 = df_res.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Download Detail Audit (CSV)",
-                    data=csv_data_1,
-                    file_name="Detail_Putaway_Audit.csv",
-                    mime="text/csv",
-                    key="dl_tab1"
-                )
-
-            # ------------------------------------------------------------------
-            # TAB 2: UNIQUE LAST BIN SAJA
-            # ------------------------------------------------------------------
-            with tab2:
-                st.subheader("🎯 LIST UNIQUE LAST BIN")
-                
-                # Ambil daftar Last Bin unik saja tanpa SKU
-                df_unique_bin = df_res[['LAST BIN MUTASI']].drop_duplicates().reset_index(drop=True)
-                
-                # Search Bar khusus Last Bin
-                bin_search = st.text_input("🔍 Cari Last Bin Spesifik:", "", key="search_tab2")
-                if bin_search:
-                    df_display_2 = df_unique_bin[
-                        df_unique_bin['LAST BIN MUTASI'].astype(str).str.contains(bin_search, case=False, na=False)
-                    ]
-                else:
-                    df_display_2 = df_unique_bin
-
-                # Tampilkan tabel murni Last Bin
-                st.dataframe(df_display_2, use_container_width=True)
-
-                # Tombol Download khusus Tab 2
-                csv_data_2 = df_unique_bin.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Download Unique Last Bin (CSV)",
-                    data=csv_data_2,
-                    file_name="Unique_Last_Bin.csv",
-                    mime="text/csv",
-                    key="dl_tab2"
-                )
-
-
-
-
-# ==============================================================================
-# LOGIC PROCESS MENU "PICKING LIST AUDIT"
-# ==============================================================================
-
-# Custom CSS Style
-st.markdown("""
-    <style>
-        .header-badge {
-            background: linear-gradient(180deg, #2D58A6 0%, #1A3C78 100%);
-            color: white;
-            font-family: 'Source Sans Pro', sans-serif;
-            font-size: 26px;
-            font-weight: 700;
-            padding: 15px 30px;
-            border-radius: 12px;
-            display: inline-block;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .stMetric {
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #e9ecef;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# ==============================================================================
-# LOGIC PEMBACAAN & PENGOLAHAN DATA
-# ==============================================================================
-
-def read_file(uploaded_file):
-    """Membaca file CSV atau Excel"""
-    try:
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file, header=None)
-        else:
-            df = pd.read_excel(uploaded_file, header=None)
-        return df
-    except Exception as e:
-        st.error(f"Gagal membaca file: {e}")
-        return None
-
-def process_picking_audit(df_sales_raw, df_rto_raw):
-    """
-    Memproses data Sales & RTO berdasarkan pemetaan kolom:
-    
-    SALES:
-      - Kolom B (index 1): SKU
-      - Kolom G (index 6): BIN
-      - Kolom K (index 10): QTY
-      
-    RTO:
-      - Kolom D (index 3): SKU
-      - Kolom H (index 7): QTY
-      - Kolom I (index 8): BIN
-    """
-    combined_list = []
-    
-    # 1. Olah Data Sales (Jika Ada)
-    if df_sales_raw is not None:
-        try:
-            if df_sales_raw.shape[1] > 10:
-                # Ambil Kolom B (1), G (6), K (10)
-                df_sales = df_sales_raw.iloc[:, [1, 6, 10]].copy()
-                df_sales.columns = ['SKU', 'BIN', 'QTY']
-                
-                # Cleaning ringan sebelum di-sum
-                df_sales['SKU'] = df_sales['SKU'].astype(str).str.strip()
-                df_sales['BIN'] = df_sales['BIN'].astype(str).str.strip()
-                df_sales['QTY'] = pd.to_numeric(df_sales['QTY'], errors='coerce').fillna(0)
-                
-                # Hapus baris kosong / header terbawa
-                df_sales = df_sales[
-                    (df_sales['SKU'] != '') & 
-                    (df_sales['BIN'] != '') & 
-                    (df_sales['SKU'].str.upper() != 'SKU')
-                ]
-                
-                # SUM QTY jika ada SKU & BIN yang sama di file Sales
-                df_sales = df_sales.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
-                df_sales['SOURCE'] = 'SALES'
-                
-                combined_list.append(df_sales)
-            else:
-                st.error("File Sales kurang kolom (butuh minimal hingga Kolom K).")
-        except Exception as e:
-            st.error(f"Gagal memproses file Sales! Error: {e}")
-
-    # 2. Olah Data RTO (Jika Ada)
-    if df_rto_raw is not None:
-        try:
-            if df_rto_raw.shape[1] > 8:
-                # Ambil Kolom D (3), H (7), I (8)
-                df_rto = df_rto_raw.iloc[:, [3, 7, 8]].copy()
-                df_rto.columns = ['SKU', 'QTY', 'BIN']
-                df_rto = df_rto[['SKU', 'BIN', 'QTY']]
-                
-                # Cleaning ringan sebelum di-sum
-                df_rto['SKU'] = df_rto['SKU'].astype(str).str.strip()
-                df_rto['BIN'] = df_rto['BIN'].astype(str).str.strip()
-                df_rto['QTY'] = pd.to_numeric(df_rto['QTY'], errors='coerce').fillna(0)
-                
-                # Hapus baris kosong / header terbawa
-                df_rto = df_rto[
-                    (df_rto['SKU'] != '') & 
-                    (df_rto['BIN'] != '') & 
-                    (df_rto['SKU'].str.upper() != 'SKU')
-                ]
-                
-                # SUM QTY jika ada SKU & BIN yang sama di file RTO
-                df_rto = df_rto.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
-                df_rto['SOURCE'] = 'RTO'
-                
-                combined_list.append(df_rto)
-            else:
-                st.error("File RTO kurang kolom (butuh minimal hingga Kolom I).")
-        except Exception as e:
-            st.error(f"Gagal memproses file RTO! Error: {e}")
-
-    if not combined_list:
-        return pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
-
-    # 3. Gabungkan Data Sales & RTO yang masing-masing sudah di-sum QTY-nya
-    df_final = pd.concat(combined_list, ignore_index=True)
-
-    # 4. Filter akhir: Hapus QTY yang bernilai 0 atau kurang
-    df_final = df_final[df_final['QTY'] > 0].reset_index(drop=True)
-    
-    return df_final
-# ==============================================================================
-# LOGIC INTERFACE MENU "PICKING AUDIT LIST"
-# ==============================================================================
-
-def menu_picking_audit_list():
-    st.markdown('<div class="header-badge">PICKING AUDIT LIST</div>', unsafe_allow_html=True)
-
-    # Inisialisasi Session State
-    if 'df_picking_result' not in st.session_state:
-        st.session_state['df_picking_result'] = None
-
-    # Section 1: Uploader (Dual File Uploader)
-    col1, col2 = st.columns(2)
-
-    with col1:
-        file_sales = st.file_uploader("Upload File Sales (Excel / CSV)", type=["xlsx", "xls", "csv"], key="sales_uploader")
-
-    with col2:
-        file_rto = st.file_uploader("Upload File RTO (Excel / CSV)", type=["xlsx", "xls", "csv"], key="rto_uploader")
-
-    # Button Eksekusi Process
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("▶️ RUN PROCESS AUDIT", type="primary", use_container_width=True):
-        if file_sales is None and file_rto is None:
-            st.warning("⚠️ Harap upload minimal salah satu file (Sales atau RTO)!")
+
+    # --------------------------------------------------------------------------
+    # TOMBOL EKSEKUSI PROCESS
+    # --------------------------------------------------------------------------
+    if st.button("▶️ RUN INTEGRATED AUDIT PROCESS", type="primary", use_container_width=True):
+        if not file_sales and not file_rto and not file_mutasi:
+            st.warning("⚠️ Harap upload setidaknya salah satu file untuk diproses!")
         else:
-            with st.spinner("Sedang memproses data Picking Audit..."):
-                df_sales_raw = read_file(file_sales) if file_sales else None
-                df_rto_raw = read_file(file_rto) if file_rto else None
-
-                df_result = process_picking_audit(df_sales_raw, df_rto_raw)
-                st.session_state['df_picking_result'] = df_result
-                st.success("✅ Process Picking Audit Selesai!")
-
-    # Section 2: Display Results
-    if st.session_state['df_picking_result'] is not None:
-        df_res = st.session_state['df_picking_result']
-
-        if not df_res.empty:
-            st.divider()
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            # --- TAB INTERFACE ---
-            tab1, tab2 = st.tabs(["📋 DETAIL PICKING AUDIT", "🎯 SUMMARY UNIQUE BIN AUDIT"])
-
-            # ------------------------------------------------------------------
-            # TAB 1: DETAIL LENGKAP
-            # ------------------------------------------------------------------
-            with tab1:
-                st.subheader("📋 Detail Picking Audit List")
+            with st.spinner("Sedang memproses seluruh data audit..."):
                 
-                # Search filter
-                col_search1, col_search2 = st.columns([2, 1])
-                with col_search1:
-                    search_sku = st.text_input("🔍 Cari SKU / BIN:", "", key="search_tab1")
-                with col_search2:
-                    filter_source = st.multiselect("Filter Source:", options=df_res['SOURCE'].unique(), default=df_res['SOURCE'].unique())
-
-                df_tab1 = df_res[df_res['SOURCE'].isin(filter_source)]
-                if search_sku:
-                    df_tab1 = df_tab1[
-                        df_tab1['SKU'].str.contains(search_sku, case=False, na=False) |
-                        df_tab1['BIN'].str.contains(search_sku, case=False, na=False)
-                    ]
-
-                st.dataframe(df_tab1, use_container_width=True, hide_index=True)
-
-                # Download Button
-                csv_tab1 = df_tab1.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Download Detail Picking Audit (CSV)",
-                    data=csv_tab1,
-                    file_name="Detail_Picking_Audit_List.csv",
-                    mime="text/csv",
-                    key="dl_tab1"
-                )
-
-            # ------------------------------------------------------------------
-            # TAB 2: UNIQUE BIN SAJA FOR PICKING AUDIT
-            # ------------------------------------------------------------------
-            with tab2:
-                st.subheader("🎯 Unique BIN List (Untuk Audit Lapangan)")
+                # --- 1. PROSES DATA PICKING (Sales & RTO) ---
+                df_sales_raw = read_file(file_sales, header_mode=None) if file_sales else None
+                df_rto_raw = read_file(file_rto, header_mode=None) if file_rto else None
                 
-                # Ambil daftar BIN unik & diurutkan secara alfabetis
-                df_unique_bin = pd.DataFrame({
-                    'BIN': sorted(df_res['BIN'].unique())
-                })
-
-                search_bin = st.text_input("🔍 Cari BIN Spesifik:", "", key="search_tab2")
-                if search_bin:
-                    df_tab2 = df_unique_bin[df_unique_bin['BIN'].str.contains(search_bin, case=False, na=False)]
+                if df_sales_raw is not None or df_rto_raw is not None:
+                    st.session_state['df_picking_res'] = process_picking_audit(df_sales_raw, df_rto_raw)
                 else:
-                    df_tab2 = df_unique_bin
+                    st.session_state['df_picking_res'] = pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
 
-                st.dataframe(df_tab2, use_container_width=True, hide_index=True)
+                # --- 2. PROSES DATA PUTAWAY (Mutasi) ---
+                if file_mutasi:
+                    try:
+                        df_mutasi_raw = read_file(file_mutasi, header_mode=0)
+                        # Ambil Kolom A (0), D (3), I (8), M (12)
+                        df_mutasi = df_mutasi_raw.iloc[:, [0, 3, 8, 12]].copy()
+                        df_mutasi.columns = ['WAKTU', 'SKU', 'BIN AWAL', 'BIN TUJUAN']
+                        
+                        df_mutasi['WAKTU'] = pd.to_datetime(df_mutasi['WAKTU'], errors='coerce')
+                        df_mutasi = df_mutasi.sort_values(by=['SKU', 'WAKTU'], ascending=[True, True]).reset_index(drop=True)
+                        
+                        df_mutasi = df_mutasi.dropna(subset=['SKU'])
+                        df_mutasi['BIN AWAL'] = df_mutasi['BIN AWAL'].fillna('')
+                        df_mutasi['BIN TUJUAN'] = df_mutasi['BIN TUJUAN'].fillna('')
+                        
+                        df_mutasi = df_mutasi[(df_mutasi['BIN AWAL'].astype(str).str.strip() != '') & 
+                                              (df_mutasi['BIN TUJUAN'].astype(str).str.strip() != '')]
+                        
+                        st.session_state['df_putaway_res'] = process_mutation_chain(df_mutasi).drop_duplicates().reset_index(drop=True)
+                    except Exception as e:
+                        st.error(f"Gagal memproses file Mutasi! Error: {e}")
+                else:
+                    st.session_state['df_putaway_res'] = pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
 
-                # Download Button
-                csv_tab2 = df_unique_bin.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Download Unique BIN List (CSV)",
-                    data=csv_tab2,
-                    file_name="Unique_BIN_Audit_List.csv",
-                    mime="text/csv",
-                    key="dl_tab2"
-                )
-        else:
-            st.warning("Data kosong atau format kolom pada file yang diupload tidak sesuai.")
+                st.success("✅ Seluruh proses audit berhasil dijalankan!")
+
+    # --------------------------------------------------------------------------
+    # SECTION 2: DISPLAY RESULTS (5 TABS)
+    # --------------------------------------------------------------------------
+    if st.session_state['df_picking_res'] is not None or st.session_state['df_putaway_res'] is not None:
+        st.divider()
+        
+        df_picking = st.session_state['df_picking_res'] if st.session_state['df_picking_res'] is not None else pd.DataFrame()
+        df_putaway = st.session_state['df_putaway_res'] if st.session_state['df_putaway_res'] is not None else pd.DataFrame()
+        
+        # DEFINISI 5 TAB
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "📋 DETAIL PICKING AUDIT", 
+            "🎯 UNIQUE BIN PICKING", 
+            "📋 DETAIL PUTAWAY AUDIT", 
+            "🎯 UNIQUE LAST BIN PUTAWAY",
+            "🔥 FINAL LIST (MATCHING BIN)"
+        ])
+
+        # ----------------------------------------------------------------------
+        # TAB 1: DETAIL PICKING AUDIT
+        # ----------------------------------------------------------------------
+        with tab1:
+            st.subheader("📋 Detail Picking Audit List (Sales & RTO)")
+            if not df_picking.empty:
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    search_p1 = st.text_input("🔍 Cari SKU / BIN:", "", key="s_p1")
+                with c2:
+                    sources = st.multiselect("Filter Source:", options=df_picking['SOURCE'].unique(), default=df_picking['SOURCE'].unique(), key="f_p1")
+
+                df_t1 = df_picking[df_picking['SOURCE'].isin(sources)]
+                if search_p1:
+                    df_t1 = df_t1[df_t1['SKU'].str.contains(search_p1, case=False, na=False) | df_t1['BIN'].str.contains(search_p1, case=False, na=False)]
+
+                st.dataframe(df_t1, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Detail Picking (CSV)", df_t1.to_csv(index=False).encode('utf-8'), "Detail_Picking_Audit.csv", "text/csv", key="dl_t1")
+            else:
+                st.info("Data Picking Kosong.")
+
+        # ----------------------------------------------------------------------
+        # TAB 2: UNIQUE BIN PICKING
+        # ----------------------------------------------------------------------
+        with tab2:
+            st.subheader("🎯 Unique BIN List (Picking Audit)")
+            if not df_picking.empty:
+                df_u_picking = pd.DataFrame({'BIN': sorted(df_picking['BIN'].unique())})
+                search_p2 = st.text_input("🔍 Cari BIN Spesifik:", "", key="s_p2")
+                if search_p2:
+                    df_u_picking = df_u_picking[df_u_picking['BIN'].str.contains(search_p2, case=False, na=False)]
+
+                st.dataframe(df_u_picking, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Unique BIN Picking (CSV)", df_u_picking.to_csv(index=False).encode('utf-8'), "Unique_BIN_Picking.csv", "text/csv", key="dl_t2")
+            else:
+                st.info("Data Unique BIN Picking Kosong.")
+
+        # ----------------------------------------------------------------------
+        # TAB 3: DETAIL PUTAWAY AUDIT
+        # ----------------------------------------------------------------------
+        with tab3:
+            st.subheader("📋 Detail Putaway Audit List (Mutasi)")
+            if not df_putaway.empty:
+                search_pt1 = st.text_input("🔍 Cari SKU Spesifik:", "", key="s_pt1")
+                df_t3 = df_putaway
+                if search_pt1:
+                    df_t3 = df_t3[df_t3['SKU'].astype(str).str.contains(search_pt1, case=False, na=False)]
+
+                st.dataframe(df_t3, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Detail Putaway (CSV)", df_t3.to_csv(index=False).encode('utf-8'), "Detail_Putaway_Audit.csv", "text/csv", key="dl_t3")
+            else:
+                st.info("Data Putaway Kosong.")
+
+        # ----------------------------------------------------------------------
+        # TAB 4: UNIQUE LAST BIN PUTAWAY
+        # ----------------------------------------------------------------------
+        with tab4:
+            st.subheader("🎯 List Unique Last Bin (Putaway Audit)")
+            if not df_putaway.empty:
+                df_u_putaway = pd.DataFrame({'LAST BIN MUTASI': sorted(df_putaway['LAST BIN MUTASI'].unique())})
+                search_pt2 = st.text_input("🔍 Cari Last Bin Spesifik:", "", key="s_pt2")
+                if search_pt2:
+                    df_u_putaway = df_u_putaway[df_u_putaway['LAST BIN MUTASI'].astype(str).str.contains(search_pt2, case=False, na=False)]
+
+                st.dataframe(df_u_putaway, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Unique Last Bin (CSV)", df_u_putaway.to_csv(index=False).encode('utf-8'), "Unique_Last_Bin_Putaway.csv", "text/csv", key="dl_t4")
+            else:
+                st.info("Data Unique Last Bin Putaway Kosong.")
+
+        # ----------------------------------------------------------------------
+        # TAB 5: FINAL LIST (IRISAN/MATCHING UNIQUE BIN PICKING & PUTAWAY)
+        # ----------------------------------------------------------------------
+        with tab5:
+            st.subheader("🔥 FINAL LIST: BIN IRISAN (PICKING & PUTAWAY SAMA)")
+            st.caption("Menampilkan BIN dari Picking (Sales/RTO) yang JUGA MUNCUL sebagai LAST BIN MUTASI di Putaway.")
+
+            if not df_picking.empty and not df_putaway.empty:
+                # Ambil set dari masing-masing BIN
+                set_picking_bin = set(df_picking['BIN'].astype(str).str.strip())
+                set_putaway_bin = set(df_putaway['LAST BIN MUTASI'].astype(str).str.strip())
+
+                # Cari Irisan (Intersection)
+                matching_bins = sorted(list(set_picking_bin.intersection(set_putaway_bin)))
+
+                if matching_bins:
+                    df_final_bin = pd.DataFrame({
+                        'NO': range(1, len(matching_bins) + 1),
+                        'BIN AUDIT FINAL': matching_bins
+                    })
+
+                    # Metrics Summary
+                    col_m1, col_m2, col_m3 = st.columns(3)
+                    col_m1.metric("Total Unique BIN Picking", len(set_picking_bin))
+                    col_m2.metric("Total Unique Last BIN Putaway", len(set_putaway_bin))
+                    col_m3.metric("🔥 Total Match (BIN Irisan)", len(matching_bins))
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    # Search Bar Tab 5
+                    search_final = st.text_input("🔍 Cari BIN Final:", "", key="s_final")
+                    if search_final:
+                        df_display_final = df_final_bin[df_final_bin['BIN AUDIT FINAL'].str.contains(search_final, case=False, na=False)]
+                    else:
+                        df_display_final = df_final_bin
+
+                    st.dataframe(df_display_final, use_container_width=True, hide_index=True)
+
+                    # Download Button Tab 5
+                    csv_final = df_final_bin.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download Final List BIN Audit (CSV)",
+                        data=csv_final,
+                        file_name="FINAL_MATCHING_BIN_AUDIT.csv",
+                        mime="text/csv",
+                        key="dl_final"
+                    )
+                else:
+                    st.warning("⚠️ Tidak ada BIN yang sama/cocok antara hasil Picking Audit dan Putaway Audit.")
+            else:
+                st.warning("⚠️ Untuk melihat **Final List**, Anda harus memproses minimal 1 file Picking (Sales/RTO) DAN 1 file Mutasi Putaway.")
+
+    
 
 
 
@@ -10219,7 +10141,7 @@ with st.sidebar:
     # --- KELOMPOK 6: PICK & PUTAWAY AUDIT ---
     if is_dc:
         st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">PICKING & PUTAWAY AUDIT</p>', unsafe_allow_html=True)
-        m6_list = ["Picking Audit List", "Putaway Audit List"]
+        m6_list = ["Putaway & Picking Audit List"]
         idx6 = m6_list.index(st.session_state.main_menu) if st.session_state.main_menu in m6_list else None
         st.radio("M6", m6_list, index=idx6, key="m6_key", on_change=sync_menu, args=("m6_key",), label_visibility="collapsed")
     st.divider()
@@ -11855,11 +11777,8 @@ if menu == "Logistic Schedule":
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
 
-elif menu == "Picking Audit List":
-    menu_picking_audit_list()
-
-elif menu == "Putaway Audit List":
-    menu_putaway_audit_list()
+elif menu == "Putaway & Picking Audit":
+    menu_picking_putaway_audit()
 
 elif menu == "Refill Koli to Koli/Refill":
     main_menu_koli()
