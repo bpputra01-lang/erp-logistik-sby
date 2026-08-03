@@ -4288,7 +4288,7 @@ def menu_picking_putaway_audit():
             "🎯 UNIQUE BIN PICKING", 
             "📋 DETAIL PUTAWAY AUDIT", 
             "🎯 UNIQUE LAST BIN PUTAWAY",
-            "🔥 FINAL LIST (MATCHING BIN)"
+            "✅ FINAL LIST (MATCH BIN)"
         ])
 
         # ----------------------------------------------------------------------
