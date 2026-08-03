@@ -4232,7 +4232,7 @@ def menu_picking_putaway_audit():
     # --------------------------------------------------------------------------
     # TOMBOL EKSEKUSI PROCESS
     # --------------------------------------------------------------------------
-    if st.button("▶️ RUN INTEGRATED AUDIT PROCESS", type="primary", use_container_width=True):
+    if st.button("▶️ RUN PROCESS", type="primary", use_container_width=True):
         if not file_sales and not file_rto and not file_mutasi:
             st.warning("⚠️ Harap upload setidaknya salah satu file untuk diproses!")
         else:
@@ -4364,8 +4364,7 @@ def menu_picking_putaway_audit():
         # TAB 5: FINAL LIST (IRISAN/MATCHING UNIQUE BIN PICKING & PUTAWAY)
         # ----------------------------------------------------------------------
         with tab5:
-            st.subheader("🔥 FINAL LIST: BIN IRISAN (PICKING & PUTAWAY SAMA)")
-            st.caption("Menampilkan BIN dari Picking (Sales/RTO) yang JUGA MUNCUL sebagai LAST BIN MUTASI di Putaway.")
+            st.subheader("✅FINAL LIST BIN AUDIT PICKING & PUTAWAY AUDIT")
 
             if not df_picking.empty and not df_putaway.empty:
                 # Ambil set dari masing-masing BIN
@@ -4380,12 +4379,6 @@ def menu_picking_putaway_audit():
                         'NO': range(1, len(matching_bins) + 1),
                         'BIN AUDIT FINAL': matching_bins
                     })
-
-                    # Metrics Summary
-                    col_m1, col_m2, col_m3 = st.columns(3)
-                    col_m1.metric("Total Unique BIN Picking", len(set_picking_bin))
-                    col_m2.metric("Total Unique Last BIN Putaway", len(set_putaway_bin))
-                    col_m3.metric("🔥 Total Match (BIN Irisan)", len(matching_bins))
 
                     st.markdown("<br>", unsafe_allow_html=True)
                     
