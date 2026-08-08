@@ -11293,7 +11293,7 @@ elif menu == "Justification SO":
         * **Contoh Kasus:**
           | BEGINNING | STOCKIN + TRF_IN | SALES + TRF_OUT | Hitungan Manual | ENDING STOCK |
           | :---: | :---: | :---: | :---: | :---: |
-          | 10 | + 5 | - 2 | **13** | **15** (Gak Match!) |
+          | 10 |  5 |  2 | **13** | **15** (Gak Match!) |
         
         **💻 4. Kesalahan System (Stock System Lost)**
         * **Kondisinya:** Tidak ada `GAP ADJUSTMENT` (`= 0`), tapi ada selisih antara Sistem dan SO. Ketika selisih itu ditambah/dikurang ke master `QTY SYSTEM ALL`, hasilnya pas dengan `CURRENT STOCK`.
