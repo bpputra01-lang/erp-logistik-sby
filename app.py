@@ -3436,11 +3436,15 @@ def calculate_dynamic_proportion(row):
 # LOGIC INTERFACE MENU "STOCK ALLOCATION"
 # ==============================================================================
 
+# ==============================================================================
+# LOGIC INTERFACE MENU "STOCK ALLOCATION"
+# ==============================================================================
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Custom CSS Premium Dark Theme Card layout
+# Pastikan st.markdown di bawah ini nempel di ujung paling kiri tanpa spasi/tab!
 st.markdown("""
     <style>
         .reportview-container { background: #0f111a; }
