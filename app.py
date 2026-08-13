@@ -3625,8 +3625,6 @@ def menu_allocation_stock():
     with col2:
         file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
 
-   import io  # Tambahkan import ini di bagian paling atas script Anda
-
     if file_stock and file_sales:
         try:
             df_stock_raw = pd.read_excel(file_stock)
