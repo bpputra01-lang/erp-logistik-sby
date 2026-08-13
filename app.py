@@ -45,7 +45,10 @@ def fetch_table_data(table_name):
 # =========================================================
 # 🚀 2. CORE ENGINE: POP-UP INTERAKTIF (PREMIUM UI)
 # =========================================================
-@st.dialog("⚠️ NOTIFIKASI SISTEM")
+# =========================================================
+# 🚀 CORE ENGINE: POP-UP INTERAKTIF (PREMIUM UI)
+# =========================================================
+@st.dialog("⚠️ PERHATIAN")
 def popup_error(judul, pesan, solusi):
     """Pop-Up Elegan untuk Karyawan yang Salah Input"""
     st.markdown(f'''
@@ -54,23 +57,20 @@ def popup_error(judul, pesan, solusi):
             <p style="color: #E0E0E0; font-size: 16px;">{pesan}</p>
         </div>
     ''', unsafe_allow_html=True)
-    
-    st.info(f"💡 **Saran Perbaikan:** {solusi}")
-    
-    if st.button("Baik, Saya Mengerti", use_container_width=True, type="primary"):
+    st.info(f"💡 **Saran:** {solusi}")
+    if st.button("Mengerti", use_container_width=True, type="primary"):
         st.rerun()
 
-@st.dialog("🎉 BERHASIL")
+@st.dialog("✅ SUKSES")
 def popup_success(pesan):
-    """Pop-Up Sukses dengan Animasi Balon"""
+    """Pop-Up Sukses Profesional (Tanpa Balon)"""
     st.markdown(f'''
         <div style="text-align: center; padding: 20px;">
-            <h2 style="color: #00FF66;">YEAY!</h2>
-            <p style="color: white; font-size: 18px;">{pesan}</p>
+            <h2 style="color: #C5A059;">PROSES SELESAI</h2>
+            <p style="color: white; font-size: 16px;">{pesan}</p>
         </div>
     ''', unsafe_allow_html=True)
-    st.balloons()
-    if st.button("Lanjutkan", use_container_width=True):
+    if st.button("Tutup & Lanjutkan", use_container_width=True):
         st.rerun()
 
 # =========================================================
@@ -309,6 +309,68 @@ st.markdown("""
         font-family: 'Inter', sans-serif !important; 
         font-weight: 600 !important; 
         font-size: 13px !important; 
+    }
+    /* ============================================
+       🌟 FIX: INPUT BOX SOLID (TIDAK TRANSPARAN)
+       ============================================ */
+    div[data-baseweb="input"] {
+        background-color: #1a2634 !important; /* Warna solid gelap */
+        border: 1px solid #C5A059 !important;
+        border-radius: 8px !important;
+    }
+    div[data-baseweb="input"] input {
+        background-color: #1a2634 !important; 
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+
+    /* ============================================
+       🌟 FIX: ALL DROPDOWN SOLID DARK & GOLD
+       ============================================ */
+    div[data-baseweb="select"] > div {
+        background-color: #1a2634 !important;
+        border: 1px solid #C5A059 !important;
+        color: white !important;
+    }
+    /* Warna List menu dropdown saat diklik (Popover) */
+    ul[data-baseweb="menu"] {
+        background-color: #1a2634 !important;
+        border: 1px solid #C5A059 !important;
+    }
+    li[data-baseweb="menu-item"] {
+        color: white !important;
+        background-color: transparent !important;
+    }
+    li[data-baseweb="menu-item"]:hover {
+        background-color: rgba(197, 160, 89, 0.3) !important;
+        color: #FFD700 !important;
+    }
+
+    /* ============================================
+       🌟 FIX: TAB MENU DI SEMUA HALAMAN (RATA & ELEGAN)
+       ============================================ */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #1a1d2e !important;
+        border-bottom: 2px solid rgba(197, 160, 89, 0.2) !important;
+        gap: 0px !important;
+        padding: 0 !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent !important;
+        color: #8c96a8 !important;
+        border: none !important;
+        padding: 12px 24px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        transition: all 0.3s ease !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: rgba(197, 160, 89, 0.1) !important;
+        color: #C5A059 !important;
+        border-bottom: 3px solid #C5A059 !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #FFD700 !important;
     }
     </style>
 """, unsafe_allow_html=True)
