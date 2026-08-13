@@ -10200,9 +10200,9 @@ if menu == "Putaway System":
         - List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan
         """)
     
-    # --- DROPDOWN PILIHAN AREA (DEFAULT KOSONG) ---
+   # --- DROPDOWN PILIHAN AREA (DEFAULT KOSONG) ---
     st.markdown("### 📍 Pilih Area Putaway")
-        (
+    pilihan_area = st.selectbox(  # <-- Tambahkan nama fungsi st.selectbox di sini
         options=["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
         index=None,  # <-- Bikin default selection jadi KOSONG (None)
         placeholder="-- Pilih Area Putaway Terlebih Dahulu --",
