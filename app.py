@@ -10202,8 +10202,7 @@ if menu == "Putaway System":
     
     # --- DROPDOWN PILIHAN AREA (DEFAULT KOSONG) ---
     st.markdown("### 📍 Pilih Area Putaway")
-    pilihan_area = st.selectbox(
-        "Pilih area penempatan untuk filter sisa stock / outstanding:",
+        (
         options=["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
         index=None,  # <-- Bikin default selection jadi KOSONG (None)
         placeholder="-- Pilih Area Putaway Terlebih Dahulu --",
