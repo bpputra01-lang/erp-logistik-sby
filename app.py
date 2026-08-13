@@ -3470,8 +3470,7 @@ def generate_stock_allocation(df_stock, df_sales_summary):
 
 import streamlit as st
 import pandas as pd
-# Import file module logic yang kita buat sebelumnya
-import logic_processor as lp
+
 
 # Custom CSS Premium Dark Theme Card layout
 st.markdown("""
