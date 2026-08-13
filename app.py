@@ -3593,7 +3593,7 @@ def menu_allocation_stock():
     # --------------------------------------------------------------------------
     # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
     # --------------------------------------------------------------------------
-    with st.expander("⚙️ LIHAT ATURAN LOGIKA PROSES & MATRIKS PERSENTASE ALOKASI"):
+    with st.expander("💡Logic Thinking")
         st.markdown("### 📘 Aturan Pembersihan Kata Kunci (Kolom A)")
         st.write("- **Sales Online:** Mengambil record data jika nama store mengandung kata `'ONLINE'`")
         st.write("- **Sales Offline:** Mengambil record data jika nama store mengandung kata `'JEZ'`")
@@ -3644,7 +3644,6 @@ def menu_allocation_stock():
                     df_final_allocation = generate_stock_allocation(df_stock_raw, df_sales_summary)
                     
                     # --- INTERFACING METRICS ---
-                    st.write("### 📊 Ringkasan Total Alokasi Unit")
                     m1, m2, m3, m4 = st.columns(4)
                     
                     col_stock_qty = df_final_allocation.columns[1] # Mengambil total qty asli dari output_cols (index 1)
@@ -3660,7 +3659,6 @@ def menu_allocation_stock():
                         st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Logistik</div><div class='metric-value'>{df_final_allocation['QTY_LOGISTIK'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
                     
                     # --- INTERFACING DATAFRAME ---
-                    st.write("### 📋 Preview Hasil Pembagian per SKU")
                     st.dataframe(df_final_allocation, use_container_width=True)
                     
                     # --- DOWNLOAD BUTTON ---
