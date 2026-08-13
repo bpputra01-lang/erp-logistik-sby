@@ -353,7 +353,7 @@ div.stFormSubmitButton > button {
 
         /* 4. Input Box biar gelap & elegan - PERBAIKAN UTAMA DISINI */
         /* container input */
-        div[data-baseweb="input"] {
+        .login-card div[data-baseweb="input"] {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
             border-radius: 10px !important;
@@ -361,16 +361,16 @@ div.stFormSubmitButton > button {
         }
         
         /* container input focus */
-        div[data-baseweb="input"]:focus-within {
+        .login-card div[data-baseweb="input"]:focus-within {
             border-color: #D4AF37 !important;
             box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
         }
         
         /* input field (termasuk password) */
-        input[type="text"], 
-        input[type="password"],
-        input[type="email"],
-        div[data-baseweb="input"] input {
+        .login-card input[type="text"], 
+        .login-card input[type="password"],
+        .login-card input[type="email"],
+        .login-card div[data-baseweb="input"] input {
             background-color: transparent !important;
             border: none !important;
             color: #C5A059 !important;
@@ -384,23 +384,23 @@ div.stFormSubmitButton > button {
         }
         
         /* placeholder styling */
-        input::placeholder {
+        .login-card input::placeholder {
             color: rgba(197, 160, 89, 0.5) !important;
             opacity: 1 !important;
         }
         
         /* Firefox placeholder */
-        input::-webkit-input-placeholder {
+        .login-card input::-webkit-input-placeholder {
             color: rgba(197, 160, 89, 0.5) !important;
         }
         
         /* password field dots styling */
-        input[type="password"] {
+        .login-card input[type="password"] {
             letter-spacing: 2px !important;
         }
 
         /* Label styling */
-        [data-testid="stWidgetLabel"] p {
+        .login-card [data-testid="stWidgetLabel"] p {
             color: #E0E0E0 !important;
             font-weight: 600 !important;
             font-size: 14px !important;
@@ -408,13 +408,13 @@ div.stFormSubmitButton > button {
         }
 
         /* Form spacing */
-        .stForm {
+        .login-card .stForm {
             background-color: transparent !important;
             border: none !important;
         }
         
         /* Input wrapper styling */
-        div[data-testid="stTextInput"] div[data-baseweb="input"] {
+        .login-card div[data-testid="stTextInput"] div[data-baseweb="input"] {
             background-color: #1a2634 !important;
             border: 1px solid #C5A059 !important;
             border-radius: 10px !important;
@@ -423,7 +423,7 @@ div.stFormSubmitButton > button {
         }
         
         /* Pastikan password dots terlihat jelas */
-        div[data-testid="stTextInput"] input {
+        .login-card div[data-testid="stTextInput"] input {
             color: #C5A059 !important;
             -webkit-text-fill-color: #C5A059 !important;
         }
