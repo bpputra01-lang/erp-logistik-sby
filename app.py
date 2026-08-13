@@ -3442,6 +3442,7 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     """
     Menggabungkan data stock gudang dengan ringkasan sales.
     Murni berbasis 100% Unique SKU tanpa membawa data BIN.
+    Menggunakan logika pembulatan ke atas (ceil) untuk Online & Offline.
     """
     df_stk = df_stock.copy()
     
@@ -3451,40 +3452,59 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     # Grouping Stock murni per SKU untuk mendapatkan total QTY awal
     df_stock_unique = df_stk.groupby(col_sku).agg({col_qty: 'sum'}).reset_index()
     
-    # Satukan data stock unique dengan summary sales per SKU (VLOOKUP / LEFT JOIN)
+    # Satukan data stock unique dengan summary sales per SKU
     sales_sku_col = df_sales_summary.columns[0]
     df_merged = pd.merge(df_stock_unique, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
     
-    # Hitung proporsi persentase alokasi secara cepat menggunakan vectorized apply
+    # Hitung proporsi persentase alokasi
     proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
     df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
     df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
     df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
     
-    # Hitung Final QTY per Lokasi (Mengubah ke integer untuk unit riil)
-    df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
-    df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
+    # --------------------------------------------------------------------------
+    # LOGIKA BARU: PEMBULATAN KE ATAS MURNI (CEIL) UNTUK ONLINE & OFFLINE
+    # --------------------------------------------------------------------------
+    df_merged['QTY_ONLINE'] = np.ceil(df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
+    df_merged['QTY_OFFLINE'] = np.ceil(df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
     
-    # Logistik mengambil sisa pembulatan integer agar nilai total stock tetap 100% klop
+    # Logistik mengambil sisa pengurangan agar total stock akhir tetap 100% Klop dengan Master
     df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
     
-    # Proteksi Tambahan: Jika ada SKU dengan total stock > 0 tetapi setelah pembulatan 
-    # QTY OFFLINE menjadi 0, paksa berikan minimal 1 Pcs (diambil dari porsi logistik/online)
-    def ensure_offline_allocation(r):
+    # --------------------------------------------------------------------------
+    # PROTEKSI PENYESUAIAN STOK (Jika total pembulatan ke atas melebihi Stock Master)
+    # --------------------------------------------------------------------------
+    def adjust_ceil_overflow(r):
         qty_master = r[col_qty]
         q_on = r['QTY_ONLINE']
         q_off = r['QTY_OFFLINE']
         q_log = r['QTY_LOGISTIK']
         
-        if qty_master > 0 and q_off == 0:
-            q_off = 1
-            if q_log > 0:
-                q_log -= 1
-            elif q_on > 0:
-                q_on -= 1
+        # Jika nilai QTY_LOGISTIK minus akibat efek double pembulatan ke atas
+        if q_log < 0:
+            # Hitung seberapa banyak kelebihan unitnya
+            excess = abs(q_log)
+            q_log = 0 # Logistik dikunci di angka 0
+            
+            # Kurangi kelebihan secara bertahap dari Online atau Offline tanpa membuatnya menjadi 0
+            while excess > 0:
+                if q_on > 1:
+                    q_on -= 1
+                    excess -= 1
+                elif q_off > 1:
+                    q_off -= 1
+                    excess -= 1
+                else:
+                    # Jika kondisi stock master sangat mepet (misal hanya 1 Pcs)
+                    # Prioritas utama dialokasikan penuh ke Offline
+                    if qty_master == 1:
+                        q_off = 1
+                        q_on = 0
+                    break
         return pd.Series([q_on, q_off, q_log])
 
-    df_merged[['QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']] = df_merged.apply(ensure_offline_allocation, axis=1)
+    # Jalankan proteksi penyesuaian
+    df_merged[['QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']] = df_merged.apply(adjust_ceil_overflow, axis=1)
     
     # Susunan susunan output kolom utama
     output_cols = [
