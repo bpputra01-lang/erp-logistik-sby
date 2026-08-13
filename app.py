@@ -3594,14 +3594,7 @@ def menu_allocation_stock():
     # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
     # --------------------------------------------------------------------------
     with st.expander("💡Logic Thinking"):
-        st.markdown("### 📘 Aturan Pembersihan Kata Kunci (Kolom A)")
-        st.write("- **Sales Online:** Mengambil record data jika nama store mengandung kata `'ONLINE'`")
-        st.write("- **Sales Offline:** Mengambil record data jika nama store mengandung kata `'JEZ'`")
-        
-        st.markdown("### 📊 Tabel Acuan Persentase Alokasi")
-        st.write("Sistem menentukan persentase alokasi tiap SKU berdasarkan performa rasio penjualan berikut:")
-        
-        # Aturan matriks terbaru dengan fokus Logistik Utama jika 0 Sales
+        st.info("""
         rules_data = {
             "Kondisi Performa SKU": [
                 "Tidak Ada Histori Sales (0 Unit)",
@@ -3615,8 +3608,7 @@ def menu_allocation_stock():
         }
         df_rules = pd.DataFrame(rules_data)
         st.table(df_rules)
-        
-        st.info("💡 **Efisiensi Stok Mati:** SKU yang tidak mencatat penjualan selama 90 hari akan diamankan sebanyak **80% di Logistik Utama** agar area penjualan Online/Offline terhindar dari tumpukan barang *slow-moving*.")
+        """)
 
     st.write("")
 
