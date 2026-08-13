@@ -3611,7 +3611,7 @@ def menu_allocation_stock():
             ],
             "Alokasi Online": ["10%", "70%", "15%", "40%"],
             "Alokasi Offline": ["10%", "15%", "70%", "40%"],
-            "Alokasi Logistik Utama": ["80%", "15%", "15%", "20%"]
+            "Alokasi Logistik": ["80%", "15%", "15%", "20%"]
         }
         df_rules = pd.DataFrame(rules_data)
         st.table(df_rules)
@@ -3624,13 +3624,9 @@ def menu_allocation_stock():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("📥 Upload Data Master Stock")
-        st.caption("Spesifikasi Kolom: B (BIN), C (SKU), J (QTY Master)")
         file_stock = st.file_uploader("Pilih file Excel Stock (.xlsx)", type=["xlsx"], key="stock")
 
     with col2:
-        st.subheader("📥 Upload Data Sales 90 Hari")
-        st.caption("Spesifikasi Kolom: A (STORE), AA (SKU), S (QTY Sales)")
         file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
 
     if file_stock and file_sales:
