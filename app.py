@@ -3374,14 +3374,13 @@ def menu_Stock_Opname():
 
     download_section()
 
+import pandas as pd
+import numpy as np
+import streamlit as st
 
 # ==============================================================================
 # LOGIC PROCESS MENU "STOCK ALLOCATION"
 # ==============================================================================
-
-
-import pandas as pd
-import numpy as np
 
 def clean_and_process_sales(df_sales):
     """
@@ -3389,71 +3388,124 @@ def clean_and_process_sales(df_sales):
     mengabaikan nilai '-', dan memisahkan sales Online vs Offline
     berdasarkan keyword spesifik di Kolom A (ONLINE vs JEZ).
     """
-    # Salin dataframe agar tidak merubah data asli
     df = df_sales.copy()
     
     # Konversi kolom S (QTY - Index 18) menjadi numerik, abaikan karakter non-numerik seperti '-'
     df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
     
-    # Identifikasi nama kolom berdasarkan index untuk mempermudah logic
+    # Identifikasi nama kolom berdasarkan index
     col_store = df.columns[0]   # Kolom A (STORE)
     col_sku = df.columns[26]    # Kolom AA (SKU)
     col_qty = df.columns[18]    # Kolom S (QTY)
     
-    # --------------------------------------------------------------------------
-    # PEMBARUAN LOGIKA SELEKSI BERDASARKAN KEYWORD DI KOLOM A
-    # --------------------------------------------------------------------------
-    # SALES ONLINE -> Kolom A mengandung kata 'ONLINE'
-    df['SALES_ONLINE'] = np.where(
-        df[col_store].str.upper().str.contains('ONLINE', na=False), 
-        df[col_qty], 
-        0
-    )
+    # Kunci Logika Seleksi Keyword Kolom A (Abaikan Case-Sensitive)
+    store_upper = df[col_store].astype(str).str.upper()
+    df['SALES_ONLINE'] = np.where(store_upper.str.contains('ONLINE', na=False), df[col_qty], 0)
+    df['SALES_OFFLINE'] = np.where(store_upper.str.contains('JEZ', na=False), df[col_qty], 0)
     
-    # SALES OFFLINE -> Kolom A mengandung kata 'JEZ'
-    df['SALES_OFFLINE'] = np.where(
-        df[col_store].str.upper().str.contains('JEZ', na=False), 
-        df[col_qty], 
-        0
-    )
-    
-    # Grouping per Unique SKU (Kolom AA) untuk melakukan akumulasi (SUMIF)
+    # Grouping per Unique SKU (Kolom AA) untuk melakukan akumulasi (SUMIF massal)
     df_summary = df.groupby(col_sku).agg({
         'SALES_ONLINE': 'sum',
         'SALES_OFFLINE': 'sum'
     }).reset_index()
     
-    # Hitung total sales dari kombinasi Online + Offline yang terfilter
     df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
     return df_summary
 
 def calculate_dynamic_proportion(row):
     """
-    Menghitung persentase alokasi proporsional berdasarkan sales 90 hari terakhir.
+    Menghitung persentase alokasi proporsional berdasarkan sales.
+    Jika tidak ada penjualan, alokasi difokuskan ke Online & Offline terlebih dahulu.
+    Setiap SKU wajib memiliki alokasi agar selalu ready di semua channel.
     """
     total = row['TOTAL_SALES']
+    
+    # --------------------------------------------------------------------------
+    # LOGIKA BARU: JIKA SKU TIDAK MEMILIKI HISTORI PENJUALAN
+    # Fokus utama dialokasikan ke Online & Offline, sisanya baru ke Logistik Utama
+    # --------------------------------------------------------------------------
     if total == 0:
-        # Jika tidak ada penjualan, amankan 80% di Logistik Utama
-        return 0.10, 0.10, 0.80 
+        return 0.45, 0.45, 0.10  # Online: 45%, Offline: 45%, Logistik Utama: 10%
     
     pct_online = row['SALES_ONLINE'] / total
     pct_offline = row['SALES_OFFLINE'] / total
     
+    # Distribusi dinamis berbasis performa sales 90 hari terakhir
     if pct_online > 0.7:      # Dominan Online
-        return 0.70, 0.10, 0.20
+        return 0.70, 0.15, 0.15  # Tetap amankan minimal 15% di Offline
     elif pct_offline > 0.7:   # Dominan Offline
-        return 0.10, 0.70, 0.20
+        return 0.15, 0.70, 0.15  # Tetap amankan minimal 15% di Online
     else:                     # Balanced / Imbang
         return 0.40, 0.40, 0.20
 
 
+def generate_stock_allocation(df_stock, df_sales_summary):
+    """
+    Menggabungkan data stock gudang dengan ringkasan sales.
+    Murni berbasis 100% Unique SKU tanpa membawa data BIN.
+    """
+    df_stk = df_stock.copy()
+    
+    col_sku = df_stk.columns[2]   # Kolom C (SKU)
+    col_qty = df_stk.columns[9]   # Kolom J (QTY Master)
+    
+    # Grouping Stock murni per SKU untuk mendapatkan total QTY awal
+    df_stock_unique = df_stk.groupby(col_sku).agg({col_qty: 'sum'}).reset_index()
+    
+    # Satukan data stock unique dengan summary sales per SKU (VLOOKUP / LEFT JOIN)
+    sales_sku_col = df_sales_summary.columns[0]
+    df_merged = pd.merge(df_stock_unique, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
+    
+    # Hitung proporsi persentase alokasi secara cepat menggunakan vectorized apply
+    proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
+    df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
+    df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
+    df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
+    
+    # Hitung Final QTY per Lokasi (Mengubah ke integer untuk unit riil)
+    df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
+    df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
+    
+    # --------------------------------------------------------------------------
+    # PERBAIKAN DISTRIBUSI & CLEANING STOCK PER SKU
+    # --------------------------------------------------------------------------
+    # Logistik mengambil sisa pembulatan integer agar nilai total stock tetap 100% klop
+    df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
+    
+    # Proteksi Tambahan: Jika ada SKU dengan total stock > 0 tetapi setelah pembulatan 
+    # QTY OFFLINE menjadi 0, paksa berikan minimal 1 Pcs (diambil dari porsi logistik/online)
+    def ensure_offline_allocation(r):
+        qty_master = r[col_qty]
+        q_on = r['QTY_ONLINE']
+        q_off = r['QTY_OFFLINE']
+        q_log = r['QTY_LOGISTIK']
+        
+        if qty_master > 0 and q_off == 0:
+            q_off = 1
+            if q_log > 0:
+                q_log -= 1
+            elif q_on > 0:
+                q_on -= 1
+        return pd.Series([q_on, q_off, q_log])
+
+    df_merged[['QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']] = df_merged.apply(ensure_offline_allocation, axis=1)
+    
+    # Susunan susunan output kolom utama
+    output_cols = [
+        col_sku,          # SKU (Unique Key)
+        col_qty,          # Total QTY Master Asli per SKU
+        'SALES_ONLINE', 
+        'SALES_OFFLINE', 
+        'QTY_ONLINE', 
+        'QTY_OFFLINE', 
+        'QTY_LOGISTIK'
+    ]
+    
+    return df_merged[output_cols]
+
 # ==============================================================================
 # LOGIC INTERFACE MENU "STOCK ALLOCATION"
 # ==============================================================================
-
-import streamlit as st
-import pandas as pd
-import numpy as np
 
 # Custom CSS Premium Dark Theme Card layout
 st.markdown("""
@@ -3476,99 +3528,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
-def clean_and_process_sales(df_sales):
-    """
-    Membersihkan data sales: mengubah qty ke numerik, 
-    mengabaikan nilai '-', dan memisahkan sales Online vs Offline.
-    """
-    df = df_sales.copy()
-    
-    # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
-    df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
-    
-    col_store = df.columns[0]   # Kolom A
-    col_sku = df.columns[26]    # Kolom AA
-    col_qty = df.columns[18]    # Kolom S
-    
-    df['SALES_ONLINE'] = np.where(df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
-    df['SALES_OFFLINE'] = np.where(~df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
-    
-    df_summary = df.groupby(col_sku).agg({
-        'SALES_ONLINE': 'sum',
-        'SALES_OFFLINE': 'sum'
-    }).reset_index()
-    
-    df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
-    return df_summary
-
-def calculate_dynamic_proportion(row):
-    """
-    Menghitung persentase alokasi proporsional berdasarkan sales 90 hari terakhir.
-    """
-    total = row['TOTAL_SALES']
-    if total == 0:
-        return 0.10, 0.10, 0.80 
-    
-    pct_online = row['SALES_ONLINE'] / total
-    pct_offline = row['SALES_OFFLINE'] / total
-    
-    if pct_online > 0.7:
-        return 0.70, 0.10, 0.20
-    elif pct_offline > 0.7:
-        return 0.10, 0.70, 0.20
-    else:
-        return 0.40, 0.40, 0.20
-
-def generate_stock_allocation(df_stock, df_sales_summary):
-    """
-    Menggabungkan data stock gudang dengan ringkasan sales.
-    Murni berbasis 100% Unique SKU tanpa memperhitungkan atau menyertakan data BIN.
-    """
-    df_stk = df_stock.copy()
-    
-    # Mapping nama kolom berdasarkan index
-    col_sku = df_stk.columns[2]   # Kolom C (SKU)
-    col_qty = df_stk.columns[9]   # Kolom J (QTY Master)
-    
-    # --------------------------------------------------------------------------
-    # LANGKAH KUNCI: Grouping Stock murni per SKU untuk mendapatkan total QTY.
-    # Kolom BIN diabaikan sepenuhnya agar output benar-benar bersih by SKU.
-    # --------------------------------------------------------------------------
-    df_stock_unique = df_stk.groupby(col_sku).agg({
-        col_qty: 'sum'  # Total QTY Master per SKU gabungan
-    }).reset_index()
-    
-    # Satukan data stock unique dengan summary sales per SKU
-    sales_sku_col = df_sales_summary.columns[0]
-    df_merged = pd.merge(df_stock_unique, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
-    
-    # Hitung proporsi persentase alokasi
-    proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
-    df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
-    df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
-    df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
-    
-    # Hitung Final QTY per Lokasi (Mengubah ke integer untuk unit riil)
-    df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
-    df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
-    
-    # Logistik mengambil sisa pembulatan agar total stock tetap 100% akurat per SKU
-    df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
-    
-    # Susunan output kolom utama untuk user tanpa membawa kolom BIN
-    output_cols = [
-        col_sku,          # SKU (Unique Key)
-        col_qty,          # Total QTY Master Asli per SKU
-        'SALES_ONLINE', 
-        'SALES_OFFLINE', 
-        'QTY_ONLINE', 
-        'QTY_OFFLINE', 
-        'QTY_LOGISTIK'
-    ]
-    
-    return df_merged[output_cols]
-
 def menu_allocation_stock():
     """
     Interface Khusus untuk Menu Alokasi Stok Gudang (Online, Offline, Logistik)
@@ -3590,7 +3549,6 @@ def menu_allocation_stock():
         st.caption("Spesifikasi Kolom: A (STORE), AA (SKU), S (QTY Sales)")
         file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
 
-    # Eksekusi Proses jika kedua file sudah di-upload
     if file_stock and file_sales:
         try:
             df_stock_raw = pd.read_excel(file_stock)
@@ -3609,7 +3567,7 @@ def menu_allocation_stock():
                     st.write("### 📊 Ringkasan Total Alokasi Unit")
                     m1, m2, m3, m4 = st.columns(4)
                     
-                    col_stock_qty = df_final_allocation.columns[2] # Kolom J asli hasil filter output_cols
+                    col_stock_qty = df_final_allocation.columns[1] # Mengambil total qty asli dari output_cols (index 1)
                     total_stock = df_final_allocation[col_stock_qty].sum()
                     
                     with m1:
@@ -3644,7 +3602,6 @@ def menu_allocation_stock():
             st.info("💡 Pastikan urutan kolom di Excel Anda sudah sesuai: Stock (B, C, J) & Sales (A, AA, S)")
     else:
         st.info("💡 Silakan upload kedua file Excel di atas terlebih dahulu untuk memulai perhitungan alokasi.")
-
 
 
 # ==============================================================================
