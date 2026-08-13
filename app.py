@@ -3629,51 +3629,66 @@ def menu_allocation_stock():
         file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
 
     if file_stock and file_sales:
-        try:
-            df_stock_raw = pd.read_excel(file_stock)
-            df_sales_raw = pd.read_excel(file_sales)
+    try:
+        df_stock_raw = pd.read_excel(file_stock)
+        df_sales_raw = pd.read_excel(file_sales)
+        
+        st.success("✅ Kedua file berhasil dimuat ke sistem. Siap diproses!")
+        
+        # Gunakan use_container_width=True agar tombolnya penuh dan solid mirip Refill System
+        if st.button("▶️ RUN PROCESS", use_container_width=True):
+            with st.spinner("Sedang memproses algoritma dynamic allocation..."):
+                
+                # --- CORE PROCESSOR LOGIC ---
+                df_sales_summary = clean_and_process_sales(df_sales_raw)
+                df_final_allocation = generate_stock_allocation(df_stock_raw, df_sales_summary)
+                
+                # --- SIMPAN KE SESSION STATE (AGAR TIDAK HILANG SAAT DOWNLOAD) ---
+                st.session_state['df_final_allocation'] = df_final_allocation
+                st.session_state['processed'] = True
+
+        # --- TAMPILKAN HASIL JIKA SUDAH PERNAH DI-RUN ---
+        if st.session_state.get('processed', False):
+            df_final_allocation = st.session_state['df_final_allocation']
             
-            st.success("✅ Kedua file berhasil dimuat ke sistem. Siap diproses!")
+            # --- INTERFACING METRICS ---
+            m1, m2, m3, m4 = st.columns(4)
             
-            if st.button("▶️ RUN PROCESS", use_container_width=False):
-                with st.spinner("Sedang memproses algoritma dynamic allocation..."):
-                    
-                    # --- CORE PROCESSOR LOGIC ---
-                    df_sales_summary = clean_and_process_sales(df_sales_raw)
-                    df_final_allocation = generate_stock_allocation(df_stock_raw, df_sales_summary)
-                    
-                    # --- INTERFACING METRICS ---
-                    m1, m2, m3, m4 = st.columns(4)
-                    
-                    col_stock_qty = df_final_allocation.columns[1] # Mengambil total qty asli dari output_cols (index 1)
-                    total_stock = df_final_allocation[col_stock_qty].sum()
-                    
-                    with m1:
-                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Total Stock Master</div><div class='metric-value'>{total_stock:,.0f} Pcs</div></div>", unsafe_allow_html=True)
-                    with m2:
-                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Online</div><div class='metric-value'>{df_final_allocation['QTY_ONLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
-                    with m3:
-                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Offline</div><div class='metric-value'>{df_final_allocation['QTY_OFFLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
-                    with m4:
-                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Logistik</div><div class='metric-value'>{df_final_allocation['QTY_LOGISTIK'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
-                    
-                    # --- INTERFACING DATAFRAME ---
-                    st.write("### 📋 Preview Hasil Pembagian per SKU")
-                    st.dataframe(df_final_allocation, use_container_width=True)
-                    
-                    # --- DOWNLOAD BUTTON ---
-                    @st.cache_data
-                    def convert_df(df):
-                        return df.to_csv(index=False).encode('utf-8')
-                        
-                    csv_data = convert_df(df_final_allocation)
-                    st.download_button(
-                        label="💾 DOWNLOAD HASIL ALOKASI (.CSV)",
-                        data=csv_data,
-                        file_name="Hasil_Alokasi_Stock_Dynamic.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
+            col_stock_qty = df_final_allocation.columns[1] # Mengambil total qty asli dari output_cols (index 1)
+            total_stock = df_final_allocation[col_stock_qty].sum()
+            
+            with m1:
+                st.markdown(f"<div class='metric-card'><div class='metric-title'>Total Stock Master</div><div class='metric-value'>{total_stock:,.0f} Pcs</div></div>", unsafe_allow_html=True)
+            with m2:
+                st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Online</div><div class='metric-value'>{df_final_allocation['QTY_ONLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+            with m3:
+                st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Offline</div><div class='metric-value'>{df_final_allocation['QTY_OFFLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+            with m4:
+                st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Logistik</div><div class='metric-value'>{df_final_allocation['QTY_LOGISTIK'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+            
+            # --- INTERFACING DATAFRAME ---
+            st.write("### 📋 Preview Hasil Pembagian per SKU")
+            st.dataframe(df_final_allocation, use_container_width=True)
+            
+            # --- DOWNLOAD BUTTON AS EXCEL (.XLSX) ---
+            @st.cache_data
+            def convert_df_to_excel(df):
+                output = io.BytesIO()
+                # Menggunakan ExcelWriter untuk membuat file .xlsx asli
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Stock_Allocation_Result')
+                processed_data = output.getvalue()
+                return processed_data
+                
+            excel_data = convert_df_to_excel(df_final_allocation)
+            
+            st.download_button(
+                label="💾 DOWNLOAD HASIL ALOKASI (.XLSX)",
+                data=excel_data,
+                file_name="Hasil_Alokasi_Stock_Dynamic.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
                     
         except Exception as e:
             st.error(f"Terjadi kesalahan pembacaan kolom struktur file: {str(e)}")
