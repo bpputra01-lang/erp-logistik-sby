@@ -3440,42 +3440,42 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Custom CSS Premium Dark Theme Card layout
-st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, #1b3a70 0%, #132952 100%);
-            padding: 24px 30px;
-            border-radius: 12px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-            margin-bottom: 25px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        ">
-            <h1 style="
-                color: #C5A059 !important; 
-                margin: 0 !important; 
-                padding: 0 !important;
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 32px;
-                font-weight: 800;
-                letter-spacing: 1px;
+    # Custom CSS Premium Dark Theme Card layout
+    st.markdown("""
+            <div style="
+                background: linear-gradient(135deg, #1b3a70 0%, #132952 100%);
+                padding: 24px 30px;
+                border-radius: 12px;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+                margin-bottom: 25px;
                 display: flex;
-                align-items: center;
-                gap: 15px;
+                flex-direction: column;
+                justify-content: center;
             ">
-                STOCK ALLOCATION SYSTEM
-            </h1>
-            <p style="
-                color: #a5b4fc; 
-                margin: 8px 0 0 0 !important; 
-                padding: 0 !important;
-                font-size: 14px;
-                font-family: 'Segoe UI', sans-serif;
-                opacity: 0.9;
-            ">
-        </div>
-    """, unsafe_allow_html=True)
+                <h1 style="
+                    color: #C5A059 !important; 
+                    margin: 0 !important; 
+                    padding: 0 !important;
+                    font-family: 'Segoe UI', sans-serif;
+                    font-size: 32px;
+                    font-weight: 800;
+                    letter-spacing: 1px;
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                ">
+                    STOCK ALLOCATION SYSTEM
+                </h1>
+                <p style="
+                    color: #a5b4fc; 
+                    margin: 8px 0 0 0 !important; 
+                    padding: 0 !important;
+                    font-size: 14px;
+                    font-family: 'Segoe UI', sans-serif;
+                    opacity: 0.9;
+                ">
+            </div>
+        """, unsafe_allow_html=True)
 
 
 def clean_and_process_sales(df_sales):
