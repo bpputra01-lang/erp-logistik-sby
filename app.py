@@ -3374,6 +3374,8 @@ def menu_Stock_Opname():
 
     download_section()
 
+
+
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -3415,17 +3417,14 @@ def clean_and_process_sales(df_sales):
 def calculate_dynamic_proportion(row):
     """
     Menghitung persentase alokasi proporsional berdasarkan sales.
-    Jika tidak ada penjualan, alokasi difokuskan ke Online & Offline terlebih dahulu.
+    Jika tidak ada penjualan, stok dibanyakin di Logistik Utama (80%).
     Setiap SKU wajib memiliki alokasi agar selalu ready di semua channel.
     """
     total = row['TOTAL_SALES']
     
-    # --------------------------------------------------------------------------
-    # LOGIKA BARU: JIKA SKU TIDAK MEMILIKI HISTORI PENJUALAN
-    # Fokus utama dialokasikan ke Online & Offline, sisanya baru ke Logistik Utama
-    # --------------------------------------------------------------------------
+    # LOGIKA JIKA SKU TIDAK MEMILIKI HISTORI PENJUALAN SAMA SEKALI
     if total == 0:
-        return 0.45, 0.45, 0.10  # Online: 45%, Offline: 45%, Logistik Utama: 10%
+        return 0.10, 0.10, 0.80  # Online: 10%, Offline: 10%, Logistik Utama: 80%
     
     pct_online = row['SALES_ONLINE'] / total
     pct_offline = row['SALES_OFFLINE'] / total
@@ -3466,9 +3465,6 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
     df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
     
-    # --------------------------------------------------------------------------
-    # PERBAIKAN DISTRIBUSI & CLEANING STOCK PER SKU
-    # --------------------------------------------------------------------------
     # Logistik mengambil sisa pembulatan integer agar nilai total stock tetap 100% klop
     df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
     
@@ -3535,6 +3531,36 @@ def menu_allocation_stock():
     st.markdown("<h1>⚡ DYNAMIC STOCK ALLOCATION SYSTEM</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color:#8e94a6;'>Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir</p>", unsafe_allow_html=True)
     st.write("---")
+
+    # --------------------------------------------------------------------------
+    # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
+    # --------------------------------------------------------------------------
+    with st.expander("⚙️ LIHAT ATURAN LOGIKA PROSES & MATRIKS PERSENTASE ALOKASI"):
+        st.markdown("### 📘 Aturan Pembersihan Kata Kunci (Kolom A)")
+        st.write("- **Sales Online:** Mengambil record data jika nama store mengandung kata `'ONLINE'`")
+        st.write("- **Sales Offline:** Mengambil record data jika nama store mengandung kata `'JEZ'`")
+        
+        st.markdown("### 📊 Tabel Acuan Persentase Alokasi")
+        st.write("Sistem menentukan persentase alokasi tiap SKU berdasarkan performa rasio penjualan berikut:")
+        
+        # Aturan matriks terbaru dengan fokus Logistik Utama jika 0 Sales
+        rules_data = {
+            "Kondisi Performa SKU": [
+                "Tidak Ada Histori Sales (0 Unit)",
+                "Dominan Online (> 70% Penjualan)",
+                "Dominan Offline (> 70% Penjualan)",
+                "Balanced / Imbang (Rasio Normal)"
+            ],
+            "Alokasi Online": ["10%", "70%", "15%", "40%"],
+            "Alokasi Offline": ["10%", "15%", "70%", "40%"],
+            "Alokasi Logistik Utama": ["80%", "15%", "15%", "20%"]
+        }
+        df_rules = pd.DataFrame(rules_data)
+        st.table(df_rules)
+        
+        st.info("💡 **Efisiensi Stok Mati:** SKU yang tidak mencatat penjualan selama 90 hari akan diamankan sebanyak **80% di Logistik Utama** agar area penjualan Online/Offline terhindar dari tumpukan barang *slow-moving*.")
+
+    st.write("")
 
     # Layout Kolom Input untuk Upload File Excel
     col1, col2 = st.columns(2)
