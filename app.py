@@ -3443,7 +3443,6 @@ import numpy as np
 
 # 2. CORE BACKEND LOGIC PROCESSING
 def clean_and_process_sales(df_sales):
- 
     df = df_sales.copy()
     
     # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
@@ -3549,7 +3548,7 @@ def menu_allocation_stock():
                 align-items: center;
                 gap: 15px;
             ">
-                STOCK ALOOCATION
+                ⚡ DYNAMIC STOCK ALLOCATION SYSTEM
             </h1>
             <p style="
                 color: #a5b4fc; 
