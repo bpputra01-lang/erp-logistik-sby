@@ -3628,7 +3628,7 @@ def menu_allocation_stock():
     with col2:
         file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
 
-    if file_stock and file_sales:
+if file_stock and file_sales:
     try:
         df_stock_raw = pd.read_excel(file_stock)
         df_sales_raw = pd.read_excel(file_sales)
@@ -3688,8 +3688,7 @@ def menu_allocation_stock():
                 file_name="Hasil_Alokasi_Stock_Dynamic.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
-            )
-                    
+            )  
         except Exception as e:
             st.error(f"Terjadi kesalahan pembacaan kolom struktur file: {str(e)}")
             st.info("💡 Pastikan urutan kolom di Excel Anda sudah sesuai: Stock (B, C, J) & Sales (A, AA, S)")
