@@ -3590,16 +3590,18 @@ def menu_allocation_stock():
         </div>
     """, unsafe_allow_html=True)
 
-   # --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
     # --------------------------------------------------------------------------
-    with st.expander("💡Logic Thinking"):
-        st.info("""
-        **KLASIFIKASI SALES & PROPORSI PEMBAGIAN:**
-        Sistem menentukan persentase alokasi tiap SKU berdasarkan performa rasio penjualan 90 hari terakhir.
-        """)
+    with st.expander("⚙️ LIHAT ATURAN LOGIKA PROSES & MATRIKS PERSENTASE ALOKASI"):
+        st.markdown("### 📘 Aturan Pembersihan Kata Kunci (Kolom A)")
+        st.write("- **Sales Online:** Mengambil record data jika nama store mengandung kata `'ONLINE'`")
+        st.write("- **Sales Offline:** Mengambil record data jika nama store mengandung kata `'JEZ'`")
         
-        # Membuat DataFrame aturan matriks agar rapi dalam bentuk tabel
+        st.markdown("### 📊 Tabel Acuan Persentase Alokasi")
+        st.write("Sistem menentukan persentase alokasi tiap SKU berdasarkan performa rasio penjualan berikut:")
+        
+        # Aturan matriks terbaru dengan fokus Logistik Utama jika 0 Sales
         rules_data = {
             "Kondisi Performa SKU": [
                 "Tidak Ada Histori Sales (0 Unit)",
@@ -3613,8 +3615,11 @@ def menu_allocation_stock():
         }
         df_rules = pd.DataFrame(rules_data)
         st.table(df_rules)
+        
+        st.info("💡 **Efisiensi Stok Mati:** SKU yang tidak mencatat penjualan selama 90 hari akan diamankan sebanyak **80% di Logistik Utama** agar area penjualan Online/Offline terhindar dari tumpukan barang *slow-moving*.")
 
     st.write("")
+
     # Layout Kolom Input untuk Upload File Excel
     col1, col2 = st.columns(2)
 
@@ -3654,6 +3659,7 @@ def menu_allocation_stock():
                         st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Logistik</div><div class='metric-value'>{df_final_allocation['QTY_LOGISTIK'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
                     
                     # --- INTERFACING DATAFRAME ---
+                    st.write("### 📋 Preview Hasil Pembagian per SKU")
                     st.dataframe(df_final_allocation, use_container_width=True)
                     
                     # --- DOWNLOAD BUTTON ---
