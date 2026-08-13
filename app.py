@@ -3474,8 +3474,6 @@ st.markdown("""
                 font-family: 'Segoe UI', sans-serif;
                 opacity: 0.9;
             ">
-                Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir
-            </p>
         </div>
     """, unsafe_allow_html=True)
 
