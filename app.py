@@ -3507,37 +3507,52 @@ def calculate_dynamic_proportion(row):
 
 def generate_stock_allocation(df_stock, df_sales_summary):
     """
-    Menggabungkan data stock gudang dengan ringkasan sales, 
-    lakukan alokasi, dan hitung final QTY per area gudang.
+    Menggabungkan data stock gudang dengan ringkasan sales.
+    Murni berbasis 100% Unique SKU tanpa memperhitungkan atau menyertakan data BIN.
     """
     df_stk = df_stock.copy()
     
     # Mapping nama kolom berdasarkan index
-    col_bin = df_stk.columns[1]   # Kolom B
-    col_sku = df_stk.columns[2]   # Kolom C
-    col_qty = df_stk.columns[9]   # Kolom J
+    col_sku = df_stk.columns[2]   # Kolom C (SKU)
+    col_qty = df_stk.columns[9]   # Kolom J (QTY Master)
     
-    # Satukan data stock dengan summary sales per SKU
+    # --------------------------------------------------------------------------
+    # LANGKAH KUNCI: Grouping Stock murni per SKU untuk mendapatkan total QTY.
+    # Kolom BIN diabaikan sepenuhnya agar output benar-benar bersih by SKU.
+    # --------------------------------------------------------------------------
+    df_stock_unique = df_stk.groupby(col_sku).agg({
+        col_qty: 'sum'  # Total QTY Master per SKU gabungan
+    }).reset_index()
+    
+    # Satukan data stock unique dengan summary sales per SKU
     sales_sku_col = df_sales_summary.columns[0]
-    df_merged = pd.merge(df_stk, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
+    df_merged = pd.merge(df_stock_unique, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
     
-    # Hitung proporsi persentase (Fungsi penunjang sudah didefinisikan di atas)
+    # Hitung proporsi persentase alokasi
     proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
     df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
     df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
     df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
     
-    # Hitung Final QTY per Lokasi (Mencegah pecahan desimal gudang)
+    # Hitung Final QTY per Lokasi (Mengubah ke integer untuk unit riil)
     df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
     df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
     
-    # Logistik mengambil sisa pembulatan agar total stock tetap 100% akurat
+    # Logistik mengambil sisa pembulatan agar total stock tetap 100% akurat per SKU
     df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
     
-    # Rapikan output kolom utama untuk user
-    output_cols = [col_bin, col_sku, col_qty, 'SALES_ONLINE', 'SALES_OFFLINE', 'QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']
+    # Susunan output kolom utama untuk user tanpa membawa kolom BIN
+    output_cols = [
+        col_sku,          # SKU (Unique Key)
+        col_qty,          # Total QTY Master Asli per SKU
+        'SALES_ONLINE', 
+        'SALES_OFFLINE', 
+        'QTY_ONLINE', 
+        'QTY_OFFLINE', 
+        'QTY_LOGISTIK'
+    ]
+    
     return df_merged[output_cols]
-
 
 def menu_allocation_stock():
     """
