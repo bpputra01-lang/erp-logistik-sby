@@ -3386,29 +3386,44 @@ import numpy as np
 def clean_and_process_sales(df_sales):
     """
     Membersihkan data sales: mengubah qty ke numerik, 
-    mengabaikan nilai '-', dan memisahkan sales Online vs Offline.
+    mengabaikan nilai '-', dan memisahkan sales Online vs Offline
+    berdasarkan keyword spesifik di Kolom A (ONLINE vs JEZ).
     """
     # Salin dataframe agar tidak merubah data asli
     df = df_sales.copy()
     
-    # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
+    # Konversi kolom S (QTY - Index 18) menjadi numerik, abaikan karakter non-numerik seperti '-'
     df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
     
     # Identifikasi nama kolom berdasarkan index untuk mempermudah logic
-    col_store = df.columns[0]   # Kolom A
-    col_sku = df.columns[26]    # Kolom AA
-    col_qty = df.columns[18]    # Kolom S
+    col_store = df.columns[0]   # Kolom A (STORE)
+    col_sku = df.columns[26]    # Kolom AA (SKU)
+    col_qty = df.columns[18]    # Kolom S (QTY)
     
-    # Filter & Pisahkan QTY Sales berdasarkan store (Online vs Offline)
-    df['SALES_ONLINE'] = np.where(df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
-    df['SALES_OFFLINE'] = np.where(~df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    # --------------------------------------------------------------------------
+    # PEMBARUAN LOGIKA SELEKSI BERDASARKAN KEYWORD DI KOLOM A
+    # --------------------------------------------------------------------------
+    # SALES ONLINE -> Kolom A mengandung kata 'ONLINE'
+    df['SALES_ONLINE'] = np.where(
+        df[col_store].str.upper().str.contains('ONLINE', na=False), 
+        df[col_qty], 
+        0
+    )
     
-    # Grouping per Unique SKU (Kolom AA)
+    # SALES OFFLINE -> Kolom A mengandung kata 'JEZ'
+    df['SALES_OFFLINE'] = np.where(
+        df[col_store].str.upper().str.contains('JEZ', na=False), 
+        df[col_qty], 
+        0
+    )
+    
+    # Grouping per Unique SKU (Kolom AA) untuk melakukan akumulasi (SUMIF)
     df_summary = df.groupby(col_sku).agg({
         'SALES_ONLINE': 'sum',
         'SALES_OFFLINE': 'sum'
     }).reset_index()
     
+    # Hitung total sales dari kombinasi Online + Offline yang terfilter
     df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
     return df_summary
 
