@@ -3587,7 +3587,6 @@ def menu_allocation_stock():
     st.markdown("""
         <div class="hero-header">
             <h1> DYNAMIC STOCK ALLOCATION SYSTEM</h1>
-            <div class="hero-subtitle">Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir</div>
         </div>
     """, unsafe_allow_html=True)
 
