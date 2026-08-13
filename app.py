@@ -3375,6 +3375,11 @@ def menu_Stock_Opname():
     download_section()
 
 
+# ==============================================================================
+# LOGIC PROCESS MENU "STOCK ALLOCATION"
+# ==============================================================================
+
+
 import pandas as pd
 import numpy as np
 
@@ -3428,48 +3433,12 @@ def calculate_dynamic_proportion(row):
 
 
 # ==============================================================================
-# LOGIC PROSES MENU "STOCK ALLOCATION"
+# LOGIC INTERFACE MENU "STOCK ALLOCATION"
 # ==============================================================================
-def generate_stock_allocation(df_stock, df_sales_summary):
-    """
-    Menggabungkan data stock gudang dengan ringkasan sales, 
-    lakukan alokasi, dan hitung final QTY per area gudang.
-    """
-    df_stk = df_stock.copy()
-    
-    # Mapping nama kolom berdasarkan index
-    col_bin = df_stk.columns[1]   # Kolom B
-    col_sku = df_stk.columns[2]   # Kolom C
-    col_qty = df_stk.columns[9]   # Kolom J
-    
-    # Satukan data stock dengan summary sales per SKU
-    # Kolom SKU di sales summary berada di index 0 hasil group by
-    sales_sku_col = df_sales_summary.columns[0]
-    df_merged = pd.merge(df_stk, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
-    
-    # Hitung proporsi persentase
-    proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
-    df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
-    df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
-    df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
-    
-    # Hitung Final QTY per Lokasi (Mencegah pecahan desimal gudang)
-    df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
-    df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
-    
-    # Logistik mengambil sisa pembulatan agar total stock tetap 100% akurat
-    df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
-    
-    # Rapikan output kolom utama untuk user
-    output_cols = [col_bin, col_sku, col_qty, 'SALES_ONLINE', 'SALES_OFFLINE', 'QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']
-    return df_merged[output_cols]
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-
-# Konfigurasi Halaman & Tema Premium Dark Mode
-st.set_page_config(page_title="ERP Logistik Dashboard", layout="wide")
 
 # Custom CSS Premium Dark Theme Card layout
 st.markdown("""
@@ -3492,9 +3461,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ==============================================================================
-# CORE PROCESSOR LOGIC
-# ==============================================================================
 
 def clean_and_process_sales(df_sales):
     """
@@ -3546,28 +3512,32 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     """
     df_stk = df_stock.copy()
     
+    # Mapping nama kolom berdasarkan index
     col_bin = df_stk.columns[1]   # Kolom B
     col_sku = df_stk.columns[2]   # Kolom C
     col_qty = df_stk.columns[9]   # Kolom J
     
+    # Satukan data stock dengan summary sales per SKU
     sales_sku_col = df_sales_summary.columns[0]
     df_merged = pd.merge(df_stk, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
     
+    # Hitung proporsi persentase (Fungsi penunjang sudah didefinisikan di atas)
     proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
     df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
     df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
     df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
     
+    # Hitung Final QTY per Lokasi (Mencegah pecahan desimal gudang)
     df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
     df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
+    
+    # Logistik mengambil sisa pembulatan agar total stock tetap 100% akurat
     df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
     
+    # Rapikan output kolom utama untuk user
     output_cols = [col_bin, col_sku, col_qty, 'SALES_ONLINE', 'SALES_OFFLINE', 'QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']
     return df_merged[output_cols]
 
-# ==============================================================================
-# LOGIC INTERFACE MENU "STOCK ALLOCATION"
-# ==============================================================================
 
 def def_menu_allocation_stock():
     """
@@ -3601,7 +3571,7 @@ def def_menu_allocation_stock():
             if st.button("🚀 HITUNG PEMBAGIAN ALOKASI STOK", use_container_width=True):
                 with st.spinner("Sedang memproses algoritma dynamic allocation..."):
                     
-                    # --- CORE PROCESSOR LOGIC (Tanpa awalan lp. karena sudah satu file) ---
+                    # --- CORE PROCESSOR LOGIC ---
                     df_sales_summary = clean_and_process_sales(df_sales_raw)
                     df_final_allocation = generate_stock_allocation(df_stock_raw, df_sales_summary)
                     
@@ -3609,7 +3579,7 @@ def def_menu_allocation_stock():
                     st.write("### 📊 Ringkasan Total Alokasi Unit")
                     m1, m2, m3, m4 = st.columns(4)
                     
-                    col_stock_qty = df_final_allocation.columns[2] # Kolom J asli
+                    col_stock_qty = df_final_allocation.columns[2] # Kolom J asli hasil filter output_cols
                     total_stock = df_final_allocation[col_stock_qty].sum()
                     
                     with m1:
