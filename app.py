@@ -3593,18 +3593,18 @@ def menu_allocation_stock():
     # --------------------------------------------------------------------------
     # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
     # --------------------------------------------------------------------------
-    with st.expander("💡Logic Thinking"):
+     with st.expander("💡Logic Thinking"):
         st.info("""
-        rules_data = {
-            "Kondisi Performa SKU": [
-                "Tidak Ada Histori Sales (0 Unit)",
-                "Dominan Online (> 70% Penjualan)",
-                "Dominan Offline (> 70% Penjualan)",
-                "Balanced / Imbang (Rasio Normal)"
-            ],
-            "Alokasi Online": ["10%", "70%", "15%", "40%"],
-            "Alokasi Offline": ["10%", "15%", "70%", "40%"],
-            "Alokasi Logistik": ["80%", "15%", "15%", "20%"]
+        **KLASIFIKASI SALES:**
+            -Tidak Ada Histori Sales (0 Unit)
+            -Dominan Online (> 70% Penjualan)
+            -Dominan Offline (> 70% Penjualan)
+            -Balanced / Imbang (Rasio Normal)
+
+        **PROPORSI PEMBAGIAN:**
+            -Alokasi Online": ["10%", "70%", "15%", "40%"]
+            -Alokasi Offline": ["10%", "15%", "70%", "40%"]
+            -Alokasi Logistik": ["80%", "15%", "15%", "20%"]
         }
         df_rules = pd.DataFrame(rules_data)
         st.table(df_rules)
