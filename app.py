@@ -10200,101 +10200,54 @@ if menu == "Putaway System":
         - List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan
         """)
     
-    # --- BARU: DROPDOWN PILIHAN AREA ---
+    # --- DROPDOWN PILIHAN AREA (DEFAULT KOSONG) ---
     st.markdown("### 📍 Pilih Area Putaway")
     pilihan_area = st.selectbox(
         "Pilih area penempatan untuk filter sisa stock / outstanding:",
-        ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
+        options=["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
+        index=None,  # <-- Bikin default selection jadi KOSONG (None)
+        placeholder="-- Pilih Area Putaway Terlebih Dahulu --",
         key="area_putaway"
     )
-    
-    st.divider()
 
-    c1, c2 = st.columns(2)
-    with c1: up_ds = st.file_uploader("📥 Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
-    with c2: up_asal = st.file_uploader("📥 Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
-
-    if up_ds and up_asal:
-        if st.button("▶️ COMPARE PUTAWAY"):
-            try:
-                # 1. LOAD DATA
-                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
-                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
-                
-                # 2. DEFINISIKAN TOTAL AWAL
-                total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
-                
-                # 3. PROSES FUNGSI (Sekarang membawa parameter variabel pilihan_area)
-                res = putaway_system(df_ds_p, df_asal_p, pilihan_area)
-                
-                # 4. SIMPAN KE SESSION STATE
-                st.session_state['putaway_results'] = {
-                    'df_comp': res[0],
-                    'df_plist': res[1],  
-                    'df_kurang': res[2],
-                    'df_sum': res[3],
-                    'df_lt3': res[4], # Ini yang sekarang otomatis terfilter dinamis
-                    'df_updated_bin': res[5],
-                    'total_awal': total_awal  
-                }
-                st.success(f"✅ Proses Putaway untuk {pilihan_area} Selesai!")
-                
-            except Exception as e:
-                st.error(f"Gagal saat memproses: {e}")
-
-    # --- TAMPILKAN HASIL ---
-    # Pastikan session_state diinisialisasi jika belum ada agar aman dari error NoneType
-    if 'putaway_results' in st.session_state and st.session_state['putaway_results'] is not None:
-        r = st.session_state['putaway_results']
+    # --- FILE UPLOADER HANYA MUNCUL JIKA AREA SUDAH DIPILIH ---
+    if pilihan_area:
+        st.info(f"📍 Area Terpilih: **{pilihan_area}**")
         
-        st.divider()
-        st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
-        
-        # --- HITUNG METRICS ---
-        total_compare_qty = r.get('total_awal', 0)
-        total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
-        total_kurang_qty = int(r['df_kurang']['DIFF'].sum()) if not r['df_kurang'].empty else 0
-        
-        lt3_total_qty = 0
-        if not r['df_lt3'].empty:
-            qty_col = [c for c in r['df_lt3'].columns if 'qty' in str(c).lower()]
-            if qty_col:
-                lt3_total_qty = int(r['df_lt3'][qty_col[0]].sum())
+        c1, c2 = st.columns(2)
+        with c1: up_ds = st.file_uploader("📥 Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
+        with c2: up_asal = st.file_uploader("📥 Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
 
-        # --- TAMPILKAN METRICS BOX ---
-        m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty System Putaway</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">Total Tersetup</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Stok Putaway</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
-
-        # --- TABS HASIL ---
-        t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 Outstanding"])
-        
-        with t1: st.dataframe(r['df_comp'], use_container_width=True)
-        with t2: st.dataframe(r['df_plist'], use_container_width=True)
-        with t3: 
-            if not r['df_kurang'].empty: st.dataframe(r['df_kurang'], use_container_width=True)
-            else: st.success("✅ Semua Tercover!")
-        with t4: 
-            if not r['df_lt3'].empty: st.dataframe(r['df_lt3'], use_container_width=True)
-            else: st.success("✅ Tidak ada Outstanding!")
-
-        # --- TOMBOL DOWNLOAD ---
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            r['df_comp'].to_excel(writer, sheet_name='COMPARE', index=False)
-            r['df_plist'].to_excel(writer, sheet_name='PUTAWAY_LIST', index=False)
-            r['df_kurang'].to_excel(writer, sheet_name='KURANG_SETUP', index=False)
-            r['df_lt3'].to_excel(writer, sheet_name='OUTSTANDING', index=False)
-            r['df_updated_bin'].to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
-        
-        st.download_button(
-            label="📥 DOWNLOAD REPORT",
-            data=output.getvalue(),
-            file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        if up_ds and up_asal:
+            if st.button("▶️ COMPARE PUTAWAY"):
+                try:
+                    # 1. LOAD DATA
+                    df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
+                    df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
+                    
+                    # 2. DEFINISIKAN TOTAL AWAL
+                    total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
+                    
+                    # 3. PROSES FUNGSI
+                    res = putaway_system(df_ds_p, df_asal_p, pilihan_area)
+                    
+                    # 4. SIMPAN KE SESSION STATE
+                    st.session_state['putaway_results'] = {
+                        'df_comp': res[0],
+                        'df_plist': res[1],  
+                        'df_kurang': res[2],
+                        'df_sum': res[3],
+                        'df_lt3': res[4], 
+                        'df_updated_bin': res[5],
+                        'total_awal': total_awal  
+                    }
+                    st.success(f"✅ Proses Putaway untuk {pilihan_area} Selesai!")
+                    
+                except Exception as e:
+                    st.error(f"Gagal saat memproses: {e}")
+    else:
+        # Peringatan kalau belum pilih area
+        st.warning("⚠️ Silakan pilih Area Putaway di atas terlebih dahulu untuk menampilkan form upload file.")
 
 # ==============================================================================
 # LOGIC INTERFACE MENU "COMPARE SYSTEM"
