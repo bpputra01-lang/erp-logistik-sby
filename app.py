@@ -3464,7 +3464,7 @@ st.markdown("""
                 align-items: center;
                 gap: 15px;
             ">
-                ⚡ DYNAMIC STOCK ALLOCATION SYSTEM
+                STOCK ALLOCATION SYSTEM
             </h1>
             <p style="
                 color: #a5b4fc; 
