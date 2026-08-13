@@ -11989,8 +11989,8 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
-    
-elif menu == "Stock Allocation"
+
+elif menu == "Stock Allocation":
     menu_allocation_stock()
 
 elif menu == "Putaway & Picking Audit List":
