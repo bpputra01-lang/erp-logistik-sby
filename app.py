@@ -90,22 +90,20 @@ st.set_page_config(
     page_icon=logo_icon,
     layout="wide"
 )
-  
+
 # =========================================================
-# 4. GLOBAL CSS: SAAS PREMIUM GLASSMORPHISM
+# 1. GLOBAL CSS (RESTORED TO ORIGINAL PREMIUM GOLD/NAVY)
 # =========================================================
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    /* ============================================
+       FONTS IMPORT
+       ============================================ */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
 
-    /* 1. GLOBAL SETTINGS - Font Lebih Modern */
-    html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif !important;
-    }
-    .stApp {
-        background: #0B0E14 !important; /* Warna Background Super Gelap Eksklusif */
-    }
-
+    /* ============================================
+       1. LAYOUT & SPACING
+       ============================================ */
     .block-container {
         padding-top: 3.5rem !important;
         padding-bottom: 0rem !important;
@@ -113,30 +111,66 @@ st.markdown("""
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarNav"] { display: none !important; }
 
+    /* ============================================
+       2. APP BACKGROUND
+       ============================================ */
+    .stApp {
+        background-color: #f5f7fa !important;
+    }
+
+    /* ============================================
+       3. SIDEBAR - PREMIUM DARK
+       ============================================ */
     [data-testid="stSidebar"] {
         background-color: #1a1d2e !important;
         border-right: 1px solid rgba(197, 160, 89, 0.15) !important;
     }
 
-    /* 2. TOMBOL PREMIUM (Efek Glow & Hover) */
-    div.stButton > button {
-        background: linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%) !important;
-        color: #FFFFFF !important;
-        border: 1px solid #3B82F6 !important;
-        border-radius: 12px !important;
+    /* ============================================
+       4. HERO HEADER - PREMIUM BLUE
+       ============================================ */
+    .hero-header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%) !important;
+        color: white !important;
+        padding: 10px 22px !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 15px rgba(30, 60, 114, 0.25) !important;
+        margin-top: 0px !important;
+        margin-bottom: 25px !important;
+        display: inline-block !important;
+        width: auto !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .hero-header h1 {
+        color: white !important;
+        font-family: 'Poppins', sans-serif !important;
+        font-size: 19px !important;
         font-weight: 700 !important;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        height: 45px !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2) !important;
+        margin: 0 !important;
+        letter-spacing: 0.3px;
+        line-height: 1.3;
+    }
+
+    /* ============================================
+       5. MAIN BUTTONS - NAVY BLUE
+       ============================================ */
+    div.stButton > button {
+        background: linear-gradient(135deg, #002b5b 0%, #003874 100%) !important;
+        color: white !important;
+        border-radius: 8px !important;
+        border: 1px solid #001a35 !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        height: 3em !important;
+        transition: all 0.25s ease !important;
+        box-shadow: 0 2px 8px rgba(0, 43, 91, 0.2) !important;
     }
     div.stButton > button:hover {
-        background: linear-gradient(135deg, #FFD700 0%, #C5A059 100%) !important;
-        color: #000000 !important;
-        border: 1px solid #FFD700 !important;
-        transform: translateY(-3px) !important;
-        box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4) !important;
+        background: linear-gradient(135deg, #003874 0%, #004a9e 100%) !important;
+        border-color: #ffc107 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(0, 43, 91, 0.3) !important;
     }
 
     /* Clear/Reset Buttons - Red */
@@ -147,60 +181,15 @@ st.markdown("""
         border-color: #4a0000 !important;
     }
 
-    /* 3. INPUT BOX (Glassmorphism + Neon Border saat diklik) */
-    div[data-baseweb="input"] > div, 
-    div[data-baseweb="select"] > div,
-    [data-testid="stFileUploaderSection"] {
-        background: rgba(25, 30, 40, 0.7) !important;
-        backdrop-filter: blur(10px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 12px !important;
-        color: white !important;
-    }
-    div[data-baseweb="input"] > div:focus-within, 
-    div[data-baseweb="select"] > div:focus-within {
-        border-color: #3B82F6 !important;
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.5) !important;
-    }
-    input { color: #ffffff !important; font-weight: 500 !important; }
-
-    /* 4. METRIC CARDS (Dashboard Card) */
-    .m-box {
-        background: linear-gradient(135deg, rgba(30, 35, 50, 0.9) 0%, rgba(15, 20, 30, 0.9) 100%) !important;
-        border-left: 4px solid #FFD700 !important;
-        border-radius: 16px !important;
-        padding: 20px !important;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.4) !important;
-        transition: transform 0.3s ease !important;
-    }
-    .m-box:hover {
-        transform: translateY(-5px) !important;
-        border-left: 4px solid #00FF66 !important;
-        box-shadow: 0 12px 30px rgba(0, 255, 102, 0.2) !important;
-    }
-    .m-lbl { color: #9CA3AF !important; font-size: 11px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 1.5px !important; }
-    .m-val { color: #FFFFFF !important; font-size: 32px !important; font-weight: 800 !important; margin-top: 5px !important; }
-
-    /* 5. TAB MENU ELEGANT */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 15px;
-        background-color: transparent;
-    }
-    .stTabs [data-baseweb="tab"] {
-        color: #9CA3AF !important;
-        background-color: #1E2330 !important;
-        border-radius: 8px 8px 0 0 !important;
-        padding: 10px 20px !important;
-        border: none !important;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #FFD700 !important;
-        background-color: #0B0E14 !important;
-        border-bottom: 3px solid #FFD700 !important;
-        font-weight: 800 !important;
-    }
-
-    /* 6. UPLOADER BUTTON STYLE */
+    /* ============================================ 
+       6. FILE UPLOADER 
+       ============================================ */ 
+    [data-testid="stFileUploader"] { 
+        background-color: #f0f2f6; 
+        border: 2px dashed rgba(0, 43, 91, 0.3) !important; 
+        border-radius: 10px; 
+        padding: 12px; 
+    } 
     [data-testid="stFileUploader"] button { 
         background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important; 
         color: #1a1d2e !important; 
@@ -209,8 +198,89 @@ st.markdown("""
         font-size: 12px !important; 
         border: none !important;
     } 
-    
-    /* 7. SIDEBAR BUTTONS */
+
+    /* ============================================ 
+       7. METRIC BOXES - PREMIUM CARD 
+       ============================================ */ 
+    .m-box { 
+        background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important; 
+        padding: 18px 20px !important; 
+        border-radius: 10px !important; 
+        border-left: 4px solid #C5A059 !important; 
+        margin-bottom: 10px !important; 
+        text-align: left !important; 
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important; 
+    } 
+    .m-lbl { 
+        color: rgba(255, 255, 255, 0.65) !important; 
+        font-family: 'Inter', sans-serif !important; 
+        font-size: 10px !important; 
+        font-weight: 600 !important; 
+        text-transform: uppercase !important; 
+        letter-spacing: 1px !important; 
+        display: block; 
+        margin-bottom: 6px; 
+    } 
+    .m-val { 
+        color: #C5A059 !important; 
+        font-family: 'Poppins', sans-serif !important; 
+        font-size: 24px !important; 
+        font-weight: 700 !important; 
+    } 
+
+    /* ============================================ 
+       8. RADIO BUTTONS 
+       ============================================ */ 
+    div.row-widget.stRadio > div { background-color: transparent !important; } 
+    div.row-widget.stRadio label { 
+        color: #a0a5b5 !important; 
+        font-family: 'Inter', sans-serif !important; 
+        font-size: 13px !important; 
+        padding: 8px 14px !important; 
+        border-radius: 6px !important; 
+        background: rgba(26, 29, 46, 0.5) !important; 
+        border: 1px solid rgba(197, 160, 89, 0.15) !important; 
+        transition: all 0.2s ease !important; 
+    } 
+    div.row-widget.stRadio label:hover { 
+        background: rgba(197, 160, 89, 0.1) !important; 
+        border-color: rgba(197, 160, 89, 0.3) !important; 
+        color: #C5A059 !important; 
+    } 
+
+    /* ============================================ 
+       9. INPUT BOXES - GOLD BORDER 
+       ============================================ */ 
+    div[data-baseweb="select"] > div, 
+    [data-testid="stFileUploaderSection"] { 
+        background-color: #1a1d2e !important; 
+        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
+        border-radius: 8px !important; 
+    } 
+    div[data-baseweb="select"] > div:focus-within, 
+    [data-testid="stFileUploaderSection"]:focus-within { 
+        border-color: #C5A059 !important; 
+        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
+    } 
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
+    [data-testid="stFileUploaderText"] > span, 
+    [data-testid="stFileUploaderText"] > small { 
+        color: #e0e0e0 !important; 
+        -webkit-text-fill-color: #e0e0e0 !important; 
+    } 
+
+    div[data-baseweb="input"] { 
+        background-color: #1a1d2e !important; 
+        border: 1px solid rgba(197, 160, 89, 0.3) !important; 
+        border-radius: 8px !important; 
+        padding: 10px 14px !important; 
+    } 
+    div[data-baseweb="input"]:focus-within { border-color: #C5A059 !important; } 
+    input { color: #ffffff !important; font-family: 'Inter', sans-serif !important; font-size: 14px !important; } 
+
+    /* ============================================ 
+       11. SIDEBAR BUTTONS - GOLD THEME 
+       ============================================ */ 
     [data-testid="stSidebar"] div.stButton > button { 
         background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important; 
         color: #C5A059 !important; 
@@ -219,6 +289,7 @@ st.markdown("""
         height: auto !important; 
         min-height: 42px !important; 
         border-radius: 8px !important; 
+        font-family: 'Inter', sans-serif !important; 
         font-weight: 500 !important; 
         font-size: 12px !important; 
         margin-bottom: 6px !important; 
@@ -228,61 +299,141 @@ st.markdown("""
         background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important; 
         border-color: #C5A059 !important; 
         color: #FFD700 !important; 
-        transform: translateY(0px) !important;
     } 
 
-    /* 8. WIDGET LABELS */
+    /* ============================================ 
+       12. LABELS 
+       ============================================ */ 
     [data-testid="stWidgetLabel"] p { 
-        color: #E0E0E0 !important; 
+        color: #2d3748 !important; 
+        font-family: 'Inter', sans-serif !important; 
         font-weight: 600 !important; 
         font-size: 13px !important; 
-    }
-    
-    /* Background Khusus Halaman Login */
-    .login-bg {
-        background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
-        background-size: cover !important;
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
     }
     </style>
 """, unsafe_allow_html=True)
 
+
 # =========================================================
-# 5. SISTEM LOGIN
+# 5. SISTEM LOGIN (DIKEMBALIKAN KE VERSI ASLI DENGAN BACKGROUND UNSPLASH)
 # =========================================================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.markdown('<div class="login-bg"></div>', unsafe_allow_html=True)
     st.markdown("""
         <style>
-        [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
-        .login-card {
-            background: rgba(20, 25, 35, 0.85);
-            backdrop-filter: blur(15px);
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid rgba(255,215,0,0.3);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-            margin-top: 10vh;
+        /* 1. Background & Layout */
+        .stApp {
+            background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070') !important;
+            background-size: cover !important;
         }
+        [data-testid="stSidebar"], [data-testid="stHeader"] { display: none !important; }
+    
+        /* 3. TOMBOL EMAS - PERBAIKAN PADDING */
+        button[data-testid="stFormSubmitButton"], 
+        div.stFormSubmitButton > button {
+            background: linear-gradient(135deg, #C5A059 0%, #8E6D35 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 12px !important;
+            padding: 18px 20px !important; 
+            line-height: 1.2 !important;   
+            height: auto !important;       
+            font-weight: 800 !important;
+            font-size: 16px !important;
+            letter-spacing: 1px !important;
+            width: 100% !important;
+            box-shadow: 0 8px 20px rgba(197, 160, 89, 0.3) !important;
+            text-transform: uppercase !important;
+        }
+        button[data-testid="stFormSubmitButton"]:hover {
+            background: linear-gradient(135deg, #D4AF37 0%, #C5A059 100%) !important;
+            color: #1e1e2f !important;
+            box-shadow: 0 20px 25px rgba(197, 160, 89, 0.5) !important;
+            transform: translateY(-2px);
+        }
+
+        /* 4. Input Box biar gelap & elegan - PERBAIKAN UTAMA DISINI */
+        div[data-baseweb="input"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 10px !important;
+            padding: 8px 12px !important;
+        }
+        div[data-baseweb="input"]:focus-within {
+            border-color: #D4AF37 !important;
+            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2) !important;
+        }
+        input[type="text"], input[type="password"] {
+            background-color: transparent !important;
+            border: none !important;
+            color: #C5A059 !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+        }
+        input::placeholder { color: rgba(197, 160, 89, 0.5) !important; }
+        
+        [data-testid="stWidgetLabel"] p {
+            color: #E0E0E0 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            margin-bottom: 8px !important;
+        }
+
+        .stForm { background-color: transparent !important; border: none !important; }
+        div[data-testid="stTextInput"] div[data-baseweb="input"] {
+            background-color: #1a2634 !important;
+            border: 1px solid #C5A059 !important;
+            border-radius: 10px !important;
+            padding: 12px 16px !important;
+            min-height: 50px !important;
+        }
+        div[data-testid="stTextInput"] input {
+            color: #C5A059 !important;
+            -webkit-text-fill-color: #C5A059 !important;
+        }
+        .stTextInput > div > div { background-color: transparent !important; }
+
+        /* Ubah background st.success jadi hijau solid */
+        div[data-testid="stNotification"] {
+            background-color: #1e7e34 !important;
+            color: white !important;               
+            border-radius: 10px !important;
+            border: 1px solid #C5A059 !important;  
+        }
+        div[data-testid="stNotification"] svg { fill: white !important; }
         </style>
     """, unsafe_allow_html=True)
     
-    _, col_mid, _ = st.columns([1, 1.5, 1])
+    _, col_mid, _ = st.columns([1, 2, 1])
     with col_mid:
         st.markdown('<div class="login-card">', unsafe_allow_html=True)
         st.markdown("""
-            <h2 style="color: #FFD700; margin-bottom: 5px; font-weight: 800; text-align: center; font-family: 'Plus Jakarta Sans', sans-serif;">
-            ZKN LOGISTIC ERP</h2>
-            <p style="color: #A0AEC0; font-size: 14px; margin-bottom: 25px; text-align: center; letter-spacing: 1px;">
-            Enterprise Warehouse Management System</p>
+            <h2 style="
+                color: #C5A059; 
+                margin-top: -60px; 
+                margin-bottom: -5px; 
+                font-family: 'Inter', sans-serif; 
+                font-weight: 800; 
+                text-align: center;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            ">ZKN LOGISTIC ERP</h2>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+            <p style="
+                color: #FFFFFF; 
+                font-size: 14px; 
+                margin-bottom: 15px; 
+                text-align: center;
+            ">🟢 Enterprise Warehouse Management System 🟢</p>
         """, unsafe_allow_html=True)
 
         with st.form("login_form"):
-            user_input = st.text_input("Username", placeholder="Masukkan username")
-            pass_input = st.text_input("Password", type="password", placeholder="Masukkan password")
+            user_input = st.text_input("Username", key="user_field", placeholder="Masukkan username")
+            pass_input = st.text_input("Password", type="password", key="pass_field", placeholder="Masukkan password")
             st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
             submit_button = st.form_submit_button("SIGN IN SECURELY")
             
@@ -300,10 +451,11 @@ if not st.session_state.logged_in:
                 else:
                     st.error("Username atau Password salah!")
         st.markdown('</div>', unsafe_allow_html=True)
+
     st.stop()
 
 if 'login_success' not in st.session_state:
-    popup_success("Selamat datang di ZKN Logistic ERP. Sistem siap digunakan!")
+    popup_success("Berhasil Login! Selamat datang di ZKN ERP.")
     st.session_state.login_success = True
 
 # Setelah login berhasil, st.stop() akan dilewati dan CSS dashboard lu bakal jalan 100% normal.
