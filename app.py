@@ -5760,9 +5760,9 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
 
 
 # ==============================================================================
-# LOGIC PROSES MENU "PUTAWAY SYSTEM"
+# LOGIC PROSES MENU "PUTAWAY SYSTEM" (UPDATED)
 # ==============================================================================
-def putaway_system(df_ds, df_asal):
+def putaway_system(df_ds, df_asal, area_pilihan):
     if df_ds is None or df_asal is None:
         empty = pd.DataFrame()
         return empty, empty, empty, empty, empty, empty
@@ -5841,13 +5841,9 @@ def putaway_system(df_ds, df_asal):
             if key in bin_qty_dict:
                 df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
 
-        # --- INI BAGIAN YANG TADI HILANG / BERUBAH ---
         df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
         if not df_plist.empty:
-            df_plist = df_plist.rename(columns={
-                "BIN DITEMUKAN": "BIN AWAL", 
-                "BIN ASAL": "BIN TUJUAN"
-            })
+            df_plist = df_plist.rename(columns={"BIN DITEMUKAN": "BIN AWAL", "BIN ASAL": "BIN TUJUAN"})
             df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
             df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
             df_plist['NOTES'] = "PUTAWAY"
@@ -5856,14 +5852,26 @@ def putaway_system(df_ds, df_asal):
 
         df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
         
-        # --- STAGGING & PUTAWAY OUTSTANDING ---
-        mask_out = (
-            (df_asal_updated.iloc[:, c_qty_a] > 0) & 
-            (
-                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("STAG", na=False) | 
-                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("PUTAWAY", na=False)
-            )
-        )
+        # --- LOGIC FILTER KEYWORD OUTSTANDING DINAMIS ---
+        # Menentukan list keyword berdasarkan pilihan dropdown area
+        if area_pilihan == "DC LANTAI 1":
+            keywords_outstanding = ["GL1-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "DC LANTAI 2":
+            keywords_outstanding = ["GL2-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "DC LANTAI 3":
+            keywords_outstanding = ["GL3-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "JERSEY ZONE":
+            keywords_outstanding = ["JZ-PUTAWAY", "STAG"] # Sesuaikan dengan format kode BIN Jersey Zone Anda
+        else:
+            keywords_outstanding = ["STAG", "PUTAWAY"] # Fallback default
+
+        # Bikin kondisi masking dengan loop keyword area
+        bin_series = df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper()
+        mask_keyword = bin_series.str.contains(keywords_outstanding[0], na=False)
+        for kw in keywords_outstanding[1:]:
+            mask_keyword = mask_keyword | bin_series.str.contains(kw, na=False)
+
+        mask_out = (df_asal_updated.iloc[:, c_qty_a] > 0) & mask_keyword
         df_outstanding = df_asal_updated[mask_out].copy()
 
         return df_comp, df_plist, df_kurang, df_comp, df_outstanding, df_asal_updated
@@ -10164,13 +10172,11 @@ if 'putaway_results' not in st.session_state:
 
 
 # ==============================================================================
-# LOGIC INTERFACE MENU "PUTAWAY SYSTEM"
+# LOGIC INTERFACE MENU "PUTAWAY SYSTEM" (UPDATED)
 # ==============================================================================
-# --- UI APP ---
 if menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     
-    # --- CSS ---
     st.markdown("""
         <style>
         .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; border: 1px solid #e0e0e0; }
@@ -10194,60 +10200,61 @@ if menu == "Putaway System":
         - List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan
         """)
     
-    c1, c2 = st.columns(2)
-    with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
-    with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
+    # --- BARU: DROPDOWN PILIHAN AREA ---
+    st.markdown("### 📍 Pilih Area Putaway")
+    pilihan_area = st.selectbox(
+        "Pilih area penempatan untuk filter sisa stock / outstanding:",
+        ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
+        key="area_putaway"
+    )
+    
+    st.divider()
 
-    # BARU MASUK KE BLOK YANG LU TULIS TADI
+    c1, c2 = st.columns(2)
+    with c1: up_ds = st.file_uploader("📥 Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
+    with c2: up_asal = st.file_uploader("📥 Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
+
     if up_ds and up_asal:
         if st.button("▶️ COMPARE PUTAWAY"):
-            # ... kode yang lu kirim tadi ...
             try:
                 # 1. LOAD DATA
                 df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
                 df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
                 
-                # 2. DEFINISIKAN TOTAL AWAL (Ambil Kolom J / Index 9)
-                # Taruh baris ini sebelum masuk ke 'res' atau 'session_state'
+                # 2. DEFINISIKAN TOTAL AWAL
                 total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
                 
-                # 3. PROSES FUNGSI
-                res = putaway_system(df_ds_p, df_asal_p)
+                # 3. PROSES FUNGSI (Sekarang membawa parameter variabel pilihan_area)
+                res = putaway_system(df_ds_p, df_asal_p, pilihan_area)
                 
                 # 4. SIMPAN KE SESSION STATE
                 st.session_state['putaway_results'] = {
                     'df_comp': res[0],
-                    'df_plist': res[1],  # Ini List Setup yang kolomnya sudah bersih
+                    'df_plist': res[1],  
                     'df_kurang': res[2],
                     'df_sum': res[3],
-                    'df_lt3': res[4],
+                    'df_lt3': res[4], # Ini yang sekarang otomatis terfilter dinamis
                     'df_updated_bin': res[5],
-                    'total_awal': total_awal  # Sekarang variabel ini sudah dikenal
+                    'total_awal': total_awal  
                 }
-                st.success("✅ Proses Putaway Selesai!")
+                st.success(f"✅ Proses Putaway untuk {pilihan_area} Selesai!")
                 
             except Exception as e:
                 st.error(f"Gagal saat memproses: {e}")
 
-    # --- TAMPILKAN HASIL (Jika sudah diproses) ---
-    if st.session_state['putaway_results'] is not None:
+    # --- TAMPILKAN HASIL ---
+    # Pastikan session_state diinisialisasi jika belum ada agar aman dari error NoneType
+    if 'putaway_results' in st.session_state and st.session_state['putaway_results'] is not None:
         r = st.session_state['putaway_results']
         
         st.divider()
         st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
         
         # --- HITUNG METRICS ---
-        
-        # 1. Gunakan 'total_awal' yang sudah disimpan di session state (Angka 278)
         total_compare_qty = r.get('total_awal', 0)
-        
-        # 2. Total yang berhasil tersetup
         total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
-        
-        # 3. Total yang gagal/kurang setup
         total_kurang_qty = int(r['df_kurang']['DIFF'].sum()) if not r['df_kurang'].empty else 0
         
-        # 4. Outstanding (Sisa di Staging/Putaway System)
         lt3_total_qty = 0
         if not r['df_lt3'].empty:
             qty_col = [c for c in r['df_lt3'].columns if 'qty' in str(c).lower()]
@@ -10256,12 +10263,12 @@ if menu == "Putaway System":
 
         # --- TAMPILKAN METRICS BOX ---
         m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sytem Putaway</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty System Putaway</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
         m2.markdown(f'<div class="m-box"><span class="m-lbl">Total Tersetup</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
         m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
         m4.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Stok Putaway</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
 
-    # ... (Sisa kode Tabs dan Download tetap sama)        # --- TABS HASIL ---
+        # --- TABS HASIL ---
         t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 Outstanding"])
         
         with t1: st.dataframe(r['df_comp'], use_container_width=True)
@@ -10273,7 +10280,7 @@ if menu == "Putaway System":
             if not r['df_lt3'].empty: st.dataframe(r['df_lt3'], use_container_width=True)
             else: st.success("✅ Tidak ada Outstanding!")
 
-        # --- TOMBOL DOWNLOAD (Excel) ---
+        # --- TOMBOL DOWNLOAD ---
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             r['df_comp'].to_excel(writer, sheet_name='COMPARE', index=False)
@@ -10288,7 +10295,6 @@ if menu == "Putaway System":
             file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
 
 # ==============================================================================
 # LOGIC INTERFACE MENU "COMPARE SYSTEM"
