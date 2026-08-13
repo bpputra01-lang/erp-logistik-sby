@@ -3518,39 +3518,78 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     ]
     
     return df_merged[output_cols]
-
-# ==============================================================================
-# LOGIC INTERFACE MENU "STOCK ALLOCATION"
-# ==============================================================================
-
-# Custom CSS Premium Dark Theme Card layout
 st.markdown("""
     <style>
         .reportview-container { background: #0f111a; }
         .main { background-color: #0f111a; color: #ffffff; }
-        h1, h2, h3 { color: #C5A059 !important; font-family: 'Segoe UI', sans-serif; }
+        h1, h2, h3 { color: #ffffff !important; font-family: 'Segoe UI', sans-serif; }
         
-        /* Premium Metric Box Custom Styling */
+        /* Menyelaraskan Tombol agar mirip dengan Refill & Withdraw */
+        div.stButton > button { 
+            width: 100% !important; 
+            background-color: #002b5b !important; 
+            color: white !important; 
+            font-weight: bold !important; 
+            border: 1px solid #ffc107 !important; 
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        div.stButton > button:hover {
+            background-color: #004085 !important;
+            border-color: #ffffff !important;
+        }
+        
+        /* Struktur Hero Header matching Refill & Withdraw */
+        .hero-header {
+            background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 193, 7, 0.2);
+        }
+        .hero-header h1 {
+            color: white !important;
+            margin: 0;
+            font-size: 28px;
+        }
+        .hero-subtitle {
+            color: #ffc107;
+            font-size: 14px;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        
+        /* Premium Metric Box Custom Styling with Navy & Gold Border */
         .metric-card {
-            background: linear-gradient(135deg, #16192b 0%, #1e223d 100%) !important;
-            border-left: 4px solid #C5A059 !important;
+            background: linear-gradient(135deg, #001f42 0%, #002b5b 100%) !important;
+            border-left: 4px solid #ffc107 !important;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
             margin-bottom: 20px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            border-right: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        .metric-title { color: #8e94a6; font-size: 12px; text-transform: uppercase; font-weight: bold; }
+        .metric-title { color: #a2b7d4; font-size: 12px; text-transform: uppercase; font-weight: bold; }
         .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
     </style>
 """, unsafe_allow_html=True)
+
 
 def menu_allocation_stock():
     """
     Interface Khusus untuk Menu Alokasi Stok Gudang (Online, Offline, Logistik)
     """
-    st.markdown("<h1>⚡ DYNAMIC STOCK ALLOCATION SYSTEM</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#8e94a6;'>Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir</p>", unsafe_allow_html=True)
-    st.write("---")
+    # Menggunakan Hero Header yang selaras dengan tema Refill & Withdraw
+    st.markdown("""
+        <div class="hero-header">
+            <h1> DYNAMIC STOCK ALLOCATION SYSTEM</h1>
+            <div class="hero-subtitle">Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir</div>
+        </div>
+    """, unsafe_allow_html=True)
 
     # --------------------------------------------------------------------------
     # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
