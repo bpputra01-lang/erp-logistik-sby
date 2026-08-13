@@ -9944,6 +9944,24 @@ def show_timbang_system():
             st.info("💡 Belum ada data timbang masuk untuk periode ini.")
                 
     
+# =========================================================
+# SIDEBAR & MENU INITIALIZATION (CLEAN & FIXED)
+# =========================================================
+
+# 1. WAJIB ADA: Init Role & Menu State agar tidak AttributeError
+if 'role' not in st.session_state:
+    st.session_state.role = "CABANG"  # Default aman
+
+if 'main_menu' not in st.session_state:
+    if st.session_state.role == "DC":
+        st.session_state.main_menu = "Dashboard Overview"
+    else:
+        st.session_state.main_menu = "Compare Penerimaan RTO"
+
+# 2. Fungsi callback sinkronisasi menu
+def sync_menu(key):
+    st.session_state.main_menu = st.session_state[key]
+
 with st.sidebar:
     st.markdown("""
         <style>
@@ -10100,6 +10118,8 @@ with st.sidebar:
         st.session_state.logged_in = False
         if 'login_success' in st.session_state:
             del st.session_state['login_success']
+        if 'main_menu' in st.session_state:
+            del st.session_state['main_menu']  # Hapus state menu saat logout agar bersih
         st.rerun()
 
 # Variabel final untuk kontrol konten di main area
