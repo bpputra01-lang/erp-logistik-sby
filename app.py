@@ -3441,36 +3441,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# 1. CUSTOM CSS GLOBAL (Rata kiri penuh, bebas IndentationError)
-st.markdown("""
-    <style>
-        .reportview-container { background: #0f111a; }
-        .main { background-color: #0f111a; color: #ffffff; }
-        
-        /* Premium Metric Box Custom Styling */
-        .metric-card {
-            background: linear-gradient(135deg, #16192b 0%, #1e223d 100%) !important;
-            border-left: 4px solid #C5A059 !important;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            margin-bottom: 20px;
-        }
-        .metric-title { color: #8e94a6; font-size: 12px; text-transform: uppercase; font-weight: bold; }
-        .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
-        
-        /* Custom Subheader Styling */
-        .sub-title {
-            color: #C5A059 !important;
-            font-family: 'Segoe UI', sans-serif;
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-
 # 2. CORE BACKEND LOGIC PROCESSING
 def clean_and_process_sales(df_sales):
     """
