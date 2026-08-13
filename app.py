@@ -3374,13 +3374,256 @@ def menu_Stock_Opname():
 
     download_section()
 
+
+# ==============================================================================
+# LOGIC PROCESS MENU "STOCK ALLOCATION"
+# ==============================================================================
+
+
+import pandas as pd
+import numpy as np
+
+def clean_and_process_sales(df_sales):
+    """
+    Membersihkan data sales: mengubah qty ke numerik, 
+    mengabaikan nilai '-', dan memisahkan sales Online vs Offline.
+    """
+    # Salin dataframe agar tidak merubah data asli
+    df = df_sales.copy()
+    
+    # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
+    df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
+    
+    # Identifikasi nama kolom berdasarkan index untuk mempermudah logic
+    col_store = df.columns[0]   # Kolom A
+    col_sku = df.columns[26]    # Kolom AA
+    col_qty = df.columns[18]    # Kolom S
+    
+    # Filter & Pisahkan QTY Sales berdasarkan store (Online vs Offline)
+    df['SALES_ONLINE'] = np.where(df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    df['SALES_OFFLINE'] = np.where(~df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    
+    # Grouping per Unique SKU (Kolom AA)
+    df_summary = df.groupby(col_sku).agg({
+        'SALES_ONLINE': 'sum',
+        'SALES_OFFLINE': 'sum'
+    }).reset_index()
+    
+    df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
+    return df_summary
+
+def calculate_dynamic_proportion(row):
+    """
+    Menghitung persentase alokasi proporsional berdasarkan sales 90 hari terakhir.
+    """
+    total = row['TOTAL_SALES']
+    if total == 0:
+        # Jika tidak ada penjualan, amankan 80% di Logistik Utama
+        return 0.10, 0.10, 0.80 
+    
+    pct_online = row['SALES_ONLINE'] / total
+    pct_offline = row['SALES_OFFLINE'] / total
+    
+    if pct_online > 0.7:      # Dominan Online
+        return 0.70, 0.10, 0.20
+    elif pct_offline > 0.7:   # Dominan Offline
+        return 0.10, 0.70, 0.20
+    else:                     # Balanced / Imbang
+        return 0.40, 0.40, 0.20
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "STOCK ALLOCATION"
+# ==============================================================================
+
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import numpy as np
+
+# Custom CSS Premium Dark Theme Card layout
+st.markdown("""
+    <style>
+        .reportview-container { background: #0f111a; }
+        .main { background-color: #0f111a; color: #ffffff; }
+        h1, h2, h3 { color: #C5A059 !important; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Premium Metric Box Custom Styling */
+        .metric-card {
+            background: linear-gradient(135deg, #16192b 0%, #1e223d 100%) !important;
+            border-left: 4px solid #C5A059 !important;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        .metric-title { color: #8e94a6; font-size: 12px; text-transform: uppercase; font-weight: bold; }
+        .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
+    </style>
+""", unsafe_allow_html=True)
+
+
+def clean_and_process_sales(df_sales):
+    """
+    Membersihkan data sales: mengubah qty ke numerik, 
+    mengabaikan nilai '-', dan memisahkan sales Online vs Offline.
+    """
+    df = df_sales.copy()
+    
+    # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
+    df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
+    
+    col_store = df.columns[0]   # Kolom A
+    col_sku = df.columns[26]    # Kolom AA
+    col_qty = df.columns[18]    # Kolom S
+    
+    df['SALES_ONLINE'] = np.where(df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    df['SALES_OFFLINE'] = np.where(~df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    
+    df_summary = df.groupby(col_sku).agg({
+        'SALES_ONLINE': 'sum',
+        'SALES_OFFLINE': 'sum'
+    }).reset_index()
+    
+    df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
+    return df_summary
+
+def calculate_dynamic_proportion(row):
+    """
+    Menghitung persentase alokasi proporsional berdasarkan sales 90 hari terakhir.
+    """
+    total = row['TOTAL_SALES']
+    if total == 0:
+        return 0.10, 0.10, 0.80 
+    
+    pct_online = row['SALES_ONLINE'] / total
+    pct_offline = row['SALES_OFFLINE'] / total
+    
+    if pct_online > 0.7:
+        return 0.70, 0.10, 0.20
+    elif pct_offline > 0.7:
+        return 0.10, 0.70, 0.20
+    else:
+        return 0.40, 0.40, 0.20
+
+def generate_stock_allocation(df_stock, df_sales_summary):
+    """
+    Menggabungkan data stock gudang dengan ringkasan sales, 
+    lakukan alokasi, dan hitung final QTY per area gudang.
+    """
+    df_stk = df_stock.copy()
+    
+    # Mapping nama kolom berdasarkan index
+    col_bin = df_stk.columns[1]   # Kolom B
+    col_sku = df_stk.columns[2]   # Kolom C
+    col_qty = df_stk.columns[9]   # Kolom J
+    
+    # Satukan data stock dengan summary sales per SKU
+    sales_sku_col = df_sales_summary.columns[0]
+    df_merged = pd.merge(df_stk, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
+    
+    # Hitung proporsi persentase (Fungsi penunjang sudah didefinisikan di atas)
+    proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
+    df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
+    df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
+    df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
+    
+    # Hitung Final QTY per Lokasi (Mencegah pecahan desimal gudang)
+    df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
+    df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
+    
+    # Logistik mengambil sisa pembulatan agar total stock tetap 100% akurat
+    df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
+    
+    # Rapikan output kolom utama untuk user
+    output_cols = [col_bin, col_sku, col_qty, 'SALES_ONLINE', 'SALES_OFFLINE', 'QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']
+    return df_merged[output_cols]
+
+
+def menu_allocation_stock():
+    """
+    Interface Khusus untuk Menu Alokasi Stok Gudang (Online, Offline, Logistik)
+    """
+    st.markdown("<h1>⚡ DYNAMIC STOCK ALLOCATION SYSTEM</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#8e94a6;'>Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir</p>", unsafe_allow_html=True)
+    st.write("---")
+
+    # Layout Kolom Input untuk Upload File Excel
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("📥 Upload Data Master Stock")
+        st.caption("Spesifikasi Kolom: B (BIN), C (SKU), J (QTY Master)")
+        file_stock = st.file_uploader("Pilih file Excel Stock (.xlsx)", type=["xlsx"], key="stock")
+
+    with col2:
+        st.subheader("📥 Upload Data Sales 90 Hari")
+        st.caption("Spesifikasi Kolom: A (STORE), AA (SKU), S (QTY Sales)")
+        file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
+
+    # Eksekusi Proses jika kedua file sudah di-upload
+    if file_stock and file_sales:
+        try:
+            df_stock_raw = pd.read_excel(file_stock)
+            df_sales_raw = pd.read_excel(file_sales)
+            
+            st.success("✅ Kedua file berhasil dimuat ke sistem. Siap diproses!")
+            
+            if st.button("🚀 HITUNG PEMBAGIAN ALOKASI STOK", use_container_width=True):
+                with st.spinner("Sedang memproses algoritma dynamic allocation..."):
+                    
+                    # --- CORE PROCESSOR LOGIC ---
+                    df_sales_summary = clean_and_process_sales(df_sales_raw)
+                    df_final_allocation = generate_stock_allocation(df_stock_raw, df_sales_summary)
+                    
+                    # --- INTERFACING METRICS ---
+                    st.write("### 📊 Ringkasan Total Alokasi Unit")
+                    m1, m2, m3, m4 = st.columns(4)
+                    
+                    col_stock_qty = df_final_allocation.columns[2] # Kolom J asli hasil filter output_cols
+                    total_stock = df_final_allocation[col_stock_qty].sum()
+                    
+                    with m1:
+                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Total Stock Master</div><div class='metric-value'>{total_stock:,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    with m2:
+                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Online</div><div class='metric-value'>{df_final_allocation['QTY_ONLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    with m3:
+                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Offline</div><div class='metric-value'>{df_final_allocation['QTY_OFFLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    with m4:
+                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Logistik</div><div class='metric-value'>{df_final_allocation['QTY_LOGISTIK'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    
+                    # --- INTERFACING DATAFRAME ---
+                    st.write("### 📋 Preview Hasil Pembagian per SKU")
+                    st.dataframe(df_final_allocation, use_container_width=True)
+                    
+                    # --- DOWNLOAD BUTTON ---
+                    @st.cache_data
+                    def convert_df(df):
+                        return df.to_csv(index=False).encode('utf-8')
+                        
+                    csv_data = convert_df(df_final_allocation)
+                    st.download_button(
+                        label="💾 DOWNLOAD HASIL ALOKASI (.CSV)",
+                        data=csv_data,
+                        file_name="Hasil_Alokasi_Stock_Dynamic.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                    
+        except Exception as e:
+            st.error(f"Terjadi kesalahan pembacaan kolom struktur file: {str(e)}")
+            st.info("💡 Pastikan urutan kolom di Excel Anda sudah sesuai: Stock (B, C, J) & Sales (A, AA, S)")
+    else:
+        st.info("💡 Silakan upload kedua file Excel di atas terlebih dahulu untuk memulai perhitungan alokasi.")
+
+
 
 # ==============================================================================
 # LOGIC PROSES MENU "STOCK TRACKING TIMELINE"
 # ==============================================================================
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
 st.markdown("""
     <style>
     .reportview-container { background: #0e1117; }
@@ -5760,9 +6003,9 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
 
 
 # ==============================================================================
-# LOGIC PROSES MENU "PUTAWAY SYSTEM"
+# LOGIC PROSES MENU "PUTAWAY SYSTEM" (UPDATED)
 # ==============================================================================
-def putaway_system(df_ds, df_asal):
+def putaway_system(df_ds, df_asal, area_pilihan):
     if df_ds is None or df_asal is None:
         empty = pd.DataFrame()
         return empty, empty, empty, empty, empty, empty
@@ -5841,13 +6084,9 @@ def putaway_system(df_ds, df_asal):
             if key in bin_qty_dict:
                 df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
 
-        # --- INI BAGIAN YANG TADI HILANG / BERUBAH ---
         df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
         if not df_plist.empty:
-            df_plist = df_plist.rename(columns={
-                "BIN DITEMUKAN": "BIN AWAL", 
-                "BIN ASAL": "BIN TUJUAN"
-            })
+            df_plist = df_plist.rename(columns={"BIN DITEMUKAN": "BIN AWAL", "BIN ASAL": "BIN TUJUAN"})
             df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
             df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
             df_plist['NOTES'] = "PUTAWAY"
@@ -5856,14 +6095,26 @@ def putaway_system(df_ds, df_asal):
 
         df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
         
-        # --- STAGGING & PUTAWAY OUTSTANDING ---
-        mask_out = (
-            (df_asal_updated.iloc[:, c_qty_a] > 0) & 
-            (
-                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("STAG", na=False) | 
-                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("PUTAWAY", na=False)
-            )
-        )
+        # --- LOGIC FILTER KEYWORD OUTSTANDING DINAMIS ---
+        # Menentukan list keyword berdasarkan pilihan dropdown area
+        if area_pilihan == "DC LANTAI 1":
+            keywords_outstanding = ["GL1-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "DC LANTAI 2":
+            keywords_outstanding = ["GL2-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "DC LANTAI 3":
+            keywords_outstanding = ["GL3-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "JERSEY ZONE":
+            keywords_outstanding = ["JZ-PUTAWAY", "STAG"] # Sesuaikan dengan format kode BIN Jersey Zone Anda
+        else:
+            keywords_outstanding = ["STAG", "PUTAWAY"] # Fallback default
+
+        # Bikin kondisi masking dengan loop keyword area
+        bin_series = df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper()
+        mask_keyword = bin_series.str.contains(keywords_outstanding[0], na=False)
+        for kw in keywords_outstanding[1:]:
+            mask_keyword = mask_keyword | bin_series.str.contains(kw, na=False)
+
+        mask_out = (df_asal_updated.iloc[:, c_qty_a] > 0) & mask_keyword
         df_outstanding = df_asal_updated[mask_out].copy()
 
         return df_comp, df_plist, df_kurang, df_comp, df_outstanding, df_asal_updated
@@ -10104,7 +10355,7 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     if is_dc:
-        m3_list = ["Stock Opname","Match Real & System","Cycle Count","Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill"]
+        m3_list = ["Stock Opname","Match Real & System","Cycle Count","Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill", "Stock Allocation"]
     else:
         m3_list = ["Stock Minus","Cycle Count","Compare System", "Justification SO"] # Menu Cabang
 
@@ -10164,13 +10415,11 @@ if 'putaway_results' not in st.session_state:
 
 
 # ==============================================================================
-# LOGIC INTERFACE MENU "PUTAWAY SYSTEM"
+# LOGIC INTERFACE MENU "PUTAWAY SYSTEM" (UPDATED)
 # ==============================================================================
-# --- UI APP ---
 if menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     
-    # --- CSS ---
     st.markdown("""
         <style>
         .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; border: 1px solid #e0e0e0; }
@@ -10194,101 +10443,56 @@ if menu == "Putaway System":
         - List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan
         """)
     
-    c1, c2 = st.columns(2)
-    with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
-    with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
+   # --- DROPDOWN PILIHAN AREA (DEFAULT KOSONG & TANPA LABEL) ---
+    st.markdown("### 📍 Pilih Area Putaway")
+    pilihan_area = st.selectbox(
+        "", # Mengosongkan label bawaan selectbox
+        ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
+        index=None,  
+        placeholder="-- Pilih Area Putaway --",
+        key="area_putaway",
+        label_visibility="collapsed" # Menyembunyikan space kosong bekas label biar makin rapi
+    )
+    
 
-    # BARU MASUK KE BLOK YANG LU TULIS TADI
-    if up_ds and up_asal:
-        if st.button("▶️ COMPARE PUTAWAY"):
-            # ... kode yang lu kirim tadi ...
-            try:
-                # 1. LOAD DATA
-                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
-                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
-                
-                # 2. DEFINISIKAN TOTAL AWAL (Ambil Kolom J / Index 9)
-                # Taruh baris ini sebelum masuk ke 'res' atau 'session_state'
-                total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
-                
-                # 3. PROSES FUNGSI
-                res = putaway_system(df_ds_p, df_asal_p)
-                
-                # 4. SIMPAN KE SESSION STATE
-                st.session_state['putaway_results'] = {
-                    'df_comp': res[0],
-                    'df_plist': res[1],  # Ini List Setup yang kolomnya sudah bersih
-                    'df_kurang': res[2],
-                    'df_sum': res[3],
-                    'df_lt3': res[4],
-                    'df_updated_bin': res[5],
-                    'total_awal': total_awal  # Sekarang variabel ini sudah dikenal
-                }
-                st.success("✅ Proses Putaway Selesai!")
-                
-            except Exception as e:
-                st.error(f"Gagal saat memproses: {e}")
+    # --- FILE UPLOADER HANYA MUNCUL JIKA AREA SUDAH DIPILIH ---
+    if pilihan_area:
+        st.info(f"📍 Area Terpilih: **{pilihan_area}**")
+        
+        c1, c2 = st.columns(2)
+        with c1: up_ds = st.file_uploader("📥 Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
+        with c2: up_asal = st.file_uploader("📥 Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
 
-    # --- TAMPILKAN HASIL (Jika sudah diproses) ---
-    if st.session_state['putaway_results'] is not None:
-        r = st.session_state['putaway_results']
-        
-        st.divider()
-        st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
-        
-        # --- HITUNG METRICS ---
-        
-        # 1. Gunakan 'total_awal' yang sudah disimpan di session state (Angka 278)
-        total_compare_qty = r.get('total_awal', 0)
-        
-        # 2. Total yang berhasil tersetup
-        total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
-        
-        # 3. Total yang gagal/kurang setup
-        total_kurang_qty = int(r['df_kurang']['DIFF'].sum()) if not r['df_kurang'].empty else 0
-        
-        # 4. Outstanding (Sisa di Staging/Putaway System)
-        lt3_total_qty = 0
-        if not r['df_lt3'].empty:
-            qty_col = [c for c in r['df_lt3'].columns if 'qty' in str(c).lower()]
-            if qty_col:
-                lt3_total_qty = int(r['df_lt3'][qty_col[0]].sum())
-
-        # --- TAMPILKAN METRICS BOX ---
-        m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sytem Putaway</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">Total Tersetup</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Stok Putaway</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
-
-    # ... (Sisa kode Tabs dan Download tetap sama)        # --- TABS HASIL ---
-        t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 Outstanding"])
-        
-        with t1: st.dataframe(r['df_comp'], use_container_width=True)
-        with t2: st.dataframe(r['df_plist'], use_container_width=True)
-        with t3: 
-            if not r['df_kurang'].empty: st.dataframe(r['df_kurang'], use_container_width=True)
-            else: st.success("✅ Semua Tercover!")
-        with t4: 
-            if not r['df_lt3'].empty: st.dataframe(r['df_lt3'], use_container_width=True)
-            else: st.success("✅ Tidak ada Outstanding!")
-
-        # --- TOMBOL DOWNLOAD (Excel) ---
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            r['df_comp'].to_excel(writer, sheet_name='COMPARE', index=False)
-            r['df_plist'].to_excel(writer, sheet_name='PUTAWAY_LIST', index=False)
-            r['df_kurang'].to_excel(writer, sheet_name='KURANG_SETUP', index=False)
-            r['df_lt3'].to_excel(writer, sheet_name='OUTSTANDING', index=False)
-            r['df_updated_bin'].to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
-        
-        st.download_button(
-            label="📥 DOWNLOAD REPORT",
-            data=output.getvalue(),
-            file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
+        if up_ds and up_asal:
+            if st.button("▶️ COMPARE PUTAWAY"):
+                try:
+                    # 1. LOAD DATA
+                    df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
+                    df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
+                    
+                    # 2. DEFINISIKAN TOTAL AWAL
+                    total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
+                    
+                    # 3. PROSES FUNGSI
+                    res = putaway_system(df_ds_p, df_asal_p, pilihan_area)
+                    
+                    # 4. SIMPAN KE SESSION STATE
+                    st.session_state['putaway_results'] = {
+                        'df_comp': res[0],
+                        'df_plist': res[1],  
+                        'df_kurang': res[2],
+                        'df_sum': res[3],
+                        'df_lt3': res[4], 
+                        'df_updated_bin': res[5],
+                        'total_awal': total_awal  
+                    }
+                    st.success(f"✅ Proses Putaway untuk {pilihan_area} Selesai!")
+                    
+                except Exception as e:
+                    st.error(f"Gagal saat memproses: {e}")
+    else:
+        # Peringatan kalau belum pilih area
+        st.warning("⚠️ Silakan pilih Area Putaway di atas terlebih dahulu untuk menampilkan form upload file.")
 
 # ==============================================================================
 # LOGIC INTERFACE MENU "COMPARE SYSTEM"
@@ -11828,6 +12032,9 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "Stock Allocation":
+    menu_allocation_stock()
 
 elif menu == "Putaway & Picking Audit List":
     menu_picking_putaway_audit()
