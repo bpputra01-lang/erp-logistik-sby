@@ -3442,40 +3442,32 @@ import numpy as np
 
     # Custom CSS Premium Dark Theme Card layout
     st.markdown("""
-            <div style="
-                background: linear-gradient(135deg, #1b3a70 0%, #132952 100%);
-                padding: 24px 30px;
-                border-radius: 12px;
-                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-                margin-bottom: 25px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            ">
-                <h1 style="
-                    color: #C5A059 !important; 
-                    margin: 0 !important; 
-                    padding: 0 !important;
-                    font-family: 'Segoe UI', sans-serif;
-                    font-size: 32px;
-                    font-weight: 800;
-                    letter-spacing: 1px;
-                    display: flex;
-                    align-items: center;
-                    gap: 15px;
-                ">
-                    STOCK ALLOCATION SYSTEM
-                </h1>
-                <p style="
-                    color: #a5b4fc; 
-                    margin: 8px 0 0 0 !important; 
-                    padding: 0 !important;
-                    font-size: 14px;
-                    font-family: 'Segoe UI', sans-serif;
-                    opacity: 0.9;
-                ">
-            </div>
-        """, unsafe_allow_html=True)
+        <style>
+            .reportview-container { background: #0f111a; }
+            .main { background-color: #0f111a; color: #ffffff; }
+            
+            /* Premium Metric Box Custom Styling */
+            .metric-card {
+                background: linear-gradient(135deg, #16192b 0%, #1e223d 100%) !important;
+                border-left: 4px solid #C5A059 !important;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                margin-bottom: 20px;
+            }
+            .metric-title { color: #8e94a6; font-size: 12px; text-transform: uppercase; font-weight: bold; }
+            .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
+            
+            /* Custom Subheader Styling */
+            .sub-title {
+                color: #C5A059 !important;
+                font-family: 'Segoe UI', sans-serif;
+                font-size: 20px;
+                font-weight: 600;
+                margin-bottom: 5px;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
 
 def clean_and_process_sales(df_sales):
