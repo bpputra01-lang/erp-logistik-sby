@@ -3374,13 +3374,256 @@ def menu_Stock_Opname():
 
     download_section()
 
+
+# ==============================================================================
+# LOGIC PROCESS MENU "STOCK ALLOCATION"
+# ==============================================================================
+
+
+import pandas as pd
+import numpy as np
+
+def clean_and_process_sales(df_sales):
+    """
+    Membersihkan data sales: mengubah qty ke numerik, 
+    mengabaikan nilai '-', dan memisahkan sales Online vs Offline.
+    """
+    # Salin dataframe agar tidak merubah data asli
+    df = df_sales.copy()
+    
+    # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
+    df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
+    
+    # Identifikasi nama kolom berdasarkan index untuk mempermudah logic
+    col_store = df.columns[0]   # Kolom A
+    col_sku = df.columns[26]    # Kolom AA
+    col_qty = df.columns[18]    # Kolom S
+    
+    # Filter & Pisahkan QTY Sales berdasarkan store (Online vs Offline)
+    df['SALES_ONLINE'] = np.where(df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    df['SALES_OFFLINE'] = np.where(~df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    
+    # Grouping per Unique SKU (Kolom AA)
+    df_summary = df.groupby(col_sku).agg({
+        'SALES_ONLINE': 'sum',
+        'SALES_OFFLINE': 'sum'
+    }).reset_index()
+    
+    df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
+    return df_summary
+
+def calculate_dynamic_proportion(row):
+    """
+    Menghitung persentase alokasi proporsional berdasarkan sales 90 hari terakhir.
+    """
+    total = row['TOTAL_SALES']
+    if total == 0:
+        # Jika tidak ada penjualan, amankan 80% di Logistik Utama
+        return 0.10, 0.10, 0.80 
+    
+    pct_online = row['SALES_ONLINE'] / total
+    pct_offline = row['SALES_OFFLINE'] / total
+    
+    if pct_online > 0.7:      # Dominan Online
+        return 0.70, 0.10, 0.20
+    elif pct_offline > 0.7:   # Dominan Offline
+        return 0.10, 0.70, 0.20
+    else:                     # Balanced / Imbang
+        return 0.40, 0.40, 0.20
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "STOCK ALLOCATION"
+# ==============================================================================
+
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import numpy as np
+
+# Custom CSS Premium Dark Theme Card layout
+st.markdown("""
+    <style>
+        .reportview-container { background: #0f111a; }
+        .main { background-color: #0f111a; color: #ffffff; }
+        h1, h2, h3 { color: #C5A059 !important; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Premium Metric Box Custom Styling */
+        .metric-card {
+            background: linear-gradient(135deg, #16192b 0%, #1e223d 100%) !important;
+            border-left: 4px solid #C5A059 !important;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        .metric-title { color: #8e94a6; font-size: 12px; text-transform: uppercase; font-weight: bold; }
+        .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
+    </style>
+""", unsafe_allow_html=True)
+
+
+def clean_and_process_sales(df_sales):
+    """
+    Membersihkan data sales: mengubah qty ke numerik, 
+    mengabaikan nilai '-', dan memisahkan sales Online vs Offline.
+    """
+    df = df_sales.copy()
+    
+    # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
+    df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
+    
+    col_store = df.columns[0]   # Kolom A
+    col_sku = df.columns[26]    # Kolom AA
+    col_qty = df.columns[18]    # Kolom S
+    
+    df['SALES_ONLINE'] = np.where(df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    df['SALES_OFFLINE'] = np.where(~df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
+    
+    df_summary = df.groupby(col_sku).agg({
+        'SALES_ONLINE': 'sum',
+        'SALES_OFFLINE': 'sum'
+    }).reset_index()
+    
+    df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
+    return df_summary
+
+def calculate_dynamic_proportion(row):
+    """
+    Menghitung persentase alokasi proporsional berdasarkan sales 90 hari terakhir.
+    """
+    total = row['TOTAL_SALES']
+    if total == 0:
+        return 0.10, 0.10, 0.80 
+    
+    pct_online = row['SALES_ONLINE'] / total
+    pct_offline = row['SALES_OFFLINE'] / total
+    
+    if pct_online > 0.7:
+        return 0.70, 0.10, 0.20
+    elif pct_offline > 0.7:
+        return 0.10, 0.70, 0.20
+    else:
+        return 0.40, 0.40, 0.20
+
+def generate_stock_allocation(df_stock, df_sales_summary):
+    """
+    Menggabungkan data stock gudang dengan ringkasan sales, 
+    lakukan alokasi, dan hitung final QTY per area gudang.
+    """
+    df_stk = df_stock.copy()
+    
+    # Mapping nama kolom berdasarkan index
+    col_bin = df_stk.columns[1]   # Kolom B
+    col_sku = df_stk.columns[2]   # Kolom C
+    col_qty = df_stk.columns[9]   # Kolom J
+    
+    # Satukan data stock dengan summary sales per SKU
+    sales_sku_col = df_sales_summary.columns[0]
+    df_merged = pd.merge(df_stk, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
+    
+    # Hitung proporsi persentase (Fungsi penunjang sudah didefinisikan di atas)
+    proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
+    df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
+    df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
+    df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
+    
+    # Hitung Final QTY per Lokasi (Mencegah pecahan desimal gudang)
+    df_merged['QTY_ONLINE'] = (df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
+    df_merged['QTY_OFFLINE'] = (df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
+    
+    # Logistik mengambil sisa pembulatan agar total stock tetap 100% akurat
+    df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
+    
+    # Rapikan output kolom utama untuk user
+    output_cols = [col_bin, col_sku, col_qty, 'SALES_ONLINE', 'SALES_OFFLINE', 'QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']
+    return df_merged[output_cols]
+
+
+def menu_allocation_stock():
+    """
+    Interface Khusus untuk Menu Alokasi Stok Gudang (Online, Offline, Logistik)
+    """
+    st.markdown("<h1>⚡ DYNAMIC STOCK ALLOCATION SYSTEM</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#8e94a6;'>Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir</p>", unsafe_allow_html=True)
+    st.write("---")
+
+    # Layout Kolom Input untuk Upload File Excel
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("📥 Upload Data Master Stock")
+        st.caption("Spesifikasi Kolom: B (BIN), C (SKU), J (QTY Master)")
+        file_stock = st.file_uploader("Pilih file Excel Stock (.xlsx)", type=["xlsx"], key="stock")
+
+    with col2:
+        st.subheader("📥 Upload Data Sales 90 Hari")
+        st.caption("Spesifikasi Kolom: A (STORE), AA (SKU), S (QTY Sales)")
+        file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
+
+    # Eksekusi Proses jika kedua file sudah di-upload
+    if file_stock and file_sales:
+        try:
+            df_stock_raw = pd.read_excel(file_stock)
+            df_sales_raw = pd.read_excel(file_sales)
+            
+            st.success("✅ Kedua file berhasil dimuat ke sistem. Siap diproses!")
+            
+            if st.button("🚀 HITUNG PEMBAGIAN ALOKASI STOK", use_container_width=True):
+                with st.spinner("Sedang memproses algoritma dynamic allocation..."):
+                    
+                    # --- CORE PROCESSOR LOGIC ---
+                    df_sales_summary = clean_and_process_sales(df_sales_raw)
+                    df_final_allocation = generate_stock_allocation(df_stock_raw, df_sales_summary)
+                    
+                    # --- INTERFACING METRICS ---
+                    st.write("### 📊 Ringkasan Total Alokasi Unit")
+                    m1, m2, m3, m4 = st.columns(4)
+                    
+                    col_stock_qty = df_final_allocation.columns[2] # Kolom J asli hasil filter output_cols
+                    total_stock = df_final_allocation[col_stock_qty].sum()
+                    
+                    with m1:
+                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Total Stock Master</div><div class='metric-value'>{total_stock:,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    with m2:
+                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Online</div><div class='metric-value'>{df_final_allocation['QTY_ONLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    with m3:
+                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Offline</div><div class='metric-value'>{df_final_allocation['QTY_OFFLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    with m4:
+                        st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Logistik</div><div class='metric-value'>{df_final_allocation['QTY_LOGISTIK'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    
+                    # --- INTERFACING DATAFRAME ---
+                    st.write("### 📋 Preview Hasil Pembagian per SKU")
+                    st.dataframe(df_final_allocation, use_container_width=True)
+                    
+                    # --- DOWNLOAD BUTTON ---
+                    @st.cache_data
+                    def convert_df(df):
+                        return df.to_csv(index=False).encode('utf-8')
+                        
+                    csv_data = convert_df(df_final_allocation)
+                    st.download_button(
+                        label="💾 DOWNLOAD HASIL ALOKASI (.CSV)",
+                        data=csv_data,
+                        file_name="Hasil_Alokasi_Stock_Dynamic.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                    
+        except Exception as e:
+            st.error(f"Terjadi kesalahan pembacaan kolom struktur file: {str(e)}")
+            st.info("💡 Pastikan urutan kolom di Excel Anda sudah sesuai: Stock (B, C, J) & Sales (A, AA, S)")
+    else:
+        st.info("💡 Silakan upload kedua file Excel di atas terlebih dahulu untuk memulai perhitungan alokasi.")
+
+
 
 # ==============================================================================
 # LOGIC PROSES MENU "STOCK TRACKING TIMELINE"
 # ==============================================================================
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
 st.markdown("""
     <style>
     .reportview-container { background: #0e1117; }
@@ -4042,6 +4285,372 @@ def main_menu_routing():
                 )
             else:
                 st.button("📊 Download Master Report (All SKU)", disabled=True, help="Data log transaksi kosong.")
+
+
+
+# ==============================================================================
+# LOGIC PROSES MENU "PUTAWAY & PICKING AUDIT LIST"
+# ==============================================================================
+
+def read_file(uploaded_file, header_mode=None):
+    """Membaca file CSV atau Excel"""
+    try:
+        if uploaded_file.name.endswith('.csv'):
+            return pd.read_csv(uploaded_file, header=header_mode)
+        else:
+            return pd.read_excel(uploaded_file, header=header_mode)
+    except Exception as e:
+        st.error(f"Gagal membaca file {uploaded_file.name}: {e}")
+        return None
+
+
+def process_mutation_chain(df):
+    """Memproses rantai perjalanan SKU berdasarkan urutan waktu kronologis (Putaway Audit)."""
+    processed_records = []
+    
+    # Grouping per SKU
+    for sku, group in df.groupby('SKU', sort=False):
+        group_sorted = group.sort_values(by='WAKTU', ascending=True)
+        active_chains = []
+        
+        for idx, row in group_sorted.iterrows():
+            bin_awal = str(row['BIN AWAL']).strip()
+            bin_tujuan = str(row['BIN TUJUAN']).strip()
+            
+            if not bin_awal or not bin_tujuan or bin_awal.lower() == 'nan' or bin_tujuan.lower() == 'nan':
+                continue
+                
+            matched = False
+            for chain in active_chains:
+                if chain['current_bin'] == bin_awal:
+                    chain['current_bin'] = bin_tujuan
+                    chain['history'].append(bin_tujuan)
+                    matched = True
+                    break
+            
+            if not matched:
+                active_chains.append({
+                    'current_bin': bin_tujuan,
+                    'history': [bin_awal, bin_tujuan]
+                })
+        
+        for chain in active_chains:
+            processed_records.append({
+                'SKU': sku,
+                'BIN AWAL': chain['history'][0],
+                'LAST BIN MUTASI': chain['current_bin'],
+                'TOTAL PERJALANAN': len(chain['history']) - 1,
+                'ALUR MUTASI': " ➔ ".join(chain['history'])
+            })
+            
+    if not processed_records:
+        return pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
+        
+    return pd.DataFrame(processed_records)
+
+
+def process_picking_audit(df_sales_raw, df_rto_raw):
+    """Memproses data Sales & RTO (Picking Audit)."""
+    combined_list = []
+    
+    # 1. Olah Data Sales
+    if df_sales_raw is not None:
+        try:
+            if df_sales_raw.shape[1] > 10:
+                df_sales = df_sales_raw.iloc[:, [1, 6, 10]].copy()
+                df_sales.columns = ['SKU', 'BIN', 'QTY']
+                
+                df_sales['SKU'] = df_sales['SKU'].astype(str).str.strip()
+                df_sales['BIN'] = df_sales['BIN'].astype(str).str.strip()
+                df_sales['QTY'] = pd.to_numeric(df_sales['QTY'], errors='coerce').fillna(0)
+                
+                df_sales = df_sales[
+                    (df_sales['SKU'] != '') & 
+                    (df_sales['BIN'] != '') & 
+                    (df_sales['SKU'].str.upper() != 'SKU')
+                ]
+                
+                df_sales = df_sales.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                df_sales['SOURCE'] = 'SALES'
+                combined_list.append(df_sales)
+            else:
+                st.error("File Sales kurang kolom (butuh minimal hingga Kolom K).")
+        except Exception as e:
+            st.error(f"Gagal memproses file Sales! Error: {e}")
+
+    # 2. Olah Data RTO
+    if df_rto_raw is not None:
+        try:
+            if df_rto_raw.shape[1] > 8:
+                df_rto = df_rto_raw.iloc[:, [3, 7, 8]].copy()
+                df_rto.columns = ['SKU', 'QTY', 'BIN']
+                df_rto = df_rto[['SKU', 'BIN', 'QTY']]
+                
+                df_rto['SKU'] = df_rto['SKU'].astype(str).str.strip()
+                df_rto['BIN'] = df_rto['BIN'].astype(str).str.strip()
+                df_rto['QTY'] = pd.to_numeric(df_rto['QTY'], errors='coerce').fillna(0)
+                
+                df_rto = df_rto[
+                    (df_rto['SKU'] != '') & 
+                    (df_rto['BIN'] != '') & 
+                    (df_rto['SKU'].str.upper() != 'SKU')
+                ]
+                
+                df_rto = df_rto.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                df_rto['SOURCE'] = 'RTO'
+                combined_list.append(df_rto)
+            else:
+                st.error("File RTO kurang kolom (butuh minimal hingga Kolom I).")
+        except Exception as e:
+            st.error(f"Gagal memproses file RTO! Error: {e}")
+
+    if not combined_list:
+        return pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
+
+    df_final = pd.concat(combined_list, ignore_index=True)
+    df_final = df_final[df_final['QTY'] > 0].reset_index(drop=True)
+    return df_final
+
+
+# ==============================================================================
+# LOGIC INTERFACE MENU "PUTAWAY & PICKING AUDIT LIST"
+# ==============================================================================
+
+def menu_picking_putaway_audit():
+    """
+    Fungsi utama menu Integrated Picking & Putaway Audit.
+    Mencakup 3 Uploader (Sales, RTO, Mutasi) & 5 Tab Hasil Analisis.
+    """
+    # Styling Header Badge & Metric
+    st.markdown("""
+        <style>
+            .header-badge {
+                background: linear-gradient(180deg, #2D58A6 0%, #1A3C78 100%);
+                color: white;
+                font-family: 'Source Sans Pro', sans-serif;
+                font-size: 26px;
+                font-weight: 700;
+                padding: 15px 30px;
+                border-radius: 12px;
+                display: inline-block;
+                margin-bottom: 20px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+            }
+            .stMetric {
+                background-color: #f8f9fa;
+                padding: 10px;
+                border-radius: 8px;
+                border: 1px solid #e9ecef;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Header
+    st.markdown('<div class="header-badge">PUTAWAY & PICKING AUDIT LIST</div>', unsafe_allow_html=True)
+
+    # Inisialisasi Session State
+    if 'df_picking_res' not in st.session_state:
+        st.session_state['df_picking_res'] = None
+    if 'df_putaway_res' not in st.session_state:
+        st.session_state['df_putaway_res'] = None
+
+    # --------------------------------------------------------------------------
+    # SECTION 1: TRIPLE FILE UPLOADER (Sales, RTO, Mutasi)
+    # --------------------------------------------------------------------------
+    col_up1, col_up2, col_up3 = st.columns(3)
+
+    with col_up1:
+        file_sales = st.file_uploader("1. File Sales (Excel / CSV)", type=["xlsx", "xls", "csv"], key="sales_up")
+
+    with col_up2:
+        file_rto = st.file_uploader("2. File RTO (Excel / CSV)", type=["xlsx", "xls", "csv"], key="rto_up")
+
+    with col_up3:
+        file_mutasi = st.file_uploader("3. File Mutasi (Excel / CSV)", type=["xlsx", "xls", "csv"], key="mutasi_up")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # --------------------------------------------------------------------------
+    # TOMBOL EKSEKUSI PROCESS
+    # --------------------------------------------------------------------------
+    if st.button("▶️ RUN PROCESS", type="primary", use_container_width=True):
+        if not file_sales and not file_rto and not file_mutasi:
+            st.warning("⚠️ Harap upload setidaknya salah satu file untuk diproses!")
+        else:
+            with st.spinner("Sedang memproses seluruh data audit..."):
+                
+                # --- 1. PROSES DATA PICKING (Sales & RTO) ---
+                df_sales_raw = read_file(file_sales, header_mode=None) if file_sales else None
+                df_rto_raw = read_file(file_rto, header_mode=None) if file_rto else None
+                
+                if df_sales_raw is not None or df_rto_raw is not None:
+                    st.session_state['df_picking_res'] = process_picking_audit(df_sales_raw, df_rto_raw)
+                else:
+                    st.session_state['df_picking_res'] = pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
+
+                # --- 2. PROSES DATA PUTAWAY (Mutasi) ---
+                if file_mutasi:
+                    try:
+                        df_mutasi_raw = read_file(file_mutasi, header_mode=0)
+                        # Ambil Kolom A (0), D (3), I (8), M (12)
+                        df_mutasi = df_mutasi_raw.iloc[:, [0, 3, 8, 12]].copy()
+                        df_mutasi.columns = ['WAKTU', 'SKU', 'BIN AWAL', 'BIN TUJUAN']
+                        
+                        df_mutasi['WAKTU'] = pd.to_datetime(df_mutasi['WAKTU'], errors='coerce')
+                        df_mutasi = df_mutasi.sort_values(by=['SKU', 'WAKTU'], ascending=[True, True]).reset_index(drop=True)
+                        
+                        df_mutasi = df_mutasi.dropna(subset=['SKU'])
+                        df_mutasi['BIN AWAL'] = df_mutasi['BIN AWAL'].fillna('')
+                        df_mutasi['BIN TUJUAN'] = df_mutasi['BIN TUJUAN'].fillna('')
+                        
+                        df_mutasi = df_mutasi[(df_mutasi['BIN AWAL'].astype(str).str.strip() != '') & 
+                                              (df_mutasi['BIN TUJUAN'].astype(str).str.strip() != '')]
+                        
+                        st.session_state['df_putaway_res'] = process_mutation_chain(df_mutasi).drop_duplicates().reset_index(drop=True)
+                    except Exception as e:
+                        st.error(f"Gagal memproses file Mutasi! Error: {e}")
+                else:
+                    st.session_state['df_putaway_res'] = pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
+
+                st.success("✅ Seluruh proses audit berhasil dijalankan!")
+
+    # --------------------------------------------------------------------------
+    # SECTION 2: DISPLAY RESULTS (5 TABS)
+    # --------------------------------------------------------------------------
+    if st.session_state['df_picking_res'] is not None or st.session_state['df_putaway_res'] is not None:
+        st.divider()
+        
+        df_picking = st.session_state['df_picking_res'] if st.session_state['df_picking_res'] is not None else pd.DataFrame()
+        df_putaway = st.session_state['df_putaway_res'] if st.session_state['df_putaway_res'] is not None else pd.DataFrame()
+        
+        # DEFINISI 5 TAB
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "📋 DETAIL PICKING AUDIT", 
+            "🎯 UNIQUE BIN PICKING", 
+            "📋 DETAIL PUTAWAY AUDIT", 
+            "🎯 UNIQUE LAST BIN PUTAWAY",
+            "✅ FINAL LIST (MATCH BIN)"
+        ])
+
+        # ----------------------------------------------------------------------
+        # TAB 1: DETAIL PICKING AUDIT
+        # ----------------------------------------------------------------------
+        with tab1:
+            st.subheader("📋 Detail Picking Audit List (Sales & RTO)")
+            if not df_picking.empty:
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    search_p1 = st.text_input("🔍 Cari SKU / BIN:", "", key="s_p1")
+                with c2:
+                    sources = st.multiselect("Filter Source:", options=df_picking['SOURCE'].unique(), default=df_picking['SOURCE'].unique(), key="f_p1")
+
+                df_t1 = df_picking[df_picking['SOURCE'].isin(sources)]
+                if search_p1:
+                    df_t1 = df_t1[df_t1['SKU'].str.contains(search_p1, case=False, na=False) | df_t1['BIN'].str.contains(search_p1, case=False, na=False)]
+
+                st.dataframe(df_t1, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Detail Picking (CSV)", df_t1.to_csv(index=False).encode('utf-8'), "Detail_Picking_Audit.csv", "text/csv", key="dl_t1")
+            else:
+                st.info("Data Picking Kosong.")
+
+        # ----------------------------------------------------------------------
+        # TAB 2: UNIQUE BIN PICKING
+        # ----------------------------------------------------------------------
+        with tab2:
+            st.subheader("🎯 Unique BIN List (Picking Audit)")
+            if not df_picking.empty:
+                df_u_picking = pd.DataFrame({'BIN': sorted(df_picking['BIN'].unique())})
+                search_p2 = st.text_input("🔍 Cari BIN Spesifik:", "", key="s_p2")
+                if search_p2:
+                    df_u_picking = df_u_picking[df_u_picking['BIN'].str.contains(search_p2, case=False, na=False)]
+
+                st.dataframe(df_u_picking, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Unique BIN Picking (CSV)", df_u_picking.to_csv(index=False).encode('utf-8'), "Unique_BIN_Picking.csv", "text/csv", key="dl_t2")
+            else:
+                st.info("Data Unique BIN Picking Kosong.")
+
+        # ----------------------------------------------------------------------
+        # TAB 3: DETAIL PUTAWAY AUDIT
+        # ----------------------------------------------------------------------
+        with tab3:
+            st.subheader("📋 Detail Putaway Audit List (Mutasi)")
+            if not df_putaway.empty:
+                search_pt1 = st.text_input("🔍 Cari SKU Spesifik:", "", key="s_pt1")
+                df_t3 = df_putaway
+                if search_pt1:
+                    df_t3 = df_t3[df_t3['SKU'].astype(str).str.contains(search_pt1, case=False, na=False)]
+
+                st.dataframe(df_t3, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Detail Putaway (CSV)", df_t3.to_csv(index=False).encode('utf-8'), "Detail_Putaway_Audit.csv", "text/csv", key="dl_t3")
+            else:
+                st.info("Data Putaway Kosong.")
+
+        # ----------------------------------------------------------------------
+        # TAB 4: UNIQUE LAST BIN PUTAWAY
+        # ----------------------------------------------------------------------
+        with tab4:
+            st.subheader("🎯 List Unique Last Bin (Putaway Audit)")
+            if not df_putaway.empty:
+                df_u_putaway = pd.DataFrame({'LAST BIN MUTASI': sorted(df_putaway['LAST BIN MUTASI'].unique())})
+                search_pt2 = st.text_input("🔍 Cari Last Bin Spesifik:", "", key="s_pt2")
+                if search_pt2:
+                    df_u_putaway = df_u_putaway[df_u_putaway['LAST BIN MUTASI'].astype(str).str.contains(search_pt2, case=False, na=False)]
+
+                st.dataframe(df_u_putaway, use_container_width=True, hide_index=True)
+                st.download_button("📥 Download Unique Last Bin (CSV)", df_u_putaway.to_csv(index=False).encode('utf-8'), "Unique_Last_Bin_Putaway.csv", "text/csv", key="dl_t4")
+            else:
+                st.info("Data Unique Last Bin Putaway Kosong.")
+
+        # ----------------------------------------------------------------------
+        # TAB 5: FINAL LIST (IRISAN/MATCHING UNIQUE BIN PICKING & PUTAWAY)
+        # ----------------------------------------------------------------------
+        with tab5:
+            st.subheader("✅FINAL LIST BIN AUDIT PICKING & PUTAWAY AUDIT")
+
+            if not df_picking.empty and not df_putaway.empty:
+                # Ambil set dari masing-masing BIN
+                set_picking_bin = set(df_picking['BIN'].astype(str).str.strip())
+                set_putaway_bin = set(df_putaway['LAST BIN MUTASI'].astype(str).str.strip())
+
+                # Cari Irisan (Intersection)
+                matching_bins = sorted(list(set_picking_bin.intersection(set_putaway_bin)))
+
+                if matching_bins:
+                    df_final_bin = pd.DataFrame({
+                        'NO': range(1, len(matching_bins) + 1),
+                        'BIN AUDIT FINAL': matching_bins
+                    })
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    # Search Bar Tab 5
+                    search_final = st.text_input("🔍 Cari BIN Final:", "", key="s_final")
+                    if search_final:
+                        df_display_final = df_final_bin[df_final_bin['BIN AUDIT FINAL'].str.contains(search_final, case=False, na=False)]
+                    else:
+                        df_display_final = df_final_bin
+
+                    st.dataframe(df_display_final, use_container_width=True, hide_index=True)
+
+                    # Download Button Tab 5
+                    csv_final = df_final_bin.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download Final List BIN Audit (CSV)",
+                        data=csv_final,
+                        file_name="FINAL_MATCHING_BIN_AUDIT.csv",
+                        mime="text/csv",
+                        key="dl_final"
+                    )
+                else:
+                    st.warning("⚠️ Tidak ada BIN yang sama/cocok antara hasil Picking Audit dan Putaway Audit.")
+            else:
+                st.warning("⚠️ Untuk melihat **Final List**, Anda harus memproses minimal 1 file Picking (Sales/RTO) DAN 1 file Mutasi Putaway.")
+
+    
+
+
 
 
 
@@ -5394,9 +6003,9 @@ def process_refill_overstock(df_all_data, df_stock_tracking=None):
 
 
 # ==============================================================================
-# LOGIC PROSES MENU "PUTAWAY SYSTEM"
+# LOGIC PROSES MENU "PUTAWAY SYSTEM" (UPDATED)
 # ==============================================================================
-def putaway_system(df_ds, df_asal):
+def putaway_system(df_ds, df_asal, area_pilihan):
     if df_ds is None or df_asal is None:
         empty = pd.DataFrame()
         return empty, empty, empty, empty, empty, empty
@@ -5475,13 +6084,9 @@ def putaway_system(df_ds, df_asal):
             if key in bin_qty_dict:
                 df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
 
-        # --- INI BAGIAN YANG TADI HILANG / BERUBAH ---
         df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
         if not df_plist.empty:
-            df_plist = df_plist.rename(columns={
-                "BIN DITEMUKAN": "BIN AWAL", 
-                "BIN ASAL": "BIN TUJUAN"
-            })
+            df_plist = df_plist.rename(columns={"BIN DITEMUKAN": "BIN AWAL", "BIN ASAL": "BIN TUJUAN"})
             df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
             df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
             df_plist['NOTES'] = "PUTAWAY"
@@ -5490,14 +6095,26 @@ def putaway_system(df_ds, df_asal):
 
         df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
         
-        # --- STAGGING & PUTAWAY OUTSTANDING ---
-        mask_out = (
-            (df_asal_updated.iloc[:, c_qty_a] > 0) & 
-            (
-                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("STAG", na=False) | 
-                df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper().str.contains("PUTAWAY", na=False)
-            )
-        )
+        # --- LOGIC FILTER KEYWORD OUTSTANDING DINAMIS ---
+        # Menentukan list keyword berdasarkan pilihan dropdown area
+        if area_pilihan == "DC LANTAI 1":
+            keywords_outstanding = ["GL1-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "DC LANTAI 2":
+            keywords_outstanding = ["GL2-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "DC LANTAI 3":
+            keywords_outstanding = ["GL3-DC-PUTAWAY", "STAG"]
+        elif area_pilihan == "JERSEY ZONE":
+            keywords_outstanding = ["JZ-PUTAWAY", "STAG"] # Sesuaikan dengan format kode BIN Jersey Zone Anda
+        else:
+            keywords_outstanding = ["STAG", "PUTAWAY"] # Fallback default
+
+        # Bikin kondisi masking dengan loop keyword area
+        bin_series = df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper()
+        mask_keyword = bin_series.str.contains(keywords_outstanding[0], na=False)
+        for kw in keywords_outstanding[1:]:
+            mask_keyword = mask_keyword | bin_series.str.contains(kw, na=False)
+
+        mask_out = (df_asal_updated.iloc[:, c_qty_a] > 0) & mask_keyword
         df_outstanding = df_asal_updated[mask_out].copy()
 
         return df_comp, df_plist, df_kurang, df_comp, df_outstanding, df_asal_updated
@@ -6188,7 +6805,7 @@ import pandas as pd
 import io
 import streamlit as st
 
-def process_justification(df_case, df_tracking, df_all_stock):
+def process_justification(df_case, df_tracking, df_all_stock, df_scan=None):
     # 1. Copy data & Standarisasi Header ke Huruf Besar
     res = df_case.copy()
     res.columns = [str(c).upper().strip() for c in res.columns]
@@ -6235,7 +6852,6 @@ def process_justification(df_case, df_tracking, df_all_stock):
     sku_col_all = df_all_stock.columns[2]
     qty_sys_col_all = df_all_stock.columns[9]
     
-    # Langsung group by dari df_all_stock tanpa ada yang dibuang
     all_stock_agg = df_all_stock.groupby(sku_col_all).agg({
         qty_sys_col_all: 'sum'
     }).reset_index()
@@ -6264,12 +6880,33 @@ def process_justification(df_case, df_tracking, df_all_stock):
     res['QTY SYSTEM ALL']     = res['_QTY_SYS_ALL']
     res['GAP ADJUSMENT']      = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
 
-    res['REAL QTY'] = (
-        res['BEGINNING STOCK'] + res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN'] 
-        - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
-    )
+    # --- PERHITUNGAN REAL QTY ---
+    if df_scan is not None and not df_scan.empty:
+        # PENGOLAHAN FILE DATA SCAN (KOLOM B = SKU, KOLOM C = QTY)
+        df_scan_copy = df_scan.copy()
+        sku_col_scan = df_scan_copy.columns[1] # Kolom B (index 1)
+        qty_col_scan = df_scan_copy.columns[2] # Kolom C (index 2)
+        
+        # Aggregasi berdasarkan SKU Scan
+        scan_agg = df_scan_copy.groupby(sku_col_scan).agg({
+            qty_col_scan: 'sum'
+        }).reset_index()
+        
+        scan_agg.columns = ['SKU_KEY_SCAN', 'REAL_QTY_SCAN']
+        scan_agg['SKU_KEY_SCAN'] = scan_agg['SKU_KEY_SCAN'].astype(str).str.split('.').str[0].str.strip().str.upper()
+        
+        # Merge data scan ke dataframe utama
+        res = res.merge(scan_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_SCAN', how='left').fillna(0)
+        res['REAL QTY'] = res['REAL_QTY_SCAN']
+        res = res.drop(columns=['SKU_KEY_SCAN', 'REAL_QTY_SCAN'], errors='ignore')
+    else:
+        # RUMUS LAMA (JIKA TDK ADA SCAN) - TIDAK DIUBAH SAMA SEKALI
+        res['REAL QTY'] = (
+            res['BEGINNING STOCK'] + res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN'] 
+            - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
+        )
 
-    # 6. Update Logika Justifikasi Sesuai Aturan Baru
+    # 6. Update Logika Justifikasi Sesuai Aturan
     def run_formula(row):
         try:
             qty_sys_row = round(float(row[qty_sys_col_case]), 2)
@@ -6289,42 +6926,32 @@ def process_justification(df_case, df_tracking, df_all_stock):
             ending_stock = round(float(row['ENDING STOCK']), 2)
             real_qty = round(float(row['REAL QTY']), 2)
 
-            # =========================================================================
             # ORDER 1: ATURAN KHUSUS - KESALAHAN SYSTEM (BEGIN STOCK -)
-            # =========================================================================
             if qty_so_row > qty_sys_row and begin_stock < 0:
                 if gap_adj > 0 and gap_adj < abs(begin_stock):
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
                 elif gap_adj == 0:
                     return "KESALAHAN SYSTEM (BEGIN STOCK -)"
 
-            # =========================================================================
             # ORDER 2: ATURAN BARU (BYPASS PINTU DEPAN - ANTI BOCOR)
-            # Kasus lu: GAP & BEGIN == 0, Stock background kembar senilai 1, master ALL bernilai 0
-            # =========================================================================
             if gap_adj == 0 and begin_stock == 0:
                 if ending_stock == real_qty == curr_stock:
                     if qty_sys_all < ending_stock:
                         return "KESALAHAN SYSTEM"
-            # =========================================================================
+
             # ORDER 5: LOGIKA KESALAHAN ADJUSMENT (+ / -) 
-            # =========================================================================
             if qty_sys_row > qty_so_row and gap_adj > 0:
                 return "KESALAHAN ADJUSMENT +"
             elif qty_sys_row < qty_so_row and gap_adj < 0:
                 return "KESALAHAN ADJUSMENT -"
 
-            # =========================================================================
             # ORDER 3: ATURAN KHUSUS - KESALAHAN SYSTEM (BEGIN STOCK >= 0 + MUTASI)
-            # =========================================================================
             if qty_so_row > qty_sys_row and begin_stock >= 0 and gap_adj == 0 and draft_in == 0 and draft_out == 0:
                 mutasi_bersih = round(begin_stock + (stock_in + trf_in) - (sales + trf_out), 2)
                 if mutasi_bersih != ending_stock:
                     return "KESALAHAN SYSTEM"
 
-            # =========================================================================
             # ORDER 6: LOGIKA KESALAHAN SYSTEM BAWAAN
-            # =========================================================================
             if gap_adj == 0:
                 if qty_sys_row > qty_so_row:
                     diff = qty_sys_row - qty_so_row
@@ -6335,15 +6962,11 @@ def process_justification(df_case, df_tracking, df_all_stock):
                     if round(qty_sys_all + diff, 2) == curr_stock:
                         return "KESALAHAN SYSTEM"
 
-            # =========================================================================
             # ORDER 7: KESALAHAN RTO & UNDEFINED
-            # =========================================================================
             if draft_in > 0 or draft_out > 0:
                 return "KESALAHAN RTO"
             
-             # =========================================================================
             # ORDER 4: CEK HASIL REKONSILIASI
-            # =========================================================================
             if qty_sys_all == curr_stock:
                 return "CEK HASIL REKONSILIASI"
 
@@ -8418,7 +9041,7 @@ def tampilan_display_control():
         }
         .metric-card {
             background: linear-gradient(135deg, #1A1D2E 0%, #252A3D 100%) !important;
-            padding: 20px;
+            padding: 18px 12px;
             border-radius: 12px;
             box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
             text-align: center;
@@ -8427,7 +9050,7 @@ def tampilan_display_control():
             margin-bottom: 10px;
         }
         .metric-value {
-            font-size: 26px;
+            font-size: 24px;
             font-weight: bold;
             margin: 0;
             color: #FFFFFF;
@@ -8437,10 +9060,10 @@ def tampilan_display_control():
             color: #A0A0A0;
             text-transform: uppercase;
             margin-bottom: 8px;
-            letter-spacing: 1px;
+            letter-spacing: 0.8px;
         }
         .metric-arrow {
-            font-size: 12px;
+            font-size: 11px;
             margin-top: 8px;
             font-weight: bold;
         }
@@ -8471,13 +9094,15 @@ def tampilan_display_control():
         - Bin mengandung: *OFFLINE, ONLINE, AMP, MARKOM, DEFECT, REJECT, STAGING, STAGGING, KARANTINA, EVENT, BANDING, INB, OUT, PUTAWAY*.
         
         **Cara Kerja Pemantauan :**
-        - **Source (Gudang):** Semua BIN aktif (selain area TOKO/DISPLAY & Area Eksklusi).
-        - **Target (Toko):** BIN yang mengandung kata 'TOKO', 'STORE', atau 'DISPLAY'.
+        - **Source (Gudang Store / DC):** Semua BIN aktif selain area Toko & Eksklusi.
+          - **Gudang Lt. 2 Store:** BIN mengandung kata `STR`, `STORE`, atau `GUDANG`.
+          - **DC (Distribution Center):** BIN mengandung kata `DC`.
+        - **Target (Toko):** BIN yang mengandung kata `TOKO` atau `DISPLAY`.
         - **Aturan Proteksi OUT:** Jika Article / SKU sudah berada di bin **'OUT'** dengan Qty > 0, otomatis **dihapus dari list penarikan**.
-        - **Logic:** Jika SKU memiliki **Stok > 0 di Gudang** tapi **Stok = 0 di Toko**, maka SKU wajib tambah display.
+        - **Logic:** Jika SKU memiliki **Stok > 0 di Gudang/DC** tapi **Stok = 0 di Toko**, maka SKU wajib tambah display.
         """)
 
-    # Handle Upload Data dengan Koneksi Mandiri Istimewa (Bebas Lock)
+    # Handle Upload Data
     uploaded_file = st.file_uploader("Upload All Stock", type=['xlsx', 'csv'], key="display_upload")
 
     if uploaded_file:
@@ -8485,8 +9110,7 @@ def tampilan_display_control():
             df_upload = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             df_upload.columns = [str(c).strip() for c in df_upload.columns]
             
-            # Buka koneksi khusus tulis, lakukan isolasi bertipe IMMEDIATE agar query read lain mengalah
-            write_conn = sqlite3.connect('database_display_control.db', timeout=30.0)
+            write_conn = sqlite3.connect('database_display_control.db', timeout=60.0)
             write_conn.execute('PRAGMA journal_mode=WAL;')
             write_conn.execute('BEGIN IMMEDIATE;')
             try:
@@ -8502,7 +9126,7 @@ def tampilan_display_control():
         except Exception as e:
             st.error(f"Gagal upload: {e}")
 
-    # Buka koneksi utama untuk proses Analisis & Tampilan Dashboard
+    # Buka koneksi utama
     conn = init_db()
 
     # --- 2. LOGIKA ANALISIS ---
@@ -8545,7 +9169,7 @@ def tampilan_display_control():
             UPPER("{col_bin}") NOT LIKE '%PUTAWAY%'
         """
 
-        f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%STORE%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
+        f_target_toko = f"(UPPER(\"{col_bin}\") LIKE '%TOKO%' OR UPPER(\"{col_bin}\") LIKE '%DISPLAY%')"
         f_source_gudang = f"(NOT ({f_target_toko})) AND ({excl_condition})"
 
         # Kunci Ringkasan Atas: Hanya Article yang bersih dari target toko dan bin OUT
@@ -8558,61 +9182,13 @@ def tampilan_display_control():
                AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%OUT%' THEN "{col_qty}" ELSE 0 END) <= 0
         """
 
-        # --- LOGIKA SINKRONISASI METRIK ---
-        q_art_on_display = f"""
-            SELECT DISTINCT ARTICLE FROM stock_display_processed 
-            WHERE {f_target_toko} AND "{col_qty}" > 0
-        """
-
-        # --- LOGIKA BARU: ARTICLE KOSONG DI TOKO TAPI ADA DI KARANTINA ---
-        q_karantina_logic = f"""
-            SELECT ARTICLE FROM stock_display_processed
-            GROUP BY ARTICLE
-            HAVING SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
-               AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%KARANTINA%' THEN "{col_qty}" ELSE 0 END) > 0
-        """
-
-        with conn:
-            q_data = pd.read_sql(f"""
-                SELECT  
-                    (SELECT COUNT(DISTINCT ARTICLE) FROM ({q_art_on_display})) as On_Display,
-                    (SELECT COUNT(*) FROM ({q_need_display_logic})) as Need_Display,
-                    (SELECT COUNT(*) FROM ({q_karantina_logic})) as Karantina_Lock
-            """, conn).iloc[0]
-
-        on_display = int(q_data['On_Display'])
-        need_display = int(q_data['Need_Display'])
-        karantina_lock = int(q_data['Karantina_Lock'])
-        total_art = on_display + need_display
-
-        # --- 3. TAMPILAN DASHBOARD ---
-        st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
-        
-        # Dipecah menjadi 4 kolom secara presisi
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #7B61FF;"><p class="metric-label">🧥 Total Article</p><p class="metric-value">{total_art:,} Art</p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
-        with c2:
-            perc_display = (on_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,} Art</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Pajang</p></div>', unsafe_allow_html=True)
-        with c3:
-            perc_need = (need_display / total_art * 100) if total_art > 0 else 0
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,} Art</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
-        with c4:
-            # Metrics box tambahan untuk status Karantina
-            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina Art.</p><p class="metric-value">{karantina_lock:,} Art</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
-
-        st.divider()
-        st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
-        
-        # --- LOGIKA TABLE REFILL ---
+        # --- LOGIKA QUERY TABLE REFILL (DISIAPKAN LEBIH AWAL) ---
         query_prioritas_refill = f"""
             WITH 
             ArticlesNeedDisplay AS (
                 {q_need_display_logic}
             ),
             
-            -- Cari tahu SKU mana saja yang sudah nangkring di BIN OUT (Qty > 0)
             SKUInBinOut AS (
                 SELECT DISTINCT "{col_sku}" as Out_SKU 
                 FROM stock_display_processed
@@ -8631,16 +9207,14 @@ def tampilan_display_control():
                 WHERE ARTICLE IN (SELECT ARTICLE FROM ArticlesNeedDisplay)
                   AND {f_source_gudang}
                   AND "{col_qty}" > 0
-                  -- PROTEKSI UTAMA: Buang SKU jika terdaftar sudah ada di bin OUT!
                   AND "{col_sku}" NOT IN (SELECT Out_SKU FROM SKUInBinOut)
             ),
             
-            -- Prioritas Utama: Cari 1 baris terbaik per ARTICLE yang ada di GUDANG / STR
             PrioritasStock AS (
                 SELECT *,
                        ROW_NUMBER() OVER (PARTITION BY Article ORDER BY Qty_In_Bin DESC) as rn
                 FROM RawGudangStock
-                WHERE UPPER(Bin_Lokasi) LIKE '%GUDANG%' OR UPPER(Bin_Lokasi) LIKE '%STR%'
+                WHERE UPPER(Bin_Lokasi) LIKE '%GUDANG%' OR UPPER(Bin_Lokasi) LIKE '%STR%' OR UPPER(Bin_Lokasi) LIKE '%STORE%'
             ),
             
             FinalPrioritas AS (
@@ -8649,7 +9223,6 @@ def tampilan_display_control():
                 WHERE rn = 1
             ),
             
-            -- Reguler: Cari alternatif 1 baris terbaik per ARTICLE jika tidak ada di GUDANG / STR
             RegulerStock AS (
                 SELECT *,
                        ROW_NUMBER() OVER (PARTITION BY Article ORDER BY Qty_In_Bin DESC) as rn
@@ -8680,8 +9253,75 @@ def tampilan_display_control():
             ORDER BY "Qty In Bin" DESC
         """
 
+        # Ambil Data Detail Refill Terlebih Dahulu
         with conn:
             df_detail = pd.read_sql(query_prioritas_refill, conn)
+
+        # --- PERHITUNGAN METRIK ATAS ---
+        # 1. On Display
+        q_art_on_display = f"""
+            SELECT DISTINCT ARTICLE FROM stock_display_processed 
+            WHERE {f_target_toko} AND "{col_qty}" > 0
+        """
+        # 2. Karantina
+        q_karantina_logic = f"""
+            SELECT ARTICLE FROM stock_display_processed
+            GROUP BY ARTICLE
+            HAVING SUM(CASE WHEN {f_target_toko} THEN "{col_qty}" ELSE 0 END) <= 0
+               AND SUM(CASE WHEN UPPER("{col_bin}") LIKE '%KARANTINA%' THEN "{col_qty}" ELSE 0 END) > 0
+        """
+
+        with conn:
+            on_display = int(pd.read_sql(f"SELECT COUNT(DISTINCT ARTICLE) as cnt FROM ({q_art_on_display})", conn).iloc[0]['cnt'])
+            karantina_lock = int(pd.read_sql(f"SELECT COUNT(*) as cnt FROM ({q_karantina_logic})", conn).iloc[0]['cnt'])
+
+        # Total Need diambil langsung dari total baris df_detail (Pasti Presisi)
+        need_display = len(df_detail)
+        
+        # Breakdown Need Display berdasarkan Bin Lokasi dari df_detail
+        if not df_detail.empty:
+            mask_gudang = df_detail['Bin Lokasi'].str.upper().str.contains('STR|STORE|GUDANG', regex=True)
+            need_gudang = int(mask_gudang.sum())
+            
+            mask_dc = df_detail['Bin Lokasi'].str.upper().str.contains('DC', regex=True)
+            need_dc = int(mask_dc.sum())
+        else:
+            need_gudang = 0
+            need_dc = 0
+
+        total_art = on_display + need_display
+
+       # --- 3. TAMPILAN DASHBOARD ---
+        st.markdown('<div class="metric-label-header"><h4 style="color: #E91E63; margin: 0; font-size: 16px; font-weight: 900;">📊 DISPLAY AVAILABILITY (ARTICLE BASE)</h4></div>', unsafe_allow_html=True)
+        
+        # BARIS 1: Metrics Utama (Total, On Display, Need Display)
+        c1, c2, c3 = st.columns(3)
+        
+        with c1:
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #7B61FF;"><p class="metric-label">🧥 Total Art.</p><p class="metric-value">{total_art:,}</p><p class="metric-arrow" style="color: #7B61FF;">Gudang Utama</p></div>', unsafe_allow_html=True)
+        
+        with c2:
+            perc_display = (on_display / total_art * 100) if total_art > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00C853;"><p class="metric-label">✅ On Display</p><p class="metric-value">{on_display:,}</p><p class="metric-arrow" style="color: #00FF00;">↑ {perc_display:.1f}% Pajang</p></div>', unsafe_allow_html=True)
+        
+        with c3:
+            perc_need = (need_display / total_art * 100) if total_art > 0 else 0
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF5252;"><p class="metric-label">⚠️ Need Display</p><p class="metric-value">{need_display:,}</p><p class="metric-arrow" style="color: #FF5252;">↓ {perc_need:.1f}% Belum Ada</p></div>', unsafe_allow_html=True)
+        
+        # BARIS 2: Breakdown Lokasi (From Store, From DC, Karantina)
+        c4, c5, c6 = st.columns(3)
+
+        with c4:
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #FF9800;"><p class="metric-label">🏬 From Store</p><p class="metric-value">{need_gudang:,}</p><p class="metric-arrow" style="color: #FF9800;">STORE</p></div>', unsafe_allow_html=True)
+        
+        with c5:
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #00BCD4;"><p class="metric-label">🏭 From DC</p><p class="metric-value">{need_dc:,}</p><p class="metric-arrow" style="color: #00BCD4;">DC</p></div>', unsafe_allow_html=True)
+        
+        with c6:
+            st.markdown(f'<div class="metric-card" style="border-left: 4px solid #C5A059;"><p class="metric-label">☣️ Karantina</p><p class="metric-value">{karantina_lock:,}</p><p class="metric-arrow" style="color: #C5A059;">Kosong di Toko</p></div>', unsafe_allow_html=True)
+
+        st.divider()
+        st.markdown("### 📋 List Article Kosong di Toko (Wajib Refill)")
 
         if not df_detail.empty:
             st.dataframe(df_detail, use_container_width=True)
@@ -8697,7 +9337,6 @@ def tampilan_display_control():
 
     except Exception as e:
         st.error(f"Error pada sistem analisis: {e}")
-
 
 
 
@@ -9314,25 +9953,25 @@ def show_timbang_system():
                     (df_filtered['created_at'].dt.month == now_jkt.month)
                 ]
 
-            # --- LOGIKAL PERHITUNGAN HARGA TARIF ---
+           # --- LOGIKAL PERHITUNGAN HARGA TARIF ---
             def hitung_harga(row):
                 eksp = str(row['ekspedisi']).upper()
                 tujuan = str(row['pengiriman_ke']).upper()
                 koli = row['total_koli']
                 berat = row['berat_total_timbang']
                 
-                # Logic 1: ACCESS + SEMARANG = Koli * 40.000
+                # Logic 1: ACCESS + SEMARANG = Koli * 40.000 * 3.2
                 if "ACCESS" in eksp and "SEMARANG" in tujuan:
-                    return koli * 40000
-                # Logic 2: ACCESS + HUB JAKARTA = Kg * 2.500
+                    return koli * 40000 * 3.2
+                # Logic 2: ACCESS + HUB JAKARTA = Kg * 2.500 * 3.2
                 elif "ACCESS" in eksp and "HUB JAKARTA" in tujuan:
-                    return berat * 2500
-                # Logic 3: ADEX + SEMARANG = Kg * 1.000
+                    return berat * 2500 * 3.2
+                # Logic 3: ADEX + SEMARANG / MALANG = Kg * 1.000 * 3.2
                 elif "ADEX" in eksp and ("SEMARANG" in tujuan or "MALANG" in tujuan):
-                    return berat * 1000
-                # Logic 4: ADEX + HUB JAKARTA = Kg * 2.000
+                    return berat * 1000 * 3.2
+                # Logic 4: ADEX + HUB JAKARTA = Kg * 2.000 * 3.2
                 elif "ADEX" in eksp and "HUB JAKARTA" in tujuan:
-                    return berat * 2000
+                    return berat * 2000 * 3.2
                 return 0
 
             # Daftarkan kolom harga baru secara dinamis
@@ -9716,9 +10355,9 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     if is_dc:
-        m3_list = ["Stock Opname","Match Real & System","Cycle Count", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill"]
+        m3_list = ["Stock Opname","Match Real & System","Cycle Count","Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill", "Stock Allocation"]
     else:
-        m3_list = ["Stock Minus","Cycle Count"] # Menu Cabang
+        m3_list = ["Stock Minus","Cycle Count","Compare System", "Justification SO"] # Menu Cabang
 
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else None
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=sync_menu, args=("m3_key",), label_visibility="collapsed")
@@ -9743,8 +10382,7 @@ with st.sidebar:
     idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else None
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=sync_menu, args=("m5_key",), label_visibility="collapsed")
 
-    st.divider()
-    
+
     # Tombol Logout (Tetap di bawah)
     if st.button("🔴 Logout", key="simple_logout"):
         st.session_state.logged_in = False
@@ -9777,13 +10415,11 @@ if 'putaway_results' not in st.session_state:
 
 
 # ==============================================================================
-# LOGIC INTERFACE MENU "PUTAWAY SYSTEM"
+# LOGIC INTERFACE MENU "PUTAWAY SYSTEM" (UPDATED)
 # ==============================================================================
-# --- UI APP ---
 if menu == "Putaway System":
     st.markdown('<div class="hero-header"><h1>PUTAWAY SYSTEM COMPARATION</h1></div>', unsafe_allow_html=True)
     
-    # --- CSS ---
     st.markdown("""
         <style>
         .m-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; margin: 5px 0; border: 1px solid #e0e0e0; }
@@ -9807,101 +10443,56 @@ if menu == "Putaway System":
         - List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan
         """)
     
-    c1, c2 = st.columns(2)
-    with c1: up_ds = st.file_uploader("📥Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
-    with c2: up_asal = st.file_uploader("📥Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
+   # --- DROPDOWN PILIHAN AREA (DEFAULT KOSONG & TANPA LABEL) ---
+    st.markdown("### 📍 Pilih Area Putaway")
+    pilihan_area = st.selectbox(
+        "", # Mengosongkan label bawaan selectbox
+        ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
+        index=None,  
+        placeholder="-- Pilih Area Putaway --",
+        key="area_putaway",
+        label_visibility="collapsed" # Menyembunyikan space kosong bekas label biar makin rapi
+    )
+    
 
-    # BARU MASUK KE BLOK YANG LU TULIS TADI
-    if up_ds and up_asal:
-        if st.button("▶️ COMPARE PUTAWAY"):
-            # ... kode yang lu kirim tadi ...
-            try:
-                # 1. LOAD DATA
-                df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
-                df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
-                
-                # 2. DEFINISIKAN TOTAL AWAL (Ambil Kolom J / Index 9)
-                # Taruh baris ini sebelum masuk ke 'res' atau 'session_state'
-                total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
-                
-                # 3. PROSES FUNGSI
-                res = putaway_system(df_ds_p, df_asal_p)
-                
-                # 4. SIMPAN KE SESSION STATE
-                st.session_state['putaway_results'] = {
-                    'df_comp': res[0],
-                    'df_plist': res[1],  # Ini List Setup yang kolomnya sudah bersih
-                    'df_kurang': res[2],
-                    'df_sum': res[3],
-                    'df_lt3': res[4],
-                    'df_updated_bin': res[5],
-                    'total_awal': total_awal  # Sekarang variabel ini sudah dikenal
-                }
-                st.success("✅ Proses Putaway Selesai!")
-                
-            except Exception as e:
-                st.error(f"Gagal saat memproses: {e}")
+    # --- FILE UPLOADER HANYA MUNCUL JIKA AREA SUDAH DIPILIH ---
+    if pilihan_area:
+        st.info(f"📍 Area Terpilih: **{pilihan_area}**")
+        
+        c1, c2 = st.columns(2)
+        with c1: up_ds = st.file_uploader("📥 Upload DS PUTAWAY", type=['xlsx', 'csv'], key="ds_up")
+        with c2: up_asal = st.file_uploader("📥 Upload ASAL BIN PUTAWAY", type=['xlsx', 'csv'], key="asal_up")
 
-    # --- TAMPILKAN HASIL (Jika sudah diproses) ---
-    if st.session_state['putaway_results'] is not None:
-        r = st.session_state['putaway_results']
-        
-        st.divider()
-        st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
-        
-        # --- HITUNG METRICS ---
-        
-        # 1. Gunakan 'total_awal' yang sudah disimpan di session state (Angka 278)
-        total_compare_qty = r.get('total_awal', 0)
-        
-        # 2. Total yang berhasil tersetup
-        total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
-        
-        # 3. Total yang gagal/kurang setup
-        total_kurang_qty = int(r['df_kurang']['DIFF'].sum()) if not r['df_kurang'].empty else 0
-        
-        # 4. Outstanding (Sisa di Staging/Putaway System)
-        lt3_total_qty = 0
-        if not r['df_lt3'].empty:
-            qty_col = [c for c in r['df_lt3'].columns if 'qty' in str(c).lower()]
-            if qty_col:
-                lt3_total_qty = int(r['df_lt3'][qty_col[0]].sum())
-
-        # --- TAMPILKAN METRICS BOX ---
-        m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty Sytem Putaway</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="m-box"><span class="m-lbl">Total Tersetup</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Stok Putaway</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
-
-    # ... (Sisa kode Tabs dan Download tetap sama)        # --- TABS HASIL ---
-        t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 Outstanding"])
-        
-        with t1: st.dataframe(r['df_comp'], use_container_width=True)
-        with t2: st.dataframe(r['df_plist'], use_container_width=True)
-        with t3: 
-            if not r['df_kurang'].empty: st.dataframe(r['df_kurang'], use_container_width=True)
-            else: st.success("✅ Semua Tercover!")
-        with t4: 
-            if not r['df_lt3'].empty: st.dataframe(r['df_lt3'], use_container_width=True)
-            else: st.success("✅ Tidak ada Outstanding!")
-
-        # --- TOMBOL DOWNLOAD (Excel) ---
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            r['df_comp'].to_excel(writer, sheet_name='COMPARE', index=False)
-            r['df_plist'].to_excel(writer, sheet_name='PUTAWAY_LIST', index=False)
-            r['df_kurang'].to_excel(writer, sheet_name='KURANG_SETUP', index=False)
-            r['df_lt3'].to_excel(writer, sheet_name='OUTSTANDING', index=False)
-            r['df_updated_bin'].to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
-        
-        st.download_button(
-            label="📥 DOWNLOAD REPORT",
-            data=output.getvalue(),
-            file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
+        if up_ds and up_asal:
+            if st.button("▶️ COMPARE PUTAWAY"):
+                try:
+                    # 1. LOAD DATA
+                    df_ds_p = pd.read_csv(up_ds) if up_ds.name.endswith('.csv') else pd.read_excel(up_ds)
+                    df_asal_p = pd.read_csv(up_asal) if up_asal.name.endswith('.csv') else pd.read_excel(up_asal)
+                    
+                    # 2. DEFINISIKAN TOTAL AWAL
+                    total_awal = int(pd.to_numeric(df_asal_p.iloc[:, 9], errors='coerce').sum())
+                    
+                    # 3. PROSES FUNGSI
+                    res = putaway_system(df_ds_p, df_asal_p, pilihan_area)
+                    
+                    # 4. SIMPAN KE SESSION STATE
+                    st.session_state['putaway_results'] = {
+                        'df_comp': res[0],
+                        'df_plist': res[1],  
+                        'df_kurang': res[2],
+                        'df_sum': res[3],
+                        'df_lt3': res[4], 
+                        'df_updated_bin': res[5],
+                        'total_awal': total_awal  
+                    }
+                    st.success(f"✅ Proses Putaway untuk {pilihan_area} Selesai!")
+                    
+                except Exception as e:
+                    st.error(f"Gagal saat memproses: {e}")
+    else:
+        # Peringatan kalau belum pilih area
+        st.warning("⚠️ Silakan pilih Area Putaway di atas terlebih dahulu untuk menampilkan form upload file.")
 
 # ==============================================================================
 # LOGIC INTERFACE MENU "COMPARE SYSTEM"
@@ -10875,6 +11466,7 @@ elif menu == "Justification SO":
         - **ADJUSTMENT FILE**: Gabungkan antara Multiple Adjustment **(Plus)** dan **(Minus)** dalam 1 File.
         - **SUMMARY STOCK**: Download dari **JEZPRO** pada menu **Dashboard Asset** (Store: **JEZ SURABAYA**).
         - **ALL DATA STOCK**: Upload file All data Stock (Multiple Adjustment) **HANYA ADA STOCK**.
+        - **DATA SCAN (Opsional)**: Jika diupload maka perhitungan **Real QTY** akan mengambil qty dari data scan dan apabila tidak dipload maka akan kembali perhitungan awal.
         """)
 
     with st.expander("💡 Logic Thinking (Justification)", expanded=False):
@@ -10905,7 +11497,7 @@ elif menu == "Justification SO":
         * **Contoh Kasus:**
           | BEGINNING | STOCKIN + TRF_IN | SALES + TRF_OUT | Hitungan Manual | ENDING STOCK |
           | :---: | :---: | :---: | :---: | :---: |
-          | 10 | + 5 | - 2 | **13** | **15** (Gak Match!) |
+          | 10 |  5 |  2 | **13** | **15** (Gak Match!) |
         
         **💻 4. Kesalahan System (Stock System Lost)**
         * **Kondisinya:** Tidak ada `GAP ADJUSTMENT` (`= 0`), tapi ada selisih antara Sistem dan SO. Ketika selisih itu ditambah/dikurang ke master `QTY SYSTEM ALL`, hasilnya pas dengan `CURRENT STOCK`.
@@ -10947,18 +11539,21 @@ elif menu == "Justification SO":
         > ❓ **Kenapa muncul ERROR DATA?** > Ada kolom yang isinya kosong, teks rusak, atau tidak bisa dihitung angka.
         """)
 
+
     # Inisialisasi Session State
     if 'result_so' not in st.session_state:
         st.session_state.result_so = None
 
-    # UI Uploader
-    col1, col2, col3 = st.columns(3)
+    # UI Uploader - Dibagi 4 Kolom
+    col1, col2, col3, col4 = st.columns(4)
     with col1: 
         up_case = st.file_uploader("Upload FILE ADJUSMENT", type=['xlsx'], key="up_case_so")
     with col2: 
         up_tracking = st.file_uploader("Upload SUMMARY STOCK", type=['xlsx'], key="up_track_so")
     with col3: 
         up_all_stock = st.file_uploader("Upload ALL DATA STOCK", type=['xlsx'], key="up_all_stock_so")
+    with col4:
+        up_scan = st.file_uploader("Upload DATA SCAN (Opsional)", type=['xlsx'], key="up_scan_so")
 
     # Logika Tombol Run
     if up_case and up_tracking and up_all_stock:
@@ -10967,22 +11562,20 @@ elif menu == "Justification SO":
                 df_c = pd.read_excel(up_case)
                 df_t = pd.read_excel(up_tracking)
                 df_a = pd.read_excel(up_all_stock)
+                df_s = pd.read_excel(up_scan) if up_scan else None
                 
-                st.session_state.result_so = process_justification(df_c, df_t, df_a)
+                st.session_state.result_so = process_justification(df_c, df_t, df_a, df_s)
 
     # TAMPILAN OUTPUT
     if st.session_state.result_so is not None:
         result = st.session_state.result_so
         
-        # --- TAMPILAN METRIC BOX (SUDAH SINKRON) ---
+        # --- TAMPILAN METRIC BOX ---
         st.divider()
         m1, m2, m3, m4, m5 = st.columns(5)
         
         c_undef = len(result[result['JUSTIFICATION'] == "UNDEFINED"])
-        
-        # PERBAIKAN METRIK: Menggabungkan "KESALAHAN SYSTEM" biasa dan "KESALAHAN SYSTEM (BEGIN STOCK -)" ke dalam SYS ERROR
         c_sys   = len(result[result['JUSTIFICATION'].isin(["KESALAHAN SYSTEM", "KESALAHAN SYSTEM (BEGIN STOCK -)"])])
-        
         c_adj   = len(result[result['JUSTIFICATION'].isin(["KESALAHAN ADJUSMENT +", "KESALAHAN ADJUSMENT -"])])
         c_rto   = len(result[result['JUSTIFICATION'] == "KESALAHAN RTO"])
         c_rekon = len(result[result['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"])
@@ -10996,10 +11589,10 @@ elif menu == "Justification SO":
         # --- TAMPILAN TABEL ---
         st.divider()
         st.markdown("""
-                <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
-                </div>
-                """, unsafe_allow_html=True)
+            <div style="background-color: #f0f2f6; padding: 10px; border-left: 5px solid #007BFF; border-radius: 5px; margin-bottom: 20px;">
+            <h3 style="color: #010B13; margin: 0; font-size: 30px;">📋RINGKASAN HASIL</h3>
+            </div>
+            """, unsafe_allow_html=True)
         st.dataframe(result, use_container_width=True, height=450)
         
         # --- DOWNLOAD BUTTON ---
@@ -11015,7 +11608,6 @@ elif menu == "Justification SO":
             use_container_width=True,
             key="btn_download_so"
         )
-
 
 
 
@@ -11440,6 +12032,12 @@ if menu == "Logistic Schedule":
 
 elif menu == "Balancing Stock":
     tampilan_balancing_stock()
+
+elif menu == "Stock Allocation":
+    menu_allocation_stock()
+
+elif menu == "Putaway & Picking Audit List":
+    menu_picking_putaway_audit()
 
 elif menu == "Refill Koli to Koli/Refill":
     main_menu_koli()
