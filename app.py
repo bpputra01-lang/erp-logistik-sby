@@ -3443,10 +3443,7 @@ import numpy as np
 
 # 2. CORE BACKEND LOGIC PROCESSING
 def clean_and_process_sales(df_sales):
-    """
-    Membersihkan data sales: mengubah qty ke numerik, 
-    mengabaikan nilai '-', dan memisahkan sales Online vs Offline.
-    """
+ 
     df = df_sales.copy()
     
     # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
