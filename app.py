@@ -3375,7 +3375,6 @@ def menu_Stock_Opname():
     download_section()
 
 
-
 # ==============================================================================
 # LOGIC PROCESS MENU "STOCK ALLOCATION"
 # ==============================================================================
@@ -3434,18 +3433,19 @@ def calculate_dynamic_proportion(row):
 
 
 # ==============================================================================
-# LOGIC PROCESS MENU "STOCK ALLOCATION"
+# LOGIC INTERFACE MENU "STOCK ALLOCATION"
 # ==============================================================================
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 
-# 1. CUSTOM CSS GLOBAL (Rata kiri penuh, bebas IndentationError)
+# Custom CSS Premium Dark Theme Card layout
 st.markdown("""
     <style>
         .reportview-container { background: #0f111a; }
         .main { background-color: #0f111a; color: #ffffff; }
+        h1, h2, h3 { color: #C5A059 !important; font-family: 'Segoe UI', sans-serif; }
         
         /* Premium Metric Box Custom Styling */
         .metric-card {
@@ -3458,20 +3458,10 @@ st.markdown("""
         }
         .metric-title { color: #8e94a6; font-size: 12px; text-transform: uppercase; font-weight: bold; }
         .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
-        
-        /* Custom Subheader Styling */
-        .sub-title {
-            color: #C5A059 !important;
-            font-family: 'Segoe UI', sans-serif;
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
     </style>
 """, unsafe_allow_html=True)
 
 
-# 2. CORE BACKEND LOGIC PROCESSING
 def clean_and_process_sales(df_sales):
     """
     Membersihkan data sales: mengubah qty ke numerik, 
@@ -3497,7 +3487,6 @@ def clean_and_process_sales(df_sales):
     df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
     return df_summary
 
-
 def calculate_dynamic_proportion(row):
     """
     Menghitung persentase alokasi proporsional berdasarkan sales 90 hari terakhir.
@@ -3509,13 +3498,12 @@ def calculate_dynamic_proportion(row):
     pct_online = row['SALES_ONLINE'] / total
     pct_offline = row['SALES_OFFLINE'] / total
     
-    if pct_online > 0.7:      # Dominan Online
+    if pct_online > 0.7:
         return 0.70, 0.10, 0.20
-    elif pct_offline > 0.7:   # Dominan Offline
+    elif pct_offline > 0.7:
         return 0.10, 0.70, 0.20
-    else:                     # Balanced / Imbang
+    else:
         return 0.40, 0.40, 0.20
-
 
 def generate_stock_allocation(df_stock, df_sales_summary):
     """
@@ -3533,7 +3521,7 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     sales_sku_col = df_sales_summary.columns[0]
     df_merged = pd.merge(df_stk, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
     
-    # Hitung proporsi persentase
+    # Hitung proporsi persentase (Fungsi penunjang sudah didefinisikan di atas)
     proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
     df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
     df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
@@ -3551,64 +3539,24 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     return df_merged[output_cols]
 
 
-# 3. INTERFACE MENU ACTION
 def menu_allocation_stock():
     """
     Interface Khusus untuk Menu Alokasi Stok Gudang (Online, Offline, Logistik)
     """
-    # --------------------------------------------------------------------------
-    # PREMIUM BOX DYNAMIC HERO HEADER (Model Kapsul Gradasi 3D)
-    # --------------------------------------------------------------------------
-    st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, #1b3a70 0%, #132952 100%);
-            padding: 24px 30px;
-            border-radius: 12px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-            margin-bottom: 25px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        ">
-            <h1 style="
-                color: #C5A059 !important; 
-                margin: 0 !important; 
-                padding: 0 !important;
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 30px;
-                font-weight: 800;
-                letter-spacing: 1px;
-                display: flex;
-                align-items: center;
-                gap: 15px;
-            ">
-                STOCK ALOOCATION
-            </h1>
-            <p style="
-                color: #a5b4fc; 
-                margin: 8px 0 0 0 !important; 
-                padding: 0 !important;
-                font-size: 14px;
-                font-family: 'Segoe UI', sans-serif;
-                opacity: 0.9;
-            ">
-                Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown("<h1>⚡ DYNAMIC STOCK ALLOCATION SYSTEM</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#8e94a6;'>Alokasi Stok Proporsional Otomatis Berbasis Data Sales 90 Hari Terakhir</p>", unsafe_allow_html=True)
     st.write("---")
 
     # Layout Kolom Input untuk Upload File Excel
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("<div class='sub-title'>📥 Upload Data Master Stock</div>", unsafe_allow_html=True)
+        st.subheader("📥 Upload Data Master Stock")
         st.caption("Spesifikasi Kolom: B (BIN), C (SKU), J (QTY Master)")
         file_stock = st.file_uploader("Pilih file Excel Stock (.xlsx)", type=["xlsx"], key="stock")
 
     with col2:
-        st.markdown("<div class='sub-title'>📥 Upload Data Sales 90 Hari</div>", unsafe_allow_html=True)
+        st.subheader("📥 Upload Data Sales 90 Hari")
         st.caption("Spesifikasi Kolom: A (STORE), AA (SKU), S (QTY Sales)")
         file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
 
@@ -3631,7 +3579,7 @@ def menu_allocation_stock():
                     st.write("### 📊 Ringkasan Total Alokasi Unit")
                     m1, m2, m3, m4 = st.columns(4)
                     
-                    col_stock_qty = df_final_allocation.columns[2] 
+                    col_stock_qty = df_final_allocation.columns[2] # Kolom J asli hasil filter output_cols
                     total_stock = df_final_allocation[col_stock_qty].sum()
                     
                     with m1:
