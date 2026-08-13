@@ -9882,89 +9882,89 @@ def delete_multiple_timbang(list_ids):
 # --- 3. UI STYLE & DASHBOARD ---
 def show_timbang_system():
     # CSS Custom - Menjaga konsistensi dengan UI Premium Surabaya Dashboard
-st.markdown("""
-    <style>
-    .hero-header {
-        background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
-        padding: 2rem;
-        border-radius: 10px;
-        border-left: 5px solid #FFD700;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
-    .hero-header h1 {
-        color: #ffffff;
-        margin: 0;
-        font-size: 2.2rem;
-        letter-spacing: 1px;
-    }
-    div[data-baseweb="input"], div[data-baseweb="select"] {
-        background-color: #0e1117 !important;
-        border: 1px solid #3e444d !important;
-        border-radius: 5px !important;
-    }
-    div[data-baseweb="input"]:focus-within {
-        border-color: #FFD700 !important;
-        box-shadow: 0 0 0 1px #FFD700 !important;
-    }
-    .solid-header {
-        background-color: #FFD700 !important; 
-        color: #0e1117 !important; 
-        padding: 10px 15px !important;
-        border-radius: 5px !important;
-        font-weight: 900 !important;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
-        margin-bottom: 15px !important;
-        display: inline-block;
-    }
-    .stButton button, .stDownloadButton button {
-        background-color: #1a1e24 !important; 
-        color: #FFD700 !important; 
-        border: 3px solid #FFD700 !important; 
-        border-radius: 12px !important; 
-        padding: 12px 24px !important;
-        font-size: 1.1rem !important;
-        font-weight: 800 !important;
-        text-transform: uppercase !important; 
-        letter-spacing: 1.5px; 
-        transition: all 0.3s ease-in-out; 
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
-    }
-    .stButton button:hover, .stDownloadButton button:hover {
-        background-color: #FFD700 !important; 
-        color: #0e1117 !important; 
-        transform: translateY(-3px); 
-        box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4); 
-    }
-    .stButton button:focus, .stDownloadButton button:focus {
-        box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.5) !important;
-        outline: none !important;
-    }
-    input[type="number"] {
-        color: #ffffff !important;
-        background-color: #0e1117 !important;
-    }
-    [data-testid="stExpander"] details summary {
-        background-color: #1a1e24 !important; 
-        color: #FFFFFF !important; 
-        border: 1px solid #3e444d !important;
-        border-radius: 8px !important;
-        padding: 10px 15px !important;
-        transition: 0.3s !important;
-    }
-    [data-testid="stMetricValue"] {
-        color: #FFD700 !important;
-        font-size: 28px !important;
-        font-weight: 700 !important;
-    }
-    [data-testid="stMetricLabel"] {
-        color: #ffffff !important;
-        font-size: 14px !important;
-        letter-spacing: 1px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+        .hero-header {
+            background: linear-gradient(135deg, #1e2227 0%, #0e1117 100%);
+            padding: 2rem;
+            border-radius: 10px;
+            border-left: 5px solid #FFD700;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .hero-header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 2.2rem;
+            letter-spacing: 1px;
+        }
+        div[data-baseweb="input"], div[data-baseweb="select"] {
+            background-color: #0e1117 !important;
+            border: 1px solid #3e444d !important;
+            border-radius: 5px !important;
+        }
+        div[data-baseweb="input"]:focus-within {
+            border-color: #FFD700 !important;
+            box-shadow: 0 0 0 1px #FFD700 !important;
+        }
+        .solid-header {
+            background-color: #FFD700 !important; 
+            color: #0e1117 !important; 
+            padding: 10px 15px !important;
+            border-radius: 5px !important;
+            font-weight: 900 !important;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 15px !important;
+            display: inline-block;
+        }
+        .stButton button, .stDownloadButton button {
+            background-color: #1a1e24 !important; 
+            color: #FFD700 !important; 
+            border: 3px solid #FFD700 !important; 
+            border-radius: 12px !important; 
+            padding: 12px 24px !important;
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            text-transform: uppercase !important; 
+            letter-spacing: 1.5px; 
+            transition: all 0.3s ease-in-out; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+        }
+        .stButton button:hover, .stDownloadButton button:hover {
+            background-color: #FFD700 !important; 
+            color: #0e1117 !important; 
+            transform: translateY(-3px); 
+            box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4); 
+        }
+        .stButton button:focus, .stDownloadButton button:focus {
+            box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.5) !important;
+            outline: none !important;
+        }
+        input[type="number"] {
+            color: #ffffff !important;
+            background-color: #0e1117 !important;
+        }
+        [data-testid="stExpander"] details summary {
+            background-color: #1a1e24 !important; 
+            color: #FFFFFF !important; 
+            border: 1px solid #3e444d !important;
+            border-radius: 8px !important;
+            padding: 10px 15px !important;
+            transition: 0.3s !important;
+        }
+        [data-testid="stMetricValue"] {
+            color: #FFD700 !important;
+            font-size: 28px !important;
+            font-weight: 700 !important;
+        }
+        [data-testid="stMetricLabel"] {
+            color: #ffffff !important;
+            font-size: 14px !important;
+            letter-spacing: 1px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
     # --- HERO HEADER ---
     st.markdown('<div class="hero-header"><h1>SISTEM TIMBANG KOLIAN</h1></div>', unsafe_allow_html=True)
