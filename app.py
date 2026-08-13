@@ -25,14 +25,8 @@ st.set_page_config(
   
 st.markdown("""
     <style>
-    /* ============================================
-       FONTS IMPORT
-       ============================================ */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap');
 
-    /* ============================================
-       1. LAYOUT & SPACING
-       ============================================ */
     .block-container {
         padding-top: 3.5rem !important;
         padding-bottom: 0rem !important;
@@ -40,34 +34,23 @@ st.markdown("""
     [data-testid="stSidebarUserContent"] { padding-top: 0rem !important; }
     [data-testid="stSidebarNav"] { display: none !important; }
 
-    /* ============================================
-       2. APP BACKGROUND
-       ============================================ */
     .stApp {
         background-color: #f5f7fa !important;
     }
 
-    /* ============================================
-       3. SIDEBAR - PREMIUM DARK
-       ============================================ */
     [data-testid="stSidebar"] {
         background-color: #1a1d2e !important;
         border-right: 1px solid rgba(197, 160, 89, 0.15) !important;
     }
 
-    /* ============================================
-       4. HERO HEADER - PREMIUM BLUE
-       ============================================ */
     .hero-header {
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%) !important;
         color: white !important;
         padding: 10px 22px !important;
         border-radius: 10px !important;
         box-shadow: 0 4px 15px rgba(30, 60, 114, 0.25) !important;
-        margin-top: 0px !important;
         margin-bottom: 25px !important;
         display: inline-block !important;
-        width: auto !important;
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
     .hero-header h1 {
@@ -76,13 +59,8 @@ st.markdown("""
         font-size: 19px !important;
         font-weight: 700 !important;
         margin: 0 !important;
-        letter-spacing: 0.3px;
-        line-height: 1.3;
     }
 
-    /* ============================================
-       5. MAIN BUTTONS - NAVY BLUE
-       ============================================ */
     div.stButton > button {
         background: linear-gradient(135deg, #002b5b 0%, #003874 100%) !important;
         color: white !important;
@@ -99,63 +77,43 @@ st.markdown("""
         background: linear-gradient(135deg, #003874 0%, #004a9e 100%) !important;
         border-color: #ffc107 !important;
         transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(0, 43, 91, 0.3) !important;
     }
 
-    /* Clear/Reset Buttons - Red */
     div.stButton > button[key*="reset"],
     div.stButton > button[key*="clear"] {
         background: linear-gradient(135deg, #8b0000 0%, #a00000 100%) !important;
         border-color: #4a0000 !important;
     }
-    div.stButton > button[key*="reset"]:hover,
-    div.stButton > button[key*="clear"]:hover {
-        background: linear-gradient(135deg, #a00000 0%, #b50000 100%) !important;
-        border-color: #ff4444 !important;
-    }
 
-    /* ============================================ 
-       6. FILE UPLOADER 
-       ============================================ */ 
     [data-testid="stFileUploader"] { 
         background-color: #f0f2f6; 
         border: 2px dashed rgba(0, 43, 91, 0.3) !important; 
         border-radius: 10px; 
         padding: 12px; 
     } 
-
     [data-testid="stFileUploader"] button { 
         background: linear-gradient(135deg, #C5A059 0%, #b08d4a 100%) !important; 
         color: #1a1d2e !important; 
         font-weight: 600 !important; 
         border-radius: 6px !important; 
-        font-size: 12px !important; 
     } 
 
-    /* ============================================ 
-       7. METRIC BOXES - PREMIUM CARD 
-       ============================================ */ 
     .m-box { 
         background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%) !important; 
         padding: 18px 20px !important; 
         border-radius: 10px !important; 
         border-left: 4px solid #C5A059 !important; 
         margin-bottom: 10px !important; 
-        text-align: left !important; 
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important; 
     } 
-
     .m-lbl { 
         color: rgba(255, 255, 255, 0.65) !important; 
         font-family: 'Inter', sans-serif !important; 
         font-size: 10px !important; 
         font-weight: 600 !important; 
         text-transform: uppercase !important; 
-        letter-spacing: 1px !important; 
-        display: block; 
         margin-bottom: 6px; 
     } 
-
     .m-val { 
         color: #C5A059 !important; 
         font-family: 'Poppins', sans-serif !important; 
@@ -163,13 +121,7 @@ st.markdown("""
         font-weight: 700 !important; 
     } 
 
-    /* ============================================ 
-       8. RADIO BUTTONS 
-       ============================================ */ 
-    div.row-widget.stRadio > div { 
-        background-color: transparent !important; 
-    } 
-
+    div.row-widget.stRadio > div { background-color: transparent !important; } 
     div.row-widget.stRadio label { 
         color: #a0a5b5 !important; 
         font-family: 'Inter', sans-serif !important; 
@@ -178,31 +130,23 @@ st.markdown("""
         border-radius: 6px !important; 
         background: rgba(26, 29, 46, 0.5) !important; 
         border: 1px solid rgba(197, 160, 89, 0.15) !important; 
-        transition: all 0.2s ease !important; 
     } 
-
     div.row-widget.stRadio label:hover { 
         background: rgba(197, 160, 89, 0.1) !important; 
         border-color: rgba(197, 160, 89, 0.3) !important; 
         color: #C5A059 !important; 
     } 
 
-    /* ============================================ 
-       9. INPUT BOXES - GOLD BORDER 
-       ============================================ */ 
     div[data-baseweb="select"] > div, 
     [data-testid="stFileUploaderSection"] { 
         background-color: #1a1d2e !important; 
         border: 1px solid rgba(197, 160, 89, 0.3) !important; 
         border-radius: 8px !important; 
     } 
-
     div[data-baseweb="select"] > div:focus-within, 
     [data-testid="stFileUploaderSection"]:focus-within { 
         border-color: #C5A059 !important; 
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
     } 
-
     div[data-testid="stSelectbox"] div[data-baseweb="select"] *, 
     [data-testid="stFileUploaderText"] > span, 
     [data-testid="stFileUploaderText"] > small { 
@@ -210,90 +154,33 @@ st.markdown("""
         -webkit-text-fill-color: #e0e0e0 !important; 
     } 
 
-    /* Text inputs */ 
     div[data-baseweb="input"] { 
         background-color: #1a1d2e !important; 
         border: 1px solid rgba(197, 160, 89, 0.3) !important; 
         border-radius: 8px !important; 
         padding: 10px 14px !important; 
     } 
+    div[data-baseweb="input"]:focus-within { border-color: #C5A059 !important; } 
+    input { color: #ffffff !important; font-family: 'Inter', sans-serif !important; } 
 
-    div[data-baseweb="input"]:focus-within { 
-        border-color: #C5A059 !important; 
-        box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.15) !important; 
-    } 
-
-    input { 
-        color: #ffffff !important; 
-        font-family: 'Inter', sans-serif !important; 
-        font-size: 14px !important; 
-    } 
-
-    /* ============================================ 
-       10. BUTTONS LAYOUT 
-       ============================================ */ 
-    [data-testid="stHorizontalBlock"] { 
-        display: flex !important; 
-        flex-wrap: wrap !important; 
-        gap: 10px !important; 
-        justify-content: flex-start !important; 
-        width: 100% !important; 
-    } 
-
-    [data-testid="column"] { 
-        flex: 0 1 auto !important; 
-        width: auto !important; 
-        min-width: fit-content !important; 
-        max-width: fit-content !important; 
-    } 
-
-    div.stButton > button { 
-        width: 170px !important; 
-        min-height: 3.3em !important; 
-        white-space: normal !important; 
-        word-wrap: break-word !important; 
-        padding: 10px 14px !important; 
-        display: flex !important; 
-        align-items: center !important; 
-        justify-content: center !important; 
-        text-align: center !important; 
-        font-size: 13px !important; 
-        line-height: 1.3 !important; 
-    } 
-
-    /* ============================================ 
-       11. SIDEBAR BUTTONS - GOLD THEME 
-       ============================================ */ 
     [data-testid="stSidebar"] div.stButton > button { 
         background: linear-gradient(135deg, rgba(197, 160, 89, 0.1) 0%, rgba(197, 160, 89, 0.05) 100%) !important; 
         color: #C5A059 !important; 
         border: 1px solid rgba(197, 160, 89, 0.25) !important; 
         width: 100% !important; 
-        height: auto !important; 
         min-height: 42px !important; 
         border-radius: 8px !important; 
         font-family: 'Inter', sans-serif !important; 
-        font-weight: 500 !important; 
         font-size: 12px !important; 
-        white-space: nowrap !important; 
-        transition: all 0.25s ease !important; 
         margin-bottom: 6px !important; 
     } 
-
     [data-testid="stSidebar"] div.stButton > button:hover { 
         background: linear-gradient(135deg, rgba(197, 160, 89, 0.2) 0%, rgba(197, 160, 89, 0.1) 100%) !important; 
         border-color: #C5A059 !important; 
         color: #FFD700 !important; 
     } 
+    [data-testid="stSidebar"] div.stButton > button p { color: inherit !important; } 
 
-    [data-testid="stSidebar"] div.stButton > button p { 
-        color: inherit !important; 
-        font-family: 'Inter', sans-serif !important; 
-    } 
-
-    /* ============================================ 
-       12. LABELS 
-       ============================================ */ 
     [data-testid="stWidgetLabel"] p { 
         color: #2d3748 !important; 
         font-family: 'Inter', sans-serif !important; 
@@ -10063,7 +9950,6 @@ with st.sidebar:
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&display=swap');
         
-        /* --- JUDUL UTAMA 3D ELEGANT --- */
         .elegant-header {
             font-family: 'Poppins', sans-serif;
             font-weight: 900;
@@ -10075,35 +9961,17 @@ with st.sidebar:
             border-bottom: 1px solid rgba(197, 160, 89, 0.3);
             letter-spacing: -0.5px;
             line-height: 1.3;
-            
-            /* Efek 3D dengan multiple shadows */
-            text-shadow: 
-                0 1px 0 rgba(255,255,255,0.1),
-                0 2px 0 rgba(0,0,0,0.2),
-                0 3px 0 rgba(0,0,0,0.15),
-                0 4px 15px rgba(0,0,0,0.3),
-                0 0 20px rgba(197, 160, 89, 0.15);
-            
-            /* Gradient text dengan warna lebih kaya */
-            background: linear-gradient(
-                180deg,
-                #FFFFFF 0%,
-                #E8E8E8 30%,
-                #C5A059 60%,
-                #8E6D35 100%
-            );
+            text-shadow: 0 1px 0 rgba(255,255,255,0.1), 0 2px 0 rgba(0,0,0,0.2), 0 3px 0 rgba(0,0,0,0.15), 0 4px 15px rgba(0,0,0,0.3), 0 0 20px rgba(197, 160, 89, 0.15);
+            background: linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 30%, #C5A059 60%, #8E6D35 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            
-            /* Subtle glow effect */
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
         }
         
-        /* --- LOGO KUSTOM DENGAN EFEK GLOW & ANIMASI --- */
         .elegant-header .header-logo {
             display: inline-block;
-            width: 42px; /* Ukuran pas disandingkan dengan teks 2 baris */
+            width: 42px;
             height: auto;
             margin-right: 10px;
             vertical-align: middle;
@@ -10111,13 +9979,11 @@ with st.sidebar:
             animation: logo-bounce 2s ease-in-out infinite;
         }
         
-        /* Animasi halus untuk logo baru */
         @keyframes logo-bounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-4px); }
         }
         
-        /* --- SUBTITLE ELEGANT --- */
         .elegant-subtitle {
             font-family: 'Inter', sans-serif;
             font-size: 11px;
@@ -10131,23 +9997,14 @@ with st.sidebar:
             text-shadow: 0 0 10px rgba(197, 160, 89, 0.3);
         }
         
-        /* --- DECORATIVE LINE --- */
         .elegant-divider {
             height: 2px;
-            background: linear-gradient(
-                90deg,
-                transparent 0%,
-                #C5A059 20%,
-                #FFD700 50%,
-                #C5A059 80%,
-                transparent 100%
-            );
+            background: linear-gradient(90deg, transparent 0%, #C5A059 20%, #FFD700 50%, #C5A059 80%, transparent 100%);
             margin: 15px 0 20px 0;
             border-radius: 2px;
             opacity: 0.6;
         }
         
-        /* --- VERSION TAG --- */
         .version-tag {
             display: inline-block;
             background: linear-gradient(135deg, rgba(197, 160, 89, 0.15) 0%, rgba(197, 160, 89, 0.05) 100%);
@@ -10162,183 +10019,42 @@ with st.sidebar:
             margin-top: 5px;
         }
 
-        /* --- LABEL STYLING --- */
+        /* PERBAIKAN: Hanya merubah warna font label radio di SIDEBAR agar tidak bocor ke Main App */
         section[data-testid="stSidebar"] label p,
         section[data-testid="stSidebar"] .stCaption p {
-            color: #E2E8F0;
+            color: #E2E8F0 !important;
             font-family: 'Inter', sans-serif;
             font-size: 13px;
-            opacity: 1 !important;
-            background: linear-gradient(90deg, #FFFFFF 0%, #94A3B8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* --- INPUT BOX STYLE --- */
-        div[data-baseweb="input"], div[data-baseweb="select"] > div {
-            background-color: #1a2634 !important;
-            border: 1px solid #C5A059 !important;
-            border-radius: 8px !important;
-        } 
-
-        input {
-            color: #FFFFFF !important;
-        }
-
-        /* --- LABEL HITAM DI AREA GELAP --- */
-        div[data-testid="stWidgetLabel"] p {
-            color: #000000 !important;
-            -webkit-text-fill-color: #000000 !important;
-            font-family: 'Inter', sans-serif;
-            font-weight: bold;
-        }
-
-        div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
-            border: 1px solid #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
-
-        /* --- FILE UPLOADER --- */
-        [data-testid="stFileUploaderSection"] {
-            background-color: #1a2634 !important;
-            border: 2px dashed #C5A059 !important;
-            border-radius: 10px !important;
-        }
-
-        [data-testid="stFileUploaderText"] > span,
-        [data-testid="stFileUploaderText"] > small {
-            color: #FFFFFF !important;
-        }
-
-        [data-testid="stFileUploader"] button {
-            background-color: #C5A059 !important;
-            color: #1a2634 !important;
-            border-radius: 5px !important;
-            font-weight: bold !important;
-            border: none !important;
-            padding: 5px 15px !important;
-        }
-
-        [data-testid="stFileUploader"] button:hover {
-            background-color: #FFD700 !important;
-            box-shadow: 0 0 10px rgba(197, 160, 89, 0.4) !important;
-        }
-
-        [data-testid="stFileUploader"] svg {
-            fill: #C5A059 !important;
-        }
-    </style>
-    
-    <div class="elegant-header">
-        <table style="border:none; background:transparent; margin:0; padding:0; border-collapse:collapse;">
-            <tr style="background:transparent; border:none;">
-                <td style="padding:0; border:none; vertical-align:middle;">
-                    <img class="header-logo" src="https://raw.githubusercontent.com/bpputra01-lang/erp-logistik-sby/main/image_981625.png">
-                </td>
-                <td style="padding:0; border:none; vertical-align:middle; line-height:1.2;">
-                    ZKN LOGISTIC<br>ERP
-                </td>
-            </tr>
-        </table>
-    </div>
-    
-    <div class="elegant-subtitle">
-        Warehouse Management System
-    </div>
-    
-    <div class="elegant-divider"></div>
-    
-    <div class="version-tag">v2.1 PRO</div>
-""", unsafe_allow_html=True)
-
-# --- TOMBOL LOGOUT ---
-with st.sidebar:
-    st.markdown("""
-        <style>
-        /* Tombol logout simple elegant */
-        .simple-logout-btn {
-            background: rgba(197, 160, 89, 0.08) !important;
-            border: 1px solid rgba(197, 160, 89, 0.25) !important;
-            border-radius: 8px !important;
-            color: #B8956E !important;
-            font-size: 10px !important;
-            font-weight: 500 !important;
-            letter-spacing: 1px !important;
-            text-transform: uppercase !important;
-            padding: 10px 14px !important;
-            transition: all 0.25s ease !important;
-            margin-top: 10px !important;
-        }
-        
-        .simple-logout-btn:hover {
-            background: rgba(197, 160, 89, 0.15) !important;
-            border-color: #C5A059 !important;
-            color: #C5A059 !important;
-        }
-        
-        .simple-logout-btn::before {
-            content: '🔴  ';
-            font-size: 12px;
         }
         </style>
+        
+        <div class="elegant-header">
+            <table style="border:none; background:transparent; margin:0; padding:0; border-collapse:collapse;">
+                <tr style="background:transparent; border:none;">
+                    <td style="padding:0; border:none; vertical-align:middle;">
+                        <img class="header-logo" src="https://raw.githubusercontent.com/bpputra01-lang/erp-logistik-sby/main/image_981625.png">
+                    </td>
+                    <td style="padding:0; border:none; vertical-align:middle; line-height:1.2;">
+                        ZKN LOGISTIC<br>ERP
+                    </td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="elegant-subtitle">Warehouse Management System</div>
+        <div class="elegant-divider"></div>
+        <div class="version-tag">v2.1 PRO</div>
     """, unsafe_allow_html=True)
-    
-    
-
-import streamlit as st
-
-# --- INITIALIZATION ---
-if 'role' not in st.session_state:
-    st.session_state.role = "CABANG"  # Default aman
-
-# Cek menu default agar tidak error jika Cabang tidak punya akses ke Dashboard Overview
-if 'main_menu' not in st.session_state:
-    if st.session_state.role == "DC":
-        st.session_state.main_menu = "Dashboard Overview"
-    else:
-        st.session_state.main_menu = "Compare Penerimaan RTO"
-
-# Fungsi callback untuk sinkronisasi menu
-def change_m1():
-    st.session_state.main_menu = st.session_state.m1_key
-def change_m2():
-    st.session_state.main_menu = st.session_state.m2_key
-def change_m3():
-    st.session_state.main_menu = st.session_state.m3_key
-def change_m4():
-    st.session_state.main_menu = st.session_state.m4_key
-def change_m5():
-    st.session_state.main_menu = st.session_state.m5_key
-
-# --- INITIALIZATION (Pastikan ini ada di atas sebelum sidebar) ---
-if 'role' not in st.session_state:
-    st.session_state.role = "CABANG" # Default safe role
-
-if 'main_menu' not in st.session_state:
-    # Default menu berdasarkan role agar tidak error
-    if st.session_state.role == "DC":
-        st.session_state.main_menu = "Dashboard Overview"
-    else:
-        st.session_state.main_menu = "Compare Penerimaan RTO"
-
-# --- CALLBACK FUNCTIONS (Untuk Sinkronisasi Antar Radio) ---
-def sync_menu(key):
-    st.session_state.main_menu = st.session_state[key]
-
-# --- SIDEBAR CONTENT ---
-with st.sidebar:
-    # ... (Bagian CSS Elegant Header & Logo tetap di sini, jangan dihapus) ...
 
     # Logika Filter Menu Berdasarkan Role
     is_dc = st.session_state.role == "DC"
 
     # --- KELOMPOK 1: DASHBOARD SUMMARY ---
-    if is_dc: # Hanya muncul untuk DC
+    if is_dc: 
         st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 10px; margin-bottom: -5px;">MAIN MENU</p>', unsafe_allow_html=True)
         st.markdown('<p style="font-weight: bold; color: #808495; margin-bottom: 5px;">DASHBOARD SUMMARY</p>', unsafe_allow_html=True)
         
         m1_list = ["Dashboard Overview", "Database Master"]
-        # Jika menu yang sedang aktif tidak ada di list ini, set index ke None agar radio tidak terpilih
         idx1 = m1_list.index(st.session_state.main_menu) if st.session_state.main_menu in m1_list else None
         st.radio("M1", m1_list, index=idx1, key="m1_key", on_change=sync_menu, args=("m1_key",), label_visibility="collapsed")
 
@@ -10347,7 +10063,7 @@ with st.sidebar:
     if is_dc:
         m2_list = ["Purchase Order Receiving", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
     else:
-        m2_list = ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"] # Menu Cabang
+        m2_list = ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"]
         
     idx2 = m2_list.index(st.session_state.main_menu) if st.session_state.main_menu in m2_list else None
     st.radio("M2", m2_list, index=idx2, key="m2_key", on_change=sync_menu, args=("m2_key",), label_visibility="collapsed")
@@ -10355,20 +10071,16 @@ with st.sidebar:
     # --- KELOMPOK 3: INVENTORY ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">INVENTORY</p>', unsafe_allow_html=True)
     if is_dc:
-        m3_list = ["Stock Opname","Match Real & System","Cycle Count","Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill", "Stock Allocation"]
+        m3_list = ["Stock Opname","Match Real & System","Cycle Count", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "Compare System", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill"]
     else:
-        m3_list = ["Stock Minus","Cycle Count","Compare System", "Justification SO"] # Menu Cabang
+        m3_list = ["Stock Minus","Cycle Count"]
 
     idx3 = m3_list.index(st.session_state.main_menu) if st.session_state.main_menu in m3_list else None
     st.radio("M3", m3_list, index=idx3, key="m3_key", on_change=sync_menu, args=("m3_key",), label_visibility="collapsed")
 
     # --- KELOMPOK 4: REJECT/DEFECT ---
     st.markdown('<p style="font-weight: bold; color: #808495; margin-top: 25px; margin-bottom: 5px;">REJECT & DEFECT</p>', unsafe_allow_html=True)
-    if is_dc:
-        m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"]
-    else:
-        m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"] # Menu Cabang
-
+    m4_list = ["Pengajuan Reject/Defect", "Reject/Defect List"]
     idx4 = m4_list.index(st.session_state.main_menu) if st.session_state.main_menu in m4_list else None
     st.radio("M4", m4_list, index=idx4, key="m4_key", on_change=sync_menu, args=("m4_key",), label_visibility="collapsed")
 
@@ -10377,16 +10089,17 @@ with st.sidebar:
     if is_dc:
         m5_list = ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display","Precentage Request FL to Store Stock", "Refill Toko"]
     else:
-        m5_list = ["Precentage Display","Refill Toko","Store Leader RTO Decission"] # Menu Cabang
+        m5_list = ["Precentage Display","Refill Toko","Store Leader RTO Decission"]
 
     idx5 = m5_list.index(st.session_state.main_menu) if st.session_state.main_menu in m5_list else None
     st.radio("M5", m5_list, index=idx5, key="m5_key", on_change=sync_menu, args=("m5_key",), label_visibility="collapsed")
 
-
-    # Tombol Logout (Tetap di bawah)
+    st.divider()
+    
     if st.button("🔴 Logout", key="simple_logout"):
         st.session_state.logged_in = False
-        st.session_state.login_success = False
+        if 'login_success' in st.session_state:
+            del st.session_state['login_success']
         st.rerun()
 
 # Variabel final untuk kontrol konten di main area
