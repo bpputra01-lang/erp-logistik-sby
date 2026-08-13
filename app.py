@@ -3593,7 +3593,7 @@ def menu_allocation_stock():
     # --------------------------------------------------------------------------
     # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
     # --------------------------------------------------------------------------
-    with st.expander("💡Logic Thinking")
+    with st.expander("💡Logic Thinking"):
         st.markdown("### 📘 Aturan Pembersihan Kata Kunci (Kolom A)")
         st.write("- **Sales Online:** Mengambil record data jika nama store mengandung kata `'ONLINE'`")
         st.write("- **Sales Offline:** Mengambil record data jika nama store mengandung kata `'JEZ'`")
