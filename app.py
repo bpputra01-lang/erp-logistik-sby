@@ -3518,65 +3518,65 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     ]
     
     return df_merged[output_cols]
-st.markdown("""
-    <style>
-        .reportview-container { background: #0f111a; }
-        .main { background-color: #0f111a; color: #ffffff; }
-        h1, h2, h3 { color: #ffffff !important; font-family: 'Segoe UI', sans-serif; }
-        
-        /* Menyelaraskan Tombol agar mirip dengan Refill & Withdraw */
-        div.stButton > button { 
-            width: 100% !important; 
-            background-color: #002b5b !important; 
-            color: white !important; 
-            font-weight: bold !important; 
-            border: 1px solid #ffc107 !important; 
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-        div.stButton > button:hover {
-            background-color: #004085 !important;
-            border-color: #ffffff !important;
-        }
-        
-        /* Struktur Hero Header matching Refill & Withdraw */
-        .hero-header {
-            background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
-            padding: 20px;
-            border-radius: 10px;
-            color: white;
-            text-align: center;
-            margin-bottom: 25px;
-            border: 1px solid rgba(255, 193, 7, 0.2);
-        }
-        .hero-header h1 {
-            color: white !important;
-            margin: 0;
-            font-size: 28px;
-        }
-        .hero-subtitle {
-            color: #ffc107;
-            font-size: 14px;
-            margin-top: 5px;
-            font-weight: 500;
-        }
-        
-        /* Premium Metric Box Custom Styling with Navy & Gold Border */
-        .metric-card {
-            background: linear-gradient(135deg, #001f42 0%, #002b5b 100%) !important;
-            border-left: 4px solid #ffc107 !important;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            margin-bottom: 20px;
-            border-top: 1px solid rgba(255,255,255,0.05);
-            border-right: 1px solid rgba(255,255,255,0.05);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .metric-title { color: #a2b7d4; font-size: 12px; text-transform: uppercase; font-weight: bold; }
-        .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
-    </style>
-""", unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+            .reportview-container { background: #0f111a; }
+            .main { background-color: #0f111a; color: #ffffff; }
+            h1, h2, h3 { color: #ffffff !important; font-family: 'Segoe UI', sans-serif; }
+            
+            /* Menyelaraskan Tombol agar mirip dengan Refill & Withdraw */
+            div.stButton > button { 
+                width: 100% !important; 
+                background-color: #002b5b !important; 
+                color: white !important; 
+                font-weight: bold !important; 
+                border: 1px solid #ffc107 !important; 
+                border-radius: 8px;
+                transition: all 0.3s ease;
+            }
+            div.stButton > button:hover {
+                background-color: #004085 !important;
+                border-color: #ffffff !important;
+            }
+            
+            /* Struktur Hero Header matching Refill & Withdraw */
+            .hero-header {
+                background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
+                padding: 20px;
+                border-radius: 10px;
+                color: white;
+                text-align: center;
+                margin-bottom: 25px;
+                border: 1px solid rgba(255, 193, 7, 0.2);
+            }
+            .hero-header h1 {
+                color: white !important;
+                margin: 0;
+                font-size: 28px;
+            }
+            .hero-subtitle {
+                color: #ffc107;
+                font-size: 14px;
+                margin-top: 5px;
+                font-weight: 500;
+            }
+            
+            /* Premium Metric Box Custom Styling with Navy & Gold Border */
+            .metric-card {
+                background: linear-gradient(135deg, #001f42 0%, #002b5b 100%) !important;
+                border-left: 4px solid #ffc107 !important;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+                margin-bottom: 20px;
+                border-top: 1px solid rgba(255,255,255,0.05);
+                border-right: 1px solid rgba(255,255,255,0.05);
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+            }
+            .metric-title { color: #a2b7d4; font-size: 12px; text-transform: uppercase; font-weight: bold; }
+            .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
+        </style>
+    """, unsafe_allow_html=True)
 
 
 def menu_allocation_stock():
@@ -3593,15 +3593,16 @@ def menu_allocation_stock():
     # --------------------------------------------------------------------------
     # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
     # --------------------------------------------------------------------------
-    with st.expander("⚙️ LIHAT ATURAN LOGIKA PROSES & MATRIKS PERSENTASE ALOKASI"):
-        st.markdown("### 📘 Aturan Pembersihan Kata Kunci (Kolom A)")
-        st.write("- **Sales Online:** Mengambil record data jika nama store mengandung kata `'ONLINE'`")
-        st.write("- **Sales Offline:** Mengambil record data jika nama store mengandung kata `'JEZ'`")
+    # --------------------------------------------------------------------------
+    # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
+    # --------------------------------------------------------------------------
+    with st.expander("💡Logic Thinking"):
+        st.info("""
+        **KLASIFIKASI SALES & PROPORSI PEMBAGIAN:**
+        Sistem menentukan persentase alokasi tiap SKU berdasarkan performa rasio penjualan 90 hari terakhir.
+        """)
         
-        st.markdown("### 📊 Tabel Acuan Persentase Alokasi")
-        st.write("Sistem menentukan persentase alokasi tiap SKU berdasarkan performa rasio penjualan berikut:")
-        
-        # Aturan matriks terbaru dengan fokus Logistik Utama jika 0 Sales
+        # Membuat DataFrame aturan matriks agar rapi dalam bentuk tabel
         rules_data = {
             "Kondisi Performa SKU": [
                 "Tidak Ada Histori Sales (0 Unit)",
@@ -3615,8 +3616,6 @@ def menu_allocation_stock():
         }
         df_rules = pd.DataFrame(rules_data)
         st.table(df_rules)
-        
-        st.info("💡 **Efisiensi Stok Mati:** SKU yang tidak mencatat penjualan selama 90 hari akan diamankan sebanyak **80% di Logistik Utama** agar area penjualan Online/Offline terhindar dari tumpukan barang *slow-moving*.")
 
     st.write("")
 
