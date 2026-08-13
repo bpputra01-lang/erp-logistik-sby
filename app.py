@@ -3539,7 +3539,7 @@ def generate_stock_allocation(df_stock, df_sales_summary):
     return df_merged[output_cols]
 
 
-def def_menu_allocation_stock():
+def menu_allocation_stock():
     """
     Interface Khusus untuk Menu Alokasi Stok Gudang (Online, Offline, Logistik)
     """
