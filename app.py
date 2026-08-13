@@ -10206,7 +10206,7 @@ if menu == "Putaway System":
         "", # Mengosongkan label bawaan selectbox
         ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
         index=None,  
-        placeholder="-- Pilih Area Putaway Terlebih Dahulu --",
+        placeholder="-- Pilih Area Putaway --",
         key="area_putaway",
         label_visibility="collapsed" # Menyembunyikan space kosong bekas label biar makin rapi
     )
