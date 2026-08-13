@@ -3376,65 +3376,6 @@ def menu_Stock_Opname():
 
 
 # ==============================================================================
-# LOGIC PROCESS MENU "STOCK ALLOCATION"
-# ==============================================================================
-
-
-import pandas as pd
-import numpy as np
-
-def clean_and_process_sales(df_sales):
-    """
-    Membersihkan data sales: mengubah qty ke numerik, 
-    mengabaikan nilai '-', dan memisahkan sales Online vs Offline.
-    """
-    # Salin dataframe agar tidak merubah data asli
-    df = df_sales.copy()
-    
-    # Konversi kolom S (QTY) menjadi numerik, abaikan karakter non-numerik seperti '-'
-    df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
-    
-    # Identifikasi nama kolom berdasarkan index untuk mempermudah logic
-    col_store = df.columns[0]   # Kolom A
-    col_sku = df.columns[26]    # Kolom AA
-    col_qty = df.columns[18]    # Kolom S
-    
-    # Filter & Pisahkan QTY Sales berdasarkan store (Online vs Offline)
-    df['SALES_ONLINE'] = np.where(df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
-    df['SALES_OFFLINE'] = np.where(~df[col_store].str.upper().str.contains('ONLINE', na=False), df[col_qty], 0)
-    
-    # Grouping per Unique SKU (Kolom AA)
-    df_summary = df.groupby(col_sku).agg({
-        'SALES_ONLINE': 'sum',
-        'SALES_OFFLINE': 'sum'
-    }).reset_index()
-    
-    df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
-    return df_summary
-
-def calculate_dynamic_proportion(row):
-    """
-    Menghitung persentase alokasi proporsional berdasarkan sales 90 hari terakhir.
-    """
-    total = row['TOTAL_SALES']
-    if total == 0:
-        # Jika tidak ada penjualan, amankan 80% di Logistik Utama
-        return 0.10, 0.10, 0.80 
-    
-    pct_online = row['SALES_ONLINE'] / total
-    pct_offline = row['SALES_OFFLINE'] / total
-    
-    if pct_online > 0.7:      # Dominan Online
-        return 0.70, 0.10, 0.20
-    elif pct_offline > 0.7:   # Dominan Offline
-        return 0.10, 0.70, 0.20
-    else:                     # Balanced / Imbang
-        return 0.40, 0.40, 0.20
-
-
-
-
-# ==============================================================================
 # LOGIC PROSES MENU "STOCK TRACKING TIMELINE"
 # ==============================================================================
 import streamlit as st
