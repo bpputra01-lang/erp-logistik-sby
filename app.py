@@ -9442,7 +9442,6 @@ supabase = init_connection()
 # --- 2. DEFINISI FUNGSI ---
 def fetch_data():
     try:
-        # Mengambil data dari tabel shipping_costs di Supabase
         res = supabase.table("shipping_costs").select("*").execute()
         return pd.DataFrame(res.data)
     except Exception:
@@ -9451,10 +9450,8 @@ def fetch_data():
 def clean_currency(value):
     if pd.isna(value) or value == "":
         return 0
-    # Buang Rp, buang titik (ribuan), buang koma (desimal), buang spasi
     clean_val = str(value).replace('Rp', '').replace('.', '').replace(',', '').strip()
     try:
-        # Pake float dulu baru int buat jaga-jaga kalau ada desimal
         return int(float(clean_val))
     except:
         return 0
@@ -9477,7 +9474,6 @@ def save_data_ongkir(supplier, ekspedisi, koli, ongkir, tanggal_jam):
 def sync_data():
     try:
         today = datetime.now().strftime("%Y-%m-%d")
-        # Pakai upsert biar kalau tanggalnya udah ada dia cuma update
         supabase.table("reset_tracker").upsert({"last_date": today}, on_conflict="last_date").execute()
     except Exception as e:
         print(f"⚠️ {e}")
@@ -9509,17 +9505,6 @@ def show_database_ongkir():
             border-color: #FFD700 !important;
             box-shadow: 0 0 0 1px #FFD700 !important;
         }
-        .solid-header {
-            background-color: #FFD700 !important; 
-            color: #0e1117 !important; 
-            padding: 10px 15px !important;
-            border-radius: 5px !important;
-            font-weight: 900 !important;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            margin-bottom: 15px !important;
-            display: inline-block;
-        }
         .stButton button, .stDownloadButton button {
             background-color: #1a1e24 !important; 
             color: #FFD700 !important; 
@@ -9539,14 +9524,6 @@ def show_database_ongkir():
             transform: translateY(-3px); 
             box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4); 
         }
-        .stButton button:focus, .stDownloadButton button:focus {
-            box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.5) !important;
-            outline: none !important;
-        }
-        input[type="number"] {
-            color: #ffffff !important;
-            background-color: #0e1117 !important;
-        }
         [data-testid="stExpander"] details summary {
             background-color: #1a1e24 !important; 
             color: #FFFFFF !important; 
@@ -9554,22 +9531,6 @@ def show_database_ongkir():
             border-radius: 8px !important;
             padding: 10px 15px !important;
             transition: 0.3s !important;
-        }
-        [data-testid="stMetricValue"] {
-            color: #FFD700 !important;
-            font-size: 28px !important;
-            font-weight: 700 !important;
-        }
-        [data-testid="stMetricLabel"] {
-            color: #ffffff !important;
-            font-size: 14px !important;
-            letter-spacing: 1px;
-        }
-        .stMetric {
-            background-color: #1e2227;
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 5px solid #FFD700;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -9633,27 +9594,21 @@ def show_database_ongkir():
                                 error_rows = []
                                 
                                 for idx, row in df_mass.iterrows():
-                                    # Handle Supplier & Ekspedisi
                                     sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
                                     eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
                                     
-                                    # Handle Total Koli (Pastikan integer valid)
                                     try:
                                         koli = int(float(row["TOTAL KOLI"])) if not pd.isna(row["TOTAL KOLI"]) else 0
                                     except:
                                         koli = 0
                                         
-                                    # Handle Ongkir
                                     ongkir = clean_currency(row["ONGKIR"])
                                     
-                                    # Handle Tanggal Jam (Konversi otomatis ke format ISO Standar)
                                     tgl_jam_raw = row["TANGGAL_JAM"]
                                     if pd.isna(tgl_jam_raw) or str(tgl_jam_raw).strip() == "":
-                                        # Fallback ke waktu sekarang jika kosong
                                         fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                     else:
                                         try:
-                                            # Mengunci parsing agar mendahulukan Hari (Day) sebelum Bulan (Month)
                                             fix_dt = pd.to_datetime(tgl_jam_raw, dayfirst=True).strftime("%Y-%m-%d %H:%M:%S")
                                         except:
                                             error_rows.append(f"Baris {idx+2}: Format tanggal '{tgl_jam_raw}' tidak valid.")
@@ -9671,15 +9626,13 @@ def show_database_ongkir():
                                         "created_at": fix_dt
                                     })
                                 
-                                # Jika ada error parsing sebelum ke database
                                 if error_rows:
                                     st.error("Gagal memproses file. Silakan perbaiki baris berikut:")
-                                    for err in error_rows[:10]: # Tampilkan max 10 error
+                                    for err in error_rows[:10]:
                                         st.text(err)
                                     if len(error_rows) > 10:
                                         st.text(f"...dan {len(error_rows) - 10} baris lainnya.")
                                 else:
-                                    # Eksekusi ke Supabase dengan aman
                                     try:
                                         if batch_data:
                                             supabase.table("shipping_costs").insert(batch_data).execute()
@@ -9689,7 +9642,6 @@ def show_database_ongkir():
                                             st.warning("Tidak ada data valid yang bisa diupload.")
                                     except Exception as db_err:
                                         st.error(f"Gagal menyimpan ke Database Supabase: {db_err}")
-                                        st.info("💡 Pastikan nama kolom di database sesuai dengan key script (supplier, ekspedisi, total_koli, total_ongkir, created_at) dan tidak melanggar constraint database.")
                     else:
                         st.error(f"Format salah! Harus mengandung kolom: {required}")
 
@@ -9730,62 +9682,109 @@ def show_database_ongkir():
             if pilih_ekspedisi != "SEMUA":
                 df_filtered = df_filtered[df_filtered['ekspedisi'] == pilih_ekspedisi]
 
+            # --- LOGIKA DASHBOARD & METRICS ---
+            total_biaya = df_filtered['total_ongkir'].sum()
+            total_koli = df_filtered['total_koli'].sum()
+            avg_overall = total_biaya / total_koli if total_koli > 0 else 0
+
+            mask_rto = df_filtered['supplier'].str.contains('RTO', case=False, na=False)
+            df_rto = df_filtered[mask_rto]
+            df_datang = df_filtered[~mask_rto]
+
+            biaya_rto = df_rto['total_ongkir'].sum()
+            koli_rto = df_rto['total_koli'].sum()
+            avg_rto = biaya_rto / koli_rto if koli_rto > 0 else 0
+
+            biaya_datang = df_datang['total_ongkir'].sum()
+            koli_datang = df_datang['total_koli'].sum()
+            avg_datang = biaya_datang / koli_datang if koli_datang > 0 else 0
+
+            # --- HEADER METRIC BOXES ---
             st.markdown("""
                 <div style="background-color: #1e2227; padding: 10px 15px; border-radius: 8px; border-left: 5px solid #FFD700; margin-top: 25px; margin-bottom: 15px;">
-                    <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">💲 TOTAL BIAYA ONGKIR</h4>
+                    <h4 style="color: white; margin: 0; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 600;">💲 SUMMARY BIAYA & KOLI</h4>
                 </div>
             """, unsafe_allow_html=True)
 
-            total_biaya = df_filtered['total_ongkir'].sum()
-            total_koli = df_filtered['total_koli'].sum()
-            avg = total_biaya / total_koli if total_koli > 0 else 0
-            mask_rto = df_filtered['supplier'].str.contains('RTO', case=False, na=False)
-            biaya_rto = df_filtered[mask_rto]['total_ongkir'].sum()
-            biaya_datang = df_filtered[~mask_rto]['total_ongkir'].sum()
-
-            # --- TAB 2: METRIC BOXES ---
+            # --- ROW 1: TOTAL OVERALL ---
             m1, m2, m3 = st.columns(3)
-            
             with m1:
                 st.markdown(f'''
-                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
-                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">💰 TOTAL BIAYA ALL</span>
-                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">Rp {total_biaya:,.0f}</span>
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">💰 TOTAL BIAYA ALL</span>
+                        <span style="color: #FFD700; font-size: 1.8rem; font-weight: 800;">Rp {total_biaya:,.0f}</span>
                     </div>
                 ''', unsafe_allow_html=True)
             
             with m2:
                 st.markdown(f'''
-                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
-                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">📦 TOTAL KOLI</span>
-                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">{total_koli} <small style="font-size: 1rem;">Koli/Bag</small></span>
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">📦 TOTAL KOLI ALL</span>
+                        <span style="color: #FFD700; font-size: 1.8rem; font-weight: 800;">{total_koli:,.0f} <small style="font-size: 0.9rem;">Koli</small></span>
                     </div>
                 ''', unsafe_allow_html=True)
 
             with m3:
                 st.markdown(f'''
-                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
-                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">📊 AVG COST/KOLI</span>
-                        <span style="color: #FFD700; font-size: 2rem; font-weight: 800;">Rp {avg:,.0f}</span>
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #FFD700; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">📊 AVG COST/KOLI ALL</span>
+                        <span style="color: #FFD700; font-size: 1.8rem; font-weight: 800;">Rp {avg_overall:,.0f}</span>
                     </div>
                 ''', unsafe_allow_html=True)
 
-            st.markdown("<br>", unsafe_allow_html=True) # Jeda antar baris
+            st.markdown("<br>", unsafe_allow_html=True)
 
-            m4, m5 = st.columns(2)
-            with m4:
+            # --- ROW 2: BARANG DATANG ---
+            d1, d2, d3 = st.columns(3)
+            with d1:
                 st.markdown(f'''
-                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #FF4B4B; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
-                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">🔄 BIAYA RTO</span>
-                        <span style="color: #FF4B4B; font-size: 2rem; font-weight: 800;">Rp {biaya_rto:,.0f}</span>
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #00EB93; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">🚚 BIAYA BARANG DATANG</span>
+                        <span style="color: #00EB93; font-size: 1.8rem; font-weight: 800;">Rp {biaya_datang:,.0f}</span>
                     </div>
                 ''', unsafe_allow_html=True)
 
-            with m5:
+            with d2:
                 st.markdown(f'''
-                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #00EB93; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
-                        <span style="color: #888; font-size: 0.9rem; font-weight: bold; display: block;">🚚 BIAYA BARANG DATANG</span>
-                        <span style="color: #00EB93; font-size: 2rem; font-weight: 800;">Rp {biaya_datang:,.0f}</span>
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #00EB93; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">📦 KOLI BARANG DATANG</span>
+                        <span style="color: #00EB93; font-size: 1.8rem; font-weight: 800;">{koli_datang:,.0f} <small style="font-size: 0.9rem;">Koli</small></span>
+                    </div>
+                ''', unsafe_allow_html=True)
+
+            with d3:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #00EB93; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">📊 AVG COST DATANG</span>
+                        <span style="color: #00EB93; font-size: 1.8rem; font-weight: 800;">Rp {avg_datang:,.0f}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # --- ROW 3: RTO ---
+            r1, r2, r3 = st.columns(3)
+            with r1:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #FF4B4B; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">🔄 BIAYA RTO</span>
+                        <span style="color: #FF4B4B; font-size: 1.8rem; font-weight: 800;">Rp {biaya_rto:,.0f}</span>
+                    </div>
+                ''', unsafe_allow_html=True)
+
+            with r2:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #FF4B4B; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">📦 KOLI RTO</span>
+                        <span style="color: #FF4B4B; font-size: 1.8rem; font-weight: 800;">{koli_rto:,.0f} <small style="font-size: 0.9rem;">Koli</small></span>
+                    </div>
+                ''', unsafe_allow_html=True)
+
+            with r3:
+                st.markdown(f'''
+                    <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #FF4B4B; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">📊 AVG COST RTO</span>
+                        <span style="color: #FF4B4B; font-size: 1.8rem; font-weight: 800;">Rp {avg_rto:,.0f}</span>
                     </div>
                 ''', unsafe_allow_html=True)
 
@@ -9809,7 +9808,6 @@ def show_database_ongkir():
                 st.warning(f"Terpilih {len(ids_to_delete)} data untuk dihapus.")
                 if st.button("🗑️ HAPUS DATA TERPILIH", type="primary"):
                     try:
-                        # Langsung hapus semua ID yang ada di dalam list
                         supabase.table("shipping_costs").delete().in_("id", ids_to_delete).execute()
                         st.success(f"Berhasil menghapus {len(ids_to_delete)} data!")
                         st.rerun()
