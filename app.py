@@ -9755,7 +9755,7 @@ def show_database_ongkir():
             with d3:
                 st.markdown(f'''
                     <div style="background: linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%); padding: 18px; border-radius: 12px; border-left: 5px solid #00EB93; box-shadow: 2px 4px 15px rgba(0,0,0,0.3);">
-                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">📊 AVG COST DATANG</span>
+                        <span style="color: #888; font-size: 0.85rem; font-weight: bold; display: block;">📊 AVG COST BARANG DATANG</span>
                         <span style="color: #00EB93; font-size: 1.8rem; font-weight: 800;">Rp {avg_datang:,.0f}</span>
                     </div>
                 ''', unsafe_allow_html=True)
