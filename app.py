@@ -10572,7 +10572,58 @@ if menu == "Putaway System":
     else:
         # Peringatan kalau belum pilih area
         st.warning("⚠️ Silakan pilih Area Putaway di atas terlebih dahulu untuk menampilkan form upload file.")
+# Pastikan session_state diinisialisasi jika belum ada agar aman dari error NoneType
+    if 'putaway_results' in st.session_state and st.session_state['putaway_results'] is not None:
+        r = st.session_state['putaway_results']
+        
+        st.divider()
+        st.markdown('<h3 style="color: #010B13;">📋 RINGKASAN HASIL</h3>', unsafe_allow_html=True)
+        
+        # --- HITUNG METRICS ---
+        total_compare_qty = r.get('total_awal', 0)
+        total_list_qty = int(r['df_plist']['QUANTITY'].sum()) if not r['df_plist'].empty else 0
+        total_kurang_qty = int(r['df_kurang']['DIFF'].sum()) if not r['df_kurang'].empty else 0
+        
+        lt3_total_qty = 0
+        if not r['df_lt3'].empty:
+            qty_col = [c for c in r['df_lt3'].columns if 'qty' in str(c).lower()]
+            if qty_col:
+                lt3_total_qty = int(r['df_lt3'][qty_col[0]].sum())
 
+        # --- TAMPILKAN METRICS BOX ---
+        m1, m2, m3, m4 = st.columns(4)
+        m1.markdown(f'<div class="m-box"><span class="m-lbl">Qty System Putaway</span><span class="m-val">{total_compare_qty}</span></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="m-box"><span class="m-lbl">Total Tersetup</span><span class="m-val">{total_list_qty}</span></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="m-box"><span class="m-lbl">Kurang Setup</span><span class="m-val">{total_kurang_qty}</span></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="m-box"><span class="m-lbl">Sisa Stok Putaway</span><span class="m-val">{lt3_total_qty}</span></div>', unsafe_allow_html=True)
+
+        # --- TABS HASIL ---
+        t1, t2, t3, t4 = st.tabs(["📋 Hasil Compare", "📝 List Setup", "⚠️ Kurang Setup", "📦 Outstanding"])
+        
+        with t1: st.dataframe(r['df_comp'], use_container_width=True)
+        with t2: st.dataframe(r['df_plist'], use_container_width=True)
+        with t3: 
+            if not r['df_kurang'].empty: st.dataframe(r['df_kurang'], use_container_width=True)
+            else: st.success("✅ Semua Tercover!")
+        with t4: 
+            if not r['df_lt3'].empty: st.dataframe(r['df_lt3'], use_container_width=True)
+            else: st.success("✅ Tidak ada Outstanding!")
+
+        # --- TOMBOL DOWNLOAD ---
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            r['df_comp'].to_excel(writer, sheet_name='COMPARE', index=False)
+            r['df_plist'].to_excel(writer, sheet_name='PUTAWAY_LIST', index=False)
+            r['df_kurang'].to_excel(writer, sheet_name='KURANG_SETUP', index=False)
+            r['df_lt3'].to_excel(writer, sheet_name='OUTSTANDING', index=False)
+            r['df_updated_bin'].to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
+        
+        st.download_button(
+            label="📥 DOWNLOAD REPORT",
+            data=output.getvalue(),
+            file_name="REPORT_PUTAWAY_SYSTEM.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 # ==============================================================================
 # LOGIC INTERFACE MENU "COMPARE SYSTEM"
 # ==============================================================================
