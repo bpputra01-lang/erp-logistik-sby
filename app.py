@@ -3664,7 +3664,7 @@ def menu_allocation_stock():
 
             st.success("✅ Kedua file berhasil dimuat ke sistem. Siap diproses!")
 
-            if st.button("▶️ RUN PROCESS", use_container_width=True):
+            if st.button("▶️ RUN PROCESS", use_container_width=False):
                 with st.spinner(
                     "Sedang memproses algoritma dynamic allocation..."
                 ):
