@@ -3524,7 +3524,7 @@ def generate_stock_allocation(df_stock, df_sales_summary):
             .main { background-color: #0f111a; color: #ffffff; }
             h1, h2, h3 { color: #ffffff !important; font-family: 'Segoe UI', sans-serif; }
             
-            /* Menyelaraskan Tombol agar mirip dengan Refill & Withdraw */
+            /* Tombol */
             div.stButton > button { 
                 width: 100% !important; 
                 background-color: #002b5b !important; 
@@ -3539,7 +3539,7 @@ def generate_stock_allocation(df_stock, df_sales_summary):
                 border-color: #ffffff !important;
             }
             
-            /* Struktur Hero Header matching Refill & Withdraw */
+            /* Hero Header */
             .hero-header {
                 background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
                 padding: 20px;
@@ -3561,7 +3561,7 @@ def generate_stock_allocation(df_stock, df_sales_summary):
                 font-weight: 500;
             }
             
-            /* Premium Metric Box Custom Styling with Navy & Gold Border */
+            /* Metric Card Custom Styling */
             .metric-card {
                 background: linear-gradient(135deg, #001f42 0%, #002b5b 100%) !important;
                 border-left: 4px solid #ffc107 !important;
@@ -3573,8 +3573,22 @@ def generate_stock_allocation(df_stock, df_sales_summary):
                 border-right: 1px solid rgba(255,255,255,0.05);
                 border-bottom: 1px solid rgba(255,255,255,0.05);
             }
-            .metric-title { color: #a2b7d4; font-size: 12px; text-transform: uppercase; font-weight: bold; }
-            .metric-value { color: #ffffff; font-size: 28px; font-weight: bold; margin-top: 5px; }
+            
+            /* PERBAIKAN WARNA TEKS DENGAN !IMPORTANT */
+            .metric-title { 
+                color: #d1e3ff !important; /* Biru terang agar kontras & jelas */
+                font-size: 13px !important; 
+                text-transform: uppercase !important; 
+                font-weight: bold !important; 
+                letter-spacing: 0.5px;
+            }
+            .metric-value { 
+                color: #ffffff !important; /* Putih murni tajam */
+                font-size: 28px !important; 
+                font-weight: bold !important; 
+                margin-top: 8px !important; 
+                text-shadow: 0px 2px 4px rgba(0,0,0,0.5); /* Efek bayangan agar teks makin menonjol */
+            }
         </style>
     """, unsafe_allow_html=True)
 
