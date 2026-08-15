@@ -3541,79 +3541,78 @@ def menu_allocation_stock():
     """
 
     # FIX: Taruh CSS custom di paling atas fungsi UI agar PASTI TEREKSEKUSI
-    st.markdown(
-        """
-        <style>
-            .reportview-container { background: #0f111a; }
-            .main { background-color: #0f111a; color: #ffffff; }
-            h1, h2, h3 { color: #ffffff !important; font-family: 'Segoe UI', sans-serif; }
-            
-            /* Tombol */
-            div.stButton > button { 
-                width: 100% !important; 
-                background-color: #002b5b !important; 
-                color: white !important; 
-                font-weight: bold !important; 
-                border: 1px solid #ffc107 !important; 
-                border-radius: 8px;
-                transition: all 0.3s ease;
-            }
-            div.stButton > button:hover {
-                background-color: #004085 !important;
-                border-color: #ffffff !important;
-            }
-            
-            /* Hero Header */
-            .hero-header {
-                background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
-                padding: 20px;
-                border-radius: 10px;
-                color: white;
-                text-align: center;
-                margin-bottom: 25px;
-                border: 1px solid rgba(255, 193, 7, 0.2);
-            }
-            .hero-header h1 {
-                color: white !important;
-                margin: 0;
-                font-size: 28px;
-            }
-            
-            /* Metric Card Custom Styling (FIXED HIGH CONTRAST COLORS) */
-            .metric-card {
-                background: linear-gradient(135deg, #001f42 0%, #002b5b 100%) !important;
-                border-left: 4px solid #ffc107 !important;
-                padding: 18px 15px !important;
-                border-radius: 8px;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-                margin-bottom: 20px;
-                border-top: 1px solid rgba(255,255,255,0.08);
-                border-right: 1px solid rgba(255,255,255,0.08);
-                border-bottom: 1px solid rgba(255,255,255,0.08);
-            }
-            
-            /* Diberikan !important agar tidak ditimpa Streamlit */
-            .metric-title { 
-                color: #ffc107 !important; /* Hijau/Kuning Emas agar sangat kontras di background biru gelap */
-                font-size: 13px !important; 
-                text-transform: uppercase !important; 
-                font-weight: 700 !important; 
-                letter-spacing: 0.5px !important;
-                margin-bottom: 6px !important;
-            }
-            
-            .metric-value { 
-                color: #ffffff !important; /* Putih terang murni */
-                font-size: 26px !important; 
-                font-weight: 800 !important; 
-                line-height: 1.2 !important;
-                text-shadow: 0px 2px 4px rgba(0,0,0,0.7) !important;
-            }
-        </style>
-    """,
-        unsafe_allow_html=True,
-    )
+    st.markdown("""
+    <style>
+        /* Tetapkan warna background & teks global agar konsisten */
+        .main { background-color: #0f111a; color: #ffffff; }
+        
+        /* Hanya h1/h2/h3 di area main dark mode yang berwarna terang */
+        .main h1, .main h2, .main h3 { 
+            color: #1e293b !important; /* Biru Gelap/Hitam Tajam agar jelas terlihat di Light Mode */
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: 700;
+        }
+        
+        /* Khusus Hero Header (karena background-nya biru gelap), paksa h1 jadi Putih */
+        .hero-header h1 {
+            color: #ffffff !important;
+            margin: 0;
+            font-size: 28px;
+        }
 
+        /* Tombol Custom */
+        div.stButton > button { 
+            width: 100% !important; 
+            background-color: #002b5b !important; 
+            color: white !important; 
+            font-weight: bold !important; 
+            border: 1px solid #ffc107 !important; 
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        div.stButton > button:hover {
+            background-color: #004085 !important;
+            border-color: #ffffff !important;
+        }
+        
+        /* Hero Header */
+        .hero-header {
+            background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 193, 7, 0.2);
+        }
+        
+        /* Metric Card Custom Styling */
+        .metric-card {
+            background: linear-gradient(135deg, #001f42 0%, #002b5b 100%) !important;
+            border-left: 4px solid #ffc107 !important;
+            padding: 18px 15px !important;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        
+        .metric-title { 
+            color: #ffc107 !important; /* Kuning Emas */
+            font-size: 13px !important; 
+            text-transform: uppercase !important; 
+            font-weight: 700 !important; 
+            letter-spacing: 0.5px !important;
+            margin-bottom: 6px !important;
+        }
+        
+        .metric-value { 
+            color: #ffffff !important; /* Putih terang di dalam kartu */
+            font-size: 26px !important; 
+            font-weight: 800 !important; 
+            line-height: 1.2 !important;
+            text-shadow: 0px 2px 4px rgba(0,0,0,0.7) !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
     st.markdown(
         """
         <div class="hero-header">
