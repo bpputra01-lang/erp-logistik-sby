@@ -3380,113 +3380,124 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
+import io
+import numpy as np
+import pandas as pd
+import streamlit as st
+
 # ==============================================================================
 # LOGIC PROCESS MENU "STOCK ALLOCATION"
 # ==============================================================================
 
+
 def clean_and_process_sales(df_sales):
-    """
-    Membersihkan data sales: mengubah qty ke numerik, 
+    """Membersihkan data sales: mengubah qty ke numerik,
+
     mengabaikan nilai '-', dan memisahkan sales Online vs Offline
     berdasarkan keyword spesifik di Kolom A (ONLINE vs JEZ).
     """
     df = df_sales.copy()
-    
-    # Konversi kolom S (QTY - Index 18) menjadi numerik, abaikan karakter non-numerik seperti '-'
-    df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors='coerce').fillna(0)
-    
+
+    # Konversi kolom S (QTY - Index 18) menjadi numerik
+    df.iloc[:, 18] = pd.to_numeric(df.iloc[:, 18], errors="coerce").fillna(0)
+
     # Identifikasi nama kolom berdasarkan index
-    col_store = df.columns[0]   # Kolom A (STORE)
-    col_sku = df.columns[26]    # Kolom AA (SKU)
-    col_qty = df.columns[18]    # Kolom S (QTY)
-    
-    # Kunci Logika Seleksi Keyword Kolom A (Abaikan Case-Sensitive)
+    col_store = df.columns[0]  # Kolom A (STORE)
+    col_sku = df.columns[26]  # Kolom AA (SKU)
+    col_qty = df.columns[18]  # Kolom S (QTY)
+
+    # Kunci Logika Seleksi Keyword Kolom A
     store_upper = df[col_store].astype(str).str.upper()
-    df['SALES_ONLINE'] = np.where(store_upper.str.contains('ONLINE', na=False), df[col_qty], 0)
-    df['SALES_OFFLINE'] = np.where(store_upper.str.contains('JEZ', na=False), df[col_qty], 0)
-    
-    # Grouping per Unique SKU (Kolom AA) untuk melakukan akumulasi (SUMIF massal)
-    df_summary = df.groupby(col_sku).agg({
-        'SALES_ONLINE': 'sum',
-        'SALES_OFFLINE': 'sum'
-    }).reset_index()
-    
-    df_summary['TOTAL_SALES'] = df_summary['SALES_ONLINE'] + df_summary['SALES_OFFLINE']
+    df["SALES_ONLINE"] = np.where(
+        store_upper.str.contains("ONLINE", na=False), df[col_qty], 0
+    )
+    df["SALES_OFFLINE"] = np.where(
+        store_upper.str.contains("JEZ", na=False), df[col_qty], 0
+    )
+
+    # Grouping per Unique SKU
+    df_summary = (
+        df.groupby(col_sku)
+        .agg({"SALES_ONLINE": "sum", "SALES_OFFLINE": "sum"})
+        .reset_index()
+    )
+
+    df_summary["TOTAL_SALES"] = (
+        df_summary["SALES_ONLINE"] + df_summary["SALES_OFFLINE"]
+    )
     return df_summary
 
+
 def calculate_dynamic_proportion(row):
-    """
-    Menghitung persentase alokasi proporsional berdasarkan sales.
+    """Menghitung persentase alokasi proporsional berdasarkan sales.
+
     Jika tidak ada penjualan, stok dibanyakin di Logistik Utama (80%).
-    Setiap SKU wajib memiliki alokasi agar selalu ready di semua channel.
     """
-    total = row['TOTAL_SALES']
-    
-    # LOGIKA JIKA SKU TIDAK MEMILIKI HISTORI PENJUALAN SAMA SEKALI
+    total = row["TOTAL_SALES"]
+
     if total == 0:
-        return 0.10, 0.10, 0.80  # Online: 10%, Offline: 10%, Logistik Utama: 80%
-    
-    pct_online = row['SALES_ONLINE'] / total
-    pct_offline = row['SALES_OFFLINE'] / total
-    
-    # Distribusi dinamis berbasis performa sales 90 hari terakhir
-    if pct_online > 0.7:      # Dominan Online
-        return 0.70, 0.15, 0.15  # Tetap amankan minimal 15% di Offline
-    elif pct_offline > 0.7:   # Dominan Offline
-        return 0.15, 0.70, 0.15  # Tetap amankan minimal 15% di Online
-    else:                     # Balanced / Imbang
+        return 0.10, 0.10, 0.80
+
+    pct_online = row["SALES_ONLINE"] / total
+    pct_offline = row["SALES_OFFLINE"] / total
+
+    if pct_online > 0.7:  # Dominan Online
+        return 0.70, 0.15, 0.15
+    elif pct_offline > 0.7:  # Dominan Offline
+        return 0.15, 0.70, 0.15
+    else:  # Balanced / Imbang
         return 0.40, 0.40, 0.20
 
 
 def generate_stock_allocation(df_stock, df_sales_summary):
-    """
-    Menggabungkan data stock gudang dengan ringkasan sales.
-    Murni berbasis 100% Unique SKU tanpa membawa data BIN.
-    Menggunakan logika pembulatan ke atas (ceil) untuk Online & Offline.
-    """
+    """Menggabungkan data stock gudang dengan ringkasan sales."""
     df_stk = df_stock.copy()
-    
-    col_sku = df_stk.columns[2]   # Kolom C (SKU)
-    col_qty = df_stk.columns[9]   # Kolom J (QTY Master)
-    
-    # Grouping Stock murni per SKU untuk mendapatkan total QTY awal
-    df_stock_unique = df_stk.groupby(col_sku).agg({col_qty: 'sum'}).reset_index()
-    
-    # Satukan data stock unique dengan summary sales per SKU
+
+    col_sku = df_stk.columns[2]  # Kolom C (SKU)
+    col_qty = df_stk.columns[9]  # Kolom J (QTY Master)
+
+    # Grouping Stock per SKU
+    df_stock_unique = (
+        df_stk.groupby(col_sku).agg({col_qty: "sum"}).reset_index()
+    )
+
+    # Satukan data stock unique dengan summary sales
     sales_sku_col = df_sales_summary.columns[0]
-    df_merged = pd.merge(df_stock_unique, df_sales_summary, left_on=col_sku, right_on=sales_sku_col, how='left').fillna(0)
-    
+    df_merged = pd.merge(
+        df_stock_unique,
+        df_sales_summary,
+        left_on=col_sku,
+        right_on=sales_sku_col,
+        how="left",
+    ).fillna(0)
+
     # Hitung proporsi persentase alokasi
     proportions = df_merged.apply(calculate_dynamic_proportion, axis=1)
-    df_merged['PCT_ONLINE'] = [x[0] for x in proportions]
-    df_merged['PCT_OFFLINE'] = [x[1] for x in proportions]
-    df_merged['PCT_LOGISTIK'] = [x[2] for x in proportions]
-    
-    # --------------------------------------------------------------------------
-    # LOGIKA BARU: PEMBULATAN KE ATAS MURNI (CEIL) UNTUK ONLINE & OFFLINE
-    # --------------------------------------------------------------------------
-    df_merged['QTY_ONLINE'] = np.ceil(df_merged[col_qty] * df_merged['PCT_ONLINE']).astype(int)
-    df_merged['QTY_OFFLINE'] = np.ceil(df_merged[col_qty] * df_merged['PCT_OFFLINE']).astype(int)
-    
-    # Logistik mengambil sisa pengurangan agar total stock akhir tetap 100% Klop dengan Master
-    df_merged['QTY_LOGISTIK'] = df_merged[col_qty] - df_merged['QTY_ONLINE'] - df_merged['QTY_OFFLINE']
-    
-    # --------------------------------------------------------------------------
-    # PROTEKSI PENYESUAIAN STOK (Jika total pembulatan ke atas melebihi Stock Master)
-    # --------------------------------------------------------------------------
+    df_merged["PCT_ONLINE"] = [x[0] for x in proportions]
+    df_merged["PCT_OFFLINE"] = [x[1] for x in proportions]
+    df_merged["PCT_LOGISTIK"] = [x[2] for x in proportions]
+
+    # Pembulatan Ke Atas (Ceil)
+    df_merged["QTY_ONLINE"] = np.ceil(
+        df_merged[col_qty] * df_merged["PCT_ONLINE"]
+    ).astype(int)
+    df_merged["QTY_OFFLINE"] = np.ceil(
+        df_merged[col_qty] * df_merged["PCT_OFFLINE"]
+    ).astype(int)
+    df_merged["QTY_LOGISTIK"] = (
+        df_merged[col_qty] - df_merged["QTY_ONLINE"] - df_merged["QTY_OFFLINE"]
+    )
+
+    # Proteksi Penyesuaian Stok
     def adjust_ceil_overflow(r):
         qty_master = r[col_qty]
-        q_on = r['QTY_ONLINE']
-        q_off = r['QTY_OFFLINE']
-        q_log = r['QTY_LOGISTIK']
-        
-        # Jika nilai QTY_LOGISTIK minus akibat efek double pembulatan ke atas
+        q_on = r["QTY_ONLINE"]
+        q_off = r["QTY_OFFLINE"]
+        q_log = r["QTY_LOGISTIK"]
+
         if q_log < 0:
-            # Hitung seberapa banyak kelebihan unitnya
             excess = abs(q_log)
-            q_log = 0 # Logistik dikunci di angka 0
-            
-            # Kurangi kelebihan secara bertahap dari Online atau Offline tanpa membuatnya menjadi 0
+            q_log = 0
             while excess > 0:
                 if q_on > 1:
                     q_on -= 1
@@ -3495,30 +3506,43 @@ def generate_stock_allocation(df_stock, df_sales_summary):
                     q_off -= 1
                     excess -= 1
                 else:
-                    # Jika kondisi stock master sangat mepet (misal hanya 1 Pcs)
-                    # Prioritas utama dialokasikan penuh ke Offline
                     if qty_master == 1:
                         q_off = 1
                         q_on = 0
                     break
         return pd.Series([q_on, q_off, q_log])
 
-    # Jalankan proteksi penyesuaian
-    df_merged[['QTY_ONLINE', 'QTY_OFFLINE', 'QTY_LOGISTIK']] = df_merged.apply(adjust_ceil_overflow, axis=1)
-    
-    # Susunan susunan output kolom utama
+    df_merged[["QTY_ONLINE", "QTY_OFFLINE", "QTY_LOGISTIK"]] = df_merged.apply(
+        adjust_ceil_overflow, axis=1
+    )
+
     output_cols = [
-        col_sku,          # SKU (Unique Key)
-        col_qty,          # Total QTY Master Asli per SKU
-        'SALES_ONLINE', 
-        'SALES_OFFLINE', 
-        'QTY_ONLINE', 
-        'QTY_OFFLINE', 
-        'QTY_LOGISTIK'
+        col_sku,
+        col_qty,
+        "SALES_ONLINE",
+        "SALES_OFFLINE",
+        "QTY_ONLINE",
+        "QTY_OFFLINE",
+        "QTY_LOGISTIK",
     ]
-    
+
+    # FIX: Baris return harus menjadi baris TERAKHIR di fungsi ini!
     return df_merged[output_cols]
-    st.markdown("""
+
+
+# ==============================================================================
+# UI STREAMLIT MAIN FUNCTION
+# ==============================================================================
+
+
+def menu_allocation_stock():
+    """Interface Khusus untuk Menu Alokasi Stok Gudang (Online, Offline,
+    Logistik)
+    """
+
+    # FIX: Taruh CSS custom di paling atas fungsi UI agar PASTI TEREKSEKUSI
+    st.markdown(
+        """
         <style>
             .reportview-container { background: #0f111a; }
             .main { background-color: #0f111a; color: #ffffff; }
@@ -3554,161 +3578,188 @@ def generate_stock_allocation(df_stock, df_sales_summary):
                 margin: 0;
                 font-size: 28px;
             }
-            .hero-subtitle {
-                color: #ffc107;
-                font-size: 14px;
-                margin-top: 5px;
-                font-weight: 500;
-            }
             
-            /* Metric Card Custom Styling */
+            /* Metric Card Custom Styling (FIXED HIGH CONTRAST COLORS) */
             .metric-card {
                 background: linear-gradient(135deg, #001f42 0%, #002b5b 100%) !important;
                 border-left: 4px solid #ffc107 !important;
-                padding: 20px;
+                padding: 18px 15px !important;
                 border-radius: 8px;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+                box-shadow: 0 4px 15px rgba(0,0,0,0.5);
                 margin-bottom: 20px;
-                border-top: 1px solid rgba(255,255,255,0.05);
-                border-right: 1px solid rgba(255,255,255,0.05);
-                border-bottom: 1px solid rgba(255,255,255,0.05);
+                border-top: 1px solid rgba(255,255,255,0.08);
+                border-right: 1px solid rgba(255,255,255,0.08);
+                border-bottom: 1px solid rgba(255,255,255,0.08);
             }
             
-            /* PERBAIKAN WARNA TEKS DENGAN !IMPORTANT */
+            /* Diberikan !important agar tidak ditimpa Streamlit */
             .metric-title { 
-                color: #d1e3ff !important; /* Biru terang agar kontras & jelas */
+                color: #ffc107 !important; /* Hijau/Kuning Emas agar sangat kontras di background biru gelap */
                 font-size: 13px !important; 
                 text-transform: uppercase !important; 
-                font-weight: bold !important; 
-                letter-spacing: 0.5px;
+                font-weight: 700 !important; 
+                letter-spacing: 0.5px !important;
+                margin-bottom: 6px !important;
             }
+            
             .metric-value { 
-                color: #ffffff !important; /* Putih murni tajam */
-                font-size: 28px !important; 
-                font-weight: bold !important; 
-                margin-top: 8px !important; 
-                text-shadow: 0px 2px 4px rgba(0,0,0,0.5); /* Efek bayangan agar teks makin menonjol */
+                color: #ffffff !important; /* Putih terang murni */
+                font-size: 26px !important; 
+                font-weight: 800 !important; 
+                line-height: 1.2 !important;
+                text-shadow: 0px 2px 4px rgba(0,0,0,0.7) !important;
             }
         </style>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
-
-def menu_allocation_stock():
-    """
-    Interface Khusus untuk Menu Alokasi Stok Gudang (Online, Offline, Logistik)
-    """
-    # Menggunakan Hero Header yang selaras dengan tema Refill & Withdraw
-    st.markdown("""
+    st.markdown(
+        """
         <div class="hero-header">
-            <h1> DYNAMIC STOCK ALLOCATION SYSTEM</h1>
+            <h1>DYNAMIC STOCK ALLOCATION SYSTEM</h1>
         </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
-    # --------------------------------------------------------------------------
-    # EXPANDER: DYNAMIC LOGIC & PERCENTAGE MATRIX RULE (UPDATED)
-    # --------------------------------------------------------------------------
+    # Expander Logic
     with st.expander("💡Logic Thinking"):
-        st.info("""
-        **KLASIFIKASI SALES & PROPORSI PEMBAGIAN:**
-        Sistem menentukan persentase alokasi tiap SKU berdasarkan performa rasio penjualan 90 hari terakhir.
-        """)
-        
-        # Membuat DataFrame aturan matriks agar rapi dalam bentuk tabel
+        st.info(
+            "**KLASIFIKASI SALES & PROPORSI PEMBAGIAN:**\nSistem menentukan"
+            " persentase alokasi tiap SKU berdasarkan performa rasio penjualan"
+            " 90 hari terakhir."
+        )
+
         rules_data = {
             "Kondisi Performa SKU": [
                 "Tidak Ada Histori Sales (0 Unit)",
                 "Dominan Online (> 70% Penjualan)",
                 "Dominan Offline (> 70% Penjualan)",
-                "Balanced / Imbang (Rasio Normal)"
+                "Balanced / Imbang (Rasio Normal)",
             ],
             "Alokasi Online": ["10%", "70%", "15%", "40%"],
             "Alokasi Offline": ["10%", "15%", "70%", "40%"],
-            "Alokasi Logistik": ["80%", "15%", "15%", "20%"]
+            "Alokasi Logistik": ["80%", "15%", "15%", "20%"],
         }
-        df_rules = pd.DataFrame(rules_data)
-        st.table(df_rules)
+        st.table(pd.DataFrame(rules_data))
 
     st.write("")
 
-    # Layout Kolom Input untuk Upload File Excel
+    # File Uploaders
     col1, col2 = st.columns(2)
-
     with col1:
-        file_stock = st.file_uploader("Pilih file Excel Stock (.xlsx)", type=["xlsx"], key="stock")
-
+        file_stock = st.file_uploader(
+            "Pilih file Excel Stock (.xlsx)", type=["xlsx"], key="stock"
+        )
     with col2:
-        file_sales = st.file_uploader("Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales")
+        file_sales = st.file_uploader(
+            "Pilih file Excel Sales (.xlsx)", type=["xlsx"], key="sales"
+        )
 
     if file_stock and file_sales:
         try:
             df_stock_raw = pd.read_excel(file_stock)
             df_sales_raw = pd.read_excel(file_sales)
-            
-            st.success("✅ Kedua file berhasil dimuat ke sistem. Siap diproses!")
-            
-            # Gunakan use_container_width=True agar tombolnya penuh dan solid mirip Refill System
-            if st.button("▶️ RUN PROCESS", use_container_width=True):
-                with st.spinner("Sedang memproses algoritma dynamic allocation..."):
-                    
-                    # --- CORE PROCESSOR LOGIC ---
-                    df_sales_summary = clean_and_process_sales(df_sales_raw)
-                    df_final_allocation = generate_stock_allocation(df_stock_raw, df_sales_summary)
-                    
-                    # --- SIMPAN KE SESSION STATE (AGAR TIDAK HILANG SAAT DOWNLOAD) ---
-                    st.session_state['df_final_allocation'] = df_final_allocation
-                    st.session_state['processed'] = True
 
-            # --- TAMPILKAN HASIL JIKA SUDAH PERNAH DI-RUN ---
-            if st.session_state.get('processed', False):
-                df_final_allocation = st.session_state['df_final_allocation']
-                
-                # --- INTERFACING METRICS ---
+            st.success("✅ Kedua file berhasil dimuat ke sistem. Siap diproses!")
+
+            if st.button("▶️ RUN PROCESS", use_container_width=True):
+                with st.spinner(
+                    "Sedang memproses algoritma dynamic allocation..."
+                ):
+                    df_sales_summary = clean_and_process_sales(df_sales_raw)
+                    df_final_allocation = generate_stock_allocation(
+                        df_stock_raw, df_sales_summary
+                    )
+
+                    st.session_state["df_final_allocation"] = (
+                        df_final_allocation
+                    )
+                    st.session_state["processed"] = True
+
+            if st.session_state.get("processed", False):
+                df_final_allocation = st.session_state["df_final_allocation"]
+
+                # Metric Cards Display
                 m1, m2, m3, m4 = st.columns(4)
-                
-                col_stock_qty = df_final_allocation.columns[1] # Mengambil total qty asli dari output_cols (index 1)
+                col_stock_qty = df_final_allocation.columns[1]
                 total_stock = df_final_allocation[col_stock_qty].sum()
-                
+
                 with m1:
-                    st.markdown(f"<div class='metric-card'><div class='metric-title'>Total Stock Master</div><div class='metric-value'>{total_stock:,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    st.markdown(
+                        "<div class='metric-card'><div"
+                        " class='metric-title'>Total Stock Master</div><div"
+                        f" class='metric-value'>{total_stock:,.0f} Pcs</div></div>",
+                        unsafe_allow_html=True,
+                    )
                 with m2:
-                    st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Online</div><div class='metric-value'>{df_final_allocation['QTY_ONLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    st.markdown(
+                        "<div class='metric-card'><div"
+                        " class='metric-title'>Alokasi Area Online</div><div"
+                        " class='metric-value'>"
+                        f"{df_final_allocation['QTY_ONLINE'].sum():,.0f} Pcs</div></div>",
+                        unsafe_allow_html=True,
+                    )
                 with m3:
-                    st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Offline</div><div class='metric-value'>{df_final_allocation['QTY_OFFLINE'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
+                    st.markdown(
+                        "<div class='metric-card'><div"
+                        " class='metric-title'>Alokasi Area Offline</div><div"
+                        " class='metric-value'>"
+                        f"{df_final_allocation['QTY_OFFLINE'].sum():,.0f} Pcs</div></div>",
+                        unsafe_allow_html=True,
+                    )
                 with m4:
-                    st.markdown(f"<div class='metric-card'><div class='metric-title'>Alokasi Area Logistik</div><div class='metric-value'>{df_final_allocation['QTY_LOGISTIK'].sum():,.0f} Pcs</div></div>", unsafe_allow_html=True)
-                
-                # --- INTERFACING DATAFRAME ---
+                    st.markdown(
+                        "<div class='metric-card'><div"
+                        " class='metric-title'>Alokasi Area"
+                        " Logistik</div><div class='metric-value'>"
+                        f"{df_final_allocation['QTY_LOGISTIK'].sum():,.0f} Pcs</div></div>",
+                        unsafe_allow_html=True,
+                    )
+
                 st.write("### 📋 Preview Hasil Pembagian per SKU")
                 st.dataframe(df_final_allocation, use_container_width=True)
-                
-                # --- DOWNLOAD BUTTON AS EXCEL (.XLSX) ---
+
                 @st.cache_data
                 def convert_df_to_excel(df):
                     output = io.BytesIO()
-                    # Menggunakan ExcelWriter untuk membuat file .xlsx asli
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df.to_excel(writer, index=False, sheet_name='Stock_Allocation_Result')
-                    processed_data = output.getvalue()
-                    return processed_data
-                    
+                    with pd.ExcelWriter(
+                        output, engine="openpyxl"
+                    ) as writer:
+                        df.to_excel(
+                            writer,
+                            index=False,
+                            sheet_name="Stock_Allocation_Result",
+                        )
+                    return output.getvalue()
+
                 excel_data = convert_df_to_excel(df_final_allocation)
-                
+
                 st.download_button(
                     label="💾 DOWNLOAD HASIL ALOKASI (.XLSX)",
                     data=excel_data,
                     file_name="Hasil_Alokasi_Stock_Dynamic.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
+                    mime=(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    ),
+                    use_container_width=True,
                 )
 
         except Exception as e:
-            st.error(f"Terjadi kesalahan pembacaan kolom struktur file: {str(e)}")
-            st.info("💡 Pastikan urutan kolom di Excel Anda sudah sesuai: Stock (B, C, J) & Sales (A, AA, S)")
+            st.error(
+                f"Terjadi kesalahan pembacaan kolom struktur file: {str(e)}"
+            )
+            st.info(
+                "💡 Pastikan urutan kolom di Excel Anda sudah sesuai: Stock"
+                " (B, C, J) & Sales (A, AA, S)"
+            )
     else:
-        # Reset state jika user menghapus file yang di-upload agar tidak terjadi bug visual
-        st.session_state['processed'] = False
-        st.info("💡 Silakan upload kedua file Excel di atas terlebih dahulu untuk memulai perhitungan alokasi.")
-
+        st.session_state["processed"] = False
+        st.info(
+            "💡 Silakan upload kedua file Excel di atas terlebih dahulu untuk"
+            " memulai perhitungan alokasi."
+        )
 
 # ==============================================================================
 # LOGIC PROSES MENU "STOCK TRACKING TIMELINE"
