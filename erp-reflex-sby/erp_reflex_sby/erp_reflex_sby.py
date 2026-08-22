@@ -1,3 +1,254 @@
+# ==============================================================================
+# STATE MANAGEMENT & LOGIN LOGIC
+# ==============================================================================
+class LoginState(rx.State):
+    username: str = ""
+    password: str = ""
+    logged_in: bool = False
+    role: str = ""
+    branch: str = ""
+    user_display_name: str = ""
+
+    def set_username(self, val: str):
+        self.username = val
+
+    def set_password(self, val: str):
+        self.password = val
+
+    def handle_login(self):
+        # Logic Multi-User
+        if self.username == "admin" and self.password == "sby123":
+            self.logged_in = True
+            self.role = "DC"
+            self.branch = "SURABAYA"
+            self.user_display_name = "Admin DC Surabaya"
+            # Trigger Pop-up Success Toast
+            return rx.toast.success(
+                "Berhasil Login! Selamat datang di ERP Surabaya.",
+                duration=4000,
+                position="bottom-right",
+            )
+        elif self.username == "toko" and self.password == "toko123":
+            self.logged_in = True
+            self.role = "CABANG"
+            self.branch = "SURABAYA"
+            self.user_display_name = "User Cabang"
+            return rx.toast.success(
+                "Berhasil Login sebagai User Cabang!",
+                duration=4000,
+                position="bottom-right",
+            )
+        else:
+            return rx.toast.error(
+                "Username atau Password salah! Periksa kembali.",
+                duration=4000,
+                position="bottom-right",
+            )
+
+    def logout(self):
+        self.logged_in = False
+        self.username = ""
+        self.password = ""
+        return rx.toast.info("Anda telah keluar dari sistem.")
+
+# ==============================================================================
+# UI COMPONENTS: LOGIN PAGE (MERAH - PUTIH - HITAM PREMUM)
+# ==============================================================================
+def login_page() -> rx.Component:
+    return rx.flex(
+        # Background Image (Warehouse High-Res Aesthetics) + Dark Overlay Gradient
+        background="linear-gradient(to right, rgba(10, 10, 12, 0.92) 35%, rgba(0, 0, 0, 0.65) 100%), url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070')",
+        background_size="cover",
+        background_position="center",
+        width="100vw",
+        height="100vh",
+        align="center",
+        justify="start",  # Asimetris estetik (Agak ke kiri, gak kaku di tengah)
+        padding_left=["2rem", "5rem", "8rem"],
+        padding_right="2rem",
+
+        # GLASSMORPHISM LOGIN CARD
+        children=[
+            rx.box(
+                width="100%",
+                max_width="440px",
+                padding="2.5rem",
+                background="rgba(18, 18, 20, 0.75)",
+                backdrop_filter="blur(16px)",
+                border_radius="20px",
+                border="1px solid rgba(255, 255, 255, 0.1)",
+                border_left="5px solid #E50914",  # Aksen Merah Premium
+                box_shadow="0 20px 50px rgba(0, 0, 0, 0.6)",
+                children=[
+                    rx.vstack(
+                        spacing="5",
+                        align="stretch",
+                        children=[
+                            # HEADER & LOGO TEXT
+                            rx.hstack(
+                                rx.box(
+                                    width="12px",
+                                    height="35px",
+                                    background="#E50914",
+                                    border_radius="4px",
+                                ),
+                                rx.vstack(
+                                    rx.heading(
+                                        "LOGISTIC DISTRIBUTION",
+                                        size="6",
+                                        color="#FFFFFF",
+                                        font_weight="800",
+                                        letter_spacing="1px",
+                                    ),
+                                    rx.text(
+                                        "CENTER WAREHOUSE • SURABAYA",
+                                        size="1",
+                                        color="#E50914",
+                                        font_weight="700",
+                                        letter_spacing="2px",
+                                    ),
+                                    spacing="0",
+                                ),
+                                align="center",
+                                spacing="3",
+                            ),
+
+                            rx.divider(border_color="rgba(255, 255, 255, 0.1)"),
+
+                            rx.text(
+                                "Silakan masuk dengan akun resmi gudang Anda.",
+                                size="2",
+                                color="#A0A0A0",
+                            ),
+
+                            # INPUT FIELD USERNAME
+                            rx.vstack(
+                                rx.text("USERNAME", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
+                                rx.input(
+                                    placeholder="Masukkan username...",
+                                    value=LoginState.username,
+                                    on_change=LoginState.set_username,
+                                    size="3",
+                                    variant="surface",
+                                    color_scheme="red",
+                                    style={
+                                        "background": "rgba(0, 0, 0, 0.5)",
+                                        "border": "1px solid rgba(255, 255, 255, 0.15)",
+                                        "color": "#FFFFFF",
+                                        "border-radius": "10px",
+                                    },
+                                ),
+                                spacing="1",
+                                width="100%",
+                            ),
+
+                            # INPUT FIELD PASSWORD
+                            rx.vstack(
+                                rx.text("PASSWORD", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
+                                rx.input(
+                                    type="password",
+                                    placeholder="Masukkan password...",
+                                    value=LoginState.password,
+                                    on_change=LoginState.set_password,
+                                    size="3",
+                                    variant="surface",
+                                    color_scheme="red",
+                                    style={
+                                        "background": "rgba(0, 0, 0, 0.5)",
+                                        "border": "1px solid rgba(255, 255, 255, 0.15)",
+                                        "color": "#FFFFFF",
+                                        "border-radius": "10px",
+                                    },
+                                ),
+                                spacing="1",
+                                width="100%",
+                            ),
+
+                            rx.box(height="10px"),
+
+                            # TOMBOL SIGN IN MERAH PUTIH ELEGAN
+                            rx.button(
+                                "SIGN IN TO SYSTEM →",
+                                on_click=LoginState.handle_login,
+                                size="3",
+                                width="100%",
+                                style={
+                                    "background": "linear-gradient(135deg, #E50914 0%, #B20710 100%)",
+                                    "color": "#FFFFFF",
+                                    "font-weight": "800",
+                                    "letter-spacing": "1px",
+                                    "border-radius": "10px",
+                                    "cursor": "pointer",
+                                    "box-shadow": "0 8px 20px rgba(229, 9, 20, 0.4)",
+                                    "transition": "all 0.2s ease-in-out",
+                                },
+                            ),
+
+                            rx.center(
+                                rx.text(
+                                    "🟢 Warehouse Supporting Tools v2.0",
+                                    size="1",
+                                    color="#666666",
+                                ),
+                                margin_top="10px",
+                            )
+                        ]
+                    )
+                ]
+            )
+        ]
+    )
+
+# ==============================================================================
+# UI COMPONENTS: MAIN DASHBOARD (MUNCUL SESUDAH LOGIN)
+# ==============================================================================
+def main_dashboard() -> rx.Component:
+    return rx.vstack(
+        # TOPBAR HEADER
+        rx.hstack(
+            rx.heading("SURABAYA ERP DASHBOARD", size="5", color="#FFFFFF"),
+            rx.spacer(),
+            rx.badge(LoginState.user_display_name, color_scheme="red", variant="solid", size="2"),
+            rx.button("Logout", on_click=LoginState.logout, color_scheme="gray", variant="soft", size="2"),
+            width="100%",
+            padding="1.5rem 2rem",
+            background="#121214",
+            border_bottom="1px solid rgba(255,255,255,0.1)",
+            align="center",
+        ),
+        
+        # DASHBOARD CONTENT
+        rx.box(
+            padding="2rem",
+            width="100%",
+            children=[
+                rx.text(
+                    f"Selamat datang {LoginState.user_display_name}! Role kamu: {LoginState.role} ({LoginState.branch})",
+                    color="#FFFFFF",
+                    size="4",
+                ),
+                # Nanti isi modul ERP-mu (Mutasi Karantina, Reject List, dll) ditaruh di sini bro!
+            ]
+        ),
+        width="100%",
+        height="100vh",
+        background="#0A0A0C",
+    )
+
+# ==============================================================================
+# APP ROUTER
+# ==============================================================================
+def index() -> rx.Component:
+    return rx.cond(
+        LoginState.logged_in,
+        main_dashboard(),
+        login_page()
+    )
+
+app = rx.App()
+app.add_page(index, title="ZKN ERP - Login")
+
+
 import reflex as rx
 from supabase import create_client
 import pandas as pd
