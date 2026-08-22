@@ -1,7 +1,7 @@
 import reflex as rx
 from supabase import create_client
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime
 import io
 
 # ==========================================
@@ -24,18 +24,25 @@ class OngkirState(rx.State):
     # Form Input State
     input_supplier: str = ""
     input_ekspedisi: str = ""
-    input_koli: int = 1
-    input_ongkir: int = 0
+    input_koli: str = "1"
+    input_ongkir: str = "0"
     input_tgl: str = datetime.now().strftime("%Y-%m-%d")
     input_jam: str = datetime.now().strftime("%H:%M:%S")
 
     # Filter State
     filter_ekspedisi: str = "SEMUA"
-    pilihan_preset: str = "All Time"
     
     # Multi-selection for Delete
     selected_ids: list[int] = []
     show_delete_modal: bool = False
+
+    # Manual Setters to avoid AttributeError
+    def set_supplier(self, val: str): self.input_supplier = val
+    def set_ekspedisi(self, val: str): self.input_ekspedisi = val
+    def set_koli(self, val: str): self.input_koli = val
+    def set_ongkir(self, val: str): self.input_ongkir = val
+    def set_tgl(self, val: str): self.input_tgl = val
+    def set_filter_ekspedisi(self, val: str): self.filter_ekspedisi = val
 
     def load_data(self):
         """Fetch Data Realtime dari Supabase"""
@@ -51,12 +58,18 @@ class OngkirState(rx.State):
         if not self.input_supplier.strip():
             return rx.window_alert("Nama Supplier Wajib Diisi!")
 
+        try:
+            koli_val = int(self.input_koli) if self.input_koli else 0
+            ongkir_val = int(self.input_ongkir) if self.input_ongkir else 0
+        except ValueError:
+            return rx.window_alert("Koli dan Ongkir harus berupa angka!")
+
         fix_dt = f"{self.input_tgl} {self.input_jam}"
         payload = {
             "supplier": self.input_supplier.upper(),
             "ekspedisi": self.input_ekspedisi.upper(),
-            "total_koli": self.input_koli,
-            "total_ongkir": self.input_ongkir,
+            "total_koli": koli_val,
+            "total_ongkir": ongkir_val,
             "created_at": fix_dt
         }
         try:
@@ -66,8 +79,8 @@ class OngkirState(rx.State):
             # Reset Form
             self.input_supplier = ""
             self.input_ekspedisi = ""
-            self.input_koli = 1
-            self.input_ongkir = 0
+            self.input_koli = "1"
+            self.input_ongkir = "0"
             return rx.window_alert("✅ Data Berhasil Disimpan!")
         except Exception as e:
             return rx.window_alert(f"Gagal Simpan: {e}")
@@ -133,7 +146,7 @@ class OngkirState(rx.State):
         except Exception as e:
             return rx.window_alert(f"Gagal Hapus: {e}")
 
-    # COMPUTED METRICS (Auto-Calculated Realtime)
+    # COMPUTED METRICS
     @rx.var
     def filtered_list(self) -> list[dict]:
         res = self.data_list
@@ -206,16 +219,14 @@ def metric_box(title: str, value: str, accent_color: str) -> rx.Component:
     )
 
 def render_table_row(row: dict) -> rx.Component:
-    is_selected = OngkirState.selected_ids.contains(row["id"])
     return rx.table.row(
         rx.table.cell(
             rx.checkbox(
-                checked=is_selected,
                 on_change=lambda _: OngkirState.toggle_select_id(row["id"])
             )
         ),
         rx.table.cell(rx.text(row["created_at"], size="2")),
-        rx.table.cell(rx.text(row["supplier"], weight="bold", color="#FFD700" if "RTO" not in row["supplier"] else "#FF4B4B")),
+        rx.table.cell(rx.text(row["supplier"], weight="bold", color="#FFD700")),
         rx.table.cell(rx.badge(row["ekspedisi"], color_scheme="gold", variant="solid")),
         rx.table.cell(str(row["total_koli"])),
         rx.table.cell(f"Rp {row['total_ongkir']:,.0f}"),
@@ -259,15 +270,15 @@ def index() -> rx.Component:
                         rx.box(
                             rx.vstack(
                                 rx.heading("📝 Input Transaksi Manual", size="4", color="#FFD700"),
-                                rx.input(placeholder="Nama Supplier...", value=OngkirState.input_supplier, on_change=OngkirState.set_input_supplier, width="100%"),
+                                rx.input(placeholder="Nama Supplier...", value=OngkirState.input_supplier, on_change=OngkirState.set_supplier, width="100%"),
                                 rx.hstack(
-                                    rx.input(placeholder="Ekspedisi...", value=OngkirState.input_ekspedisi, on_change=OngkirState.set_input_ekspedisi, width="100%"),
-                                    rx.input(type="number", placeholder="Total Koli", value=OngkirState.input_koli.to_string(), on_change=OngkirState.set_input_koli, width="100%"),
+                                    rx.input(placeholder="Ekspedisi...", value=OngkirState.input_ekspedisi, on_change=OngkirState.set_ekspedisi, width="100%"),
+                                    rx.input(type="number", placeholder="Total Koli", value=OngkirState.input_koli, on_change=OngkirState.set_koli, width="100%"),
                                     width="100%",
                                 ),
                                 rx.hstack(
-                                    rx.input(type="number", placeholder="Total Ongkir (Rp)", value=OngkirState.input_ongkir.to_string(), on_change=OngkirState.set_input_ongkir, width="100%"),
-                                    rx.input(type="date", value=OngkirState.input_tgl, on_change=OngkirState.set_input_tgl, width="100%"),
+                                    rx.input(type="number", placeholder="Total Ongkir (Rp)", value=OngkirState.input_ongkir, on_change=OngkirState.set_ongkir, width="100%"),
+                                    rx.input(type="date", value=OngkirState.input_tgl, on_change=OngkirState.set_tgl, width="100%"),
                                     width="100%",
                                 ),
                                 rx.button("🚀 SIMPAN DATA ONGKIR", on_click=OngkirState.save_single_data, color_scheme="gold", width="100%", size="3"),
@@ -374,7 +385,7 @@ def index() -> rx.Component:
                 rx.dialog.content(
                     rx.dialog.title("⚠️ Konfirmasi Delete"),
                     rx.dialog.description(
-                        f"Yakin mau menghapus {OngkirState.selected_ids.length()} data dari Supabase permanen?"
+                        "Yakin mau menghapus data dari Supabase secara permanen?"
                     ),
                     rx.hstack(
                         rx.button("Batal", on_click=OngkirState.close_delete_modal, variant="soft"),
@@ -393,7 +404,7 @@ def index() -> rx.Component:
             padding="2rem",
             max_width="1200px",
             margin="0 auto",
-            on_mount=OngkirState.load_data,  # Auto load supabase on startup!
+            on_mount=OngkirState.load_data,
         ),
         background_color="#0d0f17",
         min_height="100vh",
