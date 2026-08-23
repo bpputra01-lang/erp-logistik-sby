@@ -7,7 +7,7 @@ from .components.sidebar import sidebar
 # --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
     return rx.hstack(
-        # --- CSS ANIMASI BLINK UNTUK TITIK ONLINE ---
+        # === 1. TAMBAHKAN INI (CSS ANIMASI BLINK) ===
         rx.html("""
             <style>
                 @keyframes blinkAnimation {
@@ -20,6 +20,7 @@ def global_header() -> rx.Component:
                 }
             </style>
         """),
+        # ============================================
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
@@ -30,13 +31,14 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
-            # --- TITIK HIJAU DENGAN KELAS CSS BERKEDIP (BLINK) ---
             rx.box(
                 width="10px", 
                 height="10px", 
                 background="#10B981", 
                 border_radius="50%",
+                # === 2. TAMBAHKAN CLASS_NAME INI ===
                 class_name="blink-online"
+                # ==================================
             ),
             rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
             align="center", spacing="2",
