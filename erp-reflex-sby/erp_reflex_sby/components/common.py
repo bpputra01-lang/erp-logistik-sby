@@ -4,14 +4,15 @@ from ..state import AppState
 def metric_box(title: str, value: str, accent_color: str) -> rx.Component:
     return rx.box(
         rx.vstack(
-            rx.text(title, size="1", color="#8F95B2", weight="bold"),
-            rx.heading(value, size="5", color=accent_color, weight="bold"),
+            rx.text(title, size="1", color="#666666", weight="bold"),
+            rx.heading(value, size="5", color="#111111", weight="bold"),
             align_items="start", spacing="1",
         ),
-        padding="1rem", border_radius="10px",
-        background="linear-gradient(135deg, #181b28 0%, #11131f 100%)",
-        border_left=f"4px solid {accent_color}",
-        border_top="1px solid #232738", border_right="1px solid #232738", border_bottom="1px solid #232738",
+        padding="1.2rem", border_radius="12px",
+        background="#FFFFFF",
+        border_left=f"5px solid {accent_color}",
+        border_top="1px solid #EAEAEA", border_right="1px solid #EAEAEA", border_bottom="1px solid #EAEAEA",
+        box_shadow="0 4px 12px rgba(0, 0, 0, 0.05)",
         width="100%",
     )
 
@@ -20,9 +21,10 @@ def render_table_row(row: dict) -> rx.Component:
         rx.table.cell(
             rx.checkbox(on_change=lambda _: AppState.toggle_select_id(row["id"]))
         ),
-        rx.table.cell(rx.text(row["created_at"], size="2")),
-        rx.table.cell(rx.text(row["supplier"], weight="bold", color="#FFD700")),
-        rx.table.cell(rx.badge(row["ekspedisi"], color_scheme="gold", variant="solid")),
-        rx.table.cell(str(row["total_koli"])),
-        rx.table.cell(f"Rp {row['total_ongkir']:,.0f}"),
+        rx.table.cell(rx.text(row["created_at"], size="2", color="#333333")),
+        rx.table.cell(rx.text(row["supplier"], weight="bold", color="#111111")),
+        rx.table.cell(rx.badge(row["ekspedisi"], color_scheme="red", variant="soft")),
+        rx.table.cell(rx.text(str(row["total_koli"]), color="#333333")),
+        rx.table.cell(rx.text(f"Rp {row['total_ongkir']:,.0f}", weight="bold", color="#E50914")),
+        style={"_hover": {"background_color": "#F8F9FA"}},
     )

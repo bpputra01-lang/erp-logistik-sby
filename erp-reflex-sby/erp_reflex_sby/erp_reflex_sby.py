@@ -11,7 +11,7 @@ def index() -> rx.Component:
     )
 
 app = rx.App(
-    theme=rx.theme(appearance="dark", accent_color="gold"),
+    theme=rx.theme(appearance="light", accent_color="red"),
     style={
         "[data-sonner-toaster]": {
             "top": "20px !important",
