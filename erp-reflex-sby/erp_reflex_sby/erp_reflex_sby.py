@@ -246,6 +246,28 @@ def login_page() -> rx.Component:
                 rx.text("Silakan masuk dengan akun resmi gudang Anda.", size="2", color="#B0B0B0"),
 
                 # Input Username (Diperlebar)
+                rx.vstack(
+                    rx.text("USERNAME", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
+                    rx.input(
+                        placeholder="Masukkan username...",
+                        value=AppState.username,
+                        on_change=AppState.set_username,
+                        size="3",
+                        variant="surface",
+                        color_scheme="red",
+                        width="100%",  # Full width proporsional
+                        style={
+                            "background": "rgba(0, 0, 0, 0.75)", 
+                            "border": "1px solid rgba(229, 9, 20, 0.4)", 
+                            "color": "#FFFFFF", 
+                            "border-radius": "10px",
+                            "padding": "0.8rem 1rem",
+                        },
+                    ),
+                    spacing="1", width="100%",
+                ),
+
+                # Input Password (Diperlebar)
                 # Input Password
                 rx.vstack(
                     rx.text("PASSWORD", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
@@ -261,31 +283,8 @@ def login_page() -> rx.Component:
                         ),
                         size="3",
                         variant="surface",
-                        color_scheme="red",
+                        color_scheme="white",
                         width="100%",
-                        style={
-                            "background": "rgba(0, 0, 0, 0.75)", 
-                            "border": "1px solid rgba(229, 9, 20, 0.4)", 
-                            "color": "#FFFFFF", 
-                            "border-radius": "10px",
-                            "padding": "0.8rem 1rem",
-                        },
-                    ),
-                    spacing="1", width="100%",
-                ),
-
-                # Input Password (Diperlebar)
-                rx.vstack(
-                    rx.text("PASSWORD", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
-                    rx.input(
-                        type="password",
-                        placeholder="Masukkan password...",
-                        value=AppState.password,
-                        on_change=AppState.set_password,
-                        size="3",
-                        variant="surface",
-                        color_scheme="red",
-                        width="100%",  # Full width proporsional
                         style={
                             "background": "rgba(0, 0, 0, 0.75)", 
                             "border": "1px solid rgba(229, 9, 20, 0.4)", 
