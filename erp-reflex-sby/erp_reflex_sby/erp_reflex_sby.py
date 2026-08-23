@@ -4,23 +4,10 @@ from .components.login import login_page
 from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 
+
 # --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
     return rx.hstack(
-        # === 1. TAMBAHKAN INI (CSS ANIMASI BLINK) ===
-        rx.html("""
-            <style>
-                @keyframes blinkAnimation {
-                    0% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.3; transform: scale(0.8); }
-                    100% { opacity: 1; transform: scale(1); }
-                }
-                .blink-online {
-                    animation: blinkAnimation 1.5s infinite ease-in-out;
-                }
-            </style>
-        """),
-        # ============================================
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
@@ -31,14 +18,13 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
+            # --- TITIK HIJAU DENGAN KELAS CSS BERKEDIP (BLINK) ---
             rx.box(
                 width="10px", 
                 height="10px", 
                 background="#10B981", 
                 border_radius="50%",
-                # === 2. TAMBAHKAN CLASS_NAME INI ===
                 class_name="blink-online"
-                # ==================================
             ),
             rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
             align="center", spacing="2",
@@ -50,6 +36,7 @@ def global_header() -> rx.Component:
         justify="between", width="100%", align="center",
         margin_bottom="1rem",
     )
+
 
 def index() -> rx.Component:
     return rx.match(
@@ -104,6 +91,7 @@ def index() -> rx.Component:
             login_page(),
         ),
     )
+
 
 app = rx.App(
     theme=rx.theme(appearance="light", accent_color="red"),
