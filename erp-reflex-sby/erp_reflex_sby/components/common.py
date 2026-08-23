@@ -1,7 +1,4 @@
 import reflex as rx
-from ..state import AppState
-
-import reflex as rx
 
 def metric_box(title: str, value: str, accent_color: str, bg_gradient: str) -> rx.Component:
     return rx.box(
@@ -16,9 +13,9 @@ def metric_box(title: str, value: str, accent_color: str, bg_gradient: str) -> r
         style={
             "background": bg_gradient,
             "border_left": f"6px solid {accent_color}",
-            "border_top": "1px solid #CBD5E0",
-            "border_right": "1px solid #CBD5E0",
-            "border_bottom": "1px solid #CBD5E0",
+            "border_top": "1.5px solid #CBD5E0",
+            "border_right": "1.5px solid #CBD5E0",
+            "border_bottom": "1.5px solid #CBD5E0",
             "box_shadow": "0 4px 12px rgba(0,0,0,0.06)",
             "width": "100%",
         }

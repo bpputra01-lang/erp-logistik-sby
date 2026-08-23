@@ -250,38 +250,29 @@ def main_dashboard() -> rx.Component:
                     value="tab1",
                 ),
 
-# --- TAB 2: METRICS & TABEL HISTORY ---
+                # --- TAB 2: METRICS & TABEL HISTORY ---
                 rx.tabs.content(
                     rx.vstack(
                         rx.hstack(
                             rx.hstack(
                                 rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#111111"),
-                                # PERBAIKAN DROPDOWN BIAR TERANG & TAJAM
-                                rx.select.root(
-                                    rx.select.trigger(
-                                        placeholder="SEMUA",
-                                        style={
-                                            "background_color": "#FFFFFF !important",
-                                            "color": "#111111 !important",
-                                            "border": "2px solid #2D3748 !important",
-                                            "border_radius": "8px !important",
-                                            "font_weight": "700",
-                                            "padding": "6px 12px",
-                                            "min_width": "200px",
-                                            "cursor": "pointer",
-                                        }
-                                    ),
-                                    rx.select.content(
-                                        rx.select.group(
-                                            rx.foreach(
-                                                AppState.list_ekspedisi_options,
-                                                lambda opt: rx.select.item(opt, value=opt)
-                                            )
-                                        ),
-                                        style={"background_color": "#FFFFFF", "color": "#111111", "font_weight": "600"}
-                                    ),
+                                # DROPDOWN AMAN & TAJAM (STYLING OVERRIDE)
+                                rx.select(
+                                    AppState.list_ekspedisi_options,
                                     value=AppState.filter_ekspedisi,
-                                    on_value_change=AppState.set_filter_ekspedisi,
+                                    on_change=AppState.set_filter_ekspedisi,
+                                    width="220px",
+                                    size="2",
+                                    color_scheme="gray",
+                                    variant="surface",
+                                    style={
+                                        "background_color": "#FFFFFF !important",
+                                        "color": "#111111 !important",
+                                        "border": "2px solid #2D3748 !important",
+                                        "border_radius": "8px !important",
+                                        "font_weight": "700",
+                                        "cursor": "pointer",
+                                    }
                                 ),
                                 align="center", spacing="2",
                             ),
