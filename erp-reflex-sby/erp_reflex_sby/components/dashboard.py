@@ -47,7 +47,7 @@ def main_dashboard() -> rx.Component:
                     align="center", spacing="3",
                 ),
                 rx.hstack(
-                    # BADGE ONLINE HIJAU CLEAN & TAJAM
+                    # BADGE ONLINE HIJAU CLEAN & TAJAM (TOMBOL LOGOUT BERHASIL DIHAPUS)
                     rx.box(
                         rx.hstack(
                             rx.box(width="8px", height="8px", background="#10B981", border_radius="50%"),
@@ -59,22 +59,7 @@ def main_dashboard() -> rx.Component:
                         border="1.5px solid #A7F3D0",
                         border_radius="20px",
                     ),
-                    # TOMBOL LOGOUT MERAH KONTRAS
-                    rx.button(
-                        "Logout", 
-                        on_click=AppState.logout, 
-                        size="2",
-                        style={
-                            "background": "#E50914 !important",
-                            "color": "#FFFFFF !important",
-                            "font-weight": "700",
-                            "border-radius": "8px",
-                            "padding": "6px 16px",
-                            "cursor": "pointer",
-                            "_hover": {"background": "#B20710 !important"}
-                        }
-                    ),
-                    spacing="3", align="center"
+                    align="center"
                 ),
                 justify="between", width="100%", padding_bottom="1.2rem", border_bottom="2px solid #CBD5E0",
             ),
