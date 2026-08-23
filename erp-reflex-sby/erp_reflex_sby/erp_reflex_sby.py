@@ -2,19 +2,19 @@ import reflex as rx
 from .state import AppState
 from .components.login import login_page
 from .components.dashboard import main_dashboard
-from .components.sidebar import sidebar  # 1. Jangan lupa import sidebar-nya di sini
+from .components.sidebar import sidebar
 
 def index() -> rx.Component:
     return rx.cond(
         AppState.logged_in,
         rx.hstack(
-            sidebar(), # Sidebar otomatis menyembunyikan menu dashboard jika bukan admin
+            sidebar(),
             rx.vstack(
                 rx.match(
                     AppState.main_menu,
-                    # Validasi ganda: Pastikan hanya admin yang bisa membuka halaman ini
-                    ("Dashboard Overview", rx.cond(AppState.role == "admin", main_dashboard(), rx.text("Akses Ditolak: Khusus Admin", color="red", font_size="1.5rem"))),
-                    # Menu lainnya...
+                    # Karena role admin bernilai "DC", cek kondisinya dengan "DC"
+                    ("Dashboard Overview", rx.cond(AppState.role == "DC", main_dashboard(), rx.text("Akses Ditolak: Khusus Admin DC", color="red", font_size="1.5rem"))),
+                    # Jika ada menu lain, tambahkan di bawah sini...
                 ),
                 width="100%",
                 height="100vh",
