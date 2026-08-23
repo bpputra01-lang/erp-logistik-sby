@@ -2,16 +2,18 @@ import reflex as rx
 from ..state import AppState
 
 def menu_item(label: str, target_menu: str) -> rx.Component:
+    # Gunakan rx.cond untuk mengecek apakah menu ini sedang aktif
     is_active = AppState.main_menu == target_menu
+    
     return rx.button(
         label,
         on_click=lambda: AppState.set_main_menu(target_menu),
         width="100%",
         justify="start",
-        variant="soft" if is_active else "ghost",
-        color_scheme="red" if is_active else "gray",
+        variant=rx.cond(is_active, "soft", "ghost"),
+        color_scheme=rx.cond(is_active, "red", "gray"),
         style={
-            "font-weight": "700" if is_active else "500",
+            "font-weight": rx.cond(is_active, "700", "500"),
             "padding": "0.5rem 0.75rem",
             "margin-bottom": "2px",
             "border-radius": "8px",
