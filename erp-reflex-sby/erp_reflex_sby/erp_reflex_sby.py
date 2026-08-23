@@ -7,6 +7,19 @@ from .components.sidebar import sidebar
 # --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
     return rx.hstack(
+        # --- CSS ANIMASI BLINK UNTUK TITIK ONLINE ---
+        rx.html("""
+            <style>
+                @keyframes blinkAnimation {
+                    0% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.3; transform: scale(0.8); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
+                .blink-online {
+                    animation: blinkAnimation 1.5s infinite ease-in-out;
+                }
+            </style>
+        """),
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
@@ -17,7 +30,7 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
-            # --- TITIK HIJAU DENGAN KELAS CSS BERKEDIP (BLINK) ---
+            # --- TITIK HIJAU DENGAN KELAS BLINK ---
             rx.box(
                 width="10px", 
                 height="10px", 
@@ -44,15 +57,15 @@ def index() -> rx.Component:
             rx.hstack(
                 sidebar(),
                 rx.vstack(
-                    # --- HEADER GLOBAL DIPASANG DI SINI AGAR MUNCUL DI SEMUA MENU ---
+                    # --- HEADER GLOBAL DIPASANG DI SINI ---
                     global_header(),
-                    
+
                     rx.match(
                         AppState.main_menu,
                         ("Database Ongkir In/Out", main_dashboard()),
                         ("Database Ongkir", main_dashboard()),
                         ("dashboard_ongkir", main_dashboard()),
-                        
+
                         # Handle Error Akses Ditolak
                         (
                             "access_denied",
@@ -63,7 +76,7 @@ def index() -> rx.Component:
                                 width="100%", height="70vh",
                             ),
                         ),
-                        
+
                         # Default / Under development untuk menu lain
                         rx.vstack(
                             rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
