@@ -328,7 +328,7 @@ def login_page() -> rx.Component:
             box_shadow="0 25px 60px rgba(0, 0, 0, 0.85)",
         ),
         # RADIAL OVERLAY (Latar Hitam Simetris / Rata Kiri & Kanan)
-        background_image="radial-gradient(circle at center, rgba(5, 5, 8, 0.55) 0%, rgba(5, 5, 8, 0.88) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070')",
+        background_image="radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070')",
         background_size="cover",
         background_position="center",
         background_repeat="no-repeat",
