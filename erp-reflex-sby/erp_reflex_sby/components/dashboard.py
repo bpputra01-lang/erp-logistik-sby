@@ -6,24 +6,23 @@ from .common import metric_box, render_table_row
 STYLE_INPUT = {
     "background_color": "#FFFFFF !important",
     "color": "#111111 !important",
-    "border": "2px solid #4A5568 !important",  # Border tebal & tegas (Gelap/Charcoal)
+    "border": "2px solid #4A5568 !important",
     "border_radius": "8px !important",
     "font_weight": "600",
     "_focus": {
-        "border": "2px solid #E50914 !important",  # Berubah merah tegas saat diklik/fokus
+        "border": "2px solid #E50914 !important",
         "box_shadow": "0 0 0 1px #E50914 !important",
         "outline": "none !important",
     },
     "_hover": {
-        "border_color": "#1A202C !important",  # Lebih gelap saat kursor di atasnya
+        "border_color": "#1A202C !important",
     },
     "_placeholder": {
-        "color": "#718096 !important",  # Teks petunjuk lebih tebal & kontras
+        "color": "#718096 !important",
         "font_weight": "normal",
     }
 }
 
-# Style khusus Label / Subtitle
 STYLE_LABEL = {
     "size": "1",
     "font_weight": "800",
@@ -47,7 +46,6 @@ def main_dashboard() -> rx.Component:
                     align="center", spacing="3",
                 ),
                 rx.hstack(
-                    # BADGE ONLINE HIJAU CLEAN & TAJAM (TOMBOL LOGOUT BERHASIL DIHAPUS)
                     rx.box(
                         rx.hstack(
                             rx.box(width="8px", height="8px", background="#10B981", border_radius="50%"),
@@ -71,10 +69,7 @@ def main_dashboard() -> rx.Component:
                         "📥 INPUT & BATCH DATA", 
                         value="tab1",
                         style={
-                            "color": "#1A202C",
-                            "font-weight": "800",
-                            "padding": "8px 16px",
-                            "cursor": "pointer",
+                            "color": "#1A202C", "font-weight": "800", "padding": "8px 16px", "cursor": "pointer",
                             "_selected": {"color": "#E50914 !important", "border-bottom": "3px solid #E50914"}
                         }
                     ),
@@ -82,10 +77,7 @@ def main_dashboard() -> rx.Component:
                         "📊 SUMMARY & HISTORY", 
                         value="tab2",
                         style={
-                            "color": "#1A202C",
-                            "font-weight": "800",
-                            "padding": "8px 16px",
-                            "cursor": "pointer",
+                            "color": "#1A202C", "font-weight": "800", "padding": "8px 16px", "cursor": "pointer",
                             "_selected": {"color": "#E50914 !important", "border-bottom": "3px solid #E50914"}
                         }
                     ),
@@ -95,7 +87,6 @@ def main_dashboard() -> rx.Component:
                 # --- TAB 1: FORM INPUT & CSV UPLOAD ---
                 rx.tabs.content(
                     rx.grid(
-                        # BOX INPUT MANUAL
                         rx.box(
                             rx.vstack(
                                 rx.hstack(
@@ -104,71 +95,40 @@ def main_dashboard() -> rx.Component:
                                     align="center", spacing="2",
                                 ),
                                 rx.divider(border_color="#CBD5E0"),
-                                
                                 rx.vstack(
                                     rx.text("NAMA SUPPLIER", **STYLE_LABEL),
-                                    rx.input(
-                                        placeholder="Masukkan Nama Supplier...", 
-                                        value=AppState.input_supplier, 
-                                        on_change=AppState.set_supplier, 
-                                        width="100%", size="3", style=STYLE_INPUT
-                                    ),
+                                    rx.input(placeholder="Masukkan Nama Supplier...", value=AppState.input_supplier, on_change=AppState.set_supplier, width="100%", size="3", style=STYLE_INPUT),
                                     spacing="1", width="100%",
                                 ),
-                                
                                 rx.hstack(
                                     rx.vstack(
                                         rx.text("EKSPEDISI", **STYLE_LABEL),
-                                        rx.input(
-                                            placeholder="Nama Ekspedisi...", 
-                                            value=AppState.input_ekspedisi, 
-                                            on_change=AppState.set_ekspedisi, 
-                                            width="100%", size="3", style=STYLE_INPUT
-                                        ),
+                                        rx.input(placeholder="Nama Ekspedisi...", value=AppState.input_ekspedisi, on_change=AppState.set_ekspedisi, width="100%", size="3", style=STYLE_INPUT),
                                         spacing="1", width="100%",
                                     ),
                                     rx.vstack(
                                         rx.text("TOTAL KOLI", **STYLE_LABEL),
-                                        rx.input(
-                                            type="number", placeholder="Jumlah Koli", 
-                                            value=AppState.input_koli, 
-                                            on_change=AppState.set_koli, 
-                                            width="100%", size="3", style=STYLE_INPUT
-                                        ),
+                                        rx.input(type="number", placeholder="Jumlah Koli", value=AppState.input_koli, on_change=AppState.set_koli, width="100%", size="3", style=STYLE_INPUT),
                                         spacing="1", width="100%",
                                     ),
                                     width="100%", spacing="3",
                                 ),
-                                
                                 rx.hstack(
                                     rx.vstack(
                                         rx.text("TOTAL ONGKIR (RP)", **STYLE_LABEL),
-                                        rx.input(
-                                            type="number", placeholder="Rp 0", 
-                                            value=AppState.input_ongkir, 
-                                            on_change=AppState.set_ongkir, 
-                                            width="100%", size="3", style=STYLE_INPUT
-                                        ),
+                                        rx.input(type="number", placeholder="Rp 0", value=AppState.input_ongkir, on_change=AppState.set_ongkir, width="100%", size="3", style=STYLE_INPUT),
                                         spacing="1", width="100%",
                                     ),
                                     rx.vstack(
                                         rx.text("TANGGAL", **STYLE_LABEL),
-                                        rx.input(
-                                            type="date", 
-                                            value=AppState.input_tgl, 
-                                            on_change=AppState.set_tgl, 
-                                            width="100%", size="3", style=STYLE_INPUT
-                                        ),
+                                        rx.input(type="date", value=AppState.input_tgl, on_change=AppState.set_tgl, width="100%", size="3", style=STYLE_INPUT),
                                         spacing="1", width="100%",
                                     ),
                                     width="100%", spacing="3",
                                 ),
-                                
                                 rx.box(height="5px"),
                                 rx.button(
-                                    "🚀 SIMPAN DATA ONGKIR", 
-                                    on_click=AppState.save_single_data, 
-                                    width="100%", size="3",
+                                    "🚀 SIMPAN DATA ONGKIR", on_click=AppState.save_single_data, width="100%", size="3",
                                     style={
                                         "background": "linear-gradient(135deg, #E50914 0%, #B20710 100%)",
                                         "color": "#FFFFFF !important", "font-weight": "800", "border-radius": "10px",
@@ -180,8 +140,6 @@ def main_dashboard() -> rx.Component:
                             padding="1.8rem", background="#FFFFFF", border_radius="16px", 
                             border="2px solid #CBD5E0", box_shadow="0 10px 25px rgba(0,0,0,0.03)",
                         ),
-
-                        # BOX UPLOAD CSV
                         rx.box(
                             rx.vstack(
                                 rx.hstack(
@@ -190,40 +148,18 @@ def main_dashboard() -> rx.Component:
                                     align="center", spacing="2",
                                 ),
                                 rx.divider(border_color="#CBD5E0"),
-                                
                                 rx.upload(
                                     rx.vstack(
-                                        rx.box(
-                                            rx.text("☁️", size="6"),
-                                            padding="10px", background="#E2E8F0", border_radius="50%"
-                                        ),
-                                        rx.button(
-                                            "Pilih File CSV", 
-                                            style={
-                                                "background": "#1A202C !important", 
-                                                "color": "#FFFFFF !important",
-                                                "font-weight": "700"
-                                            }, 
-                                            size="2"
-                                        ),
+                                        rx.box(rx.text("☁️", size="6"), padding="10px", background="#E2E8F0", border_radius="50%"),
+                                        rx.button("Pilih File CSV", style={"background": "#1A202C !important", "color": "#FFFFFF !important", "font-weight": "700"}, size="2"),
                                         rx.text("atau tarik & lepaskan file CSV di sini", size="2", color="#4A5568", weight="bold"),
                                         align="center", spacing="2",
                                     ),
-                                    id="upload_csv", 
-                                    border="2px dashed #E50914", 
-                                    padding="2.5rem", border_radius="12px", width="100%",
-                                    background="#FFF5F5",
+                                    id="upload_csv", border="2px dashed #E50914", padding="2.5rem", border_radius="12px", width="100%", background="#FFF5F5",
                                 ),
-                                
                                 rx.button(
-                                    "⚡ EXECUTE BATCH UPLOAD", 
-                                    on_click=AppState.handle_upload(rx.upload_files(upload_id="upload_csv")), 
-                                    width="100%", size="3",
-                                    style={
-                                        "background": "#1A202C", "color": "#FFFFFF !important", "font-weight": "800",
-                                        "border-radius": "10px", "cursor": "pointer",
-                                        "box-shadow": "0 4px 12px rgba(0, 0, 0, 0.15)"
-                                    }
+                                    "⚡ EXECUTE BATCH UPLOAD", on_click=AppState.handle_upload(rx.upload_files(upload_id="upload_csv")), width="100%", size="3",
+                                    style={"background": "#1A202C", "color": "#FFFFFF !important", "font-weight": "800", "border-radius": "10px", "cursor": "pointer", "box-shadow": "0 4px 12px rgba(0, 0, 0, 0.15)"}
                                 ),
                                 spacing="4",
                             ),
@@ -245,17 +181,11 @@ def main_dashboard() -> rx.Component:
                                     AppState.list_ekspedisi_options,
                                     value=AppState.filter_ekspedisi,
                                     on_change=AppState.set_filter_ekspedisi,
-                                    width="220px",
-                                    size="2",
-                                    color_scheme="gray",
-                                    variant="classic",
+                                    width="220px", size="2", color_scheme="gray", variant="classic",
                                     style={
-                                        "background-color": "#FFFFFF !important",
-                                        "color": "#000000 !important",
-                                        "border": "2.5px solid #1A202C !important",
-                                        "border-radius": "8px !important",
-                                        "font-weight": "800 !important",
-                                        "box-shadow": "0 2px 5px rgba(0,0,0,0.05)",
+                                        "background-color": "#FFFFFF !important", "color": "#000000 !important",
+                                        "border": "2.5px solid #1A202C !important", "border-radius": "8px !important",
+                                        "font-weight": "800 !important", "box-shadow": "0 2px 5px rgba(0,0,0,0.05)",
                                     }
                                 ),
                                 align="center", spacing="2",
@@ -267,7 +197,6 @@ def main_dashboard() -> rx.Component:
                             justify="between", width="100%", margin_top="1.5rem", margin_bottom="0.5rem",
                         ),
                         
-                        # METRIC BOXES GRADIENT TINT BERGARIS TEGAS
                         rx.grid(
                             metric_box("💰 BIAYA ALL", AppState.total_biaya_all, "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
                             metric_box("📦 KOLI ALL", AppState.total_koli_all, "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
@@ -275,10 +204,9 @@ def main_dashboard() -> rx.Component:
                             metric_box("🚚 BIAYA DATANG", AppState.biaya_datang, "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
                             metric_box("📦 KOLI DATANG", AppState.koli_datang, "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
                             metric_box("🔄 BIAYA RTO", AppState.biaya_rto, "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
-                            columns=rx.breakpoints(initial="1", sm="3"), spacing="4", width="100%",
+                            columns=rx.breakpoints(initial="1", sm="3", lg="6"), spacing="4", width="100%",
                         ),
                         
-                        # TABEL HISTORY (HEADER DENGAN TEKS HITAM JELAS)
                         rx.box(
                             rx.table.root(
                                 rx.table.header(
@@ -320,7 +248,8 @@ def main_dashboard() -> rx.Component:
                 ),
                 open=AppState.show_delete_modal,
             ),
-            spacing="5", padding="2.5rem", max_width="1280px", margin="0 auto", on_mount=AppState.load_data,
+            # Perubahan utama di sini: width="100%" dan max_width dihapus agar melebar penuh
+            spacing="5", padding="2rem", width="100%",
         ),
-        background_color="#F7FAFC", min_height="100vh",
+        background_color="#F7FAFC", min_height="100vh", width="100%", on_mount=AppState.load_data,
     )
