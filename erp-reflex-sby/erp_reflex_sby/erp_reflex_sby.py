@@ -1,6 +1,7 @@
 import reflex as rx
 from .state import AppState
 from .components.login import login_page
+from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 
 def index() -> rx.Component:
@@ -9,7 +10,29 @@ def index() -> rx.Component:
         rx.hstack(
             sidebar(),
             rx.vstack(
-                AppState.dynamic_content,
+                rx.match(
+                    AppState.active_content_type,
+                    ("dashboard_ongkir", main_dashboard()),
+                    ("access_denied", rx.vstack(
+                        rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
+                        rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
+                        padding="3rem",
+                        align_items="center",
+                        justify_content="center",
+                        width="100%",
+                        height="80vh",
+                    )),
+                    # Default untuk under_development
+                    rx.vstack(
+                        rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
+                        rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
+                        padding="3rem",
+                        align_items="center",
+                        justify_content="center",
+                        width="100%",
+                        height="80vh",
+                    ),
+                ),
                 width="100%",
                 height="100vh",
                 background_color="#F7FAFC",
