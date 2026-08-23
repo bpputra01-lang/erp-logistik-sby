@@ -233,7 +233,7 @@ def login_page() -> rx.Component:
             rx.vstack(
                 # Header Logo / Title
                 rx.hstack(
-                    rx.box(width="12px", height="35px", background="#E50914", border_radius="4px"),
+                    rx.box(width="12px", height="38px", background="#E50914", border_radius="4px"),
                     rx.vstack(
                         rx.heading("LOGISTIC DISTRIBUTION", size="6", color="#FFFFFF", font_weight="800", letter_spacing="1px"),
                         rx.text("CENTER WAREHOUSE • SURABAYA", size="1", color="#E50914", font_weight="700", letter_spacing="2px"),
@@ -245,7 +245,7 @@ def login_page() -> rx.Component:
                 rx.divider(border_color="rgba(255, 255, 255, 0.1)"),
                 rx.text("Silakan masuk dengan akun resmi gudang Anda.", size="2", color="#B0B0B0"),
 
-                # Input Username
+                # Input Username (Diperlebar)
                 rx.vstack(
                     rx.text("USERNAME", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
                     rx.input(
@@ -255,17 +255,19 @@ def login_page() -> rx.Component:
                         size="3",
                         variant="surface",
                         color_scheme="red",
+                        width="100%",  # Full width proporsional
                         style={
                             "background": "rgba(0, 0, 0, 0.75)", 
                             "border": "1px solid rgba(229, 9, 20, 0.4)", 
                             "color": "#FFFFFF", 
-                            "border-radius": "10px"
+                            "border-radius": "10px",
+                            "padding": "0.8rem 1rem",
                         },
                     ),
                     spacing="1", width="100%",
                 ),
 
-                # Input Password
+                # Input Password (Diperlebar)
                 rx.vstack(
                     rx.text("PASSWORD", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
                     rx.input(
@@ -276,11 +278,13 @@ def login_page() -> rx.Component:
                         size="3",
                         variant="surface",
                         color_scheme="red",
+                        width="100%",  # Full width proporsional
                         style={
                             "background": "rgba(0, 0, 0, 0.75)", 
                             "border": "1px solid rgba(229, 9, 20, 0.4)", 
                             "color": "#FFFFFF", 
-                            "border-radius": "10px"
+                            "border-radius": "10px",
+                            "padding": "0.8rem 1rem",
                         },
                     ),
                     spacing="1", width="100%",
@@ -300,7 +304,8 @@ def login_page() -> rx.Component:
                         "font-weight": "800", 
                         "border-radius": "10px", 
                         "cursor": "pointer",
-                        "box-shadow": "0 4px 15px rgba(229, 9, 20, 0.4)"
+                        "box-shadow": "0 4px 15px rgba(229, 9, 20, 0.4)",
+                        "height": "48px",
                     },
                 ),
 
@@ -310,19 +315,20 @@ def login_page() -> rx.Component:
                 ),
                 spacing="5",
                 align="stretch",
+                width="100%",
             ),
             width="100%",
-            max_width="440px",
-            padding="2.5rem",
-            background="rgba(10, 10, 14, 0.88)", # Pekat transparan agar kontras dengan background terang
+            max_width="520px",  # <-- Diperlebar dari 440px ke 520px agar proporsional
+            padding="3rem 2.5rem",
+            background="rgba(12, 12, 15, 0.88)",
             backdrop_filter="blur(20px)",
             border_radius="20px",
             border="1px solid rgba(255, 255, 255, 0.12)",
             border_left="5px solid #E50914",
-            box_shadow="0 20px 50px rgba(0, 0, 0, 0.6)",
+            box_shadow="0 25px 60px rgba(0, 0, 0, 0.85)",
         ),
-        # GAMBAR GUDANG TERANG BERSIH + OVERLAY GRADIENT
-        background_image="linear-gradient(to right, rgba(5, 5, 8, 0.95) 0%, rgba(5, 5, 8, 0.60) 35%, rgba(255, 255, 255, 0.05) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070')",
+        # RADIAL OVERLAY (Latar Hitam Simetris / Rata Kiri & Kanan)
+        background_image="radial-gradient(circle at center, rgba(5, 5, 8, 0.55) 0%, rgba(5, 5, 8, 0.88) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070')",
         background_size="cover",
         background_position="center",
         background_repeat="no-repeat",
@@ -330,8 +336,7 @@ def login_page() -> rx.Component:
         height="100vh",
         align="center",
         justify="center",
-        padding_left=["2rem", "5rem", "8rem"],
-        padding_right="2rem",
+        padding="2rem",
     )
 def metric_box(title: str, value: str, accent_color: str) -> rx.Component:
     return rx.box(
