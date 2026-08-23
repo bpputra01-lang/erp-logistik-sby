@@ -18,6 +18,10 @@ class AppState(rx.State):
     def set_main_menu(self, menu: str):
         self.main_menu = menu
 
+    # Setter yang ditambahkan untuk memperbaiki error
+    def set_pilih_laporan(self, val: str):
+        self.pilih_laporan = val
+
     # --- SIDEBAR UI & DROPDOWN STATE ---
     sidebar_open: bool = True
     dropdown_dashboard: bool = True
