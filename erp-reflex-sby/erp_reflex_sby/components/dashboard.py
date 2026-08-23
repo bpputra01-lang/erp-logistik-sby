@@ -257,32 +257,31 @@ def main_dashboard() -> rx.Component:
                             rx.hstack(
                                 rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#111111"),
                                 # DROPDOWN DENGAN STYLING OVERRIDE KETAT
-                                rx.box(
+                               rx.box(
                                     rx.select(
                                         AppState.list_ekspedisi_options,
                                         value=AppState.filter_ekspedisi,
                                         on_change=AppState.set_filter_ekspedisi,
-                                        width="220px",
                                         size="2",
-                                        variant="surface",
+                                        variant="soft",
                                         color_scheme="gray",
+                                        width="100%",
                                         style={
-                                            "background": "#FFFFFF !important",
-                                            "background-color": "#FFFFFF !important",
+                                            "background": "transparent !important",
+                                            "background-color": "transparent !important",
                                             "color": "#111111 !important",
                                             "-webkit-text-fill-color": "#111111 !important",
-                                            "border": "2.5px solid #1A202C !important",
-                                            "border-radius": "8px !important",
                                             "font-weight": "800 !important",
                                             "box-shadow": "none !important",
+                                            "cursor": "pointer",
                                         }
                                     ),
                                     style={
                                         "background-color": "#FFFFFF !important",
                                         "border": "2.5px solid #1A202C !important",
                                         "border-radius": "8px !important",
-                                        "padding": "2px 6px",
-                                        "min-width": "200px",
+                                        "padding": "4px 8px",
+                                        "width": "220px",
                                         "cursor": "pointer",
                                         "box-shadow": "0 2px 5px rgba(0,0,0,0.05)",
                                     }
