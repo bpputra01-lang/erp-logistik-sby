@@ -33,40 +33,6 @@ STYLE_LABEL = {
 
 def main_dashboard() -> rx.Component:
     return rx.box(
-        rx.vstack(
-            # --- HEADER ---
-            rx.hstack(
-                rx.hstack(
-                    rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
-                    rx.vstack(
-                        rx.heading("DATABASE ONGKIR IN/OUT & ANALYTICS", size="5", color="#111111", font_weight="800"),
-                        rx.text(f"Logged in as: {AppState.user_display_name} ({AppState.role})", size="2", color="#4A5568"),
-                        align_items="start", spacing="0",
-                    ),
-                    align="center", spacing="3",
-                ),
-                rx.hstack(
-                    # --- TITIK HIJAU DENGAN ANIMASI KEDIP PULSE ---
-                    # --- Ganti bagian kotak titik hijau ini ---
-                rx.box(
-                    width="10px", 
-                    height="10px", 
-                    background="#10B981", 
-                    border_radius="50%",
-                    class_name="blink-online"
-                ),
-                    rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
-                    align="center", spacing="2",
-                ),
-                padding="8px 16px",
-                background="#D1FAE5",
-                border="1.5px solid #A7F3D0",
-                border_radius="20px",
-                justify="between", width="100%", align="center"
-            ),
-            width="100%", padding_bottom="1.2rem", border_bottom="2px solid #CBD5E0",
-        ),
-
         # --- TABS (Hanya Input dan Summary) ---
         rx.tabs.root(
             rx.tabs.list(
@@ -255,6 +221,6 @@ def main_dashboard() -> rx.Component:
             ),
             open=AppState.show_delete_modal,
         ),
-        spacing="5", padding="2rem", width="100%",
+        spacing="5", width="100%",
         background_color="#F7FAFC", min_height="100vh", on_mount=AppState.load_data,
     )
