@@ -10,14 +10,14 @@ def global_header() -> rx.Component:
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
-                rx.heading(rx.selected_menu_or_default(AppState.main_menu, "ERP SYSTEM ANALYTICS"), size="5", color="#111111", font_weight="800"),
+                rx.heading(AppState.main_menu, size="5", color="#111111", font_weight="800"),
                 rx.text(f"Logged in as: {AppState.user_display_name} ({AppState.role})", size="2", color="#4A5568"),
                 align_items="start", spacing="0",
             ),
             align="center", spacing="3",
         ),
         rx.hstack(
-            # --- TITIK HIJAU DENGAN Kelas CSS BERKEDIP (BLINK) ---
+            # --- TITIK HIJAU DENGAN KELAS CSS BERKEDIP (BLINK) ---
             rx.box(
                 width="10px", 
                 height="10px", 
