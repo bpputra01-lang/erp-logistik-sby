@@ -2,7 +2,6 @@ import reflex as rx
 from ..state import AppState
 
 def menu_item(label: str, target_menu: str) -> rx.Component:
-    # Gunakan rx.cond untuk mengecek apakah menu ini sedang aktif
     is_active = AppState.main_menu == target_menu
     
     return rx.button(
@@ -10,14 +9,28 @@ def menu_item(label: str, target_menu: str) -> rx.Component:
         on_click=lambda: AppState.set_main_menu(target_menu),
         width="100%",
         justify="start",
-        variant=rx.cond(is_active, "soft", "ghost"),
-        color_scheme=rx.cond(is_active, "red", "gray"),
+        variant="solid",
         style={
+            "background": rx.cond(
+                is_active, 
+                "linear-gradient(135deg, #E50914 0%, #B20710 100%)", 
+                "transparent"
+            ),
+            "color": rx.cond(is_active, "#FFFFFF", "#2D3748"),
             "font-weight": rx.cond(is_active, "700", "500"),
-            "padding": "0.5rem 0.75rem",
-            "margin-bottom": "2px",
+            "padding": "0.6rem 0.8rem",
+            "margin-bottom": "4px",
             "border-radius": "8px",
             "text-align": "left",
+            "box-shadow": rx.cond(is_active, "0 4px 12px rgba(229, 9, 20, 0.3)", "none"),
+            "_hover": {
+                "background": rx.cond(
+                    is_active, 
+                    "linear-gradient(135deg, #E50914 0%, #B20710 100%)", 
+                    "rgba(0, 0, 0, 0.05)"
+                ),
+                "color": "#1A202C",
+            }
         }
     )
 
@@ -31,15 +44,15 @@ def sidebar() -> rx.Component:
             rx.heading("PRO", color="#111111", font_weight="900", size="6"),
             align="center",
             spacing="1",
-            margin_bottom="1rem",
+            margin_bottom="1.5rem",
         ),
         
         # --- KELOMPOK 1: DASHBOARD SUMMARY (Hanya DC) ---
         rx.cond(
             is_dc,
             rx.vstack(
-                rx.text("MAIN MENU", size="1", weight="bold", color="#808495", margin_top="10px"),
-                rx.text("DASHBOARD SUMMARY", size="1", weight="bold", color="#808495", margin_bottom="5px"),
+                rx.text("MAIN MENU", size="1", weight="bold", color="#4A5568", margin_top="10px"),
+                rx.text("DASHBOARD SUMMARY", size="1", weight="bold", color="#4A5568", margin_bottom="5px"),
                 menu_item("Dashboard Overview", "Dashboard Overview"),
                 menu_item("Database Master", "Database Master"),
                 width="100%",
@@ -50,7 +63,7 @@ def sidebar() -> rx.Component:
         
         # --- KELOMPOK 2: OPERATIONAL ---
         rx.vstack(
-            rx.text("OPERATIONAL", size="1", weight="bold", color="#808495", margin_top="20px", margin_bottom="5px"),
+            rx.text("OPERATIONAL", size="1", weight="bold", color="#4A5568", margin_top="20px", margin_bottom="5px"),
             rx.cond(
                 is_dc,
                 rx.vstack(
@@ -76,7 +89,7 @@ def sidebar() -> rx.Component:
 
         # --- KELOMPOK 3: INVENTORY ---
         rx.vstack(
-            rx.text("INVENTORY", size="1", weight="bold", color="#808495", margin_top="20px", margin_bottom="5px"),
+            rx.text("INVENTORY", size="1", weight="bold", color="#4A5568", margin_top="20px", margin_bottom="5px"),
             rx.cond(
                 is_dc,
                 rx.vstack(
@@ -108,7 +121,7 @@ def sidebar() -> rx.Component:
 
         # --- KELOMPOK 4: REJECT & DEFECT ---
         rx.vstack(
-            rx.text("REJECT & DEFECT", size="1", weight="bold", color="#808495", margin_top="20px", margin_bottom="5px"),
+            rx.text("REJECT & DEFECT", size="1", weight="bold", color="#4A5568", margin_top="20px", margin_bottom="5px"),
             menu_item("Pengajuan Reject/Defect", "Pengajuan Reject/Defect"),
             menu_item("Reject/Defect List", "Reject/Defect List"),
             width="100%", spacing="1", align_items="start",
@@ -116,7 +129,7 @@ def sidebar() -> rx.Component:
 
         # --- KELOMPOK 5: EXTRAS ---
         rx.vstack(
-            rx.text("EXTRAS", size="1", weight="bold", color="#808495", margin_top="20px", margin_bottom="5px"),
+            rx.text("EXTRAS", size="1", weight="bold", color="#4A5568", margin_top="20px", margin_bottom="5px"),
             rx.cond(
                 is_dc,
                 rx.vstack(
@@ -140,9 +153,10 @@ def sidebar() -> rx.Component:
             width="100%", align_items="start",
         ),
 
-        width="280px",
+        width="290px",
         padding="1.5rem",
-        background_color="#FFFFFF",
+        # Background gradasi putih, merah tipis, dan aksen gelap/hitam elegan
+        background="linear-gradient(180deg, #FFFFFF 0%, #FFF5F5 50%, #F7FAFC 100%)",
         border_right="2px solid #E2E8F0",
         height="100vh",
         overflow_y="auto",
