@@ -20,7 +20,7 @@ def global_header() -> rx.Component:
                 }
             </style>
         """),
-        # Sisi Kiri: Garis Merah + Judul & Info User
+        # Sisi Kiri: Garis Merah + Judul & Info User (Flex-start agar mentok kiri)
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
@@ -30,7 +30,7 @@ def global_header() -> rx.Component:
             ),
             align="center", spacing="3",
         ),
-        # Sisi Kanan: Status Online (Otomatis terdorong ke kanan karena justify="between")
+        # Sisi Kanan: Status Online
         rx.hstack(
             rx.box(
                 width="10px", 
@@ -48,9 +48,10 @@ def global_header() -> rx.Component:
         border_radius="16px",
         justify="between", 
         width="100%", 
-        align_items="center",  # Diubah dari align="center" supaya elemen anak sejajar vertikal dengan pas di kiri-kanan
+        align_items="center",
         margin_bottom="1rem",
     )
+
 def index() -> rx.Component:
     return rx.match(
         AppState.logged_in,
@@ -59,7 +60,7 @@ def index() -> rx.Component:
             rx.hstack(
                 sidebar(),
                 rx.vstack(
-                    # --- HEADER GLOBAL DIPASANG DI SINI ---
+                    # --- HEADER GLOBAL ---
                     global_header(),
 
                     rx.match(
@@ -92,6 +93,7 @@ def index() -> rx.Component:
                     background_color="#F7FAFC",
                     overflow_y="auto",
                     padding="1.5rem",
+                    align_items="stretch", # Pastikan anak-anak vstack melebar penuh (stretch) agar header tidak "center sendiri"
                 ),
                 width="100vw",
                 height="100vh",
