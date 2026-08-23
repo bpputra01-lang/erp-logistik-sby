@@ -35,6 +35,17 @@ def menu_item(label: str, target_menu: str) -> rx.Component:
         }
     )
 
+def section_header(title: str) -> rx.Component:
+    return rx.text(
+        title, 
+        size="1", 
+        weight="bold", 
+        color="#FFFFFF",  # Warna putih bersih untuk header
+        letter_spacing="0.05em",
+        margin_top="1.2rem", 
+        margin_bottom="0.4rem"
+    )
+
 def sidebar() -> rx.Component:
     is_dc = AppState.role == "DC"
     
@@ -52,8 +63,8 @@ def sidebar() -> rx.Component:
         rx.cond(
             is_dc,
             rx.vstack(
-                rx.text("MAIN MENU", size="1", weight="bold", color="#A0AEC0", margin_top="10px"),
-                rx.text("DASHBOARD SUMMARY", size="1", weight="bold", color="#A0AEC0", margin_bottom="5px"),
+                section_header("MAIN MENU"),
+                section_header("DASHBOARD SUMMARY"),
                 menu_item("Dashboard Overview", "Dashboard Overview"),
                 menu_item("Database Master", "Database Master"),
                 width="100%",
@@ -64,7 +75,7 @@ def sidebar() -> rx.Component:
         
         # --- KELOMPOK 2: OPERATIONAL ---
         rx.vstack(
-            rx.text("OPERATIONAL", size="1", weight="bold", color="#A0AEC0", margin_top="20px", margin_bottom="5px"),
+            section_header("OPERATIONAL"),
             rx.cond(
                 is_dc,
                 rx.vstack(
@@ -90,7 +101,7 @@ def sidebar() -> rx.Component:
 
         # --- KELOMPOK 3: INVENTORY ---
         rx.vstack(
-            rx.text("INVENTORY", size="1", weight="bold", color="#A0AEC0", margin_top="20px", margin_bottom="5px"),
+            section_header("INVENTORY"),
             rx.cond(
                 is_dc,
                 rx.vstack(
@@ -122,7 +133,7 @@ def sidebar() -> rx.Component:
 
         # --- KELOMPOK 4: REJECT & DEFECT ---
         rx.vstack(
-            rx.text("REJECT & DEFECT", size="1", weight="bold", color="#A0AEC0", margin_top="20px", margin_bottom="5px"),
+            section_header("REJECT & DEFECT"),
             menu_item("Pengajuan Reject/Defect", "Pengajuan Reject/Defect"),
             menu_item("Reject/Defect List", "Reject/Defect List"),
             width="100%", spacing="1", align_items="start",
@@ -130,7 +141,7 @@ def sidebar() -> rx.Component:
 
         # --- KELOMPOK 5: EXTRAS ---
         rx.vstack(
-            rx.text("EXTRAS", size="1", weight="bold", color="#A0AEC0", margin_top="20px", margin_bottom="5px"),
+            section_header("EXTRAS"),
             rx.cond(
                 is_dc,
                 rx.vstack(
@@ -156,7 +167,6 @@ def sidebar() -> rx.Component:
 
         width="300px",
         padding="1.5rem",
-        # Background gradasi gelap elegan (Hitam arang ke abu-abu gelap dengan sentuhan merah)
         background="linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%)",
         border_right="1px solid #2D3748",
         height="100vh",
