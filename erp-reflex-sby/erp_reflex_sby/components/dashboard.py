@@ -2,27 +2,34 @@ import reflex as rx
 from ..state import AppState
 from .common import metric_box, render_table_row
 
-# Style standar untuk semua Input Box biar Konsisten, Tajam & Putih Clean
+# Style Input Box dengan BORDER TEGAS GELAP & KONTRASTING
 STYLE_INPUT = {
     "background_color": "#FFFFFF !important",
     "color": "#111111 !important",
-    "border": "1.5px solid #E2E8F0 !important",
+    "border": "2px solid #4A5568 !important",  # Border tebal & tegas (Gelap/Charcoal)
     "border_radius": "8px !important",
+    "font_weight": "600",
     "_focus": {
-        "border_color": "#E50914 !important",
+        "border": "2px solid #E50914 !important",  # Berubah merah tegas saat diklik/fokus
         "box_shadow": "0 0 0 1px #E50914 !important",
+        "outline": "none !important",
+    },
+    "_hover": {
+        "border_color": "#1A202C !important",  # Lebih gelap saat kursor di atasnya
     },
     "_placeholder": {
-        "color": "#A0AEC0 !important",
+        "color": "#718096 !important",  # Teks petunjuk lebih tebal & kontras
+        "font_weight": "normal",
     }
 }
 
 # Style khusus Label / Subtitle
 STYLE_LABEL = {
     "size": "1",
-    "font_weight": "700",
-    "color": "#2D3748",
-    "margin_bottom": "2px"
+    "font_weight": "800",
+    "color": "#1A202C",
+    "margin_bottom": "2px",
+    "letter_spacing": "0.5px"
 }
 
 def main_dashboard() -> rx.Component:
@@ -51,7 +58,7 @@ def main_dashboard() -> rx.Component:
                     ),
                     spacing="3", align="center"
                 ),
-                justify="between", width="100%", padding_bottom="1.2rem", border_bottom="2px solid #E2E8F0",
+                justify="between", width="100%", padding_bottom="1.2rem", border_bottom="2px solid #CBD5E0",
             ),
 
             # --- TABS ---
@@ -61,8 +68,8 @@ def main_dashboard() -> rx.Component:
                         "📥 INPUT & BATCH DATA", 
                         value="tab1",
                         style={
-                            "color": "#2D3748",
-                            "font-weight": "700",
+                            "color": "#1A202C",
+                            "font-weight": "800",
                             "padding": "8px 16px",
                             "cursor": "pointer",
                             "_selected": {"color": "#E50914 !important", "border-bottom": "3px solid #E50914"}
@@ -72,14 +79,14 @@ def main_dashboard() -> rx.Component:
                         "📊 SUMMARY & HISTORY", 
                         value="tab2",
                         style={
-                            "color": "#2D3748",
-                            "font-weight": "700",
+                            "color": "#1A202C",
+                            "font-weight": "800",
                             "padding": "8px 16px",
                             "cursor": "pointer",
                             "_selected": {"color": "#E50914 !important", "border-bottom": "3px solid #E50914"}
                         }
                     ),
-                    background="#EDF2F7", padding="4px", border_radius="10px", margin_top="0.5rem",
+                    background="#E2E8F0", padding="4px", border_radius="10px", margin_top="0.5rem",
                 ),
 
                 # --- TAB 1: FORM INPUT & CSV UPLOAD ---
@@ -93,7 +100,7 @@ def main_dashboard() -> rx.Component:
                                     rx.heading("Input Transaksi Manual", size="4", color="#1A202C"),
                                     align="center", spacing="2",
                                 ),
-                                rx.divider(border_color="#E2E8F0"),
+                                rx.divider(border_color="#CBD5E0"),
                                 
                                 rx.vstack(
                                     rx.text("NAMA SUPPLIER", **STYLE_LABEL),
@@ -168,7 +175,7 @@ def main_dashboard() -> rx.Component:
                                 spacing="4",
                             ),
                             padding="1.8rem", background="#FFFFFF", border_radius="16px", 
-                            border="1px solid #E2E8F0", box_shadow="0 10px 25px rgba(0,0,0,0.03)",
+                            border="2px solid #CBD5E0", box_shadow="0 10px 25px rgba(0,0,0,0.03)",
                         ),
 
                         # BOX UPLOAD CSV
@@ -179,24 +186,24 @@ def main_dashboard() -> rx.Component:
                                     rx.heading("Batch CSV Upload", size="4", color="#1A202C"),
                                     align="center", spacing="2",
                                 ),
-                                rx.divider(border_color="#E2E8F0"),
+                                rx.divider(border_color="#CBD5E0"),
                                 
                                 rx.upload(
                                     rx.vstack(
                                         rx.box(
                                             rx.text("☁️", size="6"),
-                                            padding="10px", background="#EDF2F7", border_radius="50%"
+                                            padding="10px", background="#E2E8F0", border_radius="50%"
                                         ),
                                         rx.button(
                                             "Pilih File CSV", 
                                             style={
-                                                "background": "#2D3748 !important", 
+                                                "background": "#1A202C !important", 
                                                 "color": "#FFFFFF !important",
-                                                "font-weight": "600"
+                                                "font-weight": "700"
                                             }, 
                                             size="2"
                                         ),
-                                        rx.text("atau tarik & lepaskan file CSV di sini", size="2", color="#718096"),
+                                        rx.text("atau tarik & lepaskan file CSV di sini", size="2", color="#4A5568", weight="bold"),
                                         align="center", spacing="2",
                                     ),
                                     id="upload_csv", 
@@ -218,7 +225,7 @@ def main_dashboard() -> rx.Component:
                                 spacing="4",
                             ),
                             padding="1.8rem", background="#FFFFFF", border_radius="16px", 
-                            border="1px solid #E2E8F0", box_shadow="0 10px 25px rgba(0,0,0,0.03)",
+                            border="2px solid #CBD5E0", box_shadow="0 10px 25px rgba(0,0,0,0.03)",
                         ),
                         columns=rx.breakpoints(initial="1", sm="2"), spacing="5", width="100%", margin_top="1.5rem",
                     ),
@@ -230,7 +237,7 @@ def main_dashboard() -> rx.Component:
                     rx.vstack(
                         rx.hstack(
                             rx.hstack(
-                                rx.text("FILTER EKSPEDISI:", size="2", font_weight="bold", color="#4A5568"),
+                                rx.text("FILTER EKSPEDISI:", size="2", font_weight="bold", color="#1A202C"),
                                 rx.select(AppState.list_ekspedisi_options, value=AppState.filter_ekspedisi, on_change=AppState.set_filter_ekspedisi, width="220px", size="2"),
                                 align="center", spacing="2",
                             ),
@@ -260,12 +267,12 @@ def main_dashboard() -> rx.Component:
                                         rx.table.column_header_cell("KOLI"),
                                         rx.table.column_header_cell("TOTAL ONGKIR"),
                                     ),
-                                    style={"background_color": "#EDF2F7"}
+                                    style={"background_color": "#E2E8F0"}
                                 ),
                                 rx.table.body(rx.foreach(AppState.filtered_list, render_table_row)),
                                 width="100%",
                             ),
-                            background="#FFFFFF", border_radius="16px", border="1px solid #E2E8F0", 
+                            background="#FFFFFF", border_radius="16px", border="2px solid #CBD5E0", 
                             padding="1rem", width="100%", box_shadow="0 10px 25px rgba(0,0,0,0.03)",
                         ),
                         spacing="4", width="100%",
@@ -286,7 +293,7 @@ def main_dashboard() -> rx.Component:
                         rx.button("Ya, Hapus Permanen", on_click=AppState.execute_delete, color_scheme="red"),
                         justify="end", spacing="3", margin_top="1.5rem",
                     ),
-                    background="#FFFFFF", border="1px solid #E2E8F0", border_radius="16px",
+                    background="#FFFFFF", border="2px solid #CBD5E0", border_radius="16px",
                 ),
                 open=AppState.show_delete_modal,
             ),
