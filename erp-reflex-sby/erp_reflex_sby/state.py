@@ -15,6 +15,12 @@ class AppState(rx.State):
     pilih_laporan: str = "WORKING REPORT"
     zoom_val: float = 0.35
 
+    def set_zoom_val(self, val: list[float] | float):
+        # rx.slider biasanya mengirim list jika range, atau float/int jika single value
+        if isinstance(val, list):
+            self.zoom_val = val[0]
+        else:
+            self.zoom_val = val
     def set_main_menu(self, menu: str):
         self.main_menu = menu
 
