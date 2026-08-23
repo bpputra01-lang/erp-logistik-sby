@@ -258,23 +258,23 @@ def main_dashboard() -> rx.Component:
                                 rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#111111"),
                                     # DROPDOWN DENGAN STYLING OVERRIDE KETAT
                                     # DROPDOWN BERSIH, PAS, TANPA BUNGKUSAN GANDA
-                                    rx.select(
-                                        AppState.list_ekspedisi_options,
-                                        value=AppState.filter_ekspedisi,
-                                        on_change=AppState.set_filter_ekspedisi,
-                                        width="220px",
-                                        size="2",
-                                        color_scheme="gray",
-                                        variant="classic",
-                                        style={
-                                            "background-color": "#FFFFFF !important",
-                                            "color": "#000000 !important",
-                                            "border": "2.5px solid #1A202C !important",
-                                            "border-radius": "8px !important",
-                                            "font-weight": "800 !important",
-                                            "box-shadow": "0 2px 5px rgba(0,0,0,0.05)",
-                                        }
-                                    ),
+                                rx.select(
+                                    AppState.list_ekspedisi_options,
+                                    value=AppState.filter_ekspedisi,
+                                    on_change=AppState.set_filter_ekspedisi,
+                                    width="220px",
+                                    size="2",
+                                    color_scheme="gray",
+                                    variant="classic",
+                                    style={
+                                        "background-color": "#FFFFFF !important",
+                                        "color": "#000000 !important",
+                                        "border": "2.5px solid #1A202C !important",
+                                        "border-radius": "8px !important",
+                                        "font-weight": "800 !important",
+                                        "box-shadow": "0 2px 5px rgba(0,0,0,0.05)",
+                                    }
+                                ),
                                     style={
                                         "background-color": "#FFFFFF !important",
                                         "border": "2.5px solid #1A202C !important",
