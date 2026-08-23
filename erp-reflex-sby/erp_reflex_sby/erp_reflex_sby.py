@@ -287,6 +287,7 @@ def login_page() -> rx.Component:
                 ),
 
                 # Input Password
+                # Input Password
                 rx.vstack(
                     rx.text("PASSWORD", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
                     rx.input(
@@ -297,7 +298,7 @@ def login_page() -> rx.Component:
                         on_key_down=AppState.handle_key_down,
                         size="3",
                         variant="surface",
-                        color_scheme="white",
+                        color_scheme="gray",  # DIPERBAIKI: Mengubah "white" menjadi "gray"
                         width="100%",
                         style={
                             "background": "rgba(0, 0, 0, 0.75)", 
