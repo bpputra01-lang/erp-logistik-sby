@@ -30,7 +30,7 @@ class AppState(rx.State):
     def set_username(self, val: str): self.username = val
     def set_password(self, val: str): self.password = val
 
-   def handle_login(self):
+    def handle_login(self):
         if self.username == "admin" and self.password == "sby123":
             self.logged_in = True
             self.role = "DC"
