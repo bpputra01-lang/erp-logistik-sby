@@ -2,18 +2,17 @@ import reflex as rx
 from .state import AppState
 from .components.login import login_page
 from .components.dashboard import main_dashboard
-from .components.sidebar import sidebar  # 1. Jangan lupa import sidebar-nya di sini
+from .components.sidebar import sidebar
 
 def index() -> rx.Component:
     return rx.cond(
         AppState.logged_in,
-        # 2. Bungkus dengan hstack agar sidebar ada di kiri dan konten utama di kanan
+        # Jika logged_in True (Sudah Login)
         rx.hstack(
             sidebar(),
             rx.vstack(
                 rx.match(
                     AppState.main_menu,
-                    # Validasi hak akses: Hanya role "DC" (Admin) yang bisa melihat Dashboard Ongkir
                     ("Database Ongkir In/Out", rx.cond(
                         AppState.role == "DC", 
                         main_dashboard(), 
@@ -27,7 +26,7 @@ def index() -> rx.Component:
                             height="80vh",
                         )
                     )),
-                    # Jika menu lain dipilih dan belum ada halamannya, tampilkan placeholder ini:
+                    # Placeholder untuk menu lain
                     rx.vstack(
                         rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
                         rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
@@ -48,6 +47,7 @@ def index() -> rx.Component:
             spacing="0",
             overflow="hidden",
         ),
+        # Jika logged_in False (Belum Login) -> Wajib ada sebagai argumen kedua rx.cond utama
         login_page()
     )
 
