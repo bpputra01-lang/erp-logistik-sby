@@ -250,13 +250,29 @@ def main_dashboard() -> rx.Component:
                     value="tab1",
                 ),
 
-                # --- TAB 2: METRICS & TABEL HISTORY ---
+               # --- TAB 2: METRICS & TABEL HISTORY ---
                 rx.tabs.content(
                     rx.vstack(
                         rx.hstack(
                             rx.hstack(
-                                rx.text("FILTER EKSPEDISI:", size="2", font_weight="bold", color="#1A202C"),
-                                rx.select(AppState.list_ekspedisi_options, value=AppState.filter_ekspedisi, on_change=AppState.set_filter_ekspedisi, width="220px", size="2"),
+                                rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#1A202C"),
+                                rx.select(
+                                    AppState.list_ekspedisi_options, 
+                                    value=AppState.filter_ekspedisi, 
+                                    on_change=AppState.set_filter_ekspedisi, 
+                                    width="220px", 
+                                    size="2",
+                                    style={
+                                        "background_color": "#FFFFFF !important",
+                                        "color": "#111111 !important",
+                                        "border": "2px solid #4A5568 !important",
+                                        "border_radius": "8px !important",
+                                        "font_weight": "700",
+                                        "cursor": "pointer",
+                                        "_hover": {"border_color": "#1A202C !important"},
+                                        "_focus": {"border_color": "#E50914 !important"}
+                                    }
+                                ),
                                 align="center", spacing="2",
                             ),
                             rx.cond(
@@ -265,15 +281,18 @@ def main_dashboard() -> rx.Component:
                             ),
                             justify="between", width="100%", margin_top="1.5rem", margin_bottom="0.5rem",
                         ),
+                        
+                        # METRIC BOXES BERGAYA GRADIENT TINT
                         rx.grid(
-                            metric_box("💰 BIAYA ALL", AppState.total_biaya_all, "#E50914"),
-                            metric_box("📦 KOLI ALL", AppState.total_koli_all, "#111111"),
-                            metric_box("📊 AVG COST ALL", AppState.avg_cost_all, "#E50914"),
-                            metric_box("🚚 BIAYA DATANG", AppState.biaya_datang, "#2E7D32"),
-                            metric_box("📦 KOLI DATANG", AppState.koli_datang, "#2E7D32"),
-                            metric_box("🔄 BIAYA RTO", AppState.biaya_rto, "#C62828"),
+                            metric_box("💰 BIAYA ALL", AppState.total_biaya_all, "#E50914", "linear-gradient(135deg, #FFF5F5 0%, #FED7D7 100%)"),
+                            metric_box("📦 KOLI ALL", AppState.total_koli_all, "#1A202C", "linear-gradient(135deg, #F7FAFC 0%, #EDF2F7 100%)"),
+                            metric_box("📊 AVG COST ALL", AppState.avg_cost_all, "#E50914", "linear-gradient(135deg, #FFF5F5 0%, #FED7D7 100%)"),
+                            metric_box("🚚 BIAYA DATANG", AppState.biaya_datang, "#2E7D32", "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)"),
+                            metric_box("📦 KOLI DATANG", AppState.koli_datang, "#2E7D32", "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)"),
+                            metric_box("🔄 BIAYA RTO", AppState.biaya_rto, "#C62828", "linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)"),
                             columns=rx.breakpoints(initial="1", sm="3"), spacing="4", width="100%",
                         ),
+                        
                         rx.box(
                             rx.table.root(
                                 rx.table.header(
