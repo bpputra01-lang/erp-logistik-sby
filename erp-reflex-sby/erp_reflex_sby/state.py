@@ -262,3 +262,7 @@ class AppState(rx.State):
     def koli_rto(self) -> str:
         tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" in str(x.get("supplier", ""))])
         return f"{tot:,.0f} Koli"
+
+    @rx.var
+    def is_dc_role(self) -> bool:
+        return self.role == "DC"

@@ -13,7 +13,7 @@ def index() -> rx.Component:
                 rx.match(
                     AppState.main_menu,
                     ("Database Ongkir In/Out", rx.cond(
-                        AppState.role == "DC",
+                        AppState.is_dc_role,
                         main_dashboard(),
                         rx.vstack(
                             rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
