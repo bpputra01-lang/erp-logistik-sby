@@ -49,9 +49,4 @@ app = rx.App(
         }
     }
 )
-app.add_page(
-    index, 
-    route="/", 
-    title="ZKN ERP - Database Ongkir", 
-    image_path="/favicon.png"  # Sesuaikan dengan nama file gambar Anda di folder assets
-)
+app.add_page(index, route="/", title="ZKN ERP - Database Ongkir")
