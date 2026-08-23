@@ -30,21 +30,26 @@ class AppState(rx.State):
     def set_username(self, val: str): self.username = val
     def set_password(self, val: str): self.password = val
 
-    def handle_login(self):
+   def handle_login(self):
         if self.username == "admin" and self.password == "sby123":
             self.logged_in = True
             self.role = "DC"
             self.branch = "SURABAYA"
             self.user_display_name = "Admin DC Surabaya"
-            return rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000)
+            # Ditambahkan position="top-right"
+            return rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000, position="top-right")
+            
         elif self.username == "toko" and self.password == "toko123":
             self.logged_in = True
             self.role = "CABANG"
             self.branch = "SURABAYA"
             self.user_display_name = "User Cabang"
-            return rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000)
+            # Ditambahkan position="top-right"
+            return rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000, position="top-right")
+            
         else:
-            return rx.toast.error("Username atau Password salah! Periksa kembali.", duration=4000)
+            # Ditambahkan position="top-right"
+            return rx.toast.error("Username atau Password salah! Periksa kembali.", duration=4000, position="top-right")
 
     def handle_key_down(self, key: str):
         if key == "Enter":
