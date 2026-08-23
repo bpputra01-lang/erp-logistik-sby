@@ -256,8 +256,8 @@ def login_page() -> rx.Component:
                         variant="surface",
                         color_scheme="red",
                         style={
-                            "background": "rgba(0, 0, 0, 0.65)", 
-                            "border": "1px solid rgba(229, 9, 20, 0.3)", 
+                            "background": "rgba(0, 0, 0, 0.75)", 
+                            "border": "1px solid rgba(229, 9, 20, 0.4)", 
                             "color": "#FFFFFF", 
                             "border-radius": "10px"
                         },
@@ -277,8 +277,8 @@ def login_page() -> rx.Component:
                         variant="surface",
                         color_scheme="red",
                         style={
-                            "background": "rgba(0, 0, 0, 0.65)", 
-                            "border": "1px solid rgba(229, 9, 20, 0.3)", 
+                            "background": "rgba(0, 0, 0, 0.75)", 
+                            "border": "1px solid rgba(229, 9, 20, 0.4)", 
                             "color": "#FFFFFF", 
                             "border-radius": "10px"
                         },
@@ -314,15 +314,15 @@ def login_page() -> rx.Component:
             width="100%",
             max_width="440px",
             padding="2.5rem",
-            background="rgba(15, 15, 18, 0.85)",
+            background="rgba(10, 10, 14, 0.88)", # Pekat transparan agar kontras dengan background terang
             backdrop_filter="blur(20px)",
             border_radius="20px",
-            border="1px solid rgba(255, 255, 255, 0.08)",
+            border="1px solid rgba(255, 255, 255, 0.12)",
             border_left="5px solid #E50914",
-            box_shadow="0 20px 50px rgba(0, 0, 0, 0.8)",
+            box_shadow="0 20px 50px rgba(0, 0, 0, 0.6)",
         ),
-        # BACKGROUND BARU DARI ISTOCK + OVERLAY HITAM/MERAH GELAP
-        background_image="linear-gradient(to right, rgba(10, 10, 12, 0.90) 30%, rgba(10, 10, 12, 0.60) 100%), url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070')",
+        # GAMBAR GUDANG TERANG BERSIH + OVERLAY GRADIENT
+        background_image="linear-gradient(to right, rgba(5, 5, 8, 0.95) 0%, rgba(5, 5, 8, 0.65) 35%, rgba(255, 255, 255, 0.1) 100%), url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070')",
         background_size="cover",
         background_position="center",
         background_repeat="no-repeat",
