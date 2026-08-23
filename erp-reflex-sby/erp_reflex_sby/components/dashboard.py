@@ -273,7 +273,7 @@ def main_dashboard() -> rx.Component:
                                     min=0.1,
                                     max=1.0,
                                     step=0.05,
-                                    on_value_change=AppState.set_zoom_val,
+                                    on_change=AppState.set_zoom_val,  # <-- Diubah dari on_value_change ke on_change
                                     width="200px",
                                 ),
                                 spacing="1",
