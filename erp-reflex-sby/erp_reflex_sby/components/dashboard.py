@@ -251,7 +251,9 @@ def main_dashboard() -> rx.Component:
                 ),
 
                 # --- TAB 2: METRICS & TABEL HISTORY ---
-                rx.hstack(
+                rx.tabs.content(
+                    rx.vstack(
+                        rx.hstack(
                             rx.hstack(
                                 rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#111111"),
                                 rx.select(
