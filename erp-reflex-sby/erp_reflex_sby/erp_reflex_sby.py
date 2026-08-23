@@ -329,7 +329,7 @@ def login_page() -> rx.Component:
         width="100vw",
         height="100vh",
         align="center",
-        justify="start",
+        justify="end",
         padding_left=["2rem", "5rem", "8rem"],
         padding_right="2rem",
     )
