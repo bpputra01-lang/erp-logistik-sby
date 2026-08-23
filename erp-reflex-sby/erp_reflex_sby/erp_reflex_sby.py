@@ -322,9 +322,10 @@ def login_page() -> rx.Component:
             box_shadow="0 20px 50px rgba(0, 0, 0, 0.8)",
         ),
         # BACKGROUND BARU DARI ISTOCK + OVERLAY HITAM/MERAH GELAP
-        background="linear-gradient(to right, rgba(5, 5, 8, 0.92) 30%, rgba(15, 5, 8, 0.70) 100%), url('https://media.istockphoto.com/id/1198089627/photo/warehouse-or-storehouse-as-background.jpg?s=612x612&w=0&k=20&c=0K6v9a4l0-v49mB0k_yP-8g1-g25iH0-G8S9-kR0-00=')",
+        background_image="linear-gradient(to right, rgba(10, 10, 12, 0.90) 30%, rgba(10, 10, 12, 0.60) 100%), url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070')",
         background_size="cover",
         background_position="center",
+        background_repeat="no-repeat",
         width="100vw",
         height="100vh",
         align="center",
