@@ -56,27 +56,7 @@ def section_dropdown_header(title: str, dropdown_key: str, is_open: bool) -> rx.
         _hover={"background": "rgba(255, 255, 255, 0.1)"}
     )
 
-def online_indicator() -> rx.Component:
-    return rx.hstack(
-        rx.box(
-            width="8px",
-            height="8px",
-            border_radius="full",
-            background="#22C55E",
-            style={"animation": "pulse 1.5s infinite"}
-        ),
-        rx.text("ONLINE", size="1", weight="bold", color="#065F46", letter_spacing="0.05em"),
-        align="center",
-        spacing="2",
-        padding="0.3rem 0.75rem",
-        background="rgba(34, 197, 94, 0.15)",
-        border="1px solid rgba(34, 197, 94, 0.4)",
-        border_radius="full",
-    )
-
 def sidebar() -> rx.Component:
-    is_dc = AppState.role == "DC"
-    
     return rx.cond(
         AppState.sidebar_open,
         # KONDISI SAAT SIDEBAR TERBUKA
@@ -103,132 +83,87 @@ def sidebar() -> rx.Component:
             
             # Area Menu yang bisa di-scroll
             rx.vstack(
-                # --- KELOMPOK 1: DASHBOARD SUMMARY (Hanya DC - Dengan Dropdown) ---
-                rx.cond(
-                    is_dc,
-                    rx.vstack(
-                        section_dropdown_header("DASHBOARD SUMMARY", "dashboard", AppState.dropdown_dashboard),
-                        rx.cond(
-                            AppState.dropdown_dashboard,
-                            rx.vstack(
-                                menu_item("Dashboard Overview", "Dashboard Overview"),
-                                menu_item("Database Master", "Database Master"),
-                                width="100%", spacing="1", padding_left="0.5rem",
+                # --- KELOMPOK 1: DASHBOARD SUMMARY ---
+                rx.vstack(
+                    section_dropdown_header("DASHBOARD SUMMARY", "dashboard", AppState.dropdown_dashboard),
+                    rx.cond(
+                        AppState.dropdown_dashboard,
+                        rx.vstack(
+                            rx.foreach(
+                                AppState.menu_dashboard,
+                                lambda item: menu_item(item, item)
                             ),
-                            rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
+                            width="100%", spacing="1", padding_left="0.5rem",
                         ),
-                        width="100%", align_items="start",
+                        rx.fragment()
                     ),
-                    rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
+                    width="100%", align_items="start",
                 ),
                 
-                # --- KELOMPOK 2: OPERATIONAL (DROPDOWN) ---
+                # --- KELOMPOK 2: OPERATIONAL ---
                 rx.vstack(
                     section_dropdown_header("OPERATIONAL", "operational", AppState.dropdown_operational),
                     rx.cond(
                         AppState.dropdown_operational,
-                        rx.cond(
-                            is_dc,
-                            rx.vstack(
-                                menu_item("Purchase Order Receiving", "Purchase Order Receiving"),
-                                menu_item("Putaway System", "Putaway System"),
-                                menu_item("Scan Out Validation", "Scan Out Validation"),
-                                menu_item("Refill & Overstock", "Refill & Overstock"),
-                                menu_item("Refill & Withdraw", "Refill & Withdraw"),
-                                menu_item("Compare RTO", "Compare RTO"),
-                                menu_item("Compare Penerimaan RTO", "Compare Penerimaan RTO"),
-                                menu_item("FDR Update", "FDR Update"),
-                                width="100%", spacing="1", padding_left="0.5rem",
+                        rx.vstack(
+                            rx.foreach(
+                                AppState.menu_operational,
+                                lambda item: menu_item(item, item)
                             ),
-                            rx.vstack(
-                                menu_item("Compare Penerimaan RTO", "Compare Penerimaan RTO"),
-                                menu_item("Putaway System", "Putaway System"),
-                                menu_item("Purchase Order Receiving", "Purchase Order Receiving"),
-                                width="100%", spacing="1", padding_left="0.5rem",
-                            ),
+                            width="100%", spacing="1", padding_left="0.5rem",
                         ),
-                        rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
+                        rx.fragment()
                     ),
                     width="100%", align_items="start",
                 ),
 
-                # --- KELOMPOK 3: INVENTORY (DROPDOWN) ---
+                # --- KELOMPOK 3: INVENTORY ---
                 rx.vstack(
                     section_dropdown_header("INVENTORY", "inventory", AppState.dropdown_inventory),
                     rx.cond(
                         AppState.dropdown_inventory,
-                        rx.cond(
-                            is_dc,
-                            rx.vstack(
-                                menu_item("Stock Opname", "Stock Opname"),
-                                menu_item("Match Real & System", "Match Real & System"),
-                                menu_item("Compare System", "Compare System"),
-                                menu_item("Cycle Count", "Cycle Count"),
-                                menu_item("Putaway & Picking Audit List", "Putaway & Picking Audit List"),
-                                menu_item("List Bin Cycle Count", "List Bin Cycle Count"),
-                                menu_item("Stock Tracking Timeline", "Stock Tracking Timeline"),
-                                menu_item("Justification SO", "Justification SO"),
-                                menu_item("Stock Minus", "Stock Minus"),
-                                menu_item("List Retur Out", "List Retur Out"),
-                                menu_item("Pengajuan Mutasi Karantina", "Pengajuan Mutasi Karantina"),
-                                menu_item("Refill Koli to Koli/Refill", "Refill Koli to Koli/Refill"),
-                                menu_item("Stock Allocation", "Stock Allocation"),
-                                width="100%", spacing="1", padding_left="0.5rem",
+                        rx.vstack(
+                            rx.foreach(
+                                AppState.menu_inventory,
+                                lambda item: menu_item(item, item)
                             ),
-                            rx.vstack(
-                                menu_item("Stock Minus", "Stock Minus"),
-                                menu_item("Cycle Count", "Cycle Count"),
-                                menu_item("Compare System", "Compare System"),
-                                menu_item("Justification SO", "Justification SO"),
-                                width="100%", spacing="1", padding_left="0.5rem",
-                            ),
+                            width="100%", spacing="1", padding_left="0.5rem",
                         ),
-                        rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
+                        rx.fragment()
                     ),
                     width="100%", align_items="start",
                 ),
 
-                # --- KELOMPOK 4: REJECT & DEFECT (DROPDOWN) ---
+                # --- KELOMPOK 4: REJECT & DEFECT ---
                 rx.vstack(
                     section_dropdown_header("REJECT & DEFECT", "reject", AppState.dropdown_reject),
                     rx.cond(
                         AppState.dropdown_reject,
                         rx.vstack(
-                            menu_item("Pengajuan Reject/Defect", "Pengajuan Reject/Defect"),
-                            menu_item("Reject/Defect List", "Reject/Defect List"),
+                            rx.foreach(
+                                AppState.menu_reject,
+                                lambda item: menu_item(item, item)
+                            ),
                             width="100%", spacing="1", padding_left="0.5rem",
                         ),
-                        rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
+                        rx.fragment()
                     ),
                     width="100%", align_items="start",
                 ),
 
-                # --- KELOMPOK 5: EXTRAS (DROPDOWN) ---
+                # --- KELOMPOK 5: EXTRAS ---
                 rx.vstack(
                     section_dropdown_header("EXTRAS", "extras", AppState.dropdown_extras),
                     rx.cond(
                         AppState.dropdown_extras,
-                        rx.cond(
-                            is_dc,
-                            rx.vstack(
-                                menu_item("Logistic Schedule", "Logistic Schedule"),
-                                menu_item("Balancing Stock", "Balancing Stock"),
-                                menu_item("Reporting & PIC", "Reporting & PIC"),
-                                menu_item("Data Timbang Ongkir", "Data Timbang Ongkir"),
-                                menu_item("Database Ongkir In/Out", "Database Ongkir In/Out"),
-                                menu_item("Precentage Display", "Precentage Display"),
-                                menu_item("Precentage Request FL to Store Stock", "Precentage Request FL to Store Stock"),
-                                menu_item("Refill Toko", "Refill Toko"),
-                                width="100%", spacing="1", padding_left="0.5rem",
+                        rx.vstack(
+                            rx.foreach(
+                                AppState.menu_extras,
+                                lambda item: menu_item(item, item)
                             ),
-                            rx.vstack(
-                                menu_item("Precentage Display", "Precentage Display"),
-                                menu_item("Refill Toko", "Refill Toko"),
-                                menu_item("Store Leader RTO Decission", "Store Leader RTO Decission"),
-                                width="100%", spacing="1", padding_left="0.5rem",
-                            ),
+                            width="100%", spacing="1", padding_left="0.5rem",
                         ),
-                        rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
+                        rx.fragment()
                     ),
                     width="100%", align_items="start",
                 ),
@@ -239,7 +174,7 @@ def sidebar() -> rx.Component:
                 spacing="2",
             ),
 
-            # --- TOMBOL LOGOUT DI BAGIAN BAWAH SIDEBAR ---
+            # --- TOMBOL LOGOUT ---
             rx.box(
                 rx.button(
                     rx.hstack(
@@ -271,7 +206,7 @@ def sidebar() -> rx.Component:
             align_items="start",
             transition="width 0.3s ease",
         ),
-        # KONDISI SAAT SIDEBAR DITUTUP (ARGUMEN KEDUA RX.COND UTAMA)
+        # KONDISI SAAT SIDEBAR DITUTUP
         rx.vstack(
             rx.button(
                 rx.icon("panel-left-open", size=20),

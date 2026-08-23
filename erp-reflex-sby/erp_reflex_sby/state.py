@@ -273,3 +273,34 @@ class AppState(rx.State):
                 return "access_denied"
         else:
             return "under_development"
+
+    @rx.var
+    def menu_dashboard(self) -> list[str]:
+        if self.role == "DC":
+            return ["Dashboard Overview", "Database Master"]
+        return []
+
+    @rx.var
+    def menu_operational(self) -> list[str]:
+        if self.role == "DC":
+            return ["Purchase Order Receiving", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
+        else:
+            return ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"]
+
+    @rx.var
+    def menu_inventory(self) -> list[str]:
+        if self.role == "DC":
+            return ["Stock Opname", "Match Real & System", "Compare System", "Cycle Count", "Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill", "Stock Allocation"]
+        else:
+            return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
+
+    @rx.var
+    def menu_reject(self) -> list[str]:
+        return ["Pengajuan Reject/Defect", "Reject/Defect List"]
+
+    @rx.var
+    def menu_extras(self) -> list[str]:
+        if self.role == "DC":
+            return ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display", "Precentage Request FL to Store Stock", "Refill Toko"]
+        else:
+            return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
