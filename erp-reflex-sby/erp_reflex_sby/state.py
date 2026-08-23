@@ -4,6 +4,7 @@ from datetime import datetime
 import io
 import asyncio
 from .database import get_supabase
+from erp_reflex_sby.components.dashboard import main_dashboard  # sesuaikan path foldernya
 
 class AppState(rx.State):
     # --- NAVIGATION & ROLE STATE ---
@@ -263,6 +264,29 @@ class AppState(rx.State):
         tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" in str(x.get("supplier", ""))])
         return f"{tot:,.0f} Koli"
 
+  # --- COMPUTED DYNAMIC CONTENT ---
     @rx.var
-    def is_dc_role(self) -> bool:
-        return self.role == "DC"
+    def dynamic_content(self) -> rx.Component:
+        if self.main_menu == "Database Ongkir In/Out":
+            if self.role == "DC":
+                return main_dashboard()
+            else:
+                return rx.vstack(
+                    rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
+                    rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
+                    padding="3rem",
+                    align_items="center",
+                    justify_content="center",
+                    width="100%",
+                    height="80vh",
+                )
+        else:
+            return rx.vstack(
+                rx.heading(f"Halaman: {self.main_menu}", size="7", color="#1A202C"),
+                rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
+                padding="3rem",
+                align_items="center",
+                justify_content="center",
+                width="100%",
+                height="80vh",
+            )
