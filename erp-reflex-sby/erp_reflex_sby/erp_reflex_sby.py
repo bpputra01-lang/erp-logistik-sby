@@ -14,9 +14,9 @@ def index() -> rx.Component:
                 sidebar(),
                 rx.vstack(
                     rx.match(
-                        AppState.active_content_type,
-                        ("dashboard_ongkir", main_dashboard()),
+                        AppState.main_menu,  # <-- Diubah dari AppState.active_content_type ke AppState.main_menu
                         ("Dashboard Overview", main_dashboard()),
+                        ("dashboard_ongkir", main_dashboard()),
                         (
                             "access_denied",
                             rx.vstack(
