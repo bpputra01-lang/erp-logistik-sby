@@ -14,14 +14,28 @@ def index() -> rx.Component:
                 sidebar(),
                 rx.vstack(
                     rx.match(
-                        AppState.main_menu,  # <-- Diubah dari AppState.active_content_type ke AppState.main_menu
-                        ("Dashboard Overview", main_dashboard()),
+                        AppState.main_menu,
+                        # 1. Halaman Dashboard Overview yang asli
+                        ("Dashboard Overview", rx.vstack(
+                            rx.heading("Dashboard Overview", size="7", color="#1A202C"),
+                            rx.text("Selamat datang di sistem manajemen logistik.", color="#718096"),
+                            padding="3rem",
+                            align_items="center",
+                            justify_content="center",
+                            width="100%",
+                            height="80vh",
+                        )),
+                        
+                        # 2. Halaman khusus untuk Database Ongkir
+                        ("Database Ongkir", main_dashboard()),
                         ("dashboard_ongkir", main_dashboard()),
+                        
+                        # 3. Handle Error Akses Ditolak
                         (
                             "access_denied",
                             rx.vstack(
                                 rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
-                                rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
+                                rx.text("Maaf, halaman Database Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
                                 padding="3rem",
                                 align_items="center",
                                 justify_content="center",
@@ -29,7 +43,8 @@ def index() -> rx.Component:
                                 height="80vh",
                             ),
                         ),
-                        # Default / Under development
+                        
+                        # 4. Default / Under development untuk menu lain
                         rx.vstack(
                             rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
                             rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
