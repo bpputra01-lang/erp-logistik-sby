@@ -7,23 +7,14 @@ from .components.sidebar import sidebar  # 1. Jangan lupa import sidebar-nya di 
 def index() -> rx.Component:
     return rx.cond(
         AppState.logged_in,
-        # 2. Bungkus dengan hstack agar sidebar ada di kiri dan dashboard di kanan
         rx.hstack(
-            sidebar(),
+            sidebar(), # Sidebar otomatis menyembunyikan menu dashboard jika bukan admin
             rx.vstack(
                 rx.match(
                     AppState.main_menu,
-                    ("Database Ongkir In/Out", main_dashboard()),
-                    # Jika menu lain dipilih dan belum ada halamannya, tampilkan placeholder ini:
-                    rx.vstack(
-                        rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
-                        rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
-                        padding="3rem",
-                        align_items="center",
-                        justify_content="center",
-                        width="100%",
-                        height="80vh",
-                    ),
+                    # Validasi ganda: Pastikan hanya admin yang bisa membuka halaman ini
+                    ("Dashboard Overview", rx.cond(AppState.role == "admin", main_dashboard(), rx.text("Akses Ditolak: Khusus Admin", color="red", font_size="1.5rem"))),
+                    # Menu lainnya...
                 ),
                 width="100%",
                 height="100vh",
@@ -33,7 +24,6 @@ def index() -> rx.Component:
             width="100vw",
             height="100vh",
             spacing="0",
-            overflow="hidden",
         ),
         login_page()
     )

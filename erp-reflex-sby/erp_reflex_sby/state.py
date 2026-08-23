@@ -6,9 +6,14 @@ import asyncio
 from .database import get_supabase
 
 class AppState(rx.State):
-    # --- NAVIGATION STATE ---
+    # --- NAVIGATION & ROLE STATE ---
+    logged_in: bool = False
+    role: str = "toko"  # Contoh: "DC" (admin) atau "CABANG" (toko)
     main_menu: str = "Dashboard Overview"
-    role: str = "DC"  # Default role, akan berubah saat login
+    
+    # State untuk Dashboard Overview
+    pilih_laporan: str = "WORKING REPORT"
+    zoom_val: float = 0.35
 
     def set_main_menu(self, menu: str):
         self.main_menu = menu
@@ -39,7 +44,6 @@ class AppState(rx.State):
     # --- LOGIN STATE ---
     username: str = ""
     password: str = ""
-    logged_in: bool = False
     branch: str = ""
     user_display_name: str = ""
 
@@ -49,14 +53,14 @@ class AppState(rx.State):
     def handle_login(self):
         if self.username == "admin" and self.password == "sby123":
             self.logged_in = True
-            self.role = "DC"
+            self.role = "DC"  # Role admin
             self.branch = "SURABAYA"
             self.user_display_name = "Admin DC Surabaya"
             return rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000, position="top-right")
             
         elif self.username == "toko" and self.password == "toko123":
             self.logged_in = True
-            self.role = "CABANG"
+            self.role = "CABANG"  # Role toko
             self.branch = "SURABAYA"
             self.user_display_name = "User Cabang"
             return rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000, position="top-right")
@@ -72,7 +76,7 @@ class AppState(rx.State):
         self.logged_in = False
         self.username = ""
         self.password = ""
-        self.role = ""
+        self.role = "toko"
         return rx.toast.info("Anda telah keluar dari sistem.")
 
     # --- ONGKIR DATABASE STATE ---
