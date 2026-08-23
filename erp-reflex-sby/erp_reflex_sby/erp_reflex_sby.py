@@ -26,7 +26,9 @@ def global_header() -> rx.Component:
             rx.vstack(
                 rx.heading(AppState.main_menu, size="5", color="#111111", font_weight="800"),
                 rx.text(f"Logged in as: {AppState.user_display_name} ({AppState.role})", size="2", color="#4A5568"),
-                align_items="start", spacing="0",
+                align_items="start", 
+                text_align="left",
+                spacing="0",
             ),
             align="center", spacing="3",
         ),
