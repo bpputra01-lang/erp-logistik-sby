@@ -31,8 +31,8 @@ STYLE_LABEL = {
     "letter_spacing": "0.5px"
 }
 
-def main_dashboard() -> rx.Component:
-    # Dictionary GID Google Sheets untuk dinamis iframe
+def google_sheets_viewer() -> rx.Component:
+    """Komponen terpisah untuk Google Sheets Viewer agar dapat diimpor."""
     dash_links = {
         "WORKING REPORT": "864743695",
         "PERSONAL PERFORMANCE": "251294539",
@@ -40,6 +40,58 @@ def main_dashboard() -> rx.Component:
         "DASHBOARD MOVING STOCK": "1671817510",
     }
 
+    return rx.vstack(
+        rx.hstack(
+            rx.vstack(
+                rx.text("PILIH LAPORAN", size="2", weight="bold", color="#4A5568"),
+                rx.select(
+                    ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
+                    value=AppState.pilih_laporan,
+                    on_change=AppState.set_pilih_laporan,
+                    width="300px",
+                ),
+                spacing="1",
+            ),
+            rx.vstack(
+                rx.text(
+                    AppState.zoom_val.to(lambda val: f"ZOOM: {val:.2f}"), 
+                    size="2", 
+                    weight="bold", 
+                    color="#4A5568"
+                ),
+                rx.slider(
+                    default_value=[0.35],
+                    min=0.1,
+                    max=1.0,
+                    step=0.05,
+                    on_change=AppState.set_zoom_val,
+                    width="200px",
+                ),
+                spacing="1",
+            ),
+            spacing="5",
+            align_items="end",
+            margin_bottom="10px",
+        ),
+        rx.html(
+            AppState.pilih_laporan.to(
+                lambda lap: AppState.zoom_val.to(
+                    lambda zoom: f"""
+                    <div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                        <div style="width: 100%; height: 600px; overflow: auto;">
+                            <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links.get(lap, '864743695')}&single=true&rm=minimal" 
+                                style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;">
+                            </iframe>
+                        </div>
+                    </div>
+                    """
+                )
+            )
+        ),
+        width="100%", spacing="4",
+    )
+
+def main_dashboard() -> rx.Component:
     return rx.box(
         rx.vstack(
             # --- HEADER ---
@@ -247,58 +299,9 @@ def main_dashboard() -> rx.Component:
                     value="tab2",
                 ),
 
-                # --- TAB 3: GOOGLE SHEETS VIEWER (DINAMIS DENGAN ZOOM & GID) ---
+                # --- TAB 3: GOOGLE SHEETS VIEWER ---
                 rx.tabs.content(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.vstack(
-                                rx.text("PILIH LAPORAN", size="2", weight="bold", color="#4A5568"),
-                                rx.select(
-                                    ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
-                                    value=AppState.pilih_laporan,
-                                    on_change=AppState.set_pilih_laporan,
-                                    width="300px",
-                                ),
-                                spacing="1",
-                            ),
-                            rx.vstack(
-                                rx.text(
-                                    AppState.zoom_val.to(lambda val: f"ZOOM: {val:.2f}"), 
-                                    size="2", 
-                                    weight="bold", 
-                                    color="#4A5568"
-                                ),
-                                rx.slider(
-                                    default_value=[0.35],
-                                    min=0.1,
-                                    max=1.0,
-                                    step=0.05,
-                                    on_change=AppState.set_zoom_val,
-                                    width="200px",
-                                ),
-                                spacing="1",
-                            ),
-                            spacing="5",
-                            align_items="end",
-                            margin_bottom="10px",
-                        ),
-                        rx.html(
-                            AppState.pilih_laporan.to(
-                                lambda lap: AppState.zoom_val.to(
-                                    lambda zoom: f"""
-                                    <div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                                        <div style="width: 100%; height: 600px; overflow: auto;">
-                                            <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links.get(lap, '864743695')}&single=true&rm=minimal" 
-                                                style="width: 4000px; height: 1500px; border: none; transform: scale({zoom}); transform-origin: 0 0;">
-                                            </iframe>
-                                        </div>
-                                    </div>
-                                    """
-                                )
-                            )
-                        ),
-                        width="100%", spacing="4",
-                    ),
+                    google_sheets_viewer(),
                     value="tab3",
                 ),
 
