@@ -13,8 +13,9 @@ class AppState(rx.State):
     def set_main_menu(self, menu: str):
         self.main_menu = menu
 
-    # --- SIDEBAR UI STATE ---
+    # --- SIDEBAR UI & DROPDOWN STATE ---
     sidebar_open: bool = True
+    dropdown_dashboard: bool = True
     dropdown_operational: bool = True
     dropdown_inventory: bool = False
     dropdown_reject: bool = False
@@ -24,7 +25,9 @@ class AppState(rx.State):
         self.sidebar_open = not self.sidebar_open
 
     def toggle_dropdown(self, key: str):
-        if key == "operational":
+        if key == "dashboard":
+            self.dropdown_dashboard = not self.dropdown_dashboard
+        elif key == "operational":
             self.dropdown_operational = not self.dropdown_operational
         elif key == "inventory":
             self.dropdown_inventory = not self.dropdown_inventory
