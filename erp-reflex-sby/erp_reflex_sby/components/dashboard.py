@@ -257,19 +257,26 @@ def main_dashboard() -> rx.Component:
                             rx.hstack(
                                 rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#111111"),
                                 # DROPDOWN DENGAN STYLING OVERRIDE KETAT
-                                rx.select(
-                                    AppState.list_ekspedisi_options,
-                                    value=AppState.filter_ekspedisi,
-                                    on_change=AppState.set_filter_ekspedisi,
-                                    width="220px",
-                                    size="2",
+                                rx.box(
+                                    rx.select(
+                                        AppState.list_ekspedisi_options,
+                                        value=AppState.filter_ekspedisi,
+                                        on_change=AppState.set_filter_ekspedisi,
+                                        size="2",
+                                        style={
+                                            "background-color": "#FFFFFF !important",
+                                            "color": "#111111 !important",
+                                            "font-weight": "800 !important",
+                                        }
+                                    ),
                                     style={
                                         "background-color": "#FFFFFF !important",
-                                        "color": "#111111 !important",
                                         "border": "2.5px solid #1A202C !important",
                                         "border-radius": "8px !important",
-                                        "font-weight": "800 !important",
+                                        "padding": "2px 6px",
+                                        "min-width": "200px",
                                         "cursor": "pointer",
+                                        "box-shadow": "0 2px 5px rgba(0,0,0,0.05)",
                                     }
                                 ),
                                 align="center", spacing="2",
@@ -282,7 +289,6 @@ def main_dashboard() -> rx.Component:
                         ),
                         
                         # METRIC BOXES GRADIENT TINT BERGARIS TEGAS
-                        # METRIC BOXES DENGAN WARNA LEBIH KUAT & PEKAT
                         rx.grid(
                             metric_box("💰 BIAYA ALL", AppState.total_biaya_all, "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
                             metric_box("📦 KOLI ALL", AppState.total_koli_all, "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
