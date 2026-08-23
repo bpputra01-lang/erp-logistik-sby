@@ -7,7 +7,7 @@ from .components.sidebar import sidebar
 # --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
     return rx.hstack(
-        # --- CSS ANIMASI BLINK UNTUK TITIK ONLINE ---
+        # --- TAMBAHKAN CSS ANIMASI BLINK DI SINI ---
         rx.html("""
             <style>
                 @keyframes blinkAnimation {
@@ -20,20 +20,17 @@ def global_header() -> rx.Component:
                 }
             </style>
         """),
-        # Sisi Kiri: Garis Merah + Judul & Info User (Flex-start agar mentok kiri)
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
                 rx.heading(AppState.main_menu, size="5", color="#111111", font_weight="800"),
                 rx.text(f"Logged in as: {AppState.user_display_name} ({AppState.role})", size="2", color="#4A5568"),
-                align_items="start", 
-                text_align="left",
-                spacing="0",
+                align_items="start", spacing="0",
             ),
             align="center", spacing="3",
         ),
-        # Sisi Kanan: Status Online
         rx.hstack(
+            # --- TITIK HIJAU DENGAN KELAS CSS BERKEDIP (BLINK) ---
             rx.box(
                 width="10px", 
                 height="10px", 
@@ -48,9 +45,7 @@ def global_header() -> rx.Component:
         background="#D1FAE5",
         border="1.5px solid #A7F3D0",
         border_radius="16px",
-        justify="between", 
-        width="100%", 
-        align_items="center",
+        justify="between", width="100%", align="center",
         margin_bottom="1rem",
     )
 
@@ -62,7 +57,7 @@ def index() -> rx.Component:
             rx.hstack(
                 sidebar(),
                 rx.vstack(
-                    # --- HEADER GLOBAL ---
+                    # --- HEADER GLOBAL DIPASANG DI SINI AGAR MUNCUL DI SEMUA MENU ---
                     global_header(),
 
                     rx.match(
@@ -95,7 +90,6 @@ def index() -> rx.Component:
                     background_color="#F7FAFC",
                     overflow_y="auto",
                     padding="1.5rem",
-                    align_items="stretch", # Pastikan anak-anak vstack melebar penuh (stretch) agar header tidak "center sendiri"
                 ),
                 width="100vw",
                 height="100vh",
