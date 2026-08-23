@@ -47,14 +47,32 @@ def main_dashboard() -> rx.Component:
                     align="center", spacing="3",
                 ),
                 rx.hstack(
-                    rx.badge("● SUPABASE CONNECTED", color_scheme="green", variant="surface", size="3"),
+                    # BADGE ONLINE HIJAU CLEAN & TAJAM
+                    rx.box(
+                        rx.hstack(
+                            rx.box(width="8px", height="8px", background="#10B981", border_radius="50%"),
+                            rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
+                            align="center", spacing="2",
+                        ),
+                        padding="6px 14px",
+                        background="#D1FAE5",
+                        border="1.5px solid #A7F3D0",
+                        border_radius="20px",
+                    ),
+                    # TOMBOL LOGOUT MERAH KONTRAS
                     rx.button(
                         "Logout", 
                         on_click=AppState.logout, 
-                        variant="soft", 
-                        color_scheme="red",
                         size="2",
-                        style={"cursor": "pointer", "font-weight": "bold"}
+                        style={
+                            "background": "#E50914 !important",
+                            "color": "#FFFFFF !important",
+                            "font-weight": "700",
+                            "border-radius": "8px",
+                            "padding": "6px 16px",
+                            "cursor": "pointer",
+                            "_hover": {"background": "#B20710 !important"}
+                        }
                     ),
                     spacing="3", align="center"
                 ),
