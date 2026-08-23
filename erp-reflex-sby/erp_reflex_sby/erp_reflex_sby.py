@@ -5,46 +5,55 @@ from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 
 def index() -> rx.Component:
-    return rx.cond(
+    # Menggunakan rx.match untuk menghindari sama sekali error rx.cond
+    return rx.match(
         AppState.logged_in,
-        # JIKA LOGGED_IN == TRUE (Tampilkan Layout Utama & Match Halaman)
-        rx.hstack(
-            sidebar(),
-            rx.vstack(
-                rx.match(
-                    AppState.active_content_type,
-                    ("dashboard_ongkir", main_dashboard()),
-                    ("access_denied", rx.vstack(
-                        rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
-                        rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
-                        padding="3rem",
-                        align_items="center",
-                        justify_content="center",
-                        width="100%",
-                        height="80vh",
-                    )),
-                    rx.vstack(
-                        rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
-                        rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
-                        padding="3rem",
-                        align_items="center",
-                        justify_content="center",
-                        width="100%",
-                        height="80vh",
+        (
+            True,
+            rx.hstack(
+                sidebar(),
+                rx.vstack(
+                    rx.match(
+                        AppState.active_content_type,
+                        ("dashboard_ongkir", main_dashboard()),
+                        (
+                            "access_denied",
+                            rx.vstack(
+                                rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
+                                rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
+                                padding="3rem",
+                                align_items="center",
+                                justify_content="center",
+                                width="100%",
+                                height="80vh",
+                            ),
+                        ),
+                        # Default / Under development
+                        rx.vstack(
+                            rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
+                            rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
+                            padding="3rem",
+                            align_items="center",
+                            justify_content="center",
+                            width="100%",
+                            height="80vh",
+                        ),
                     ),
+                    width="100%",
+                    height="100vh",
+                    background_color="#F7FAFC",
+                    overflow_y="auto",
                 ),
-                width="100%",
+                width="100vw",
                 height="100vh",
-                background_color="#F7FAFC",
-                overflow_y="auto",
+                spacing="0",
+                overflow="hidden",
             ),
-            width="100vw",
-            height="100vh",
-            spacing="0",
-            overflow="hidden",
         ),
-        # JIKA LOGGED_IN == FALSE (Tampilkan Halaman Login) -> INI ARGUMEN KEDUA YANG WAJIB ADA
-        login_page()
+        (
+            False,
+            login_page(),
+        ),
     )
 
 app = rx.App(
