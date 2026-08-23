@@ -1,7 +1,7 @@
 import reflex as rx
 from .state import AppState
 from .components.login import login_page
-from .components.dashboard import main_dashboard
+from .components.dashboard import main_dashboard, google_sheets_viewer  # Pastikan google_sheets_viewer diimpor dari dashboard.py
 from .components.sidebar import sidebar
 
 def index() -> rx.Component:
@@ -15,20 +15,12 @@ def index() -> rx.Component:
                 rx.vstack(
                     rx.match(
                         AppState.main_menu,
-                        # 1. Menu Dashboard Overview
-                        ("Dashboard Overview", rx.vstack(
-                            rx.heading("Dashboard Overview", size="7", color="#1A202C"),
-                            rx.text("Selamat datang di sistem manajemen logistik.", color="#718096"),
-                            padding="3rem",
-                            align_items="center",
-                            justify_content="center",
-                            width="100%",
-                            height="80vh",
-                        )),
+                        # 1. Menu Dashboard Overview (Kini menampilkan Google Sheets Viewer secara mandiri)
+                        ("Dashboard Overview", google_sheets_viewer()),
                         
-                        # 2. Menu Database Ongkir In/Out (Tampilan Spreadsheet Ongkir)
+                        # 2. Menu Database Ongkir In/Out (Hanya menampilkan form input & history tanpa tab sheets viewer)
                         ("Database Ongkir In/Out", main_dashboard()),
-                        ("Database Ongkir", main_dashboard()), # Antisipasi kalau tulisannya pendek
+                        ("Database Ongkir", main_dashboard()),
                         ("dashboard_ongkir", main_dashboard()),
                         
                         # 3. Handle Error Akses Ditolak
