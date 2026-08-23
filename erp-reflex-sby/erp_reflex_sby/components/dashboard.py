@@ -32,6 +32,14 @@ STYLE_LABEL = {
 }
 
 def main_dashboard() -> rx.Component:
+    # Dictionary GID Google Sheets untuk dinamis iframe
+    dash_links = {
+        "WORKING REPORT": "864743695",
+        "PERSONAL PERFORMANCE": "251294539",
+        "CYCLE COUNT DAN KERAPIHAN": "1743896821",
+        "DASHBOARD MOVING STOCK": "1671817510",
+    }
+
     return rx.box(
         rx.vstack(
             # --- HEADER ---
@@ -39,7 +47,7 @@ def main_dashboard() -> rx.Component:
                 rx.hstack(
                     rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
                     rx.vstack(
-                        rx.heading("DATABASE ONGKIR IN/OUT", size="5", color="#111111", font_weight="800"),
+                        rx.heading("DATABASE ONGKIR IN/OUT & ANALYTICS", size="5", color="#111111", font_weight="800"),
                         rx.text(f"Logged in as: {AppState.user_display_name} ({AppState.role})", size="2", color="#4A5568"),
                         align_items="start", spacing="0",
                     ),
@@ -76,6 +84,14 @@ def main_dashboard() -> rx.Component:
                     rx.tabs.trigger(
                         "📊 SUMMARY & HISTORY", 
                         value="tab2",
+                        style={
+                            "color": "#1A202C", "font-weight": "800", "padding": "8px 16px", "cursor": "pointer",
+                            "_selected": {"color": "#E50914 !important", "border-bottom": "3px solid #E50914"}
+                        }
+                    ),
+                    rx.tabs.trigger(
+                        "📈 GOOGLE SHEETS VIEWER", 
+                        value="tab3",
                         style={
                             "color": "#1A202C", "font-weight": "800", "padding": "8px 16px", "cursor": "pointer",
                             "_selected": {"color": "#E50914 !important", "border-bottom": "3px solid #E50914"}
@@ -230,6 +246,58 @@ def main_dashboard() -> rx.Component:
                     ),
                     value="tab2",
                 ),
+
+                # --- TAB 3: GOOGLE SHEETS VIEWER ---
+                rx.tabs.content(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.vstack(
+                                rx.text("PILIH LAPORAN", size="2", weight="bold", color="#4A5568"),
+                                rx.select(
+                                    ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
+                                    value=AppState.pilih_laporan,
+                                    on_change=AppState.set_pilih_laporan,
+                                    width="300px",
+                                ),
+                                spacing="1",
+                            ),
+                            rx.vstack(
+                                rx.text(
+                                    AppState.zoom_val.to(lambda val: f"ZOOM: {val:.2f}"), 
+                                    size="2", 
+                                    weight="bold", 
+                                    color="#4A5568"
+                                ),
+                                rx.slider(
+                                    default_value=[0.35],
+                                    min=0.1,
+                                    max=1.0,
+                                    step=0.05,
+                                    on_value_change=AppState.set_zoom_val,
+                                    width="200px",
+                                ),
+                                spacing="1",
+                            ),
+                            spacing="5",
+                            align_items="end",
+                            margin_bottom="10px",
+                        ),
+                        rx.html(
+                            """
+                            <div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                                <div style="width: 100%; height: 600px; overflow: auto;">
+                                    <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true&rm=minimal" 
+                                        style="width: 4000px; height: 1500px; border: none; transform: scale(0.35); transform-origin: 0 0;">
+                                    </iframe>
+                                </div>
+                            </div>
+                            """
+                        ),
+                        width="100%", spacing="4",
+                    ),
+                    value="tab3",
+                ),
+
                 default_value="tab1",
                 width="100%",
             ),
@@ -248,70 +316,7 @@ def main_dashboard() -> rx.Component:
                 ),
                 open=AppState.show_delete_modal,
             ),
-            # Perubahan utama di sini: width="100%" dan max_width dihapus agar melebar penuh
             spacing="5", padding="2rem", width="100%",
         ),
         background_color="#F7FAFC", min_height="100vh", width="100%", on_mount=AppState.load_data,
-    )
-
-
-
-
-def main_dashboard() -> rx.Component:
-    # Dictionary GID Google Sheets
-    dash_links = {
-        "WORKING REPORT": "864743695",
-        "PERSONAL PERFORMANCE": "251294539",
-        "CYCLE COUNT DAN KERAPIHAN": "1743896821",
-        "DASHBOARD MOVING STOCK": "1671817510",
-    }
-
-    return rx.vstack(
-        # Header Halaman
-        rx.heading("📊 DASHBOARD ANALYTICS", size="7", color="#1A202C", margin_bottom="20px"),
-        
-        # Kontrol Selectbox & Slider (Menggantikan kolom c1, c2)
-        rx.hstack(
-            rx.vstack(
-                rx.text("PILIH LAPORAN", size="2", weight="bold", color="#4A5568"),
-                rx.select(
-                    ["WORKING REPORT", "PERSONAL PERFORMANCE", "CYCLE COUNT DAN KERAPIHAN", "DASHBOARD MOVING STOCK"],
-                    value=AppState.pilih_laporan,
-                    on_change=AppState.set_pilih_laporan,
-                    width="300px",
-                ),
-                spacing="1",
-            ),
-            rx.vstack(
-                rx.text(rx.cond(AppState.zoom_val, f"ZOOM: {AppState.zoom_val}"), size="2", weight="bold", color="#4A5568"),
-                rx.slider(
-                    default_value=[0.35],
-                    min=0.1,
-                    max=1.0,
-                    step=0.05,
-                    on_value_change=AppState.set_zoom_val,
-                    width="200px",
-                ),
-                spacing="1",
-            ),
-            spacing="5",
-            align_items="end",
-            margin_bottom="20px",
-        ),
-        
-        # Container Iframe Google Sheets dengan kustomisasi CSS via HTML
-        rx.html(
-            f"""
-            <div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                <div style="width: 100%; height: 600px; overflow: auto;">
-                    <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true&rm=minimal" 
-                        style="width: 4000px; height: 1500px; border: none; transform: scale(0.35); transform-origin: 0 0;">
-                    </iframe>
-                </div>
-            </div>
-            """
-        ),
-        width="100%",
-        padding="2rem",
-        background_color="#F7FAFC",
     )
