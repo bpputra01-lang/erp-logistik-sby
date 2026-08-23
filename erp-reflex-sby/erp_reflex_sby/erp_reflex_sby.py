@@ -7,15 +7,16 @@ from .components.sidebar import sidebar
 def index() -> rx.Component:
     return rx.cond(
         AppState.logged_in,
-        # Jika logged_in True (Sudah Login)
         rx.hstack(
             sidebar(),
             rx.vstack(
                 rx.match(
                     AppState.main_menu,
-                    ("Database Ongkir In/Out", rx.cond(
-                        AppState.role == "DC", 
-                        main_dashboard(), 
+                    # Jika menu Dashboard dan rolenya DC (Admin)
+                    ("Database Ongkir In/Out", rx.match(
+                        AppState.role,
+                        ("DC", main_dashboard()),
+                        # Default case jika rolenya bukan DC (Akses Ditolak)
                         rx.vstack(
                             rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
                             rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
@@ -26,7 +27,7 @@ def index() -> rx.Component:
                             height="80vh",
                         )
                     )),
-                    # Placeholder untuk menu lain
+                    # Default case untuk menu lainnya yang sedang dalam pengembangan
                     rx.vstack(
                         rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
                         rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
@@ -47,7 +48,6 @@ def index() -> rx.Component:
             spacing="0",
             overflow="hidden",
         ),
-        # Jika logged_in False (Belum Login) -> Wajib ada sebagai argumen kedua rx.cond utama
         login_page()
     )
 
