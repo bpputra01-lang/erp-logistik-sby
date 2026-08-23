@@ -1,4 +1,5 @@
 import reflex as rx
+from ..state import AppState
 
 def metric_box(title: str, value: str, accent_color: str, bg_gradient: str) -> rx.Component:
     return rx.box(
