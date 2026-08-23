@@ -13,6 +13,26 @@ class AppState(rx.State):
     def set_main_menu(self, menu: str):
         self.main_menu = menu
 
+    # --- SIDEBAR UI STATE ---
+    sidebar_open: bool = True
+    dropdown_operational: bool = True
+    dropdown_inventory: bool = False
+    dropdown_reject: bool = False
+    dropdown_extras: bool = False
+
+    def toggle_sidebar(self):
+        self.sidebar_open = not self.sidebar_open
+
+    def toggle_dropdown(self, key: str):
+        if key == "operational":
+            self.dropdown_operational = not self.dropdown_operational
+        elif key == "inventory":
+            self.dropdown_inventory = not self.dropdown_inventory
+        elif key == "reject":
+            self.dropdown_reject = not self.dropdown_reject
+        elif key == "extras":
+            self.dropdown_extras = not self.dropdown_extras
+
     # --- LOGIN STATE ---
     username: str = ""
     password: str = ""
