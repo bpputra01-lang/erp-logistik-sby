@@ -5,21 +5,15 @@ from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 
 
+import reflex as rx
+from .state import AppState
+from .components.login import login_page
+from .components.dashboard import main_dashboard
+from .components.sidebar import sidebar
+
 # --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
     return rx.hstack(
-        rx.html("""
-            <style>
-                @keyframes blinkAnimation {
-                    0% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.3; transform: scale(0.8); }
-                    100% { opacity: 1; transform: scale(1); }
-                }
-                .blink-online {
-                    animation: blinkAnimation 1.5s infinite ease-in-out;
-                }
-            </style>
-        """),
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
@@ -51,57 +45,75 @@ def global_header() -> rx.Component:
 
 
 def index() -> rx.Component:
-    return rx.match(
-        AppState.logged_in,
-        (
-            True,
-            rx.hstack(
-                sidebar(),
-                rx.vstack(
-                    # --- HEADER GLOBAL DIPASANG DI SINI AGAR MUNCUL DI SEMUA MENU ---
-                    global_header(),
+    return rx.vstack(
+        # --- CSS ANIMASI BLINK DITARUH DI LUAR (AMAN, TIDAK MERUSAK LAYOUT HEADER) ---
+        rx.html("""
+            <style>
+                @keyframes blinkAnimation {
+                    0% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.3; transform: scale(0.8); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
+                .blink-online {
+                    animation: blinkAnimation 1.5s infinite ease-in-out;
+                }
+            </style>
+        """),
+        rx.match(
+            AppState.logged_in,
+            (
+                True,
+                rx.hstack(
+                    sidebar(),
+                    rx.vstack(
+                        # --- HEADER GLOBAL ---
+                        global_header(),
 
-                    rx.match(
-                        AppState.main_menu,
-                        ("Database Ongkir In/Out", main_dashboard()),
-                        ("Database Ongkir", main_dashboard()),
-                        ("dashboard_ongkir", main_dashboard()),
+                        rx.match(
+                            AppState.main_menu,
+                            ("Database Ongkir In/Out", main_dashboard()),
+                            ("Database Ongkir", main_dashboard()),
+                            ("dashboard_ongkir", main_dashboard()),
 
-                        # Handle Error Akses Ditolak
-                        (
-                            "access_denied",
+                            # Handle Error Akses Ditolak
+                            (
+                                "access_denied",
+                                rx.vstack(
+                                    rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
+                                    rx.text("Maaf, halaman ini dibatasi hak aksesnya.", color="#718096"),
+                                    padding="3rem", align_items="center", justify_content="center",
+                                    width="100%", height="70vh",
+                                ),
+                            ),
+
+                            # Default / Under development untuk menu lain
                             rx.vstack(
-                                rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
-                                rx.text("Maaf, halaman ini dibatasi hak aksesnya.", color="#718096"),
+                                rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
+                                rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
                                 padding="3rem", align_items="center", justify_content="center",
                                 width="100%", height="70vh",
                             ),
                         ),
-
-                        # Default / Under development untuk menu lain
-                        rx.vstack(
-                            rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
-                            rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
-                            padding="3rem", align_items="center", justify_content="center",
-                            width="100%", height="70vh",
-                        ),
+                        width="100%",
+                        height="100vh",
+                        background_color="#F7FAFC",
+                        overflow_y="auto",
+                        padding="1.5rem",
                     ),
-                    width="100%",
+                    width="100vw",
                     height="100vh",
-                    background_color="#F7FAFC",
-                    overflow_y="auto",
-                    padding="1.5rem",
+                    spacing="0",
+                    overflow="hidden",
                 ),
-                width="100vw",
-                height="100vh",
-                spacing="0",
-                overflow="hidden",
+            ),
+            (
+                False,
+                login_page(),
             ),
         ),
-        (
-            False,
-            login_page(),
-        ),
+        width="100vw",
+        height="100vh",
+        spacing="0",
     )
 
 
