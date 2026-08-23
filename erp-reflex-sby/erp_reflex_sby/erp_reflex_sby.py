@@ -6,13 +6,7 @@ from .components.sidebar import sidebar
 
 def google_sheets_viewer() -> rx.Component:
     """Komponen Google Sheets Viewer untuk Dashboard Overview."""
-    dash_links = {
-        "WORKING REPORT": "864743695",
-        "PERSONAL PERFORMANCE": "251294539",
-        "CYCLE COUNT DAN KERAPIHAN": "1743896821",
-        "DASHBOARD MOVING STOCK": "1671817510",
-    }
-
+    
     return rx.vstack(
         rx.hstack(
             rx.vstack(
@@ -33,9 +27,9 @@ def google_sheets_viewer() -> rx.Component:
                     color="#4A5568"
                 ),
                 rx.slider(
-                    default_value=[0.8],
-                    min=0.4,
-                    max=1.5,
+                    default_value=[0.5],
+                    min=0.3,
+                    max=1.2,
                     step=0.05,
                     on_change=AppState.set_zoom_val,
                     width="200px",
@@ -46,20 +40,16 @@ def google_sheets_viewer() -> rx.Component:
             align_items="end",
             margin_bottom="10px",
         ),
-        # Menggunakan reaktif AppState untuk mengubah GID di dalam URL secara otomatis & menyesuaikan layar
+        # Mengembalikan struktur iframe stabil yang langsung muncul
         rx.box(
             rx.html(
-                AppState.pilih_laporan.to(
-                    lambda lap: AppState.zoom_val.to(
-                        lambda zoom: f"""
-                        <div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; height: 75vh; overflow: hidden; position: relative;">
-                            <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid={dash_links.get(lap, '864743695')}&single=true&rm=minimal" 
-                                style="width: 100%; height: 100%; border: none; transform: scale({zoom}); transform-origin: 0 0; position: absolute; top: 0; left: 0;">
-                            </iframe>
-                        </div>
-                        """
-                    )
-                )
+                f"""
+                <div style="background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; height: 75vh; overflow: auto;">
+                    <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRIMd-eghecjZKcOmhz0TW4f-1cG0LOWgD6X9mIK1XhiYSOx-V6xSnZQzBLfru0LhCIinIZAfbYnHv_/pubhtml?gid=864743695&single=true&rm=minimal" 
+                        style="width: 100%; height: 100%; border: none;">
+                    </iframe>
+                </div>
+                """
             ),
             width="100%",
         ),
