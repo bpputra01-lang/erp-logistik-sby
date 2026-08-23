@@ -20,6 +20,7 @@ def global_header() -> rx.Component:
                 }
             </style>
         """),
+        # Sisi Kiri: Garis Merah + Judul & Info User
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
@@ -29,8 +30,8 @@ def global_header() -> rx.Component:
             ),
             align="center", spacing="3",
         ),
+        # Sisi Kanan: Status Online (Otomatis terdorong ke kanan karena justify="between")
         rx.hstack(
-            # --- TITIK HIJAU DENGAN KELAS BLINK ---
             rx.box(
                 width="10px", 
                 height="10px", 
@@ -45,10 +46,11 @@ def global_header() -> rx.Component:
         background="#D1FAE5",
         border="1.5px solid #A7F3D0",
         border_radius="16px",
-        justify="between", width="100%", align="center",
+        justify="between", 
+        width="100%", 
+        align_items="center",  # Diubah dari align="center" supaya elemen anak sejajar vertikal dengan pas di kiri-kanan
         margin_bottom="1rem",
     )
-
 def index() -> rx.Component:
     return rx.match(
         AppState.logged_in,
