@@ -2,19 +2,41 @@ import reflex as rx
 from .state import AppState
 from .components.login import login_page
 from .components.dashboard import main_dashboard
-from .components.sidebar import sidebar
+from .components.sidebar import sidebar  # 1. Jangan lupa import sidebar-nya di sini
 
 def index() -> rx.Component:
     return rx.cond(
         AppState.logged_in,
+        # 2. Bungkus dengan hstack agar sidebar ada di kiri dan konten utama di kanan
         rx.hstack(
             sidebar(),
             rx.vstack(
                 rx.match(
                     AppState.main_menu,
-                    # Karena role admin bernilai "DC", cek kondisinya dengan "DC"
-                    ("Dashboard Overview", rx.cond(AppState.role == "DC", main_dashboard(), rx.text("Akses Ditolak: Khusus Admin DC", color="red", font_size="1.5rem"))),
-                    # Jika ada menu lain, tambahkan di bawah sini...
+                    # Validasi hak akses: Hanya role "DC" (Admin) yang bisa melihat Dashboard Ongkir
+                    ("Database Ongkir In/Out", rx.cond(
+                        AppState.role == "DC", 
+                        main_dashboard(), 
+                        rx.vstack(
+                            rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
+                            rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
+                            padding="3rem",
+                            align_items="center",
+                            justify_content="center",
+                            width="100%",
+                            height="80vh",
+                        )
+                    )),
+                    # Jika menu lain dipilih dan belum ada halamannya, tampilkan placeholder ini:
+                    rx.vstack(
+                        rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
+                        rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
+                        padding="3rem",
+                        align_items="center",
+                        justify_content="center",
+                        width="100%",
+                        height="80vh",
+                    ),
                 ),
                 width="100%",
                 height="100vh",
@@ -24,6 +46,7 @@ def index() -> rx.Component:
             width="100vw",
             height="100vh",
             spacing="0",
+            overflow="hidden",
         ),
         login_page()
     )
