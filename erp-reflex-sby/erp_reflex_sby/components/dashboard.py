@@ -47,15 +47,14 @@ def main_dashboard() -> rx.Component:
                 ),
                 rx.hstack(
                     # --- TITIK HIJAU DENGAN ANIMASI KEDIP PULSE ---
-                    rx.box(
-                        width="10px", 
-                        height="10px", 
-                        background="#10B981", 
-                        border_radius="50%",
-                        style={
-                            "animation": "pulse-glow 1.5s infinite ease-in-out",
-                        }
-                    ),
+                    # --- Ganti bagian kotak titik hijau ini ---
+                rx.box(
+                    width="10px", 
+                    height="10px", 
+                    background="#10B981", 
+                    border_radius="50%",
+                    class_name="blink-online"
+                ),
                     rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
                     align="center", spacing="2",
                 ),
