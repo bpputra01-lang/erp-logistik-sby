@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: erp-logistik-sby
-    env: python
-    buildCommand: "pip install -r requirements.txt && reflex export --frontend-only"
-    startCommand: "reflex run --env prod"
-    envVars:
-      - key: PORT
-        value: 10000

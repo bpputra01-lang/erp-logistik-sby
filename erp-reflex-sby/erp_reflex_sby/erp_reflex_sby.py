@@ -229,6 +229,77 @@ class AppState(rx.State):
 # ==========================================
 def login_page() -> rx.Component:
     return rx.flex(
+        rx.box(
+            rx.vstack(
+                rx.hstack(
+                    rx.box(width="12px", height="35px", background="#E50914", border_radius="4px"),
+                    rx.vstack(
+                        rx.heading("LOGISTIC DISTRIBUTION", size="6", color="#FFFFFF", font_weight="800", letter_spacing="1px"),
+                        rx.text("CENTER WAREHOUSE • SURABAYA", size="1", color="#E50914", font_weight="700", letter_spacing="2px"),
+                        spacing="0",
+                    ),
+                    align="center",
+                    spacing="3",
+                ),
+                rx.divider(border_color="rgba(255, 255, 255, 0.1)"),
+                rx.text("Silakan masuk dengan akun resmi gudang Anda.", size="2", color="#A0A0A0"),
+
+                rx.vstack(
+                    rx.text("USERNAME", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
+                    rx.input(
+                        placeholder="Masukkan username...",
+                        value=AppState.username,
+                        on_change=AppState.set_username,
+                        size="3",
+                        variant="surface",
+                        color_scheme="red",
+                        style={"background": "rgba(0, 0, 0, 0.5)", "border": "1px solid rgba(255, 255, 255, 0.15)", "color": "#FFFFFF", "border-radius": "10px"},
+                    ),
+                    spacing="1", width="100%",
+                ),
+
+                rx.vstack(
+                    rx.text("PASSWORD", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
+                    rx.input(
+                        type="password",
+                        placeholder="Masukkan password...",
+                        value=AppState.password,
+                        on_change=AppState.set_password,
+                        size="3",
+                        variant="surface",
+                        color_scheme="red",
+                        style={"background": "rgba(0, 0, 0, 0.5)", "border": "1px solid rgba(255, 255, 255, 0.15)", "color": "#FFFFFF", "border-radius": "10px"},
+                    ),
+                    spacing="1", width="100%",
+                ),
+
+                rx.box(height="10px"),
+
+                rx.button(
+                    "SIGN IN TO SYSTEM →",
+                    on_click=AppState.handle_login,
+                    size="3",
+                    width="100%",
+                    style={"background": "linear-gradient(135deg, #E50914 0%, #B20710 100%)", "color": "#FFFFFF", "font-weight": "800", "border-radius": "10px", "cursor": "pointer"},
+                ),
+
+                rx.center(
+                    rx.text("🟢 Warehouse Supporting Tools v2.0", size="1", color="#666666"),
+                    margin_top="10px",
+                ),
+                spacing="5",
+                align="stretch",
+            ),
+            width="100%",
+            max_width="440px",
+            padding="2.5rem",
+            background="rgba(18, 18, 20, 0.75)",
+            backdrop_filter="blur(16px)",
+            border_radius="20px",
+            border="1px solid rgba(255, 255, 255, 0.1)",
+            border_left="5px solid #E50914",
+            box_shadow="0 20px 50px rgba(0, 0, 0, 0.6)",
+        ),
         background="linear-gradient(to right, rgba(10, 10, 12, 0.92) 35%, rgba(0, 0, 0, 0.65) 100%), url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070')",
         background_size="cover",
         background_position="center",
@@ -238,84 +309,6 @@ def login_page() -> rx.Component:
         justify="start",
         padding_left=["2rem", "5rem", "8rem"],
         padding_right="2rem",
-
-        children=[
-            rx.box(
-                width="100%",
-                max_width="440px",
-                padding="2.5rem",
-                background="rgba(18, 18, 20, 0.75)",
-                backdrop_filter="blur(16px)",
-                border_radius="20px",
-                border="1px solid rgba(255, 255, 255, 0.1)",
-                border_left="5px solid #E50914",
-                box_shadow="0 20px 50px rgba(0, 0, 0, 0.6)",
-                children=[
-                    rx.vstack(
-                        spacing="5",
-                        align="stretch",
-                        children=[
-                            rx.hstack(
-                                rx.box(width="12px", height="35px", background="#E50914", border_radius="4px"),
-                                rx.vstack(
-                                    rx.heading("LOGISTIC DISTRIBUTION", size="6", color="#FFFFFF", font_weight="800", letter_spacing="1px"),
-                                    rx.text("CENTER WAREHOUSE • SURABAYA", size="1", color="#E50914", font_weight="700", letter_spacing="2px"),
-                                    spacing="0",
-                                ),
-                                align="center",
-                                spacing="3",
-                            ),
-                            rx.divider(border_color="rgba(255, 255, 255, 0.1)"),
-                            rx.text("Silakan masuk dengan akun resmi gudang Anda.", size="2", color="#A0A0A0"),
-
-                            rx.vstack(
-                                rx.text("USERNAME", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
-                                rx.input(
-                                    placeholder="Masukkan username...",
-                                    value=AppState.username,
-                                    on_change=AppState.set_username,
-                                    size="3",
-                                    variant="surface",
-                                    color_scheme="red",
-                                    style={"background": "rgba(0, 0, 0, 0.5)", "border": "1px solid rgba(255, 255, 255, 0.15)", "color": "#FFFFFF", "border-radius": "10px"},
-                                ),
-                                spacing="1", width="100%",
-                            ),
-
-                            rx.vstack(
-                                rx.text("PASSWORD", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
-                                rx.input(
-                                    type="password",
-                                    placeholder="Masukkan password...",
-                                    value=AppState.password,
-                                    on_change=AppState.set_password,
-                                    size="3",
-                                    variant="surface",
-                                    color_scheme="red",
-                                    style={"background": "rgba(0, 0, 0, 0.5)", "border": "1px solid rgba(255, 255, 255, 0.15)", "color": "#FFFFFF", "border-radius": "10px"},
-                                ),
-                                spacing="1", width="100%",
-                            ),
-
-                            rx.box(height="10px"),
-
-                            rx.button(
-                                "SIGN IN TO SYSTEM →",
-                                on_click=AppState.handle_login,
-                                size="3",
-                                width="100%",
-                                style={"background": "linear-gradient(135deg, #E50914 0%, #B20710 100%)", "color": "#FFFFFF", "font-weight": "800", "border-radius": "10px", "cursor": "pointer"},
-                            ),
-
-                            rx.center(
-                                rx.text("🟢 Warehouse Supporting Tools v2.0", size="1", color="#666666"),
-                                margin_top="10px",
-                            )
-                        ]
-                    )
-                ]
-            )
-        ]
     )
 
 def metric_box(title: str, value: str, accent_color: str) -> rx.Component:
