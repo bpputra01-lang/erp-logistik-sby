@@ -322,7 +322,7 @@ def login_page() -> rx.Component:
             box_shadow="0 20px 50px rgba(0, 0, 0, 0.6)",
         ),
         # GAMBAR GUDANG TERANG BERSIH + OVERLAY GRADIENT
-        background_image="linear-gradient(to right, rgba(5, 5, 8, 0.95) 0%, rgba(5, 5, 8, 0.65) 35%, rgba(255, 255, 255, 0.1) 100%), url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070')",
+        background_image="linear-gradient(to right, rgba(5, 5, 8, 0.95) 0%, rgba(5, 5, 8, 0.60) 35%, rgba(255, 255, 255, 0.05) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070')",
         background_size="cover",
         background_position="center",
         background_repeat="no-repeat",
@@ -333,7 +333,6 @@ def login_page() -> rx.Component:
         padding_left=["2rem", "5rem", "8rem"],
         padding_right="2rem",
     )
-
 def metric_box(title: str, value: str, accent_color: str) -> rx.Component:
     return rx.box(
         rx.vstack(
