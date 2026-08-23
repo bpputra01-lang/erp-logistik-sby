@@ -3,6 +3,7 @@ from supabase import create_client
 import pandas as pd
 from datetime import datetime
 import io
+import asyncio
 
 # ==========================================
 # 1. SUPABASE CONFIG
@@ -15,7 +16,7 @@ def get_supabase():
 
 
 # ==========================================
-# 2. STATE MANAGEMENT (LOGIN & ONGKIR)
+# 2. STATE MANAGEMENT
 # ==========================================
 class AppState(rx.State):
     # --- LOGIN STATE ---
@@ -29,19 +30,29 @@ class AppState(rx.State):
     def set_username(self, val: str): self.username = val
     def set_password(self, val: str): self.password = val
 
-    def handle_login(self):
-        if self.username == "admin" and self.password == "sby123":
+    def handle_login(self, form_data: dict):
+        # Membaca data langsung dari form submit
+        usr = form_data.get("username", "").strip()
+        pwd = form_data.get("password", "").strip()
+
+        if usr == "admin" and pwd == "sby123":
             self.logged_in = True
             self.role = "DC"
             self.branch = "SURABAYA"
             self.user_display_name = "Admin DC Surabaya"
-            return rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000)
-        elif self.username == "toko" and self.password == "toko123":
+            return [
+                rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000),
+                AppState.load_data()
+            ]
+        elif usr == "toko" and pwd == "toko123":
             self.logged_in = True
             self.role = "CABANG"
             self.branch = "SURABAYA"
             self.user_display_name = "User Cabang"
-            return rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000)
+            return [
+                rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000),
+                AppState.load_data()
+            ]
         else:
             return rx.toast.error("Username atau Password salah! Periksa kembali.", duration=4000)
 
@@ -64,6 +75,7 @@ class AppState(rx.State):
     filter_ekspedisi: str = "SEMUA"
     selected_ids: list[int] = []
     show_delete_modal: bool = False
+    is_loading: bool = False
 
     def set_supplier(self, val: str): self.input_supplier = val
     def set_ekspedisi(self, val: str): self.input_ekspedisi = val
@@ -72,81 +84,105 @@ class AppState(rx.State):
     def set_tgl(self, val: str): self.input_tgl = val
     def set_filter_ekspedisi(self, val: str): self.filter_ekspedisi = val
 
-    def load_data(self):
-        """Fetch Data Realtime dari Supabase"""
+    async def load_data(self):
+        """Fetch Data Realtime dari Supabase secara Asynchronous"""
+        self.is_loading = True
         try:
             client = get_supabase()
-            res = client.table("shipping_costs").select("*").execute()
+            res = await asyncio.to_thread(lambda: client.table("shipping_costs").select("*").order("id", desc=True).execute())
             self.data_list = res.data if res.data else []
         except Exception as e:
             print("Error loading:", e)
+            yield rx.toast.error(f"Gagal mengambil data: {e}")
+        finally:
+            self.is_loading = False
 
-    def save_single_data(self):
+    async def save_single_data(self):
         """Simpan Input Manual"""
         if not self.input_supplier.strip():
-            return rx.window_alert("Nama Supplier Wajib Diisi!")
+            return rx.toast.warning("Nama Supplier Wajib Diisi!")
 
         try:
             koli_val = int(self.input_koli) if self.input_koli else 0
             ongkir_val = int(self.input_ongkir) if self.input_ongkir else 0
         except ValueError:
-            return rx.window_alert("Koli dan Ongkir harus berupa angka!")
+            return rx.toast.warning("Koli dan Ongkir harus berupa angka!")
 
         fix_dt = f"{self.input_tgl} {self.input_jam}"
         payload = {
-            "supplier": self.input_supplier.upper(),
-            "ekspedisi": self.input_ekspedisi.upper(),
+            "supplier": self.input_supplier.upper().strip(),
+            "ekspedisi": self.input_ekspedisi.upper().strip(),
             "total_koli": koli_val,
             "total_ongkir": ongkir_val,
             "created_at": fix_dt
         }
+        
         try:
             client = get_supabase()
-            client.table("shipping_costs").insert(payload).execute()
-            self.load_data()
+            await asyncio.to_thread(lambda: client.table("shipping_costs").insert(payload).execute())
+            
+            # Reset Form
             self.input_supplier = ""
             self.input_ekspedisi = ""
             self.input_koli = "1"
             self.input_ongkir = "0"
-            return rx.window_alert("✅ Data Berhasil Disimpan!")
+            
+            yield rx.toast.success("✅ Data Berhasil Disimpan!")
+            yield AppState.load_data()
         except Exception as e:
-            return rx.window_alert(f"Gagal Simpan: {e}")
+            yield rx.toast.error(f"Gagal Simpan: {e}")
 
     async def handle_upload(self, files: list[rx.UploadFile]):
         """Batch Upload CSV File Processing"""
+        if not files:
+            return rx.toast.warning("Pilih file CSV terlebih dahulu!")
+
         for file in files:
             upload_data = await file.read()
             df = pd.read_csv(io.BytesIO(upload_data))
             
             required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"]
             if not all(col in df.columns for col in required):
-                return rx.window_alert("Format CSV Salah! Wajib ada kolom template.")
+                return rx.toast.error("Format CSV Salah! Kolom wajib: SUPPLIER, EKSPEDISI, TOTAL KOLI, ONGKIR, TANGGAL_JAM")
 
             batch_data = []
             for _, row in df.iterrows():
                 sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
-                if not sup: continue
+                if not sup: 
+                    continue
                 
                 eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
-                try: koli = int(float(row["TOTAL KOLI"]))
-                except: koli = 0
                 
-                try: ongkir = int(float(str(row["ONGKIR"]).replace('Rp', '').replace('.', '').replace(',', '').strip()))
-                except: ongkir = 0
+                try: 
+                    koli = int(float(row["TOTAL KOLI"]))
+                except: 
+                    koli = 0
+                
+                try: 
+                    raw_ongkir = str(row["ONGKIR"]).replace('Rp', '').replace('.', '').replace(',', '').strip()
+                    ongkir = int(float(raw_ongkir))
+                except: 
+                    ongkir = 0
 
                 tgl_raw = row["TANGGAL_JAM"]
                 fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if pd.isna(tgl_raw) else str(tgl_raw)
 
                 batch_data.append({
-                    "supplier": sup, "ekspedisi": eks, "total_koli": koli,
-                    "total_ongkir": ongkir, "created_at": fix_dt
+                    "supplier": sup, 
+                    "ekspedisi": eks, 
+                    "total_koli": koli,
+                    "total_ongkir": ongkir, 
+                    "created_at": fix_dt
                 })
 
             if batch_data:
-                client = get_supabase()
-                client.table("shipping_costs").insert(batch_data).execute()
-                self.load_data()
-                return rx.window_alert(f"🚀 Berhasil Upload {len(batch_data)} Data CSV!")
+                try:
+                    client = get_supabase()
+                    await asyncio.to_thread(lambda: client.table("shipping_costs").insert(batch_data).execute())
+                    yield rx.toast.success(f"🚀 Berhasil Upload {len(batch_data)} Data CSV!")
+                    yield AppState.load_data()
+                except Exception as e:
+                    yield rx.toast.error(f"Gagal Upload Batch: {e}")
 
     # Multi Delete Logic
     def toggle_select_id(self, item_id: int):
@@ -156,24 +192,28 @@ class AppState(rx.State):
             self.selected_ids.append(item_id)
 
     def open_delete_modal(self):
-        if self.selected_ids:
+        if len(self.selected_ids) > 0:
             self.show_delete_modal = True
 
     def close_delete_modal(self):
         self.show_delete_modal = False
 
-    def execute_delete(self):
+    async def execute_delete(self):
         try:
             client = get_supabase()
-            client.table("shipping_costs").delete().in_("id", self.selected_ids).execute()
+            await asyncio.to_thread(lambda: client.table("shipping_costs").delete().in_("id", self.selected_ids).execute())
             self.selected_ids = []
             self.show_delete_modal = False
-            self.load_data()
-            return rx.window_alert("🗑️ Data Berhasil Dihapus!")
+            yield rx.toast.success("🗑️ Data Berhasil Dihapus!")
+            yield AppState.load_data()
         except Exception as e:
-            return rx.window_alert(f"Gagal Hapus: {e}")
+            yield rx.toast.error(f"Gagal Hapus: {e}")
 
-    # COMPUTED METRICS
+    # COMPUTED METRICS & VARS
+    @rx.var
+    def selected_count(self) -> int:
+        return len(self.selected_ids)
+
     @rx.var
     def filtered_list(self) -> list[dict]:
         res = self.data_list
@@ -205,22 +245,22 @@ class AppState(rx.State):
 
     @rx.var
     def biaya_datang(self) -> str:
-        tot = sum([x.get("total_ongkir", 0) for x in self.filtered_list if "RTO" not in x.get("supplier", "")])
+        tot = sum([x.get("total_ongkir", 0) for x in self.filtered_list if "RTO" not in str(x.get("supplier", ""))])
         return f"Rp {tot:,.0f}"
 
     @rx.var
     def koli_datang(self) -> str:
-        tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" not in x.get("supplier", "")])
+        tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" not in str(x.get("supplier", ""))])
         return f"{tot:,.0f} Koli"
 
     @rx.var
     def biaya_rto(self) -> str:
-        tot = sum([x.get("total_ongkir", 0) for x in self.filtered_list if "RTO" in x.get("supplier", "")])
+        tot = sum([x.get("total_ongkir", 0) for x in self.filtered_list if "RTO" in str(x.get("supplier", ""))])
         return f"Rp {tot:,.0f}"
 
     @rx.var
     def koli_rto(self) -> str:
-        tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" in x.get("supplier", "")])
+        tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" in str(x.get("supplier", ""))])
         return f"{tot:,.0f} Koli"
 
 
@@ -230,10 +270,8 @@ class AppState(rx.State):
 def login_page() -> rx.Component:
     return rx.flex(
         rx.box(
-            # Bungkus vstack dengan rx.form
             rx.form(
                 rx.vstack(
-                    # Header Logo / Title
                     rx.hstack(
                         rx.box(width="12px", height="38px", background="#E50914", border_radius="4px"),
                         rx.vstack(
@@ -251,9 +289,8 @@ def login_page() -> rx.Component:
                     rx.vstack(
                         rx.text("USERNAME", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
                         rx.input(
+                            name="username",
                             placeholder="Masukkan username...",
-                            value=AppState.username,
-                            on_change=AppState.set_username,
                             size="3",
                             variant="surface",
                             color_scheme="red",
@@ -274,9 +311,8 @@ def login_page() -> rx.Component:
                         rx.text("PASSWORD", size="1", font_weight="700", color="#FFFFFF", letter_spacing="1px"),
                         rx.input(
                             type="password",
+                            name="password",
                             placeholder="Masukkan password...",
-                            value=AppState.password,
-                            on_change=AppState.set_password,
                             size="3",
                             variant="surface",
                             color_scheme="white",
@@ -294,7 +330,6 @@ def login_page() -> rx.Component:
 
                     rx.box(height="10px"),
 
-                    # Button Submit (type="submit" agar merespon Enter dari Form)
                     rx.button(
                         "SIGN IN TO SYSTEM →",
                         type="submit", 
@@ -319,7 +354,7 @@ def login_page() -> rx.Component:
                     align="stretch",
                     width="100%",
                 ),
-                on_submit=AppState.handle_login,  # <-- Trigger saat ditekan Enter / Klik Button
+                on_submit=AppState.handle_login,
             ),
             width="100%",
             max_width="520px",
@@ -341,6 +376,7 @@ def login_page() -> rx.Component:
         justify="center",
         padding="2rem",
     )
+
 def metric_box(title: str, value: str, accent_color: str) -> rx.Component:
     return rx.box(
         rx.vstack(
@@ -358,7 +394,10 @@ def metric_box(title: str, value: str, accent_color: str) -> rx.Component:
 def render_table_row(row: dict) -> rx.Component:
     return rx.table.row(
         rx.table.cell(
-            rx.checkbox(on_change=lambda _: AppState.toggle_select_id(row["id"]))
+            rx.checkbox(
+                checked=AppState.selected_ids.contains(row["id"]),
+                on_change=lambda _: AppState.toggle_select_id(row["id"])
+            )
         ),
         rx.table.cell(rx.text(row["created_at"], size="2")),
         rx.table.cell(rx.text(row["supplier"], weight="bold", color="#FFD700")),
@@ -425,7 +464,13 @@ def main_dashboard() -> rx.Component:
                                     ),
                                     id="upload_csv", border="1px dashed #FFD700", padding="2rem", border_radius="10px", width="100%",
                                 ),
-                                rx.button("⚡ EXECUTE BATCH UPLOAD", on_click=AppState.handle_upload(rx.upload_files(upload_id="upload_csv")), color_scheme="green", width="100%", size="3"),
+                                rx.button(
+                                    "⚡ EXECUTE BATCH UPLOAD", 
+                                    on_click=AppState.handle_upload(rx.upload_files(upload_id="upload_csv")), 
+                                    color_scheme="green", 
+                                    width="100%", 
+                                    size="3"
+                                ),
                                 spacing="3",
                             ),
                             padding="1.5rem", background="#141724", border_radius="12px", border="1px solid #232738",
@@ -441,8 +486,8 @@ def main_dashboard() -> rx.Component:
                         rx.hstack(
                             rx.select(AppState.list_ekspedisi_options, value=AppState.filter_ekspedisi, on_change=AppState.set_filter_ekspedisi, width="200px"),
                             rx.cond(
-                                AppState.selected_ids.length() > 0,
-                                rx.button(f"🗑️ HAPUS ({AppState.selected_ids.length()}) DATA", on_click=AppState.open_delete_modal, color_scheme="red", variant="solid"),
+                                AppState.selected_count > 0,
+                                rx.button(f"🗑️ HAPUS ({AppState.selected_count}) DATA", on_click=AppState.open_delete_modal, color_scheme="red", variant="solid"),
                             ),
                             justify="between", width="100%", margin_top="1rem",
                         ),
@@ -493,7 +538,7 @@ def main_dashboard() -> rx.Component:
                 ),
                 open=AppState.show_delete_modal,
             ),
-            spacing="4", padding="2rem", max_width="1200px", margin="0 auto", on_mount=AppState.load_data,
+            spacing="4", padding="2rem", max_width="1200px", margin="0 auto",
         ),
         background_color="#0d0f17", min_height="100vh",
     )
@@ -508,16 +553,7 @@ def index() -> rx.Component:
         login_page()
     )
 
-# MENGATUR TOAST KE POJOK KANAN ATAS (top-right)
 app = rx.App(
     theme=rx.theme(appearance="dark", accent_color="gold"),
-    style={
-        "[data-sonner-toaster]": {
-            "top": "20px !important",
-            "right": "20px !important",
-            "bottom": "auto !important",
-            "left": "auto !important",
-        }
-    }
 )
-app.add_page(index, route="/", title="ZKN ERP - Database Ongkir")
+app.add_page(index, route="/", title="ZKN ERP - Database Ongkir", on_load=AppState.load_data)
