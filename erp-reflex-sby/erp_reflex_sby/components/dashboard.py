@@ -282,13 +282,14 @@ def main_dashboard() -> rx.Component:
                         ),
                         
                         # METRIC BOXES GRADIENT TINT BERGARIS TEGAS
+                        # METRIC BOXES DENGAN WARNA LEBIH KUAT & PEKAT
                         rx.grid(
-                            metric_box("💰 BIAYA ALL", AppState.total_biaya_all, "#E50914", "linear-gradient(135deg, #FFF0F0 0%, #FEE2E2 100%)"),
-                            metric_box("📦 KOLI ALL", AppState.total_koli_all, "#1A202C", "linear-gradient(135deg, #F7FAFC 0%, #EDF2F7 100%)"),
-                            metric_box("📊 AVG COST ALL", AppState.avg_cost_all, "#E50914", "linear-gradient(135deg, #FFF0F0 0%, #FEE2E2 100%)"),
-                            metric_box("🚚 BIAYA DATANG", AppState.biaya_datang, "#16A34A", "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)"),
-                            metric_box("📦 KOLI DATANG", AppState.koli_datang, "#16A34A", "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)"),
-                            metric_box("🔄 BIAYA RTO", AppState.biaya_rto, "#DC2626", "linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%)"),
+                            metric_box("💰 BIAYA ALL", AppState.total_biaya_all, "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
+                            metric_box("📦 KOLI ALL", AppState.total_koli_all, "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
+                            metric_box("📊 AVG COST ALL", AppState.avg_cost_all, "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
+                            metric_box("🚚 BIAYA DATANG", AppState.biaya_datang, "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
+                            metric_box("📦 KOLI DATANG", AppState.koli_datang, "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
+                            metric_box("🔄 BIAYA RTO", AppState.biaya_rto, "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
                             columns=rx.breakpoints(initial="1", sm="3"), spacing="4", width="100%",
                         ),
                         
