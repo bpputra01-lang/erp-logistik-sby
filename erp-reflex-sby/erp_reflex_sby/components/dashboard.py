@@ -256,21 +256,19 @@ def main_dashboard() -> rx.Component:
                         rx.hstack(
                             rx.hstack(
                                 rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#111111"),
-                                # DROPDOWN AMAN & TAJAM (STYLING OVERRIDE)
+                                # DROPDOWN DENGAN STYLING OVERRIDE KETAT
                                 rx.select(
                                     AppState.list_ekspedisi_options,
                                     value=AppState.filter_ekspedisi,
                                     on_change=AppState.set_filter_ekspedisi,
                                     width="220px",
                                     size="2",
-                                    color_scheme="gray",
-                                    variant="surface",
                                     style={
-                                        "background_color": "#FFFFFF !important",
+                                        "background-color": "#FFFFFF !important",
                                         "color": "#111111 !important",
-                                        "border": "2px solid #2D3748 !important",
-                                        "border_radius": "8px !important",
-                                        "font_weight": "700",
+                                        "border": "2.5px solid #1A202C !important",
+                                        "border-radius": "8px !important",
+                                        "font-weight": "800 !important",
                                         "cursor": "pointer",
                                     }
                                 ),
@@ -283,7 +281,7 @@ def main_dashboard() -> rx.Component:
                             justify="between", width="100%", margin_top="1.5rem", margin_bottom="0.5rem",
                         ),
                         
-                        # METRIC BOXES GRADIENT TINT TAJAM
+                        # METRIC BOXES GRADIENT TINT BERGARIS TEGAS
                         rx.grid(
                             metric_box("💰 BIAYA ALL", AppState.total_biaya_all, "#E50914", "linear-gradient(135deg, #FFF0F0 0%, #FEE2E2 100%)"),
                             metric_box("📦 KOLI ALL", AppState.total_koli_all, "#1A202C", "linear-gradient(135deg, #F7FAFC 0%, #EDF2F7 100%)"),
@@ -294,25 +292,25 @@ def main_dashboard() -> rx.Component:
                             columns=rx.breakpoints(initial="1", sm="3"), spacing="4", width="100%",
                         ),
                         
-                        # TABEL HISTORY
+                        # TABEL HISTORY (HEADER DENGAN TEKS HITAM JELAS)
                         rx.box(
                             rx.table.root(
                                 rx.table.header(
                                     rx.table.row(
-                                        rx.table.column_header_cell("SELECT"),
-                                        rx.table.column_header_cell("TANGGAL"),
-                                        rx.table.column_header_cell("SUPPLIER"),
-                                        rx.table.column_header_cell("EKSPEDISI"),
-                                        rx.table.column_header_cell("KOLI"),
-                                        rx.table.column_header_cell("TOTAL ONGKIR"),
+                                        rx.table.column_header_cell(rx.text("SELECT", color="#1A202C", weight="bold")),
+                                        rx.table.column_header_cell(rx.text("TANGGAL", color="#1A202C", weight="bold")),
+                                        rx.table.column_header_cell(rx.text("SUPPLIER", color="#1A202C", weight="bold")),
+                                        rx.table.column_header_cell(rx.text("EKSPEDISI", color="#1A202C", weight="bold")),
+                                        rx.table.column_header_cell(rx.text("KOLI", color="#1A202C", weight="bold")),
+                                        rx.table.column_header_cell(rx.text("TOTAL ONGKIR", color="#1A202C", weight="bold")),
                                     ),
-                                    style={"background_color": "#E2E8F0"}
+                                    style={"background-color": "#CBD5E0 !important"}
                                 ),
                                 rx.table.body(rx.foreach(AppState.filtered_list, render_table_row)),
                                 width="100%",
                             ),
-                            background="#FFFFFF", border_radius="16px", border="2px solid #CBD5E0", 
-                            padding="1rem", width="100%", box_shadow="0 10px 25px rgba(0,0,0,0.03)",
+                            background="#FFFFFF", border_radius="16px", border="2.5px solid #1A202C", 
+                            padding="1rem", width="100%", box_shadow="0 10px 25px rgba(0,0,0,0.04)",
                         ),
                         spacing="4", width="100%",
                     ),
