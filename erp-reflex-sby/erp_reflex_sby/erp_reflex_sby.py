@@ -314,15 +314,15 @@ def login_page() -> rx.Component:
             width="100%",
             max_width="440px",
             padding="2.5rem",
-            background="rgba(15, 15, 18, 0.85)", # Dark Card dengan transparansi pas
+            background="rgba(15, 15, 18, 0.85)",
             backdrop_filter="blur(20px)",
             border_radius="20px",
             border="1px solid rgba(255, 255, 255, 0.08)",
-            border_left="5px solid #E50914", # Accent Merah khas
+            border_left="5px solid #E50914",
             box_shadow="0 20px 50px rgba(0, 0, 0, 0.8)",
         ),
-        # Dark Overlay + Background Image yang match tema Hitam-Merah-Putih
-        background="linear-gradient(to right, rgba(5, 5, 8, 0.95) 30%, rgba(15, 5, 8, 0.75) 100%), url('https://images.unsplash.com/photo-1578575437130-527eed3abbec?q=80&w=2070')",
+        # BACKGROUND BARU DARI ISTOCK + OVERLAY HITAM/MERAH GELAP
+        background="linear-gradient(to right, rgba(5, 5, 8, 0.92) 30%, rgba(15, 5, 8, 0.70) 100%), url('https://media.istockphoto.com/id/1198089627/photo/warehouse-or-storehouse-as-background.jpg?s=612x612&w=0&k=20&c=0K6v9a4l0-v49mB0k_yP-8g1-g25iH0-G8S9-kR0-00=')",
         background_size="cover",
         background_position="center",
         width="100vw",
