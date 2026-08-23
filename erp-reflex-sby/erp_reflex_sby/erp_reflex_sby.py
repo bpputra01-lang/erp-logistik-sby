@@ -7,6 +7,7 @@ from .components.sidebar import sidebar
 def index() -> rx.Component:
     return rx.cond(
         AppState.logged_in,
+        # JIKA LOGGED_IN == TRUE (Tampilkan Layout Utama & Match Halaman)
         rx.hstack(
             sidebar(),
             rx.vstack(
@@ -22,7 +23,6 @@ def index() -> rx.Component:
                         width="100%",
                         height="80vh",
                     )),
-                    # Default untuk under_development
                     rx.vstack(
                         rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
                         rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
@@ -43,6 +43,7 @@ def index() -> rx.Component:
             spacing="0",
             overflow="hidden",
         ),
+        # JIKA LOGGED_IN == FALSE (Tampilkan Halaman Login) -> INI ARGUMEN KEDUA YANG WAJIB ADA
         login_page()
     )
 
