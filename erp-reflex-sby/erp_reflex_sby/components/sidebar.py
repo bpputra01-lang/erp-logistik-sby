@@ -56,7 +56,6 @@ def section_dropdown_header(title: str, dropdown_key: str, is_open: bool) -> rx.
         _hover={"background": "rgba(255, 255, 255, 0.1)"}
     )
 
-# Komponen Indikator Online Berkedip (Bisa dipasang di Header tiap halaman)
 def online_indicator() -> rx.Component:
     return rx.hstack(
         rx.box(
@@ -102,7 +101,7 @@ def sidebar() -> rx.Component:
                 align="center",
             ),
             
-            # Area Menu yang bisa di-scroll (agar tombol logout tidak ikut tertutup jika layar pendek)
+            # Area Menu yang bisa di-scroll
             rx.vstack(
                 # --- KELOMPOK 1: DASHBOARD SUMMARY (Hanya DC - Dengan Dropdown) ---
                 rx.cond(
@@ -116,9 +115,11 @@ def sidebar() -> rx.Component:
                                 menu_item("Database Master", "Database Master"),
                                 width="100%", spacing="1", padding_left="0.5rem",
                             ),
+                            rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
                         ),
                         width="100%", align_items="start",
                     ),
+                    rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
                 ),
                 
                 # --- KELOMPOK 2: OPERATIONAL (DROPDOWN) ---
@@ -146,6 +147,7 @@ def sidebar() -> rx.Component:
                                 width="100%", spacing="1", padding_left="0.5rem",
                             ),
                         ),
+                        rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
                     ),
                     width="100%", align_items="start",
                 ),
@@ -181,6 +183,7 @@ def sidebar() -> rx.Component:
                                 width="100%", spacing="1", padding_left="0.5rem",
                             ),
                         ),
+                        rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
                     ),
                     width="100%", align_items="start",
                 ),
@@ -195,6 +198,7 @@ def sidebar() -> rx.Component:
                             menu_item("Reject/Defect List", "Reject/Defect List"),
                             width="100%", spacing="1", padding_left="0.5rem",
                         ),
+                        rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
                     ),
                     width="100%", align_items="start",
                 ),
@@ -224,6 +228,7 @@ def sidebar() -> rx.Component:
                                 width="100%", spacing="1", padding_left="0.5rem",
                             ),
                         ),
+                        rx.fragment() # <-- DITAMBAHKAN AGAR TIDAK ERROR
                     ),
                     width="100%", align_items="start",
                 ),
@@ -266,7 +271,7 @@ def sidebar() -> rx.Component:
             align_items="start",
             transition="width 0.3s ease",
         ),
-        # KONDISI SAAT SIDEBAR DITUTUP
+        # KONDISI SAAT SIDEBAR DITUTUP (ARGUMEN KEDUA RX.COND UTAMA)
         rx.vstack(
             rx.button(
                 rx.icon("panel-left-open", size=20),
