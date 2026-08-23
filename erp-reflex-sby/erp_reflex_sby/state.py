@@ -6,11 +6,17 @@ import asyncio
 from .database import get_supabase
 
 class AppState(rx.State):
+    # --- NAVIGATION STATE ---
+    main_menu: str = "Dashboard Overview"
+    role: str = "DC"  # Default role, akan berubah saat login
+
+    def set_main_menu(self, menu: str):
+        self.main_menu = menu
+
     # --- LOGIN STATE ---
     username: str = ""
     password: str = ""
     logged_in: bool = False
-    role: str = ""
     branch: str = ""
     user_display_name: str = ""
 
@@ -43,6 +49,7 @@ class AppState(rx.State):
         self.logged_in = False
         self.username = ""
         self.password = ""
+        self.role = ""
         return rx.toast.info("Anda telah keluar dari sistem.")
 
     # --- ONGKIR DATABASE STATE ---
