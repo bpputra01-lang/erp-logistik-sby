@@ -251,13 +251,9 @@ def main_dashboard() -> rx.Component:
                 ),
 
                 # --- TAB 2: METRICS & TABEL HISTORY ---
-                rx.tabs.content(
-                    rx.vstack(
-                        rx.hstack(
+                rx.hstack(
                             rx.hstack(
                                 rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#111111"),
-                                    # DROPDOWN DENGAN STYLING OVERRIDE KETAT
-                                    # DROPDOWN BERSIH, PAS, TANPA BUNGKUSAN GANDA
                                 rx.select(
                                     AppState.list_ekspedisi_options,
                                     value=AppState.filter_ekspedisi,
@@ -272,16 +268,6 @@ def main_dashboard() -> rx.Component:
                                         "border": "2.5px solid #1A202C !important",
                                         "border-radius": "8px !important",
                                         "font-weight": "800 !important",
-                                        "box-shadow": "0 2px 5px rgba(0,0,0,0.05)",
-                                    }
-                                ),
-                                    style={
-                                        "background-color": "#FFFFFF !important",
-                                        "border": "2.5px solid #1A202C !important",
-                                        "border-radius": "8px !important",
-                                        "padding": "4px 8px",
-                                        "width": "220px",
-                                        "cursor": "pointer",
                                         "box-shadow": "0 2px 5px rgba(0,0,0,0.05)",
                                     }
                                 ),
