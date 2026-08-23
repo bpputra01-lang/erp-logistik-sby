@@ -83,24 +83,7 @@ def sidebar() -> rx.Component:
             
             # Area Menu yang bisa di-scroll
             rx.vstack(
-                # --- KELOMPOK 1: DASHBOARD SUMMARY ---
-                rx.vstack(
-                    section_dropdown_header("DASHBOARD SUMMARY", "dashboard", AppState.dropdown_dashboard),
-                    rx.cond(
-                        AppState.dropdown_dashboard,
-                        rx.vstack(
-                            rx.foreach(
-                                AppState.menu_dashboard,
-                                lambda item: menu_item(item, item)
-                            ),
-                            width="100%", spacing="1", padding_left="0.5rem",
-                        ),
-                        rx.fragment()
-                    ),
-                    width="100%", align_items="start",
-                ),
-                
-                # --- KELOMPOK 2: OPERATIONAL ---
+                # --- KELOMPOK 1: OPERATIONAL ---
                 rx.vstack(
                     section_dropdown_header("OPERATIONAL", "operational", AppState.dropdown_operational),
                     rx.cond(
@@ -117,7 +100,7 @@ def sidebar() -> rx.Component:
                     width="100%", align_items="start",
                 ),
 
-                # --- KELOMPOK 3: INVENTORY ---
+                # --- KELOMPOK 2: INVENTORY ---
                 rx.vstack(
                     section_dropdown_header("INVENTORY", "inventory", AppState.dropdown_inventory),
                     rx.cond(
@@ -134,7 +117,7 @@ def sidebar() -> rx.Component:
                     width="100%", align_items="start",
                 ),
 
-                # --- KELOMPOK 4: REJECT & DEFECT ---
+                # --- KELOMPOK 3: REJECT & DEFECT ---
                 rx.vstack(
                     section_dropdown_header("REJECT & DEFECT", "reject", AppState.dropdown_reject),
                     rx.cond(
@@ -151,7 +134,7 @@ def sidebar() -> rx.Component:
                     width="100%", align_items="start",
                 ),
 
-                # --- KELOMPOK 5: EXTRAS ---
+                # --- KELOMPOK 4: EXTRAS ---
                 rx.vstack(
                     section_dropdown_header("EXTRAS", "extras", AppState.dropdown_extras),
                     rx.cond(

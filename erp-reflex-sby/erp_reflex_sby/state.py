@@ -9,28 +9,13 @@ class AppState(rx.State):
     # --- NAVIGATION & ROLE STATE ---
     logged_in: bool = False
     role: str = "toko"  # Contoh: "DC" (admin) atau "CABANG" (toko)
-    main_menu: str = "Dashboard Overview"
-    
-    # State untuk Dashboard Overview
-    pilih_laporan: str = "WORKING REPORT"
-    zoom_val: float = 0.35
+    main_menu: str = "Database Ongkir In/Out"
 
-    def set_zoom_val(self, val: list[float] | float):
-        # rx.slider biasanya mengirim list jika range, atau float/int jika single value
-        if isinstance(val, list):
-            self.zoom_val = val[0]
-        else:
-            self.zoom_val = val
     def set_main_menu(self, menu: str):
         self.main_menu = menu
 
-    # Setter yang ditambahkan untuk memperbaiki error
-    def set_pilih_laporan(self, val: str):
-        self.pilih_laporan = val
-
     # --- SIDEBAR UI & DROPDOWN STATE ---
     sidebar_open: bool = True
-    dropdown_dashboard: bool = True
     dropdown_operational: bool = True
     dropdown_inventory: bool = False
     dropdown_reject: bool = False
@@ -40,9 +25,7 @@ class AppState(rx.State):
         self.sidebar_open = not self.sidebar_open
 
     def toggle_dropdown(self, key: str):
-        if key == "dashboard":
-            self.dropdown_dashboard = not self.dropdown_dashboard
-        elif key == "operational":
+        if key == "operational":
             self.dropdown_operational = not self.dropdown_operational
         elif key == "inventory":
             self.dropdown_inventory = not self.dropdown_inventory
@@ -269,7 +252,7 @@ class AppState(rx.State):
         tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" in str(x.get("supplier", ""))])
         return f"{tot:,.0f} Koli"
 
-    # --- COMPUTED ACTIVE CONTENT STATUS (BEBAS CIRCULAR IMPORT) ---
+    # --- COMPUTED ACTIVE CONTENT STATUS ---
     @rx.var
     def active_content_type(self) -> str:
         if self.main_menu == "Database Ongkir In/Out":
@@ -279,12 +262,6 @@ class AppState(rx.State):
                 return "access_denied"
         else:
             return "under_development"
-
-    @rx.var
-    def menu_dashboard(self) -> list[str]:
-        if self.role == "DC":
-            return ["Dashboard Overview", "Database Master"]
-        return []
 
     @rx.var
     def menu_operational(self) -> list[str]:
