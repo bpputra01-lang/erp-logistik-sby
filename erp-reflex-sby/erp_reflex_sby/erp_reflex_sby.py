@@ -8,6 +8,18 @@ from .components.sidebar import sidebar
 # --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
     return rx.hstack(
+        rx.html("""
+            <style>
+                @keyframes blinkAnimation {
+                    0% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.3; transform: scale(0.8); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
+                .blink-online {
+                    animation: blinkAnimation 1.5s infinite ease-in-out;
+                }
+            </style>
+        """),
         rx.hstack(
             rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
             rx.vstack(
