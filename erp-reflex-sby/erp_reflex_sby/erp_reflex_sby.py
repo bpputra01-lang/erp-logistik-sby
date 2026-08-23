@@ -16,6 +16,7 @@ def index() -> rx.Component:
                     rx.match(
                         AppState.active_content_type,
                         ("dashboard_ongkir", main_dashboard()),
+                        ("Dashboard Overview", main_dashboard()),
                         (
                             "access_denied",
                             rx.vstack(
