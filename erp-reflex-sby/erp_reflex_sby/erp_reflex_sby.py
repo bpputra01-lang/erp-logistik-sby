@@ -4,6 +4,21 @@ from .components.login import login_page
 from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 
+def render_content() -> rx.Component:
+    # Evaluasi berbasis Python murni untuk menghindari error Var conditional Reflex
+    if AppState.role == "DC":
+        return main_dashboard()
+    else:
+        return rx.vstack(
+            rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
+            rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
+            padding="3rem",
+            align_items="center",
+            justify_content="center",
+            width="100%",
+            height="80vh",
+        )
+
 def index() -> rx.Component:
     return rx.cond(
         AppState.logged_in,
@@ -12,22 +27,8 @@ def index() -> rx.Component:
             rx.vstack(
                 rx.match(
                     AppState.main_menu,
-                    # Jika menu Dashboard dan rolenya DC (Admin)
-                    ("Database Ongkir In/Out", rx.match(
-                        AppState.role,
-                        ("DC", main_dashboard()),
-                        # Default case jika rolenya bukan DC (Akses Ditolak)
-                        rx.vstack(
-                            rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
-                            rx.text("Maaf, halaman Dashboard Ongkir ini khusus untuk Admin DC (Surabaya).", color="#718096"),
-                            padding="3rem",
-                            align_items="center",
-                            justify_content="center",
-                            width="100%",
-                            height="80vh",
-                        )
-                    )),
-                    # Default case untuk menu lainnya yang sedang dalam pengembangan
+                    ("Database Ongkir In/Out", render_content()),
+                    # Default case untuk menu lainnya
                     rx.vstack(
                         rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
                         rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
