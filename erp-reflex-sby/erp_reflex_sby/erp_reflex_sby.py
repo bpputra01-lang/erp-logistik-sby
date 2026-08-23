@@ -19,8 +19,8 @@ def get_supabase():
 # ==========================================
 class AppState(rx.State):
     # --- LOGIN STATE ---
-    username: str = "admin"
-    password: str = "admin123"
+    username: str = ""
+    password: str = ""
     logged_in: bool = False
     role: str = ""
     branch: str = ""
