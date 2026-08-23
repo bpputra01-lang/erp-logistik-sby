@@ -257,23 +257,21 @@ def main_dashboard() -> rx.Component:
                             rx.hstack(
                                 rx.text("FILTER EKSPEDISI:", size="2", font_weight="800", color="#111111"),
                                 # DROPDOWN DENGAN STYLING OVERRIDE KETAT
-                               rx.box(
-                                    rx.select(
+                                rx.box(
+                                        rx.select(
                                         AppState.list_ekspedisi_options,
                                         value=AppState.filter_ekspedisi,
                                         on_change=AppState.set_filter_ekspedisi,
+                                        width="220px",
                                         size="2",
-                                        variant="soft",
                                         color_scheme="gray",
-                                        width="100%",
+                                        variant="classic",
                                         style={
-                                            "background": "transparent !important",
-                                            "background-color": "transparent !important",
-                                            "color": "#111111 !important",
-                                            "-webkit-text-fill-color": "#111111 !important",
+                                            "background-color": "#FFFFFF !important",
+                                            "color": "#000000 !important",
+                                            "border": "2.5px solid #1A202C !important",
+                                            "border-radius": "8px !important",
                                             "font-weight": "800 !important",
-                                            "box-shadow": "none !important",
-                                            "cursor": "pointer",
                                         }
                                     ),
                                     style={
