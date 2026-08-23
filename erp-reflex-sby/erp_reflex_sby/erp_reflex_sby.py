@@ -15,7 +15,7 @@ def index() -> rx.Component:
                 rx.vstack(
                     rx.match(
                         AppState.main_menu,
-                        # 1. Halaman Dashboard Overview yang asli
+                        # 1. Menu Dashboard Overview
                         ("Dashboard Overview", rx.vstack(
                             rx.heading("Dashboard Overview", size="7", color="#1A202C"),
                             rx.text("Selamat datang di sistem manajemen logistik.", color="#718096"),
@@ -26,8 +26,9 @@ def index() -> rx.Component:
                             height="80vh",
                         )),
                         
-                        # 2. Halaman khusus untuk Database Ongkir
-                        ("Database Ongkir", main_dashboard()),
+                        # 2. Menu Database Ongkir In/Out (Tampilan Spreadsheet Ongkir)
+                        ("Database Ongkir In/Out", main_dashboard()),
+                        ("Database Ongkir", main_dashboard()), # Antisipasi kalau tulisannya pendek
                         ("dashboard_ongkir", main_dashboard()),
                         
                         # 3. Handle Error Akses Ditolak
@@ -83,4 +84,4 @@ app = rx.App(
         }
     }
 )
-app.add_page(index, route="/", title="ZKN ERP - Database Ongkir")
+app.add_page(index, route="/", title="ZKN ERP - Logistik Surabaya")
