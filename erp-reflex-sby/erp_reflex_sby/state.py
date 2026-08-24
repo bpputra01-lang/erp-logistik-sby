@@ -23,12 +23,17 @@ class AppState(rx.State):
 
     # --- STOCK MINUS STATE ---
     stock_minus_processed: bool = False
+    is_info_open: bool = False  # <-- Ditambahkan untuk kontrol modal panduan/logic
+    is_loading: bool = False    # <-- Ditambahkan untuk kontrol popup loading
     total_qty_minus: int = 0
     total_tercover: int = 0
     total_sisa_adj: int = 0
     df_minus_awal_data: list[dict] = []
     df_set_up_data: list[dict] = []
     df_need_adj_data: list[dict] = []
+
+    def set_is_info_open(self, val: bool):
+        self.is_info_open = val
 
     def toggle_sidebar(self):
         self.sidebar_open = not self.sidebar_open
@@ -217,9 +222,13 @@ class AppState(rx.State):
             yield rx.toast.warning("Pilih file Excel terlebih dahulu!")
             return
 
-        for file in files:
-            upload_data = await file.read()
-            try:
+        # Nyalakan indikator loading
+        self.is_loading = True
+        yield
+
+        try:
+            for file in files:
+                upload_data = await file.read()
                 df = pd.read_excel(io.BytesIO(upload_data), engine="openpyxl")
                 df.columns = [str(c).strip().upper() for c in df.columns]
                 
@@ -228,6 +237,7 @@ class AppState(rx.State):
                 col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
                 
                 if col_qty is None:
+                    self.is_loading = False
                     yield rx.toast.error("❌ Kolom 'QTY SYSTEM' tidak ditemukan!")
                     return
                 
@@ -302,16 +312,19 @@ class AppState(rx.State):
                 self.total_tercover = int(df_s["QUANTITY"].sum()) if not df_s.empty else 0
                 self.total_sisa_adj = int(abs(df_n[col_qty].sum())) if not df_n.empty and col_qty in df_n.columns else 0
 
-                # Simpan ke state data list dict (diperbaiki agar tidak saling menimpa salah)
+                # Simpan ke state data list dict
                 self.df_minus_awal_data = df_minus_awal.to_dict(orient="records") if not df_minus_awal.empty else []
                 self.df_set_up_data = df_s.to_dict(orient="records") if not df_s.empty else []
                 self.df_need_adj_data = df_n.to_dict(orient="records") if not df_n.empty else []
                 
                 self.stock_minus_processed = True
-                yield rx.toast.success("✅ Data Stock Minus Berhasil Diproses!")
-                
-            except Exception as e:
-                yield rx.toast.error(f"Gagal memproses file: {e}")
+
+            self.is_loading = False
+            yield rx.toast.success("✅ Data Stock Minus Berhasil Diproses!")
+            
+        except Exception as e:
+            self.is_loading = False
+            yield rx.toast.error(f"Gagal memproses file: {e}")
 
     # --- COMPUTED METRICS ---
     @rx.var
