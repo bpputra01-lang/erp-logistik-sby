@@ -2,19 +2,15 @@ import reflex as rx
 from ..state import AppState
 
 def render_dynamic_table(data_list) -> rx.Component:
-    """Helper untuk merender tabel dinamis berdasarkan list of dict dari Pandas."""
     return rx.box(
         rx.cond(
-            data_list,  # True jika list memiliki isi, False jika kosong/[]
+            data_list.length() > 0,
             rx.table.root(
                 rx.table.header(
                     rx.table.row(
-                        # Menggunakan data_list[0] untuk mengambil header kolom pertama secara dinamis
                         rx.foreach(
-                            data_list[0],
-                            lambda col_key: rx.table.column_header_cell(
-                                col_key, color="#2D3748", font_weight="bold"
-                            )
+                            data_list[0].keys(),
+                            lambda col: rx.table.column_header_cell(col, color="#2D3748", font_weight="bold")
                         )
                     )
                 ),
@@ -23,10 +19,8 @@ def render_dynamic_table(data_list) -> rx.Component:
                         data_list,
                         lambda row: rx.table.row(
                             rx.foreach(
-                                row,
-                                lambda item: rx.table.cell(
-                                    item[1].to_string(), color="#4A5568"
-                                )
+                                row.values(),
+                                lambda val: rx.table.cell(val.to_string(), color="#4A5568")
                             )
                         )
                     )
@@ -35,85 +29,87 @@ def render_dynamic_table(data_list) -> rx.Component:
                 size="2",
                 width="100%",
             ),
-            rx.center(
-                rx.text("Tidak ada data untuk ditampilkan.", color="#718096", padding="2rem", font_style="italic"),
-                width="100%"
-            ),
+            rx.text("Tidak ada data untuk ditampilkan.", color="#718096", padding="1rem"),
         ),
         overflow_x="auto",
         width="100%",
         background="white",
         border_radius="8px",
         padding="0.5rem",
-        box_shadow="0 1px 3px rgba(0,0,0,0.05)",
     )
 
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
-        # Hero Header
-        rx.box(
-            rx.heading("STOCK MINUS CLEARANCE", size="6", color="#FFFFFF", font_weight="800"),
-            padding="1rem 1.5rem",
-            background="linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%)",
-            border_radius="12px",
-            border_left="5px solid #f39c12",
-            width="100%",
-            margin_bottom="1.5rem",
+        # --- MODAL POPUP INFORMASI & LOGIC THINKING ---
+        rx.dialog.root(
+            rx.dialog.content(
+                rx.dialog.title("📖 Panduan & Logic Stock Minus"),
+                rx.vstack(
+                    rx.heading("1. Informasi Format File", size="3", color="#f39c12"),
+                    rx.text("• Download Multiple Adjustment dari Jezpro dan pastikan memilih opsi **Termasuk yang sudah habis**."),
+                    
+                    rx.heading("2. Logic Thinking", size="3", color="#f39c12", margin_top="1rem"),
+                    rx.text("• Mengambil SKU yang memiliki Qty System bernilai minus (-)."),
+                    rx.text("• Melakukan alokasi/covering stock dari bin prioritas (All Staging, Karantina, dll)."),
+                    rx.text("• Prioritas alokasi antara BIN Toko vs Gudang Lt.2 / Staging Lt.2."),
+                    rx.text("• Sisa minus yang tidak ter-cover otomatis masuk ke tabel Item Need Justifikasi."),
+                    spacing="2",
+                    align_items="start",
+                ),
+                rx.flex(
+                    rx.dialog.close(
+                        rx.button("Tutup", variant="soft", color_scheme="gray"),
+                    ),
+                    justify="end",
+                    margin_top="1.5rem",
+                ),
+            ),
+            open=AppState.is_info_open,
+            on_open_change=AppState.set_is_info_open,
         ),
 
-        # Accordion Informasi Format File & Logic Thinking
-        rx.accordion.root(
-            rx.accordion.item(
-                header="📋 Informasi Format File",
-                content=rx.vstack(
-                    rx.text("Format yang diharapkan:", font_weight="bold"),
-                    rx.text("- All Data Stock: Download Multiple Adjustment dari Jezpro dan pilih Termasuk yang sudah habis"),
-                    align_items="start", spacing="1",
+        # --- MODAL LOADING STATE SAAT PROSES DATA ---
+        rx.dialog.root(
+            rx.dialog.content(
+                rx.vstack(
+                    rx.spinner(size="3", color="orange"),
+                    rx.text("Sedang memproses data Excel, mohon tunggu...", font_weight="bold", color="#2D3748"),
+                    align="center",
+                    spacing="4",
+                    padding="2rem",
                 ),
-                value="item-1",
+                show=AppState.is_loading,
             ),
-            rx.accordion.item(
-                header="💡 Logic Thinking",
-                content=rx.vstack(
-                    rx.text("Alur Process Compare Stock Minus:", font_weight="bold"),
-                    rx.text("- Mengambil SKU yang memiliki Qty System minus (-)"),
-                    rx.text("- Melakukan shuffle covering stock dari bin prioritas (All Staging, Karantina, dll)"),
-                    rx.text("- Prioritas BIN Toko vs Gudang Lt.2 / Staging Lt.2"),
-                    rx.text("- Jika tidak selesai lewat setup, dimasukkan ke item need justifikasi"),
-                    align_items="start", spacing="1",
-                ),
-                value="item-2",
-            ),
-            type="multiple",
-            collapsible=True,
-            width="100%",
-            margin_bottom="1.5rem",
         ),
 
-        # File Upload Component
+        # --- UPLOAD SECTION (Tanpa Judul Ganda) ---
         rx.upload(
             rx.vstack(
-                rx.icon("upload", size=32, color="#f39c12"),
-                rx.text("Drag and drop file Excel di sini atau klik untuk browse", color="#4A5568"),
+                rx.icon("upload", size=36, color="#f39c12"),
+                rx.text("Drag and drop file Excel di sini atau klik untuk browse", color="#4A5568", font_weight="600"),
+                rx.text("Format yang didukung: .xlsx, .xls", color="#A0AEC0", font_size="12px"),
                 align="center", spacing="2",
             ),
             id="upload_stock_file",
             border="2px dashed #CBD5E0",
-            padding="2rem",
+            padding="2.5rem",
             border_radius="12px",
             width="100%",
             background="#FFFFFF",
+            multiple=False,
         ),
+        
         rx.button(
             "🔃 PROSES DATA",
             on_click=AppState.handle_upload_stock_minus(rx.upload_files("upload_stock_file")),
             color_scheme="orange",
+            size="3",
+            width="100%",
             margin_top="1rem",
             margin_bottom="1.5rem",
-            cursor="pointer",
         ),
 
-        # Dashboard Metrics (Muncul setelah diproses)
+        # --- DASHBOARD METRICS & TABS (Muncul Setelah Diproses) ---
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
@@ -158,8 +154,6 @@ def stock_minus_view() -> rx.Component:
                     ),
                     default_value="tab1", width="100%",
                 ),
-                width="100%",
-                spacing="0",
             ),
         ),
         width="100%",
