@@ -1,6 +1,45 @@
 import reflex as rx
 from ..state import AppState
 
+def render_dynamic_table(data_list) -> rx.Component:
+    """Helper untuk merender tabel dinamis berdasarkan list of dict dari Pandas."""
+    return rx.box(
+        rx.cond(
+            data_list.length() > 0,
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        # Mengambil kunci dari item pertama sebagai header kolom
+                        rx.foreach(
+                            data_list[0].keys(),
+                            lambda col: rx.table.column_header_cell(col, color="#2D3748", font_weight="bold")
+                        )
+                    )
+                ),
+                rx.table.body(
+                    rx.foreach(
+                        data_list,
+                        lambda row: rx.table.row(
+                            rx.foreach(
+                                row.values(),
+                                lambda val: rx.table.cell(val.to_string(), color="#4A5568")
+                            )
+                        )
+                    )
+                ),
+                variant="surface",
+                size="2",
+                width="100%",
+            ),
+            rx.text("Tidak ada data untuk ditampilkan.", color="#718096", padding="1rem"),
+        ),
+        overflow_x="auto",
+        width="100%",
+        background="white",
+        border_radius="8px",
+        padding="0.5rem",
+    )
+
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
         # Hero Header
@@ -14,7 +53,7 @@ def stock_minus_view() -> rx.Component:
             margin_bottom="1.5rem",
         ),
 
-        # Accordion Informasi Format File & Logic Thinking (Pengganti Disclosure)
+        # Accordion Informasi Format File & Logic Thinking
         rx.accordion.root(
             rx.accordion.item(
                 header="📋 Informasi Format File",
@@ -97,16 +136,16 @@ def stock_minus_view() -> rx.Component:
                         rx.tabs.trigger("⚠️ JUSTIFIKASI", value="tab3"),
                     ),
                     rx.tabs.content(
-                        rx.data_table(data=AppState.df_minus_awal_data, pagination=True, search=True, sort=True),
-                        value="tab1", padding="1rem", background="white", border_radius="8px",
+                        render_dynamic_table(AppState.df_minus_awal_data),
+                        value="tab1", padding="1rem",
                     ),
                     rx.tabs.content(
-                        rx.data_table(data=AppState.df_set_up_data, pagination=True, search=True, sort=True),
-                        value="tab2", padding="1rem", background="white", border_radius="8px",
+                        render_dynamic_table(AppState.df_set_up_data),
+                        value="tab2", padding="1rem",
                     ),
                     rx.tabs.content(
-                        rx.data_table(data=AppState.df_need_adj_data, pagination=True, search=True, sort=True),
-                        value="tab3", padding="1rem", background="white", border_radius="8px",
+                        render_dynamic_table(AppState.df_need_adj_data),
+                        value="tab3", padding="1rem",
                     ),
                     default_value="tab1", width="100%",
                 ),
