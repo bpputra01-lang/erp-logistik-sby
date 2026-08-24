@@ -213,6 +213,10 @@ class AppState(rx.State):
 
     # --- STOCK MINUS FILE HANDLER & LOGIC ---
     async def handle_upload_stock_minus(self, files: list[rx.UploadFile]):
+        if not files:
+            yield rx.toast.warning("Pilih file Excel terlebih dahulu!")
+            return
+
         for file in files:
             upload_data = await file.read()
             try:
@@ -224,7 +228,8 @@ class AppState(rx.State):
                 col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
                 
                 if col_qty is None:
-                    return rx.window_alert("❌ Kolom 'QTY SYSTEM' tidak ditemukan!")
+                    yield rx.toast.error("❌ Kolom 'QTY SYSTEM' tidak ditemukan!")
+                    return
                 
                 # 1. Persiapan Data
                 df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
@@ -297,15 +302,16 @@ class AppState(rx.State):
                 self.total_tercover = int(df_s["QUANTITY"].sum()) if not df_s.empty else 0
                 self.total_sisa_adj = int(abs(df_n[col_qty].sum())) if not df_n.empty and col_qty in df_n.columns else 0
 
-                # Simpan ke state data list dict
-                self.df_minus_awal_data = df_s.to_dict(orient="records") if not df_s.empty else [] # atau df_minus_awal
-                self.df_minus_awal_data = df_minus_awal.to_dict(orient="records")
-                self.df_set_up_data = df_s.to_dict(orient="records")
-                self.df_need_adj_data = df_n.to_dict(orient="records")
+                # Simpan ke state data list dict (diperbaiki agar tidak saling menimpa salah)
+                self.df_minus_awal_data = df_minus_awal.to_dict(orient="records") if not df_minus_awal.empty else []
+                self.df_set_up_data = df_s.to_dict(orient="records") if not df_s.empty else []
+                self.df_need_adj_data = df_n.to_dict(orient="records") if not df_n.empty else []
+                
                 self.stock_minus_processed = True
+                yield rx.toast.success("✅ Data Stock Minus Berhasil Diproses!")
                 
             except Exception as e:
-                rx.window_alert(f"Gagal memproses file: {e}")
+                yield rx.toast.error(f"Gagal memproses file: {e}")
 
     # --- COMPUTED METRICS ---
     @rx.var

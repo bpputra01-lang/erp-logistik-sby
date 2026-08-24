@@ -3,13 +3,7 @@ from .state import AppState
 from .components.login import login_page
 from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
-
-
-import reflex as rx
-from .state import AppState
-from .components.login import login_page
-from .components.dashboard import main_dashboard
-from .components.sidebar import sidebar
+from .components.stock_minus import stock_minus_view  # <-- 1. Import komponen Stock Minus
 
 # --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
@@ -74,6 +68,7 @@ def index() -> rx.Component:
                             ("Database Ongkir In/Out", main_dashboard()),
                             ("Database Ongkir", main_dashboard()),
                             ("dashboard_ongkir", main_dashboard()),
+                            ("Stock Minus", stock_minus_view()),  # <-- 2. Routing Stock Minus ditambahkan di sini
 
                             # Handle Error Akses Ditolak
                             (
