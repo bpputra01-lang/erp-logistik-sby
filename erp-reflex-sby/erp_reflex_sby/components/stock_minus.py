@@ -1,5 +1,5 @@
 import reflex as rx
-from .state import AppState
+from ..state import AppState
 
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
