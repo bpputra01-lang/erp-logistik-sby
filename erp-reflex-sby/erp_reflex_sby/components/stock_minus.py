@@ -92,15 +92,17 @@ def stock_minus_view() -> rx.Component:
             ),
         ),
 
-        # --- UPLOAD SECTION (Desain Bersih & Elegan) ---
+        # --- UPLOAD SECTION (Mengganti rx.circle dengan rx.center + border_radius) ---
         rx.vstack(
             rx.upload(
                 rx.vstack(
-                    rx.circle(
+                    rx.center(
                         rx.icon("upload", size=24, color="#E50914"),
-                        size="48px",
+                        width="48px",
+                        height="48px",
                         background="#FFF5F5",
                         border="1px solid #FED7D7",
+                        border_radius="50%",
                     ),
                     rx.vstack(
                         rx.text("Drag and drop file Excel di sini atau klik untuk browse", font_weight="bold", color="#2D3748", size="3"),
@@ -151,7 +153,7 @@ def stock_minus_view() -> rx.Component:
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
-                # Kotak Metrik 3 Kolom (Tema Gelap Elegan dengan Aksen Merah/Hijau/Abu)
+                # Kotak Metrik 3 Kolom
                 rx.hstack(
                     rx.box(
                         rx.text("TOTAL QTY MINUS", color="#A0AEC0", font_size="11px", font_weight="bold"),
