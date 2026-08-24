@@ -10,7 +10,7 @@ def render_dynamic_table(data_list) -> rx.Component:
                 rx.table.header(
                     rx.table.row(
                         rx.foreach(
-                            data_list[0],
+                            data_list,
                             lambda col_key: rx.table.column_header_cell(
                                 col_key, color="#1A202C", font_weight="bold"
                             )
@@ -87,17 +87,15 @@ def stock_minus_view() -> rx.Component:
                     cursor="pointer",
                 ),
                 
-                # Nama file terpilih langsung tampil rapi di bawah uploader
+                # Nama file terpilih (Diamankan agar tidak null iterator)
                 rx.cond(
                     rx.selected_files("upload_stock_file"),
-                    rx.foreach(
-                        rx.selected_files("upload_stock_file"),
-                        lambda file_name: rx.hstack(
-                            rx.icon("file-spreadsheet", size=14, color="#38A169"),
-                            rx.text(file_name, size="1", color="#22543D", font_weight="bold", truncate=True),
-                            spacing="1", align="center", background="#F0FFF4", padding="4px 8px", border_radius="4px", max_width="280px",
-                        )
+                    rx.hstack(
+                        rx.icon("file-spreadsheet", size=14, color="#38A169"),
+                        rx.text(rx.selected_files("upload_stock_file")[0], size="1", color="#22543D", font_weight="bold", truncate=True),
+                        spacing="1", align="center", background="#F0FFF4", padding="4px 8px", border_radius="4px", max_width="280px",
                     ),
+                    rx.fragment(),
                 ),
                 align_items="start", spacing="2",
             ),
@@ -127,11 +125,11 @@ def stock_minus_view() -> rx.Component:
             width="fit-content",
         ),
 
-        # --- 3. DASHBOARD METRICS & TABS (Muncul Setelah Diproses + Indikator Sukses) ---
+        # --- 3. DASHBOARD METRICS & TABS (Muncul Setelah Diproses) ---
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
-                # Banner Sukses dengan Ikon Centang Hijau (Clean & Modern)
+                # Banner Sukses dengan Ikon Centang Hijau
                 rx.hstack(
                     rx.icon("check-circle", size=18, color="#38A169"),
                     rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#22543D", size="2"),
