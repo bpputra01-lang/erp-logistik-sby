@@ -64,40 +64,7 @@ def stock_minus_view() -> rx.Component:
             ),
         ),
 
-        # --- 2. MODAL POPUP SUKSES (Centang Hijau di Tengah Layar) ---
-        rx.dialog.root(
-            rx.dialog.content(
-                rx.vstack(
-                    rx.center(
-                        rx.icon("check", size=32, color="white"),
-                        background="#38A169",
-                        width="56px",
-                        height="56px",
-                        border_radius="50%",
-                        box_shadow="0 4px 10px rgba(56, 161, 105, 0.3)",
-                    ),
-                    rx.text("Berhasil Diproses!", font_weight="bold", color="#1A202C", size="4"),
-                    rx.text("Data stock minus & validasi selesai dijalankan.", color="#718096", size="2", text_align="center"),
-                    rx.button(
-                        "Tutup",
-                        on_click=AppState.set_stock_minus_processed(False),
-                        background_color="#2D3748",
-                        color="white",
-                        size="2",
-                        border_radius="6px",
-                        width="100%",
-                        margin_top="10px",
-                        cursor="pointer",
-                    ),
-                    align="center",
-                    spacing="3",
-                    padding="1.5rem",
-                ),
-                show=AppState.stock_minus_processed, 
-            ),
-        ),
-
-        # --- 3. UPLOAD SECTION (Compact, Tidak Full Layar) ---
+        # --- 2. UPLOAD SECTION (Kecil, Rapi, Tidak Full Layar) ---
         rx.hstack(
             rx.vstack(
                 rx.upload(
@@ -120,7 +87,7 @@ def stock_minus_view() -> rx.Component:
                     cursor="pointer",
                 ),
                 
-                # Nama file terpilih langsung di bawah uploader
+                # Nama file terpilih langsung tampil rapi di bawah uploader
                 rx.cond(
                     rx.selected_files("upload_stock_file"),
                     rx.foreach(
@@ -160,10 +127,24 @@ def stock_minus_view() -> rx.Component:
             width="fit-content",
         ),
 
-        # --- 4. DASHBOARD METRICS & TABS (Muncul Setelah Diproses) ---
+        # --- 3. DASHBOARD METRICS & TABS (Muncul Setelah Diproses + Indikator Sukses) ---
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
+                # Banner Sukses dengan Ikon Centang Hijau (Clean & Modern)
+                rx.hstack(
+                    rx.icon("check-circle", size=18, color="#38A169"),
+                    rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#22543D", size="2"),
+                    background="#C6F6D5", 
+                    border="1px solid #9AE6B4", 
+                    padding="8px 14px", 
+                    border_radius="6px",
+                    width="100%", 
+                    align="center", 
+                    spacing="2", 
+                    margin_bottom="1rem",
+                ),
+
                 # Kotak Metrik 3 Kolom
                 rx.hstack(
                     rx.box(
