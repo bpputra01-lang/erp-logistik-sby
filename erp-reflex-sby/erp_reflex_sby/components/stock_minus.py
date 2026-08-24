@@ -7,36 +7,40 @@ def stock_minus_view() -> rx.Component:
         rx.box(
             rx.heading("STOCK MINUS CLEARANCE", size="6", color="#FFFFFF", font_weight="800"),
             padding="1rem 1.5rem",
-            background= "linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%)",
+            background="linear-gradient(135deg, #1a1d2e 0%, #252a3d 100%)",
             border_radius="12px",
             border_left="5px solid #f39c12",
             width="100%",
             margin_bottom="1.5rem",
         ),
 
-        # Expander Informasi Format File
-        rx.disclosure(
-            rx.disclosure_button("📋 Informasi Format File", font_weight="bold", color="#2D3748"),
-            rx.disclosure_panel(
-                rx.text("Format yang diharapkan:", font_weight="bold"),
-                rx.text("- **All Data Stock**: Download Multiple Adjustment dari Jezpro dan pilih **Termasuk yang sudah habis**"),
-                padding="1rem", background="#EDF2F7", border_radius="8px",
+        # Accordion Informasi Format File & Logic Thinking (Pengganti Disclosure)
+        rx.accordion.root(
+            rx.accordion.item(
+                header="📋 Informasi Format File",
+                content=rx.vstack(
+                    rx.text("Format yang diharapkan:", font_weight="bold"),
+                    rx.text("- All Data Stock: Download Multiple Adjustment dari Jezpro dan pilih Termasuk yang sudah habis"),
+                    align_items="start", spacing="1",
+                ),
+                value="item-1",
             ),
-            width="100%", margin_bottom="1rem",
-        ),
-
-        # Expander Logic Thinking
-        rx.disclosure(
-            rx.disclosure_button("💡 Logic Thinking", font_weight="bold", color="#2D3748"),
-            rx.disclosure_panel(
-                rx.text("Alur Process Compare Stock Minus:", font_weight="bold"),
-                rx.text("- Mengambil SKU yang memiliki Qty System minus (-)"),
-                rx.text("- Melakukan shuffle covering stock dari bin prioritas (All Staging, Karantina, dll)"),
-                rx.text("- Prioritas BIN Toko vs Gudang Lt.2 / Staging Lt.2"),
-                rx.text("- Jika tidak selesai lewat setup, dimasukkan ke item need justifikasi"),
-                padding="1rem", background="#EDF2F7", border_radius="8px",
+            rx.accordion.item(
+                header="💡 Logic Thinking",
+                content=rx.vstack(
+                    rx.text("Alur Process Compare Stock Minus:", font_weight="bold"),
+                    rx.text("- Mengambil SKU yang memiliki Qty System minus (-)"),
+                    rx.text("- Melakukan shuffle covering stock dari bin prioritas (All Staging, Karantina, dll)"),
+                    rx.text("- Prioritas BIN Toko vs Gudang Lt.2 / Staging Lt.2"),
+                    rx.text("- Jika tidak selesai lewat setup, dimasukkan ke item need justifikasi"),
+                    align_items="start", spacing="1",
+                ),
+                value="item-2",
             ),
-            width="100%", margin_bottom="1.5rem",
+            type="multiple",
+            collapsible=True,
+            width="100%",
+            margin_bottom="1.5rem",
         ),
 
         # File Upload Component
