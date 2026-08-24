@@ -3,7 +3,7 @@ from .state import AppState
 from .components.login import login_page
 from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
-from .components.stock_minus import stock_minus_view  # <-- 1. Import komponen Stock Minus
+from .components.stock_minus import stock_minus_view
 
 # --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
@@ -40,7 +40,7 @@ def global_header() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.vstack(
-        # --- CSS ANIMASI BLINK DITARUH DI LUAR (AMAN, TIDAK MERUSAK LAYOUT HEADER) ---
+        # --- CSS ANIMASI BLINK & LOADING OVERLAY ---
         rx.html("""
             <style>
                 @keyframes blinkAnimation {
@@ -53,6 +53,31 @@ def index() -> rx.Component:
                 }
             </style>
         """),
+        
+        # --- GLOBAL LOADING OVERLAY (UNTUK STOCK MINUS/PROSES BERAT) ---
+        rx.cond(
+            AppState.is_loading,
+            rx.center(
+                rx.vstack(
+                    rx.spinner(size="3", color="red"),
+                    rx.text("Sedang memproses data, mohon tunggu...", font_weight="bold", color="#1A202C", size="3"),
+                    background="white",
+                    padding="2rem",
+                    border_radius="12px",
+                    box_shadow="lg",
+                    align="center",
+                    spacing="3",
+                ),
+                position="fixed",
+                top="0",
+                left="0",
+                width="100vw",
+                height="100vh",
+                background="rgba(0, 0, 0, 0.5)",
+                z_index="9999",
+            ),
+        ),
+
         rx.match(
             AppState.logged_in,
             (
@@ -68,7 +93,7 @@ def index() -> rx.Component:
                             ("Database Ongkir In/Out", main_dashboard()),
                             ("Database Ongkir", main_dashboard()),
                             ("dashboard_ongkir", main_dashboard()),
-                            ("Stock Minus", stock_minus_view()),  # <-- 2. Routing Stock Minus ditambahkan di sini
+                            ("Stock Minus", stock_minus_view()), 
 
                             # Handle Error Akses Ditolak
                             (
