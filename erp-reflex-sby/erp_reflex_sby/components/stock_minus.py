@@ -80,7 +80,7 @@ def stock_minus_view() -> rx.Component:
                     rx.text("Data stock minus & validasi selesai dijalankan.", color="#718096", size="2", text_align="center"),
                     rx.button(
                         "Tutup",
-                        on_click=AppState.set_stock_minus_processed(True), # Atau state penutup modal jika ada
+                        on_click=AppState.set_stock_minus_processed(False),
                         background_color="#2D3748",
                         color="white",
                         size="2",
@@ -93,14 +93,12 @@ def stock_minus_view() -> rx.Component:
                     spacing="3",
                     padding="1.5rem",
                 ),
-                # Muncul otomatis ketika data sudah sukses diproses (bisa disesuaikan state-nya)
                 show=AppState.stock_minus_processed, 
             ),
         ),
 
-        # --- 3. UPLOAD SECTION (DIKERCILIN & COMPACT - TIDAK FULL SELAYAR) ---
+        # --- 3. UPLOAD SECTION (Compact, Tidak Full Layar) ---
         rx.hstack(
-            # Kotak Uploader Mini di Kiri
             rx.vstack(
                 rx.upload(
                     rx.hstack(
@@ -137,7 +135,7 @@ def stock_minus_view() -> rx.Component:
                 align_items="start", spacing="2",
             ),
 
-            # Tombol Run / Proses Ukuran Kecil & Proporsional di Sampingnya
+            # Tombol Run Ukuran Kecil & Proporsional
             rx.button(
                 rx.hstack(rx.icon("play", size=14), rx.text("PROSES"), spacing="1"),
                 on_click=AppState.handle_upload_stock_minus(rx.upload_files("upload_stock_file")),
@@ -159,7 +157,7 @@ def stock_minus_view() -> rx.Component:
             border="1px solid #E2E8F0",
             box_shadow="0 1px 3px rgba(0,0,0,0.02)",
             margin_bottom="1rem",
-            width="fit-content", # Biar ukurannya pas seukuran konten, gak melar full layar!
+            width="fit-content",
         ),
 
         # --- 4. DASHBOARD METRICS & TABS (Muncul Setelah Diproses) ---
