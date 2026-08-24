@@ -21,6 +21,15 @@ class AppState(rx.State):
     dropdown_reject: bool = False
     dropdown_extras: bool = False
 
+    # --- STOCK MINUS STATE ---
+    stock_minus_processed: bool = False
+    total_qty_minus: int = 0
+    total_tercover: int = 0
+    total_sisa_adj: int = 0
+    df_minus_awal_data: list[dict] = []
+    df_set_up_data: list[dict] = []
+    df_need_adj_data: list[dict] = []
+
     def toggle_sidebar(self):
         self.sidebar_open = not self.sidebar_open
 
@@ -46,14 +55,14 @@ class AppState(rx.State):
     def handle_login(self):
         if self.username == "admin" and self.password == "sby123":
             self.logged_in = True
-            self.role = "DC"  # Role admin
+            self.role = "DC" 
             self.branch = "SURABAYA"
             self.user_display_name = "Admin DC Surabaya"
             return rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000, position="top-right")
             
         elif self.username == "toko" and self.password == "toko123":
             self.logged_in = True
-            self.role = "CABANG"  # Role toko
+            self.role = "CABANG" 
             self.branch = "SURABAYA"
             self.user_display_name = "User Cabang"
             return rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000, position="top-right")
@@ -202,6 +211,102 @@ class AppState(rx.State):
         except Exception as e:
             yield rx.toast.error(f"Gagal Hapus: {e}")
 
+    # --- STOCK MINUS FILE HANDLER & LOGIC ---
+    async def handle_upload_stock_minus(self, files: list[rx.UploadFile]):
+        for file in files:
+            upload_data = await file.read()
+            try:
+                df = pd.read_excel(io.BytesIO(upload_data), engine="openpyxl")
+                df.columns = [str(c).strip().upper() for c in df.columns]
+                
+                col_sku = 'SKU'
+                col_bin = 'BIN'
+                col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
+                
+                if col_qty is None:
+                    return rx.window_alert("❌ Kolom 'QTY SYSTEM' tidak ditemukan!")
+                
+                # 1. Persiapan Data
+                df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
+                df[col_sku] = df[col_sku].astype(str).str.strip().str.upper()
+                df[col_bin] = df[col_bin].astype(str).str.strip().str.upper()
+
+                df_minus_awal = df[df[col_qty] < 0].copy()
+                df_positif = df[df[col_qty] > 0]
+                
+                inventory = {}
+                for _, row in df_positif.iterrows():
+                    sku, bn, qt = row[col_sku], row[col_bin], row[col_qty]
+                    if sku not in inventory: inventory[sku] = {}
+                    inventory[sku][bn] = inventory[sku].get(bn, 0) + qt
+
+                prior_bins = [
+                    "RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC",
+                    "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3",
+                    "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"
+                ]
+
+                set_up_results = []
+                df_need_adj_list = []
+
+                # 2. Proses Alokasi & Sisa
+                for _, row in df_minus_awal.iterrows():
+                    sku = row[col_sku]
+                    bin_asal = row[col_bin]
+                    sisa_minus = abs(row[col_qty])
+                    
+                    if sku in inventory and any(v > 0 for v in inventory[sku].values()):
+                        sku_stock = inventory[sku]
+                        while sisa_minus > 0:
+                            bin_solusi = ""
+                            if bin_asal == "TOKO":
+                                if sku_stock.get("STAGGING LT.2", 0) > 0: bin_solusi = "STAGGING LT.2"
+                                elif sku_stock.get("LT.2", 0) > 0: bin_solusi = "LT.2"
+                            elif bin_asal in ["STAGGING LT.2", "LT.2"] and sku_stock.get("TOKO", 0) > 0:
+                                bin_solusi = "TOKO"
+
+                            if not bin_solusi:
+                                for b in prior_bins:
+                                    if sku_stock.get(b, 0) > 0: bin_solusi = b; break
+                            
+                            if not bin_solusi:
+                                for b, q in sku_stock.items():
+                                    if b != "REJECT DEFECT" and q > 0: bin_solusi = b; break
+
+                            if not bin_solusi: break
+                            else:
+                                qty_tersedia = sku_stock[bin_solusi]
+                                ambil = min(sisa_minus, qty_tersedia)
+                                set_up_results.append({
+                                    "BIN AWAL": bin_solusi, "BIN TUJUAN": bin_asal,
+                                    "SKU": sku, "QUANTITY": ambil, "NOTES": "STOCK MINUS"
+                                })
+                                sku_stock[bin_solusi] -= ambil
+                                sisa_minus -= ambil
+
+                    if sisa_minus > 0:
+                        row_adj = row.to_dict()
+                        row_adj[col_qty] = -sisa_minus 
+                        df_need_adj_list.append(row_adj)
+
+                df_s = pd.DataFrame(set_up_results)
+                df_n = pd.DataFrame(df_need_adj_list)
+
+                # Hitung Metrik
+                self.total_qty_minus = int(abs(pd.to_numeric(df_minus_awal[col_qty], errors='coerce').sum()))
+                self.total_tercover = int(df_s["QUANTITY"].sum()) if not df_s.empty else 0
+                self.total_sisa_adj = int(abs(df_n[col_qty].sum())) if not df_n.empty and col_qty in df_n.columns else 0
+
+                # Simpan ke state data list dict
+                self.df_minus_awal_data = df_s.to_dict(orient="records") if not df_s.empty else [] # atau df_minus_awal
+                self.df_minus_awal_data = df_minus_awal.to_dict(orient="records")
+                self.df_set_up_data = df_s.to_dict(orient="records")
+                self.df_need_adj_data = df_n.to_dict(orient="records")
+                self.stock_minus_processed = True
+                
+            except Exception as e:
+                rx.window_alert(f"Gagal memproses file: {e}")
+
     # --- COMPUTED METRICS ---
     @rx.var
     def filtered_list(self) -> list[dict]:
@@ -260,6 +365,8 @@ class AppState(rx.State):
                 return "dashboard_ongkir"
             else:
                 return "access_denied"
+        elif self.main_menu == "Stock Minus":
+            return "stock_minus"
         else:
             return "under_development"
 
