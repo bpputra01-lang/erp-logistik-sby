@@ -5,14 +5,16 @@ def render_dynamic_table(data_list) -> rx.Component:
     """Helper untuk merender tabel dinamis berdasarkan list of dict dari Pandas."""
     return rx.box(
         rx.cond(
-            data_list.length() > 0,
+            data_list,  # True jika list memiliki isi, False jika kosong/[]
             rx.table.root(
                 rx.table.header(
                     rx.table.row(
-                        # Mengambil kunci dari item pertama sebagai header kolom
+                        # Menggunakan data_list[0] untuk mengambil header kolom pertama secara dinamis
                         rx.foreach(
-                            data_list[0].keys(),
-                            lambda col: rx.table.column_header_cell(col, color="#2D3748", font_weight="bold")
+                            data_list[0],
+                            lambda col_key: rx.table.column_header_cell(
+                                col_key, color="#2D3748", font_weight="bold"
+                            )
                         )
                     )
                 ),
@@ -21,8 +23,10 @@ def render_dynamic_table(data_list) -> rx.Component:
                         data_list,
                         lambda row: rx.table.row(
                             rx.foreach(
-                                row.values(),
-                                lambda val: rx.table.cell(val.to_string(), color="#4A5568")
+                                row,
+                                lambda item: rx.table.cell(
+                                    item[1].to_string(), color="#4A5568"
+                                )
                             )
                         )
                     )
@@ -31,13 +35,17 @@ def render_dynamic_table(data_list) -> rx.Component:
                 size="2",
                 width="100%",
             ),
-            rx.text("Tidak ada data untuk ditampilkan.", color="#718096", padding="1rem"),
+            rx.center(
+                rx.text("Tidak ada data untuk ditampilkan.", color="#718096", padding="2rem", font_style="italic"),
+                width="100%"
+            ),
         ),
         overflow_x="auto",
         width="100%",
         background="white",
         border_radius="8px",
         padding="0.5rem",
+        box_shadow="0 1px 3px rgba(0,0,0,0.05)",
     )
 
 def stock_minus_view() -> rx.Component:
@@ -102,6 +110,7 @@ def stock_minus_view() -> rx.Component:
             color_scheme="orange",
             margin_top="1rem",
             margin_bottom="1.5rem",
+            cursor="pointer",
         ),
 
         # Dashboard Metrics (Muncul setelah diproses)
@@ -149,6 +158,8 @@ def stock_minus_view() -> rx.Component:
                     ),
                     default_value="tab1", width="100%",
                 ),
+                width="100%",
+                spacing="0",
             ),
         ),
         width="100%",
