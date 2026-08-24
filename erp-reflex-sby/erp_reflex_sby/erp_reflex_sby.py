@@ -18,16 +18,22 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
-            # --- TITIK HIJAU DENGAN KELAS CSS BERKEDIP (BLINK) ---
+            # Tombol Informasi Format & Logic (Megaphone Icon)
+            rx.button(
+                rx.icon("megaphone", size=18),
+                "Panduan & Logic",
+                on_click=AppState.set_is_info_open(True),
+                size="2",
+                variant="soft",
+                color_scheme="orange",
+            ),
+            # Titik Hijau Berkedip
             rx.box(
-                width="10px", 
-                height="10px", 
-                background="#10B981", 
-                border_radius="50%",
-                class_name="blink-online"
+                width="10px", height="10px", background="#10B981", 
+                border_radius="50%", class_name="blink-online"
             ),
             rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
-            align="center", spacing="2",
+            align="center", spacing="3",
         ),
         padding="12px 20px",
         background="#D1FAE5",
