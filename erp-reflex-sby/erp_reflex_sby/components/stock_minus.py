@@ -50,67 +50,39 @@ def render_dynamic_table(data_list) -> rx.Component:
 
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
-        # --- MODAL POPUP INFORMASI & LOGIC THINKING ---
-        rx.dialog.root(
-            rx.dialog.content(
-                rx.dialog.title("📖 Panduan & Logic Stock Minus"),
-                rx.vstack(
-                    rx.heading("1. Informasi Format File", size="3", color="#E50914"),
-                    rx.text("• Download Multiple Adjustment dari Jezpro dan pastikan memilih opsi **Termasuk yang sudah habis**.", color="#4A5568", size="2"),
-                    
-                    rx.heading("2. Logic Thinking", size="3", color="#E50914", margin_top="1rem"),
-                    rx.text("• Mengambil SKU yang memiliki Qty System bernilai minus (-).", color="#4A5568", size="2"),
-                    rx.text("• Melakukan alokasi/covering stock dari bin prioritas (All Staging, Karantina, dll).", color="#4A5568", size="2"),
-                    rx.text("• Prioritas alokasi antara BIN Toko vs Gudang Lt.2 / Staging Lt.2.", color="#4A5568", size="2"),
-                    rx.text("• Sisa minus yang tidak ter-cover otomatis masuk ke tabel Item Need Justifikasi.", color="#4A5568", size="2"),
-                    spacing="2",
-                    align_items="start",
-                ),
-                rx.flex(
-                    rx.dialog.close(
-                        rx.button("Tutup", variant="soft", color_scheme="gray"),
-                    ),
-                    justify="end",
-                    margin_top="1.5rem",
-                ),
-            ),
-            open=AppState.is_info_open,
-            on_open_change=AppState.set_is_info_open,
-        ),
-
         # --- MODAL LOADING STATE SAAT PROSES DATA ---
         rx.dialog.root(
             rx.dialog.content(
                 rx.vstack(
                     rx.spinner(size="3", color="red"),
-                    rx.text("Sedang memproses data Excel, mohon tunggu...", font_weight="bold", color="#2D3748"),
+                    rx.text("Sedang memproses data Excel, mohon tunggu...", font_weight="bold", color="#2D3748", size="3"),
                     align="center",
-                    spacing="4",
-                    padding="2rem",
+                    spacing="3",
+                    padding="1.5rem",
                 ),
                 show=AppState.is_loading,
             ),
         ),
 
-        # --- UPLOAD SECTION (Mengganti rx.circle dengan rx.center + border_radius) ---
+        # --- UPLOAD SECTION (Dibuat Lebih Compact & Rapi) ---
         rx.vstack(
             rx.upload(
-                rx.vstack(
+                rx.hstack(
                     rx.center(
-                        rx.icon("upload", size=24, color="#E50914"),
-                        width="48px",
-                        height="48px",
+                        rx.icon("upload", size=20, color="#E50914"),
+                        width="36px",
+                        height="36px",
                         background="#FFF5F5",
                         border="1px solid #FED7D7",
                         border_radius="50%",
                     ),
                     rx.vstack(
-                        rx.text("Drag and drop file Excel di sini atau klik untuk browse", font_weight="bold", color="#2D3748", size="3"),
-                        rx.text("Format yang didukung: .xlsx, .xls", color="#A0AEC0", font_size="12px"),
-                        align="center", spacing="1",
+                        rx.text("Drag & drop file Excel di sini atau klik untuk browse", font_weight="bold", color="#2D3748", size="2"),
+                        rx.text("Format: .xlsx, .xls", color="#A0AEC0", font_size="11px"),
+                        align_items="start", spacing="0",
                     ),
                     align="center", spacing="3",
-                    padding="2.5rem",
+                    padding="1rem 1.25rem",
                 ),
                 id="upload_stock_file",
                 accept={
@@ -119,40 +91,59 @@ def stock_minus_view() -> rx.Component:
                 },
                 max_files=1,
                 border="2px dashed #CBD5E0",
-                border_radius="12px",
+                border_radius="10px",
                 width="100%",
                 background="#FFFFFF",
                 _hover={"background": "#F7FAFC", "border_color": "#E50914"},
                 cursor="pointer",
             ),
             
+            # Menampilkan nama file yang sedang dipilih
+            rx.foreach(
+                rx.selected_files("upload_stock_file"),
+                lambda file: rx.hstack(
+                    rx.icon("file-spreadsheet", size=16, color="#38A169"),
+                    rx.text(f"File terpilih: {file}", size="2", color="#2D3748", font_weight="bold"),
+                    spacing="2", align="center", background="#F0FFF4", padding="6px 12px", border_radius="6px", width="100%",
+                )
+            ),
+            
             rx.button(
-                rx.hstack(rx.icon("refresh-cw", size=18), rx.text("PROSES DATA SEKARANG"), spacing="2"),
+                rx.hstack(rx.icon("refresh-cw", size=16), rx.text("PROSES DATA SEKARANG"), spacing="2"),
                 on_click=AppState.handle_upload_stock_minus(rx.upload_files("upload_stock_file")),
                 background_color="#E50914",
                 color="white",
                 font_weight="bold",
                 border_radius="8px",
                 width="100%",
-                padding="0.75rem",
+                padding="0.5rem",
+                size="2",
                 _hover={"background_color": "#B20710"},
                 cursor="pointer",
                 box_shadow="0 2px 4px rgba(229, 9, 20, 0.2)",
             ),
             width="100%",
-            spacing="3",
+            spacing="2",
             background="white",
-            padding="1.5rem",
-            border_radius="12px",
+            padding="1rem",
+            border_radius="10px",
             border="1px solid #E2E8F0",
             box_shadow="0 1px 3px rgba(0,0,0,0.02)",
-            margin_bottom="1.5rem",
+            margin_bottom="1rem",
         ),
 
-        # --- DASHBOARD METRICS & TABS (Muncul Setelah Diproses) ---
+        # --- DASHBOARD METRICS & TABS (Muncul Setelah Diproses + Checklist Notif) ---
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
+                # Notifikasi Checklist Sukses Berjalan
+                rx.hstack(
+                    rx.icon("check-circle", size=18, color="#38A169"),
+                    rx.text("Data Stock Minus Berhasil Diproses!", font_weight="bold", color="#22543D", size="2"),
+                    background="#C6F6D5", border="1px solid #9AE6B4", padding="8px 16px", border_radius="8px",
+                    width="100%", align="center", spacing="2", margin_bottom="1rem",
+                ),
+
                 # Kotak Metrik 3 Kolom
                 rx.hstack(
                     rx.box(
