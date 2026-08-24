@@ -5,8 +5,7 @@ config = rx.Config(
     favicon="/favicon.png",
     plugins=[
         rx.plugins.RadixThemesPlugin(
-            appearance="dark", 
-            accent_color="red"
+            theme=rx.theme(appearance="dark", accent_color="red")
         ),
     ],
 )
