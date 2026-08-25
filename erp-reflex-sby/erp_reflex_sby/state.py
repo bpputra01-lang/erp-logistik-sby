@@ -339,7 +339,7 @@ class AppState(rx.State):
     area_putaway: str = ""
     putaway_processed: bool = False
 
-    # Variabel Internal Server untuk menampung data file sementara
+    # Variabel Internal Server untuk menampung data file
     _ds_file_data: bytes = b""
     _ds_file_name: str = ""
     _asal_file_data: bytes = b""
@@ -361,7 +361,6 @@ class AppState(rx.State):
     df_out_headers: list[str] = []
     df_out_rows: list[list[str]] = []
     
-    # Variabel internal untuk keperluan Download Excel
     _raw_df_comp: pd.DataFrame = pd.DataFrame()
     _raw_df_plist: pd.DataFrame = pd.DataFrame()
     _raw_df_kurang: pd.DataFrame = pd.DataFrame()
@@ -371,58 +370,51 @@ class AppState(rx.State):
     def set_area_putaway(self, val: str):
         self.area_putaway = val
 
-    # 🔥 FUNGSI BARU: Mereset buffer/memori sebelum proses berjalan
-    def reset_buffers(self):
+    # 🔥 Menginisiasi loading dan mereset memori setiap kali tombol diklik
+    def start_loading(self):
+        self.is_loading = True
         self._ds_file_data = b""
         self._asal_file_data = b""
-        self._ds_file_name = ""
-        self._asal_file_name = ""
 
-    # 🔥 FUNGSI BARU: Tangkap File DS Putaway
+    # 🔥 Tangkap DS Putaway -> Kalau Asal Bin juga sudah siap, langsung jalankan!
     async def handle_upload_ds(self, files: list[rx.UploadFile]):
         if files:
             self._ds_file_data = await files[0].read()
             self._ds_file_name = files[0].filename
+            
+            # Cek apakah file pasangan-nya sudah di memori? Jika Ya, RUN!
+            if self._ds_file_data and self._asal_file_data:
+                return self.run_compare_logic()
 
-    # 🔥 FUNGSI BARU: Tangkap File Asal Bin
+    # 🔥 Tangkap Asal Bin -> Kalau DS Putaway juga sudah siap, langsung jalankan!
     async def handle_upload_asal(self, files: list[rx.UploadFile]):
         if files:
             self._asal_file_data = await files[0].read()
             self._asal_file_name = files[0].filename
-
-    # 🔥 PERBAIKAN: Fungsi Utama, menggunakan wait-loop agar tidak error saat klik pertama
-    async def handle_process_putaway(self):
-        if not self.area_putaway:
-            yield rx.toast.warning("Silakan pilih Area Putaway terlebih dahulu!", position="top-center")
-            return
-        
-        self.is_loading = True
-        yield
-
-        # WAIT-LOOP: Sistem sabar menunggu maksimal 2 detik hingga file ter-upload
-        for _ in range(20): 
+            
+            # Cek apakah file pasangan-nya sudah di memori? Jika Ya, RUN!
             if self._ds_file_data and self._asal_file_data:
-                break
-            await asyncio.sleep(0.1)
+                return self.run_compare_logic()
 
-        # Validasi akhir: Jika tetap kosong setelah ditunggu, munculkan peringatan
-        if not self._ds_file_data or not self._asal_file_data:
-            self.is_loading = False
-            yield rx.toast.warning("Harap upload KEDUA file (DS Putaway & Asal Bin)!", position="top-center")
-            return
-
+    # 🔥 Fungsi Utama Pandas (Sekarang dijalankan otomatis saat dua file landing)
+    async def run_compare_logic(self):
         try:
-            # 1. Baca Data dari Memori Server
+            # 1. Baca Data
             ds_data = self._ds_file_data
             df_ds = pd.read_csv(io.BytesIO(ds_data)) if self._ds_file_name.endswith('.csv') else pd.read_excel(io.BytesIO(ds_data), engine="openpyxl")
             
             asal_data = self._asal_file_data
             df_asal = pd.read_csv(io.BytesIO(asal_data)) if self._asal_file_name.endswith('.csv') else pd.read_excel(io.BytesIO(asal_data), engine="openpyxl")
 
+            # Kosongkan kembali RAM server
+            self._ds_file_data = b""
+            self._asal_file_data = b""
+            self._ds_file_name = ""
+            self._asal_file_name = ""
+
             df_asal_updated = df_asal.copy()
             self.putaway_qty_system = int(pd.to_numeric(df_asal_updated.iloc[:, 9], errors='coerce').sum())
 
-            # Helper Kolom Dinamis
             def get_col_idx(df, keywords, default_idx):
                 for i, col in enumerate(df.columns):
                     if any(k.lower() in str(col).lower() for k in keywords): return i
@@ -436,7 +428,6 @@ class AppState(rx.State):
             c_sku_d = get_col_idx(df_ds, ['sku', 'item'], 1)
             c_qty_d = get_col_idx(df_ds, ['qty', 'jumlah'], 2)
 
-            # Dictionary Mapping
             bin_qty_dict = {}
             for _, row in df_asal_updated.iterrows():
                 try:
@@ -445,7 +436,6 @@ class AppState(rx.State):
                     bin_qty_dict[key] = qty if pd.notna(qty) else 0
                 except: continue
 
-            # Main Logic (Covering Stock)
             out_data = []
             for _, row in df_ds.iterrows():
                 try:
@@ -482,7 +472,6 @@ class AppState(rx.State):
                         out_data.append([bin_tujuan, sku, int(diff_qty), "(NO BIN)", 0, rem, "PERLU CARI STOCK MANUAL"])
                 except: continue
 
-            # Extract DataFrames
             df_comp = pd.DataFrame(out_data, columns=["BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QUANTITY", "DIFF", "STATUS"])
             
             for idx in df_asal_updated.index:
@@ -501,7 +490,6 @@ class AppState(rx.State):
 
             df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
             
-            # Logic Filter Keyword
             if self.area_putaway == "DC LANTAI 1": kw_out = ["GL1-DC-PUTAWAY", "STAG"]
             elif self.area_putaway == "DC LANTAI 2": kw_out = ["GL2-DC-PUTAWAY", "STAG"]
             elif self.area_putaway == "DC LANTAI 3": kw_out = ["GL3-DC-PUTAWAY", "STAG"]
@@ -516,7 +504,6 @@ class AppState(rx.State):
             mask_out = (pd.to_numeric(df_asal_updated.iloc[:, c_qty_a], errors='coerce') > 0) & mask_kw
             df_outstanding = df_asal_updated[mask_out].copy()
 
-            # Assign Metrics
             self.putaway_total_setup = int(df_plist['QUANTITY'].sum()) if not df_plist.empty else 0
             self.putaway_kurang_setup = int(df_kurang['DIFF'].sum()) if not df_kurang.empty else 0
             
@@ -525,7 +512,6 @@ class AppState(rx.State):
                 qty_col = [c for c in df_outstanding.columns if 'qty' in str(c).lower()]
                 if qty_col: self.putaway_sisa_stok = int(pd.to_numeric(df_outstanding[qty_col[0]], errors='coerce').sum())
 
-            # Convert to State Headers & Rows
             def to_state(df):
                 if df.empty: return [], []
                 clean = df.fillna("").astype(str)
@@ -536,7 +522,6 @@ class AppState(rx.State):
             self.df_kurang_headers, self.df_kurang_rows = to_state(df_kurang)
             self.df_out_headers, self.df_out_rows = to_state(df_outstanding)
             
-            # Save Raw for Export
             self._raw_df_comp = df_comp
             self._raw_df_plist = df_plist
             self._raw_df_kurang = df_kurang
@@ -545,6 +530,7 @@ class AppState(rx.State):
             
             self.putaway_processed = True
             
+            # Matikan loading, tampilkan success!
             self.is_loading = False
             self.show_success_modal = True
             yield
@@ -555,8 +541,10 @@ class AppState(rx.State):
             
         except Exception as e:
             self.is_loading = False
+            self._ds_file_data = b""
+            self._asal_file_data = b""
             yield rx.toast.error(f"Gagal memproses file: {e}", position="top-center")
-            
+                        
     async def download_putaway_report(self):
         if not self.putaway_processed:
             return rx.toast.warning("Belum ada data untuk didownload!", position="top-center")
