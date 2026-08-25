@@ -48,46 +48,9 @@ def putaway_view() -> rx.Component:
                         spacing="4", width="100%"
                     ),
                     
-                    # --- SELECTION & UPLOAD SECTION ---
-        rx.vstack(
-            rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
-            rx.select(
-                ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
-                placeholder="-- Pilih Area Putaway --",
-                value=AppState.area_putaway,
-                on_change=AppState.set_area_putaway,
-                size="3", width="100%", margin_bottom="1rem"
-            ),
-            
-            # Form Upload HANYA muncul jika area sudah dipilih
-            rx.cond(
-                AppState.area_putaway != "",
-                rx.vstack(
-                    rx.hstack(
-                        rx.icon("map-pin", color="#3182ce", size=18),
-                        rx.text("Area Terpilih: ", font_weight="normal", color="#2c5282", size="2"),
-                        rx.text(AppState.area_putaway, font_weight="bold", color="#2c5282", size="2"),
-                        background="#ebf8ff", border_left="4px solid #3182ce", padding="10px 16px", border_radius="6px", width="100%", align="center", spacing="2", margin_bottom="1rem"
-                    ),
-                    
-                    rx.hstack(
-                        # Upload 1: DS Putaway
-                        rx.upload(
-                            rx.vstack(rx.icon("upload", size=24, color="#C5A059"), rx.text("Upload DS PUTAWAY", font_weight="bold", color="#4A5568", size="2"), align="center"),
-                            id="ds_putaway_file", max_files=1, border="2px dashed black", border_radius="8px", background="#F8FAFC", padding="1.5rem", width="100%", cursor="pointer",
-                        ),
-                        # Upload 2: ASAL Putaway
-                        rx.upload(
-                            rx.vstack(rx.icon("upload", size=24, color="#C5A059"), rx.text("Upload ASAL BIN", font_weight="bold", color="#4A5568", size="2"), align="center"),
-                            id="asal_putaway_file", max_files=1, border="2px dashed black", border_radius="8px", background="#F8FAFC", padding="1.5rem", width="100%", cursor="pointer",
-                        ),
-                        spacing="4", width="100%"
-                    ),
-                    
-                    # Indikator File Terpilih & Tombol Proses (PERBAIKAN UTAMA DI SINI)
+                    # Indikator File Terpilih & Tombol Proses
                     rx.hstack(
                         rx.hstack(
-                            # Indikator File 1 (Gunakan rx.foreach alih-alih [0])
                             rx.cond(
                                 rx.selected_files("ds_putaway_file"), 
                                 rx.hstack(
@@ -100,7 +63,6 @@ def putaway_view() -> rx.Component:
                                 ), 
                                 rx.fragment()
                             ),
-                            # Indikator File 2 (Gunakan rx.foreach alih-alih [0])
                             rx.cond(
                                 rx.selected_files("asal_putaway_file"), 
                                 rx.hstack(
@@ -115,9 +77,9 @@ def putaway_view() -> rx.Component:
                             ),
                             spacing="2"
                         ),
-                        # Tombol Compare (Memanggil 1 list ID upload)
                         rx.button(
                             rx.hstack(rx.icon("play", size=16), rx.text("COMPARE PUTAWAY"), spacing="2"), 
+                            # PERBAIKAN DI SINI: Masukkan kedua ID upload ke dalam 1 list/tuple
                             on_click=AppState.handle_process_putaway(
                                 rx.upload_files(["ds_putaway_file", "asal_putaway_file"])
                             ), 
@@ -132,6 +94,7 @@ def putaway_view() -> rx.Component:
             ),
             width="100%", background="white", padding="1.25rem", border_radius="10px", border="1px solid #E2E8F0", margin_bottom="1.25rem", align_items="start",
         ),
+
         # --- DASHBOARD METRICS & TABS ---
         rx.cond(
             AppState.putaway_processed,
