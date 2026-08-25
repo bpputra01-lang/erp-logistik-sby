@@ -1,8 +1,8 @@
 import reflex as rx
 from ..state import AppState
 
-def render_dynamic_table(data_list) -> rx.Component:
-    """Helper untuk merender tabel dinamis data dictionary dengan warna teks yang jelas."""
+def render_clean_table(data_list) -> rx.Component:
+    """Helper tabel bersih khusus struktur list of dictionary / Pandas records."""
     return rx.box(
         rx.cond(
             data_list,
@@ -10,9 +10,9 @@ def render_dynamic_table(data_list) -> rx.Component:
                 rx.table.header(
                     rx.table.row(
                         rx.foreach(
-                            data_list,
+                            data_list[0],  # Ambil keys dari dictionary baris pertama untuk header
                             lambda col_key: rx.table.column_header_cell(
-                                col_key, color="#1A202C", font_weight="bold", background="#F7FAFC"
+                                col_key[0], color="#1A202C", font_weight="bold", background="#EDF2F7"
                             )
                         )
                     )
@@ -24,7 +24,7 @@ def render_dynamic_table(data_list) -> rx.Component:
                             rx.foreach(
                                 row,
                                 lambda item: rx.table.cell(
-                                    item[1].to_string(), color="#1A202C", font_size="13px"
+                                    item[1].to_string(), color="#2D3748", font_size="13px"
                                 )
                             )
                         )
@@ -64,7 +64,7 @@ def stock_minus_view() -> rx.Component:
             ),
         ),
 
-        # --- 2. UPLOAD SECTION (Kotak Panjang, Border Hitam Dashed, Tombol Gold) ---
+        # --- 2. UPLOAD SECTION ---
         rx.vstack(
             rx.text("Upload File STOCK MINUS", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
             
@@ -94,7 +94,7 @@ def stock_minus_view() -> rx.Component:
                     "application/vnd.ms-excel": [".xls"],
                 },
                 max_files=1,
-                border="2px dashed #000000", # Garis border box warna HITAM
+                border="2px dashed #000000",
                 border_radius="8px",
                 background="#F8FAFC",
                 padding="1rem 1.25rem",
@@ -148,18 +148,20 @@ def stock_minus_view() -> rx.Component:
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
-                # Banner Sukses Bersih di Atas Metrik (Tanpa Floating Modal Mengganggu)
+                # Banner Sukses Tengah yang Jelas
                 rx.hstack(
-                    rx.icon("check-circle", size=18, color="#38A169"),
-                    rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#22543D", size="2"),
+                    rx.icon("check-circle", size=20, color="#22543D"),
+                    rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#22543D", size="3"),
                     background="#C6F6D5", 
                     border="1px solid #9AE6B4", 
-                    padding="10px 16px", 
-                    border_radius="6px",
+                    padding="12px 18px", 
+                    border_radius="8px",
                     width="100%", 
                     align="center", 
+                    justify="center",
                     spacing="2", 
-                    margin_bottom="1rem",
+                    margin_bottom="1.25rem",
+                    box_shadow="0 2px 4px rgba(0,0,0,0.05)",
                 ),
 
                 # Kotak Metrik 3 Kolom
@@ -182,24 +184,36 @@ def stock_minus_view() -> rx.Component:
                     width="100%", spacing="3", margin_bottom="1.25rem",
                 ),
 
-                # Tabs Lengkap Termasuk Panduan & Logic yang Dikembalikan
+                # Tabs dengan Warna Teks Judul Hitam Jelas & Kontras
                 rx.tabs.root(
                     rx.tabs.list(
-                        rx.tabs.trigger("📄 MINUS AWAL", value="tab1"),
-                        rx.tabs.trigger("🔄 TEMPLATE SET UP", value="tab2"),
-                        rx.tabs.trigger("⚠️ JUSTIFIKASI", value="tab3"),
-                        rx.tabs.trigger("📖 PANDUAN & LOGIC", value="tab4"),
+                        rx.tabs.trigger(
+                            rx.hstack(rx.icon("file-text", size=14), rx.text("MINUS AWAL", font_weight="bold")),
+                            value="tab1", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
+                        ),
+                        rx.tabs.trigger(
+                            rx.hstack(rx.icon("refresh-cw", size=14), rx.text("TEMPLATE SET UP", font_weight="bold")),
+                            value="tab2", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
+                        ),
+                        rx.tabs.trigger(
+                            rx.hstack(rx.icon("alert-triangle", size=14), rx.text("JUSTIFIKASI", font_weight="bold")),
+                            value="tab3", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
+                        ),
+                        rx.tabs.trigger(
+                            rx.hstack(rx.icon("book-open", size=14), rx.text("PANDUAN & LOGIC", font_weight="bold")),
+                            value="tab4", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
+                        ),
                     ),
                     rx.tabs.content(
-                        render_dynamic_table(AppState.df_minus_awal_data),
+                        render_clean_table(AppState.df_minus_awal_data),
                         value="tab1", padding="0.75rem 0",
                     ),
                     rx.tabs.content(
-                        render_dynamic_table(AppState.df_set_up_data),
+                        render_clean_table(AppState.df_set_up_data),
                         value="tab2", padding="0.75rem 0",
                     ),
                     rx.tabs.content(
-                        render_dynamic_table(AppState.df_need_adj_data),
+                        render_clean_table(AppState.df_need_adj_data),
                         value="tab3", padding="0.75rem 0",
                     ),
                     rx.tabs.content(
@@ -208,7 +222,7 @@ def stock_minus_view() -> rx.Component:
                                 rx.text("Panduan & Logic Stock Minus System", font_weight="bold", color="#1A202C", size="4"),
                                 rx.text("1. Sistem membaca file excel stock minus dan melakukan pencocokan data Qty System vs Qty SO.", color="#4A5568", size="2"),
                                 rx.text("2. Tab 'Template Set Up' menghasilkan format otomatis untuk penyesuaian database gudang.", color="#4A5568", size="2"),
-                                rx.text("3. Tab 'Justifikasi' menampilkan selisih item yang membutuhkanApproval / Adjust manual dari PIC.", color="#4A5568", size="2"),
+                                rx.text("3. Tab 'Justifikasi' menampilkan selisih item yang membutuhkan Approval / Adjust manual dari PIC.", color="#4A5568", size="2"),
                                 align_items="start", spacing="3", padding="1rem",
                             ),
                             background="white", border_radius="8px", border="1px solid #E2E8F0", padding="1rem", width="100%",
