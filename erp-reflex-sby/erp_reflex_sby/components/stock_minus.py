@@ -2,17 +2,12 @@ import reflex as rx
 from ..state import AppState
 
 def render_clean_table(headers: list, data_rows: list) -> rx.Component:
-    """Helper tabel aman memisahkan Header dan Baris agar teks tidak menyatu (mashed)."""
     return rx.box(
         rx.cond(
             data_rows.length() > 0,
             rx.table.root(
-                rx.table.header(
-                    rx.table.row(rx.foreach(headers, lambda col_name: rx.table.column_header_cell(rx.text(col_name, weight="bold", font_size="12px"), color="#1A202C", background="#EDF2F7", padding="10px", white_space="nowrap")))
-                ),
-                rx.table.body(
-                    rx.foreach(data_rows, lambda row: rx.table.row(rx.foreach(row, lambda cell_value: rx.table.cell(rx.text(cell_value, color="#2D3748", font_size="13px"), padding="8px 10px", white_space="nowrap"))))
-                ),
+                rx.table.header(rx.table.row(rx.foreach(headers, lambda col_name: rx.table.column_header_cell(rx.text(col_name, weight="bold", font_size="12px"), color="#1A202C", background="#EDF2F7", padding="10px", white_space="nowrap")))),
+                rx.table.body(rx.foreach(data_rows, lambda row: rx.table.row(rx.foreach(row, lambda cell_value: rx.table.cell(rx.text(cell_value, color="#2D3748", font_size="13px"), padding="8px 10px", white_space="nowrap"))))),
                 variant="surface", size="2", width="100%",
             ),
             rx.center(rx.text("Tidak ada data untuk ditampilkan.", color="#718096", padding="1.5rem", font_style="italic", size="2"), width="100%"),
@@ -20,44 +15,34 @@ def render_clean_table(headers: list, data_rows: list) -> rx.Component:
         overflow_x="auto", width="100%", background="white", border_radius="8px", padding="0.5rem", box_shadow="0 1px 3px rgba(0,0,0,0.05)", border="1px solid #E2E8F0",
     )
 
-# --- KOMPONEN POP UP SUCCESS SESUAI GAMBAR ---
+# [PERBAIKAN 1]: Pop up Transparan (Hanya Checklist dan Success)
 def success_modal() -> rx.Component:
-    return rx.dialog.root(
-        rx.dialog.content(
+    return rx.cond(
+        AppState.show_success_modal,
+        rx.center(
             rx.vstack(
-                rx.flex(rx.dialog.close(rx.icon("x", size=20, color="#A0AEC0", cursor="pointer", _hover={"color": "#4A5568"})), width="100%", justify="end"),
-                rx.center(
-                    rx.box(
-                        rx.icon("check", size=50, color="white", stroke_width=4),
-                        background="linear-gradient(135deg, #4ade80 0%, #16a34a 100%)",
-                        border_radius="50%", padding="15px", box_shadow="0 10px 20px rgba(74, 222, 128, 0.3)", margin_bottom="10px"
-                    ),
-                    width="100%"
+                rx.box(
+                    rx.icon("check", size=65, color="white", stroke_width=4),
+                    background="linear-gradient(135deg, #4ade80 0%, #16a34a 100%)",
+                    border_radius="50%", padding="20px", box_shadow="0 10px 25px rgba(74, 222, 128, 0.4)", margin_bottom="5px"
                 ),
-                rx.heading("Success!", size="7", color="#1A202C", weight="bold"),
-                rx.text("Your action was completed successfully.", color="#718096", text_align="center", size="3", margin_bottom="15px"),
-                rx.dialog.close(
-                    rx.button("Done", width="100%", size="3", background_color="#3b82f6", color="white", border_radius="10px", font_weight="bold", padding="20px", _hover={"background_color": "#2563eb"}, cursor="pointer")
-                ),
-                align_items="center", spacing="3", width="100%",
+                rx.heading("Success!", size="8", color="#1A202C", weight="bold"),
+                align_items="center", spacing="3", background="transparent"
             ),
-            max_width="350px", background_color="white", border_radius="20px", padding="24px", box_shadow="0 10px 30px rgba(0,0,0,0.15)",
-        ),
-        open=AppState.show_success_modal,
-        on_open_change=AppState.set_show_success_modal,
+            position="fixed", top="0", left="0", width="100vw", height="100vh", z_index="9999",
+            background="rgba(255, 255, 255, 0.7)", backdrop_filter="blur(5px)", # Efek background blur agar ikon menonjol
+        )
     )
 
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
-        success_modal(), # <-- Memanggil Pop up Modal
+        success_modal(), 
         
-        # --- 1. HEADER MODUL ---
         rx.hstack(
             rx.text("Modul Stock Minus & Validation", font_weight="bold", color="#1A202C", size="5"),
             justify="between", align="center", width="100%", margin_bottom="1rem",
         ),
 
-        # --- 2. UPLOAD SECTION ---
         rx.vstack(
             rx.text("Upload File STOCK MINUS", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
             rx.upload(
@@ -66,7 +51,9 @@ def stock_minus_view() -> rx.Component:
                     rx.text("200MB per file • XLSX, XLS", color="#4A5568", size="2", font_weight="medium"),
                     align="center", spacing="4", width="100%", padding="0.5rem 0",
                 ),
-                id="upload_stock_file", max_files=1, border="2px dashed #CBD5E0", border_radius="8px", background="#F8FAFC", padding="1rem 1.25rem", width="100%", cursor="pointer",
+                id="upload_stock_file", max_files=1, 
+                border="2px dashed black", # [PERBAIKAN 2]: Border uploader menjadi hitam
+                border_radius="8px", background="#F8FAFC", padding="1rem 1.25rem", width="100%", cursor="pointer",
             ),
             rx.hstack(
                 rx.cond(rx.selected_files("upload_stock_file"), rx.hstack(rx.icon("file-spreadsheet", size=16, color="#38A169"), rx.text(rx.selected_files("upload_stock_file")[0], size="2", color="#22543D", font_weight="bold", truncate=True), spacing="2", align="center", background="#F0FFF4", border="1px solid #C6F6D5", padding="6px 12px", border_radius="6px"), rx.fragment()),
@@ -76,7 +63,6 @@ def stock_minus_view() -> rx.Component:
             width="100%", background="white", padding="1.25rem", border_radius="10px", border="1px solid #E2E8F0", margin_bottom="1.25rem", align_items="start",
         ),
 
-        # --- 3. DASHBOARD METRICS & TABS ---
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
