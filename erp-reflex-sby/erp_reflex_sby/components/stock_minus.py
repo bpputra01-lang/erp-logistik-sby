@@ -2,7 +2,7 @@ import reflex as rx
 from ..state import AppState
 
 def render_clean_table(data_list) -> rx.Component:
-    """Helper tabel aman untuk mencegah crash render React DOM."""
+    """Helper tabel aman untuk merender list/dict Pandas tanpa teks JSON mentah."""
     return rx.box(
         rx.cond(
             data_list.length() > 0,
@@ -12,9 +12,10 @@ def render_clean_table(data_list) -> rx.Component:
                         rx.foreach(
                             data_list[0],
                             lambda col_key: rx.table.column_header_cell(
-                                rx.text(col_key, weight="bold"), 
+                                rx.text(col_key, weight="bold", font_size="12px"), 
                                 color="#1A202C", 
-                                background="#EDF2F7"
+                                background="#EDF2F7",
+                                padding="10px"
                             )
                         )
                     )
@@ -26,7 +27,8 @@ def render_clean_table(data_list) -> rx.Component:
                             rx.foreach(
                                 row,
                                 lambda item: rx.table.cell(
-                                    rx.text(item.to_string(), color="#2D3748", font_size="13px")
+                                    rx.text(item, color="#2D3748", font_size="13px"),
+                                    padding="8px 10px"
                                 )
                             )
                         )
@@ -52,66 +54,16 @@ def render_clean_table(data_list) -> rx.Component:
 
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
-        # --- 1. MODAL LOADING STATE SAAT PROSES DATA ---
-        rx.dialog.root(
-            rx.dialog.content(
-                rx.vstack(
-                    rx.spinner(size="3", color="red"),
-                    rx.text("Sedang memproses data Excel, mohon tunggu...", font_weight="bold", color="#2D3748", size="2"),
-                    align="center",
-                    spacing="2",
-                    padding="1.25rem",
-                ),
-                show=AppState.is_loading,
-            ),
-        ),
-
-        # --- 2. HEADER & TOMBOL PANDUAN & LOGIC KHUSUS (Digabung dalam satu root) ---
+        # --- 1. HEADER MODUL (Tanpa tombol dobel, karena sudah ada di Global Header atas) ---
         rx.hstack(
             rx.text("Modul Stock Minus & Validation", font_weight="bold", color="#1A202C", size="5"),
-            
-            # Perbaikan: rx.dialog.root membungkus trigger dan content sekaligus
-            rx.dialog.root(
-                rx.dialog.trigger(
-                    rx.button(
-                        rx.hstack(rx.icon("megaphone", size=16, color="#DD6B20"), rx.text("Panduan & Logic", font_weight="bold", color="#DD6B20"), spacing="2"),
-                        background_color="#FEEBC8",
-                        border="1px solid #FBD38D",
-                        border_radius="6px",
-                        padding="0.5rem 1rem",
-                        cursor="pointer",
-                        _hover={"background_color": "#FDE68A"},
-                    ),
-                ),
-                rx.dialog.content(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.icon("book-open", size=20, color="#C5A059"),
-                            rx.text("Panduan & Logic Stock Minus System", font_weight="bold", color="#1A202C", size="4"),
-                            justify="between", width="100%", align="center"
-                        ),
-                        rx.divider(margin_y="0.5rem"),
-                        rx.text("1. Sistem membaca file excel stock minus dan melakukan pencocokan data Qty System vs Qty SO.", color="#4A5568", size="2"),
-                        rx.text("2. Tab 'Template Set Up' menghasilkan format otomatis untuk penyesuaian database gudang.", color="#4A5568", size="2"),
-                        rx.text("3. Tab 'Justifikasi' menampilkan selisih item yang membutuhkan Approval / Adjust manual dari PIC.", color="#4A5568", size="2"),
-                        rx.flex(
-                            rx.dialog.close(
-                                rx.button("Tutup", background_color="#2D3748", color="white", size="2", font_weight="bold", cursor="pointer")
-                            ),
-                            justify="end", width="100%", margin_top="1rem"
-                        ),
-                        spacing="3", align_items="start", width="100%",
-                    ),
-                ),
-            ),
-            
             justify="between",
             align="center",
             width="100%",
             margin_bottom="1rem",
         ),
 
-        # --- 3. UPLOAD SECTION ---
+        # --- 2. UPLOAD SECTION ---
         rx.vstack(
             rx.text("Upload File STOCK MINUS", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
             
@@ -141,7 +93,7 @@ def stock_minus_view() -> rx.Component:
                     "application/vnd.ms-excel": [".xls"],
                 },
                 max_files=1,
-                border="2px dashed #000000",
+                border="2px dashed #CBD5E0",
                 border_radius="8px",
                 background="#F8FAFC",
                 padding="1rem 1.25rem",
@@ -191,7 +143,7 @@ def stock_minus_view() -> rx.Component:
             align_items="start",
         ),
 
-        # --- 4. DASHBOARD METRICS & TABS ---
+        # --- 3. DASHBOARD METRICS & TABS ---
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
@@ -231,7 +183,7 @@ def stock_minus_view() -> rx.Component:
                     width="100%", spacing="3", margin_bottom="1.25rem",
                 ),
 
-                # Tabs Bersih
+                # Tabs Data Bersih
                 rx.tabs.root(
                     rx.tabs.list(
                         rx.tabs.trigger(
