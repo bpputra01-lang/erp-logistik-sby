@@ -63,32 +63,72 @@ def index() -> rx.Component:
             ),
         ),
 
-        # --- GLOBAL DIALOG PANDUAN & LOGIC (PERBAIKAN BACKGROUND) ---
+        # --- GLOBAL DIALOG PANDUAN & LOGIC (Gaya st.expander) ---
         rx.dialog.root(
             rx.dialog.content(
                 rx.vstack(
                     rx.hstack(
                         rx.icon("book-open", size=20, color="#C5A059"),
-                        rx.text("Panduan & Logic ERP Logistik Surabaya", font_weight="bold", color="#1A202C", size="4"),
+                        rx.text("Panduan & Logic ERP Logistik", font_weight="bold", color="#1A202C", size="4"),
                         justify="between", width="100%", align="center"
                     ),
                     rx.divider(margin_y="0.5rem"),
-                    rx.text("1. Modul Stock Minus: Digunakan untuk mencocokkan Qty System vs Qty Stock Opname (SO) aktual gudang.", color="#4A5568", size="2"),
-                    rx.text("2. Template Set Up: Menghasilkan format baris otomatis untuk proses penyesuaian database.", color="#4A5568", size="2"),
-                    rx.text("3. Justifikasi: Menyaring item selisih yang memerlukan approval atau investigasi lanjut oleh PIC.", color="#4A5568", size="2"),
+                    
+                    # Expander (Accordion) mirip st.expander
+                    rx.accordion.root(
+                        # Expander 1: Informasi Format File
+                        rx.accordion.item(
+                            header=rx.text("📋 Informasi Format File", font_weight="bold", color="#1A202C"),
+                            content=rx.box(
+                                rx.text("Format yang diharapkan:", font_weight="bold", margin_bottom="6px", size="2", color="#2c5282"),
+                                rx.unordered_list(
+                                    rx.list_item(rx.text("Download Multiple Adjusmet dari Jezpro dan pilih ", rx.text.strong("Termasuk yang sudah habis"))),
+                                    padding_left="20px", size="2", color="#2c5282"
+                                ),
+                                background="#ebf8ff", border_left="4px solid #3182ce", padding="16px", border_radius="6px"
+                            ),
+                            value="item-1",
+                            border_bottom="1px solid #E2E8F0"
+                        ),
+                        
+                        # Expander 2: Logic Thinking
+                        rx.accordion.item(
+                            header=rx.text("💡 Logic Thinking", font_weight="bold", color="#1A202C"),
+                            content=rx.box(
+                                rx.text("Alur Process Compare Stock Minus:", font_weight="bold", margin_bottom="6px", size="2", color="#2c5282"),
+                                rx.unordered_list(
+                                    rx.list_item("Mengambil SKU yang memiliki Qty System minus (-)"),
+                                    rx.list_item("Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock"),
+                                    rx.list_item("Dimana terdapat Bin prioritas untuk shuffle Covering Stock (All Stagging, Karantina)"),
+                                    rx.list_item("Dan jika minus terjadi di Gudang lt.2 maka akan prioritas mengambil BIN Toko begitupun sebaliknya"),
+                                    rx.list_item("Lalu jika tidak ditemukan di BIN Prioritas maka akan mengambil random BIN kecuali LIVE, Offline dan Online"),
+                                    rx.list_item("Jika sudah ditemukan SKU dan Qty yang bisa covering maka akan dibuatkan list Set up"),
+                                    rx.list_item("Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut"),
+                                    padding_left="20px", size="2", color="#2c5282", spacing="2"
+                                ),
+                                background="#ebf8ff", border_left="4px solid #3182ce", padding="16px", border_radius="6px"
+                            ),
+                            value="item-2",
+                            border_bottom="1px solid #E2E8F0"
+                        ),
+                        type="multiple",
+                        collapsible=True,
+                        width="100%",
+                    ),
+
                     rx.flex(
                         rx.dialog.close(
-                            rx.button("Tutup", background_color="#2D3748", color="white", size="2", font_weight="bold", cursor="pointer", on_click=AppState.set_is_info_open(False))
+                            rx.button("Tutup", background_color="#2D3748", color="white", size="2", font_weight="bold", cursor="pointer", _hover={"background_color": "#1A202C"}, on_click=AppState.set_is_info_open(False))
                         ),
                         justify="end", width="100%", margin_top="1rem"
                     ),
                     spacing="3", align_items="start", width="100%",
                 ),
-                # PERBAIKAN: Memastikan background putih terang dan rapi
                 background_color="white",
                 padding="24px",
                 border_radius="12px",
                 box_shadow="0 10px 25px rgba(0,0,0,0.2)",
+                max_width="650px", # Diperlebar agar teks muat bagus
             ),
             open=AppState.is_info_open,
             on_open_change=AppState.set_is_info_open,

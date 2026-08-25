@@ -24,12 +24,16 @@ class AppState(rx.State):
     # --- STOCK MINUS STATE ---
     stock_minus_processed: bool = False
     is_info_open: bool = False  
-    is_loading: bool = False    
+    is_loading: bool = False
+    
+    # [PERBAIKAN] State untuk mengontrol munculnya pop up modal sukses yang besar
+    show_success_modal: bool = False    
+    
     total_qty_minus: int = 0
     total_tercover: int = 0
     total_sisa_adj: int = 0
     
-    # PERBAIKAN 1: Memisahkan Header dan Rows untuk tabel Reflex
+    # Memisahkan Header dan Rows untuk tabel Reflex
     df_minus_awal_headers: list[str] = []
     df_minus_awal_rows: list[list[str]] = []
     
@@ -41,6 +45,10 @@ class AppState(rx.State):
 
     def set_is_info_open(self, val: bool):
         self.is_info_open = val
+
+    # [PERBAIKAN] Fungsi untuk menutup/membuka popup sukses
+    def set_show_success_modal(self, val: bool):
+        self.show_success_modal = val
 
     def toggle_sidebar(self):
         self.sidebar_open = not self.sidebar_open
@@ -318,8 +326,6 @@ class AppState(rx.State):
                 self.total_qty_minus = int(abs(pd.to_numeric(df_minus_awal[col_qty], errors='coerce').sum()))
                 self.total_tercover = int(df_s["QUANTITY"].sum()) if not df_s.empty else 0
                 self.total_sisa_adj = int(abs(df_n[col_qty].sum())) if not df_n.empty and col_qty in df_n.columns else 0
-
-                # PERBAIKAN 2: Simpan Data Pandas ke state Header & Rows terpisah agar tabel rapi
                 
                 # Format Data Minus Awal
                 if not df_minus_awal.empty:
@@ -352,8 +358,9 @@ class AppState(rx.State):
 
             self.is_loading = False
             
-            # Ini memanggil pop up (toast) notifikasi sukses di posisi atas-tengah layar
-            yield rx.toast.success("✅ Data Stock Minus Berhasil Diproses!", position="top-center", duration=5000)
+            # [PERBAIKAN] Memicu Pop Up Modal Sukses dan BUKAN toast kecil di pojok
+            self.show_success_modal = True
+            yield
             
         except Exception as e:
             self.is_loading = False
