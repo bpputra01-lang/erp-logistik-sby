@@ -64,65 +64,87 @@ def stock_minus_view() -> rx.Component:
             ),
         ),
 
-        # --- 2. UPLOAD SECTION (Kecil, Rapi, Tidak Full Layar) ---
-        rx.hstack(
-            rx.vstack(
-                rx.upload(
-                    rx.hstack(
-                        rx.icon("upload", size=18, color="#E50914"),
-                        rx.text("Pilih atau Drop File Excel", font_weight="bold", color="#2D3748", size="2"),
-                        align="center", spacing="2",
-                        padding="0.6rem 1rem",
+        # --- 2. UPLOAD SECTION (Sesuai Referensi Gambar: Kotak Panjang, Border Hitam Dashed, Tombol Gold) ---
+        rx.vstack(
+            rx.text("Upload File STOCK MINUS", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
+            
+            rx.upload(
+                rx.hstack(
+                    # Tombol Upload Style Gold/Bronze
+                    rx.button(
+                        rx.hstack(rx.icon("upload", size=16), rx.text("Upload"), spacing="2"),
+                        background_color="#C5A059",
+                        color="white",
+                        font_weight="bold",
+                        border_radius="6px",
+                        padding="0.5rem 1.2rem",
+                        size="2",
+                        cursor="pointer",
+                        box_shadow="0 2px 4px rgba(0,0,0,0.1)",
+                        _hover={"background_color": "#B38F4D"},
                     ),
-                    id="upload_stock_file",
-                    accept={
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-                        "application/vnd.ms-excel": [".xls"],
-                    },
-                    max_files=1,
-                    border="2px dashed #CBD5E0",
-                    border_radius="6px",
-                    background="#FFFFFF",
-                    _hover={"background": "#F7FAFC", "border_color": "#E50914"},
-                    cursor="pointer",
+                    # Informasi Kapasitas & Ekstensi File
+                    rx.text("200MB per file • XLSX, XLS", color="#718096", size="2", font_weight="medium"),
+                    align="center",
+                    spacing="4",
+                    width="100%",
+                    padding="0.5rem 0",
                 ),
-                
-                # Nama file terpilih (Diamankan agar tidak null iterator)
+                id="upload_stock_file",
+                accept={
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+                    "application/vnd.ms-excel": [".xls"],
+                },
+                max_files=1,
+                border="2px dashed #000000", # Garis border box warna HITAM sesuai permintaan!
+                border_radius="8px",
+                background="#F8FAFC",
+                padding="1rem 1.25rem",
+                width="100%",
+                _hover={"background": "#F1F5F9"},
+                cursor="pointer",
+            ),
+            
+            # Nama file terpilih & Tombol Proses Eksekusi di bawahnya
+            rx.hstack(
                 rx.cond(
                     rx.selected_files("upload_stock_file"),
                     rx.hstack(
-                        rx.icon("file-spreadsheet", size=14, color="#38A169"),
-                        rx.text(rx.selected_files("upload_stock_file")[0], size="1", color="#22543D", font_weight="bold", truncate=True),
-                        spacing="1", align="center", background="#F0FFF4", padding="4px 8px", border_radius="4px", max_width="280px",
+                        rx.icon("file-spreadsheet", size=16, color="#38A169"),
+                        rx.text(rx.selected_files("upload_stock_file")[0], size="2", color="#22543D", font_weight="bold", truncate=True),
+                        spacing="2", align="center", background="#F0FFF4", border="1px solid #C6F6D5", padding="6px 12px", border_radius="6px",
                     ),
                     rx.fragment(),
                 ),
-                align_items="start", spacing="2",
+                
+                # Tombol Proses / Run
+                rx.button(
+                    rx.hstack(rx.icon("play", size=16), rx.text("PROSES DATA"), spacing="2"),
+                    on_click=AppState.handle_upload_stock_minus(rx.upload_files("upload_stock_file")),
+                    background_color="#E50914",
+                    color="white",
+                    font_weight="bold",
+                    border_radius="6px",
+                    padding="0.5rem 1.25rem",
+                    size="2",
+                    _hover={"background_color": "#B20710"},
+                    cursor="pointer",
+                    box_shadow="0 2px 4px rgba(229, 9, 20, 0.2)",
+                ),
+                width="100%",
+                justify="between",
+                align="center",
+                margin_top="0.5rem",
             ),
-
-            # Tombol Run Ukuran Kecil & Proporsional
-            rx.button(
-                rx.hstack(rx.icon("play", size=14), rx.text("PROSES"), spacing="1"),
-                on_click=AppState.handle_upload_stock_minus(rx.upload_files("upload_stock_file")),
-                background_color="#E50914",
-                color="white",
-                font_weight="bold",
-                border_radius="6px",
-                padding="0.6rem 1.2rem",
-                size="2",
-                _hover={"background_color": "#B20710"},
-                cursor="pointer",
-                box_shadow="0 2px 4px rgba(229, 9, 20, 0.2)",
-            ),
-            align="center",
-            spacing="3",
+            
+            width="100%",
             background="white",
-            padding="1rem",
-            border_radius="8px",
+            padding="1.25rem",
+            border_radius="10px",
             border="1px solid #E2E8F0",
             box_shadow="0 1px 3px rgba(0,0,0,0.02)",
-            margin_bottom="1rem",
-            width="fit-content",
+            margin_bottom="1.25rem",
+            align_items="start",
         ),
 
         # --- 3. DASHBOARD METRICS & TABS (Muncul Setelah Diproses) ---
