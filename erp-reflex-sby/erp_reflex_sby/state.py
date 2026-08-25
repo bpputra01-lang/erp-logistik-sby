@@ -8,7 +8,7 @@ from .database import get_supabase
 class AppState(rx.State):
     # --- NAVIGATION & ROLE STATE ---
     logged_in: bool = False
-    role: str = "toko"  # Contoh: "DC" (admin) atau "CABANG" (toko)
+    role: str = "toko"
     main_menu: str = "Database Ongkir In/Out"
 
     def set_main_menu(self, menu: str):
@@ -25,15 +25,12 @@ class AppState(rx.State):
     stock_minus_processed: bool = False
     is_info_open: bool = False  
     is_loading: bool = False
-    
-    # State untuk mengontrol munculnya pop up modal sukses
     show_success_modal: bool = False    
     
     total_qty_minus: int = 0
     total_tercover: int = 0
     total_sisa_adj: int = 0
     
-    # Memisahkan Header dan Rows untuk tabel Reflex
     df_minus_awal_headers: list[str] = []
     df_minus_awal_rows: list[list[str]] = []
     
@@ -46,7 +43,6 @@ class AppState(rx.State):
     def set_is_info_open(self, val: bool):
         self.is_info_open = val
 
-    # Fungsi untuk menutup/membuka popup sukses
     def set_show_success_modal(self, val: bool):
         self.show_success_modal = val
 
@@ -54,14 +50,10 @@ class AppState(rx.State):
         self.sidebar_open = not self.sidebar_open
 
     def toggle_dropdown(self, key: str):
-        if key == "operational":
-            self.dropdown_operational = not self.dropdown_operational
-        elif key == "inventory":
-            self.dropdown_inventory = not self.dropdown_inventory
-        elif key == "reject":
-            self.dropdown_reject = not self.dropdown_reject
-        elif key == "extras":
-            self.dropdown_extras = not self.dropdown_extras
+        if key == "operational": self.dropdown_operational = not self.dropdown_operational
+        elif key == "inventory": self.dropdown_inventory = not self.dropdown_inventory
+        elif key == "reject": self.dropdown_reject = not self.dropdown_reject
+        elif key == "extras": self.dropdown_extras = not self.dropdown_extras
 
     # --- LOGIN STATE ---
     username: str = ""
@@ -74,45 +66,49 @@ class AppState(rx.State):
 
     def handle_login(self):
         if self.username == "admin" and self.password == "sby123":
-            self.logged_in = True
-            self.role = "DC" 
-            self.branch = "SURABAYA"
-            self.user_display_name = "Admin DC Surabaya"
+            self.logged_in = True; self.role = "DC"; self.branch = "SURABAYA"; self.user_display_name = "Admin DC Surabaya"
             return rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000, position="top-right")
-            
         elif self.username == "toko" and self.password == "toko123":
-            self.logged_in = True
-            self.role = "CABANG" 
-            self.branch = "SURABAYA"
-            self.user_display_name = "User Cabang"
+            self.logged_in = True; self.role = "CABANG"; self.branch = "SURABAYA"; self.user_display_name = "User Cabang"
             return rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000, position="top-right")
-            
         else:
             return rx.toast.error("Username atau Password salah! Periksa kembali.", duration=4000, position="top-right")
 
     def handle_key_down(self, key: str):
-        if key == "Enter":
-            return self.handle_login()
+        if key == "Enter": return self.handle_login()
 
     def logout(self):
-        self.logged_in = False
-        self.username = ""
-        self.password = ""
-        self.role = "toko"
+        self.logged_in = False; self.username = ""; self.password = ""; self.role = "toko"
         return rx.toast.info("Anda telah keluar dari sistem.")
+
+    # --- FITUR DOWNLOAD EXCEL ---
+    async def download_excel_data(self, tab_name: str):
+        output = io.BytesIO()
+        df = pd.DataFrame()
+        filename = "download.xlsx"
+
+        if tab_name == "minus_awal" and self.df_minus_awal_headers:
+            df = pd.DataFrame(self.df_minus_awal_rows, columns=self.df_minus_awal_headers)
+            filename = "Data_Minus_Awal.xlsx"
+        elif tab_name == "set_up" and self.df_set_up_headers:
+            df = pd.DataFrame(self.df_set_up_rows, columns=self.df_set_up_headers)
+            filename = "Template_Set_Up.xlsx"
+        elif tab_name == "justifikasi" and self.df_need_adj_headers:
+            df = pd.DataFrame(self.df_need_adj_rows, columns=self.df_need_adj_headers)
+            filename = "Data_Justifikasi.xlsx"
+        else:
+            return rx.toast.warning("Data kosong, tidak ada yang didownload.", position="top-center")
+
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+        
+        return rx.download(data=output.getvalue(), filename=filename)
 
     # --- ONGKIR DATABASE STATE ---
     data_list: list[dict] = []
-    input_supplier: str = ""
-    input_ekspedisi: str = ""
-    input_koli: str = "1"
-    input_ongkir: str = "0"
-    input_tgl: str = datetime.now().strftime("%Y-%m-%d")
-    input_jam: str = datetime.now().strftime("%H:%M:%S")
-
-    filter_ekspedisi: str = "SEMUA"
-    selected_ids: list[int] = []
-    show_delete_modal: bool = False
+    input_supplier: str = ""; input_ekspedisi: str = ""; input_koli: str = "1"; input_ongkir: str = "0"
+    input_tgl: str = datetime.now().strftime("%Y-%m-%d"); input_jam: str = datetime.now().strftime("%H:%M:%S")
+    filter_ekspedisi: str = "SEMUA"; selected_ids: list[int] = []; show_delete_modal: bool = False
 
     def set_supplier(self, val: str): self.input_supplier = val
     def set_ekspedisi(self, val: str): self.input_ekspedisi = val
@@ -133,7 +129,6 @@ class AppState(rx.State):
         if not self.input_supplier.strip():
             yield rx.toast.warning("Nama Supplier Wajib Diisi!")
             return
-
         try:
             koli_val = int(self.input_koli) if self.input_koli else 0
             ongkir_val = int(self.input_ongkir) if self.input_ongkir else 0
@@ -142,20 +137,11 @@ class AppState(rx.State):
             return
 
         fix_dt = f"{self.input_tgl} {self.input_jam}"
-        payload = {
-            "supplier": self.input_supplier.upper().strip(),
-            "ekspedisi": self.input_ekspedisi.upper().strip(),
-            "total_koli": koli_val,
-            "total_ongkir": ongkir_val,
-            "created_at": fix_dt
-        }
+        payload = {"supplier": self.input_supplier.upper().strip(), "ekspedisi": self.input_ekspedisi.upper().strip(), "total_koli": koli_val, "total_ongkir": ongkir_val, "created_at": fix_dt}
         try:
             client = get_supabase()
             await asyncio.to_thread(lambda: client.table("shipping_costs").insert(payload).execute())
-            self.input_supplier = ""
-            self.input_ekspedisi = ""
-            self.input_koli = "1"
-            self.input_ongkir = "0"
+            self.input_supplier = ""; self.input_ekspedisi = ""; self.input_koli = "1"; self.input_ongkir = "0"
             yield rx.toast.success("✅ Data Berhasil Disimpan!")
             yield AppState.load_data()
         except Exception as e:
@@ -165,39 +151,25 @@ class AppState(rx.State):
         if not files:
             yield rx.toast.warning("Pilih file CSV terlebih dahulu!")
             return
-
         for file in files:
             upload_data = await file.read()
             df = pd.read_csv(io.BytesIO(upload_data))
-
             required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"]
             if not all(col in df.columns for col in required):
                 yield rx.toast.error("Format CSV Salah! Kolom wajib: SUPPLIER, EKSPEDISI, TOTAL KOLI, ONGKIR, TANGGAL_JAM")
                 return
-
             batch_data = []
             for _, row in df.iterrows():
                 sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
                 if not sup: continue
-
                 eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
                 try: koli = int(float(row["TOTAL KOLI"]))
                 except: koli = 0
-
                 try: ongkir = int(float(str(row["ONGKIR"]).replace('Rp', '').replace('.', '').replace(',', '').strip()))
                 except: ongkir = 0
-
                 tgl_raw = row["TANGGAL_JAM"]
                 fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if pd.isna(tgl_raw) else str(tgl_raw)
-
-                batch_data.append({
-                    "supplier": sup, 
-                    "ekspedisi": eks, 
-                    "total_koli": koli,
-                    "total_ongkir": ongkir, 
-                    "created_at": fix_dt
-                })
-
+                batch_data.append({"supplier": sup, "ekspedisi": eks, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
             if batch_data:
                 try:
                     client = get_supabase()
@@ -208,14 +180,11 @@ class AppState(rx.State):
                     yield rx.toast.error(f"Gagal Upload Batch: {e}")
 
     def toggle_select_id(self, item_id: int):
-        if item_id in self.selected_ids:
-            self.selected_ids.remove(item_id)
-        else:
-            self.selected_ids.append(item_id)
+        if item_id in self.selected_ids: self.selected_ids.remove(item_id)
+        else: self.selected_ids.append(item_id)
 
     def open_delete_modal(self):
-        if self.selected_ids:
-            self.show_delete_modal = True
+        if self.selected_ids: self.show_delete_modal = True
 
     def close_delete_modal(self):
         self.show_delete_modal = False
@@ -224,8 +193,7 @@ class AppState(rx.State):
         try:
             client = get_supabase()
             await asyncio.to_thread(lambda: client.table("shipping_costs").delete().in_("id", self.selected_ids).execute())
-            self.selected_ids = []
-            self.show_delete_modal = False
+            self.selected_ids = []; self.show_delete_modal = False
             yield rx.toast.success("🗑️ Data Berhasil Dihapus!")
             yield AppState.load_data()
         except Exception as e:
@@ -237,7 +205,6 @@ class AppState(rx.State):
             yield rx.toast.warning("Pilih file Excel terlebih dahulu!")
             return
 
-        # Nyalakan indikator loading
         self.is_loading = True
         yield
 
@@ -256,7 +223,6 @@ class AppState(rx.State):
                     yield rx.toast.error("❌ Kolom 'QTY SYSTEM' tidak ditemukan!")
                     return
                 
-                # 1. Persiapan Data
                 df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
                 df[col_sku] = df[col_sku].astype(str).str.strip().str.upper()
                 df[col_bin] = df[col_bin].astype(str).str.strip().str.upper()
@@ -279,7 +245,6 @@ class AppState(rx.State):
                 set_up_results = []
                 df_need_adj_list = []
 
-                # 2. Proses Alokasi & Sisa
                 for _, row in df_minus_awal.iterrows():
                     sku = row[col_sku]
                     bin_asal = row[col_bin]
@@ -322,47 +287,37 @@ class AppState(rx.State):
                 df_s = pd.DataFrame(set_up_results)
                 df_n = pd.DataFrame(df_need_adj_list)
 
-                # Hitung Metrik
                 self.total_qty_minus = int(abs(pd.to_numeric(df_minus_awal[col_qty], errors='coerce').sum()))
                 self.total_tercover = int(df_s["QUANTITY"].sum()) if not df_s.empty else 0
                 self.total_sisa_adj = int(abs(df_n[col_qty].sum())) if not df_n.empty and col_qty in df_n.columns else 0
                 
-                # Format Data Minus Awal
                 if not df_minus_awal.empty:
                     df_m_clean = df_minus_awal.fillna("").astype(str)
                     self.df_minus_awal_headers = df_m_clean.columns.tolist()
                     self.df_minus_awal_rows = df_m_clean.values.tolist()
                 else:
-                    self.df_minus_awal_headers = []
-                    self.df_minus_awal_rows = []
+                    self.df_minus_awal_headers = []; self.df_minus_awal_rows = []
 
-                # Format Data Set Up
                 if not df_s.empty:
                     df_s_clean = df_s.fillna("").astype(str)
                     self.df_set_up_headers = df_s_clean.columns.tolist()
                     self.df_set_up_rows = df_s_clean.values.tolist()
                 else:
-                    self.df_set_up_headers = []
-                    self.df_set_up_rows = []
+                    self.df_set_up_headers = []; self.df_set_up_rows = []
 
-                # Format Data Need Adj (Justifikasi)
                 if not df_n.empty:
                     df_n_clean = df_n.fillna("").astype(str)
                     self.df_need_adj_headers = df_n_clean.columns.tolist()
                     self.df_need_adj_rows = df_n_clean.values.tolist()
                 else:
-                    self.df_need_adj_headers = []
-                    self.df_need_adj_rows = []
+                    self.df_need_adj_headers = []; self.df_need_adj_rows = []
                 
                 self.stock_minus_processed = True
 
             self.is_loading = False
-            
-            # [PERBAIKAN] Memicu Pop Up Modal Sukses transparan
             self.show_success_modal = True
             yield
             
-            # [PERBAIKAN] Menunggu 2.5 detik lalu menutup modal otomatis
             await asyncio.sleep(2.5)
             self.show_success_modal = False
             yield
@@ -375,8 +330,7 @@ class AppState(rx.State):
     @rx.var
     def filtered_list(self) -> list[dict]:
         res = self.data_list
-        if self.filter_ekspedisi != "SEMUA":
-            res = [x for x in res if x.get("ekspedisi") == self.filter_ekspedisi]
+        if self.filter_ekspedisi != "SEMUA": res = [x for x in res if x.get("ekspedisi") == self.filter_ekspedisi]
         return res
 
     @rx.var
@@ -386,49 +340,38 @@ class AppState(rx.State):
 
     @rx.var
     def total_biaya_all(self) -> str:
-        tot = sum([x.get("total_ongkir", 0) for x in self.filtered_list])
-        return f"Rp {tot:,.0f}"
+        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.filtered_list]):,.0f}"
 
     @rx.var
     def total_koli_all(self) -> str:
-        tot = sum([x.get("total_koli", 0) for x in self.filtered_list])
-        return f"{tot:,.0f} Koli"
+        return f"{sum([x.get('total_koli', 0) for x in self.filtered_list]):,.0f} Koli"
 
     @rx.var
     def avg_cost_all(self) -> str:
         biaya = sum([x.get("total_ongkir", 0) for x in self.filtered_list])
         koli = sum([x.get("total_koli", 0) for x in self.filtered_list])
-        avg = biaya / koli if koli > 0 else 0
-        return f"Rp {avg:,.0f}"
+        return f"Rp {biaya / koli if koli > 0 else 0:,.0f}"
 
     @rx.var
     def biaya_datang(self) -> str:
-        tot = sum([x.get("total_ongkir", 0) for x in self.filtered_list if "RTO" not in str(x.get("supplier", ""))])
-        return f"Rp {tot:,.0f}"
+        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.filtered_list if 'RTO' not in str(x.get('supplier', ''))]):,.0f}"
 
     @rx.var
     def koli_datang(self) -> str:
-        tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" not in str(x.get("supplier", ""))])
-        return f"{tot:,.0f} Koli"
+        return f"{sum([x.get('total_koli', 0) for x in self.filtered_list if 'RTO' not in str(x.get('supplier', ''))]):,.0f} Koli"
 
     @rx.var
     def biaya_rto(self) -> str:
-        tot = sum([x.get("total_ongkir", 0) for x in self.filtered_list if "RTO" in str(x.get("supplier", ""))])
-        return f"Rp {tot:,.0f}"
+        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.filtered_list if 'RTO' in str(x.get('supplier', ''))]):,.0f}"
 
     @rx.var
     def koli_rto(self) -> str:
-        tot = sum([x.get("total_koli", 0) for x in self.filtered_list if "RTO" in str(x.get("supplier", ""))])
-        return f"{tot:,.0f} Koli"
+        return f"{sum([x.get('total_koli', 0) for x in self.filtered_list if 'RTO' in str(x.get('supplier', ''))]):,.0f} Koli"
 
-    # --- COMPUTED ACTIVE CONTENT STATUS ---
     @rx.var
     def active_content_type(self) -> str:
         if self.main_menu == "Database Ongkir In/Out":
-            if self.role == "DC":
-                return "dashboard_ongkir"
-            else:
-                return "access_denied"
+            return "dashboard_ongkir" if self.role == "DC" else "access_denied"
         elif self.main_menu == "Stock Minus":
             return "stock_minus"
         else:
@@ -436,25 +379,18 @@ class AppState(rx.State):
 
     @rx.var
     def menu_operational(self) -> list[str]:
-        if self.role == "DC":
-            return ["Purchase Order Receiving", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
-        else:
-            return ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"]
+        if self.role == "DC": return ["Purchase Order Receiving", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
+        else: return ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"]
 
     @rx.var
     def menu_inventory(self) -> list[str]:
-        if self.role == "DC":
-            return ["Stock Opname", "Match Real & System", "Compare System", "Cycle Count", "Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill", "Stock Allocation"]
-        else:
-            return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
+        if self.role == "DC": return ["Stock Opname", "Match Real & System", "Compare System", "Cycle Count", "Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill", "Stock Allocation"]
+        else: return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
 
     @rx.var
-    def menu_reject(self) -> list[str]:
-        return ["Pengajuan Reject/Defect", "Reject/Defect List"]
+    def menu_reject(self) -> list[str]: return ["Pengajuan Reject/Defect", "Reject/Defect List"]
 
     @rx.var
     def menu_extras(self) -> list[str]:
-        if self.role == "DC":
-            return ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display", "Precentage Request FL to Store Stock", "Refill Toko"]
-        else:
-            return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
+        if self.role == "DC": return ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display", "Precentage Request FL to Store Stock", "Refill Toko"]
+        else: return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
