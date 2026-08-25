@@ -7,51 +7,79 @@ from .components.stock_minus import stock_minus_view
 from .components.putaway_system import putaway_view
 
 def global_header() -> rx.Component:
-    return rx.hstack(
+    return rx.fragment(
         rx.hstack(
-            rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
-            rx.vstack(
-                rx.heading(AppState.main_menu, size="5", color="#111111", font_weight="800"),
-                rx.text(f"Logged in as: {AppState.user_display_name} ({AppState.role})", size="2", color="#4A5568"),
-                align_items="start", spacing="0",
-            ),
-            align="center", spacing="3",
-        ),
-        rx.hstack(
-            rx.button(
-                rx.icon("megaphone", size=18, color="#1A202C"),
-                "Panduan & Logic",
-                on_click=AppState.set_is_info_open(True),
-                size="2",
-                variant="soft",
-                color_scheme="gray", 
-                color="#1A202C",     
-                cursor="pointer",
-            ),
-            
-            # --- [PERBAIKAN] Menumpuk ONLINE dan TIMER menjadi simetris dan transparan ---
-            rx.vstack(
-                # Bagian Atas: Titik Hijau & ONLINE
-                rx.hstack(
-                    rx.box(width="8px", height="8px", background="#10B981", border_radius="50%", class_name="blink-online"),
-                    rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
-                    align="center", spacing="2",
+            rx.hstack(
+                rx.box(width="10px", height="32px", background="#E50914", border_radius="4px"),
+                rx.vstack(
+                    rx.heading(AppState.main_menu, size="5", color="#111111", font_weight="800"),
+                    rx.text(f"Logged in as: {AppState.user_display_name} ({AppState.role})", size="2", color="#4A5568"),
+                    align_items="start", spacing="0",
                 ),
-                # Bagian Bawah: Timer Live (Tanpa Kotak Background)
-                rx.hstack(
-                    rx.text(AppState.login_timestamp_ms, id="login-time-store", display="none"), # HIDDEN STATE
-                    rx.icon("timer", size=14, color="#4A5568"),
-                    rx.text("00:00:00", id="live-timer", color="#4A5568", font_weight="bold", size="1", font_family="monospace"),
-                    align="center", spacing="1", 
-                ),
-                align_items="center", # Membuatnya simetris (rata tengah atas-bawah)
-                spacing="1",
+                align="center", spacing="3",
             ),
-            # ---------------------------------------------
-            
-            align="center", spacing="4",
+            rx.hstack(
+                rx.button(
+                    rx.icon("megaphone", size=18, color="#1A202C"),
+                    "Panduan & Logic",
+                    on_click=AppState.set_is_info_open(True),
+                    size="2",
+                    variant="soft",
+                    color_scheme="gray", 
+                    color="#1A202C",     
+                    cursor="pointer",
+                ),
+                
+                # --- Menumpuk ONLINE dan TIMER ---
+                rx.vstack(
+                    rx.hstack(
+                        rx.box(width="8px", height="8px", background="#10B981", border_radius="50%", class_name="blink-online"),
+                        rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
+                        align="center", spacing="2",
+                    ),
+                    rx.hstack(
+                        # Hidden elemen penampung waktu login
+                        rx.text(AppState.login_timestamp_ms, id="login-time-store", display="none"), 
+                        rx.icon("timer", size=14, color="#4A5568"),
+                        rx.text("00:00:00", id="live-timer", color="#4A5568", font_weight="bold", size="1", font_family="monospace"),
+                        align="center", spacing="1", 
+                    ),
+                    align_items="center",
+                    spacing="1",
+                ),
+                align="center", spacing="4",
+            ),
+            padding="12px 20px", background="#D1FAE5", border="1.5px solid #A7F3D0", border_radius="16px", justify="between", width="100%", align="center", margin_bottom="1rem",
         ),
-        padding="12px 20px", background="#D1FAE5", border="1.5px solid #A7F3D0", border_radius="16px", justify="between", width="100%", align="center", margin_bottom="1rem",
+        
+        # 🔥 JAVASCRIPT INJECTION: Mengubah timer secara Live di browser
+        rx.script("""
+            setInterval(function() {
+                var storeEl = document.getElementById('login-time-store');
+                var timerEl = document.getElementById('live-timer');
+                
+                if (storeEl && timerEl) {
+                    var startTime = parseInt(storeEl.innerText);
+                    
+                    // Jika belum login (waktu = 0 atau kosong), paksa 00:00:00
+                    if (isNaN(startTime) || startTime <= 0) {
+                        timerEl.innerText = "00:00:00";
+                        return;
+                    }
+                    
+                    // Hitung durasi login (Sekarang - Waktu Mulai)
+                    var now = Date.now();
+                    var diffInSeconds = Math.floor((now - startTime) / 1000);
+                    
+                    // Konversi ke format HH:MM:SS
+                    var h = String(Math.floor(diffInSeconds / 3600)).padStart(2, '0');
+                    var m = String(Math.floor((diffInSeconds % 3600) / 60)).padStart(2, '0');
+                    var s = String(diffInSeconds % 60).padStart(2, '0');
+                    
+                    timerEl.innerText = h + ":" + m + ":" + s;
+                }
+            }, 1000);
+        """)
     )
 
 # --- FUNGSI PANDUAN DINAMIS ---
