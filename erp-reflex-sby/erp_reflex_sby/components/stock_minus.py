@@ -15,7 +15,6 @@ def render_clean_table(headers: list, data_rows: list) -> rx.Component:
         overflow_x="auto", width="100%", background="white", border_radius="8px", padding="0.5rem", box_shadow="0 1px 3px rgba(0,0,0,0.05)", border="1px solid #E2E8F0",
     )
 
-# [PERBAIKAN 1]: Pop up Transparan (Hanya Checklist dan Success)
 def success_modal() -> rx.Component:
     return rx.cond(
         AppState.show_success_modal,
@@ -23,6 +22,7 @@ def success_modal() -> rx.Component:
             rx.vstack(
                 rx.box(
                     rx.icon("check", size=65, color="white", stroke_width=4),
+                    class_name="animate-pop", # <-- CSS Class untuk animasi loncat
                     background="linear-gradient(135deg, #4ade80 0%, #16a34a 100%)",
                     border_radius="50%", padding="20px", box_shadow="0 10px 25px rgba(74, 222, 128, 0.4)", margin_bottom="5px"
                 ),
@@ -30,7 +30,7 @@ def success_modal() -> rx.Component:
                 align_items="center", spacing="3", background="transparent"
             ),
             position="fixed", top="0", left="0", width="100vw", height="100vh", z_index="9999",
-            background="rgba(255, 255, 255, 0.7)", backdrop_filter="blur(5px)", # Efek background blur agar ikon menonjol
+            background="rgba(255, 255, 255, 0.7)", backdrop_filter="blur(5px)",
         )
     )
 
@@ -51,9 +51,7 @@ def stock_minus_view() -> rx.Component:
                     rx.text("200MB per file • XLSX, XLS", color="#4A5568", size="2", font_weight="medium"),
                     align="center", spacing="4", width="100%", padding="0.5rem 0",
                 ),
-                id="upload_stock_file", max_files=1, 
-                border="2px dashed black", # [PERBAIKAN 2]: Border uploader menjadi hitam
-                border_radius="8px", background="#F8FAFC", padding="1rem 1.25rem", width="100%", cursor="pointer",
+                id="upload_stock_file", max_files=1, border="2px dashed black", border_radius="8px", background="#F8FAFC", padding="1rem 1.25rem", width="100%", cursor="pointer",
             ),
             rx.hstack(
                 rx.cond(rx.selected_files("upload_stock_file"), rx.hstack(rx.icon("file-spreadsheet", size=16, color="#38A169"), rx.text(rx.selected_files("upload_stock_file")[0], size="2", color="#22543D", font_weight="bold", truncate=True), spacing="2", align="center", background="#F0FFF4", border="1px solid #C6F6D5", padding="6px 12px", border_radius="6px"), rx.fragment()),
@@ -78,9 +76,25 @@ def stock_minus_view() -> rx.Component:
                         rx.tabs.trigger(rx.hstack(rx.icon("refresh-cw", size=14), rx.text("TEMPLATE SET UP", font_weight="bold")), value="tab2", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
                         rx.tabs.trigger(rx.hstack(rx.icon("alert-triangle", size=14), rx.text("JUSTIFIKASI", font_weight="bold")), value="tab3", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
                     ),
-                    rx.tabs.content(render_clean_table(AppState.df_minus_awal_headers, AppState.df_minus_awal_rows), value="tab1", padding="0.75rem 0"),
-                    rx.tabs.content(render_clean_table(AppState.df_set_up_headers, AppState.df_set_up_rows), value="tab2", padding="0.75rem 0"),
-                    rx.tabs.content(render_clean_table(AppState.df_need_adj_headers, AppState.df_need_adj_rows), value="tab3", padding="0.75rem 0"),
+                    # Tambahan tombol download di dalam setiap TAB
+                    rx.tabs.content(
+                        rx.vstack(
+                            rx.flex(rx.button(rx.icon("download", size=16), " Download Excel", on_click=AppState.download_excel_data("minus_awal"), color_scheme="green", variant="outline", size="2", cursor="pointer"), justify="end", width="100%", margin_bottom="0.5rem"),
+                            render_clean_table(AppState.df_minus_awal_headers, AppState.df_minus_awal_rows),
+                        ), value="tab1", padding="0.75rem 0"
+                    ),
+                    rx.tabs.content(
+                        rx.vstack(
+                            rx.flex(rx.button(rx.icon("download", size=16), " Download Excel", on_click=AppState.download_excel_data("set_up"), color_scheme="green", variant="outline", size="2", cursor="pointer"), justify="end", width="100%", margin_bottom="0.5rem"),
+                            render_clean_table(AppState.df_set_up_headers, AppState.df_set_up_rows),
+                        ), value="tab2", padding="0.75rem 0"
+                    ),
+                    rx.tabs.content(
+                        rx.vstack(
+                            rx.flex(rx.button(rx.icon("download", size=16), " Download Excel", on_click=AppState.download_excel_data("justifikasi"), color_scheme="green", variant="outline", size="2", cursor="pointer"), justify="end", width="100%", margin_bottom="0.5rem"),
+                            render_clean_table(AppState.df_need_adj_headers, AppState.df_need_adj_rows),
+                        ), value="tab3", padding="0.75rem 0"
+                    ),
                     default_value="tab1", width="100%",
                 ),
                 width="100%", spacing="0",
