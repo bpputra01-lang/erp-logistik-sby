@@ -39,7 +39,6 @@ def stock_minus_view() -> rx.Component:
         success_modal(), 
         
         rx.hstack(
-            rx.text("Modul Stock Minus & Validation", font_weight="bold", color="#1A202C", size="5"),
             justify="between", align="center", width="100%", margin_bottom="1rem",
         ),
 
