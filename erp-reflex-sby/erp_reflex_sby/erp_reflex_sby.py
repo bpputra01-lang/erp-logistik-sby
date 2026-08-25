@@ -5,7 +5,6 @@ from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 from .components.stock_minus import stock_minus_view
 
-# --- KOMPONEN HEADER GLOBAL (ONLINE & USER INFO) ---
 def global_header() -> rx.Component:
     return rx.hstack(
         rx.hstack(
@@ -18,7 +17,6 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
-            # Tombol Informasi Format & Logic (Megaphone Icon) - Membuka Global Modal Info
             rx.button(
                 rx.icon("megaphone", size=18),
                 "Panduan & Logic",
@@ -28,11 +26,7 @@ def global_header() -> rx.Component:
                 color_scheme="orange",
                 cursor="pointer",
             ),
-            # Titik Hijau Berkedip
-            rx.box(
-                width="10px", height="10px", background="#10B981", 
-                border_radius="50%", class_name="blink-online"
-            ),
+            rx.box(width="10px", height="10px", background="#10B981", border_radius="50%", class_name="blink-online"),
             rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
             align="center", spacing="3",
         ),
@@ -44,10 +38,8 @@ def global_header() -> rx.Component:
         margin_bottom="1rem",
     )
 
-
 def index() -> rx.Component:
     return rx.vstack(
-        # --- CSS ANIMASI BLINK ---
         rx.html("""
             <style>
                 @keyframes blinkAnimation {
@@ -55,37 +47,23 @@ def index() -> rx.Component:
                     50% { opacity: 0.3; transform: scale(0.8); }
                     100% { opacity: 1; transform: scale(1); }
                 }
-                .blink-online {
-                    animation: blinkAnimation 1.5s infinite ease-in-out;
-                }
+                .blink-online { animation: blinkAnimation 1.5s infinite ease-in-out; }
             </style>
         """),
         
-        # --- GLOBAL LOADING OVERLAY ---
         rx.cond(
             AppState.is_loading,
             rx.center(
                 rx.vstack(
                     rx.spinner(size="3", color="red"),
                     rx.text("Sedang memproses data, mohon tunggu...", font_weight="bold", color="#1A202C", size="3"),
-                    background="white",
-                    padding="2rem",
-                    border_radius="12px",
-                    box_shadow="lg",
-                    align="center",
-                    spacing="3",
+                    background="white", padding="2rem", border_radius="12px", box_shadow="lg", align="center", spacing="3",
                 ),
-                position="fixed",
-                top="0",
-                left="0",
-                width="100vw",
-                height="100vh",
-                background="rgba(0, 0, 0, 0.5)",
-                z_index="9999",
+                position="fixed", top="0", left="0", width="100vw", height="100vh", background="rgba(0, 0, 0, 0.5)", z_index="9999",
             ),
         ),
 
-        # --- GLOBAL DIALOG PANDUAN & LOGIC (Dikontrol oleh AppState.is_info_open) ---
+        # --- GLOBAL DIALOG PANDUAN & LOGIC (PERBAIKAN BACKGROUND) ---
         rx.dialog.root(
             rx.dialog.content(
                 rx.vstack(
@@ -106,6 +84,11 @@ def index() -> rx.Component:
                     ),
                     spacing="3", align_items="start", width="100%",
                 ),
+                # PERBAIKAN: Memastikan background putih terang dan rapi
+                background_color="white",
+                padding="24px",
+                border_radius="12px",
+                box_shadow="0 10px 25px rgba(0,0,0,0.2)",
             ),
             open=AppState.is_info_open,
             on_open_change=AppState.set_is_info_open,
@@ -118,55 +101,35 @@ def index() -> rx.Component:
                 rx.hstack(
                     sidebar(),
                     rx.vstack(
-                        # --- HEADER GLOBAL ---
                         global_header(),
-
                         rx.match(
                             AppState.main_menu,
                             ("Database Ongkir In/Out", main_dashboard()),
                             ("Database Ongkir", main_dashboard()),
                             ("dashboard_ongkir", main_dashboard()),
                             ("Stock Minus", stock_minus_view()), 
-
-                            # Handle Error Akses Ditolak
                             (
                                 "access_denied",
                                 rx.vstack(
                                     rx.heading("⛔ Akses Ditolak", size="7", color="#E53E3E"),
                                     rx.text("Maaf, halaman ini dibatasi hak aksesnya.", color="#718096"),
-                                    padding="3rem", align_items="center", justify_content="center",
-                                    width="100%", height="70vh",
+                                    padding="3rem", align_items="center", justify_content="center", width="100%", height="70vh",
                                 ),
                             ),
-
-                            # Default / Under development untuk menu lain
                             rx.vstack(
                                 rx.heading(f"Halaman: {AppState.main_menu}", size="7", color="#1A202C"),
                                 rx.text("Halaman ini sedang dalam tahap pengembangan.", color="#718096"),
-                                padding="3rem", align_items="center", justify_content="center",
-                                width="100%", height="70vh",
+                                padding="3rem", align_items="center", justify_content="center", width="100%", height="70vh",
                             ),
                         ),
-                        width="100%",
-                        height="100vh",
-                        background_color="#F7FAFC",
-                        overflow_y="auto",
-                        padding="1.5rem",
+                        width="100%", height="100vh", background_color="#F7FAFC", overflow_y="auto", padding="1.5rem",
                     ),
-                    width="100vw",
-                    height="100vh",
-                    spacing="0",
-                    overflow="hidden",
+                    width="100vw", height="100vh", spacing="0", overflow="hidden",
                 ),
             ),
-            (
-                False,
-                login_page(),
-            ),
+            (False, login_page()),
         ),
-        width="100vw",
-        height="100vh",
-        spacing="0",
+        width="100vw", height="100vh", spacing="0",
     )
 
 
