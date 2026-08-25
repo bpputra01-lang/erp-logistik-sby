@@ -4,6 +4,7 @@ from .components.login import login_page
 from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 from .components.stock_minus import stock_minus_view
+from .components.putaway_system import putaway_view
 
 def global_header() -> rx.Component:
     return rx.hstack(
@@ -58,12 +59,19 @@ def dynamic_panduan_logic() -> rx.Component:
     return rx.match(
         AppState.main_menu,
         ("Stock Minus", 
+            # ... (Biarkan kode Stock Minus yang sudah ada disini) ...
+        ),
+        ("Putaway System",  # <--- [TAMBAHAN BARU UNTUK PUTAWAY]
             rx.accordion.root(
                 rx.accordion.item(
                     header=rx.text("📋 Informasi Format File", font_weight="bold", color="#1A202C"),
                     content=rx.box(
                         rx.text("Format yang diharapkan:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
-                        rx.unordered_list(rx.list_item(rx.text("Download Multiple Adjusmet dari Jezpro dan pilih ", rx.text.strong("Termasuk yang sudah habis"))), padding_left="20px", size="2", color="#4A5568"),
+                        rx.unordered_list(
+                            rx.list_item(rx.hstack(rx.text.strong("DATA SCAN PUTAWAY:"), rx.text("Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN"))),
+                            rx.list_item(rx.hstack(rx.text.strong("DATA PUTAWAY:"), rx.text("Sesuai yang ada pada template Jezpro."))),
+                            padding_left="20px", size="2", color="#4A5568"
+                        ),
                         background="#F7FAFC", padding="16px", border_radius="6px"
                     ),
                     value="item-1",
@@ -71,15 +79,12 @@ def dynamic_panduan_logic() -> rx.Component:
                 rx.accordion.item(
                     header=rx.text("💡 Logic Thinking", font_weight="bold", color="#1A202C"),
                     content=rx.box(
-                        rx.text("Alur Process Compare Stock Minus:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
+                        rx.text("Alur Compare Putaway:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
                         rx.unordered_list(
-                            rx.list_item("Mengambil SKU yang memiliki Qty System minus (-)"),
-                            rx.list_item("Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock"),
-                            rx.list_item("Dimana terdapat Bin prioritas untuk shuffle Covering Stock (All Stagging, Karantina)"),
-                            rx.list_item("Dan jika minus terjadi di Gudang lt.2 maka akan prioritas mengambil BIN Toko begitupun sebaliknya"),
-                            rx.list_item("Lalu jika tidak ditemukan di BIN Prioritas maka akan mengambil random BIN kecuali LIVE, Offline dan Online"),
-                            rx.list_item("Jika sudah ditemukan SKU dan Qty yang bisa covering maka akan dibuatkan list Set up"),
-                            rx.list_item("Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut"),
+                            rx.list_item("SKU di file data scan akan dicompare dengan SKU yang ada di FIle data BIN Putaway"),
+                            rx.list_item("Tiap unique SKU teratas di File data scan akan mendapatkan alokasi penuh"),
+                            rx.list_item(rx.hstack(rx.text("Untuk SKU yang tidak mendapatkan alokasi maka akan ditulis dengan note "), rx.text.strong("PERLU CEK MANUAL"), rx.text(" untuk mengetahui apakah ada double data scan atau item belum terset up di BIN PUTAWAY"))),
+                            rx.list_item("List Set up akan dibuatkan otomatis oleh system dengan BIN awal diambil dari BIN di file Putaway dan BIN tujuan disesuaikan dengan BIN yang ada di data scan"),
                             padding_left="20px", size="2", color="#4A5568", spacing="2"
                         ),
                         background="#F7FAFC", padding="16px", border_radius="6px"
@@ -89,7 +94,7 @@ def dynamic_panduan_logic() -> rx.Component:
                 type="multiple", collapsible=True, width="100%", variant="ghost", color_scheme="gray",  
             )
         ),
-        # Default untuk menu yang belum ada panduannya
+        # Default
         rx.center(
             rx.vstack(
                 rx.icon("folder-open", size=40, color="#CBD5E0"),
@@ -196,6 +201,7 @@ def index() -> rx.Component:
                             ("Database Ongkir", main_dashboard()),
                             ("dashboard_ongkir", main_dashboard()),
                             ("Stock Minus", stock_minus_view()), 
+                            ("Putaway System", putaway_view()),
                             (
                                 "access_denied",
                                 rx.vstack(
