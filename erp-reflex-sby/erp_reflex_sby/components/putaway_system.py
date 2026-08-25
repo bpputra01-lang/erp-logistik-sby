@@ -41,26 +41,33 @@ def putaway_view() -> rx.Component:
         ),
 
         rx.vstack(
-            rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#000000", size="3", margin_bottom="0.25rem"),
-            # PERBAIKAN 1: Teks dropdown menjadi hitam bold
+            rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
+            
+            # 🔥 Ganti bagian rx.select Anda persis seperti ini:
             rx.select(
                 ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
                 placeholder="-- Pilih Area Putaway --",
                 value=AppState.area_putaway,
                 on_change=AppState.set_area_putaway,
-                size="3", width="100%", margin_bottom="1rem",
-                color="black", font_weight="bold",
-                style={"color": "black !important", "fontWeight": "bold !important"} 
+                size="3", 
+                width="100%", 
+                margin_bottom="1rem",
+                high_contrast=True,  # Membuat teks kontras maksimal (hitam pekat)
+                style={
+                    "color": "#000000",
+                    "font_weight": "bold",
+                }
             ),
+            
             
             rx.cond(
                 AppState.area_putaway != "",
                 rx.vstack(
                     rx.hstack(
                         rx.icon("map-pin", color="#3182ce", size=18),
-                        rx.text("Area Terpilih: ", font_weight="normal", color="#000000", size="2"),
-                        rx.text(AppState.area_putaway, font_weight="bold", color="#000000", size="2"),
-                        background="#000000", border_left="4px solid #3182ce", padding="10px 16px", border_radius="6px", width="100%", align="center", spacing="2", margin_bottom="1rem"
+                        rx.text("Area Terpilih: ", font_weight="normal", color="#2c5282", size="2"),
+                        rx.text(AppState.area_putaway, font_weight="bold", color="#2c5282", size="2"),
+                        background="#ebf8ff", border_left="4px solid #3182ce", padding="10px 16px", border_radius="6px", width="100%", align="center", spacing="2", margin_bottom="1rem"
                     ),
                     
                     rx.hstack(
