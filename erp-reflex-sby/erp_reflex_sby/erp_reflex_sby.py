@@ -5,7 +5,6 @@ from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 from .components.stock_minus import stock_minus_view
 
-# [PERBAIKAN 4]: Mengubah tombol menjadi Hitam (Gray)
 def global_header() -> rx.Component:
     return rx.hstack(
         rx.hstack(
@@ -18,14 +17,15 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
+            # Tombol Panduan & Logic menjadi warna hitam (gray)
             rx.button(
                 rx.icon("megaphone", size=18, color="#1A202C"),
                 "Panduan & Logic",
                 on_click=AppState.set_is_info_open(True),
                 size="2",
                 variant="soft",
-                color_scheme="gray", # <-- Diubah dari orange ke gray agar tulisannya hitam/gelap
-                color="#1A202C",     # Memastikan teks berwarna hitam gelap
+                color_scheme="gray", 
+                color="#1A202C",     
                 cursor="pointer",
             ),
             rx.box(width="10px", height="10px", background="#10B981", border_radius="50%", class_name="blink-online"),
@@ -35,9 +35,32 @@ def global_header() -> rx.Component:
         padding="12px 20px", background="#D1FAE5", border="1.5px solid #A7F3D0", border_radius="16px", justify="between", width="100%", align="center", margin_bottom="1rem",
     )
 
-# ... (pastikan fungsi index dan lainnya tetap ada)
+def index() -> rx.Component:
+    return rx.vstack(
+        rx.html("""
+            <style>
+                @keyframes blinkAnimation {
+                    0% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.3; transform: scale(0.8); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
+                .blink-online { animation: blinkAnimation 1.5s infinite ease-in-out; }
+            </style>
+        """),
+        
+        rx.cond(
+            AppState.is_loading,
+            rx.center(
+                rx.vstack(
+                    rx.spinner(size="3", color="red"),
+                    rx.text("Sedang memproses data, mohon tunggu...", font_weight="bold", color="#1A202C", size="3"),
+                    background="white", padding="2rem", border_radius="12px", box_shadow="lg", align="center", spacing="3",
+                ),
+                position="fixed", top="0", left="0", width="100vw", height="100vh", background="rgba(0, 0, 0, 0.5)", z_index="9999",
+            ),
+        ),
 
-        # [PERBAIKAN 3]: Menghilangkan kotak merah dari Panduan
+        # --- GLOBAL DIALOG PANDUAN & LOGIC ---
         rx.dialog.root(
             rx.dialog.content(
                 rx.vstack(
@@ -80,8 +103,8 @@ def global_header() -> rx.Component:
                             value="item-2",
                         ),
                         type="multiple", collapsible=True, width="100%", 
-                        variant="ghost",      # <-- Ini yang menghilangkan warna merahnya (menjadi bersih)
-                        color_scheme="gray",  # <-- Memastikan warnanya abu-abu/hitam standar
+                        variant="ghost",      
+                        color_scheme="gray",  
                     ),
 
                     rx.flex(
