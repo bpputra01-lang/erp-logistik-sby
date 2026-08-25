@@ -1,43 +1,32 @@
 import reflex as rx
 from ..state import AppState
-from .stock_minus import render_clean_table, success_modal  # Pinjam helper yang sudah rapi
+from .stock_minus import render_clean_table, success_modal
 
-# 🔥 KOMPONEN BARU: Custom Uploader persis seperti gambar yang diminta
+# Komponen Uploader yang lebih gemuk dan proporsional
 def custom_uploader_box(id_str: str, title: str) -> rx.Component:
     return rx.vstack(
         rx.text(title, font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
         rx.upload(
             rx.hstack(
-                # Tombol palsu untuk tampilan
                 rx.button(
                     rx.hstack(rx.icon("upload", size=16), rx.text("Upload", font_weight="bold")),
                     background_color="#C5A059", color="white", pointer_events="none", border_radius="6px"
                 ),
-                # Kondisi: Jika file dipilih vs Belum dipilih
                 rx.cond(
                     rx.selected_files(id_str),
-                    # Tampilan JIKA FILE SUDAH DIPILIH (Muncul di dalam kotak)
                     rx.hstack(
                         rx.icon("check-circle", color="#38A169", size=20),
-                        rx.foreach(
-                            rx.selected_files(id_str),
-                            lambda f: rx.text(f, color="#38A169", font_weight="bold", truncate=True)
-                        ),
+                        rx.foreach(rx.selected_files(id_str), lambda f: rx.text(f, color="#38A169", font_weight="bold", truncate=True)),
                         spacing="2", align="center"
                     ),
-                    # Tampilan JIKA KOSONG
                     rx.text("200MB per file • XLSX, XLS, CSV", color="#718096", size="2")
                 ),
                 spacing="4", align="center", width="100%"
             ),
-            id=id_str,
-            max_files=1,
-            border="2px dashed #CBD5E0",
-            border_radius="8px",
-            padding="1rem",
-            width="100%",
-            cursor="pointer",
-            _hover={"border_color": "#C5A059", "background_color": "#F8FAFC"}
+            id=id_str, max_files=1, 
+            border="2px dashed #CBD5E0", border_radius="8px", 
+            padding="2rem 1.5rem", min_height="100px",  # Box dibuat lebih gemuk
+            width="100%", cursor="pointer", _hover={"border_color": "#C5A059", "background_color": "#F8FAFC"}
         ),
         width="100%", spacing="0"
     )
@@ -46,27 +35,24 @@ def putaway_view() -> rx.Component:
     return rx.vstack(
         success_modal(), 
         
-        # --- HEADER ---
         rx.hstack(
             rx.text("PUTAWAY SYSTEM COMPARATION", font_weight="bold", color="#1A202C", size="5"),
             justify="between", align="center", width="100%", margin_bottom="1rem",
         ),
 
-        # --- SELECTION & UPLOAD SECTION ---
         rx.vstack(
             rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
-            
-            # 🔥 PERBAIKAN 1: Dropdown teks hitam bold
+            # PERBAIKAN 1: Teks dropdown menjadi hitam bold
             rx.select(
                 ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
                 placeholder="-- Pilih Area Putaway --",
                 value=AppState.area_putaway,
                 on_change=AppState.set_area_putaway,
                 size="3", width="100%", margin_bottom="1rem",
-                color="black", font_weight="bold" 
+                color="black", font_weight="bold",
+                style={"color": "black !important", "fontWeight": "bold !important"} 
             ),
             
-            # Form Upload HANYA muncul jika area sudah dipilih
             rx.cond(
                 AppState.area_putaway != "",
                 rx.vstack(
@@ -77,32 +63,34 @@ def putaway_view() -> rx.Component:
                         background="#ebf8ff", border_left="4px solid #3182ce", padding="10px 16px", border_radius="6px", width="100%", align="center", spacing="2", margin_bottom="1rem"
                     ),
                     
-                    # 🔥 PERBAIKAN 2, 3, 4: Memanggil komponen custom uploader
                     rx.hstack(
                         custom_uploader_box("ds_putaway_file", "Upload DS PUTAWAY"),
                         custom_uploader_box("asal_putaway_file", "Upload ASAL BIN"),
                         spacing="4", width="100%", margin_bottom="1.5rem"
                     ),
                     
-                    # 🔥 LOGIKA TOMBOL PINTAR: Tombol otomatis terkunci kalau file belum lengkap
-                    rx.cond(
-                        rx.selected_files("ds_putaway_file") & rx.selected_files("asal_putaway_file"),
-                        rx.button(
-                            rx.hstack(rx.icon("play", size=16), rx.text("COMPARE PUTAWAY"), spacing="2"), 
-                            on_click=[
-                                AppState.start_loading,
-                                AppState.handle_upload_ds(rx.upload_files("ds_putaway_file")),
-                                AppState.handle_upload_asal(rx.upload_files("asal_putaway_file"))
-                            ], 
-                            background_color="#E50914", color="white", font_weight="bold", 
-                            border_radius="6px", padding="0.75rem", cursor="pointer", width="100%", size="3"
+                    # PERBAIKAN 2: Tombol rata kanan, warna tetap merah tapi transparan saat locked
+                    rx.flex(
+                        rx.cond(
+                            rx.selected_files("ds_putaway_file") & rx.selected_files("asal_putaway_file"),
+                            rx.button(
+                                rx.hstack(rx.icon("play", size=16), rx.text("COMPARE PUTAWAY"), spacing="2"), 
+                                on_click=[
+                                    AppState.start_loading,
+                                    AppState.handle_upload_ds(rx.upload_files("ds_putaway_file")),
+                                    AppState.handle_upload_asal(rx.upload_files("asal_putaway_file"))
+                                ], 
+                                background_color="#E50914", color="white", font_weight="bold", 
+                                border_radius="6px", padding="0.75rem 1.5rem", cursor="pointer"
+                            ),
+                            rx.button(
+                                rx.hstack(rx.icon("lock", size=16), rx.text("PILIH KEDUA FILE UNTUK MEMULAI"), spacing="2"), 
+                                disabled=True,
+                                background_color="#E50914", opacity="0.5", color="white", font_weight="bold", 
+                                border_radius="6px", padding="0.75rem 1.5rem", cursor="not-allowed"
+                            )
                         ),
-                        rx.button(
-                            rx.hstack(rx.icon("lock", size=16), rx.text("PILIH KEDUA FILE UNTUK MEMULAI"), spacing="2"), 
-                            disabled=True,
-                            background_color="#FEB2B2", color="white", font_weight="bold", 
-                            border_radius="6px", padding="0.75rem", width="100%", size="3"
-                        )
+                        width="100%", justify="end" # Rata Kanan
                     ),
                     width="100%",
                 ),
@@ -117,8 +105,6 @@ def putaway_view() -> rx.Component:
             rx.vstack(
                 rx.divider(),
                 rx.heading("📋 RINGKASAN HASIL", size="4", color="#010B13", margin_y="1rem"),
-                
-                # Metrics 4 Kotak
                 rx.hstack(
                     rx.box(rx.text("Qty System Putaway", color="#A0AEC0", font_size="11px", font_weight="bold"), rx.text(AppState.putaway_qty_system, color="#E53E3E", font_size="22px", font_weight="bold"), background="#1A1A1A", padding="1rem", border_radius="8px", border_left="4px solid #E53E3E", width="100%", text_align="center"),
                     rx.box(rx.text("Total Tersetup", color="#A0AEC0", font_size="11px", font_weight="bold"), rx.text(AppState.putaway_total_setup, color="#38A169", font_size="22px", font_weight="bold"), background="#1A1A1A", padding="1rem", border_radius="8px", border_left="4px solid #38A169", width="100%", text_align="center"),
@@ -126,8 +112,6 @@ def putaway_view() -> rx.Component:
                     rx.box(rx.text("Sisa Stok Putaway", color="#A0AEC0", font_size="11px", font_weight="bold"), rx.text(AppState.putaway_sisa_stok, color="#3182CE", font_size="22px", font_weight="bold"), background="#1A1A1A", padding="1rem", border_radius="8px", border_left="4px solid #3182CE", width="100%", text_align="center"),
                     width="100%", spacing="3", margin_bottom="1.25rem",
                 ),
-                
-                # Download Report Button
                 rx.flex(
                     rx.button(
                         rx.hstack(rx.icon("download", size=16), rx.text("DOWNLOAD REPORT LENGKAP"), spacing="2", align="center"),
@@ -136,8 +120,6 @@ def putaway_view() -> rx.Component:
                         box_shadow="0 2px 4px rgba(0,0,0,0.1)", cursor="pointer", _hover={"background_color": "#059669"},
                     ), justify="end", width="100%", margin_bottom="0.5rem"
                 ),
-
-                # Tabs
                 rx.tabs.root(
                     rx.tabs.list(
                         rx.tabs.trigger(rx.text("📋 Hasil Compare", font_weight="bold"), value="t1", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
@@ -147,14 +129,8 @@ def putaway_view() -> rx.Component:
                     ),
                     rx.tabs.content(render_clean_table(AppState.df_comp_headers, AppState.df_comp_rows), value="t1", padding="0.75rem 0"),
                     rx.tabs.content(render_clean_table(AppState.df_plist_headers, AppState.df_plist_rows), value="t2", padding="0.75rem 0"),
-                    rx.tabs.content(
-                        rx.cond(AppState.df_kurang_rows.bool(), render_clean_table(AppState.df_kurang_headers, AppState.df_kurang_rows), rx.center(rx.text("✅ Semua Tercover!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")),
-                        value="t3", padding="0.75rem 0"
-                    ),
-                    rx.tabs.content(
-                        rx.cond(AppState.df_out_rows.bool(), render_clean_table(AppState.df_out_headers, AppState.df_out_rows), rx.center(rx.text("✅ Tidak ada Outstanding!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")),
-                        value="t4", padding="0.75rem 0"
-                    ),
+                    rx.tabs.content(rx.cond(AppState.df_kurang_rows.bool(), render_clean_table(AppState.df_kurang_headers, AppState.df_kurang_rows), rx.center(rx.text("✅ Semua Tercover!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")), value="t3", padding="0.75rem 0"),
+                    rx.tabs.content(rx.cond(AppState.df_out_rows.bool(), render_clean_table(AppState.df_out_headers, AppState.df_out_rows), rx.center(rx.text("✅ Tidak ada Outstanding!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")), value="t4", padding="0.75rem 0"),
                     default_value="t1", width="100%",
                 ),
                 width="100%", spacing="0",
