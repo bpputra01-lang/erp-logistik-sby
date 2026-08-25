@@ -16,3 +16,14 @@
 .blink-online {
   animation: pulse-glow 1.5s infinite ease-in-out !important;
 }
+
+/* Memaksa placeholder dan teks di dalam semua elemen select agar hitam tebal */
+[data-radix-popper-content-wrapper], button[role="combobox"], [data-placeholder] {
+    color: #000000 !important;
+    font-weight: bold !important;
+}
+span:has(> select), .rt-SelectTrigger, .rt-SelectPlaceholder {
+    color: #000000 !important;
+    font-weight: bold !important;
+    opacity: 1 !important;
+}
