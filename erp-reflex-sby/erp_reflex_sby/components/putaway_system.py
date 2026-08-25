@@ -29,7 +29,7 @@ def putaway_view() -> rx.Component:
                 rx.vstack(
                     rx.hstack(
                         rx.icon("map-pin", color="#3182ce", size=18),
-                        rx.text(f"Area Terpilih: ", font_weight="normal", color="#2c5282", size="2"),
+                        rx.text("Area Terpilih: ", font_weight="normal", color="#2c5282", size="2"),
                         rx.text(AppState.area_putaway, font_weight="bold", color="#2c5282", size="2"),
                         background="#ebf8ff", border_left="4px solid #3182ce", padding="10px 16px", border_radius="6px", width="100%", align="center", spacing="2", margin_bottom="1rem"
                     ),
@@ -110,7 +110,7 @@ def putaway_view() -> rx.Component:
                     width="100%", spacing="3", margin_bottom="1.25rem",
                 ),
                 
-                # Download Report Button (Global Download for Putaway)
+                # Download Report Button
                 rx.flex(
                     rx.button(
                         rx.hstack(rx.icon("download", size=16), rx.text("DOWNLOAD REPORT LENGKAP"), spacing="2", align="center"),
@@ -131,11 +131,13 @@ def putaway_view() -> rx.Component:
                     rx.tabs.content(render_clean_table(AppState.df_comp_headers, AppState.df_comp_rows), value="t1", padding="0.75rem 0"),
                     rx.tabs.content(render_clean_table(AppState.df_plist_headers, AppState.df_plist_rows), value="t2", padding="0.75rem 0"),
                     rx.tabs.content(
-                        rx.cond(AppState.df_kurang_rows.length() > 0, render_clean_table(AppState.df_kurang_headers, AppState.df_kurang_rows), rx.center(rx.text("✅ Semua Tercover!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")),
+                        # FIX: Gunakan .bool() alih-alih .length() > 0
+                        rx.cond(AppState.df_kurang_rows.bool(), render_clean_table(AppState.df_kurang_headers, AppState.df_kurang_rows), rx.center(rx.text("✅ Semua Tercover!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")),
                         value="t3", padding="0.75rem 0"
                     ),
                     rx.tabs.content(
-                        rx.cond(AppState.df_out_rows.length() > 0, render_clean_table(AppState.df_out_headers, AppState.df_out_rows), rx.center(rx.text("✅ Tidak ada Outstanding!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")),
+                        # FIX: Gunakan .bool() alih-alih .length() > 0
+                        rx.cond(AppState.df_out_rows.bool(), render_clean_table(AppState.df_out_headers, AppState.df_out_rows), rx.center(rx.text("✅ Tidak ada Outstanding!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")),
                         value="t4", padding="0.75rem 0"
                     ),
                     default_value="t1", width="100%",
