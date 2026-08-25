@@ -48,7 +48,7 @@ def putaway_view() -> rx.Component:
                 rx.select.trigger(
                     placeholder="-- Pilih Area Putaway --",
                     style={
-                        "background-color": "white !important",
+                        "background-color": "white",
                         "color": "black !important",
                         "font-weight": "bold !important",
                         "border": "1px solid #CBD5E0",
