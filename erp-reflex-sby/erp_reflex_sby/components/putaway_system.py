@@ -41,16 +41,22 @@ def putaway_view() -> rx.Component:
         ),
 
         rx.vstack(
-            rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
-            # PERBAIKAN 1: Teks dropdown menjadi hitam bold
             rx.select(
                 ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
                 placeholder="-- Pilih Area Putaway --",
                 value=AppState.area_putaway,
                 on_change=AppState.set_area_putaway,
                 size="3", width="100%", margin_bottom="1rem",
-                color="black", font_weight="bold",
-                style={"color": "black !important", "fontWeight": "bold !important"} 
+                # Tambahkan class_name ini agar teks pasti hitam & bold di browser
+                class_name="!text-black !font-bold",
+                style={
+                    "color": "#000000 !important",
+                    "font-weight": "bold !important",
+                    "& span": {
+                        "color": "#000000 !important",
+                        "font-weight": "bold !important",
+                    }
+                }
             ),
             
             rx.cond(
