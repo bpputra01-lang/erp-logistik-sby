@@ -51,20 +51,16 @@ def putaway_view() -> rx.Component:
                 size="3", 
                 width="100%", 
                 margin_bottom="1rem",
-                id="my-custom-select",  # 🔥 Kita beri ID unik
+                # 🔥 Gunakan kombinasi ini agar tembus dari tema abu-abu Radix UI
+                color_scheme="gray",
+                variant="surface",
+                style={
+                    "background-color": "white",
+                    "color": "black",
+                    "font-weight": "bold",
+                    "border": "1px solid #CBD5E0",
+                }
             ),
-            
-            # 🔥 Suntikan CSS langsung untuk membunuh warna abu-abu bawaan
-            rx.script("""
-                setTimeout(function() {
-                    // Cari semua elemen teks / span di dalam select tersebut dan paksa jadi Hitam Bold
-                    var selectTriggers = document.querySelectorAll('#my-custom-select, #my-custom-select span, #my-custom-select div');
-                    selectTriggers.forEach(function(el) {
-                        el.style.setProperty('color', '#000000', 'important');
-                        el.style.setProperty('font-weight', 'bold', 'important');
-                    });
-                }, 100);
-            """),
             
             
             rx.cond(
