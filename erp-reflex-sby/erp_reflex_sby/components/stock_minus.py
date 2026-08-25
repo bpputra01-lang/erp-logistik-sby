@@ -2,17 +2,17 @@ import reflex as rx
 from ..state import AppState
 
 def render_clean_table(data_list) -> rx.Component:
-    """Helper tabel bersih khusus struktur list of dictionary / Pandas records."""
+    """Helper tabel aman untuk mencegah crash render React DOM."""
     return rx.box(
         rx.cond(
-            data_list,
+            data_list.length() > 0,
             rx.table.root(
                 rx.table.header(
                     rx.table.row(
                         rx.foreach(
                             data_list[0],
                             lambda col_key: rx.table.column_header_cell(
-                                col_key[0], color="#1A202C", font_weight="bold", background="#EDF2F7"
+                                col_key, color="#1A202C", font_weight="bold", background="#EDF2F7"
                             )
                         )
                     )
@@ -24,7 +24,7 @@ def render_clean_table(data_list) -> rx.Component:
                             rx.foreach(
                                 row,
                                 lambda item: rx.table.cell(
-                                    item[1].to_string(), color="#2D3748", font_size="13px"
+                                    rx.text(item, color="#2D3748", font_size="13px")
                                 )
                             )
                         )
