@@ -370,13 +370,18 @@ class AppState(rx.State):
     def set_area_putaway(self, val: str):
         self.area_putaway = val
 
-    async def handle_process_putaway(self, files: list[rx.UploadFile]):
+    # 🔥 PERBAIKAN TOTAL DI SINI 🔥
+    async def handle_process_putaway(
+        self, 
+        ds_files: list[rx.UploadFile],   # Argumen 1 (Dari ds_putaway_file)
+        asal_files: list[rx.UploadFile]  # Argumen 2 (Dari asal_putaway_file)
+    ):
         if not self.area_putaway:
             yield rx.toast.warning("Silakan pilih Area Putaway terlebih dahulu!", position="top-center")
             return
         
-        # Validasi bahwa user mengunggah minimal 2 file
-        if not files or len(files) < 2:
+        # Validasi: Pastikan KEDUA form upload sudah diisi oleh user
+        if not ds_files or not asal_files:
             yield rx.toast.warning("Harap upload KEDUA file (DS Putaway & Asal Bin)!", position="top-center")
             return
 
@@ -384,10 +389,9 @@ class AppState(rx.State):
         yield
 
         try:
-            # File pertama dianggap DS Putaway, File kedua dianggap Asal Bin
-            # (Atau bisa disesuaikan dengan logika urutan upload Anda)
-            ds_file = files[0]
-            asal_file = files[1]
+            # Ambil file dari masing-masing form upload
+            ds_file = ds_files[0]
+            asal_file = asal_files[0]
 
             # 1. Baca Data
             ds_data = await ds_file.read()
@@ -396,7 +400,6 @@ class AppState(rx.State):
             asal_data = await asal_file.read()
             df_asal = pd.read_csv(io.BytesIO(asal_data)) if asal_file.filename.endswith('.csv') else pd.read_excel(io.BytesIO(asal_data), engine="openpyxl")
 
-        # ... (Sisa kode ke bawah tetap sama)
             df_asal_updated = df_asal.copy()
             self.putaway_qty_system = int(pd.to_numeric(df_asal_updated.iloc[:, 9], errors='coerce').sum())
 
@@ -534,7 +537,7 @@ class AppState(rx.State):
         except Exception as e:
             self.is_loading = False
             yield rx.toast.error(f"Gagal memproses file: {e}", position="top-center")
-
+            
     async def download_putaway_report(self):
         if not self.putaway_processed:
             return rx.toast.warning("Belum ada data untuk didownload!", position="top-center")
