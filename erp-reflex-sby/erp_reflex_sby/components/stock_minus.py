@@ -49,6 +49,7 @@ def render_clean_table(data_list) -> rx.Component:
         box_shadow="0 1px 3px rgba(0,0,0,0.05)",
         border="1px solid #E2E8F0",
     )
+
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
         # --- 1. MODAL LOADING STATE SAAT PROSES DATA ---
@@ -65,55 +66,52 @@ def stock_minus_view() -> rx.Component:
             ),
         ),
 
-        # --- 2. MODAL DIALOG UNTUK PANDUAN & LOGIC (Dipanggil dari tombol khusus) ---
-        rx.dialog.root(
-            rx.dialog.content(
-                rx.vstack(
-                    rx.hstack(
-                        rx.icon("book-open", size=20, color="#C5A059"),
-                        rx.text("Panduan & Logic Stock Minus System", font_weight="bold", color="#1A202C", size="4"),
-                        justify="between", width="100%", align="center"
-                    ),
-                    rx.divider(margin_y="0.5rem"),
-                    rx.text("1. Sistem membaca file excel stock minus dan melakukan pencocokan data Qty System vs Qty SO.", color="#4A5568", size="2"),
-                    rx.text("2. Tab 'Template Set Up' menghasilkan format otomatis untuk penyesuaian database gudang.", color="#4A5568", size="2"),
-                    rx.text("3. Tab 'Justifikasi' menampilkan selisih item yang membutuhkan Approval / Adjust manual dari PIC.", color="#4A5568", size="2"),
-                    rx.flex(
-                        rx.dialog.close(
-                            rx.button("Tutup", background_color="#2D3748", color="white", size="2", font_weight="bold", cursor="pointer")
-                        ),
-                        justify="end", width="100%", margin_top="1rem"
-                    ),
-                    spacing="3", align_items="start", width="100%",
-                ),
-            ),
-            id="modal_panduan",
-        ),
-
-        # --- 3. HEADER & TOMBOL PANDUAN & LOGIC KHUSUS (Sesuai Referensi) ---
+        # --- 2. HEADER & TOMBOL PANDUAN & LOGIC KHUSUS (Digabung dalam satu root) ---
         rx.hstack(
             rx.text("Modul Stock Minus & Validation", font_weight="bold", color="#1A202C", size="5"),
             
-            # Tombol Panduan & Logic terpisah (Bisa diklik muncul modal)
-            rx.dialog.trigger(
-                rx.button(
-                    rx.hstack(rx.icon("megaphone", size=16, color="#DD6B20"), rx.text("Panduan & Logic", font_weight="bold", color="#DD6B20"), spacing="2"),
-                    background_color="#FEEBC8",
-                    border="1px solid #FBD38D",
-                    border_radius="6px",
-                    padding="0.5rem 1rem",
-                    cursor="pointer",
-                    _hover={"background_color": "#FDE68A"},
+            # Perbaikan: rx.dialog.root membungkus trigger dan content sekaligus
+            rx.dialog.root(
+                rx.dialog.trigger(
+                    rx.button(
+                        rx.hstack(rx.icon("megaphone", size=16, color="#DD6B20"), rx.text("Panduan & Logic", font_weight="bold", color="#DD6B20"), spacing="2"),
+                        background_color="#FEEBC8",
+                        border="1px solid #FBD38D",
+                        border_radius="6px",
+                        padding="0.5rem 1rem",
+                        cursor="pointer",
+                        _hover={"background_color": "#FDE68A"},
+                    ),
                 ),
-                control="modal_panduan",
+                rx.dialog.content(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.icon("book-open", size=20, color="#C5A059"),
+                            rx.text("Panduan & Logic Stock Minus System", font_weight="bold", color="#1A202C", size="4"),
+                            justify="between", width="100%", align="center"
+                        ),
+                        rx.divider(margin_y="0.5rem"),
+                        rx.text("1. Sistem membaca file excel stock minus dan melakukan pencocokan data Qty System vs Qty SO.", color="#4A5568", size="2"),
+                        rx.text("2. Tab 'Template Set Up' menghasilkan format otomatis untuk penyesuaian database gudang.", color="#4A5568", size="2"),
+                        rx.text("3. Tab 'Justifikasi' menampilkan selisih item yang membutuhkan Approval / Adjust manual dari PIC.", color="#4A5568", size="2"),
+                        rx.flex(
+                            rx.dialog.close(
+                                rx.button("Tutup", background_color="#2D3748", color="white", size="2", font_weight="bold", cursor="pointer")
+                            ),
+                            justify="end", width="100%", margin_top="1rem"
+                        ),
+                        spacing="3", align_items="start", width="100%",
+                    ),
+                ),
             ),
+            
             justify="between",
             align="center",
             width="100%",
             margin_bottom="1rem",
         ),
 
-        # --- 4. UPLOAD SECTION ---
+        # --- 3. UPLOAD SECTION ---
         rx.vstack(
             rx.text("Upload File STOCK MINUS", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
             
@@ -193,11 +191,11 @@ def stock_minus_view() -> rx.Component:
             align_items="start",
         ),
 
-        # --- 5. DASHBOARD METRICS & TABS (Hanya 3 Tab Utama: Minus Awal, Template Set Up, Justifikasi) ---
+        # --- 4. DASHBOARD METRICS & TABS ---
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
-                # Banner Sukses Bersih di Tengah (Bebas dari pop-up pojok kanan bawah)
+                # Banner Sukses
                 rx.hstack(
                     rx.icon("check-circle", size=20, color="#22543D"),
                     rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#22543D", size="3"),
@@ -233,7 +231,7 @@ def stock_minus_view() -> rx.Component:
                     width="100%", spacing="3", margin_bottom="1.25rem",
                 ),
 
-                # Tabs Bersih (Hanya 3 Tab Data)
+                # Tabs Bersih
                 rx.tabs.root(
                     rx.tabs.list(
                         rx.tabs.trigger(
