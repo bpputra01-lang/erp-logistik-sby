@@ -43,7 +43,6 @@ def putaway_view() -> rx.Component:
         rx.vstack(
             rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
             
-            # 🔥 Ganti bagian rx.select Anda persis seperti ini:
             rx.select(
                 ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
                 placeholder="-- Pilih Area Putaway --",
@@ -52,12 +51,20 @@ def putaway_view() -> rx.Component:
                 size="3", 
                 width="100%", 
                 margin_bottom="1rem",
-                high_contrast=True,  # Membuat teks kontras maksimal (hitam pekat)
-                style={
-                    "color": "#000000",
-                    "font_weight": "bold",
-                }
+                id="my-custom-select",  # 🔥 Kita beri ID unik
             ),
+            
+            # 🔥 Suntikan CSS langsung untuk membunuh warna abu-abu bawaan
+            rx.script("""
+                setTimeout(function() {
+                    // Cari semua elemen teks / span di dalam select tersebut dan paksa jadi Hitam Bold
+                    var selectTriggers = document.querySelectorAll('#my-custom-select, #my-custom-select span, #my-custom-select div');
+                    selectTriggers.forEach(function(el) {
+                        el.style.setProperty('color', '#000000', 'important');
+                        el.style.setProperty('font-weight', 'bold', 'important');
+                    });
+                }, 100);
+            """),
             
             
             rx.cond(
