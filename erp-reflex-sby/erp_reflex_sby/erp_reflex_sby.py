@@ -17,7 +17,6 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
-            # Tombol Panduan & Logic menjadi warna hitam (gray)
             rx.button(
                 rx.icon("megaphone", size=18, color="#1A202C"),
                 "Panduan & Logic",
@@ -35,8 +34,56 @@ def global_header() -> rx.Component:
         padding="12px 20px", background="#D1FAE5", border="1.5px solid #A7F3D0", border_radius="16px", justify="between", width="100%", align="center", margin_bottom="1rem",
     )
 
+# --- FUNGSI PANDUAN DINAMIS ---
+def dynamic_panduan_logic() -> rx.Component:
+    return rx.match(
+        AppState.main_menu,
+        ("Stock Minus", 
+            rx.accordion.root(
+                rx.accordion.item(
+                    header=rx.text("📋 Informasi Format File", font_weight="bold", color="#1A202C"),
+                    content=rx.box(
+                        rx.text("Format yang diharapkan:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
+                        rx.unordered_list(rx.list_item(rx.text("Download Multiple Adjusmet dari Jezpro dan pilih ", rx.text.strong("Termasuk yang sudah habis"))), padding_left="20px", size="2", color="#4A5568"),
+                        background="#F7FAFC", padding="16px", border_radius="6px"
+                    ),
+                    value="item-1",
+                ),
+                rx.accordion.item(
+                    header=rx.text("💡 Logic Thinking", font_weight="bold", color="#1A202C"),
+                    content=rx.box(
+                        rx.text("Alur Process Compare Stock Minus:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
+                        rx.unordered_list(
+                            rx.list_item("Mengambil SKU yang memiliki Qty System minus (-)"),
+                            rx.list_item("Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock"),
+                            rx.list_item("Dimana terdapat Bin prioritas untuk shuffle Covering Stock (All Stagging, Karantina)"),
+                            rx.list_item("Dan jika minus terjadi di Gudang lt.2 maka akan prioritas mengambil BIN Toko begitupun sebaliknya"),
+                            rx.list_item("Lalu jika tidak ditemukan di BIN Prioritas maka akan mengambil random BIN kecuali LIVE, Offline dan Online"),
+                            rx.list_item("Jika sudah ditemukan SKU dan Qty yang bisa covering maka akan dibuatkan list Set up"),
+                            rx.list_item("Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut"),
+                            padding_left="20px", size="2", color="#4A5568", spacing="2"
+                        ),
+                        background="#F7FAFC", padding="16px", border_radius="6px"
+                    ),
+                    value="item-2",
+                ),
+                type="multiple", collapsible=True, width="100%", variant="ghost", color_scheme="gray",  
+            )
+        ),
+        # Default untuk menu yang belum ada panduannya
+        rx.center(
+            rx.vstack(
+                rx.icon("folder-open", size=40, color="#CBD5E0"),
+                rx.text(f"Panduan dan Logic untuk halaman '{AppState.main_menu}' belum tersedia.", color="#718096", font_style="italic", text_align="center"),
+                align="center", spacing="2"
+            ),
+            width="100%", padding="2rem"
+        )
+    )
+
 def index() -> rx.Component:
     return rx.vstack(
+        # CSS tambahan untuk Animasi Blink dan Animasi Pop Up Centang
         rx.html("""
             <style>
                 @keyframes blinkAnimation {
@@ -45,6 +92,13 @@ def index() -> rx.Component:
                     100% { opacity: 1; transform: scale(1); }
                 }
                 .blink-online { animation: blinkAnimation 1.5s infinite ease-in-out; }
+                
+                @keyframes popIn {
+                    0% { transform: scale(0.5); opacity: 0; }
+                    70% { transform: scale(1.15); opacity: 1; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+                .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
             </style>
         """),
         
@@ -60,7 +114,7 @@ def index() -> rx.Component:
             ),
         ),
 
-        # --- GLOBAL DIALOG PANDUAN & LOGIC ---
+        # GLOBAL DIALOG PANDUAN & LOGIC
         rx.dialog.root(
             rx.dialog.content(
                 rx.vstack(
@@ -71,41 +125,8 @@ def index() -> rx.Component:
                     ),
                     rx.divider(margin_y="0.5rem"),
                     
-                    rx.accordion.root(
-                        rx.accordion.item(
-                            header=rx.text("📋 Informasi Format File", font_weight="bold", color="#1A202C"),
-                            content=rx.box(
-                                rx.text("Format yang diharapkan:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
-                                rx.unordered_list(
-                                    rx.list_item(rx.text("Download Multiple Adjusmet dari Jezpro dan pilih ", rx.text.strong("Termasuk yang sudah habis"))),
-                                    padding_left="20px", size="2", color="#4A5568"
-                                ),
-                                background="#F7FAFC", padding="16px", border_radius="6px"
-                            ),
-                            value="item-1",
-                        ),
-                        rx.accordion.item(
-                            header=rx.text("💡 Logic Thinking", font_weight="bold", color="#1A202C"),
-                            content=rx.box(
-                                rx.text("Alur Process Compare Stock Minus:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
-                                rx.unordered_list(
-                                    rx.list_item("Mengambil SKU yang memiliki Qty System minus (-)"),
-                                    rx.list_item("Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock"),
-                                    rx.list_item("Dimana terdapat Bin prioritas untuk shuffle Covering Stock (All Stagging, Karantina)"),
-                                    rx.list_item("Dan jika minus terjadi di Gudang lt.2 maka akan prioritas mengambil BIN Toko begitupun sebaliknya"),
-                                    rx.list_item("Lalu jika tidak ditemukan di BIN Prioritas maka akan mengambil random BIN kecuali LIVE, Offline dan Online"),
-                                    rx.list_item("Jika sudah ditemukan SKU dan Qty yang bisa covering maka akan dibuatkan list Set up"),
-                                    rx.list_item("Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut"),
-                                    padding_left="20px", size="2", color="#4A5568", spacing="2"
-                                ),
-                                background="#F7FAFC", padding="16px", border_radius="6px"
-                            ),
-                            value="item-2",
-                        ),
-                        type="multiple", collapsible=True, width="100%", 
-                        variant="ghost",      
-                        color_scheme="gray",  
-                    ),
+                    # Memanggil Fungsi Panduan Dinamis
+                    dynamic_panduan_logic(),
 
                     rx.flex(
                         rx.dialog.close(
