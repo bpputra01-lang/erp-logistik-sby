@@ -53,7 +53,7 @@ def putaway_view() -> rx.Component:
                 margin_bottom="1rem",
                 # 🔥 Gunakan variant="surface" dan color_scheme agar teksnya terbaca jelas
                 variant="surface",
-                color_scheme="gray",
+                color_scheme="black",
             ),
             
             
