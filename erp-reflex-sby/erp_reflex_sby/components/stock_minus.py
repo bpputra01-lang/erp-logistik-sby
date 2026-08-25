@@ -44,18 +44,39 @@ def stock_minus_view() -> rx.Component:
 
         rx.vstack(
             rx.text("Upload File STOCK MINUS", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
+            
+            # PERBAIKAN: Uploader baru, gemuk, nama file muncul di dalam
             rx.upload(
                 rx.hstack(
-                    rx.button(rx.hstack(rx.icon("upload", size=16), rx.text("Upload"), spacing="2"), background_color="#C5A059", color="white", font_weight="bold", border_radius="6px", padding="0.5rem 1.2rem", cursor="pointer"),
-                    rx.text("200MB per file • XLSX, XLS", color="#4A5568", size="2", font_weight="medium"),
-                    align="center", spacing="4", width="100%", padding="0.5rem 0",
+                    rx.button(
+                        rx.hstack(rx.icon("upload", size=16), rx.text("Upload", font_weight="bold")),
+                        background_color="#C5A059", color="white", pointer_events="none", border_radius="6px"
+                    ),
+                    rx.cond(
+                        rx.selected_files("upload_stock_file"),
+                        rx.hstack(
+                            rx.icon("check-circle", color="#38A169", size=20),
+                            rx.foreach(rx.selected_files("upload_stock_file"), lambda f: rx.text(f, color="#38A169", font_weight="bold", truncate=True)),
+                            spacing="2", align="center"
+                        ),
+                        rx.text("200MB per file • XLSX, XLS", color="#718096", size="2")
+                    ),
+                    spacing="4", align="center", width="100%"
                 ),
-                id="upload_stock_file", max_files=1, border="2px dashed black", border_radius="8px", background="#F8FAFC", padding="1rem 1.25rem", width="100%", cursor="pointer",
+                id="upload_stock_file", max_files=1, 
+                border="2px dashed #CBD5E0", border_radius="8px", background="#F8FAFC", 
+                padding="2rem 1.5rem", min_height="100px", width="100%", cursor="pointer",
+                _hover={"border_color": "#C5A059"}
             ),
-            rx.hstack(
-                rx.cond(rx.selected_files("upload_stock_file"), rx.hstack(rx.icon("file-spreadsheet", size=16, color="#38A169"), rx.text(rx.selected_files("upload_stock_file")[0], size="2", color="#22543D", font_weight="bold", truncate=True), spacing="2", align="center", background="#F0FFF4", border="1px solid #C6F6D5", padding="6px 12px", border_radius="6px"), rx.fragment()),
-                rx.button(rx.hstack(rx.icon("play", size=16), rx.text("PROSES DATA"), spacing="2"), on_click=AppState.handle_upload_stock_minus(rx.upload_files("upload_stock_file")), background_color="#E50914", color="white", font_weight="bold", border_radius="6px", padding="0.5rem 1.25rem", cursor="pointer"),
-                width="100%", justify="between", align="center", margin_top="0.5rem",
+            
+            # PERBAIKAN: Tombol dipindah ke kanan, merah, dan punya kondisi lock
+            rx.flex(
+                rx.cond(
+                    rx.selected_files("upload_stock_file"),
+                    rx.button(rx.hstack(rx.icon("play", size=16), rx.text("PROSES DATA"), spacing="2"), on_click=AppState.handle_upload_stock_minus(rx.upload_files("upload_stock_file")), background_color="#E50914", color="white", font_weight="bold", border_radius="6px", padding="0.75rem 1.5rem", cursor="pointer"),
+                    rx.button(rx.hstack(rx.icon("lock", size=16), rx.text("PILIH FILE UNTUK MEMULAI"), spacing="2"), disabled=True, background_color="#E50914", opacity="0.5", color="white", font_weight="bold", border_radius="6px", padding="0.75rem 1.5rem", cursor="not-allowed")
+                ),
+                width="100%", justify="end", margin_top="1rem"
             ),
             width="100%", background="white", padding="1.25rem", border_radius="10px", border="1px solid #E2E8F0", margin_bottom="1.25rem", align_items="start",
         ),
@@ -75,52 +96,24 @@ def stock_minus_view() -> rx.Component:
                         rx.tabs.trigger(rx.hstack(rx.icon("refresh-cw", size=14), rx.text("TEMPLATE SET UP", font_weight="bold")), value="tab2", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
                         rx.tabs.trigger(rx.hstack(rx.icon("alert-triangle", size=14), rx.text("JUSTIFIKASI", font_weight="bold")), value="tab3", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
                     ),
-                    
-                    # --- TAB 1: MINUS AWAL ---
                     rx.tabs.content(
                         rx.vstack(
-                            rx.flex(
-                                rx.button(
-                                    rx.hstack(rx.icon("download", size=16), rx.text("Download Excel"), spacing="2", align="center"),
-                                    on_click=AppState.download_excel_data("minus_awal"),
-                                    background_color="#10B981", color="white", font_weight="bold", border_radius="6px",
-                                    box_shadow="0 2px 4px rgba(0,0,0,0.1)", cursor="pointer", _hover={"background_color": "#059669"},
-                                ), justify="end", width="100%", margin_bottom="0.5rem"
-                            ),
+                            rx.flex(rx.button(rx.hstack(rx.icon("download", size=16), rx.text("Download Excel"), spacing="2", align="center"), on_click=AppState.download_excel_data("minus_awal"), background_color="#10B981", color="white", font_weight="bold", border_radius="6px", box_shadow="0 2px 4px rgba(0,0,0,0.1)", cursor="pointer", _hover={"background_color": "#059669"}), justify="end", width="100%", margin_bottom="0.5rem"),
                             render_clean_table(AppState.df_minus_awal_headers, AppState.df_minus_awal_rows),
                         ), value="tab1", padding="0.75rem 0"
                     ),
-                    
-                    # --- TAB 2: TEMPLATE SET UP ---
                     rx.tabs.content(
                         rx.vstack(
-                            rx.flex(
-                                rx.button(
-                                    rx.hstack(rx.icon("download", size=16), rx.text("Download Excel"), spacing="2", align="center"),
-                                    on_click=AppState.download_excel_data("set_up"),
-                                    background_color="#10B981", color="white", font_weight="bold", border_radius="6px",
-                                    box_shadow="0 2px 4px rgba(0,0,0,0.1)", cursor="pointer", _hover={"background_color": "#059669"},
-                                ), justify="end", width="100%", margin_bottom="0.5rem"
-                            ),
+                            rx.flex(rx.button(rx.hstack(rx.icon("download", size=16), rx.text("Download Excel"), spacing="2", align="center"), on_click=AppState.download_excel_data("set_up"), background_color="#10B981", color="white", font_weight="bold", border_radius="6px", box_shadow="0 2px 4px rgba(0,0,0,0.1)", cursor="pointer", _hover={"background_color": "#059669"}), justify="end", width="100%", margin_bottom="0.5rem"),
                             render_clean_table(AppState.df_set_up_headers, AppState.df_set_up_rows),
                         ), value="tab2", padding="0.75rem 0"
                     ),
-                    
-                    # --- TAB 3: JUSTIFIKASI ---
                     rx.tabs.content(
                         rx.vstack(
-                            rx.flex(
-                                rx.button(
-                                    rx.hstack(rx.icon("download", size=16), rx.text("Download Excel"), spacing="2", align="center"),
-                                    on_click=AppState.download_excel_data("justifikasi"),
-                                    background_color="#10B981", color="white", font_weight="bold", border_radius="6px",
-                                    box_shadow="0 2px 4px rgba(0,0,0,0.1)", cursor="pointer", _hover={"background_color": "#059669"},
-                                ), justify="end", width="100%", margin_bottom="0.5rem"
-                            ),
+                            rx.flex(rx.button(rx.hstack(rx.icon("download", size=16), rx.text("Download Excel"), spacing="2", align="center"), on_click=AppState.download_excel_data("justifikasi"), background_color="#10B981", color="white", font_weight="bold", border_radius="6px", box_shadow="0 2px 4px rgba(0,0,0,0.1)", cursor="pointer", _hover={"background_color": "#059669"}), justify="end", width="100%", margin_bottom="0.5rem"),
                             render_clean_table(AppState.df_need_adj_headers, AppState.df_need_adj_rows),
                         ), value="tab3", padding="0.75rem 0"
                     ),
-                    
                     default_value="tab1", width="100%",
                 ),
                 width="100%", spacing="0",
