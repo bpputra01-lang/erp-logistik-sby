@@ -79,11 +79,14 @@ def putaway_view() -> rx.Component:
                         ),
                         rx.button(
                             rx.hstack(rx.icon("play", size=16), rx.text("COMPARE PUTAWAY"), spacing="2"), 
-                            # PERBAIKAN: Pisahkan rx.upload_files menjadi 2 argumen independen
-                            on_click=AppState.handle_process_putaway(
-                                rx.upload_files("ds_putaway_file"),
-                                rx.upload_files("asal_putaway_file")
-                            ), 
+                            
+                            # 🔥 PERBAIKAN: Gunakan List untuk Event Chaining (Unggah satu persatu, lalu proses)
+                            on_click=[
+                                AppState.handle_upload_ds(rx.upload_files("ds_putaway_file")),
+                                AppState.handle_upload_asal(rx.upload_files("asal_putaway_file")),
+                                AppState.handle_process_putaway
+                            ], 
+                            
                             background_color="#E50914", color="white", font_weight="bold", 
                             border_radius="6px", padding="0.5rem 1.25rem", cursor="pointer"
                         ),
