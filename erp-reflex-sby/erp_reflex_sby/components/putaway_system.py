@@ -51,15 +51,8 @@ def putaway_view() -> rx.Component:
                 size="3", 
                 width="100%", 
                 margin_bottom="1rem",
-                # 🔥 Gunakan kombinasi ini agar tembus dari tema abu-abu Radix UI
-                color_scheme="gray",
-                variant="surface",
-                style={
-                    "background-color": "white",
-                    "color": "black",
-                    "font-weight": "bold",
-                    "border": "1px solid #CBD5E0",
-                }
+                # 🔥 Gunakan class_name Tailwind untuk memaksa teks hitam bold secara mutlak
+                class_name="text-black font-extrabold",
             ),
             
             
