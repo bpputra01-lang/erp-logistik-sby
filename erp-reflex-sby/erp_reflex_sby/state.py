@@ -370,11 +370,13 @@ class AppState(rx.State):
     def set_area_putaway(self, val: str):
         self.area_putaway = val
 
-    async def handle_process_putaway(self, ds_files: list[rx.UploadFile], asal_files: list[rx.UploadFile]):
+    async def handle_process_putaway(self, files: list[rx.UploadFile]):
         if not self.area_putaway:
             yield rx.toast.warning("Silakan pilih Area Putaway terlebih dahulu!", position="top-center")
             return
-        if not ds_files or not asal_files:
+        
+        # Validasi bahwa user mengunggah minimal 2 file
+        if not files or len(files) < 2:
             yield rx.toast.warning("Harap upload KEDUA file (DS Putaway & Asal Bin)!", position="top-center")
             return
 
@@ -382,13 +384,19 @@ class AppState(rx.State):
         yield
 
         try:
-            # 1. Baca Data
-            ds_data = await ds_files[0].read()
-            df_ds = pd.read_csv(io.BytesIO(ds_data)) if ds_files[0].filename.endswith('.csv') else pd.read_excel(io.BytesIO(ds_data), engine="openpyxl")
-            
-            asal_data = await asal_files[0].read()
-            df_asal = pd.read_csv(io.BytesIO(asal_data)) if asal_files[0].filename.endswith('.csv') else pd.read_excel(io.BytesIO(asal_data), engine="openpyxl")
+            # File pertama dianggap DS Putaway, File kedua dianggap Asal Bin
+            # (Atau bisa disesuaikan dengan logika urutan upload Anda)
+            ds_file = files[0]
+            asal_file = files[1]
 
+            # 1. Baca Data
+            ds_data = await ds_file.read()
+            df_ds = pd.read_csv(io.BytesIO(ds_data)) if ds_file.filename.endswith('.csv') else pd.read_excel(io.BytesIO(ds_data), engine="openpyxl")
+            
+            asal_data = await asal_file.read()
+            df_asal = pd.read_csv(io.BytesIO(asal_data)) if asal_file.filename.endswith('.csv') else pd.read_excel(io.BytesIO(asal_data), engine="openpyxl")
+
+        # ... (Sisa kode ke bawah tetap sama)
             df_asal_updated = df_asal.copy()
             self.putaway_qty_system = int(pd.to_numeric(df_asal_updated.iloc[:, 9], errors='coerce').sum())
 
