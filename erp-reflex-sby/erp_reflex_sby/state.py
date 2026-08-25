@@ -335,6 +335,212 @@ class AppState(rx.State):
             self.is_loading = False
             yield rx.toast.error(f"Gagal memproses file: {e}", position="top-center")
 
+# ==========================================
+    # --- PUTAWAY SYSTEM STATE & LOGIC ---
+    # ==========================================
+    area_putaway: str = ""
+    putaway_processed: bool = False
+    
+    # Metrics Putaway
+    putaway_qty_system: int = 0
+    putaway_total_setup: int = 0
+    putaway_kurang_setup: int = 0
+    putaway_sisa_stok: int = 0
+    
+    # Data DataFrames (Headers & Rows)
+    df_comp_headers: list[str] = []
+    df_comp_rows: list[list[str]] = []
+    
+    df_plist_headers: list[str] = []
+    df_plist_rows: list[list[str]] = []
+    
+    df_kurang_headers: list[str] = []
+    df_kurang_rows: list[list[str]] = []
+    
+    df_out_headers: list[str] = []
+    df_out_rows: list[list[str]] = []
+    
+    # Variabel internal untuk keperluan Download Excel
+    _raw_df_comp: pd.DataFrame = pd.DataFrame()
+    _raw_df_plist: pd.DataFrame = pd.DataFrame()
+    _raw_df_kurang: pd.DataFrame = pd.DataFrame()
+    _raw_df_out: pd.DataFrame = pd.DataFrame()
+    _raw_df_updated: pd.DataFrame = pd.DataFrame()
+
+    def set_area_putaway(self, val: str):
+        self.area_putaway = val
+
+    async def handle_process_putaway(self, ds_files: list[rx.UploadFile], asal_files: list[rx.UploadFile]):
+        if not self.area_putaway:
+            yield rx.toast.warning("Silakan pilih Area Putaway terlebih dahulu!", position="top-center")
+            return
+        if not ds_files or not asal_files:
+            yield rx.toast.warning("Harap upload KEDUA file (DS Putaway & Asal Bin)!", position="top-center")
+            return
+
+        self.is_loading = True
+        yield
+
+        try:
+            # 1. Baca Data
+            ds_data = await ds_files[0].read()
+            df_ds = pd.read_csv(io.BytesIO(ds_data)) if ds_files[0].filename.endswith('.csv') else pd.read_excel(io.BytesIO(ds_data), engine="openpyxl")
+            
+            asal_data = await asal_files[0].read()
+            df_asal = pd.read_csv(io.BytesIO(asal_data)) if asal_files[0].filename.endswith('.csv') else pd.read_excel(io.BytesIO(asal_data), engine="openpyxl")
+
+            df_asal_updated = df_asal.copy()
+            self.putaway_qty_system = int(pd.to_numeric(df_asal_updated.iloc[:, 9], errors='coerce').sum())
+
+            # Helper Kolom Dinamis
+            def get_col_idx(df, keywords, default_idx):
+                for i, col in enumerate(df.columns):
+                    if any(k.lower() in str(col).lower() for k in keywords): return i
+                return default_idx
+
+            c_bin_a = get_col_idx(df_asal, ['bin', 'lokasi'], 1)
+            c_sku_a = get_col_idx(df_asal, ['sku', 'item code'], 2)
+            c_qty_a = get_col_idx(df_asal, ['qty system', 'quantity', 'stok'], 9)
+
+            c_bin_d = get_col_idx(df_ds, ['bin', 'tujuan'], 0)
+            c_sku_d = get_col_idx(df_ds, ['sku', 'item'], 1)
+            c_qty_d = get_col_idx(df_ds, ['qty', 'jumlah'], 2)
+
+            # Dictionary Mapping
+            bin_qty_dict = {}
+            for _, row in df_asal_updated.iterrows():
+                try:
+                    key = f"{str(row.iloc[c_bin_a])}|{str(row.iloc[c_sku_a])}"
+                    qty = pd.to_numeric(row.iloc[c_qty_a], errors='coerce')
+                    bin_qty_dict[key] = qty if pd.notna(qty) else 0
+                except: continue
+
+            # Main Logic (Covering Stock)
+            out_data = []
+            for _, row in df_ds.iterrows():
+                try:
+                    sku = str(row.iloc[c_sku_d])
+                    diff_qty = pd.to_numeric(row.iloc[c_qty_d], errors='coerce')
+                    if pd.isna(diff_qty) or diff_qty <= 0: continue
+                    
+                    bin_tujuan = str(row.iloc[c_bin_d])
+                    rem = int(diff_qty)
+                    
+                    patterns = ["STAGING LT.3", "STAGGING LT.3", "STAGING", "STAGGING", "KARANTINA", "NORMAL"]
+                    for pattern in patterns:
+                        if rem <= 0: break
+                        for key in list(bin_qty_dict.keys()):
+                            qty_avail = bin_qty_dict[key]
+                            if qty_avail <= 0: continue
+                            b_name, s_name = key.split("|")
+                            if s_name != sku: continue
+                            
+                            match = False
+                            if pattern == "NORMAL":
+                                if not any(x in b_name.upper() for x in ["STAG", "KARANTINA"]): match = True
+                            else:
+                                if pattern in b_name.upper(): match = True
+                            
+                            if match:
+                                take = min(rem, qty_avail)
+                                bin_qty_dict[key] -= take
+                                rem -= take
+                                out_data.append([bin_tujuan, sku, int(diff_qty), b_name, take, rem, "FULLY SETUP" if rem == 0 else "PARTIAL SETUP"])
+                                if rem <= 0: break
+                    
+                    if rem > 0:
+                        out_data.append([bin_tujuan, sku, int(diff_qty), "(NO BIN)", 0, rem, "PERLU CARI STOCK MANUAL"])
+                except: continue
+
+            # Extract DataFrames
+            df_comp = pd.DataFrame(out_data, columns=["BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QUANTITY", "DIFF", "STATUS"])
+            
+            for idx in df_asal_updated.index:
+                key = f"{str(df_asal_updated.iloc[idx, c_bin_a])}|{str(df_asal_updated.iloc[idx, c_sku_a])}"
+                if key in bin_qty_dict:
+                    df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
+
+            df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
+            if not df_plist.empty:
+                df_plist = df_plist.rename(columns={"BIN DITEMUKAN": "BIN AWAL", "BIN ASAL": "BIN TUJUAN"})
+                df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
+                df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
+                df_plist['NOTES'] = "PUTAWAY"
+            else:
+                df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
+
+            df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
+            
+            # Logic Filter Keyword
+            if self.area_putaway == "DC LANTAI 1": kw_out = ["GL1-DC-PUTAWAY", "STAG"]
+            elif self.area_putaway == "DC LANTAI 2": kw_out = ["GL2-DC-PUTAWAY", "STAG"]
+            elif self.area_putaway == "DC LANTAI 3": kw_out = ["GL3-DC-PUTAWAY", "STAG"]
+            elif self.area_putaway == "JERSEY ZONE": kw_out = ["JZ-PUTAWAY", "STAG"]
+            else: kw_out = ["STAG", "PUTAWAY"]
+
+            bin_series = df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper()
+            mask_kw = bin_series.str.contains(kw_out[0], na=False)
+            for kw in kw_out[1:]:
+                mask_kw = mask_kw | bin_series.str.contains(kw, na=False)
+
+            mask_out = (pd.to_numeric(df_asal_updated.iloc[:, c_qty_a], errors='coerce') > 0) & mask_kw
+            df_outstanding = df_asal_updated[mask_out].copy()
+
+            # Assign Metrics
+            self.putaway_total_setup = int(df_plist['QUANTITY'].sum()) if not df_plist.empty else 0
+            self.putaway_kurang_setup = int(df_kurang['DIFF'].sum()) if not df_kurang.empty else 0
+            
+            self.putaway_sisa_stok = 0
+            if not df_outstanding.empty:
+                qty_col = [c for c in df_outstanding.columns if 'qty' in str(c).lower()]
+                if qty_col: self.putaway_sisa_stok = int(pd.to_numeric(df_outstanding[qty_col[0]], errors='coerce').sum())
+
+            # Convert to State Headers & Rows
+            def to_state(df):
+                if df.empty: return [], []
+                clean = df.fillna("").astype(str)
+                return clean.columns.tolist(), clean.values.tolist()
+
+            self.df_comp_headers, self.df_comp_rows = to_state(df_comp)
+            self.df_plist_headers, self.df_plist_rows = to_state(df_plist)
+            self.df_kurang_headers, self.df_kurang_rows = to_state(df_kurang)
+            self.df_out_headers, self.df_out_rows = to_state(df_outstanding)
+            
+            # Save Raw for Export
+            self._raw_df_comp = df_comp
+            self._raw_df_plist = df_plist
+            self._raw_df_kurang = df_kurang
+            self._raw_df_out = df_outstanding
+            self._raw_df_updated = df_asal_updated
+            
+            self.putaway_processed = True
+            
+            self.is_loading = False
+            self.show_success_modal = True
+            yield
+            
+            await asyncio.sleep(2.5)
+            self.show_success_modal = False
+            yield
+            
+        except Exception as e:
+            self.is_loading = False
+            yield rx.toast.error(f"Gagal memproses file: {e}", position="top-center")
+
+    async def download_putaway_report(self):
+        if not self.putaway_processed:
+            return rx.toast.warning("Belum ada data untuk didownload!", position="top-center")
+        
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            self._raw_df_comp.to_excel(writer, sheet_name='COMPARE', index=False)
+            self._raw_df_plist.to_excel(writer, sheet_name='PUTAWAY_LIST', index=False)
+            self._raw_df_kurang.to_excel(writer, sheet_name='KURANG_SETUP', index=False)
+            self._raw_df_out.to_excel(writer, sheet_name='OUTSTANDING', index=False)
+            self._raw_df_updated.to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
+        
+        return rx.download(data=output.getvalue(), filename="REPORT_PUTAWAY_SYSTEM.xlsx")
+
     # --- COMPUTED METRICS ---
     @rx.var
     def filtered_list(self) -> list[dict]:
