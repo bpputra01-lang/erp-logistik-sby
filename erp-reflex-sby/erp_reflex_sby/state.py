@@ -340,6 +340,12 @@ class AppState(rx.State):
     # ==========================================
     area_putaway: str = ""
     putaway_processed: bool = False
+
+    # 🔥 TAMBAHAN: Variabel Internal Server untuk menampung data file sementara
+    _ds_file_data: bytes = b""
+    _ds_file_name: str = ""
+    _asal_file_data: bytes = b""
+    _asal_file_name: str = ""
     
     # Metrics Putaway
     putaway_qty_system: int = 0
@@ -350,13 +356,10 @@ class AppState(rx.State):
     # Data DataFrames (Headers & Rows)
     df_comp_headers: list[str] = []
     df_comp_rows: list[list[str]] = []
-    
     df_plist_headers: list[str] = []
     df_plist_rows: list[list[str]] = []
-    
     df_kurang_headers: list[str] = []
     df_kurang_rows: list[list[str]] = []
-    
     df_out_headers: list[str] = []
     df_out_rows: list[list[str]] = []
     
@@ -370,18 +373,26 @@ class AppState(rx.State):
     def set_area_putaway(self, val: str):
         self.area_putaway = val
 
-    # 🔥 PERBAIKAN TOTAL DI SINI 🔥
-    async def handle_process_putaway(
-        self, 
-        ds_files: list[rx.UploadFile],   # Argumen 1 (Dari ds_putaway_file)
-        asal_files: list[rx.UploadFile]  # Argumen 2 (Dari asal_putaway_file)
-    ):
+    # 🔥 FUNGSI BARU: Tangkap File DS Putaway
+    async def handle_upload_ds(self, files: list[rx.UploadFile]):
+        if files:
+            self._ds_file_data = await files[0].read()
+            self._ds_file_name = files[0].filename
+
+    # 🔥 FUNGSI BARU: Tangkap File Asal Bin
+    async def handle_upload_asal(self, files: list[rx.UploadFile]):
+        if files:
+            self._asal_file_data = await files[0].read()
+            self._asal_file_name = files[0].filename
+
+    # 🔥 PERBAIKAN: Fungsi Utama, sekarang tidak butuh parameter
+    async def handle_process_putaway(self):
         if not self.area_putaway:
             yield rx.toast.warning("Silakan pilih Area Putaway terlebih dahulu!", position="top-center")
             return
         
-        # Validasi: Pastikan KEDUA form upload sudah diisi oleh user
-        if not ds_files or not asal_files:
+        # Validasi bahwa kedua file berhasil ditangkap
+        if not self._ds_file_data or not self._asal_file_data:
             yield rx.toast.warning("Harap upload KEDUA file (DS Putaway & Asal Bin)!", position="top-center")
             return
 
@@ -389,16 +400,18 @@ class AppState(rx.State):
         yield
 
         try:
-            # Ambil file dari masing-masing form upload
-            ds_file = ds_files[0]
-            asal_file = asal_files[0]
-
-            # 1. Baca Data
-            ds_data = await ds_file.read()
-            df_ds = pd.read_csv(io.BytesIO(ds_data)) if ds_file.filename.endswith('.csv') else pd.read_excel(io.BytesIO(ds_data), engine="openpyxl")
+            # 1. Baca Data dari Memori Server
+            ds_data = self._ds_file_data
+            df_ds = pd.read_csv(io.BytesIO(ds_data)) if self._ds_file_name.endswith('.csv') else pd.read_excel(io.BytesIO(ds_data), engine="openpyxl")
             
-            asal_data = await asal_file.read()
-            df_asal = pd.read_csv(io.BytesIO(asal_data)) if asal_file.filename.endswith('.csv') else pd.read_excel(io.BytesIO(asal_data), engine="openpyxl")
+            asal_data = self._asal_file_data
+            df_asal = pd.read_csv(io.BytesIO(asal_data)) if self._asal_file_name.endswith('.csv') else pd.read_excel(io.BytesIO(asal_data), engine="openpyxl")
+
+            # Reset memori agar siap jika user klik compare lagi di masa depan
+            self._ds_file_data = b""
+            self._asal_file_data = b""
+            self._ds_file_name = ""
+            self._asal_file_name = ""
 
             df_asal_updated = df_asal.copy()
             self.putaway_qty_system = int(pd.to_numeric(df_asal_updated.iloc[:, 9], errors='coerce').sum())
