@@ -17,7 +17,6 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
-            # Tombol Panduan & Logic
             rx.button(
                 rx.icon("megaphone", size=18, color="#1A202C"),
                 "Panduan & Logic",
@@ -29,7 +28,7 @@ def global_header() -> rx.Component:
                 cursor="pointer",
             ),
             
-            # --- [PERBAIKAN] Menumpuk ONLINE dan TIMER ---
+            # --- [PERBAIKAN] Menumpuk ONLINE dan TIMER menjadi simetris dan transparan ---
             rx.vstack(
                 # Bagian Atas: Titik Hijau & ONLINE
                 rx.hstack(
@@ -37,14 +36,14 @@ def global_header() -> rx.Component:
                     rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
                     align="center", spacing="2",
                 ),
-                # Bagian Bawah: Timer Live
+                # Bagian Bawah: Timer Live (Tanpa Kotak Background)
                 rx.hstack(
                     rx.text(AppState.login_timestamp_ms, id="login-time-store", display="none"), # HIDDEN STATE
                     rx.icon("timer", size=14, color="#4A5568"),
-                    rx.text("00:00:00", id="live-timer", color="#1A202C", font_weight="bold", size="1", font_family="monospace"),
-                    align="center", spacing="2", background="#E2E8F0", padding="2px 6px", border_radius="6px",
+                    rx.text("00:00:00", id="live-timer", color="#4A5568", font_weight="bold", size="1", font_family="monospace"),
+                    align="center", spacing="1", 
                 ),
-                align_items="end", # Meratakan elemen ke sebelah kanan
+                align_items="center", # Membuatnya simetris (rata tengah atas-bawah)
                 spacing="1",
             ),
             # ---------------------------------------------
@@ -220,6 +219,7 @@ def index() -> rx.Component:
         ),
         width="100vw", height="100vh", spacing="0",
     )
+
 
 app = rx.App(
     theme=rx.theme(appearance="light", accent_color="red"),
