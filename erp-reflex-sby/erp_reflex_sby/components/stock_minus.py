@@ -2,7 +2,7 @@ import reflex as rx
 from ..state import AppState
 
 def render_dynamic_table(data_list) -> rx.Component:
-    """Helper untuk merender tabel dinamis berdasarkan list of dict dari Pandas."""
+    """Helper untuk merender tabel dinamis data dictionary dengan warna teks yang jelas."""
     return rx.box(
         rx.cond(
             data_list,
@@ -12,7 +12,7 @@ def render_dynamic_table(data_list) -> rx.Component:
                         rx.foreach(
                             data_list,
                             lambda col_key: rx.table.column_header_cell(
-                                col_key, color="#1A202C", font_weight="bold"
+                                col_key, color="#1A202C", font_weight="bold", background="#F7FAFC"
                             )
                         )
                     )
@@ -24,7 +24,7 @@ def render_dynamic_table(data_list) -> rx.Component:
                             rx.foreach(
                                 row,
                                 lambda item: rx.table.cell(
-                                    item[1].to_string(), color="#4A5568"
+                                    item[1].to_string(), color="#1A202C", font_size="13px"
                                 )
                             )
                         )
@@ -64,13 +64,12 @@ def stock_minus_view() -> rx.Component:
             ),
         ),
 
-        # --- 2. UPLOAD SECTION (Sesuai Referensi Gambar: Kotak Panjang, Border Hitam Dashed, Tombol Gold) ---
+        # --- 2. UPLOAD SECTION (Kotak Panjang, Border Hitam Dashed, Tombol Gold) ---
         rx.vstack(
             rx.text("Upload File STOCK MINUS", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
             
             rx.upload(
                 rx.hstack(
-                    # Tombol Upload Style Gold/Bronze
                     rx.button(
                         rx.hstack(rx.icon("upload", size=16), rx.text("Upload"), spacing="2"),
                         background_color="#C5A059",
@@ -83,8 +82,7 @@ def stock_minus_view() -> rx.Component:
                         box_shadow="0 2px 4px rgba(0,0,0,0.1)",
                         _hover={"background_color": "#B38F4D"},
                     ),
-                    # Informasi Kapasitas & Ekstensi File
-                    rx.text("200MB per file • XLSX, XLS", color="#718096", size="2", font_weight="medium"),
+                    rx.text("200MB per file • XLSX, XLS", color="#4A5568", size="2", font_weight="medium"),
                     align="center",
                     spacing="4",
                     width="100%",
@@ -96,7 +94,7 @@ def stock_minus_view() -> rx.Component:
                     "application/vnd.ms-excel": [".xls"],
                 },
                 max_files=1,
-                border="2px dashed #000000", # Garis border box warna HITAM sesuai permintaan!
+                border="2px dashed #000000", # Garis border box warna HITAM
                 border_radius="8px",
                 background="#F8FAFC",
                 padding="1rem 1.25rem",
@@ -105,7 +103,7 @@ def stock_minus_view() -> rx.Component:
                 cursor="pointer",
             ),
             
-            # Nama file terpilih & Tombol Proses Eksekusi di bawahnya
+            # Nama file terpilih & Tombol Proses
             rx.hstack(
                 rx.cond(
                     rx.selected_files("upload_stock_file"),
@@ -117,7 +115,6 @@ def stock_minus_view() -> rx.Component:
                     rx.fragment(),
                 ),
                 
-                # Tombol Proses / Run
                 rx.button(
                     rx.hstack(rx.icon("play", size=16), rx.text("PROSES DATA"), spacing="2"),
                     on_click=AppState.handle_upload_stock_minus(rx.upload_files("upload_stock_file")),
@@ -151,13 +148,13 @@ def stock_minus_view() -> rx.Component:
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
-                # Banner Sukses dengan Ikon Centang Hijau
+                # Banner Sukses Bersih di Atas Metrik (Tanpa Floating Modal Mengganggu)
                 rx.hstack(
                     rx.icon("check-circle", size=18, color="#38A169"),
                     rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#22543D", size="2"),
                     background="#C6F6D5", 
                     border="1px solid #9AE6B4", 
-                    padding="8px 14px", 
+                    padding="10px 16px", 
                     border_radius="6px",
                     width="100%", 
                     align="center", 
@@ -185,12 +182,13 @@ def stock_minus_view() -> rx.Component:
                     width="100%", spacing="3", margin_bottom="1.25rem",
                 ),
 
-                # Tabs untuk Tabel Hasil
+                # Tabs Lengkap Termasuk Panduan & Logic yang Dikembalikan
                 rx.tabs.root(
                     rx.tabs.list(
                         rx.tabs.trigger("📄 MINUS AWAL", value="tab1"),
                         rx.tabs.trigger("🔄 TEMPLATE SET UP", value="tab2"),
                         rx.tabs.trigger("⚠️ JUSTIFIKASI", value="tab3"),
+                        rx.tabs.trigger("📖 PANDUAN & LOGIC", value="tab4"),
                     ),
                     rx.tabs.content(
                         render_dynamic_table(AppState.df_minus_awal_data),
@@ -203,6 +201,19 @@ def stock_minus_view() -> rx.Component:
                     rx.tabs.content(
                         render_dynamic_table(AppState.df_need_adj_data),
                         value="tab3", padding="0.75rem 0",
+                    ),
+                    rx.tabs.content(
+                        rx.box(
+                            rx.vstack(
+                                rx.text("Panduan & Logic Stock Minus System", font_weight="bold", color="#1A202C", size="4"),
+                                rx.text("1. Sistem membaca file excel stock minus dan melakukan pencocokan data Qty System vs Qty SO.", color="#4A5568", size="2"),
+                                rx.text("2. Tab 'Template Set Up' menghasilkan format otomatis untuk penyesuaian database gudang.", color="#4A5568", size="2"),
+                                rx.text("3. Tab 'Justifikasi' menampilkan selisih item yang membutuhkanApproval / Adjust manual dari PIC.", color="#4A5568", size="2"),
+                                align_items="start", spacing="3", padding="1rem",
+                            ),
+                            background="white", border_radius="8px", border="1px solid #E2E8F0", padding="1rem", width="100%",
+                        ),
+                        value="tab4", padding="0.75rem 0",
                     ),
                     default_value="tab1", width="100%",
                 ),
