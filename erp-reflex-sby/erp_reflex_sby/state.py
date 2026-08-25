@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import io
 import asyncio
+import time  # <-- TAMBAHAN UNTUK TIMER
 from .database import get_supabase
 
 class AppState(rx.State):
@@ -60,6 +61,9 @@ class AppState(rx.State):
     password: str = ""
     branch: str = ""
     user_display_name: str = ""
+    
+    # [TAMBAHAN] Menyimpan waktu login dalam bentuk millisecond
+    login_timestamp_ms: int = 0 
 
     def set_username(self, val: str): self.username = val
     def set_password(self, val: str): self.password = val
@@ -67,10 +71,14 @@ class AppState(rx.State):
     def handle_login(self):
         if self.username == "admin" and self.password == "sby123":
             self.logged_in = True; self.role = "DC"; self.branch = "SURABAYA"; self.user_display_name = "Admin DC Surabaya"
+            self.login_timestamp_ms = int(time.time() * 1000) # Catat waktu login
             return rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000, position="top-right")
+        
         elif self.username == "toko" and self.password == "toko123":
             self.logged_in = True; self.role = "CABANG"; self.branch = "SURABAYA"; self.user_display_name = "User Cabang"
+            self.login_timestamp_ms = int(time.time() * 1000) # Catat waktu login
             return rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000, position="top-right")
+        
         else:
             return rx.toast.error("Username atau Password salah! Periksa kembali.", duration=4000, position="top-right")
 
@@ -79,6 +87,7 @@ class AppState(rx.State):
 
     def logout(self):
         self.logged_in = False; self.username = ""; self.password = ""; self.role = "toko"
+        self.login_timestamp_ms = 0 # Reset waktu logout
         return rx.toast.info("Anda telah keluar dari sistem.")
 
     # --- FITUR DOWNLOAD EXCEL ---
