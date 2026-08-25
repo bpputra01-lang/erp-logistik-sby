@@ -46,14 +46,12 @@ def putaway_view() -> rx.Component:
             # 🔥 Menggunakan Low-Level Select API agar styling hitam bold-nya benar-benar tembus
             rx.select.root(
                 rx.select.trigger(
-                    placeholder="-- Pilih Area Putaway --",
                     style={
                         "background-color": "white",
                         "color": "black",
-                        "font-weight": "bold !important",
+                        "font-weight": "bold",
                         "border": "1px solid #CBD5E0",
                         "width": "100%",
-                        "height": "40px",
                     }
                 ),
                 rx.select.content(
@@ -61,10 +59,10 @@ def putaway_view() -> rx.Component:
                     rx.select.item("DC LANTAI 2", value="DC LANTAI 2"),
                     rx.select.item("DC LANTAI 3", value="DC LANTAI 3"),
                     rx.select.item("JERSEY ZONE", value="JERSEY ZONE"),
-                    style={"background-color": "white", "color": "black", "font-weight": "bold"}
                 ),
                 value=AppState.area_putaway,
                 on_change=AppState.set_area_putaway,
+                placeholder="-- Pilih Area Putaway --",
             ),
             
             
