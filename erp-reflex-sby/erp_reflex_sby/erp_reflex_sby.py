@@ -17,18 +17,7 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
-            # --- [TAMBAHAN TIMER LIVE] ---
-            # 1. (HIDDEN) Penyimpan waktu untuk dibaca oleh Javascript
-            rx.text(AppState.login_timestamp_ms, id="login-time-store", display="none"),
-            
-            # 2. UI TIMER (Sebelah Kiri Panduan & Logic)
-            rx.hstack(
-                rx.icon("timer", size=16, color="#4A5568"),
-                rx.text("00:00:00", id="live-timer", color="#1A202C", font_weight="bold", size="2", font_family="monospace"),
-                align="center", spacing="2", background="#E2E8F0", padding="6px 12px", border_radius="8px",
-            ),
-            # -----------------------------
-
+            # Tombol Panduan & Logic
             rx.button(
                 rx.icon("megaphone", size=18, color="#1A202C"),
                 "Panduan & Logic",
@@ -39,9 +28,28 @@ def global_header() -> rx.Component:
                 color="#1A202C",     
                 cursor="pointer",
             ),
-            rx.box(width="10px", height="10px", background="#10B981", border_radius="50%", class_name="blink-online"),
-            rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
-            align="center", spacing="3",
+            
+            # --- [PERBAIKAN] Menumpuk ONLINE dan TIMER ---
+            rx.vstack(
+                # Bagian Atas: Titik Hijau & ONLINE
+                rx.hstack(
+                    rx.box(width="8px", height="8px", background="#10B981", border_radius="50%", class_name="blink-online"),
+                    rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
+                    align="center", spacing="2",
+                ),
+                # Bagian Bawah: Timer Live
+                rx.hstack(
+                    rx.text(AppState.login_timestamp_ms, id="login-time-store", display="none"), # HIDDEN STATE
+                    rx.icon("timer", size=14, color="#4A5568"),
+                    rx.text("00:00:00", id="live-timer", color="#1A202C", font_weight="bold", size="1", font_family="monospace"),
+                    align="center", spacing="2", background="#E2E8F0", padding="2px 6px", border_radius="6px",
+                ),
+                align_items="end", # Meratakan elemen ke sebelah kanan
+                spacing="1",
+            ),
+            # ---------------------------------------------
+            
+            align="center", spacing="4",
         ),
         padding="12px 20px", background="#D1FAE5", border="1.5px solid #A7F3D0", border_radius="16px", justify="between", width="100%", align="center", margin_bottom="1rem",
     )
@@ -114,7 +122,7 @@ def index() -> rx.Component:
             </style>
         """),
         
-        # --- [TAMBAHAN BARU] SCRIPT JAVASCRIPT UNTUK TIMER ---
+        # SCRIPT JAVASCRIPT UNTUK TIMER
         rx.script("""
             setInterval(function() {
                 let elStore = document.getElementById('login-time-store');
@@ -212,7 +220,6 @@ def index() -> rx.Component:
         ),
         width="100vw", height="100vh", spacing="0",
     )
-
 
 app = rx.App(
     theme=rx.theme(appearance="light", accent_color="red"),
