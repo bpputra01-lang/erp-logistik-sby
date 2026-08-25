@@ -17,6 +17,18 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
+            # --- [TAMBAHAN TIMER LIVE] ---
+            # 1. (HIDDEN) Penyimpan waktu untuk dibaca oleh Javascript
+            rx.text(AppState.login_timestamp_ms, id="login-time-store", display="none"),
+            
+            # 2. UI TIMER (Sebelah Kiri Panduan & Logic)
+            rx.hstack(
+                rx.icon("timer", size=16, color="#4A5568"),
+                rx.text("00:00:00", id="live-timer", color="#1A202C", font_weight="bold", size="2", font_family="monospace"),
+                align="center", spacing="2", background="#E2E8F0", padding="6px 12px", border_radius="8px",
+            ),
+            # -----------------------------
+
             rx.button(
                 rx.icon("megaphone", size=18, color="#1A202C"),
                 "Panduan & Logic",
@@ -100,6 +112,27 @@ def index() -> rx.Component:
                 }
                 .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
             </style>
+        """),
+        
+        # --- [TAMBAHAN BARU] SCRIPT JAVASCRIPT UNTUK TIMER ---
+        rx.script("""
+            setInterval(function() {
+                let elStore = document.getElementById('login-time-store');
+                let elTimer = document.getElementById('live-timer');
+                if (elStore && elTimer) {
+                    let loginTime = parseInt(elStore.innerText);
+                    if (loginTime && loginTime > 0) {
+                        let now = new Date().getTime();
+                        let diff = Math.floor((now - loginTime) / 1000);
+                        let h = String(Math.floor(diff / 3600)).padStart(2, '0');
+                        let m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+                        let s = String(diff % 60).padStart(2, '0');
+                        elTimer.innerText = h + ':' + m + ':' + s;
+                    } else {
+                        elTimer.innerText = "00:00:00";
+                    }
+                }
+            }, 1000);
         """),
         
         rx.cond(
