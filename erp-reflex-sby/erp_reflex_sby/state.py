@@ -23,14 +23,21 @@ class AppState(rx.State):
 
     # --- STOCK MINUS STATE ---
     stock_minus_processed: bool = False
-    is_info_open: bool = False  # <-- Ditambahkan untuk kontrol modal panduan/logic
-    is_loading: bool = False    # <-- Ditambahkan untuk kontrol popup loading
+    is_info_open: bool = False  
+    is_loading: bool = False    
     total_qty_minus: int = 0
     total_tercover: int = 0
     total_sisa_adj: int = 0
-    df_minus_awal_data: list[dict] = []
-    df_set_up_data: list[dict] = []
-    df_need_adj_data: list[dict] = []
+    
+    # PERBAIKAN 1: Memisahkan Header dan Rows untuk tabel Reflex
+    df_minus_awal_headers: list[str] = []
+    df_minus_awal_rows: list[list[str]] = []
+    
+    df_set_up_headers: list[str] = []
+    df_set_up_rows: list[list[str]] = []
+    
+    df_need_adj_headers: list[str] = []
+    df_need_adj_rows: list[list[str]] = []
 
     def set_is_info_open(self, val: bool):
         self.is_info_open = val
@@ -312,19 +319,45 @@ class AppState(rx.State):
                 self.total_tercover = int(df_s["QUANTITY"].sum()) if not df_s.empty else 0
                 self.total_sisa_adj = int(abs(df_n[col_qty].sum())) if not df_n.empty and col_qty in df_n.columns else 0
 
-                # Simpan ke state data list dict
-                self.df_minus_awal_data = df_minus_awal.to_dict(orient="records") if not df_minus_awal.empty else []
-                self.df_set_up_data = df_s.to_dict(orient="records") if not df_s.empty else []
-                self.df_need_adj_data = df_n.to_dict(orient="records") if not df_n.empty else []
+                # PERBAIKAN 2: Simpan Data Pandas ke state Header & Rows terpisah agar tabel rapi
+                
+                # Format Data Minus Awal
+                if not df_minus_awal.empty:
+                    df_m_clean = df_minus_awal.fillna("").astype(str)
+                    self.df_minus_awal_headers = df_m_clean.columns.tolist()
+                    self.df_minus_awal_rows = df_m_clean.values.tolist()
+                else:
+                    self.df_minus_awal_headers = []
+                    self.df_minus_awal_rows = []
+
+                # Format Data Set Up
+                if not df_s.empty:
+                    df_s_clean = df_s.fillna("").astype(str)
+                    self.df_set_up_headers = df_s_clean.columns.tolist()
+                    self.df_set_up_rows = df_s_clean.values.tolist()
+                else:
+                    self.df_set_up_headers = []
+                    self.df_set_up_rows = []
+
+                # Format Data Need Adj (Justifikasi)
+                if not df_n.empty:
+                    df_n_clean = df_n.fillna("").astype(str)
+                    self.df_need_adj_headers = df_n_clean.columns.tolist()
+                    self.df_need_adj_rows = df_n_clean.values.tolist()
+                else:
+                    self.df_need_adj_headers = []
+                    self.df_need_adj_rows = []
                 
                 self.stock_minus_processed = True
 
             self.is_loading = False
-            yield rx.toast.success("✅ Data Stock Minus Berhasil Diproses!")
+            
+            # Ini memanggil pop up (toast) notifikasi sukses di posisi atas-tengah layar
+            yield rx.toast.success("✅ Data Stock Minus Berhasil Diproses!", position="top-center", duration=5000)
             
         except Exception as e:
             self.is_loading = False
-            yield rx.toast.error(f"Gagal memproses file: {e}")
+            yield rx.toast.error(f"Gagal memproses file: {e}", position="top-center")
 
     # --- COMPUTED METRICS ---
     @rx.var

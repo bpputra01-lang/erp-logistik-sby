@@ -1,34 +1,38 @@
 import reflex as rx
 from ..state import AppState
 
-def render_clean_table(data_list) -> rx.Component:
-    """Helper tabel aman untuk merender list/dict Pandas tanpa teks JSON mentah."""
+def render_clean_table(headers: list, data_rows: list) -> rx.Component:
+    """Helper tabel aman memisahkan Header dan Baris agar teks tidak menyatu (mashed)."""
     return rx.box(
         rx.cond(
-            data_list.length() > 0,
+            data_rows.length() > 0,
             rx.table.root(
                 rx.table.header(
                     rx.table.row(
+                        # Render Kolom Header
                         rx.foreach(
-                            data_list[0],
-                            lambda col_key: rx.table.column_header_cell(
-                                rx.text(col_key, weight="bold", font_size="12px"), 
+                            headers,
+                            lambda col_name: rx.table.column_header_cell(
+                                rx.text(col_name, weight="bold", font_size="12px"), 
                                 color="#1A202C", 
                                 background="#EDF2F7",
-                                padding="10px"
+                                padding="10px",
+                                white_space="nowrap"
                             )
                         )
                     )
                 ),
                 rx.table.body(
+                    # Render Baris Data
                     rx.foreach(
-                        data_list,
+                        data_rows,
                         lambda row: rx.table.row(
                             rx.foreach(
                                 row,
-                                lambda item: rx.table.cell(
-                                    rx.text(item, color="#2D3748", font_size="13px"),
-                                    padding="8px 10px"
+                                lambda cell_value: rx.table.cell(
+                                    rx.text(cell_value, color="#2D3748", font_size="13px"),
+                                    padding="8px 10px",
+                                    white_space="nowrap"
                                 )
                             )
                         )
@@ -54,7 +58,7 @@ def render_clean_table(data_list) -> rx.Component:
 
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
-        # --- 1. HEADER MODUL (Tanpa tombol dobel, karena sudah ada di Global Header atas) ---
+        # --- 1. HEADER MODUL ---
         rx.hstack(
             rx.text("Modul Stock Minus & Validation", font_weight="bold", color="#1A202C", size="5"),
             justify="between",
@@ -147,12 +151,12 @@ def stock_minus_view() -> rx.Component:
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
-                # Banner Sukses
+                # Banner Sukses (Gaya Pop-up Inline yang Rapi)
                 rx.hstack(
-                    rx.icon("check-circle", size=20, color="#22543D"),
-                    rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#22543D", size="3"),
-                    background="#C6F6D5", 
-                    border="1px solid #9AE6B4", 
+                    rx.icon("check-circle", size=20, color="#15803d"),
+                    rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#15803d", size="3"),
+                    background="#dcfce7", 
+                    border="1px solid #86efac", 
                     padding="12px 18px", 
                     border_radius="8px",
                     width="100%", 
@@ -160,7 +164,7 @@ def stock_minus_view() -> rx.Component:
                     justify="center",
                     spacing="2", 
                     margin_bottom="1.25rem",
-                    box_shadow="0 2px 4px rgba(0,0,0,0.05)",
+                    box_shadow="0 4px 6px rgba(0,0,0,0.05)",
                 ),
 
                 # Kotak Metrik 3 Kolom
@@ -183,32 +187,23 @@ def stock_minus_view() -> rx.Component:
                     width="100%", spacing="3", margin_bottom="1.25rem",
                 ),
 
-                # Tabs Data Bersih
+                # Tabs Data Bersih menggunakan State baru yang terpisah
                 rx.tabs.root(
                     rx.tabs.list(
-                        rx.tabs.trigger(
-                            rx.hstack(rx.icon("file-text", size=14), rx.text("MINUS AWAL", font_weight="bold")),
-                            value="tab1", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
-                        ),
-                        rx.tabs.trigger(
-                            rx.hstack(rx.icon("refresh-cw", size=14), rx.text("TEMPLATE SET UP", font_weight="bold")),
-                            value="tab2", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
-                        ),
-                        rx.tabs.trigger(
-                            rx.hstack(rx.icon("alert-triangle", size=14), rx.text("JUSTIFIKASI", font_weight="bold")),
-                            value="tab3", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
-                        ),
+                        rx.tabs.trigger(rx.hstack(rx.icon("file-text", size=14), rx.text("MINUS AWAL", font_weight="bold")), value="tab1", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
+                        rx.tabs.trigger(rx.hstack(rx.icon("refresh-cw", size=14), rx.text("TEMPLATE SET UP", font_weight="bold")), value="tab2", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
+                        rx.tabs.trigger(rx.hstack(rx.icon("alert-triangle", size=14), rx.text("JUSTIFIKASI", font_weight="bold")), value="tab3", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
                     ),
                     rx.tabs.content(
-                        render_clean_table(AppState.df_minus_awal_data),
+                        render_clean_table(AppState.df_minus_awal_headers, AppState.df_minus_awal_rows),
                         value="tab1", padding="0.75rem 0",
                     ),
                     rx.tabs.content(
-                        render_clean_table(AppState.df_set_up_data),
+                        render_clean_table(AppState.df_set_up_headers, AppState.df_set_up_rows),
                         value="tab2", padding="0.75rem 0",
                     ),
                     rx.tabs.content(
-                        render_clean_table(AppState.df_need_adj_data),
+                        render_clean_table(AppState.df_need_adj_headers, AppState.df_need_adj_rows),
                         value="tab3", padding="0.75rem 0",
                     ),
                     default_value="tab1", width="100%",
