@@ -10,7 +10,7 @@ def render_clean_table(data_list) -> rx.Component:
                 rx.table.header(
                     rx.table.row(
                         rx.foreach(
-                            data_list[0],  # Ambil keys dari dictionary baris pertama untuk header
+                            data_list[0],
                             lambda col_key: rx.table.column_header_cell(
                                 col_key[0], color="#1A202C", font_weight="bold", background="#EDF2F7"
                             )
@@ -64,7 +64,55 @@ def stock_minus_view() -> rx.Component:
             ),
         ),
 
-        # --- 2. UPLOAD SECTION ---
+        # --- 2. MODAL DIALOG UNTUK PANDUAN & LOGIC (Dipanggil dari tombol khusus) ---
+        rx.dialog.root(
+            rx.dialog.content(
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("book-open", size=20, color="#C5A059"),
+                        rx.text("Panduan & Logic Stock Minus System", font_weight="bold", color="#1A202C", size="4"),
+                        justify="between", width="100%", align="center"
+                    ),
+                    rx.divider(margin_y="0.5rem"),
+                    rx.text("1. Sistem membaca file excel stock minus dan melakukan pencocokan data Qty System vs Qty SO.", color="#4A5568", size="2"),
+                    rx.text("2. Tab 'Template Set Up' menghasilkan format otomatis untuk penyesuaian database gudang.", color="#4A5568", size="2"),
+                    rx.text("3. Tab 'Justifikasi' menampilkan selisih item yang membutuhkan Approval / Adjust manual dari PIC.", color="#4A5568", size="2"),
+                    rx.flex(
+                        rx.dialog.close(
+                            rx.button("Tutup", background_color="#2D3748", color="white", size="2", font_weight="bold", cursor="pointer")
+                        ),
+                        justify="end", width="100%", margin_top="1rem"
+                    ),
+                    spacing="3", align_items="start", width="100%",
+                ),
+            ),
+            id="modal_panduan",
+        ),
+
+        # --- 3. HEADER & TOMBOL PANDUAN & LOGIC KHUSUS (Sesuai Referensi) ---
+        rx.hstack(
+            rx.text("Modul Stock Minus & Validation", font_weight="bold", color="#1A202C", size="5"),
+            
+            # Tombol Panduan & Logic terpisah (Bisa diklik muncul modal)
+            rx.dialog.trigger(
+                rx.button(
+                    rx.hstack(rx.icon("megaphone", size=16, color="#DD6B20"), rx.text("Panduan & Logic", font_weight="bold", color="#DD6B20"), spacing="2"),
+                    background_color="#FEEBC8",
+                    border="1px solid #FBD38D",
+                    border_radius="6px",
+                    padding="0.5rem 1rem",
+                    cursor="pointer",
+                    _hover={"background_color": "#FDE68A"},
+                ),
+                control="modal_panduan",
+            ),
+            justify="between",
+            align="center",
+            width="100%",
+            margin_bottom="1rem",
+        ),
+
+        # --- 4. UPLOAD SECTION ---
         rx.vstack(
             rx.text("Upload File STOCK MINUS", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
             
@@ -144,11 +192,11 @@ def stock_minus_view() -> rx.Component:
             align_items="start",
         ),
 
-        # --- 3. DASHBOARD METRICS & TABS (Muncul Setelah Diproses) ---
+        # --- 5. DASHBOARD METRICS & TABS (Hanya 3 Tab Utama: Minus Awal, Template Set Up, Justifikasi) ---
         rx.cond(
             AppState.stock_minus_processed,
             rx.vstack(
-                # Banner Sukses Tengah yang Jelas
+                # Banner Sukses Bersih di Tengah (Bebas dari pop-up pojok kanan bawah)
                 rx.hstack(
                     rx.icon("check-circle", size=20, color="#22543D"),
                     rx.text("Data Stock Minus Berhasil Diproses & Divalidasi!", font_weight="bold", color="#22543D", size="3"),
@@ -184,7 +232,7 @@ def stock_minus_view() -> rx.Component:
                     width="100%", spacing="3", margin_bottom="1.25rem",
                 ),
 
-                # Tabs dengan Warna Teks Judul Hitam Jelas & Kontras
+                # Tabs Bersih (Hanya 3 Tab Data)
                 rx.tabs.root(
                     rx.tabs.list(
                         rx.tabs.trigger(
@@ -199,10 +247,6 @@ def stock_minus_view() -> rx.Component:
                             rx.hstack(rx.icon("alert-triangle", size=14), rx.text("JUSTIFIKASI", font_weight="bold")),
                             value="tab3", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
                         ),
-                        rx.tabs.trigger(
-                            rx.hstack(rx.icon("book-open", size=14), rx.text("PANDUAN & LOGIC", font_weight="bold")),
-                            value="tab4", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}
-                        ),
                     ),
                     rx.tabs.content(
                         render_clean_table(AppState.df_minus_awal_data),
@@ -215,19 +259,6 @@ def stock_minus_view() -> rx.Component:
                     rx.tabs.content(
                         render_clean_table(AppState.df_need_adj_data),
                         value="tab3", padding="0.75rem 0",
-                    ),
-                    rx.tabs.content(
-                        rx.box(
-                            rx.vstack(
-                                rx.text("Panduan & Logic Stock Minus System", font_weight="bold", color="#1A202C", size="4"),
-                                rx.text("1. Sistem membaca file excel stock minus dan melakukan pencocokan data Qty System vs Qty SO.", color="#4A5568", size="2"),
-                                rx.text("2. Tab 'Template Set Up' menghasilkan format otomatis untuk penyesuaian database gudang.", color="#4A5568", size="2"),
-                                rx.text("3. Tab 'Justifikasi' menampilkan selisih item yang membutuhkan Approval / Adjust manual dari PIC.", color="#4A5568", size="2"),
-                                align_items="start", spacing="3", padding="1rem",
-                            ),
-                            background="white", border_radius="8px", border="1px solid #E2E8F0", padding="1rem", width="100%",
-                        ),
-                        value="tab4", padding="0.75rem 0",
                     ),
                     default_value="tab1", width="100%",
                 ),
