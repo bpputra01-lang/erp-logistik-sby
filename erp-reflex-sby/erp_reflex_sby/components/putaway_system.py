@@ -43,26 +43,17 @@ def putaway_view() -> rx.Component:
         rx.vstack(
             rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
             
-            # 🔥 Menggunakan Low-Level Select API agar styling hitam bold-nya benar-benar tembus
-            rx.select.root(
-                rx.select.trigger(
-                    style={
-                        "background-color": "white",
-                        "color": "black",
-                        "font-weight": "bold",
-                        "border": "1px solid #CBD5E0",
-                        "width": "100%",
-                    }
-                ),
-                rx.select.content(
-                    rx.select.item("DC LANTAI 1", value="DC LANTAI 1"),
-                    rx.select.item("DC LANTAI 2", value="DC LANTAI 2"),
-                    rx.select.item("DC LANTAI 3", value="DC LANTAI 3"),
-                    rx.select.item("JERSEY ZONE", value="JERSEY ZONE"),
-                ),
+            rx.select(
+                ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
+                placeholder="-- Pilih Area Putaway --",
                 value=AppState.area_putaway,
                 on_change=AppState.set_area_putaway,
-                placeholder="-- Pilih Area Putaway --",
+                size="3", 
+                width="100%", 
+                margin_bottom="1rem",
+                # 🔥 Gunakan variant="surface" dan color_scheme agar teksnya terbaca jelas
+                variant="surface",
+                color_scheme="gray",
             ),
             
             
