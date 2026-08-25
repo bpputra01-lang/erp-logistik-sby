@@ -79,8 +79,10 @@ def putaway_view() -> rx.Component:
                         ),
                         rx.button(
                             rx.hstack(rx.icon("play", size=16), rx.text("COMPARE PUTAWAY"), spacing="2"), 
+                            # PERBAIKAN: Pisahkan rx.upload_files menjadi 2 argumen independen
                             on_click=AppState.handle_process_putaway(
-                                rx.upload_files(["ds_putaway_file", "asal_putaway_file"])
+                                rx.upload_files("ds_putaway_file"),
+                                rx.upload_files("asal_putaway_file")
                             ), 
                             background_color="#E50914", color="white", font_weight="bold", 
                             border_radius="6px", padding="0.5rem 1.25rem", cursor="pointer"
@@ -131,12 +133,10 @@ def putaway_view() -> rx.Component:
                     rx.tabs.content(render_clean_table(AppState.df_comp_headers, AppState.df_comp_rows), value="t1", padding="0.75rem 0"),
                     rx.tabs.content(render_clean_table(AppState.df_plist_headers, AppState.df_plist_rows), value="t2", padding="0.75rem 0"),
                     rx.tabs.content(
-                        # FIX: Gunakan .bool() alih-alih .length() > 0
                         rx.cond(AppState.df_kurang_rows.bool(), render_clean_table(AppState.df_kurang_headers, AppState.df_kurang_rows), rx.center(rx.text("✅ Semua Tercover!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")),
                         value="t3", padding="0.75rem 0"
                     ),
                     rx.tabs.content(
-                        # FIX: Gunakan .bool() alih-alih .length() > 0
                         rx.cond(AppState.df_out_rows.bool(), render_clean_table(AppState.df_out_headers, AppState.df_out_rows), rx.center(rx.text("✅ Tidak ada Outstanding!", color="#38A169", font_weight="bold"), background="#C6F6D5", padding="1rem", border_radius="8px")),
                         value="t4", padding="0.75rem 0"
                     ),
