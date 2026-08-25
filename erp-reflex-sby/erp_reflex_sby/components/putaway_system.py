@@ -58,8 +58,8 @@ def putaway_view() -> rx.Component:
                 rx.vstack(
                     rx.hstack(
                         rx.icon("map-pin", color="#3182ce", size=18),
-                        rx.text("Area Terpilih: ", font_weight="normal", color="#2c5282", size="2"),
-                        rx.text(AppState.area_putaway, font_weight="bold", color="#2c5282", size="2"),
+                        rx.text("Area Terpilih: ", font_weight="normal", color="#000000", size="2"),
+                        rx.text(AppState.area_putaway, font_weight="bold", color="#000000", size="2"),
                         background="#ebf8ff", border_left="4px solid #3182ce", padding="10px 16px", border_radius="6px", width="100%", align="center", spacing="2", margin_bottom="1rem"
                     ),
                     
