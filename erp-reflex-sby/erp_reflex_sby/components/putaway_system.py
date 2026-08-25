@@ -79,7 +79,6 @@ def putaway_view() -> rx.Component:
                         ),
                         rx.button(
                             rx.hstack(rx.icon("play", size=16), rx.text("COMPARE PUTAWAY"), spacing="2"), 
-                            # PERBAIKAN DI SINI: Masukkan kedua ID upload ke dalam 1 list/tuple
                             on_click=AppState.handle_process_putaway(
                                 rx.upload_files(["ds_putaway_file", "asal_putaway_file"])
                             ), 
