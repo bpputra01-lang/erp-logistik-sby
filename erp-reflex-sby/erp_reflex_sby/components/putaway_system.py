@@ -2,6 +2,46 @@ import reflex as rx
 from ..state import AppState
 from .stock_minus import render_clean_table, success_modal  # Pinjam helper yang sudah rapi
 
+# 🔥 KOMPONEN BARU: Custom Uploader persis seperti gambar yang diminta
+def custom_uploader_box(id_str: str, title: str) -> rx.Component:
+    return rx.vstack(
+        rx.text(title, font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
+        rx.upload(
+            rx.hstack(
+                # Tombol palsu untuk tampilan
+                rx.button(
+                    rx.hstack(rx.icon("upload", size=16), rx.text("Upload", font_weight="bold")),
+                    background_color="#C5A059", color="white", pointer_events="none", border_radius="6px"
+                ),
+                # Kondisi: Jika file dipilih vs Belum dipilih
+                rx.cond(
+                    rx.selected_files(id_str),
+                    # Tampilan JIKA FILE SUDAH DIPILIH (Muncul di dalam kotak)
+                    rx.hstack(
+                        rx.icon("check-circle", color="#38A169", size=20),
+                        rx.foreach(
+                            rx.selected_files(id_str),
+                            lambda f: rx.text(f, color="#38A169", font_weight="bold", truncate=True)
+                        ),
+                        spacing="2", align="center"
+                    ),
+                    # Tampilan JIKA KOSONG
+                    rx.text("200MB per file • XLSX, XLS, CSV", color="#718096", size="2")
+                ),
+                spacing="4", align="center", width="100%"
+            ),
+            id=id_str,
+            max_files=1,
+            border="2px dashed #CBD5E0",
+            border_radius="8px",
+            padding="1rem",
+            width="100%",
+            cursor="pointer",
+            _hover={"border_color": "#C5A059", "background_color": "#F8FAFC"}
+        ),
+        width="100%", spacing="0"
+    )
+
 def putaway_view() -> rx.Component:
     return rx.vstack(
         success_modal(), 
@@ -15,12 +55,15 @@ def putaway_view() -> rx.Component:
         # --- SELECTION & UPLOAD SECTION ---
         rx.vstack(
             rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
+            
+            # 🔥 PERBAIKAN 1: Dropdown teks hitam bold
             rx.select(
                 ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
                 placeholder="-- Pilih Area Putaway --",
                 value=AppState.area_putaway,
                 on_change=AppState.set_area_putaway,
-                size="3", width="100%", margin_bottom="1rem"
+                size="3", width="100%", margin_bottom="1rem",
+                color="black", font_weight="bold" 
             ),
             
             # Form Upload HANYA muncul jika area sudah dipilih
@@ -34,64 +77,32 @@ def putaway_view() -> rx.Component:
                         background="#ebf8ff", border_left="4px solid #3182ce", padding="10px 16px", border_radius="6px", width="100%", align="center", spacing="2", margin_bottom="1rem"
                     ),
                     
+                    # 🔥 PERBAIKAN 2, 3, 4: Memanggil komponen custom uploader
                     rx.hstack(
-                        # Upload 1: DS Putaway
-                        rx.upload(
-                            rx.vstack(rx.icon("upload", size=24, color="#C5A059"), rx.text("Upload DS PUTAWAY", font_weight="bold", color="#4A5568", size="2"), align="center"),
-                            id="ds_putaway_file", max_files=1, border="2px dashed black", border_radius="8px", background="#F8FAFC", padding="1.5rem", width="100%", cursor="pointer",
-                        ),
-                        # Upload 2: ASAL Putaway
-                        rx.upload(
-                            rx.vstack(rx.icon("upload", size=24, color="#C5A059"), rx.text("Upload ASAL BIN", font_weight="bold", color="#4A5568", size="2"), align="center"),
-                            id="asal_putaway_file", max_files=1, border="2px dashed black", border_radius="8px", background="#F8FAFC", padding="1.5rem", width="100%", cursor="pointer",
-                        ),
-                        spacing="4", width="100%"
+                        custom_uploader_box("ds_putaway_file", "Upload DS PUTAWAY"),
+                        custom_uploader_box("asal_putaway_file", "Upload ASAL BIN"),
+                        spacing="4", width="100%", margin_bottom="1.5rem"
                     ),
                     
-                    # Indikator File Terpilih & Tombol Proses
-                    rx.hstack(
-                        rx.hstack(
-                            rx.cond(
-                                rx.selected_files("ds_putaway_file"), 
-                                rx.hstack(
-                                    rx.icon("check-circle", size=14, color="#38A169"), 
-                                    rx.foreach(
-                                        rx.selected_files("ds_putaway_file"),
-                                        lambda file_name: rx.text(file_name, size="1", color="#22543D", font_weight="bold", truncate=True)
-                                    ), 
-                                    background="#F0FFF4", padding="4px 8px", border_radius="4px"
-                                ), 
-                                rx.fragment()
-                            ),
-                            rx.cond(
-                                rx.selected_files("asal_putaway_file"), 
-                                rx.hstack(
-                                    rx.icon("check-circle", size=14, color="#38A169"), 
-                                    rx.foreach(
-                                        rx.selected_files("asal_putaway_file"),
-                                        lambda file_name: rx.text(file_name, size="1", color="#22543D", font_weight="bold", truncate=True)
-                                    ), 
-                                    background="#F0FFF4", padding="4px 8px", border_radius="4px"
-                                ), 
-                                rx.fragment()
-                            ),
-                            spacing="2"
-                        ),
+                    # 🔥 LOGIKA TOMBOL PINTAR: Tombol otomatis terkunci kalau file belum lengkap
+                    rx.cond(
+                        rx.selected_files("ds_putaway_file") & rx.selected_files("asal_putaway_file"),
                         rx.button(
                             rx.hstack(rx.icon("play", size=16), rx.text("COMPARE PUTAWAY"), spacing="2"), 
-                            
-                            # 🔥 PERBAIKAN TOTAL: Proses dirangkai secara berurutan agar sinkron
                             on_click=[
-                                AppState.reset_buffers,
+                                AppState.start_loading,
                                 AppState.handle_upload_ds(rx.upload_files("ds_putaway_file")),
-                                AppState.handle_upload_asal(rx.upload_files("asal_putaway_file")),
-                                AppState.handle_process_putaway
+                                AppState.handle_upload_asal(rx.upload_files("asal_putaway_file"))
                             ], 
-                            
                             background_color="#E50914", color="white", font_weight="bold", 
-                            border_radius="6px", padding="0.5rem 1.25rem", cursor="pointer"
+                            border_radius="6px", padding="0.75rem", cursor="pointer", width="100%", size="3"
                         ),
-                        width="100%", justify="between", align="center", margin_top="1rem"
+                        rx.button(
+                            rx.hstack(rx.icon("lock", size=16), rx.text("PILIH KEDUA FILE UNTUK MEMULAI"), spacing="2"), 
+                            disabled=True,
+                            background_color="#FEB2B2", color="white", font_weight="bold", 
+                            border_radius="6px", padding="0.75rem", width="100%", size="3"
+                        )
                     ),
                     width="100%",
                 ),
