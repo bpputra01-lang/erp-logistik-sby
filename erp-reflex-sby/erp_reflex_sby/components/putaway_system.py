@@ -35,11 +35,6 @@ def putaway_view() -> rx.Component:
     return rx.vstack(
         success_modal(), 
         
-        rx.hstack(
-            rx.text("PUTAWAY SYSTEM COMPARATION", font_weight="bold", color="#1A202C", size="5"),
-            justify="between", align="center", width="100%", margin_bottom="1rem",
-        ),
-
         rx.vstack(
             rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.5rem"),
             
