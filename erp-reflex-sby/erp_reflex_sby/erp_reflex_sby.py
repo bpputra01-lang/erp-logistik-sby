@@ -5,6 +5,7 @@ from .components.dashboard import main_dashboard
 from .components.sidebar import sidebar
 from .components.stock_minus import stock_minus_view
 
+# [PERBAIKAN 4]: Mengubah tombol menjadi Hitam (Gray)
 def global_header() -> rx.Component:
     return rx.hstack(
         rx.hstack(
@@ -18,52 +19,25 @@ def global_header() -> rx.Component:
         ),
         rx.hstack(
             rx.button(
-                rx.icon("megaphone", size=18),
+                rx.icon("megaphone", size=18, color="#1A202C"),
                 "Panduan & Logic",
                 on_click=AppState.set_is_info_open(True),
                 size="2",
                 variant="soft",
-                color_scheme="orange",
+                color_scheme="gray", # <-- Diubah dari orange ke gray agar tulisannya hitam/gelap
+                color="#1A202C",     # Memastikan teks berwarna hitam gelap
                 cursor="pointer",
             ),
             rx.box(width="10px", height="10px", background="#10B981", border_radius="50%", class_name="blink-online"),
             rx.text("ONLINE", size="2", font_weight="800", color="#065F46"),
             align="center", spacing="3",
         ),
-        padding="12px 20px",
-        background="#D1FAE5",
-        border="1.5px solid #A7F3D0",
-        border_radius="16px",
-        justify="between", width="100%", align="center",
-        margin_bottom="1rem",
+        padding="12px 20px", background="#D1FAE5", border="1.5px solid #A7F3D0", border_radius="16px", justify="between", width="100%", align="center", margin_bottom="1rem",
     )
 
-def index() -> rx.Component:
-    return rx.vstack(
-        rx.html("""
-            <style>
-                @keyframes blinkAnimation {
-                    0% { opacity: 1; transform: scale(1); }
-                    50% { opacity: 0.3; transform: scale(0.8); }
-                    100% { opacity: 1; transform: scale(1); }
-                }
-                .blink-online { animation: blinkAnimation 1.5s infinite ease-in-out; }
-            </style>
-        """),
-        
-        rx.cond(
-            AppState.is_loading,
-            rx.center(
-                rx.vstack(
-                    rx.spinner(size="3", color="red"),
-                    rx.text("Sedang memproses data, mohon tunggu...", font_weight="bold", color="#1A202C", size="3"),
-                    background="white", padding="2rem", border_radius="12px", box_shadow="lg", align="center", spacing="3",
-                ),
-                position="fixed", top="0", left="0", width="100vw", height="100vh", background="rgba(0, 0, 0, 0.5)", z_index="9999",
-            ),
-        ),
+# ... (pastikan fungsi index dan lainnya tetap ada)
 
-        # --- GLOBAL DIALOG PANDUAN & LOGIC (Gaya st.expander) ---
+        # [PERBAIKAN 3]: Menghilangkan kotak merah dari Panduan
         rx.dialog.root(
             rx.dialog.content(
                 rx.vstack(
@@ -74,28 +48,23 @@ def index() -> rx.Component:
                     ),
                     rx.divider(margin_y="0.5rem"),
                     
-                    # Expander (Accordion) mirip st.expander
                     rx.accordion.root(
-                        # Expander 1: Informasi Format File
                         rx.accordion.item(
                             header=rx.text("📋 Informasi Format File", font_weight="bold", color="#1A202C"),
                             content=rx.box(
-                                rx.text("Format yang diharapkan:", font_weight="bold", margin_bottom="6px", size="2", color="#2c5282"),
+                                rx.text("Format yang diharapkan:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
                                 rx.unordered_list(
                                     rx.list_item(rx.text("Download Multiple Adjusmet dari Jezpro dan pilih ", rx.text.strong("Termasuk yang sudah habis"))),
-                                    padding_left="20px", size="2", color="#2c5282"
+                                    padding_left="20px", size="2", color="#4A5568"
                                 ),
-                                background="#ebf8ff", border_left="4px solid #3182ce", padding="16px", border_radius="6px"
+                                background="#F7FAFC", padding="16px", border_radius="6px"
                             ),
                             value="item-1",
-                            border_bottom="1px solid #E2E8F0"
                         ),
-                        
-                        # Expander 2: Logic Thinking
                         rx.accordion.item(
                             header=rx.text("💡 Logic Thinking", font_weight="bold", color="#1A202C"),
                             content=rx.box(
-                                rx.text("Alur Process Compare Stock Minus:", font_weight="bold", margin_bottom="6px", size="2", color="#2c5282"),
+                                rx.text("Alur Process Compare Stock Minus:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
                                 rx.unordered_list(
                                     rx.list_item("Mengambil SKU yang memiliki Qty System minus (-)"),
                                     rx.list_item("Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock"),
@@ -104,16 +73,15 @@ def index() -> rx.Component:
                                     rx.list_item("Lalu jika tidak ditemukan di BIN Prioritas maka akan mengambil random BIN kecuali LIVE, Offline dan Online"),
                                     rx.list_item("Jika sudah ditemukan SKU dan Qty yang bisa covering maka akan dibuatkan list Set up"),
                                     rx.list_item("Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut"),
-                                    padding_left="20px", size="2", color="#2c5282", spacing="2"
+                                    padding_left="20px", size="2", color="#4A5568", spacing="2"
                                 ),
-                                background="#ebf8ff", border_left="4px solid #3182ce", padding="16px", border_radius="6px"
+                                background="#F7FAFC", padding="16px", border_radius="6px"
                             ),
                             value="item-2",
-                            border_bottom="1px solid #E2E8F0"
                         ),
-                        type="multiple",
-                        collapsible=True,
-                        width="100%",
+                        type="multiple", collapsible=True, width="100%", 
+                        variant="ghost",      # <-- Ini yang menghilangkan warna merahnya (menjadi bersih)
+                        color_scheme="gray",  # <-- Memastikan warnanya abu-abu/hitam standar
                     ),
 
                     rx.flex(
@@ -124,11 +92,7 @@ def index() -> rx.Component:
                     ),
                     spacing="3", align_items="start", width="100%",
                 ),
-                background_color="white",
-                padding="24px",
-                border_radius="12px",
-                box_shadow="0 10px 25px rgba(0,0,0,0.2)",
-                max_width="650px", # Diperlebar agar teks muat bagus
+                background_color="white", padding="24px", border_radius="12px", box_shadow="0 10px 25px rgba(0,0,0,0.2)", max_width="650px",
             ),
             open=AppState.is_info_open,
             on_open_change=AppState.set_is_info_open,

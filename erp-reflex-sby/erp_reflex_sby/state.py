@@ -26,7 +26,7 @@ class AppState(rx.State):
     is_info_open: bool = False  
     is_loading: bool = False
     
-    # [PERBAIKAN] State untuk mengontrol munculnya pop up modal sukses yang besar
+    # State untuk mengontrol munculnya pop up modal sukses
     show_success_modal: bool = False    
     
     total_qty_minus: int = 0
@@ -46,7 +46,7 @@ class AppState(rx.State):
     def set_is_info_open(self, val: bool):
         self.is_info_open = val
 
-    # [PERBAIKAN] Fungsi untuk menutup/membuka popup sukses
+    # Fungsi untuk menutup/membuka popup sukses
     def set_show_success_modal(self, val: bool):
         self.show_success_modal = val
 
@@ -358,8 +358,13 @@ class AppState(rx.State):
 
             self.is_loading = False
             
-            # [PERBAIKAN] Memicu Pop Up Modal Sukses dan BUKAN toast kecil di pojok
+            # [PERBAIKAN] Memicu Pop Up Modal Sukses transparan
             self.show_success_modal = True
+            yield
+            
+            # [PERBAIKAN] Menunggu 2.5 detik lalu menutup modal otomatis
+            await asyncio.sleep(2.5)
+            self.show_success_modal = False
             yield
             
         except Exception as e:
