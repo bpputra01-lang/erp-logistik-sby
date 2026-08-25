@@ -12,7 +12,9 @@ def render_clean_table(data_list) -> rx.Component:
                         rx.foreach(
                             data_list[0],
                             lambda col_key: rx.table.column_header_cell(
-                                col_key, color="#1A202C", font_weight="bold", background="#EDF2F7"
+                                rx.text(col_key, weight="bold"), 
+                                color="#1A202C", 
+                                background="#EDF2F7"
                             )
                         )
                     )
@@ -24,7 +26,7 @@ def render_clean_table(data_list) -> rx.Component:
                             rx.foreach(
                                 row,
                                 lambda item: rx.table.cell(
-                                    rx.text(item, color="#2D3748", font_size="13px")
+                                    rx.text(item.to_string(), color="#2D3748", font_size="13px")
                                 )
                             )
                         )
@@ -47,7 +49,6 @@ def render_clean_table(data_list) -> rx.Component:
         box_shadow="0 1px 3px rgba(0,0,0,0.05)",
         border="1px solid #E2E8F0",
     )
-
 def stock_minus_view() -> rx.Component:
     return rx.vstack(
         # --- 1. MODAL LOADING STATE SAAT PROSES DATA ---
