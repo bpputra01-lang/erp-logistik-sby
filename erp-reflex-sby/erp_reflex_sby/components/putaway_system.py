@@ -49,7 +49,7 @@ def putaway_view() -> rx.Component:
                     placeholder="-- Pilih Area Putaway --",
                     style={
                         "background-color": "white",
-                        "color": "black !important",
+                        "color": "black",
                         "font-weight": "bold !important",
                         "border": "1px solid #CBD5E0",
                         "width": "100%",
