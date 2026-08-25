@@ -25,7 +25,7 @@ def custom_uploader_box(id_str: str, title: str) -> rx.Component:
             ),
             id=id_str, max_files=1, 
             border="2px dashed #CBD5E0", border_radius="8px", 
-            padding="2rem 1.5rem", min_height="100px",  # Box dibuat lebih gemuk
+            padding="2rem 1.5rem", min_height="100px",
             width="100%", cursor="pointer", _hover={"border_color": "#C5A059", "background_color": "#F8FAFC"}
         ),
         width="100%", spacing="0"
@@ -41,21 +41,31 @@ def putaway_view() -> rx.Component:
         ),
 
         rx.vstack(
-            rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.25rem"),
+            rx.text("📍 Pilih Area Putaway", font_weight="bold", color="#1A202C", size="3", margin_bottom="0.5rem"),
             
-            rx.select(
-                ["DC LANTAI 1", "DC LANTAI 2", "DC LANTAI 3", "JERSEY ZONE"],
-                placeholder="-- Pilih Area Putaway --",
+            # 🔥 SOLUSI: Menggunakan rx.el.select (Native Select) dengan warna hitam pekat bold
+            rx.el.select(
+                rx.el.option("-- Pilih Area Putaway --", value=""),
+                rx.el.option("DC LANTAI 1", value="DC LANTAI 1"),
+                rx.el.option("DC LANTAI 2", value="DC LANTAI 2"),
+                rx.el.option("DC LANTAI 3", value="DC LANTAI 3"),
+                rx.el.option("JERSEY ZONE", value="JERSEY ZONE"),
                 value=AppState.area_putaway,
                 on_change=AppState.set_area_putaway,
-                size="3", 
-                width="100%", 
-                margin_bottom="1rem",
-                # 🔥 Gunakan variant="surface" dan color_scheme agar teksnya terbaca jelas
-                variant="surface",
-                color_scheme="gray",
+                style={
+                    "width": "100%",
+                    "padding": "10px 14px",
+                    "background_color": "#FFFFFF",
+                    "color": "#000000",
+                    "font_weight": "bold",
+                    "font_size": "14px",
+                    "border": "1.5px solid #CBD5E0",
+                    "border_radius": "8px",
+                    "outline": "none",
+                    "cursor": "pointer",
+                    "margin_bottom": "1rem",
+                },
             ),
-            
             
             rx.cond(
                 AppState.area_putaway != "",
@@ -73,7 +83,7 @@ def putaway_view() -> rx.Component:
                         spacing="4", width="100%", margin_bottom="1.5rem"
                     ),
                     
-                    # PERBAIKAN 2: Tombol rata kanan, warna tetap merah tapi transparan saat locked
+                    # Tombol Rata Kanan, Merah Transparan Saat Terkunci
                     rx.flex(
                         rx.cond(
                             rx.selected_files("ds_putaway_file") & rx.selected_files("asal_putaway_file"),
@@ -94,7 +104,7 @@ def putaway_view() -> rx.Component:
                                 border_radius="6px", padding="0.75rem 1.5rem", cursor="not-allowed"
                             )
                         ),
-                        width="100%", justify="end" # Rata Kanan
+                        width="100%", justify="end"
                     ),
                     width="100%",
                 ),
