@@ -18,7 +18,7 @@ def global_header() -> rx.Component:
             align="center", spacing="3",
         ),
         rx.hstack(
-            # Tombol Informasi Format & Logic (Megaphone Icon)
+            # Tombol Informasi Format & Logic (Megaphone Icon) - Membuka Global Modal Info
             rx.button(
                 rx.icon("megaphone", size=18),
                 "Panduan & Logic",
@@ -26,6 +26,7 @@ def global_header() -> rx.Component:
                 size="2",
                 variant="soft",
                 color_scheme="orange",
+                cursor="pointer",
             ),
             # Titik Hijau Berkedip
             rx.box(
@@ -46,7 +47,7 @@ def global_header() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.vstack(
-        # --- CSS ANIMASI BLINK & LOADING OVERLAY ---
+        # --- CSS ANIMASI BLINK ---
         rx.html("""
             <style>
                 @keyframes blinkAnimation {
@@ -60,7 +61,7 @@ def index() -> rx.Component:
             </style>
         """),
         
-        # --- GLOBAL LOADING OVERLAY (UNTUK STOCK MINUS/PROSES BERAT) ---
+        # --- GLOBAL LOADING OVERLAY ---
         rx.cond(
             AppState.is_loading,
             rx.center(
@@ -82,6 +83,32 @@ def index() -> rx.Component:
                 background="rgba(0, 0, 0, 0.5)",
                 z_index="9999",
             ),
+        ),
+
+        # --- GLOBAL DIALOG PANDUAN & LOGIC (Dikontrol oleh AppState.is_info_open) ---
+        rx.dialog.root(
+            rx.dialog.content(
+                rx.vstack(
+                    rx.hstack(
+                        rx.icon("book-open", size=20, color="#C5A059"),
+                        rx.text("Panduan & Logic ERP Logistik Surabaya", font_weight="bold", color="#1A202C", size="4"),
+                        justify="between", width="100%", align="center"
+                    ),
+                    rx.divider(margin_y="0.5rem"),
+                    rx.text("1. Modul Stock Minus: Digunakan untuk mencocokkan Qty System vs Qty Stock Opname (SO) aktual gudang.", color="#4A5568", size="2"),
+                    rx.text("2. Template Set Up: Menghasilkan format baris otomatis untuk proses penyesuaian database.", color="#4A5568", size="2"),
+                    rx.text("3. Justifikasi: Menyaring item selisih yang memerlukan approval atau investigasi lanjut oleh PIC.", color="#4A5568", size="2"),
+                    rx.flex(
+                        rx.dialog.close(
+                            rx.button("Tutup", background_color="#2D3748", color="white", size="2", font_weight="bold", cursor="pointer", on_click=AppState.set_is_info_open(False))
+                        ),
+                        justify="end", width="100%", margin_top="1rem"
+                    ),
+                    spacing="3", align_items="start", width="100%",
+                ),
+            ),
+            open=AppState.is_info_open,
+            on_open_change=AppState.set_is_info_open,
         ),
 
         rx.match(
