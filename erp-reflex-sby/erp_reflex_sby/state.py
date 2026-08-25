@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import io
 import asyncio
-import time  # <-- TAMBAHAN UNTUK TIMER
+import time
 from .database import get_supabase
 
 class AppState(rx.State):
@@ -61,8 +61,6 @@ class AppState(rx.State):
     password: str = ""
     branch: str = ""
     user_display_name: str = ""
-    
-    # [TAMBAHAN] Menyimpan waktu login dalam bentuk millisecond
     login_timestamp_ms: int = 0 
 
     def set_username(self, val: str): self.username = val
@@ -71,12 +69,12 @@ class AppState(rx.State):
     def handle_login(self):
         if self.username == "admin" and self.password == "sby123":
             self.logged_in = True; self.role = "DC"; self.branch = "SURABAYA"; self.user_display_name = "Admin DC Surabaya"
-            self.login_timestamp_ms = int(time.time() * 1000) # Catat waktu login
+            self.login_timestamp_ms = int(time.time() * 1000)
             return rx.toast.success("Berhasil Login! Selamat datang di ERP Surabaya.", duration=4000, position="top-right")
         
         elif self.username == "toko" and self.password == "toko123":
             self.logged_in = True; self.role = "CABANG"; self.branch = "SURABAYA"; self.user_display_name = "User Cabang"
-            self.login_timestamp_ms = int(time.time() * 1000) # Catat waktu login
+            self.login_timestamp_ms = int(time.time() * 1000)
             return rx.toast.success("Berhasil Login sebagai User Cabang!", duration=4000, position="top-right")
         
         else:
@@ -87,7 +85,7 @@ class AppState(rx.State):
 
     def logout(self):
         self.logged_in = False; self.username = ""; self.password = ""; self.role = "toko"
-        self.login_timestamp_ms = 0 # Reset waktu logout
+        self.login_timestamp_ms = 0
         return rx.toast.info("Anda telah keluar dari sistem.")
 
     # --- FITUR DOWNLOAD EXCEL ---
@@ -335,13 +333,13 @@ class AppState(rx.State):
             self.is_loading = False
             yield rx.toast.error(f"Gagal memproses file: {e}", position="top-center")
 
-# ==========================================
+    # ==========================================
     # --- PUTAWAY SYSTEM STATE & LOGIC ---
     # ==========================================
     area_putaway: str = ""
     putaway_processed: bool = False
 
-    # 🔥 TAMBAHAN: Variabel Internal Server untuk menampung data file sementara
+    # Variabel Internal Server untuk menampung data file sementara
     _ds_file_data: bytes = b""
     _ds_file_name: str = ""
     _asal_file_data: bytes = b""
@@ -373,6 +371,13 @@ class AppState(rx.State):
     def set_area_putaway(self, val: str):
         self.area_putaway = val
 
+    # 🔥 FUNGSI BARU: Mereset buffer/memori sebelum proses berjalan
+    def reset_buffers(self):
+        self._ds_file_data = b""
+        self._asal_file_data = b""
+        self._ds_file_name = ""
+        self._asal_file_name = ""
+
     # 🔥 FUNGSI BARU: Tangkap File DS Putaway
     async def handle_upload_ds(self, files: list[rx.UploadFile]):
         if files:
@@ -385,19 +390,26 @@ class AppState(rx.State):
             self._asal_file_data = await files[0].read()
             self._asal_file_name = files[0].filename
 
-    # 🔥 PERBAIKAN: Fungsi Utama, sekarang tidak butuh parameter
+    # 🔥 PERBAIKAN: Fungsi Utama, menggunakan wait-loop agar tidak error saat klik pertama
     async def handle_process_putaway(self):
         if not self.area_putaway:
             yield rx.toast.warning("Silakan pilih Area Putaway terlebih dahulu!", position="top-center")
             return
         
-        # Validasi bahwa kedua file berhasil ditangkap
-        if not self._ds_file_data or not self._asal_file_data:
-            yield rx.toast.warning("Harap upload KEDUA file (DS Putaway & Asal Bin)!", position="top-center")
-            return
-
         self.is_loading = True
         yield
+
+        # WAIT-LOOP: Sistem sabar menunggu maksimal 2 detik hingga file ter-upload
+        for _ in range(20): 
+            if self._ds_file_data and self._asal_file_data:
+                break
+            await asyncio.sleep(0.1)
+
+        # Validasi akhir: Jika tetap kosong setelah ditunggu, munculkan peringatan
+        if not self._ds_file_data or not self._asal_file_data:
+            self.is_loading = False
+            yield rx.toast.warning("Harap upload KEDUA file (DS Putaway & Asal Bin)!", position="top-center")
+            return
 
         try:
             # 1. Baca Data dari Memori Server
@@ -406,12 +418,6 @@ class AppState(rx.State):
             
             asal_data = self._asal_file_data
             df_asal = pd.read_csv(io.BytesIO(asal_data)) if self._asal_file_name.endswith('.csv') else pd.read_excel(io.BytesIO(asal_data), engine="openpyxl")
-
-            # Reset memori agar siap jika user klik compare lagi di masa depan
-            self._ds_file_data = b""
-            self._asal_file_data = b""
-            self._ds_file_name = ""
-            self._asal_file_name = ""
 
             df_asal_updated = df_asal.copy()
             self.putaway_qty_system = int(pd.to_numeric(df_asal_updated.iloc[:, 9], errors='coerce').sum())
