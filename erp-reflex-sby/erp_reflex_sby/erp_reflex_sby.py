@@ -58,10 +58,42 @@ def global_header() -> rx.Component:
 def dynamic_panduan_logic() -> rx.Component:
     return rx.match(
         AppState.main_menu,
+        # 1. PANDUAN UNTUK MENU STOCK MINUS
         ("Stock Minus", 
-            # ... (Biarkan kode Stock Minus yang sudah ada disini) ...
+            rx.accordion.root(
+                rx.accordion.item(
+                    header=rx.text("📋 Informasi Format File", font_weight="bold", color="#1A202C"),
+                    content=rx.box(
+                        rx.text("Format yang diharapkan:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
+                        rx.unordered_list(rx.list_item(rx.text("Download Multiple Adjusmet dari Jezpro dan pilih ", rx.text.strong("Termasuk yang sudah habis"))), padding_left="20px", size="2", color="#4A5568"),
+                        background="#F7FAFC", padding="16px", border_radius="6px"
+                    ),
+                    value="item-1",
+                ),
+                rx.accordion.item(
+                    header=rx.text("💡 Logic Thinking", font_weight="bold", color="#1A202C"),
+                    content=rx.box(
+                        rx.text("Alur Process Compare Stock Minus:", font_weight="bold", margin_bottom="6px", size="2", color="#1A202C"),
+                        rx.unordered_list(
+                            rx.list_item("Mengambil SKU yang memiliki Qty System minus (-)"),
+                            rx.list_item("Lalu SKU yang memiliki QTY Minus (-) tersebut akan di lakukan shuffle covering Stock"),
+                            rx.list_item("Dimana terdapat Bin prioritas untuk shuffle Covering Stock (All Stagging, Karantina)"),
+                            rx.list_item("Dan jika minus terjadi di Gudang lt.2 maka akan prioritas mengambil BIN Toko begitupun sebaliknya"),
+                            rx.list_item("Lalu jika tidak ditemukan di BIN Prioritas maka akan mengambil random BIN kecuali LIVE, Offline dan Online"),
+                            rx.list_item("Jika sudah ditemukan SKU dan Qty yang bisa covering maka akan dibuatkan list Set up"),
+                            rx.list_item("Dan jika tidak bisa diselesaikan lewat set up maka sistem akan memasukkan kedalam item need justifikasi dan perlu analisa lebih lanjut"),
+                            padding_left="20px", size="2", color="#4A5568", spacing="2"
+                        ),
+                        background="#F7FAFC", padding="16px", border_radius="6px"
+                    ),
+                    value="item-2",
+                ),
+                type="multiple", collapsible=True, width="100%", variant="ghost", color_scheme="gray",  
+            )
         ),
-        ("Putaway System",  # <--- [TAMBAHAN BARU UNTUK PUTAWAY]
+        
+        # 2. PANDUAN UNTUK MENU PUTAWAY SYSTEM
+        ("Putaway System",
             rx.accordion.root(
                 rx.accordion.item(
                     header=rx.text("📋 Informasi Format File", font_weight="bold", color="#1A202C"),
@@ -94,7 +126,8 @@ def dynamic_panduan_logic() -> rx.Component:
                 type="multiple", collapsible=True, width="100%", variant="ghost", color_scheme="gray",  
             )
         ),
-        # Default
+        
+        # 3. DEFAULT (JIKA MENU LAIN DIKLIK YANG BELUM ADA PANDUANNYA)
         rx.center(
             rx.vstack(
                 rx.icon("folder-open", size=40, color="#CBD5E0"),
@@ -104,7 +137,6 @@ def dynamic_panduan_logic() -> rx.Component:
             width="100%", padding="2rem"
         )
     )
-
 def index() -> rx.Component:
     return rx.vstack(
         # CSS tambahan untuk Animasi Blink dan Animasi Pop Up Centang
