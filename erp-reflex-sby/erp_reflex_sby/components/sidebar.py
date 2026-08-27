@@ -69,7 +69,7 @@ def sidebar() -> rx.Component:
                     spacing="1",
                 ),
                 rx.button(
-                    rx.icon("panel-left-close", size=18),
+                    rx.icon("panel_left_close", size=18),
                     on_click=AppState.toggle_sidebar,
                     variant="ghost",
                     color="#CBD5E0",
@@ -192,7 +192,7 @@ def sidebar() -> rx.Component:
         # KONDISI SAAT SIDEBAR DITUTUP
         rx.vstack(
             rx.button(
-                rx.icon("panel-left-open", size=20),
+                rx.icon("panel_left_open", size=20),
                 on_click=AppState.toggle_sidebar,
                 variant="ghost",
                 color="#FFFFFF",
