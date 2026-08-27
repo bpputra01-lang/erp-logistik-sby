@@ -68,4 +68,10 @@ websockets==15.0.1
 wrapt==2.1.2
 wsproto==1.3.2
 yarl==1.24.5
-openpyxl
+psycopg2-binary
+sqlalchemy
+mysql-connector-python
+xlsxwriter
+xlrd
+python-calamine
+pytz
