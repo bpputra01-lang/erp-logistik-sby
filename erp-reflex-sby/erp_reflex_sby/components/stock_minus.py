@@ -55,7 +55,7 @@ def stock_minus_view() -> rx.Component:
                     rx.cond(
                         rx.selected_files("upload_stock_file"),
                         rx.hstack(
-                            rx.icon("check-circle", color="#38A169", size=20),
+                            rx.icon("circle-check", color="#38A169", size=20),
                             rx.foreach(rx.selected_files("upload_stock_file"), lambda f: rx.text(f, color="#38A169", font_weight="bold", truncate=True)),
                             spacing="2", align="center"
                         ),
@@ -94,7 +94,7 @@ def stock_minus_view() -> rx.Component:
                     rx.tabs.list(
                         rx.tabs.trigger(rx.hstack(rx.icon("file-text", size=14), rx.text("MINUS AWAL", font_weight="bold")), value="tab1", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
                         rx.tabs.trigger(rx.hstack(rx.icon("refresh-cw", size=14), rx.text("TEMPLATE SET UP", font_weight="bold")), value="tab2", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
-                        rx.tabs.trigger(rx.hstack(rx.icon("alert-triangle", size=14), rx.text("JUSTIFIKASI", font_weight="bold")), value="tab3", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
+                        rx.tabs.trigger(rx.hstack(rx.icon("triangle-alert", size=14), rx.text("JUSTIFIKASI", font_weight="bold")), value="tab3", color="#1A202C", _selected={"color": "#E50914", "border_bottom": "2px solid #E50914"}),
                     ),
                     rx.tabs.content(
                         rx.vstack(
