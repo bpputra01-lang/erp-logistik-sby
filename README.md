@@ -1,6 +1,6 @@
----
+﻿---
 title: ERP Logistik SBY
-emoji: ??
+emoji: 🏢
 colorFrom: blue
 colorTo: green
 sdk: docker
