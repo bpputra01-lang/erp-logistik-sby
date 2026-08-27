@@ -14,6 +14,6 @@ jobs:
         with:
           auth_token: ${{ secrets.REFLEX_AUTH_TOKEN }}
           project_id: "0caca57c-de13-42cf-a528-063339c49cbd"
-          directory: erp-reflex-sby
+          app_directory: erp-reflex-sby
           extra_args: "--app-name erp-reflex-sby-v2"
           python_version: "3.12"
