@@ -9,11 +9,24 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Reflex Cloud
-        uses: reflex-dev/reflex-deploy-action@v1
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          auth_token: ${{ secrets.REFLEX_AUTH_TOKEN }}
-          project_id: "0caca57c-de13-42cf-a528-063339c49cbd"
-          app_directory: erp-reflex-sby
-          extra_args: "--app-id c6c9ea8a-6246-4640-99d9-6be83ced4567 --loglevel debug"
-          python_version: "3.12"
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        working-directory: erp-reflex-sby
+        run: |
+          python -m pip install --upgrade pip
+          pip install reflex reflex-hosting-cli
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Deploy to Reflex Cloud
+        working-directory: erp-reflex-sby
+        env:
+          REFLEX_AUTH_TOKEN: ${{ secrets.REFLEX_AUTH_TOKEN }}
+        run: |
+          reflex deploy --project 0caca57c-de13-42cf-a528-063339c49cbd --app-name erp-logistik-sby --no-interactive
