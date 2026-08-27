@@ -15,7 +15,8 @@ def custom_uploader_box(id_str: str, title: str) -> rx.Component:
                 rx.cond(
                     rx.selected_files(id_str),
                     rx.hstack(
-                        rx.icon("check-circle", color="#38A169", size=20),
+                        # ✅ PERBAIKAN:
+                        rx.icon("circle-check", color="#38A169", size=20),
                         rx.foreach(rx.selected_files(id_str), lambda f: rx.text(f, color="#38A169", font_weight="bold", truncate=True)),
                         spacing="2", align="center"
                     ),
