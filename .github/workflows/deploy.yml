@@ -30,4 +30,4 @@ jobs:
           REFLEX_AUTH_TOKEN: ${{ secrets.REFLEX_AUTH_TOKEN }}
           REFLEX_TOKEN: ${{ secrets.REFLEX_AUTH_TOKEN }}
         run: |
-          reflex deploy --token "${{ secrets.REFLEX_AUTH_TOKEN }}" --project 0caca57c-de13-42cf-a528-063339c49cbd --app-name erp-reflex-sby --no-interactive --loglevel debug
+          reflex deploy --token "${{ secrets.REFLEX_AUTH_TOKEN }}" --project 0caca57c-de13-42cf-a528-063339c49cbd --app-name erp-logistik-sby --regions sin --no-interactive
