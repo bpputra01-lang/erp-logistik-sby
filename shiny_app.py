@@ -20,7 +20,6 @@ def get_supabase() -> Client:
         print("Supabase Init Error:", e)
         return None
 
-# Helper aman untuk parsing angka
 def safe_int(val, default=0) -> int:
     try:
         if pd.isna(val) or val is None: return default
@@ -530,7 +529,7 @@ CUSTOM_HEAD = ui.head_content(
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #F7FAFC; }
+        body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #F7FAFC; margin: 0; padding: 0; }
         
         @keyframes blinkAnimation {
             0% { opacity: 1; transform: scale(1); }
@@ -1162,7 +1161,7 @@ def sidebar(state: AppState):
             ui.div(
                 ui.span("JEZ", style="color: #E50914; font-weight: 900; font-size: 20px;"),
                 ui.span("PRO", style="color: #FFFFFF; font-weight: 900; font-size: 20px;"),
-                style="display: flex; gap: 2px; align-items: center;"
+                style="display: gap: 2px; align-items: center;"
             ),
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 16px; color: #CBD5E0;"),
@@ -1332,10 +1331,11 @@ def global_header(state: AppState):
 # ==============================================================================
 # 9. ROOT UI & SERVER CONTROLLER
 # ==============================================================================
-app_ui = ui.page_fluid(
+app_ui = ui.div(
     CUSTOM_HEAD,
     ui.output_ui("global_loading_overlay_ui"),
-    ui.output_ui("main_root_container")
+    ui.output_ui("main_root_container"),
+    style="width: 100vw; height: 100vh; overflow: hidden; margin: 0; padding: 0;"
 )
 
 def server(input: Inputs, output: Outputs, session: Session):
@@ -1511,7 +1511,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         if succ: ui.notification_show(msg, type="message")
         else: ui.notification_show(msg, type="error")
 
-    @output
     @render.ui
     def stock_minus_file_label():
         f = input.upload_stock_file() if "upload_stock_file" in input else None
@@ -1567,7 +1566,6 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _area_sel():
         state.area_putaway.set(input.select_area_putaway())
 
-    @output
     @render.ui
     def ds_file_label():
         f = input.ds_putaway_file() if "ds_putaway_file" in input else None
@@ -1579,7 +1577,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             )
         return ui.span("200MB per file • XLSX, XLS, CSV", style="color: #718096; font-size: 13px;")
 
-    @output
     @render.ui
     def asal_file_label():
         f = input.asal_putaway_file() if "asal_putaway_file" in input else None
@@ -1623,7 +1620,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         await asyncio.sleep(2.5)
         state.show_success_modal.set(False)
 
-    @output
     @render.ui
     def global_loading_overlay_ui():
         if not state.is_loading():
@@ -1637,7 +1633,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); z-index: 99999; display: flex; align-items: center; justify-content: center;"
         )
 
-    @output
     @render.ui
     def main_root_container():
         try:
