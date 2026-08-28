@@ -6,9 +6,9 @@ import pandas as pd
 from supabase import create_client, Client
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
-# ==========================================
-# KONFIGURASI SUPABASE
-# ==========================================
+# ==============================================================================
+# 1. KONFIGURASI SUPABASE
+# ==============================================================================
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
 
@@ -18,9 +18,502 @@ def get_supabase() -> Client:
     except Exception:
         return None
 
-# ==========================================
-# ASSETS CSS & JS LENGKAP
-# ==========================================
+# ==============================================================================
+# 2. APP STATE & SELURUH LOGIKA (REFLEX STATE EQUIVALENT)
+# ==============================================================================
+class AppState:
+    def __init__(self):
+        # --- NAVIGATION & ROLE STATE ---
+        self.logged_in = reactive.Value(False)
+        self.role = reactive.Value("toko")  # "DC" atau "CABANG"
+        self.branch = reactive.Value("SURABAYA")
+        self.user_display_name = reactive.Value("")
+        self.username = reactive.Value("")
+        self.password = reactive.Value("")
+        self.login_timestamp_ms = reactive.Value(0)
+        self.main_menu = reactive.Value("Database Ongkir In/Out")
+
+        # --- SIDEBAR UI & DROPDOWN STATE ---
+        self.sidebar_open = reactive.Value(True)
+        self.dropdown_operational = reactive.Value(True)
+        self.dropdown_inventory = reactive.Value(False)
+        self.dropdown_reject = reactive.Value(False)
+        self.dropdown_extras = reactive.Value(False)
+
+        # --- MODAL & LOADING STATES ---
+        self.is_info_open = reactive.Value(False)
+        self.is_loading = reactive.Value(False)
+        self.show_success_modal = reactive.Value(False)
+
+        # --- ONGKIR DATABASE STATE ---
+        self.data_list = reactive.Value([])
+        self.input_supplier = reactive.Value("")
+        self.input_ekspedisi = reactive.Value("")
+        self.input_koli = reactive.Value("1")
+        self.input_ongkir = reactive.Value("0")
+        self.input_tgl = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
+        self.filter_ekspedisi = reactive.Value("SEMUA")
+        self.selected_ids = reactive.Value([])
+        self.show_delete_modal = reactive.Value(False)
+
+        # --- STOCK MINUS STATE ---
+        self.stock_minus_processed = reactive.Value(False)
+        self.total_qty_minus = reactive.Value(0)
+        self.total_tercover = reactive.Value(0)
+        self.total_sisa_adj = reactive.Value(0)
+
+        self.df_minus_awal_headers = reactive.Value([])
+        self.df_minus_awal_rows = reactive.Value([])
+        self.df_set_up_headers = reactive.Value([])
+        self.df_set_up_rows = reactive.Value([])
+        self.df_need_adj_headers = reactive.Value([])
+        self.df_need_adj_rows = reactive.Value([])
+
+        self._raw_df_minus_awal = pd.DataFrame()
+        self._raw_df_set_up = pd.DataFrame()
+        self._raw_df_need_adj = pd.DataFrame()
+
+        # --- PUTAWAY SYSTEM STATE ---
+        self.area_putaway = reactive.Value("")
+        self.putaway_processed = reactive.Value(False)
+        self.putaway_qty_system = reactive.Value(0)
+        self.putaway_total_setup = reactive.Value(0)
+        self.putaway_kurang_setup = reactive.Value(0)
+        self.putaway_sisa_stok = reactive.Value(0)
+
+        self.df_comp_headers = reactive.Value([])
+        self.df_comp_rows = reactive.Value([])
+        self.df_plist_headers = reactive.Value([])
+        self.df_plist_rows = reactive.Value([])
+        self.df_kurang_headers = reactive.Value([])
+        self.df_kurang_rows = reactive.Value([])
+        self.df_out_headers = reactive.Value([])
+        self.df_out_rows = reactive.Value([])
+
+        self._raw_df_comp = pd.DataFrame()
+        self._raw_df_plist = pd.DataFrame()
+        self._raw_df_kurang = pd.DataFrame()
+        self._raw_df_out = pd.DataFrame()
+        self._raw_df_updated = pd.DataFrame()
+
+    def set_main_menu(self, menu: str):
+        self.main_menu.set(menu)
+
+    def toggle_sidebar(self):
+        self.sidebar_open.set(not self.sidebar_open())
+
+    def toggle_dropdown(self, key: str):
+        if key == "operational": self.dropdown_operational.set(not self.dropdown_operational())
+        elif key == "inventory": self.dropdown_inventory.set(not self.dropdown_inventory())
+        elif key == "reject": self.dropdown_reject.set(not self.dropdown_reject())
+        elif key == "extras": self.dropdown_extras.set(not self.dropdown_extras())
+
+    def handle_login(self, u: str, p: str):
+        u = u.strip()
+        p = p.strip()
+        if u == "admin" and p == "sby123":
+            self.logged_in.set(True)
+            self.role.set("DC")
+            self.branch.set("SURABAYA")
+            self.user_display_name.set("Admin DC Surabaya")
+            self.login_timestamp_ms.set(int(time.time() * 1000))
+            return True, "Berhasil Login! Selamat datang di ERP Surabaya."
+        elif u == "toko" and p == "toko123":
+            self.logged_in.set(True)
+            self.role.set("CABANG")
+            self.branch.set("SURABAYA")
+            self.user_display_name.set("User Cabang")
+            self.login_timestamp_ms.set(int(time.time() * 1000))
+            return True, "Berhasil Login sebagai User Cabang!"
+        else:
+            return False, "Username atau Password salah! Periksa kembali."
+
+    def logout(self):
+        self.logged_in.set(False)
+        self.username.set("")
+        self.password.set("")
+        self.role.set("toko")
+        self.login_timestamp_ms.set(0)
+
+    def get_menu_operational(self) -> list[str]:
+        if self.role() == "DC":
+            return ["Purchase Order Receiving", "Putaway System", "Scan Out Validation", "Refill & Overstock", "Refill & Withdraw", "Compare RTO", "Compare Penerimaan RTO", "FDR Update"]
+        else:
+            return ["Compare Penerimaan RTO", "Putaway System", "Purchase Order Receiving"]
+
+    def get_menu_inventory(self) -> list[str]:
+        if self.role() == "DC":
+            return ["Stock Opname", "Match Real & System", "Compare System", "Cycle Count", "Putaway & Picking Audit List", "List Bin Cycle Count", "Stock Tracking Timeline", "Justification SO", "Stock Minus", "List Retur Out", "Pengajuan Mutasi Karantina", "Refill Koli to Koli/Refill", "Stock Allocation"]
+        else:
+            return ["Stock Minus", "Cycle Count", "Compare System", "Justification SO"]
+
+    def get_menu_reject(self) -> list[str]:
+        return ["Pengajuan Reject/Defect", "Reject/Defect List"]
+
+    def get_menu_extras(self) -> list[str]:
+        if self.role() == "DC":
+            return ["Logistic Schedule", "Balancing Stock", "Reporting & PIC", "Data Timbang Ongkir", "Database Ongkir In/Out", "Precentage Display", "Precentage Request FL to Store Stock", "Refill Toko"]
+        else:
+            return ["Precentage Display", "Refill Toko", "Store Leader RTO Decission"]
+
+    def get_active_content_type(self) -> str:
+        cur_menu = self.main_menu()
+        if cur_menu == "Database Ongkir In/Out":
+            return "dashboard_ongkir" if self.role() == "DC" else "access_denied"
+        elif cur_menu == "Stock Minus":
+            return "stock_minus"
+        elif cur_menu == "Putaway System":
+            return "putaway_system"
+        else:
+            return "under_development"
+
+    def load_ongkir_data(self):
+        try:
+            client = get_supabase()
+            if client:
+                res = client.table("shipping_costs").select("*").execute()
+                self.data_list.set(res.data if res.data else [])
+        except Exception as e:
+            print("Error loading Supabase data:", e)
+
+    def save_single_ongkir(self, supp: str, eksp: str, koli_str: str, ongkir_str: str, tgl_str: str):
+        if not supp.strip():
+            return False, "Nama Supplier Wajib Diisi!"
+        try:
+            koli_val = int(koli_str) if koli_str else 0
+            ongkir_val = int(ongkir_str) if ongkir_str else 0
+        except ValueError:
+            return False, "Koli dan Ongkir harus berupa angka!"
+
+        fix_dt = f"{tgl_str} {datetime.now().strftime('%H:%M:%S')}"
+        payload = {
+            "supplier": supp.upper().strip(),
+            "ekspedisi": eksp.upper().strip(),
+            "total_koli": koli_val,
+            "total_ongkir": ongkir_val,
+            "created_at": fix_dt
+        }
+        try:
+            client = get_supabase()
+            if client:
+                client.table("shipping_costs").insert(payload).execute()
+            self.load_ongkir_data()
+            return True, "✅ Data Berhasil Disimpan!"
+        except Exception as e:
+            return False, f"Gagal Simpan: {e}"
+
+    def batch_upload_csv(self, file_bytes: bytes):
+        try:
+            df = pd.read_csv(io.BytesIO(file_bytes))
+            required = ["SUPPLIER", "EKSPEDISI", "TOTAL KOLI", "ONGKIR", "TANGGAL_JAM"]
+            if not all(col in df.columns for col in required):
+                return False, "Format CSV Salah! Kolom wajib: SUPPLIER, EKSPEDISI, TOTAL KOLI, ONGKIR, TANGGAL_JAM"
+
+            batch_data = []
+            for _, row in df.iterrows():
+                sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
+                if not sup: continue
+                eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
+                try: koli = int(float(row["TOTAL KOLI"]))
+                except: koli = 0
+                try: ongkir = int(float(str(row["ONGKIR"]).replace('Rp', '').replace('.', '').replace(',', '').strip()))
+                except: ongkir = 0
+                tgl_raw = row["TANGGAL_JAM"]
+                fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if pd.isna(tgl_raw) else str(tgl_raw)
+                batch_data.append({"supplier": sup, "ekspedisi": eks, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
+
+            if batch_data:
+                client = get_supabase()
+                if client:
+                    client.table("shipping_costs").insert(batch_data).execute()
+                self.load_ongkir_data()
+                return True, f"🚀 Berhasil Upload {len(batch_data)} Data CSV!"
+            return False, "Tidak ada data valid yang diupload."
+        except Exception as e:
+            return False, f"Gagal Upload Batch: {e}"
+
+    def toggle_select_id(self, item_id: int):
+        s = list(self.selected_ids())
+        if item_id in s: s.remove(item_id)
+        else: s.append(item_id)
+        self.selected_ids.set(s)
+
+    def execute_delete(self):
+        s = self.selected_ids()
+        try:
+            client = get_supabase()
+            if client:
+                client.table("shipping_costs").delete().in_("id", s).execute()
+            self.selected_ids.set([])
+            self.show_delete_modal.set(False)
+            self.load_ongkir_data()
+            return True, "🗑️ Data Berhasil Dihapus!"
+        except Exception as e:
+            return False, f"Gagal Hapus: {e}"
+
+    def get_filtered_ongkir(self) -> list[dict]:
+        res = self.data_list()
+        flt = self.filter_ekspedisi()
+        if flt != "SEMUA":
+            res = [x for x in res if x.get("ekspedisi") == flt]
+        return res
+
+    def get_list_ekspedisi_options(self) -> list[str]:
+        eksp = list(set([x.get("ekspedisi", "") for x in self.data_list() if x.get("ekspedisi")]))
+        return ["SEMUA"] + sorted(eksp)
+
+    def metric_total_biaya_all(self) -> str:
+        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.get_filtered_ongkir()]):,.0f}"
+
+    def metric_total_koli_all(self) -> str:
+        return f"{sum([x.get('total_koli', 0) for x in self.get_filtered_ongkir()]):,.0f} Koli"
+
+    def metric_avg_cost_all(self) -> str:
+        data = self.get_filtered_ongkir()
+        biaya = sum([x.get("total_ongkir", 0) for x in data])
+        koli = sum([x.get("total_koli", 0) for x in data])
+        return f"Rp {biaya / koli if koli > 0 else 0:,.0f}"
+
+    def metric_biaya_datang(self) -> str:
+        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', ''))]):,.0f}"
+
+    def metric_koli_datang(self) -> str:
+        return f"{sum([x.get('total_koli', 0) for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', ''))]):,.0f} Koli"
+
+    def metric_biaya_rto(self) -> str:
+        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.get_filtered_ongkir() if 'RTO' in str(x.get('supplier', ''))]):,.0f}"
+
+    def process_stock_minus_file(self, file_bytes: bytes, file_name: str):
+        try:
+            df = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl") if file_name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(file_bytes))
+            df.columns = [str(c).strip().upper() for c in df.columns]
+
+            col_sku = 'SKU'
+            col_bin = 'BIN'
+            col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
+
+            if col_qty is None:
+                return False, "❌ Kolom 'QTY SYSTEM' tidak ditemukan!"
+
+            df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
+            df[col_sku] = df[col_sku].astype(str).str.strip().str.upper()
+            df[col_bin] = df[col_bin].astype(str).str.strip().str.upper()
+
+            df_minus_awal = df[df[col_qty] < 0].copy()
+            df_positif = df[df[col_qty] > 0]
+
+            inventory = {}
+            for _, row in df_positif.iterrows():
+                sku, bn, qt = row[col_sku], row[col_bin], row[col_qty]
+                if sku not in inventory: inventory[sku] = {}
+                inventory[sku][bn] = inventory[sku].get(bn, 0) + qt
+
+            prior_bins = [
+                "RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC",
+                "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3",
+                "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"
+            ]
+
+            set_up_results = []
+            df_need_adj_list = []
+
+            for _, row in df_minus_awal.iterrows():
+                sku = row[col_sku]
+                bin_asal = row[col_bin]
+                sisa_minus = abs(row[col_qty])
+
+                if sku in inventory and any(v > 0 for v in inventory[sku].values()):
+                    sku_stock = inventory[sku]
+                    while sisa_minus > 0:
+                        bin_solusi = ""
+                        if bin_asal == "TOKO":
+                            if sku_stock.get("STAGGING LT.2", 0) > 0: bin_solusi = "STAGGING LT.2"
+                            elif sku_stock.get("LT.2", 0) > 0: bin_solusi = "LT.2"
+                        elif bin_asal in ["STAGGING LT.2", "LT.2"] and sku_stock.get("TOKO", 0) > 0:
+                            bin_solusi = "TOKO"
+
+                        if not bin_solusi:
+                            for b in prior_bins:
+                                if sku_stock.get(b, 0) > 0: bin_solusi = b; break
+
+                        if not bin_solusi:
+                            for b, q in sku_stock.items():
+                                if b != "REJECT DEFECT" and q > 0: bin_solusi = b; break
+
+                        if not bin_solusi: break
+                        else:
+                            qty_tersedia = sku_stock[bin_solusi]
+                            ambil = min(sisa_minus, qty_tersedia)
+                            set_up_results.append({
+                                "BIN AWAL": bin_solusi, "BIN TUJUAN": bin_asal,
+                                "SKU": sku, "QUANTITY": ambil, "NOTES": "STOCK MINUS"
+                            })
+                            sku_stock[bin_solusi] -= ambil
+                            sisa_minus -= ambil
+
+                if sisa_minus > 0:
+                    row_adj = row.to_dict()
+                    row_adj[col_qty] = -sisa_minus
+                    df_need_adj_list.append(row_adj)
+
+            df_s = pd.DataFrame(set_up_results)
+            df_n = pd.DataFrame(df_need_adj_list)
+
+            self.total_qty_minus.set(int(abs(pd.to_numeric(df_minus_awal[col_qty], errors='coerce').sum())))
+            self.total_tercover.set(int(df_s["QUANTITY"].sum()) if not df_s.empty else 0)
+            self.total_sisa_adj.set(int(abs(df_n[col_qty].sum())) if not df_n.empty and col_qty in df_n.columns else 0)
+
+            self._raw_df_minus_awal = df_minus_awal
+            self._raw_df_set_up = df_s
+            self._raw_df_need_adj = df_n
+
+            self.df_minus_awal_headers.set(df_minus_awal.columns.tolist() if not df_minus_awal.empty else [])
+            self.df_minus_awal_rows.set(df_minus_awal.fillna("").astype(str).values.tolist() if not df_minus_awal.empty else [])
+
+            self.df_set_up_headers.set(df_s.columns.tolist() if not df_s.empty else [])
+            self.df_set_up_rows.set(df_s.fillna("").astype(str).values.tolist() if not df_s.empty else [])
+
+            self.df_need_adj_headers.set(df_n.columns.tolist() if not df_n.empty else [])
+            self.df_need_adj_rows.set(df_n.fillna("").astype(str).values.tolist() if not df_n.empty else [])
+
+            self.stock_minus_processed.set(True)
+            return True, "Data Stock Minus berhasil diproses!"
+        except Exception as e:
+            return False, f"Gagal memproses file: {e}"
+
+    def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
+        try:
+            df_ds = pd.read_excel(io.BytesIO(ds_bytes), engine="openpyxl") if ds_name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(ds_bytes))
+            df_asal = pd.read_excel(io.BytesIO(asal_bytes), engine="openpyxl") if asal_name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(asal_bytes))
+
+            df_asal_updated = df_asal.copy()
+            self.putaway_qty_system.set(int(pd.to_numeric(df_asal_updated.iloc[:, 9], errors='coerce').sum()))
+
+            def get_col_idx(df_target, keywords, default_idx):
+                for i, col in enumerate(df_target.columns):
+                    if any(k.lower() in str(col).lower() for k in keywords): return i
+                return default_idx
+
+            c_bin_a = get_col_idx(df_asal, ['bin', 'lokasi'], 1)
+            c_sku_a = get_col_idx(df_asal, ['sku', 'item code'], 2)
+            c_qty_a = get_col_idx(df_asal, ['qty system', 'quantity', 'stok'], 9)
+
+            c_bin_d = get_col_idx(df_ds, ['bin', 'tujuan'], 0)
+            c_sku_d = get_col_idx(df_ds, ['sku', 'item'], 1)
+            c_qty_d = get_col_idx(df_ds, ['qty', 'jumlah'], 2)
+
+            bin_qty_dict = {}
+            for _, row in df_asal_updated.iterrows():
+                try:
+                    key = f"{str(row.iloc[c_bin_a])}|{str(row.iloc[c_sku_a])}"
+                    qty = pd.to_numeric(row.iloc[c_qty_a], errors='coerce')
+                    bin_qty_dict[key] = qty if pd.notna(qty) else 0
+                except: continue
+
+            out_data = []
+            for _, row in df_ds.iterrows():
+                try:
+                    sku = str(row.iloc[c_sku_d])
+                    diff_qty = pd.to_numeric(row.iloc[c_qty_d], errors='coerce')
+                    if pd.isna(diff_qty) or diff_qty <= 0: continue
+
+                    bin_tujuan = str(row.iloc[c_bin_d])
+                    rem = int(diff_qty)
+
+                    patterns = ["STAGING LT.3", "STAGGING LT.3", "STAGING", "STAGGING", "KARANTINA", "NORMAL"]
+                    for pattern in patterns:
+                        if rem <= 0: break
+                        for key in list(bin_qty_dict.keys()):
+                            qty_avail = bin_qty_dict[key]
+                            if qty_avail <= 0: continue
+                            b_name, s_name = key.split("|")
+                            if s_name != sku: continue
+
+                            match = False
+                            if pattern == "NORMAL":
+                                if not any(x in b_name.upper() for x in ["STAG", "KARANTINA"]): match = True
+                            else:
+                                if pattern in b_name.upper(): match = True
+
+                            if match:
+                                take = min(rem, qty_avail)
+                                bin_qty_dict[key] -= take
+                                rem -= take
+                                out_data.append([bin_tujuan, sku, int(diff_qty), b_name, take, rem, "FULLY SETUP" if rem == 0 else "PARTIAL SETUP"])
+                                if rem <= 0: break
+
+                    if rem > 0:
+                        out_data.append([bin_tujuan, sku, int(diff_qty), "(NO BIN)", 0, rem, "PERLU CARI STOCK MANUAL"])
+                except: continue
+
+            df_comp = pd.DataFrame(out_data, columns=["BIN ASAL", "SKU", "QTY PUTAWAY", "BIN DITEMUKAN", "QUANTITY", "DIFF", "STATUS"])
+
+            for idx in df_asal_updated.index:
+                key = f"{str(df_asal_updated.iloc[idx, c_bin_a])}|{str(df_asal_updated.iloc[idx, c_sku_a])}"
+                if key in bin_qty_dict:
+                    df_asal_updated.iloc[idx, c_qty_a] = bin_qty_dict[key]
+
+            df_plist = df_comp[df_comp['STATUS'].str.contains("SETUP")].copy()
+            if not df_plist.empty:
+                df_plist = df_plist.rename(columns={"BIN DITEMUKAN": "BIN AWAL", "BIN ASAL": "BIN TUJUAN"})
+                df_plist = df_plist[["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "STATUS"]]
+                df_plist.columns = ["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"]
+                df_plist['NOTES'] = "PUTAWAY"
+            else:
+                df_plist = pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
+
+            df_kurang = df_comp[df_comp['STATUS'] == "PERLU CARI STOCK MANUAL"].copy()
+
+            area = self.area_putaway()
+            if area == "DC LANTAI 1": kw_out = ["GL1-DC-PUTAWAY", "STAG"]
+            elif area == "DC LANTAI 2": kw_out = ["GL2-DC-PUTAWAY", "STAG"]
+            elif area == "DC LANTAI 3": kw_out = ["GL3-DC-PUTAWAY", "STAG"]
+            elif area == "JERSEY ZONE": kw_out = ["JZ-PUTAWAY", "STAG"]
+            else: kw_out = ["STAG", "PUTAWAY"]
+
+            bin_series = df_asal_updated.iloc[:, c_bin_a].astype(str).str.upper()
+            mask_kw = bin_series.str.contains(kw_out[0], na=False)
+            for kw in kw_out[1:]:
+                mask_kw = mask_kw | bin_series.str.contains(kw, na=False)
+
+            mask_out = (pd.to_numeric(df_asal_updated.iloc[:, c_qty_a], errors='coerce') > 0) & mask_kw
+            df_outstanding = df_asal_updated[mask_out].copy()
+
+            self.putaway_total_setup.set(int(df_plist['QUANTITY'].sum()) if not df_plist.empty else 0)
+            self.putaway_kurang_setup.set(int(df_kurang['DIFF'].sum()) if not df_kurang.empty else 0)
+
+            sisa = 0
+            if not df_outstanding.empty:
+                qty_col = [c for c in df_outstanding.columns if 'qty' in str(c).lower()]
+                if qty_col: sisa = int(pd.to_numeric(df_outstanding[qty_col[0]], errors='coerce').sum())
+            self.putaway_sisa_stok.set(sisa)
+
+            self._raw_df_comp = df_comp
+            self._raw_df_plist = df_plist
+            self._raw_df_kurang = df_kurang
+            self._raw_df_out = df_outstanding
+            self._raw_df_updated = df_asal_updated
+
+            self.df_comp_headers.set(df_comp.columns.tolist() if not df_comp.empty else [])
+            self.df_comp_rows.set(df_comp.fillna("").astype(str).values.tolist() if not df_comp.empty else [])
+
+            self.df_plist_headers.set(df_plist.columns.tolist() if not df_plist.empty else [])
+            self.df_plist_rows.set(df_plist.fillna("").astype(str).values.tolist() if not df_plist.empty else [])
+
+            self.df_kurang_headers.set(df_kurang.columns.tolist() if not df_kurang.empty else [])
+            self.df_kurang_rows.set(df_kurang.fillna("").astype(str).values.tolist() if not df_kurang.empty else [])
+
+            self.df_out_headers.set(df_outstanding.columns.tolist() if not df_outstanding.empty else [])
+            self.df_out_rows.set(df_outstanding.fillna("").astype(str).values.tolist() if not df_outstanding.empty else [])
+
+            self.putaway_processed.set(True)
+            return True, "Compare Putaway berhasil diproses!"
+        except Exception as e:
+            return False, f"Gagal memproses file Putaway: {e}"
+
+# ==============================================================================
+# 3. CSS & JAVASCRIPT LENGKAP
+# ==============================================================================
 CUSTOM_HEAD = ui.head_content(
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
     ui.tags.style("""
@@ -40,6 +533,21 @@ CUSTOM_HEAD = ui.head_content(
             100% { transform: scale(1); opacity: 1; }
         }
         .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        
+        .form-input-dark {
+            background-color: #FFFFFF !important;
+            color: #111111 !important;
+            border: 2px solid #4A5568 !important;
+            border-radius: 8px !important;
+            font-weight: 600;
+            padding: 8px 12px;
+            width: 100%;
+        }
+        .form-input-dark:focus {
+            border: 2px solid #E50914 !important;
+            box-shadow: 0 0 0 1px #E50914 !important;
+            outline: none !important;
+        }
         
         .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
         .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
@@ -93,9 +601,9 @@ CUSTOM_HEAD = ui.head_content(
     """)
 )
 
-# ==========================================
-# HELPER KOMPONEN TABEL & METRICS
-# ==========================================
+# ==============================================================================
+# 4. HELPER KOMPONEN TABEL, METRICS & MODAL
+# ==============================================================================
 def metric_box(title: str, val_ui, text_color: str, bg_gradient: str):
     return ui.div(
         ui.div(title, style="color: #4A5568; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;"),
@@ -132,9 +640,6 @@ def render_clean_table(headers: list, rows: list):
         style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;"
     )
 
-# ==========================================
-# SUCCESS MODAL (ANIMASI POP-IN)
-# ==========================================
 def success_modal(show: bool):
     if not show:
         return ui.div()
@@ -154,11 +659,10 @@ def success_modal(show: bool):
         style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center;"
     )
 
-# ==========================================
-# VIEW STOCK MINUS
-# ==========================================
+# ==============================================================================
+# 5. VIEW STOCK MINUS
+# ==============================================================================
 def stock_minus_view(state: AppState, has_file: bool):
-    # Action button logic (Lock vs Active)
     if has_file:
         btn_process = ui.input_action_button(
             "btn_process_stock_minus",
@@ -175,7 +679,6 @@ def stock_minus_view(state: AppState, has_file: bool):
             style="padding: 0.75rem 1.5rem;"
         )
 
-    # Uploader Box Custom
     uploader_ui = ui.div(
         ui.span("Upload File STOCK MINUS", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
         ui.div(
@@ -200,7 +703,6 @@ def stock_minus_view(state: AppState, has_file: bool):
         style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
-    # Hasil Pemrosesan Dashboard & Tabs
     if not state.stock_minus_processed():
         return ui.div(
             success_modal(state.show_success_modal()),
@@ -209,14 +711,12 @@ def stock_minus_view(state: AppState, has_file: bool):
         )
 
     results_ui = ui.div(
-        # 3 Kartu Metric
         ui.div(
             dark_metric_box("TOTAL QTY MINUS", f"{state.total_qty_minus()}", "#E53E3E"),
             dark_metric_box("TERCOVER", f"{state.total_tercover()}", "#38A169"),
             dark_metric_box("SISA ADJ", f"{state.total_sisa_adj()}", "#DD6B20"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; margin-bottom: 1.25rem;"
         ),
-        # 3 Tabs
         ui.navset_card_tab(
             ui.nav_panel(
                 ui.tags.span(ui.tags.i(class_="fa-regular fa-file-lines", style="margin-right: 6px; font-size: 14px;"), "MINUS AWAL"),
@@ -274,9 +774,9 @@ def stock_minus_view(state: AppState, has_file: bool):
         style="width: 100%; padding: 1rem;"
     )
 
-# ==========================================
-# CUSTOM UPLOADER BOX UNTUK PUTAWAY
-# ==========================================
+# ==============================================================================
+# 6. VIEW PUTAWAY SYSTEM
+# ==============================================================================
 def custom_uploader_box(id_str: str, title: str, file_label_output_id: str):
     return ui.div(
         ui.span(title, style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
@@ -298,13 +798,9 @@ def custom_uploader_box(id_str: str, title: str, file_label_output_id: str):
         style="width: 100%; margin-bottom: 0.5rem;"
     )
 
-# ==========================================
-# VIEW PUTAWAY SYSTEM
-# ==========================================
 def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
     cur_area = state.area_putaway()
 
-    # Dynamic action button logic (Active if both files selected, else Locked)
     if has_ds and has_asal:
         btn_compare = ui.input_action_button(
             "btn_compare_putaway",
@@ -321,7 +817,6 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
             style="padding: 0.75rem 1.5rem;"
         )
 
-    # Content when Area Putaway selected vs not selected
     if cur_area != "":
         area_content = ui.div(
             ui.div(
@@ -367,7 +862,6 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
         style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
-    # Putaway Results UI
     if not state.putaway_processed():
         return ui.div(
             success_modal(state.show_success_modal()),
@@ -375,7 +869,6 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
             style="width: 100%; padding: 1rem;"
         )
 
-    # Empty State Conditionals for Tab 3 & 4
     kurang_rows = state.df_kurang_rows()
     if kurang_rows and len(kurang_rows) > 0:
         kurang_content = render_clean_table(state.df_kurang_headers(), kurang_rows)
@@ -391,7 +884,6 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
     results_ui = ui.div(
         ui.hr(style="margin: 1.5rem 0 1rem 0; border-color: #E2E8F0;"),
         ui.h4("📋 RINGKASAN HASIL", style="font-size: 16px; color: #010B13; font-weight: 800; margin: 1rem 0;"),
-        # 4 Metric Cards
         ui.div(
             dark_metric_box("Qty System Putaway", f"{state.putaway_qty_system()}", "#E53E3E"),
             dark_metric_box("Total Tersetup", f"{state.putaway_total_setup()}", "#38A169"),
@@ -399,7 +891,6 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
             dark_metric_box("Sisa Stok Putaway", f"{state.putaway_sisa_stok()}", "#3182CE"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; margin-bottom: 1.25rem;"
         ),
-        # Download Full Report Button
         ui.div(
             ui.download_button(
                 "btn_dl_putaway_report",
@@ -408,7 +899,6 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
             ),
             style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
         ),
-        # 4 Tabs
         ui.navset_card_tab(
             ui.nav_panel(
                 ui.tags.span("📋 Hasil Compare", style="font-weight: bold;"),
@@ -437,19 +927,13 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
         style="width: 100%; padding: 1rem;"
     )
 
-# ==========================================
-# CONSTANT STYLES SESUAI REFLEX
-# ==========================================
-STYLE_INPUT_ATTRS = 'class="form-input-dark" style="background-color: #FFFFFF !important; color: #111111 !important; border: 2px solid #4A5568 !important; border-radius: 8px !important; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"'
-STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
-
-# ==========================================
-# VIEW MAIN DASHBOARD (DATABASE ONGKIR)
-# ==========================================
+# ==============================================================================
+# 7. VIEW DATABASE ONGKIR (MAIN DASHBOARD)
+# ==============================================================================
 def main_dashboard_view(state: AppState):
-    # --- TAB 1: FORM INPUT & CSV BATCH ---
+    STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
+
     tab1_content = ui.div(
-        # Box Kiri: Manual Input
         ui.div(
             ui.div(
                 ui.span("📝", style="font-size: 20px; margin-right: 8px;"),
@@ -504,7 +988,6 @@ def main_dashboard_view(state: AppState):
             ),
             style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
         ),
-        # Box Kanan: CSV Batch Upload
         ui.div(
             ui.div(
                 ui.span("📁", style="font-size: 20px; margin-right: 8px;"),
@@ -532,7 +1015,6 @@ def main_dashboard_view(state: AppState):
         style="display: flex; flex-wrap: wrap; gap: 1.25rem; width: 100%; margin-top: 1.5rem;"
     )
 
-    # --- TAB 2: METRICS & TABEL HISTORY ---
     selected_count = len(state.selected_ids())
     del_btn_ui = ui.tags.button(
         f"🗑️ HAPUS ({selected_count}) DATA",
@@ -540,11 +1022,9 @@ def main_dashboard_view(state: AppState):
         style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
     ) if selected_count > 0 else ui.div()
 
-    # Ekspedisi dropdown options
     eksp_options = state.get_list_ekspedisi_options()
     select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in eksp_options]
 
-    # Table rows generation with checkboxes
     filtered_data = state.get_filtered_ongkir()
     table_rows = []
     sel_set = set(state.selected_ids())
@@ -581,7 +1061,6 @@ def main_dashboard_view(state: AppState):
             del_btn_ui,
             style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 0.5rem;"
         ),
-        # 6 Grid Metric Box
         ui.div(
             metric_box("💰 BIAYA ALL", state.metric_total_biaya_all(), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
             metric_box("📦 KOLI ALL", state.metric_total_koli_all(), "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
@@ -591,7 +1070,6 @@ def main_dashboard_view(state: AppState):
             metric_box("🔄 BIAYA RTO", state.metric_biaya_rto(), "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
         ),
-        # Tabel History
         ui.div(
             ui.tags.table(
                 ui.tags.thead(
@@ -627,15 +1105,12 @@ def main_dashboard_view(state: AppState):
         style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;"
     )
 
-# ==========================================
-# KOMPONEN MENU ITEM & DROPDOWN HEADER
-# ==========================================
+# ==============================================================================
+# 8. VIEW SIDEBAR & LOGIN PAGE
+# ==============================================================================
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
-    if is_active:
-        bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);"
-    else:
-        bg_style = "background: transparent; color: #CBD5E0; font-weight: 500;"
+    bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
 
     return ui.tags.button(
         label,
@@ -644,9 +1119,7 @@ def menu_item(label: str, target_menu: str, current_menu: str):
             width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px;
             border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer;
             justify-content: flex-start; transition: all 0.2s ease; {bg_style}
-        """,
-        onmouseover="if (!this.classList.contains('active-menu')) this.style.background='rgba(255, 255, 255, 0.08)'; this.style.color='#FFFFFF';",
-        onmouseout=f"if (!this.classList.contains('active-menu')) {{ {('this.style.background=\'linear-gradient(135deg, #E50914 0%, #B20710 100%)\'; this.style.color=\'#FFFFFF\';' if is_active else 'this.style.background=\'transparent\'; this.style.color=\'#CBD5E0\';')} }}"
+        """
     )
 
 def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
@@ -660,38 +1133,28 @@ def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
             padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer;
             background: rgba(255, 255, 255, 0.05); margin-top: 0.8rem; margin-bottom: 0.3rem;
             transition: background 0.2s ease;
-        """,
-        onmouseover="this.style.background='rgba(255, 255, 255, 0.1)';",
-        onmouseout="this.style.background='rgba(255, 255, 255, 0.05)';"
+        """
     )
 
-# ==========================================
-# VIEW SIDEBAR (EXPANDED & COLLAPSED)
-# ==========================================
 def sidebar(state: AppState):
     cur_menu = state.main_menu()
 
-    # KONDISI SAAT SIDEBAR DITUTUP (COLLAPSED: 60px)
     if not state.sidebar_open():
         return ui.div(
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"),
                 onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})",
-                style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;",
-                onmouseover="this.style.background='rgba(255, 255, 255, 0.1)';",
-                onmouseout="this.style.background='transparent';"
+                style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"
             ),
             style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;"
         )
 
-    # KONDISI SAAT SIDEBAR TERBUKA (EXPANDED: 280px)
     op_menus = state.get_menu_operational()
     inv_menus = state.get_menu_inventory()
     rej_menus = state.get_menu_reject()
     ext_menus = state.get_menu_extras()
 
     return ui.div(
-        # HEADER & TOMBOL CLOSE SIDEBAR
         ui.div(
             ui.div(
                 ui.span("JEZ", style="color: #E50914; font-weight: 900; font-size: 20px;"),
@@ -701,16 +1164,11 @@ def sidebar(state: AppState):
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 16px; color: #CBD5E0;"),
                 onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})",
-                style="background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px;",
-                onmouseover="this.style.color='#FFFFFF'; this.style.background='rgba(255, 255, 255, 0.1)';",
-                onmouseout="this.style.color='#CBD5E0'; this.style.background='transparent';"
+                style="background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px;"
             ),
             style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.5rem;"
         ),
-
-        # AREA MENU BISA DI-SCROLL
         ui.div(
-            # KELOMPOK 1: OPERATIONAL
             ui.div(
                 section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()),
                 ui.div(
@@ -719,8 +1177,6 @@ def sidebar(state: AppState):
                 ),
                 style="width: 100%;"
             ),
-
-            # KELOMPOK 2: INVENTORY
             ui.div(
                 section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()),
                 ui.div(
@@ -729,8 +1185,6 @@ def sidebar(state: AppState):
                 ),
                 style="width: 100%;"
             ),
-
-            # KELOMPOK 3: REJECT & DEFECT
             ui.div(
                 section_dropdown_header("REJECT & DEFECT", "reject", state.dropdown_reject()),
                 ui.div(
@@ -739,8 +1193,6 @@ def sidebar(state: AppState):
                 ),
                 style="width: 100%;"
             ),
-
-            # KELOMPOK 4: EXTRAS
             ui.div(
                 section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()),
                 ui.div(
@@ -751,8 +1203,6 @@ def sidebar(state: AppState):
             ),
             style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
         ),
-
-        # TOMBOL LOGOUT SISTEM
         ui.div(
             ui.tags.button(
                 ui.tags.span(
@@ -765,7 +1215,6 @@ def sidebar(state: AppState):
             ),
             style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"
         ),
-
         style="""
             width: 280px; min-width: 280px; padding: 1rem;
             background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%);
@@ -774,9 +1223,6 @@ def sidebar(state: AppState):
         """
     )
 
-# ==========================================
-# VIEW LOGIN PAGE
-# ==========================================
 def login_page():
     return ui.div(
         ui.div(
@@ -792,8 +1238,6 @@ def login_page():
                 ),
                 ui.hr(style="border-color: rgba(255, 255, 255, 0.1); margin-bottom: 1.25rem;"),
                 ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 13px; margin-bottom: 1.5rem;"),
-
-                # USERNAME INPUT
                 ui.div(
                     ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"),
                     ui.tags.input(
@@ -803,8 +1247,6 @@ def login_page():
                     ),
                     style="margin-bottom: 1rem;"
                 ),
-
-                # PASSWORD INPUT
                 ui.div(
                     ui.span("PASSWORD", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"),
                     ui.tags.input(
@@ -814,10 +1256,7 @@ def login_page():
                     ),
                     style="margin-bottom: 1.5rem;"
                 ),
-
                 ui.div(style="height: 10px;"),
-
-                # BUTTON SIGN IN
                 ui.tags.button(
                     "SIGN IN TO SYSTEM →",
                     id="btn_sign_in",
@@ -830,7 +1269,6 @@ def login_page():
                     class_="btn-red-gradient",
                     style="width: 100%; height: 48px; font-size: 14px; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);"
                 ),
-
                 ui.div(
                     "🟢 Warehouse Supporting Tools v2.0",
                     style="color: #888888; font-size: 12px; text-align: center; margin-top: 10px;"
@@ -851,12 +1289,8 @@ def login_page():
         """
     )
 
-# ==========================================
-# GLOBAL TOPBAR / HEADER
-# ==========================================
 def global_header(state: AppState):
     return ui.div(
-        # Sisi Kiri: Red Bar & Page Title
         ui.div(
             ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
             ui.div(
@@ -866,27 +1300,19 @@ def global_header(state: AppState):
             ),
             style="display: flex; align-items: center;"
         ),
-
-        # Sisi Kanan: Panduan Button + Online Status & Live Timer
         ui.div(
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"),
                 "Panduan & Logic",
                 onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})",
-                style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; transition: background 0.2s ease;",
-                onmouseover="this.style.background='#CBD5E0';",
-                onmouseout="this.style.background='#E2E8F0';"
+                style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
             ),
-
-            # Menumpuk Status Online dan Live Timer Simetris
             ui.div(
-                # Atas: Titik Hijau & ONLINE
                 ui.div(
                     ui.div(style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px;", class_="blink-online"),
                     ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"),
                     style="display: flex; align-items: center;"
                 ),
-                # Bawah: Timer Live
                 ui.div(
                     ui.span(str(state.login_timestamp_ms()), id="login-time-store", style="display: none;"),
                     ui.tags.i(class_="fa-regular fa-clock", style="font-size: 12px; color: #4A5568; margin-right: 4px;"),
@@ -900,22 +1326,18 @@ def global_header(state: AppState):
         style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
     )
 
-# ==========================================
-# ROOT UI LAYOUT
-# ==========================================
+# ==============================================================================
+# 9. ROOT UI & SERVER CONTROLLER
+# ==============================================================================
 app_ui = ui.page_fluid(
     CUSTOM_HEAD,
     ui.output_ui("global_loading_overlay_ui"),
     ui.output_ui("main_root_container")
 )
 
-# ==========================================
-# SERVER ENGINE & CONTROLLER
-# ==========================================
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
 
-    # --- 1. AUTHENTICATION HANDLERS ---
     @reactive.Effect
     @reactive.event(input.btn_submit_login)
     def _login_event():
@@ -935,7 +1357,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.logout()
         ui.notification_show("Anda telah keluar dari sistem.", type="warning")
 
-    # --- 2. SIDEBAR & NAVIGATION HANDLERS ---
     @reactive.Effect
     @reactive.event(input.select_menu_item)
     def _nav_event():
@@ -951,7 +1372,6 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _drop_toggle():
         state.toggle_dropdown(input.toggle_dropdown_section())
 
-    # --- 3. DYNAMIC PANDUAN & LOGIC MODAL ---
     @reactive.Effect
     @reactive.event(input.btn_open_panduan_modal)
     def _panduan_modal():
@@ -1029,7 +1449,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
         ui.modal_show(modal)
 
-    # --- 4. ONGKIR DATABASE HANDLERS ---
     @reactive.Effect
     @reactive.event(input.btn_save_ongkir_manual)
     def _save_manual():
@@ -1089,7 +1508,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         if succ: ui.notification_show(msg, type="message")
         else: ui.notification_show(msg, type="error")
 
-    # --- 5. STOCK MINUS HANDLERS & DOWNLOADS ---
     @output
     @render.ui
     def stock_minus_file_label():
@@ -1141,11 +1559,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         return buf.getvalue()
 
-    # --- 6. PUTAWAY HANDLERS & DOWNLOADS ---
     @reactive.Effect
     @reactive.event(input.select_area_putaway)
     def _area_sel():
-        state.set_area_putaway(input.select_area_putaway())
+        state.area_putaway.set(input.select_area_putaway())
 
     @output
     @render.ui
@@ -1203,7 +1620,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         await asyncio.sleep(2.5)
         state.show_success_modal.set(False)
 
-    # --- 7. LOADING OVERLAY OUTPUT ---
     @output
     @render.ui
     def global_loading_overlay_ui():
@@ -1218,7 +1634,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); z-index: 99999; display: flex; align-items: center; justify-content: center;"
         )
 
-    # --- 8. MAIN ROOT DYNAMIC ROUTER ---
     @output
     @render.ui
     def main_root_container():
@@ -1259,7 +1674,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="display: flex; width: 100vw; height: 100vh; overflow: hidden;"
         )
 
-# ==========================================
-# INISIALISASI APLIKASI UTUH
-# ==========================================
+# ==============================================================================
+# 10. INISIALISASI UTUH
+# ==============================================================================
 app = App(app_ui, server)
