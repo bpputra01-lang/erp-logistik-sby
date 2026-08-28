@@ -4,164 +4,6 @@ import pandas as pd
 import requests
 from shiny import reactive, req
 from shiny.express import input, render, ui
-from shiny import reactive
-
-
-
-
-ui.tags.style("""
-    /* Reset & Full Page Background Gambar + Gradient Overlay */
-    * {
-        box-sizing: border-box !important;
-    }
-
-    body, html {
-        height: 100vh;
-        margin: 0;
-        padding: 0;
-        background-image: 
-            radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 100%), 
-            url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    /* Container Tengah */
-    .login-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        width: 100%;
-        padding: 1.5rem;
-    }
-
-    /* Card Glassmorphism ala Reflex */
-    .login-card {
-        width: 100%;
-        max-width: 480px;
-        padding: 2.8rem 2.2rem;
-        background: rgba(12, 12, 15, 0.88) !important;
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-left: 5px solid #E50914 !important;
-        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
-    }
-
-    /* Input Native Styling 100% Full Width & Simetris */
-    .custom-field {
-        width: 100% !important;
-        display: block !important;
-        background: rgba(0, 0, 0, 0.75) !important;
-        border: 1px solid rgba(229, 9, 20, 0.4) !important;
-        color: #FFFFFF !important;
-        border-radius: 10px !important;
-        padding: 0 1.2rem !important;
-        height: 50px !important;
-        font-size: 0.95rem !important;
-        outline: none !important;
-        transition: all 0.2s ease-in-out;
-    }
-
-    .custom-field::placeholder {
-        color: #555555 !important;
-    }
-
-    .custom-field:focus {
-        border-color: #E50914 !important;
-        box-shadow: 0 0 12px rgba(229, 9, 20, 0.5) !important;
-        background: rgba(0, 0, 0, 0.9) !important;
-    }
-
-    /* Gradient Button Full Width Simetris */
-    .btn-login {
-        background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
-        color: #FFFFFF !important;
-        font-weight: 800 !important;
-        border-radius: 10px !important;
-        cursor: pointer !important;
-        box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4) !important;
-        height: 50px !important;
-        width: 100% !important;
-        border: none !important;
-        letter-spacing: 1px;
-        font-size: 0.95rem !important;
-        transition: all 0.2s ease;
-        margin-top: 0.5rem;
-    }
-
-    .btn-login:hover {
-        opacity: 0.95;
-        transform: translateY(-1px);
-        box-shadow: 0 6px 20px rgba(229, 9, 20, 0.6) !important;
-    }
-""")
-
-# 2. Layout & UI Structure
-with ui.div(class_="login-container"):
-    with ui.div(class_="login-card"):
-        
-        # Header (Red Bar + Title)
-        with ui.div(style="display: flex; align-items: center; gap: 14px; margin-bottom: 1.5rem;"):
-            ui.div(style="width: 10px; height: 38px; background: #E50914; border-radius: 3px; flex-shrink: 0;")
-            with ui.div():
-                ui.div(
-                    "LOGISTIC DISTRIBUTION", 
-                    style="font-size: 1.2rem; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; line-height: 1.2;"
-                )
-                ui.div(
-                    "CENTER WAREHOUSE • SURABAYA", 
-                    style="font-size: 0.72rem; font-weight: 700; color: #E50914; letter-spacing: 2px; margin-top: 2px;"
-                )
-
-        # Subtitle
-        ui.hr(style="border-color: rgba(255, 255, 255, 0.1); margin: 1rem 0 1.2rem 0;")
-        ui.div(
-            "Silakan masuk dengan akun resmi gudang Anda.", 
-            style="color: #B0B0B0; font-size: 0.85rem; margin-bottom: 1.5rem;"
-        )
-
-        # Form Input Username (Pakai HTML Tag Langsung Agar Bebas Hambatan Bootstrap)
-        with ui.div(style="margin-bottom: 1.2rem; width: 100%;"):
-            ui.div("USERNAME", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;")
-            ui.tags.input(
-                id="username", 
-                type="text", 
-                placeholder="Masukkan username...", 
-                class_="custom-field"
-            )
-
-        # Form Input Password
-        with ui.div(style="margin-bottom: 1.6rem; width: 100%;"):
-            ui.div("PASSWORD", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;")
-            ui.tags.input(
-                id="password", 
-                type="password", 
-                placeholder="Masukkan password...", 
-                class_="custom-field"
-            )
-
-        # Submit Button
-        ui.input_action_button("btn_login", "SIGN IN TO SYSTEM →", class_="btn-login")
-
-        # Footer Status
-        ui.div(
-            "🟢 Warehouse Supporting Tools v2.0", 
-            style="text-align: center; color: #888888; font-size: 0.75rem; margin-top: 1.6rem;"
-        )
-
-# 3. Server Logic
-@reactive.effect
-@reactive.event(input.btn_login)
-def handle_login():
-    user = input.username()
-    pwd = input.password()
-    print(f"Logging in user: {user}")
-
 
 # ==========================================
 # CONSTANTS & CONFIGURATION
@@ -205,12 +47,103 @@ df_out = reactive.value(pd.DataFrame())
 df_updated = reactive.value(pd.DataFrame())
 
 # ==========================================
-# UI DESIGN (SHINY EXPRESS)
+# GLOBAL STYLING & CSS CUSTOM
 # ==========================================
-
-# CSS Custom Theme & Dark Styling
 ui.tags.style("""
-    body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+    /* Reset & Full Page Background Gambar + Gradient Overlay */
+    * {
+        box-sizing: border-box !important;
+    }
+
+    body, html {
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        background-color: #0f172a;
+        color: #f8fafc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .bg-login {
+        background-image: 
+            radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 100%), 
+            url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        min-height: 100vh;
+    }
+
+    /* Container Tengah */
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        width: 100%;
+        padding: 1.5rem;
+    }
+
+    /* Card Glassmorphism */
+    .login-card {
+        width: 100%;
+        max-width: 480px;
+        padding: 2.8rem 2.2rem;
+        background: rgba(12, 12, 15, 0.88) !important;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-left: 5px solid #E50914 !important;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+    }
+
+    /* Custom Field */
+    .custom-field {
+        width: 100% !important;
+        display: block !important;
+        background: rgba(0, 0, 0, 0.75) !important;
+        border: 1px solid rgba(229, 9, 20, 0.4) !important;
+        color: #FFFFFF !important;
+        border-radius: 10px !important;
+        padding: 0 1.2rem !important;
+        height: 50px !important;
+        font-size: 0.95rem !important;
+        outline: none !important;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .custom-field::placeholder { color: #555555 !important; }
+    .custom-field:focus {
+        border-color: #E50914 !important;
+        box-shadow: 0 0 12px rgba(229, 9, 20, 0.5) !important;
+        background: rgba(0, 0, 0, 0.9) !important;
+    }
+
+    /* Gradient Button Full Width */
+    .btn-login {
+        background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
+        color: #FFFFFF !important;
+        font-weight: 800 !important;
+        border-radius: 10px !important;
+        cursor: pointer !important;
+        box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4) !important;
+        height: 50px !important;
+        width: 100% !important;
+        border: none !important;
+        letter-spacing: 1px;
+        font-size: 0.95rem !important;
+        transition: all 0.2s ease;
+        margin-top: 0.5rem;
+    }
+
+    .btn-login:hover {
+        opacity: 0.95;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(229, 9, 20, 0.6) !important;
+    }
+
+    /* Dashboard UI */
     .card { background-color: #1e293b; border: 1px solid #334155; color: white; margin-bottom: 15px; }
     .btn-primary { background-color: #3b82f6; border: none; }
     .btn-success { background-color: #22c55e; border: none; }
@@ -220,7 +153,7 @@ ui.tags.style("""
 """)
 
 # ------------------------------------------
-# LOGIN BAR / HEADER
+# HEADER AUTHENTICATION (SETELAH LOGIN)
 # ------------------------------------------
 @render.ui
 def header_auth():
@@ -229,10 +162,9 @@ def header_auth():
     return ui.div(
         ui.span(f"👤 {user_display_name.get()} ({role.get().upper()})", style="font-weight: bold; margin-right: 15px;"),
         ui.input_action_button("btn_logout", "Logout", class_="btn-danger btn-sm"),
-        style="display: flex; justify-content: flex-end; align-items: center; padding: 10px; background: #1e293b; margin-bottom: 20px; border-radius: 6px;"
+        style="display: flex; justify-content: flex-end; align-items: center; padding: 15px 25px; background: #1e293b; border-bottom: 1px solid #334155;"
     )
 
-# Logout Event
 @reactive.effect
 @reactive.event(input.btn_logout)
 def _logout():
@@ -241,50 +173,52 @@ def _logout():
     user_display_name.set("")
 
 # ------------------------------------------
-# MAIN CONTENT AREA (LOGIN & DASHBOARD)
+# MAIN APP ROUTER (SWITCH LOGIN / DASHBOARD)
 # ------------------------------------------
 @render.ui
 def main_app():
     if not logged_in.get():
-        # FORM LOGIN UI CUSTOM (Dengan ID yang sesuai)
+        # FORM LOGIN GLASSMORPHISM CUSTOM
         return ui.div(
-            ui.div(
-                ui.h4("LOGISTIC DISTRIBUTION", style="color: white; font-weight: bold; margin-bottom: 2px;"),
-                ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #a1a1aa; font-size: 13px; margin-bottom: 20px;"),
-                
-                # INPUT USERNAME (ID: login_user)
-                ui.input_text("login_user", "USERNAME", placeholder="admin"),
-                
-                # INPUT PASSWORD (ID: login_pass)
-                ui.input_password("login_pass", "PASSWORD", placeholder="••••••"),
-                
-                # TOMBOL SIGN IN (ID WAJIB: btn_login)
-                ui.input_action_button("btn_login", "SIGN IN TO SYSTEM →", class_="btn-danger w-100 mt-3", style="background-color: #dc2626; border: none; font-weight: bold; padding: 12px;"),
-                
-                style="""
-                    width: 380px; 
-                    margin: 100px auto; 
-                    padding: 30px; 
-                    background: rgba(18, 18, 18, 0.9); 
-                    border-radius: 12px; 
-                    border-left: 4px solid #dc2626;
-                    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-                """
-            )
+            with ui.div(class_="login-container"):
+                with ui.div(class_="login-card"):
+                    with ui.div(style="display: flex; align-items: center; gap: 14px; margin-bottom: 1.5rem;"):
+                        ui.div(style="width: 10px; height: 38px; background: #E50914; border-radius: 3px; flex-shrink: 0;")
+                        with ui.div():
+                            ui.div("LOGISTIC DISTRIBUTION", style="font-size: 1.2rem; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; line-height: 1.2;")
+                            ui.div("CENTER WAREHOUSE • SURABAYA", style="font-size: 0.72rem; font-weight: 700; color: #E50914; letter-spacing: 2px; margin-top: 2px;")
+
+                    ui.hr(style="border-color: rgba(255, 255, 255, 0.1); margin: 1rem 0 1.2rem 0;")
+                    ui.div("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 0.85rem; margin-bottom: 1.5rem;")
+
+                    with ui.div(style="margin-bottom: 1.2rem; width: 100%;"):
+                        ui.div("USERNAME", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;")
+                        ui.input_text("login_user", "", placeholder="Masukkan username...", class_="custom-field")
+
+                    with ui.div(style="margin-bottom: 1.6rem; width: 100%;"):
+                        ui.div("PASSWORD", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;")
+                        ui.input_password("login_pass", "", placeholder="Masukkan password...", class_="custom-field")
+
+                    ui.input_action_button("btn_login", "SIGN IN TO SYSTEM →", class_="btn-login")
+
+                    ui.div("🟢 Warehouse Supporting Tools v2.0", style="text-align: center; color: #888888; font-size: 0.75rem; margin-top: 1.6rem;"),
+            class_="bg-login"
         )
     
-    # NAVIGATION TABS (JIKA SUDAH LOGIN)
+    # KETIKA BERHASIL LOGIN -> TAMPILKAN MAIN DASHBOARD
     tabs = ["📦 Putaway System", "⚠️ Stock Minus"]
     if role.get() == "DC":
         tabs = ["🚚 Database Ongkir In/Out", "📦 Putaway System", "⚠️ Stock Minus", "🚫 Reject / Defect", "📊 Reporting & PIC"]
         
-    return ui.navset_card_tab(
-        *[ui.nav_panel(title, render_tab_content(title)) for title in tabs]
+    return ui.div(
+        ui.navset_card_tab(
+            *[ui.nav_panel(title, render_tab_content(title)) for title in tabs]
+        ),
+        style="padding: 20px;"
     )
 
-
 # ------------------------------------------
-# HANDLER LOGIC LOGIN (MEMPROSES TOMBOL)
+# SINGLE HANDLER LOGIC FOR LOGIN
 # ------------------------------------------
 @reactive.effect
 @reactive.event(input.btn_login)
@@ -292,7 +226,6 @@ def _login():
     u = input.login_user().strip() if input.login_user() else ""
     p = input.login_pass().strip() if input.login_pass() else ""
     
-    # Kredensial Hardcoded dari state Reflex kamu
     if u == "admin" and p == "sby123":
         logged_in.set(True)
         role.set("DC")
@@ -307,21 +240,14 @@ def _login():
         ui.notification_show("Berhasil Login sebagai User Cabang!", type="message")
     else:
         ui.notification_show("❌ Username atau Password Salah!", type="error")
-        
+
 def render_tab_content(tab_name):
-    # --------------------------------------
-    # TAB: STOCK MINUS
-    # --------------------------------------
     if "Stock Minus" in tab_name:
         return ui.div(
             ui.h3("⚙️ STOCK MINUS SYSTEM"),
             ui.input_file("file_stock_minus", "Upload File Stock Opname (Excel/CSV)", accept=[".xlsx", ".xls", ".csv"]),
             ui.output_ui("ui_stock_minus_results")
         )
-    
-    # --------------------------------------
-    # TAB: PUTAWAY SYSTEM
-    # --------------------------------------
     elif "Putaway System" in tab_name:
         return ui.div(
             ui.h3("📦 PUTAWAY SYSTEM"),
@@ -331,7 +257,6 @@ def render_tab_content(tab_name):
             ui.input_action_button("btn_process_putaway", "Proses Compare Putaway", class_="btn-success mt-2"),
             ui.output_ui("ui_putaway_results")
         )
-    
     else:
         return ui.div(ui.p(f"Menu {tab_name} aktif dan siap dikembangkan."))
 
@@ -339,15 +264,12 @@ def render_tab_content(tab_name):
 # LOGIC & COMPUTATION (EFFECTS & HANDLERS)
 # ==========================================
 
-# ------------------------------------------
 # STOCK MINUS LOGIC
-# ------------------------------------------
 @reactive.effect
 @reactive.event(input.file_stock_minus)
 def _process_stock_minus():
     file_info = input.file_stock_minus()
-    if not file_info:
-        return
+    if not file_info: return
     
     path = file_info[0]["datapath"]
     df = pd.read_excel(path) if path.endswith(('.xlsx', '.xls')) else pd.read_csv(path)
@@ -404,8 +326,7 @@ def _process_stock_minus():
                             bin_solusi = b
                             break
                             
-                if not bin_solusi:
-                    break
+                if not bin_solusi: break
                     
                 qty_avail = sku_stock[bin_solusi]
                 ambil = min(sisa_minus, qty_avail)
@@ -441,9 +362,7 @@ def _process_stock_minus():
 
 @render.ui
 def ui_stock_minus_results():
-    if not stock_minus_processed.get():
-        return ui.div()
-        
+    if not stock_minus_processed.get(): return ui.div()
     return ui.div(
         ui.hr(),
         ui.row(
@@ -456,9 +375,7 @@ def ui_stock_minus_results():
         render.data_frame(render.DataGrid(df_set_up.get().head(10)))
     )
 
-# ------------------------------------------
-# PUTAWAY SYSTEM LOGIC
-# ------------------------------------------
+# PUTAWAY LOGIC
 @reactive.effect
 @reactive.event(input.btn_process_putaway)
 def _process_putaway():
@@ -547,9 +464,7 @@ def _process_putaway():
 
 @render.ui
 def ui_putaway_results():
-    if not putaway_processed.get():
-        return ui.div()
-        
+    if not putaway_processed.get(): return ui.div()
     return ui.div(
         ui.hr(),
         ui.row(
