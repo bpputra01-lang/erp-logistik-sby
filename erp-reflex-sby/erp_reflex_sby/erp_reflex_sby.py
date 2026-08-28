@@ -875,39 +875,15 @@ def error_modal(show: bool, message: str = ""):
 
 # --- GLOBAL LOADING OVERLAY (CONVERTED DARI REFLEX) ---
 def render_reflex_loading_overlay(is_loading: bool):
-    if not is_loading:
-        return ui.div()
+    display_style = "flex" if is_loading else "none"
     return ui.div(
         ui.div(
             ui.div(class_="reflex-spinner-red"),
-            ui.span(
-                "Sedang memproses data, mohon tunggu...",
-                style="font-weight: bold; color: #1A202C; font-size: 14px; text-align: center;"
-            ),
-            style="""
-                background: white;
-                padding: 2rem;
-                border-radius: 12px;
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 1rem;
-                min-width: 280px;
-            """
+            ui.span("Sedang memproses data, mohon tunggu...", style="font-weight: bold; color: #1A202C; font-size: 14px; text-align: center;"),
+            style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); display: flex; flex-direction: column; align-items: center; gap: 1rem; min-width: 280px;"
         ),
-        style="""
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 99999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        """
+        id="global_reflex_loading",
+        style=f"position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); z-index: 99999; display: {display_style}; align-items: center; justify-content: center;"
     )
 
 # ==============================================================================
@@ -1561,37 +1537,37 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     # --- DYNAMIC ACTION BUTTONS & FILE BADGES (NO RE-RENDER UPLOADER) ---
     @render.ui
-    def stock_minus_action_btn_ui():
-        f = input.upload_stock_file() if "upload_stock_file" in input else None
-        if f and len(f) > 0:
-            file_name = f[0]["name"]
-            size_kb = round(f[0]["size"] / 1024, 1) if "size" in f[0] else 0
-            return ui.div(
-                ui.div(
-                    ui.tags.i(class_="fa-solid fa-file-excel", style="color: #10B981; font-size: 16px; margin-right: 8px;"),
-                    ui.span("File Terpilih: ", style="color: #4A5568; font-size: 13px; font-weight: bold;"),
-                    ui.span(f"{file_name} ({size_kb} KB)", style="color: #10B981; font-size: 13px; font-weight: 800;"),
-                    style="display: flex; align-items: center;"
-                ),
-                ui.input_action_button(
-                    "btn_process_stock_minus",
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"),
-                    class_="btn-red-gradient",
-                    style="padding: 0.75rem 1.5rem; font-weight: bold; border-radius: 6px;"
-                ),
-                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1rem;"
-            )
-        else:
-            return ui.div(
-                ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-                    "PILIH FILE UNTUK MEMULAI",
-                    disabled=True,
-                    class_="btn-locked",
-                    style="padding: 0.75rem 1.5rem;"
-                ),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
-            )
+def stock_minus_action_btn_ui():
+    f = input.upload_stock_file() if "upload_stock_file" in input else None
+    if f and len(f) > 0:
+        file_name = f[0]["name"]
+        return ui.div(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-file-excel", style="color: #10B981; font-size: 16px; margin-right: 8px;"),
+                ui.span("File Terpilih: ", style="color: #4A5568; font-size: 13px; font-weight: bold;"),
+                ui.span(f"{file_name}", style="color: #10B981; font-size: 13px; font-weight: 800;"),
+                style="display: flex; align-items: center;"
+            ),
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"),
+                id="btn_process_stock_minus_custom",
+                onclick="document.getElementById('global_reflex_loading').style.display='flex'; Shiny.setInputValue('btn_process_stock_minus', Math.random(), {priority: 'event'});",
+                class_="btn-red-gradient",
+                style="padding: 0.75rem 1.5rem; font-weight: bold; border-radius: 6px;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1rem;"
+        )
+    else:
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "PILIH FILE UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked",
+                style="padding: 0.75rem 1.5rem;"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+        )
 
     @render.ui
     def putaway_action_btn_ui():
