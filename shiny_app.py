@@ -48,8 +48,7 @@ class AppState:
         self.dropdown_reject = reactive.Value(False)
         self.dropdown_extras = reactive.Value(False)
 
-        # --- MODAL & LOADING STATES ---
-        self.is_info_open = reactive.Value(False)
+        # --- GLOBAL MODAL & LOADING STATES ---
         self.is_loading = reactive.Value(False)
         self.show_success_modal = reactive.Value(False)
         self.show_error_modal = reactive.Value(False)
@@ -105,6 +104,19 @@ class AppState:
         self._raw_df_kurang = pd.DataFrame()
         self._raw_df_out = pd.DataFrame()
         self._raw_df_updated = pd.DataFrame()
+
+    # --- GLOBAL POPUP TRIGGER HELPERS ---
+    def trigger_success(self):
+        self.show_error_modal.set(False)
+        self.show_success_modal.set(True)
+
+    def trigger_error(self, message: str = ""):
+        self.show_success_modal.set(False)
+        self.error_modal_message.set(message if message else "Terjadi kesalahan saat memproses data!")
+        self.show_error_modal.set(True)
+
+    def set_loading(self, status: bool):
+        self.is_loading.set(status)
 
     def set_main_menu(self, menu: str):
         self.main_menu.set(menu)
@@ -225,7 +237,7 @@ class AppState:
                 ongkir = safe_int(row.get("ONGKIR", 0))
                 tgl_raw = row["TANGGAL_JAM"]
                 fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if pd.isna(tgl_raw) else str(tgl_raw)
-                batch_data.append({"supplier": sup, "ekspedisi": eks, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
+                batch_data.append({"supplier": sup, "ekspedisi": eksp, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
 
             if batch_data:
                 client = get_supabase()
@@ -789,7 +801,7 @@ def render_clean_table(headers: list, rows: list):
         style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;"
     )
 
-# --- SUCCESS MODAL (TRANSPARAN TANPA KOTAK PUTIH) ---
+# --- SUCCESS MODAL (CHECKLIST HIJAU GLOBAL) ---
 def success_modal(show: bool):
     if not show:
         return ui.div()
@@ -817,7 +829,7 @@ def success_modal(show: bool):
         style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; cursor: pointer;"
     )
 
-# --- ERROR MODAL (POP-UP TANDA SILANG MERAH) ---
+# --- ERROR MODAL (TANDA SILANG MERAH GLOBAL) ---
 def error_modal(show: bool, message: str = ""):
     if not show:
         return ui.div()
@@ -887,12 +899,7 @@ def stock_minus_view(state: AppState, has_file: bool):
     )
 
     if not state.stock_minus_processed():
-        return ui.div(
-            success_modal(state.show_success_modal()),
-            error_modal(state.show_error_modal(), state.error_modal_message()),
-            uploader_ui,
-            style="width: 100%; padding: 1rem;"
-        )
+        return ui.div(uploader_ui, style="width: 100%; padding: 1rem;")
 
     results_ui = ui.div(
         ui.div(
@@ -952,8 +959,6 @@ def stock_minus_view(state: AppState, has_file: bool):
     )
 
     return ui.div(
-        success_modal(state.show_success_modal()),
-        error_modal(state.show_error_modal(), state.error_modal_message()),
         uploader_ui,
         results_ui,
         style="width: 100%; padding: 1rem;"
@@ -1044,12 +1049,7 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
     )
 
     if not state.putaway_processed():
-        return ui.div(
-            success_modal(state.show_success_modal()),
-            error_modal(state.show_error_modal(), state.error_modal_message()),
-            top_section,
-            style="width: 100%; padding: 1rem;"
-        )
+        return ui.div(top_section, style="width: 100%; padding: 1rem;")
 
     kurang_rows = state.df_kurang_rows()
     if kurang_rows and len(kurang_rows) > 0:
@@ -1103,8 +1103,6 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
     )
 
     return ui.div(
-        success_modal(state.show_success_modal()),
-        error_modal(state.show_error_modal(), state.error_modal_message()),
         top_section,
         results_ui,
         style="width: 100%; padding: 1rem;"
@@ -1525,11 +1523,14 @@ def global_header(state: AppState):
     )
 
 # ==============================================================================
-# 9. ROOT UI & SERVER CONTROLLER
+# 9. ROOT UI & SERVER CONTROLLER (SENTRALISASI POP-UP & MODAL)
 # ==============================================================================
 app_ui = ui.page_fluid(
     CUSTOM_HEAD,
+    # --- GLOBAL MODALS & LOADINGS OVERLAYS ---
     ui.output_ui("global_loading_overlay_ui"),
+    ui.output_ui("global_success_modal_ui"),
+    ui.output_ui("global_error_modal_ui"),
     ui.output_ui("main_root_container"),
     style="padding: 0; margin: 0;"
 )
@@ -1549,6 +1550,29 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.show_error_modal.set(False)
         state.error_modal_message.set("")
 
+    # --- RENDER GLOBAL OVERLAYS (BERLAKU DI SELURUH MENU) ---
+    @render.ui
+    def global_success_modal_ui():
+        return success_modal(state.show_success_modal())
+
+    @render.ui
+    def global_error_modal_ui():
+        return error_modal(state.show_error_modal(), state.error_modal_message())
+
+    @render.ui
+    def global_loading_overlay_ui():
+        if not state.is_loading():
+            return ui.div()
+        return ui.div(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-spinner fa-spin", style="font-size: 40px; color: #E50914; margin-bottom: 1rem;"),
+                ui.span("Sedang memproses data, mohon tunggu...", style="font-weight: bold; color: #1A202C; font-size: 15px;"),
+                style="background: white; padding: 2rem 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center;"
+            ),
+            style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); z-index: 99998; display: flex; align-items: center; justify-content: center;"
+        )
+
+    # --- AUTHENTICATION & NAVIGATION EVENTS ---
     @reactive.Effect
     @reactive.event(input.btn_submit_login)
     def _login_event():
@@ -1558,8 +1582,10 @@ def server(input: Inputs, output: Outputs, session: Session):
         success, msg = state.handle_login(u, p)
         if success:
             state.load_ongkir_data()
+            state.trigger_success()
             ui.notification_show(msg, type="message", duration=4)
         else:
+            state.trigger_error(msg)
             ui.notification_show(msg, type="error", duration=4)
 
     @reactive.Effect
@@ -1660,31 +1686,34 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
         ui.modal_show(modal)
 
+    # --- DATABASE ONGKIR ACTIONS ---
     @reactive.Effect
     @reactive.event(input.btn_save_ongkir_manual)
     def _save_manual():
         d = input.btn_save_ongkir_manual()
+        state.set_loading(True)
         succ, msg = state.save_single_ongkir(d.get("supplier", ""), d.get("ekspedisi", ""), d.get("koli", "1"), d.get("ongkir", "0"), d.get("tgl", ""))
+        state.set_loading(False)
         if succ:
-            state.show_success_modal.set(True)
+            state.trigger_success()
         else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+            state.trigger_error(msg)
 
     @reactive.Effect
     @reactive.event(input.btn_execute_batch_upload)
     def _save_batch():
         f = input.upload_csv_batch()
         if not f:
-            ui.notification_show("Pilih file CSV terlebih dahulu!", type="warning", duration=4)
+            state.trigger_error("Pilih file CSV terlebih dahulu!")
             return
+        state.set_loading(True)
         with open(f[0]["datapath"], "rb") as fp:
             succ, msg = state.batch_upload_csv(fp.read())
+        state.set_loading(False)
         if succ:
-            state.show_success_modal.set(True)
+            state.trigger_success()
         else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+            state.trigger_error(msg)
 
     @reactive.Effect
     @reactive.event(input.toggle_row_id)
@@ -1714,23 +1743,33 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Effect
     @reactive.event(input.btn_confirm_delete_permanent)
     def _del_exec():
+        state.set_loading(True)
         succ, msg = state.execute_delete()
+        state.set_loading(False)
         ui.modal_remove()
-        if succ: ui.notification_show(msg, type="message", duration=4)
-        else: ui.notification_show(msg, type="error", duration=4)
+        if succ:
+            state.trigger_success()
+            ui.notification_show(msg, type="message", duration=4)
+        else:
+            state.trigger_error(msg)
+            ui.notification_show(msg, type="error", duration=4)
 
+    # --- STOCK MINUS ACTIONS ---
     @reactive.Effect
     @reactive.event(input.btn_process_stock_minus)
     def _proc_stock_file():
         f = input.upload_stock_file()
-        if not f: return
+        if not f:
+            state.trigger_error("Pilih file Stock Minus terlebih dahulu!")
+            return
+        state.set_loading(True)
         with open(f[0]["datapath"], "rb") as fp:
             succ, msg = state.process_stock_minus_file(fp.read(), f[0]["name"])
+        state.set_loading(False)
         if succ:
-            state.show_success_modal.set(True)
+            state.trigger_success()
         else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+            state.trigger_error(msg)
 
     @render.download(filename="Data_Minus_Awal.xlsx")
     def btn_dl_minus_awal():
@@ -1756,6 +1795,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         return buf.getvalue()
 
+    # --- PUTAWAY ACTIONS ---
     @reactive.Effect
     @reactive.event(input.select_area_putaway)
     def _area_sel():
@@ -1766,14 +1806,17 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _proc_putaway_files():
         f_ds = input.ds_putaway_file()
         f_as = input.asal_putaway_file()
-        if not f_ds or not f_as: return
+        if not f_ds or not f_as:
+            state.trigger_error("Kedua file (DS Putaway & Asal Bin) wajib diupload!")
+            return
+        state.set_loading(True)
         with open(f_ds[0]["datapath"], "rb") as fp_ds, open(f_as[0]["datapath"], "rb") as fp_as:
             succ, msg = state.process_putaway_compare(fp_ds.read(), f_ds[0]["name"], fp_as.read(), f_as[0]["name"])
+        state.set_loading(False)
         if succ:
-            state.show_success_modal.set(True)
+            state.trigger_success()
         else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+            state.trigger_error(msg)
 
     @render.download(filename="REPORT_PUTAWAY_SYSTEM.xlsx")
     def btn_dl_putaway_report():
@@ -1787,19 +1830,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         return buf.getvalue()
 
-    @render.ui
-    def global_loading_overlay_ui():
-        if not state.is_loading():
-            return ui.div()
-        return ui.div(
-            ui.div(
-                ui.tags.i(class_="fa-solid fa-spinner fa-spin", style="font-size: 40px; color: #E50914; margin-bottom: 1rem;"),
-                ui.span("Sedang memproses data, mohon tunggu...", style="font-weight: bold; color: #1A202C; font-size: 15px;"),
-                style="background: white; padding: 2rem 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center;"
-            ),
-            style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); z-index: 99999; display: flex; align-items: center; justify-content: center;"
-        )
-
+    # --- MAIN ROOT CONTAINER (DYNAMIC ROUTING) ---
     @render.ui
     def main_root_container():
         if not state.logged_in():
