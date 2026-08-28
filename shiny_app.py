@@ -180,28 +180,42 @@ def main_app():
     if not logged_in.get():
         # FORM LOGIN GLASSMORPHISM CUSTOM
         return ui.div(
-            with ui.div(class_="login-container"):
-                with ui.div(class_="login-card"):
-                    with ui.div(style="display: flex; align-items: center; gap: 14px; margin-bottom: 1.5rem;"):
-                        ui.div(style="width: 10px; height: 38px; background: #E50914; border-radius: 3px; flex-shrink: 0;")
-                        with ui.div():
-                            ui.div("LOGISTIC DISTRIBUTION", style="font-size: 1.2rem; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; line-height: 1.2;")
-                            ui.div("CENTER WAREHOUSE • SURABAYA", style="font-size: 0.72rem; font-weight: 700; color: #E50914; letter-spacing: 2px; margin-top: 2px;")
+            ui.div(
+                ui.div(
+                    # Header Card
+                    ui.div(
+                        ui.div(style="width: 10px; height: 38px; background: #E50914; border-radius: 3px; flex-shrink: 0;"),
+                        ui.div(
+                            ui.div("LOGISTIC DISTRIBUTION", style="font-size: 1.2rem; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; line-height: 1.2;"),
+                            ui.div("CENTER WAREHOUSE • SURABAYA", style="font-size: 0.72rem; font-weight: 700; color: #E50914; letter-spacing: 2px; margin-top: 2px;"),
+                        ),
+                        style="display: flex; align-items: center; gap: 14px; margin-bottom: 1.5rem;"
+                    ),
+                    ui.hr(style="border-color: rgba(255, 255, 255, 0.1); margin: 1rem 0 1.2rem 0;"),
+                    ui.div("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 0.85rem; margin-bottom: 1.5rem;"),
 
-                    ui.hr(style="border-color: rgba(255, 255, 255, 0.1); margin: 1rem 0 1.2rem 0;")
-                    ui.div("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 0.85rem; margin-bottom: 1.5rem;")
+                    # Field Input Username
+                    ui.div(
+                        ui.div("USERNAME", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;"),
+                        ui.input_text("login_user", "", placeholder="Masukkan username...", class_="custom-field"),
+                        style="margin-bottom: 1.2rem; width: 100%;"
+                    ),
 
-                    with ui.div(style="margin-bottom: 1.2rem; width: 100%;"):
-                        ui.div("USERNAME", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;")
-                        ui.input_text("login_user", "", placeholder="Masukkan username...", class_="custom-field")
+                    # Field Input Password
+                    ui.div(
+                        ui.div("PASSWORD", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;"),
+                        ui.input_password("login_pass", "", placeholder="Masukkan password...", class_="custom-field"),
+                        style="margin-bottom: 1.6rem; width: 100%;"
+                    ),
 
-                    with ui.div(style="margin-bottom: 1.6rem; width: 100%;"):
-                        ui.div("PASSWORD", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;")
-                        ui.input_password("login_pass", "", placeholder="Masukkan password...", class_="custom-field")
-
-                    ui.input_action_button("btn_login", "SIGN IN TO SYSTEM →", class_="btn-login")
-
+                    # Tombol Submit Login
+                    ui.input_action_button("btn_login", "SIGN IN TO SYSTEM →", class_="btn-login"),
                     ui.div("🟢 Warehouse Supporting Tools v2.0", style="text-align: center; color: #888888; font-size: 0.75rem; margin-top: 1.6rem;"),
+                    
+                    class_="login-card"
+                ),
+                class_="login-container"
+            ),
             class_="bg-login"
         )
     
@@ -216,7 +230,6 @@ def main_app():
         ),
         style="padding: 20px;"
     )
-
 # ------------------------------------------
 # SINGLE HANDLER LOGIC FOR LOGIN
 # ------------------------------------------
