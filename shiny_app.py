@@ -46,52 +46,87 @@ ui.tags.style("""
     * { box-sizing: border-box !important; }
     body, html {
         height: 100vh; margin: 0; padding: 0;
-        background-color: #0f172a; color: #f8fafc;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
+    
+    /* Background Full Screen Gambar Gudang */
     .bg-login {
-        background: radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%);
+        background: linear-gradient(rgba(15, 23, 42, 0.65), rgba(15, 23, 42, 0.75)), 
+                    url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=1920&auto=format&fit=crop') no-repeat center center fixed !important;
+        background-size: cover !important;
         min-height: 100vh;
+        width: 100%;
     }
     .login-container {
         display: flex; justify-content: center; align-items: center;
         min-height: 100vh; width: 100%; padding: 1.5rem;
     }
+    
+    /* Card Login Sleek Dark Mode */
     .login-card {
-        width: 100%; max-width: 450px; padding: 2.5rem 2rem;
-        background: rgba(15, 23, 42, 0.95) !important;
-        border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1);
-        border-left: 5px solid #E50914 !important;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+        width: 100%; max-width: 440px; padding: 2.5rem 2.2rem;
+        background: rgba(18, 18, 20, 0.95) !important;
+        border-radius: 16px; 
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-left: 4px solid #E50914 !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9);
+        backdrop-filter: blur(8px);
     }
 
-    /* Styling Target Seluruh Input Field di Card Login */
-    .login-card input[type="text"], 
-    .login-card input[type="password"] {
-        width: 100% !important; 
-        background: #020617 !important;
-        border: 1px solid rgba(229, 9, 20, 0.4) !important; 
+    /* Reset Wrapper Input Shiny */
+    .login-card .shiny-input-container {
+        width: 100% !important;
+        margin-bottom: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Styling Input Field */
+    .login-card input.form-control {
+        width: 100% !important;
+        background-color: #0d0d0f !important;
+        border: 1px solid rgba(229, 9, 20, 0.6) !important;
         color: #FFFFFF !important;
-        border-radius: 8px !important; 
+        border-radius: 8px !important;
         padding: 0 1rem !important;
-        height: 46px !important; 
-        font-size: 0.95rem !important; 
+        height: 46px !important;
+        font-size: 0.95rem !important;
         outline: none !important;
-    }
-    .login-card input[type="text"]:focus, 
-    .login-card input[type="password"]:focus {
-        border-color: #E50914 !important;
-        box-shadow: 0 0 10px rgba(229, 9, 20, 0.5) !important;
+        box-shadow: none !important;
     }
 
-    .btn-login {
-        background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
-        color: #FFFFFF !important; font-weight: 800 !important;
-        border-radius: 8px !important; cursor: pointer !important;
-        height: 48px !important; width: 100% !important; border: none !important;
-        letter-spacing: 1px; font-size: 0.95rem !important; margin-top: 0.5rem;
+    /* Placeholder Text */
+    .login-card input.form-control::placeholder {
+        color: #52525b !important;
+        opacity: 1 !important;
     }
-    .btn-login:hover { opacity: 0.95; transform: translateY(-1px); }
+
+    /* Focus State */
+    .login-card input.form-control:focus {
+        border-color: #E50914 !important;
+        box-shadow: 0 0 12px rgba(229, 9, 20, 0.5) !important;
+        background-color: #000000 !important;
+    }
+
+    /* Button Red Premium */
+    .btn-login {
+        background: #E50914 !important;
+        color: #FFFFFF !important; 
+        font-weight: 800 !important;
+        border-radius: 8px !important; 
+        cursor: pointer !important;
+        height: 46px !important; 
+        width: 100% !important; 
+        border: none !important;
+        letter-spacing: 1px; 
+        font-size: 0.95rem !important; 
+        margin-top: 0.5rem;
+        transition: all 0.2s ease;
+    }
+    .btn-login:hover { 
+        background: #b80710 !important;
+        transform: translateY(-1px); 
+    }
+    
     .metric-box { padding: 15px; border-radius: 8px; background: #1e293b; text-align: center; border: 1px solid #334155; }
     .metric-val { font-size: 24px; font-weight: bold; }
 """)
