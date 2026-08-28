@@ -207,7 +207,6 @@ df_updated = reactive.value(pd.DataFrame())
 # ==========================================
 # UI DESIGN (SHINY EXPRESS)
 # ==========================================
-ui.page_opts(title="ERP LOGISTIK SBY", fillable=True)
 
 # CSS Custom Theme & Dark Styling
 ui.tags.style("""
