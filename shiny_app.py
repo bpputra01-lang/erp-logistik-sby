@@ -52,6 +52,8 @@ class AppState:
         self.is_info_open = reactive.Value(False)
         self.is_loading = reactive.Value(False)
         self.show_success_modal = reactive.Value(False)
+        self.show_error_modal = reactive.Value(False)
+        self.error_modal_message = reactive.Value("")
 
         # --- ONGKIR DATABASE STATE ---
         self.data_list = reactive.Value([])
@@ -302,7 +304,7 @@ class AppState:
             col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
 
             if col_qty is None:
-                return False, "❌ Kolom 'QTY SYSTEM' tidak ditemukan!"
+                return False, "❌ Kolom 'QTY SYSTEM' tidak ditemukan pada file!"
 
             df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
             df[col_sku] = df[col_sku].astype(str).str.strip().str.upper()
@@ -541,14 +543,42 @@ CUSTOM_HEAD = ui.head_content(
             70% { transform: scale(1.15); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
         }
-        .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-
-        @keyframes autoFadeOut {
-            0% { opacity: 1; visibility: visible; }
-            75% { opacity: 1; }
-            100% { opacity: 0; visibility: hidden; pointer-events: none; }
-        }
+        .animate-pop { animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         
+        /* Notifikasi Toast Selalu di Pojok Kanan Atas */
+        #shiny-notification-panel {
+            top: 25px !important;
+            right: 25px !important;
+            bottom: auto !important;
+            left: auto !important;
+            position: fixed !important;
+            z-index: 999999 !important;
+            width: 360px !important;
+        }
+        .shiny-notification {
+            border-radius: 10px !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.18) !important;
+            font-weight: 700 !important;
+            font-size: 13px !important;
+            padding: 14px 18px !important;
+            margin-bottom: 10px !important;
+        }
+        .shiny-notification-message {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+            color: #FFFFFF !important;
+            border: none !important;
+        }
+        .shiny-notification-error {
+            background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
+            color: #FFFFFF !important;
+            border: none !important;
+        }
+        .shiny-notification-warning {
+            background: linear-gradient(135deg, #DD6B20 0%, #C05621 100%) !important;
+            color: #FFFFFF !important;
+            border: none !important;
+        }
+
         .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
         .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
         .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
@@ -621,10 +651,11 @@ CUSTOM_HEAD = ui.head_content(
         .uploader-box .form-control {
             background-color: transparent !important;
             border: none !important;
-            color: #38A169 !important;
-            font-weight: bold !important;
+            color: #276749 !important;
+            font-weight: 800 !important;
+            font-size: 14px !important;
             box-shadow: none !important;
-            padding-left: 1rem !important;
+            padding-left: 1.25rem !important;
             height: auto !important;
             display: flex;
             align-items: center;
@@ -681,8 +712,8 @@ CUSTOM_HEAD = ui.head_content(
         .csv-batch-box .form-control {
             background-color: transparent !important;
             border: none !important;
-            color: #1A202C !important;
-            font-weight: bold !important;
+            color: #276749 !important;
+            font-weight: 800 !important;
             box-shadow: none !important;
             padding-left: 1rem !important;
             text-align: left;
@@ -758,21 +789,19 @@ def render_clean_table(headers: list, rows: list):
         style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;"
     )
 
+# --- SUCCESS MODAL (TRANSPARAN TANPA KOTAK PUTIH) ---
 def success_modal(show: bool):
     if not show:
         return ui.div()
     return ui.div(
         ui.div(
             ui.div(
-                ui.div(
-                    ui.tags.i(class_="fa-solid fa-check", style="font-size: 48px; color: white;"),
-                    class_="animate-pop",
-                    style="background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); border-radius: 50%; width: 80px; height: 80px; box-shadow: 0 10px 25px rgba(74, 222, 128, 0.4); margin-bottom: 8px; display: flex; align-items: center; justify-content: center;"
-                ),
-                ui.h2("Success!", style="font-size: 24px; color: #1A202C; font-weight: bold; margin: 0;"),
-                style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; padding: 1.8rem 2.2rem; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.2);"
+                ui.tags.i(class_="fa-solid fa-check", style="font-size: 55px; color: white;"),
+                class_="animate-pop",
+                style="background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); border-radius: 50%; width: 95px; height: 95px; box-shadow: 0 10px 30px rgba(74, 222, 128, 0.5); margin-bottom: 10px; display: flex; align-items: center; justify-content: center;"
             ),
-            style="display: flex; align-items: center; justify-content: center;"
+            ui.h2("Success!", style="font-size: 32px; color: #1A202C; font-weight: 800; margin: 0;"),
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent;"
         ),
         ui.tags.script("""
             setTimeout(function() {
@@ -785,7 +814,36 @@ def success_modal(show: bool):
         """),
         id="success-modal-overlay",
         onclick="this.remove(); Shiny.setInputValue('close_success_modal_event', Math.random(), {priority: 'event'});",
-        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(0, 0, 0, 0.25); display: flex; align-items: center; justify-content: center; cursor: pointer;"
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; cursor: pointer;"
+    )
+
+# --- ERROR MODAL (POP-UP TANDA SILANG MERAH) ---
+def error_modal(show: bool, message: str = ""):
+    if not show:
+        return ui.div()
+    return ui.div(
+        ui.div(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-xmark", style="font-size: 55px; color: white;"),
+                class_="animate-pop",
+                style="background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%); border-radius: 50%; width: 95px; height: 95px; box-shadow: 0 10px 30px rgba(239, 68, 68, 0.5); margin-bottom: 10px; display: flex; align-items: center; justify-content: center;"
+            ),
+            ui.h2("Gagal / Error!", style="font-size: 30px; color: #E53E3E; font-weight: 800; margin: 0 0 6px 0;"),
+            ui.p(message if message else "Terjadi kesalahan saat memproses data!", style="color: #2D3748; font-size: 15px; font-weight: 700; text-align: center; max-width: 450px; margin: 0;"),
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent;"
+        ),
+        ui.tags.script("""
+            setTimeout(function() {
+                let el = document.getElementById('error-modal-overlay');
+                if (el) {
+                    el.remove();
+                    Shiny.setInputValue('close_error_modal_event', Math.random(), {priority: 'event'});
+                }
+            }, 2600);
+        """),
+        id="error-modal-overlay",
+        onclick="this.remove(); Shiny.setInputValue('close_error_modal_event', Math.random(), {priority: 'event'});",
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; cursor: pointer;"
     )
 
 # ==============================================================================
@@ -831,6 +889,7 @@ def stock_minus_view(state: AppState, has_file: bool):
     if not state.stock_minus_processed():
         return ui.div(
             success_modal(state.show_success_modal()),
+            error_modal(state.show_error_modal(), state.error_modal_message()),
             uploader_ui,
             style="width: 100%; padding: 1rem;"
         )
@@ -894,6 +953,7 @@ def stock_minus_view(state: AppState, has_file: bool):
 
     return ui.div(
         success_modal(state.show_success_modal()),
+        error_modal(state.show_error_modal(), state.error_modal_message()),
         uploader_ui,
         results_ui,
         style="width: 100%; padding: 1rem;"
@@ -986,6 +1046,7 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
     if not state.putaway_processed():
         return ui.div(
             success_modal(state.show_success_modal()),
+            error_modal(state.show_error_modal(), state.error_modal_message()),
             top_section,
             style="width: 100%; padding: 1rem;"
         )
@@ -1043,6 +1104,7 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
 
     return ui.div(
         success_modal(state.show_success_modal()),
+        error_modal(state.show_error_modal(), state.error_modal_message()),
         top_section,
         results_ui,
         style="width: 100%; padding: 1rem;"
@@ -1055,6 +1117,7 @@ def main_dashboard_view(state: AppState):
     STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
 
     tab1_content = ui.div(
+        # Box Kiri: Manual Input
         ui.div(
             ui.div(
                 ui.span("📝", style="font-size: 20px; margin-right: 8px;"),
@@ -1109,6 +1172,7 @@ def main_dashboard_view(state: AppState):
             ),
             style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
         ),
+        # Box Kanan: Batch CSV Upload (Single Integrated Box)
         ui.div(
             ui.div(
                 ui.span("📁", style="font-size: 20px; margin-right: 8px;"),
@@ -1142,6 +1206,7 @@ def main_dashboard_view(state: AppState):
         style="display: flex; flex-wrap: wrap; gap: 1.25rem; width: 100%; margin-top: 1.5rem;"
     )
 
+    # --- TAB 2: METRICS & TABEL HISTORY ---
     selected_count = len(state.selected_ids())
     del_btn_ui = ui.tags.button(
         f"🗑️ HAPUS ({selected_count}) DATA",
@@ -1472,11 +1537,17 @@ app_ui = ui.page_fluid(
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
 
-    # --- LISTENER PENUTUP MODAL SUCCESS ---
+    # --- LISTENER PENUTUP MODAL SUCCESS & ERROR ---
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
     def _on_close_success_modal():
         state.show_success_modal.set(False)
+
+    @reactive.Effect
+    @reactive.event(input.close_error_modal_event)
+    def _on_close_error_modal():
+        state.show_error_modal.set(False)
+        state.error_modal_message.set("")
 
     @reactive.Effect
     @reactive.event(input.btn_submit_login)
@@ -1495,7 +1566,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.btn_execute_logout)
     def _logout_event():
         state.logout()
-        ui.notification_show("Anda telah keluar dari sistem.", type="warning")
+        ui.notification_show("Anda telah keluar dari sistem.", type="warning", duration=4)
 
     @reactive.Effect
     @reactive.event(input.select_menu_item)
@@ -1597,21 +1668,23 @@ def server(input: Inputs, output: Outputs, session: Session):
         if succ:
             state.show_success_modal.set(True)
         else:
-            ui.notification_show(msg, type="error")
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
 
     @reactive.Effect
     @reactive.event(input.btn_execute_batch_upload)
     def _save_batch():
         f = input.upload_csv_batch()
         if not f:
-            ui.notification_show("Pilih file CSV terlebih dahulu!", type="warning")
+            ui.notification_show("Pilih file CSV terlebih dahulu!", type="warning", duration=4)
             return
         with open(f[0]["datapath"], "rb") as fp:
             succ, msg = state.batch_upload_csv(fp.read())
         if succ:
             state.show_success_modal.set(True)
         else:
-            ui.notification_show(msg, type="error")
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
 
     @reactive.Effect
     @reactive.event(input.toggle_row_id)
@@ -1643,8 +1716,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _del_exec():
         succ, msg = state.execute_delete()
         ui.modal_remove()
-        if succ: ui.notification_show(msg, type="message")
-        else: ui.notification_show(msg, type="error")
+        if succ: ui.notification_show(msg, type="message", duration=4)
+        else: ui.notification_show(msg, type="error", duration=4)
 
     @reactive.Effect
     @reactive.event(input.btn_process_stock_minus)
@@ -1656,7 +1729,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         if succ:
             state.show_success_modal.set(True)
         else:
-            ui.notification_show(msg, type="error")
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
 
     @render.download(filename="Data_Minus_Awal.xlsx")
     def btn_dl_minus_awal():
@@ -1698,7 +1772,8 @@ def server(input: Inputs, output: Outputs, session: Session):
         if succ:
             state.show_success_modal.set(True)
         else:
-            ui.notification_show(msg, type="error")
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
 
     @render.download(filename="REPORT_PUTAWAY_SYSTEM.xlsx")
     def btn_dl_putaway_report():
