@@ -7,11 +7,19 @@ from config import safe_int
 # CSS & JAVASCRIPT ASSETS (PERSIS REFLEX)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
+    # --- 1. JUDUL TAB BROWSER ---
+    ui.tags.title("ZKN WAREHOUSE ERP"),
+
+    # --- 2. ICON TAB BROWSER (Menggunakan image_981625.png) ---
+    ui.tags.link(rel="icon", type="image/png", href="image_981625.png"),
+
+    # --- 3. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
+
+    # --- 4. CSS STYLING LENGKAP ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
-        
         .reflex-spinner-red {
             width: 38px; height: 38px;
             border: 3.5px solid rgba(229, 9, 20, 0.2);
