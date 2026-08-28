@@ -1,7 +1,6 @@
 from shiny import reactive
 from shiny.express import input, render, ui
 
-
 ui.tags.style("""
     /* Full Page Background Gambar + Gradient Overlay */
     body, html {
