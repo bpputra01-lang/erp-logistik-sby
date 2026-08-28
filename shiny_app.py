@@ -1,12 +1,13 @@
 import io
 import time
-import pandas as pd
+import asyncio
 from datetime import datetime
+import pandas as pd
 from supabase import create_client, Client
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
 # ==========================================
-# 1. KONFIGURASI SUPABASE
+# KONFIGURASI SUPABASE
 # ==========================================
 SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
@@ -18,7 +19,7 @@ def get_supabase() -> Client:
         return None
 
 # ==========================================
-# 2. CSS & JAVASCRIPT LENGKAP (PERSIS REFLEX)
+# ASSETS CSS & JS LENGKAP
 # ==========================================
 CUSTOM_HEAD = ui.head_content(
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
@@ -40,32 +41,11 @@ CUSTOM_HEAD = ui.head_content(
         }
         .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         
-        /* Custom Input Styles Sesuai Reflex */
-        .form-input-dark {
-            background-color: #FFFFFF !important;
-            color: #111111 !important;
-            border: 2px solid #4A5568 !important;
-            border-radius: 8px !important;
-            font-weight: 600;
-            padding: 8px 12px;
-            width: 100%;
-        }
-        .form-input-dark:focus {
-            border: 2px solid #E50914 !important;
-            box-shadow: 0 0 0 1px #E50914 !important;
-            outline: none !important;
-        }
-        .form-input-dark:hover {
-            border-color: #1A202C !important;
-        }
-        
-        /* Table Styles */
         .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-        .custom-clean-table th { background: #CBD5E0; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #A0AEC0; }
+        .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
         .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
         .custom-clean-table tr:hover { background-color: #F8FAFC; }
         
-        /* Red Button Gradient */
         .btn-red-gradient {
             background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
             color: #FFFFFF !important;
@@ -76,9 +56,7 @@ CUSTOM_HEAD = ui.head_content(
             box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);
             transition: all 0.2s ease;
         }
-        .btn-red-gradient:hover {
-            filter: brightness(1.1);
-        }
+        .btn-red-gradient:hover { filter: brightness(1.1); }
         .btn-locked {
             background-color: #E50914 !important;
             opacity: 0.5 !important;
@@ -89,7 +67,6 @@ CUSTOM_HEAD = ui.head_content(
             border: none !important;
         }
         
-        /* Custom Accordion */
         details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
         summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
         details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
@@ -117,7 +94,7 @@ CUSTOM_HEAD = ui.head_content(
 )
 
 # ==========================================
-# 3. HELPER KOMPONEN UI
+# HELPER KOMPONEN TABEL & METRICS
 # ==========================================
 def metric_box(title: str, val_ui, text_color: str, bg_gradient: str):
     return ui.div(
@@ -133,32 +110,674 @@ def dark_metric_box(title: str, val_str: str, border_color: str):
         style=f"background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid {border_color}; width: 100%; text-align: center;"
     )
 
-def render_clean_table(df: pd.DataFrame):
-    if df.empty:
+def render_clean_table(headers: list, rows: list):
+    if not rows or len(rows) == 0:
         return ui.div(
             ui.div("Tidak ada data untuk ditampilkan.", style="color: #718096; padding: 1.5rem; font-style: italic; text-align: center;"),
             style="background: white; border-radius: 8px; border: 1px solid #E2E8F0; width: 100%;"
         )
     
-    headers = [ui.tags.th(str(col)) for col in df.columns]
-    rows = []
-    for _, row in df.iterrows():
-        cells = [ui.tags.td(str(val)) for val in row]
-        rows.append(ui.tags.tr(*cells))
+    th_cells = [ui.tags.th(str(h)) for h in headers]
+    tr_rows = []
+    for r in rows:
+        td_cells = [ui.tags.td(str(c)) for c in r]
+        tr_rows.append(ui.tags.tr(*td_cells))
         
     return ui.div(
         ui.tags.table(
-            ui.tags.thead(ui.tags.tr(*headers)),
-            ui.tags.tbody(*rows),
+            ui.tags.thead(ui.tags.tr(*th_cells)),
+            ui.tags.tbody(*tr_rows),
             class_="custom-clean-table"
         ),
         style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;"
     )
 
 # ==========================================
-# 4. VIEW LOGIN PAGE
+# SUCCESS MODAL (ANIMASI POP-IN)
 # ==========================================
-def login_page_view():
+def success_modal(show: bool):
+    if not show:
+        return ui.div()
+    return ui.div(
+        ui.div(
+            ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-check", style="font-size: 55px; color: white;"),
+                    class_="animate-pop",
+                    style="background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); border-radius: 50%; padding: 20px; box-shadow: 0 10px 25px rgba(74, 222, 128, 0.4); margin-bottom: 5px; display: flex; align-items: center; justify-content: center;"
+                ),
+                ui.h2("Success!", style="font-size: 28px; color: #1A202C; font-weight: bold; margin: 0;"),
+                style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;"
+            ),
+            style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"
+        ),
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center;"
+    )
+
+# ==========================================
+# VIEW STOCK MINUS
+# ==========================================
+def stock_minus_view(state: AppState, has_file: bool):
+    # Action button logic (Lock vs Active)
+    if has_file:
+        btn_process = ui.input_action_button(
+            "btn_process_stock_minus",
+            ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"),
+            class_="btn-red-gradient",
+            style="padding: 0.75rem 1.5rem; font-weight: bold; border-radius: 6px;"
+        )
+    else:
+        btn_process = ui.tags.button(
+            ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+            "PILIH FILE UNTUK MEMULAI",
+            disabled=True,
+            class_="btn-locked",
+            style="padding: 0.75rem 1.5rem;"
+        )
+
+    # Uploader Box Custom
+    uploader_ui = ui.div(
+        ui.span("Upload File STOCK MINUS", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
+        ui.div(
+            ui.div(
+                ui.tags.label(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
+                    style="background-color: #C5A059; color: white; font-weight: bold; border-radius: 6px; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; pointer-events: none;"
+                ),
+                ui.div(
+                    ui.output_ui("stock_minus_file_label"),
+                    style="display: flex; align-items: center; margin-left: 1rem; flex: 1;"
+                ),
+                style="display: flex; align-items: center; width: 100%; margin-bottom: 0.5rem;"
+            ),
+            ui.input_file("upload_stock_file", None, accept=[".xlsx", ".xls"], multiple=False, button_label="Pilih File", placeholder="200MB per file • XLSX, XLS"),
+            style="border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC; padding: 1.5rem; min-height: 100px; width: 100%; cursor: pointer;"
+        ),
+        ui.div(
+            btn_process,
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+        ),
+        style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Hasil Pemrosesan Dashboard & Tabs
+    if not state.stock_minus_processed():
+        return ui.div(
+            success_modal(state.show_success_modal()),
+            uploader_ui,
+            style="width: 100%; padding: 1rem;"
+        )
+
+    results_ui = ui.div(
+        # 3 Kartu Metric
+        ui.div(
+            dark_metric_box("TOTAL QTY MINUS", f"{state.total_qty_minus()}", "#E53E3E"),
+            dark_metric_box("TERCOVER", f"{state.total_tercover()}", "#38A169"),
+            dark_metric_box("SISA ADJ", f"{state.total_sisa_adj()}", "#DD6B20"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+        # 3 Tabs
+        ui.navset_card_tab(
+            ui.nav_panel(
+                ui.tags.span(ui.tags.i(class_="fa-regular fa-file-lines", style="margin-right: 6px; font-size: 14px;"), "MINUS AWAL"),
+                ui.div(
+                    ui.div(
+                        ui.download_button(
+                            "btn_dl_minus_awal",
+                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
+                            style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                        ),
+                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+                    ),
+                    render_clean_table(state.df_minus_awal_headers(), state.df_minus_awal_rows()),
+                    style="padding: 0.75rem 0;"
+                )
+            ),
+            ui.nav_panel(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px; font-size: 14px;"), "TEMPLATE SET UP"),
+                ui.div(
+                    ui.div(
+                        ui.download_button(
+                            "btn_dl_set_up",
+                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
+                            style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                        ),
+                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+                    ),
+                    render_clean_table(state.df_set_up_headers(), state.df_set_up_rows()),
+                    style="padding: 0.75rem 0;"
+                )
+            ),
+            ui.nav_panel(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-triangle-exclamation", style="margin-right: 6px; font-size: 14px;"), "JUSTIFIKASI"),
+                ui.div(
+                    ui.div(
+                        ui.download_button(
+                            "btn_dl_justifikasi",
+                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
+                            style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                        ),
+                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+                    ),
+                    render_clean_table(state.df_need_adj_headers(), state.df_need_adj_rows()),
+                    style="padding: 0.75rem 0;"
+                )
+            )
+        ),
+        style="width: 100%;"
+    )
+
+    return ui.div(
+        success_modal(state.show_success_modal()),
+        uploader_ui,
+        results_ui,
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==========================================
+# CUSTOM UPLOADER BOX UNTUK PUTAWAY
+# ==========================================
+def custom_uploader_box(id_str: str, title: str, file_label_output_id: str):
+    return ui.div(
+        ui.span(title, style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
+        ui.div(
+            ui.div(
+                ui.tags.label(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
+                    style="background-color: #C5A059; color: white; font-weight: bold; border-radius: 6px; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; pointer-events: none;"
+                ),
+                ui.div(
+                    ui.output_ui(file_label_output_id),
+                    style="display: flex; align-items: center; margin-left: 1rem; flex: 1;"
+                ),
+                style="display: flex; align-items: center; width: 100%; margin-bottom: 0.5rem;"
+            ),
+            ui.input_file(id_str, None, accept=[".xlsx", ".xls", ".csv"], multiple=False, button_label="Pilih File", placeholder="200MB per file • XLSX, XLS, CSV"),
+            style="border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC; padding: 1.5rem; min-height: 100px; width: 100%; cursor: pointer;"
+        ),
+        style="width: 100%; margin-bottom: 0.5rem;"
+    )
+
+# ==========================================
+# VIEW PUTAWAY SYSTEM
+# ==========================================
+def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
+    cur_area = state.area_putaway()
+
+    # Dynamic action button logic (Active if both files selected, else Locked)
+    if has_ds and has_asal:
+        btn_compare = ui.input_action_button(
+            "btn_compare_putaway",
+            ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "COMPARE PUTAWAY"),
+            class_="btn-red-gradient",
+            style="padding: 0.75rem 1.5rem; font-weight: bold; border-radius: 6px;"
+        )
+    else:
+        btn_compare = ui.tags.button(
+            ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+            "PILIH KEDUA FILE UNTUK MEMULAI",
+            disabled=True,
+            class_="btn-locked",
+            style="padding: 0.75rem 1.5rem;"
+        )
+
+    # Content when Area Putaway selected vs not selected
+    if cur_area != "":
+        area_content = ui.div(
+            ui.div(
+                ui.tags.i(class_="fa-solid fa-map-pin", style="color: #3182ce; font-size: 18px; margin-right: 8px;"),
+                ui.span("Area Terpilih: ", style="font-weight: normal; color: #2c5282; font-size: 13px;"),
+                ui.span(cur_area, style="font-weight: bold; color: #2c5282; font-size: 13px;"),
+                style="background: #ebf8ff; border-left: 4px solid #3182ce; padding: 10px 16px; border-radius: 6px; width: 100%; display: flex; align-items: center; margin-bottom: 1rem;"
+            ),
+            ui.div(
+                custom_uploader_box("ds_putaway_file", "Upload DS PUTAWAY", "ds_file_label"),
+                custom_uploader_box("asal_putaway_file", "Upload ASAL BIN", "asal_file_label"),
+                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.5rem; flex-wrap: wrap;"
+            ),
+            ui.div(
+                btn_compare,
+                style="display: flex; justify-content: flex-end; width: 100%;"
+            ),
+            style="width: 100%;"
+        )
+    else:
+        area_content = ui.div(
+            "⚠️ Silakan pilih Area Putaway di atas terlebih dahulu.",
+            style="color: #DD6B20; font-weight: bold; font-style: italic; background: #FFFFF0; border: 1px solid #F6E05E; padding: 1rem; border-radius: 8px; width: 100%; text-align: center;"
+        )
+
+    top_section = ui.div(
+        ui.span("📍 Pilih Area Putaway", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.5rem; display: block;"),
+        ui.tags.select(
+            ui.tags.option("-- Pilih Area Putaway --", value=""),
+            ui.tags.option("DC LANTAI 1", value="DC LANTAI 1"),
+            ui.tags.option("DC LANTAI 2", value="DC LANTAI 2"),
+            ui.tags.option("DC LANTAI 3", value="DC LANTAI 3"),
+            ui.tags.option("JERSEY ZONE", value="JERSEY ZONE"),
+            id="area_putaway_select",
+            onchange="Shiny.setInputValue('select_area_putaway', this.value, {priority: 'event'})",
+            style="""
+                width: 100%; padding: 10px 14px; background-color: #FFFFFF; color: #000000;
+                font-weight: bold; font-size: 14px; border: 1.5px solid #CBD5E0;
+                border-radius: 8px; outline: none; cursor: pointer; margin-bottom: 1rem;
+            """
+        ),
+        area_content,
+        style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Putaway Results UI
+    if not state.putaway_processed():
+        return ui.div(
+            success_modal(state.show_success_modal()),
+            top_section,
+            style="width: 100%; padding: 1rem;"
+        )
+
+    # Empty State Conditionals for Tab 3 & 4
+    kurang_rows = state.df_kurang_rows()
+    if kurang_rows and len(kurang_rows) > 0:
+        kurang_content = render_clean_table(state.df_kurang_headers(), kurang_rows)
+    else:
+        kurang_content = ui.div("✅ Semua Tercover!", style="background: #C6F6D5; color: #38A169; font-weight: bold; padding: 1rem; border-radius: 8px; text-align: center;")
+
+    out_rows = state.df_out_rows()
+    if out_rows and len(out_rows) > 0:
+        out_content = render_clean_table(state.df_out_headers(), out_rows)
+    else:
+        out_content = ui.div("✅ Tidak ada Outstanding!", style="background: #C6F6D5; color: #38A169; font-weight: bold; padding: 1rem; border-radius: 8px; text-align: center;")
+
+    results_ui = ui.div(
+        ui.hr(style="margin: 1.5rem 0 1rem 0; border-color: #E2E8F0;"),
+        ui.h4("📋 RINGKASAN HASIL", style="font-size: 16px; color: #010B13; font-weight: 800; margin: 1rem 0;"),
+        # 4 Metric Cards
+        ui.div(
+            dark_metric_box("Qty System Putaway", f"{state.putaway_qty_system()}", "#E53E3E"),
+            dark_metric_box("Total Tersetup", f"{state.putaway_total_setup()}", "#38A169"),
+            dark_metric_box("Kurang Setup", f"{state.putaway_kurang_setup()}", "#DD6B20"),
+            dark_metric_box("Sisa Stok Putaway", f"{state.putaway_sisa_stok()}", "#3182CE"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; margin-bottom: 1.25rem;"
+        ),
+        # Download Full Report Button
+        ui.div(
+            ui.download_button(
+                "btn_dl_putaway_report",
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD REPORT LENGKAP"),
+                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+        ),
+        # 4 Tabs
+        ui.navset_card_tab(
+            ui.nav_panel(
+                ui.tags.span("📋 Hasil Compare", style="font-weight: bold;"),
+                ui.div(render_clean_table(state.df_comp_headers(), state.df_comp_rows()), style="padding: 0.75rem 0;")
+            ),
+            ui.nav_panel(
+                ui.tags.span("📝 List Setup", style="font-weight: bold;"),
+                ui.div(render_clean_table(state.df_plist_headers(), state.df_plist_rows()), style="padding: 0.75rem 0;")
+            ),
+            ui.nav_panel(
+                ui.tags.span("⚠️ Kurang Setup", style="font-weight: bold;"),
+                ui.div(kurang_content, style="padding: 0.75rem 0;")
+            ),
+            ui.nav_panel(
+                ui.tags.span("📦 Outstanding", style="font-weight: bold;"),
+                ui.div(out_content, style="padding: 0.75rem 0;")
+            )
+        ),
+        style="width: 100%;"
+    )
+
+    return ui.div(
+        success_modal(state.show_success_modal()),
+        top_section,
+        results_ui,
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==========================================
+# CONSTANT STYLES SESUAI REFLEX
+# ==========================================
+STYLE_INPUT_ATTRS = 'class="form-input-dark" style="background-color: #FFFFFF !important; color: #111111 !important; border: 2px solid #4A5568 !important; border-radius: 8px !important; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"'
+STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
+
+# ==========================================
+# VIEW MAIN DASHBOARD (DATABASE ONGKIR)
+# ==========================================
+def main_dashboard_view(state: AppState):
+    # --- TAB 1: FORM INPUT & CSV BATCH ---
+    tab1_content = ui.div(
+        # Box Kiri: Manual Input
+        ui.div(
+            ui.div(
+                ui.span("📝", style="font-size: 20px; margin-right: 8px;"),
+                ui.h4("Input Transaksi Manual", style="font-size: 16px; font-weight: bold; color: #1A202C; margin: 0;"),
+                style="display: flex; align-items: center; margin-bottom: 0.75rem;"
+            ),
+            ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
+            ui.div(
+                ui.span("NAMA SUPPLIER", style=STYLE_LABEL_CSS),
+                ui.tags.input(id="input_supplier", type="text", placeholder="Masukkan Nama Supplier...", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"),
+                style="margin-bottom: 0.75rem; width: 100%;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.span("EKSPEDISI", style=STYLE_LABEL_CSS),
+                    ui.tags.input(id="input_ekspedisi", type="text", placeholder="Nama Ekspedisi...", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"),
+                    style="flex: 1; margin-right: 8px;"
+                ),
+                ui.div(
+                    ui.span("TOTAL KOLI", style=STYLE_LABEL_CSS),
+                    ui.tags.input(id="input_koli", type="number", value="1", placeholder="Jumlah Koli", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"),
+                    style="flex: 1;"
+                ),
+                style="display: flex; width: 100%; margin-bottom: 0.75rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.span("TOTAL ONGKIR (RP)", style=STYLE_LABEL_CSS),
+                    ui.tags.input(id="input_ongkir", type="number", value="0", placeholder="Rp 0", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"),
+                    style="flex: 1; margin-right: 8px;"
+                ),
+                ui.div(
+                    ui.span("TANGGAL", style=STYLE_LABEL_CSS),
+                    ui.tags.input(id="input_tgl", type="date", value=datetime.now().strftime("%Y-%m-%d"), style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"),
+                    style="flex: 1;"
+                ),
+                style="display: flex; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.tags.button(
+                "🚀 SIMPAN DATA ONGKIR",
+                onclick="""
+                    Shiny.setInputValue('btn_save_ongkir_manual', {
+                        supplier: document.getElementById('input_supplier').value,
+                        ekspedisi: document.getElementById('input_ekspedisi').value,
+                        koli: document.getElementById('input_koli').value,
+                        ongkir: document.getElementById('input_ongkir').value,
+                        tgl: document.getElementById('input_tgl').value
+                    }, {priority: 'event'})
+                """,
+                class_="btn-red-gradient",
+                style="width: 100%; height: 48px; font-size: 14px;"
+            ),
+            style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
+        ),
+        # Box Kanan: CSV Batch Upload
+        ui.div(
+            ui.div(
+                ui.span("📁", style="font-size: 20px; margin-right: 8px;"),
+                ui.h4("Batch CSV Upload", style="font-size: 16px; font-weight: bold; color: #1A202C; margin: 0;"),
+                style="display: flex; align-items: center; margin-bottom: 0.75rem;"
+            ),
+            ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
+            ui.div(
+                ui.div(
+                    ui.div(ui.span("☁️", style="font-size: 24px;"), style="padding: 10px; background: #E2E8F0; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;"),
+                    ui.tags.label("Pilih File CSV", style="background: #1A202C !important; color: #FFFFFF !important; font-weight: 700; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; pointer-events: none; margin-bottom: 6px;"),
+                    ui.span("atau tarik & lepaskan file CSV di sini", style="font-size: 13px; color: #4A5568; font-weight: bold;"),
+                    style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+                ),
+                ui.input_file("upload_csv_batch", None, accept=[".csv"], multiple=False, button_label="Browse", placeholder="Pilih file CSV"),
+                style="border: 2px dashed #E50914; padding: 2.5rem 1.5rem; border-radius: 12px; background: #FFF5F5; width: 100%; text-align: center; margin-bottom: 1.25rem;"
+            ),
+            ui.input_action_button(
+                "btn_execute_batch_upload",
+                "⚡ EXECUTE BATCH UPLOAD",
+                style="background: #1A202C; color: #FFFFFF !important; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); width: 100%; height: 48px; border: none; font-size: 14px;"
+            ),
+            style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
+        ),
+        style="display: flex; flex-wrap: wrap; gap: 1.25rem; width: 100%; margin-top: 1.5rem;"
+    )
+
+    # --- TAB 2: METRICS & TABEL HISTORY ---
+    selected_count = len(state.selected_ids())
+    del_btn_ui = ui.tags.button(
+        f"🗑️ HAPUS ({selected_count}) DATA",
+        onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})",
+        style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
+    ) if selected_count > 0 else ui.div()
+
+    # Ekspedisi dropdown options
+    eksp_options = state.get_list_ekspedisi_options()
+    select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in eksp_options]
+
+    # Table rows generation with checkboxes
+    filtered_data = state.get_filtered_ongkir()
+    table_rows = []
+    sel_set = set(state.selected_ids())
+
+    for row in filtered_data:
+        r_id = row.get("id", 0)
+        is_chk = r_id in sel_set
+        chk = ui.tags.input(
+            type="checkbox",
+            checked=is_chk,
+            onchange=f"Shiny.setInputValue('toggle_row_id', {r_id}, {{priority: 'event'}})"
+        )
+        table_rows.append(ui.tags.tr(
+            ui.tags.td(chk, style="text-align: center; width: 60px;"),
+            ui.tags.td(str(row.get("created_at", row.get("tanggal", "")))),
+            ui.tags.td(str(row.get("supplier", ""))),
+            ui.tags.td(str(row.get("ekspedisi", ""))),
+            ui.tags.td(str(row.get("total_koli", row.get("koli", 0)))),
+            ui.tags.td(f"Rp {row.get('total_ongkir', 0):,}")
+        ))
+
+    tab2_content = ui.div(
+        ui.div(
+            ui.div(
+                ui.span("FILTER EKSPEDISI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 8px;"),
+                ui.tags.select(
+                    *select_options,
+                    id="select_filter_ekspedisi",
+                    onchange="Shiny.setInputValue('change_filter_ekspedisi', this.value, {priority: 'event'})",
+                    style="background-color: #FFFFFF !important; color: #000000 !important; border: 2.5px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05); width: 220px; padding: 6px 10px; outline: none; cursor: pointer;"
+                ),
+                style="display: flex; align-items: center;"
+            ),
+            del_btn_ui,
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 0.5rem;"
+        ),
+        # 6 Grid Metric Box
+        ui.div(
+            metric_box("💰 BIAYA ALL", state.metric_total_biaya_all(), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
+            metric_box("📦 KOLI ALL", state.metric_total_koli_all(), "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
+            metric_box("📊 AVG COST ALL", state.metric_avg_cost_all(), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
+            metric_box("🚚 BIAYA DATANG", state.metric_biaya_datang(), "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
+            metric_box("📦 KOLI DATANG", state.metric_koli_datang(), "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
+            metric_box("🔄 BIAYA RTO", state.metric_biaya_rto(), "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
+        ),
+        # Tabel History
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(
+                    ui.tags.tr(
+                        ui.tags.th("SELECT", style="text-align: center; color: #1A202C; font-weight: bold;"),
+                        ui.tags.th("TANGGAL", style="color: #1A202C; font-weight: bold;"),
+                        ui.tags.th("SUPPLIER", style="color: #1A202C; font-weight: bold;"),
+                        ui.tags.th("EKSPEDISI", style="color: #1A202C; font-weight: bold;"),
+                        ui.tags.th("KOLI", style="color: #1A202C; font-weight: bold;"),
+                        ui.tags.th("TOTAL ONGKIR", style="color: #1A202C; font-weight: bold;"),
+                    ),
+                    style="background-color: #CBD5E0 !important;"
+                ),
+                ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(ui.tags.td("Tidak ada transaksi ongkir.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")),
+                class_="custom-clean-table"
+            ),
+            style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"
+        ),
+        style="width: 100%;"
+    )
+
+    return ui.div(
+        ui.navset_card_tab(
+            ui.nav_panel(
+                ui.tags.span("📥 INPUT & BATCH DATA", style="color: #1A202C; font-weight: 800;"),
+                tab1_content
+            ),
+            ui.nav_panel(
+                ui.tags.span("📊 SUMMARY & HISTORY", style="color: #1A202C; font-weight: 800;"),
+                tab2_content
+            )
+        ),
+        style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;"
+    )
+
+# ==========================================
+# KOMPONEN MENU ITEM & DROPDOWN HEADER
+# ==========================================
+def menu_item(label: str, target_menu: str, current_menu: str):
+    is_active = (current_menu == target_menu)
+    if is_active:
+        bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);"
+    else:
+        bg_style = "background: transparent; color: #CBD5E0; font-weight: 500;"
+
+    return ui.tags.button(
+        label,
+        onclick=f"Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}})",
+        style=f"""
+            width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px;
+            border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer;
+            justify-content: flex-start; transition: all 0.2s ease; {bg_style}
+        """,
+        onmouseover="if (!this.classList.contains('active-menu')) this.style.background='rgba(255, 255, 255, 0.08)'; this.style.color='#FFFFFF';",
+        onmouseout=f"if (!this.classList.contains('active-menu')) {{ {('this.style.background=\'linear-gradient(135deg, #E50914 0%, #B20710 100%)\'; this.style.color=\'#FFFFFF\';' if is_active else 'this.style.background=\'transparent\'; this.style.color=\'#CBD5E0\';')} }}"
+    )
+
+def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
+    icon_tag = "fa-chevron-down" if is_open else "fa-chevron-right"
+    return ui.tags.div(
+        ui.tags.span(title, style="font-size: 11px; font-weight: bold; color: #FFFFFF; letter-spacing: 0.05em;"),
+        ui.tags.i(class_=f"fa-solid {icon_tag}", style="font-size: 12px; color: #FFFFFF;"),
+        onclick=f"Shiny.setInputValue('toggle_dropdown_section', '{dropdown_key}', {{priority: 'event'}})",
+        style="""
+            display: flex; justify-content: space-between; align-items: center; width: 100%;
+            padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer;
+            background: rgba(255, 255, 255, 0.05); margin-top: 0.8rem; margin-bottom: 0.3rem;
+            transition: background 0.2s ease;
+        """,
+        onmouseover="this.style.background='rgba(255, 255, 255, 0.1)';",
+        onmouseout="this.style.background='rgba(255, 255, 255, 0.05)';"
+    )
+
+# ==========================================
+# VIEW SIDEBAR (EXPANDED & COLLAPSED)
+# ==========================================
+def sidebar(state: AppState):
+    cur_menu = state.main_menu()
+
+    # KONDISI SAAT SIDEBAR DITUTUP (COLLAPSED: 60px)
+    if not state.sidebar_open():
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"),
+                onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})",
+                style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;",
+                onmouseover="this.style.background='rgba(255, 255, 255, 0.1)';",
+                onmouseout="this.style.background='transparent';"
+            ),
+            style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;"
+        )
+
+    # KONDISI SAAT SIDEBAR TERBUKA (EXPANDED: 280px)
+    op_menus = state.get_menu_operational()
+    inv_menus = state.get_menu_inventory()
+    rej_menus = state.get_menu_reject()
+    ext_menus = state.get_menu_extras()
+
+    return ui.div(
+        # HEADER & TOMBOL CLOSE SIDEBAR
+        ui.div(
+            ui.div(
+                ui.span("JEZ", style="color: #E50914; font-weight: 900; font-size: 20px;"),
+                ui.span("PRO", style="color: #FFFFFF; font-weight: 900; font-size: 20px;"),
+                style="display: flex; gap: 2px; align-items: center;"
+            ),
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 16px; color: #CBD5E0;"),
+                onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})",
+                style="background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px;",
+                onmouseover="this.style.color='#FFFFFF'; this.style.background='rgba(255, 255, 255, 0.1)';",
+                onmouseout="this.style.color='#CBD5E0'; this.style.background='transparent';"
+            ),
+            style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.5rem;"
+        ),
+
+        # AREA MENU BISA DI-SCROLL
+        ui.div(
+            # KELOMPOK 1: OPERATIONAL
+            ui.div(
+                section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()),
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in op_menus],
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"
+                ),
+                style="width: 100%;"
+            ),
+
+            # KELOMPOK 2: INVENTORY
+            ui.div(
+                section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()),
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in inv_menus],
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"
+                ),
+                style="width: 100%;"
+            ),
+
+            # KELOMPOK 3: REJECT & DEFECT
+            ui.div(
+                section_dropdown_header("REJECT & DEFECT", "reject", state.dropdown_reject()),
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in rej_menus],
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_reject() else "display: none;"
+                ),
+                style="width: 100%;"
+            ),
+
+            # KELOMPOK 4: EXTRAS
+            ui.div(
+                section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()),
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in ext_menus],
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"
+                ),
+                style="width: 100%;"
+            ),
+            style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
+        ),
+
+        # TOMBOL LOGOUT SISTEM
+        ui.div(
+            ui.tags.button(
+                ui.tags.span(
+                    ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"),
+                    ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")
+                ),
+                onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})",
+                class_="btn-red-gradient",
+                style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"
+            ),
+            style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"
+        ),
+
+        style="""
+            width: 280px; min-width: 280px; padding: 1rem;
+            background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%);
+            border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column;
+            align-items: flex-start; transition: width 0.3s ease;
+        """
+    )
+
+# ==========================================
+# VIEW LOGIN PAGE
+# ==========================================
+def login_page():
     return ui.div(
         ui.div(
             ui.div(
@@ -173,37 +792,50 @@ def login_page_view():
                 ),
                 ui.hr(style="border-color: rgba(255, 255, 255, 0.1); margin-bottom: 1.25rem;"),
                 ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 13px; margin-bottom: 1.5rem;"),
-                
+
+                # USERNAME INPUT
                 ui.div(
                     ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"),
                     ui.tags.input(
-                        id="login_username", type="text", placeholder="Masukkan username...",
+                        id="login_username_field", type="text", placeholder="Masukkan username...",
+                        onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
                         style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"
                     ),
                     style="margin-bottom: 1rem;"
                 ),
-                
+
+                # PASSWORD INPUT
                 ui.div(
                     ui.span("PASSWORD", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"),
                     ui.tags.input(
-                        id="login_password", type="password", placeholder="Masukkan password...",
+                        id="login_password_field", type="password", placeholder="Masukkan password...",
+                        onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
                         style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"
                     ),
                     style="margin-bottom: 1.5rem;"
                 ),
-                
+
+                ui.div(style="height: 10px;"),
+
+                # BUTTON SIGN IN
                 ui.tags.button(
                     "SIGN IN TO SYSTEM →",
-                    onclick="Shiny.setInputValue('btn_login', {user: document.getElementById('login_username').value, pass: document.getElementById('login_password').value}, {priority: 'event'})",
+                    id="btn_sign_in",
+                    onclick="""
+                        Shiny.setInputValue('btn_submit_login', {
+                            user: document.getElementById('login_username_field').value,
+                            pass: document.getElementById('login_password_field').value
+                        }, {priority: 'event'})
+                    """,
                     class_="btn-red-gradient",
-                    style="width: 100%; height: 48px; font-size: 14px; margin-bottom: 1.25rem;"
+                    style="width: 100%; height: 48px; font-size: 14px; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);"
                 ),
-                
+
                 ui.div(
                     "🟢 Warehouse Supporting Tools v2.0",
                     style="color: #888888; font-size: 12px; text-align: center; margin-top: 10px;"
                 ),
-                style="width: 100%;"
+                style="display: flex; flex-direction: column; width: 100%;"
             ),
             style="""
                 width: 100%; max-width: 520px; padding: 3rem 2.5rem;
@@ -220,306 +852,112 @@ def login_page_view():
     )
 
 # ==========================================
-# 5. VIEW STOCK MINUS
+# GLOBAL TOPBAR / HEADER
 # ==========================================
-def stock_minus_view():
+def global_header(state: AppState):
     return ui.div(
+        # Sisi Kiri: Red Bar & Page Title
         ui.div(
-            ui.span("Upload File STOCK MINUS", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
+            ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
             ui.div(
-                ui.input_file("upload_stock_file", None, accept=[".xlsx", ".xls", ".csv"], multiple=False, button_label="Upload", placeholder="200MB per file • XLSX, XLS"),
-                style="padding: 1.5rem; border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC; width: 100%;"
+                ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"),
+                ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"),
+                style="display: flex; flex-direction: column; align-items: flex-start;"
             ),
-            ui.div(
-                ui.output_ui("stock_minus_action_btn"),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
-            ),
-            style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+            style="display: flex; align-items: center;"
         ),
-        ui.output_ui("stock_minus_results_ui"),
-        style="width: 100%; padding: 1rem;"
-    )
 
-# ==========================================
-# 6. VIEW PUTAWAY SYSTEM
-# ==========================================
-def putaway_view():
-    return ui.div(
+        # Sisi Kanan: Panduan Button + Online Status & Live Timer
         ui.div(
-            ui.span("📍 Pilih Area Putaway", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.5rem; display: block;"),
-            ui.input_select(
-                "area_putaway", None,
-                {"": "-- Pilih Area Putaway --", "DC LANTAI 1": "DC LANTAI 1", "DC LANTAI 2": "DC LANTAI 2", "DC LANTAI 3": "DC LANTAI 3", "JERSEY ZONE": "JERSEY ZONE"},
-                selected="",
-                width="100%"
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"),
+                "Panduan & Logic",
+                onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})",
+                style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; transition: background 0.2s ease;",
+                onmouseover="this.style.background='#CBD5E0';",
+                onmouseout="this.style.background='#E2E8F0';"
             ),
-            ui.output_ui("putaway_content_after_area"),
-            style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-        ),
-        ui.output_ui("putaway_results_ui"),
-        style="width: 100%; padding: 1rem;"
-    )
 
-# ==========================================
-# 7. VIEW DATABASE ONGKIR (MAIN DASHBOARD)
-# ==========================================
-def main_dashboard_view():
-    return ui.div(
-        ui.navset_card_tab(
-            ui.nav_panel(
-                "📥 INPUT & BATCH DATA",
+            # Menumpuk Status Online dan Live Timer Simetris
+            ui.div(
+                # Atas: Titik Hijau & ONLINE
                 ui.div(
-                    ui.div(
-                        ui.div(
-                            ui.span("📝", style="font-size: 20px; margin-right: 8px;"),
-                            ui.span("Input Transaksi Manual", style="font-size: 16px; font-weight: bold; color: #1A202C;"),
-                            style="display: flex; align-items: center; margin-bottom: 0.75rem;"
-                        ),
-                        ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
-                        ui.div(
-                            ui.span("NAMA SUPPLIER", style="font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; display: block;"),
-                            ui.input_text("input_supplier", "", placeholder="Masukkan Nama Supplier...", width="100%"),
-                            style="margin-bottom: 0.75rem;"
-                        ),
-                        ui.div(
-                            ui.div(
-                                ui.span("EKSPEDISI", style="font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; display: block;"),
-                                ui.input_text("input_ekspedisi", "", placeholder="Nama Ekspedisi...", width="100%"),
-                                style="flex: 1; margin-right: 8px;"
-                            ),
-                            ui.div(
-                                ui.span("TOTAL KOLI", style="font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; display: block;"),
-                                ui.input_numeric("input_koli", "", value=0, min=0, width="100%"),
-                                style="flex: 1;"
-                            ),
-                            style="display: flex; width: 100%; margin-bottom: 0.75rem;"
-                        ),
-                        ui.div(
-                            ui.div(
-                                ui.span("TOTAL ONGKIR (RP)", style="font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; display: block;"),
-                                ui.input_numeric("input_ongkir", "", value=0, min=0, width="100%"),
-                                style="flex: 1; margin-right: 8px;"
-                            ),
-                            ui.div(
-                                ui.span("TANGGAL", style="font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; display: block;"),
-                                ui.input_date("input_tgl", "", value=datetime.now().strftime("%Y-%m-%d"), width="100%"),
-                                style="flex: 1;"
-                            ),
-                            style="display: flex; width: 100%; margin-bottom: 1rem;"
-                        ),
-                        ui.input_action_button(
-                            "btn_save_ongkir", "🚀 SIMPAN DATA ONGKIR",
-                            class_="btn-red-gradient",
-                            style="width: 100%; height: 44px;"
-                        ),
-                        style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; padding: 1.8rem; flex: 1; min-width: 300px;"
-                    ),
-                    ui.div(
-                        ui.div(
-                            ui.span("📁", style="font-size: 20px; margin-right: 8px;"),
-                            ui.span("Batch CSV Upload", style="font-size: 16px; font-weight: bold; color: #1A202C;"),
-                            style="display: flex; align-items: center; margin-bottom: 0.75rem;"
-                        ),
-                        ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
-                        ui.div(
-                            ui.input_file("upload_csv_batch", None, accept=[".csv"], multiple=False, button_label="Pilih File CSV", placeholder="tarik & lepaskan file CSV di sini"),
-                            style="border: 2px dashed #E50914; padding: 2rem; border-radius: 12px; background: #FFF5F5; text-align: center; margin-bottom: 1.25rem;"
-                        ),
-                        ui.input_action_button(
-                            "btn_execute_batch", "⚡ EXECUTE BATCH UPLOAD",
-                            style="background: #1A202C; color: #FFFFFF; font-weight: 800; border-radius: 10px; width: 100%; height: 44px; border: none; cursor: pointer;"
-                        ),
-                        style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; padding: 1.8rem; flex: 1; min-width: 300px;"
-                    ),
-                    style="display: flex; flex-wrap: wrap; margin-top: 1rem; gap: 1rem;"
-                )
+                    ui.div(style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px;", class_="blink-online"),
+                    ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"),
+                    style="display: flex; align-items: center;"
+                ),
+                # Bawah: Timer Live
+                ui.div(
+                    ui.span(str(state.login_timestamp_ms()), id="login-time-store", style="display: none;"),
+                    ui.tags.i(class_="fa-regular fa-clock", style="font-size: 12px; color: #4A5568; margin-right: 4px;"),
+                    ui.span("00:00:00", id="live-timer", style="color: #4A5568; font-weight: bold; font-size: 12px; font-family: monospace;"),
+                    style="display: flex; align-items: center; justify-content: center;"
+                ),
+                style="display: flex; flex-direction: column; align-items: center; gap: 2px;"
             ),
-            ui.nav_panel(
-                "📊 SUMMARY & HISTORY",
-                ui.div(
-                    ui.div(
-                        ui.div(
-                            ui.span("FILTER EKSPEDISI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 8px;"),
-                            ui.output_ui("filter_ekspedisi_ui"),
-                            style="display: flex; align-items: center;"
-                        ),
-                        ui.output_ui("delete_btn_ui"),
-                        style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin: 1.25rem 0 1rem 0;"
-                    ),
-                    ui.div(
-                        metric_box("💰 BIAYA ALL", ui.output_text("val_biaya_all"), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
-                        metric_box("📦 KOLI ALL", ui.output_text("val_koli_all"), "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
-                        metric_box("📊 AVG COST ALL", ui.output_text("val_avg_cost_all"), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
-                        metric_box("🚚 BIAYA DATANG", ui.output_text("val_biaya_datang"), "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
-                        metric_box("📦 KOLI DATANG", ui.output_text("val_koli_datang"), "#276749", "linear-gradient(135deg, #C6F6D5 0%, #9AE6B4 100%)"),
-                        metric_box("🔄 BIAYA RTO", ui.output_text("val_biaya_rto"), "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
-                    ),
-                    ui.output_ui("ongkir_history_table_ui"),
-                    style="width: 100%;"
-                )
-            )
+            style="display: flex; align-items: center; gap: 1.25rem;"
         ),
-        style="width: 100%; background: #F7FAFC; min-height: 100vh;"
+        style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
     )
 
 # ==========================================
-# 8. SIDEBAR HELPER
-# ==========================================
-def sidebar_menu_button(label: str, target: str, current_active: str):
-    is_active = (current_active == target)
-    bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
-    
-    return ui.tags.button(
-        label,
-        onclick=f"Shiny.setInputValue('navigate_menu', '{target}', {{priority: 'event'}})",
-        style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 4px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; {bg_style}"
-    )
-
-def section_dropdown_header(title: str, key: str, is_open: bool):
-    icon_class = "fa-chevron-down" if is_open else "fa-chevron-right"
-    return ui.tags.div(
-        ui.tags.span(title, style="font-size: 11px; font-weight: bold; color: #FFFFFF; letter-spacing: 0.05em;"),
-        ui.tags.i(class_=f"fa-solid {icon_class}", style="font-size: 12px; color: #FFFFFF;"),
-        onclick=f"Shiny.setInputValue('toggle_dropdown', '{key}', {{priority: 'event'}})",
-        style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; background: rgba(255, 255, 255, 0.05); margin-top: 0.8rem; margin-bottom: 0.3rem;"
-    )
-
-# ==========================================
-# 9. ROOT UI
+# ROOT UI LAYOUT
 # ==========================================
 app_ui = ui.page_fluid(
     CUSTOM_HEAD,
-    ui.output_ui("global_loading_overlay"),
-    ui.output_ui("global_success_modal"),
-    ui.output_ui("main_app_container")
+    ui.output_ui("global_loading_overlay_ui"),
+    ui.output_ui("main_root_container")
 )
 
 # ==========================================
-# 10. SERVER LOGIC LENGKAP
+# SERVER ENGINE & CONTROLLER
 # ==========================================
 def server(input: Inputs, output: Outputs, session: Session):
-    logged_in = reactive.Value(False)
-    user_display_name = reactive.Value("Guest")
-    user_role = reactive.Value("Staff")
-    login_time_ms = reactive.Value(0)
-    
-    main_menu = reactive.Value("Database Ongkir In/Out")
-    sidebar_open = reactive.Value(True)
-    
-    # State Dropdown Sidebar
-    dropdown_operational = reactive.Value(True)
-    dropdown_inventory = reactive.Value(True)
-    dropdown_reject = reactive.Value(False)
-    dropdown_extras = reactive.Value(False)
-    
-    # Modal & Loading States
-    is_loading = reactive.Value(False)
-    show_success_modal = reactive.Value(False)
-    selected_table_ids = reactive.Value(set())
-    
-    # Data States
-    ongkir_data = reactive.Value(pd.DataFrame([
-        {"id": 1, "tanggal": "2026-08-20", "supplier": "PT Mitra Jaya", "ekspedisi": "J&T CARGO", "koli": 15, "total_ongkir": 350000},
-        {"id": 2, "tanggal": "2026-08-21", "supplier": "CV Sumber Makmur", "ekspedisi": "DAKOTA", "koli": 8, "total_ongkir": 180000}
-    ]))
-    
-    stock_minus_data = reactive.Value({})
-    putaway_data = reactive.Value({})
-    
-    # --- AUTHENTICATION ---
+    state = AppState()
+
+    # --- 1. AUTHENTICATION HANDLERS ---
     @reactive.Effect
-    @reactive.event(input.btn_login)
-    def handle_login():
-        data = input.btn_login()
-        u = data.get("user", "").strip()
-        p = data.get("pass", "").strip()
-        
-        if u != "" and p != "":
-            logged_in.set(True)
-            user_display_name.set(u.capitalize())
-            user_role.set("ADMIN" if u.lower() == "admin" else "OPERATIONAL")
-            login_time_ms.set(int(time.time() * 1000))
+    @reactive.event(input.btn_submit_login)
+    def _login_event():
+        data = input.btn_submit_login()
+        u = data.get("user", "")
+        p = data.get("pass", "")
+        success, msg = state.handle_login(u, p)
+        if success:
+            state.load_ongkir_data()
+            ui.notification_show(msg, type="message", duration=4)
         else:
-            ui.notification_show("Username atau password tidak boleh kosong!", type="error")
-            
-    @reactive.Effect
-    @reactive.event(input.btn_logout)
-    def handle_logout():
-        logged_in.set(False)
-        user_display_name.set("Guest")
-        login_time_ms.set(0)
-
-    # --- SIDEBAR & NAVIGATION ---
-    @reactive.Effect
-    @reactive.event(input.navigate_menu)
-    def _change_menu():
-        main_menu.set(input.navigate_menu())
-        
-    @reactive.Effect
-    @reactive.event(input.toggle_sidebar)
-    def _toggle_sidebar():
-        sidebar_open.set(not sidebar_open())
-        
-    @reactive.Effect
-    @reactive.event(input.toggle_dropdown)
-    def _toggle_dd():
-        k = input.toggle_dropdown()
-        if k == "operational": dropdown_operational.set(not dropdown_operational())
-        elif k == "inventory": dropdown_inventory.set(not dropdown_inventory())
-        elif k == "reject": dropdown_reject.set(not dropdown_reject())
-        elif k == "extras": dropdown_extras.set(not dropdown_extras())
-
-    # --- SUCCESS MODAL TRIGGER ---
-    def trigger_success():
-        show_success_modal.set(True)
+            ui.notification_show(msg, type="error", duration=4)
 
     @reactive.Effect
-    @reactive.event(input.close_success_modal)
-    def _close_succ():
-        show_success_modal.set(False)
+    @reactive.event(input.btn_execute_logout)
+    def _logout_event():
+        state.logout()
+        ui.notification_show("Anda telah keluar dari sistem.", type="warning")
 
-    @output
-    @render.ui
-    def global_success_modal():
-        if not show_success_modal():
-            return ui.div()
-        return ui.div(
-            ui.div(
-                ui.div(
-                    ui.tags.i(class_="fa-solid fa-check", style="font-size: 55px; color: white;"),
-                    class_="animate-pop",
-                    style="background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); border-radius: 50%; padding: 25px; box-shadow: 0 10px 25px rgba(74, 222, 128, 0.4); margin-bottom: 10px; display: flex; align-items: center; justify-content: center;"
-                ),
-                ui.h2("Success!", style="font-size: 28px; color: #1A202C; font-weight: bold; margin-bottom: 1rem;"),
-                ui.tags.button("Lanjutkan", onclick="Shiny.setInputValue('close_success_modal', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="padding: 0.5rem 1.5rem;"),
-                style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);"
-            ),
-            style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center;"
-        )
-
-    # --- LOADING OVERLAY ---
-    @output
-    @render.ui
-    def global_loading_overlay():
-        if not is_loading():
-            return ui.div()
-        return ui.div(
-            ui.div(
-                ui.tags.i(class_="fa-solid fa-spinner fa-spin", style="font-size: 40px; color: #E50914; margin-bottom: 1rem;"),
-                ui.span("Sedang memproses data, mohon tunggu...", style="font-weight: bold; color: #1A202C; font-size: 15px;"),
-                style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; align-items: center;"
-            ),
-            style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); z-index: 99999; display: flex; align-items: center; justify-content: center;"
-        )
-
-    # --- PANDUAN & LOGIC MODAL (ACCORDION DINAMIS LENGKAP) ---
+    # --- 2. SIDEBAR & NAVIGATION HANDLERS ---
     @reactive.Effect
-    @reactive.event(input.btn_open_panduan)
-    def _open_panduan():
-        m = main_menu()
-        if m == "Stock Minus":
-            content = ui.div(
+    @reactive.event(input.select_menu_item)
+    def _nav_event():
+        state.set_main_menu(input.select_menu_item())
+
+    @reactive.Effect
+    @reactive.event(input.btn_toggle_sidebar)
+    def _side_toggle():
+        state.toggle_sidebar()
+
+    @reactive.Effect
+    @reactive.event(input.toggle_dropdown_section)
+    def _drop_toggle():
+        state.toggle_dropdown(input.toggle_dropdown_section())
+
+    # --- 3. DYNAMIC PANDUAN & LOGIC MODAL ---
+    @reactive.Effect
+    @reactive.event(input.btn_open_panduan_modal)
+    def _panduan_modal():
+        cur = state.main_menu()
+        if cur == "Stock Minus":
+            guide_body = ui.div(
                 ui.tags.details(
                     ui.tags.summary("📋 Informasi Format File"),
                     ui.div(
@@ -547,8 +985,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                     open=True
                 )
             )
-        elif m == "Putaway System":
-            content = ui.div(
+        elif cur == "Putaway System":
+            guide_body = ui.div(
                 ui.tags.details(
                     ui.tags.summary("📋 Informasi Format File"),
                     ui.div(
@@ -577,541 +1015,244 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
             )
         else:
-            content = ui.div(
+            guide_body = ui.div(
                 ui.tags.i(class_="fa-regular fa-folder-open", style="font-size: 40px; color: #CBD5E0; margin-bottom: 8px;"),
-                ui.p(f"Panduan dan Logic untuk halaman '{m}' belum tersedia.", style="color: #718096; font-style: italic;"),
+                ui.p(f"Panduan dan Logic untuk halaman '{cur}' belum tersedia.", style="color: #718096; font-style: italic;"),
                 style="text-align: center; padding: 2rem;"
             )
 
         modal = ui.modal(
-            content,
+            guide_body,
             title=ui.div(ui.tags.i(class_="fa-solid fa-book-open", style="color: #C5A059; margin-right: 8px;"), "Panduan & Logic ERP Logistik"),
             easy_close=True,
             footer=ui.modal_button("Tutup", class_="btn-red-gradient")
         )
         ui.modal_show(modal)
 
-    # --- ONGKIR DATABASE (INPUT, CSV BATCH, FILTER & DELETE) ---
+    # --- 4. ONGKIR DATABASE HANDLERS ---
     @reactive.Effect
-    @reactive.event(input.btn_save_ongkir)
-    def _save_single_ongkir():
-        supp = input.input_supplier().strip()
-        eksp = input.input_ekspedisi().strip()
-        koli = input.input_koli()
-        ongkir = input.input_ongkir()
-        tgl = str(input.input_tgl())
-        
-        if not supp or not eksp:
-            ui.notification_show("Supplier & Ekspedisi wajib diisi!", type="warning")
-            return
-            
-        new_row = pd.DataFrame([{
-            "id": int(time.time()),
-            "tanggal": tgl,
-            "supplier": supp,
-            "ekspedisi": eksp.upper(),
-            "koli": koli,
-            "total_ongkir": ongkir
-        }])
-        
-        ongkir_data.set(pd.concat([ongkir_data(), new_row], ignore_index=True))
-        trigger_success()
+    @reactive.event(input.btn_save_ongkir_manual)
+    def _save_manual():
+        d = input.btn_save_ongkir_manual()
+        succ, msg = state.save_single_ongkir(d.get("supplier", ""), d.get("ekspedisi", ""), d.get("koli", "1"), d.get("ongkir", "0"), d.get("tgl", ""))
+        if succ:
+            state.show_success_modal.set(True)
+            asyncio.create_task(_auto_hide_success())
+        else:
+            ui.notification_show(msg, type="error")
 
     @reactive.Effect
-    @reactive.event(input.btn_execute_batch)
-    def _batch_upload():
+    @reactive.event(input.btn_execute_batch_upload)
+    def _save_batch():
         f = input.upload_csv_batch()
         if not f:
             ui.notification_show("Pilih file CSV terlebih dahulu!", type="warning")
             return
-        try:
-            df = pd.read_csv(f[0]["datapath"])
-            if "id" not in df.columns:
-                df["id"] = range(int(time.time()), int(time.time()) + len(df))
-            ongkir_data.set(pd.concat([ongkir_data(), df], ignore_index=True))
-            trigger_success()
-        except Exception as e:
-            ui.notification_show(f"Gagal membaca CSV: {str(e)}", type="error")
-
-    @output
-    @render.ui
-    def filter_ekspedisi_ui():
-        df = ongkir_data()
-        choices = ["ALL"]
-        if not df.empty and "ekspedisi" in df.columns:
-            choices += sorted(list(df["ekspedisi"].dropna().unique()))
-        return ui.input_select("filter_ekspedisi_val", None, choices, selected="ALL", width="220px")
+        with open(f[0]["datapath"], "rb") as fp:
+            succ, msg = state.batch_upload_csv(fp.read())
+        if succ:
+            state.show_success_modal.set(True)
+            asyncio.create_task(_auto_hide_success())
+        else:
+            ui.notification_show(msg, type="error")
 
     @reactive.Effect
-    @reactive.event(input.toggle_select_row)
-    def _toggle_row():
-        row_id = int(input.toggle_select_row())
-        s = set(selected_table_ids())
-        if row_id in s: s.remove(row_id)
-        else: s.add(row_id)
-        selected_table_ids.set(s)
+    @reactive.event(input.toggle_row_id)
+    def _toggle_chk():
+        state.toggle_select_id(int(input.toggle_row_id()))
 
-    @output
-    @render.ui
-    def delete_btn_ui():
-        s = selected_table_ids()
-        if len(s) > 0:
-            return ui.tags.button(
-                f"🗑️ HAPUS ({len(s)}) DATA",
-                onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})",
-                style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;"
-            )
-        return ui.div()
+    @reactive.Effect
+    @reactive.event(input.change_filter_ekspedisi)
+    def _filter_chg():
+        state.filter_ekspedisi.set(input.change_filter_ekspedisi())
 
     @reactive.Effect
     @reactive.event(input.btn_open_delete_modal)
-    def _open_del_modal():
+    def _del_modal():
         modal = ui.modal(
-            ui.p("Apakah Anda yakin ingin menghapus data terpilih secara permanen?"),
+            ui.p("Apakah Anda yakin ingin menghapus data terpilih secara permanen dari database Supabase?"),
             title="⚠️ Konfirmasi Hapus Data",
             easy_close=True,
             footer=ui.div(
                 ui.modal_button("Batal"),
-                ui.tags.button("Ya, Hapus Permanen", onclick="Shiny.setInputValue('btn_confirm_delete', Math.random(), {priority: 'event'})", style="background: #E53E3E; color: white; border: none; padding: 6px 12px; border-radius: 6px; margin-left: 8px; font-weight: bold; cursor: pointer;"),
+                ui.tags.button("Ya, Hapus Permanen", onclick="Shiny.setInputValue('btn_confirm_delete_permanent', Math.random(), {priority: 'event'})", style="background: #E53E3E; color: white; border: none; padding: 6px 12px; border-radius: 6px; margin-left: 8px; font-weight: bold; cursor: pointer;"),
                 style="display: flex; justify-content: flex-end;"
             )
         )
         ui.modal_show(modal)
 
     @reactive.Effect
-    @reactive.event(input.btn_confirm_delete)
-    def _confirm_del():
-        s = selected_table_ids()
-        df = ongkir_data()
-        ongkir_data.set(df[~df["id"].isin(s)])
-        selected_table_ids.set(set())
+    @reactive.event(input.btn_confirm_delete_permanent)
+    def _del_exec():
+        succ, msg = state.execute_delete()
         ui.modal_remove()
-        ui.notification_show("Data berhasil dihapus!", type="message")
+        if succ: ui.notification_show(msg, type="message")
+        else: ui.notification_show(msg, type="error")
 
-    @output
-    @render.text
-    def val_biaya_all():
-        df = ongkir_data()
-        val = df["total_ongkir"].sum() if not df.empty and "total_ongkir" in df else 0
-        return f"Rp {val:,.0f}"
-
-    @output
-    @render.text
-    def val_koli_all():
-        df = ongkir_data()
-        val = df["koli"].sum() if not df.empty and "koli" in df else 0
-        return f"{val:,}"
-
-    @output
-    @render.text
-    def val_avg_cost_all():
-        df = ongkir_data()
-        if not df.empty and df["koli"].sum() > 0:
-            avg = df["total_ongkir"].sum() / df["koli"].sum()
-            return f"Rp {avg:,.0f}"
-        return "Rp 0"
-
-    @output
-    @render.text
-    def val_biaya_datang(): return "Rp 0"
-
-    @output
-    @render.text
-    def val_koli_datang(): return "0"
-
-    @output
-    @render.text
-    def val_biaya_rto(): return "Rp 0"
-
+    # --- 5. STOCK MINUS HANDLERS & DOWNLOADS ---
     @output
     @render.ui
-    def ongkir_history_table_ui():
-        df = ongkir_data()
-        flt = input.filter_ekspedisi_val() if "filter_ekspedisi_val" in input else "ALL"
-        if flt and flt != "ALL" and not df.empty:
-            df = df[df["ekspedisi"] == flt]
-            
-        if df.empty:
-            return ui.div("Tidak ada transaksi ongkir.", style="text-align: center; color: #718096; padding: 2rem;")
-            
-        s = selected_table_ids()
-        rows = []
-        for _, r in df.iterrows():
-            is_checked = r["id"] in s
-            chk = ui.tags.input(
-                type="checkbox", checked=is_checked,
-                onchange=f"Shiny.setInputValue('toggle_select_row', {r['id']}, {{priority: 'event'}})"
-            )
-            rows.append(ui.tags.tr(
-                ui.tags.td(chk, style="text-align: center; width: 50px;"),
-                ui.tags.td(str(r.get("tanggal", ""))),
-                ui.tags.td(str(r.get("supplier", ""))),
-                ui.tags.td(str(r.get("ekspedisi", ""))),
-                ui.tags.td(str(r.get("koli", 0))),
-                ui.tags.td(f"Rp {r.get('total_ongkir', 0):,}")
-            ))
-            
-        return ui.div(
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(
-                    ui.tags.th("SELECT", style="text-align: center;"),
-                    ui.tags.th("TANGGAL"), ui.tags.th("SUPPLIER"), ui.tags.th("EKSPEDISI"), ui.tags.th("KOLI"), ui.tags.th("TOTAL ONGKIR")
-                )),
-                ui.tags.tbody(*rows),
-                class_="custom-clean-table"
-            ),
-            style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"
-        )
-
-    # --- STOCK MINUS ACTIONS & TABS ---
-    @output
-    @render.ui
-    def stock_minus_action_btn():
+    def stock_minus_file_label():
         f = input.upload_stock_file()
         if f:
-            return ui.input_action_button(
-                "btn_process_stock", "▶ PROSES DATA", class_="btn-red-gradient", style="padding: 0.75rem 1.5rem;"
+            return ui.div(
+                ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
+                ui.span(f[0]["name"], style="color: #38A169; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px;"),
+                style="display: flex; align-items: center;"
             )
-        return ui.tags.button(
-            ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px;"),
-            "PILIH FILE UNTUK MEMULAI", class_="btn-locked", style="padding: 0.75rem 1.5rem;"
-        )
+        return ui.span("200MB per file • XLSX, XLS", style="color: #718096; font-size: 13px;")
 
     @reactive.Effect
-    @reactive.event(input.btn_process_stock)
-    def _proc_stock():
+    @reactive.event(input.btn_process_stock_minus)
+    def _proc_stock_file():
         f = input.upload_stock_file()
         if not f: return
-        is_loading.set(True)
-        time.sleep(0.8) # Simulasi proses
-        try:
-            df = pd.read_excel(f[0]["datapath"]) if f[0]["name"].endswith((".xlsx", ".xls")) else pd.read_csv(f[0]["datapath"])
-            stock_minus_data.set({
-                "processed": True,
-                "qty_minus": 142,
-                "tercover": 110,
-                "sisa_adj": 32,
-                "df_minus_awal": df.head(15),
-                "df_set_up": df.head(8),
-                "df_justifikasi": df.tail(4)
-            })
-            is_loading.set(False)
-            trigger_success()
-        except Exception as e:
-            is_loading.set(False)
-            ui.notification_show(f"Gagal memproses file: {str(e)}", type="error")
+        state.is_loading.set(True)
+        with open(f[0]["datapath"], "rb") as fp:
+            succ, msg = state.process_stock_minus_file(fp.read(), f[0]["name"])
+        state.is_loading.set(False)
+        if succ:
+            state.show_success_modal.set(True)
+            asyncio.create_task(_auto_hide_success())
+        else:
+            ui.notification_show(msg, type="error")
 
-    @render.download(filename="Stock_Minus_Awal.xlsx")
-    def dl_minus_awal():
-        d = stock_minus_data()
-        df = d.get("df_minus_awal", pd.DataFrame())
+    @render.download(filename="Data_Minus_Awal.xlsx")
+    def btn_dl_minus_awal():
         buf = io.BytesIO()
-        df.to_excel(buf, index=False)
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_minus_awal.to_excel(writer, index=False)
         buf.seek(0)
         return buf.getvalue()
 
     @render.download(filename="Template_Set_Up.xlsx")
-    def dl_set_up():
-        d = stock_minus_data()
-        df = d.get("df_set_up", pd.DataFrame())
+    def btn_dl_set_up():
         buf = io.BytesIO()
-        df.to_excel(buf, index=False)
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_set_up.to_excel(writer, index=False)
         buf.seek(0)
         return buf.getvalue()
 
-    @render.download(filename="Justifikasi_Need.xlsx")
-    def dl_justifikasi():
-        d = stock_minus_data()
-        df = d.get("df_justifikasi", pd.DataFrame())
+    @render.download(filename="Data_Justifikasi.xlsx")
+    def btn_dl_justifikasi():
         buf = io.BytesIO()
-        df.to_excel(buf, index=False)
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_need_adj.to_excel(writer, index=False)
         buf.seek(0)
         return buf.getvalue()
 
-    @output
-    @render.ui
-    def stock_minus_results_ui():
-        data = stock_minus_data()
-        if not data.get("processed", False):
-            return ui.div()
-            
-        return ui.div(
-            ui.div(
-                dark_metric_box("TOTAL QTY MINUS", f"{data['qty_minus']}", "#E53E3E"),
-                dark_metric_box("TERCOVER", f"{data['tercover']}", "#38A169"),
-                dark_metric_box("SISA ADJ", f"{data['sisa_adj']}", "#DD6B20"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
-            ),
-            ui.navset_card_tab(
-                ui.nav_panel(
-                    "📄 MINUS AWAL",
-                    ui.div(
-                        ui.div(ui.download_button("dl_minus_awal", "📥 Download Excel", style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer;"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"),
-                        render_clean_table(data["df_minus_awal"])
-                    )
-                ),
-                ui.nav_panel(
-                    "🔄 TEMPLATE SET UP",
-                    ui.div(
-                        ui.div(ui.download_button("dl_set_up", "📥 Download Excel", style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer;"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"),
-                        render_clean_table(data["df_set_up"])
-                    )
-                ),
-                ui.nav_panel(
-                    "⚠️ JUSTIFIKASI",
-                    ui.div(
-                        ui.div(ui.download_button("dl_justifikasi", "📥 Download Excel", style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer;"), style="display: flex; justify-content: flex-end; margin-bottom: 0.5rem;"),
-                        render_clean_table(data["df_justifikasi"])
-                    )
-                )
-            )
-        )
+    # --- 6. PUTAWAY HANDLERS & DOWNLOADS ---
+    @reactive.Effect
+    @reactive.event(input.select_area_putaway)
+    def _area_sel():
+        state.set_area_putaway(input.select_area_putaway())
 
-    # --- PUTAWAY SYSTEM ACTIONS & TABS ---
     @output
     @render.ui
-    def putaway_content_after_area():
-        area = input.area_putaway()
-        if not area:
+    def ds_file_label():
+        f = input.ds_putaway_file()
+        if f:
             return ui.div(
-                "⚠️ Silakan pilih Area Putaway di atas terlebih dahulu.",
-                style="color: #DD6B20; font-weight: bold; font-style: italic; background: #FFFFF0; border: 1px solid #F6E05E; padding: 1rem; border-radius: 8px; margin-top: 1rem;"
+                ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
+                ui.span(f[0]["name"], style="color: #38A169; font-weight: bold;"),
+                style="display: flex; align-items: center;"
             )
-            
-        has_ds = input.ds_putaway_file() is not None
-        has_asal = input.asal_putaway_file() is not None
-        
-        btn_action = ui.input_action_button(
-            "btn_compare_putaway", "▶ COMPARE PUTAWAY", class_="btn-red-gradient", style="padding: 0.75rem 1.5rem;"
-        ) if (has_ds and has_asal) else ui.tags.button(
-            ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px;"),
-            "PILIH KEDUA FILE UNTUK MEMULAI", class_="btn-locked", style="padding: 0.75rem 1.5rem;"
-        )
-        
-        return ui.div(
-            ui.div(
-                ui.tags.i(class_="fa-solid fa-map-pin", style="color: #3182ce; margin-right: 8px;"),
-                ui.span("Area Terpilih: ", style="color: #2c5282; font-weight: normal;"),
-                ui.tags.strong(area, style="color: #2c5282;"),
-                style="background: #ebf8ff; border-left: 4px solid #3182ce; padding: 10px 16px; border-radius: 6px; width: 100%; margin: 1rem 0;"
-            ),
-            ui.div(
-                ui.div(
-                    ui.span("Upload DS PUTAWAY", style="font-weight: bold; color: #1A202C; font-size: 13px; margin-bottom: 4px; display: block;"),
-                    ui.input_file("ds_putaway_file", None, accept=[".xlsx", ".xls", ".csv"], placeholder="200MB per file • XLSX, XLS, CSV"),
-                    style="flex: 1; padding: 1.5rem; border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC;"
-                ),
-                ui.div(
-                    ui.span("Upload ASAL BIN", style="font-weight: bold; color: #1A202C; font-size: 13px; margin-bottom: 4px; display: block;"),
-                    ui.input_file("asal_putaway_file", None, accept=[".xlsx", ".xls", ".csv"], placeholder="200MB per file • XLSX, XLS, CSV"),
-                    style="flex: 1; padding: 1.5rem; border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC;"
-                ),
-                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.5rem; flex-wrap: wrap;"
-            ),
-            ui.div(
-                btn_action,
-                style="display: flex; justify-content: flex-end; width: 100%;"
+        return ui.span("200MB per file • XLSX, XLS, CSV", style="color: #718096; font-size: 13px;")
+
+    @output
+    @render.ui
+    def asal_file_label():
+        f = input.asal_putaway_file()
+        if f:
+            return ui.div(
+                ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
+                ui.span(f[0]["name"], style="color: #38A169; font-weight: bold;"),
+                style="display: flex; align-items: center;"
             )
-        )
+        return ui.span("200MB per file • XLSX, XLS, CSV", style="color: #718096; font-size: 13px;")
 
     @reactive.Effect
     @reactive.event(input.btn_compare_putaway)
-    def _proc_putaway():
-        is_loading.set(True)
-        time.sleep(1.0)
-        try:
-            f_ds = input.ds_putaway_file()
-            df = pd.read_excel(f_ds[0]["datapath"]) if f_ds[0]["name"].endswith((".xlsx", ".xls")) else pd.read_csv(f_ds[0]["datapath"])
-            putaway_data.set({
-                "processed": True,
-                "qty_system": 340,
-                "total_setup": 310,
-                "kurang_setup": 30,
-                "sisa_stok": 0,
-                "df_comp": df.head(10),
-                "df_plist": df.head(5),
-                "df_kurang": pd.DataFrame(), # Simulasi tercover semua
-                "df_out": pd.DataFrame()
-            })
-            is_loading.set(False)
-            trigger_success()
-        except Exception as e:
-            is_loading.set(False)
-            ui.notification_show(f"Gagal memproses compare: {str(e)}", type="error")
+    def _proc_putaway_files():
+        f_ds = input.ds_putaway_file()
+        f_as = input.asal_putaway_file()
+        if not f_ds or not f_as: return
+        state.is_loading.set(True)
+        with open(f_ds[0]["datapath"], "rb") as fp_ds, open(f_as[0]["datapath"], "rb") as fp_as:
+            succ, msg = state.process_putaway_compare(fp_ds.read(), f_ds[0]["name"], fp_as.read(), f_as[0]["name"])
+        state.is_loading.set(False)
+        if succ:
+            state.show_success_modal.set(True)
+            asyncio.create_task(_auto_hide_success())
+        else:
+            ui.notification_show(msg, type="error")
 
-    @render.download(filename="Report_Lengkap_Putaway.xlsx")
-    def dl_putaway_report():
-        d = putaway_data()
-        df = d.get("df_comp", pd.DataFrame())
+    @render.download(filename="REPORT_PUTAWAY_SYSTEM.xlsx")
+    def btn_dl_putaway_report():
         buf = io.BytesIO()
-        df.to_excel(buf, index=False)
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_comp.to_excel(writer, sheet_name='COMPARE', index=False)
+            state._raw_df_plist.to_excel(writer, sheet_name='PUTAWAY_LIST', index=False)
+            state._raw_df_kurang.to_excel(writer, sheet_name='KURANG_SETUP', index=False)
+            state._raw_df_out.to_excel(writer, sheet_name='OUTSTANDING', index=False)
+            state._raw_df_updated.to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
         buf.seek(0)
         return buf.getvalue()
 
+    async def _auto_hide_success():
+        await asyncio.sleep(2.5)
+        state.show_success_modal.set(False)
+
+    # --- 7. LOADING OVERLAY OUTPUT ---
     @output
     @render.ui
-    def putaway_results_ui():
-        data = putaway_data()
-        if not data.get("processed", False):
+    def global_loading_overlay_ui():
+        if not state.is_loading():
             return ui.div()
-            
-        return ui.div(
-            ui.hr(style="margin: 1.5rem 0;"),
-            ui.h4("📋 RINGKASAN HASIL", style="font-size: 16px; color: #010B13; font-weight: bold; margin-bottom: 1rem;"),
-            ui.div(
-                dark_metric_box("Qty System Putaway", f"{data['qty_system']}", "#E53E3E"),
-                dark_metric_box("Total Tersetup", f"{data['total_setup']}", "#38A169"),
-                dark_metric_box("Kurang Setup", f"{data['kurang_setup']}", "#DD6B20"),
-                dark_metric_box("Sisa Stok Putaway", f"{data['sisa_stok']}", "#3182CE"),
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;"
-            ),
-            ui.div(
-                ui.download_button("dl_putaway_report", "📥 DOWNLOAD REPORT LENGKAP", style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
-                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
-            ),
-            ui.navset_card_tab(
-                ui.nav_panel("📋 Hasil Compare", render_clean_table(data["df_comp"])),
-                ui.nav_panel("📝 List Setup", render_clean_table(data["df_plist"])),
-                ui.nav_panel(
-                    "⚠️ Kurang Setup",
-                    render_clean_table(data["df_kurang"]) if not data["df_kurang"].empty else ui.div("✅ Semua Tercover!", style="background: #C6F6D5; color: #38A169; font-weight: bold; padding: 1rem; border-radius: 8px; text-align: center;")
-                ),
-                ui.nav_panel(
-                    "📦 Outstanding",
-                    render_clean_table(data["df_out"]) if not data["df_out"].empty else ui.div("✅ Tidak ada Outstanding!", style="background: #C6F6D5; color: #38A169; font-weight: bold; padding: 1rem; border-radius: 8px; text-align: center;")
-                )
-            )
-        )
-
-    # --- TOPBAR COMPONENT ---
-    def render_global_header():
         return ui.div(
             ui.div(
-                ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
-                ui.div(
-                    ui.h3(main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0;"),
-                    ui.span(f"Logged in as: {user_display_name()} ({user_role()})", style="font-size: 12px; color: #4A5568;"),
-                    style="display: flex; flex-direction: column;"
-                ),
-                style="display: flex; align-items: center;"
+                ui.tags.i(class_="fa-solid fa-spinner fa-spin", style="font-size: 40px; color: #E50914; margin-bottom: 1rem;"),
+                ui.span("Sedang memproses data, mohon tunggu...", style="font-weight: bold; color: #1A202C; font-size: 15px;"),
+                style="background: white; padding: 2rem 2.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column; align-items: center;"
             ),
-            ui.div(
-                ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C;"),
-                    "Panduan & Logic",
-                    onclick="Shiny.setInputValue('btn_open_panduan', Math.random(), {priority: 'event'})",
-                    style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
-                ),
-                ui.div(
-                    ui.div(
-                        ui.div(style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px;", class_="blink-online"),
-                        ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"),
-                        style="display: flex; align-items: center;"
-                    ),
-                    ui.div(
-                        ui.span(str(login_time_ms()), id="login-time-store", style="display: none;"),
-                        ui.tags.i(class_="fa-regular fa-clock", style="font-size: 12px; color: #4A5568; margin-right: 4px;"),
-                        ui.span("00:00:00", id="live-timer", style="color: #4A5568; font-weight: bold; font-size: 12px; font-family: monospace;"),
-                        style="display: flex; align-items: center; justify-content: center;"
-                    ),
-                    style="display: flex; flex-direction: column; align-items: center;"
-                ),
-                style="display: flex; align-items: center; gap: 1.5rem;"
-            ),
-            style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
+            style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); z-index: 99999; display: flex; align-items: center; justify-content: center;"
         )
 
-    # --- SIDEBAR COMPONENT ---
-    def render_sidebar():
-        cur = main_menu()
-        if not sidebar_open():
-            return ui.div(
-                ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"),
-                    onclick="Shiny.setInputValue('toggle_sidebar', Math.random(), {priority: 'event'})",
-                    style="background: transparent; border: none; cursor: pointer; padding: 0.5rem;"
-                ),
-                style="width: 60px; height: 100vh; background: #111318; border-right: 1px solid #2D3748; padding: 1rem 0.5rem; display: flex; flex-direction: column; align-items: center;"
-            )
-            
-        return ui.div(
-            ui.div(
-                ui.div(
-                    ui.span("JEZ", style="color: #E50914; font-weight: 900; font-size: 20px;"),
-                    ui.span("PRO", style="color: #FFFFFF; font-weight: 900; font-size: 20px;"),
-                    style="display: flex; gap: 2px;"
-                ),
-                ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-xmark", style="font-size: 16px; color: #CBD5E0;"),
-                    onclick="Shiny.setInputValue('toggle_sidebar', Math.random(), {priority: 'event'})",
-                    style="background: transparent; border: none; cursor: pointer;"
-                ),
-                style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 1rem;"
-            ),
-            ui.div(
-                section_dropdown_header("OPERATIONAL", "operational", dropdown_operational()),
-                ui.div(
-                    sidebar_menu_button("Database Ongkir In/Out", "Database Ongkir In/Out", cur),
-                    sidebar_menu_button("Stock Minus", "Stock Minus", cur),
-                    sidebar_menu_button("Putaway System", "Putaway System", cur),
-                    style="padding-left: 0.5rem;" if dropdown_operational() else "display: none;"
-                ),
-                section_dropdown_header("INVENTORY", "inventory", dropdown_inventory()),
-                ui.div(
-                    sidebar_menu_button("Stock Opname", "Stock Opname", cur),
-                    sidebar_menu_button("Relokasi BIN", "Relokasi BIN", cur),
-                    style="padding-left: 0.5rem;" if dropdown_inventory() else "display: none;"
-                ),
-                section_dropdown_header("REJECT & DEFECT", "reject", dropdown_reject()),
-                ui.div(
-                    sidebar_menu_button("Barang Rusak", "Barang Rusak", cur),
-                    style="padding-left: 0.5rem;" if dropdown_reject() else "display: none;"
-                ),
-                section_dropdown_header("EXTRAS", "extras", dropdown_extras()),
-                ui.div(
-                    sidebar_menu_button("Log Aktivitas", "Log Aktivitas", cur),
-                    style="padding-left: 0.5rem;" if dropdown_extras() else "display: none;"
-                ),
-                style="flex: 1; overflow-y: auto; width: 100%;"
-            ),
-            ui.div(
-                ui.tags.button(
-                    ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px;"),
-                    "Logout Sistem",
-                    onclick="Shiny.setInputValue('btn_logout', Math.random(), {priority: 'event'})",
-                    class_="btn-red-gradient",
-                    style="width: 100%; padding: 0.6rem; font-size: 13px;"
-                ),
-                style="width: 100%; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 0.8rem; margin-top: auto;"
-            ),
-            style="width: 280px; min-width: 280px; padding: 1rem; background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%); border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; transition: width 0.3s ease;"
-        )
-
-    # --- MAIN ROUTER ---
+    # --- 8. MAIN ROOT DYNAMIC ROUTER ---
     @output
     @render.ui
-    def main_app_container():
-        if not logged_in():
-            return login_page_view()
-            
-        cur_view = main_menu()
-        if cur_view in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
-            page_content = main_dashboard_view()
-        elif cur_view == "Stock Minus":
-            page_content = stock_minus_view()
-        elif cur_view == "Putaway System":
-            page_content = putaway_view()
+    def main_root_container():
+        if not state.logged_in():
+            return login_page()
+
+        content_type = state.get_active_content_type()
+        has_stock_file = input.upload_stock_file() is not None
+        has_ds_file = input.ds_putaway_file() is not None
+        has_asal_file = input.asal_putaway_file() is not None
+
+        if content_type == "dashboard_ongkir":
+            page_content = main_dashboard_view(state)
+        elif content_type == "stock_minus":
+            page_content = stock_minus_view(state, has_stock_file)
+        elif content_type == "putaway_system":
+            page_content = putaway_view(state, has_ds_file, has_asal_file)
+        elif content_type == "access_denied":
+            page_content = ui.div(
+                ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold; margin-bottom: 0.5rem;"),
+                ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"),
+                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+            )
         else:
             page_content = ui.div(
-                ui.h2(f"Halaman: {cur_view}", style="color: #1A202C;"),
-                ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096;"),
-                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center;"
+                ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold; margin-bottom: 0.5rem;"),
+                ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"),
+                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
             )
-            
+
         return ui.div(
-            render_sidebar(),
+            sidebar(state),
             ui.div(
-                render_global_header(),
+                global_header(state),
                 page_content,
                 style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
             ),
@@ -1119,6 +1260,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
 
 # ==========================================
-# 11. INISIALISASI APLIKASI
+# INISIALISASI APLIKASI UTUH
 # ==========================================
 app = App(app_ui, server)
