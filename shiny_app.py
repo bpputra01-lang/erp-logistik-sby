@@ -778,4 +778,42 @@ def server(input: Inputs, output: Outputs, session: Session):
                 width: 280px; min-width: 280px; padding: 1rem;
                 background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%);
                 border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column;
-                transition: width 0.3s
+                transition: width 0.3s ease;
+            """
+        )
+
+    # --- MAIN DYNAMIC ROUTER ---
+    @output
+    @render.ui
+    def main_app_container():
+        if not logged_in():
+            return login_view()
+            
+        cur_view = main_menu()
+        if cur_view in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
+            page_content = main_dashboard_view()
+        elif cur_view == "Stock Minus":
+            page_content = stock_minus_view()
+        elif cur_view == "Putaway System":
+            page_content = putaway_view()
+        else:
+            page_content = ui.div(
+                ui.h2(f"Halaman: {cur_view}", style="color: #1A202C;"),
+                ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096;"),
+                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center;"
+            )
+            
+        return ui.div(
+            render_sidebar(),
+            ui.div(
+                render_global_header(),
+                page_content,
+                style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
+            ),
+            style="display: flex; width: 100vw; height: 100vh; overflow: hidden;"
+        )
+
+# ==========================================
+# 11. INITIALIZATION
+# ==========================================
+app = App(app_ui, server)
