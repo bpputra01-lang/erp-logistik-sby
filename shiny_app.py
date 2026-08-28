@@ -720,6 +720,9 @@ def render_clean_table(headers: list, rows: list):
         style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;"
     )
 
+# ==============================================================================
+# SUCCESS MODAL (AUTO-DISMISS & NON-BLOCKING)
+# ==============================================================================
 def success_modal(show: bool):
     if not show:
         return ui.div()
@@ -727,23 +730,27 @@ def success_modal(show: bool):
         ui.div(
             ui.div(
                 ui.div(
-                    ui.tags.i(class_="fa-solid fa-check", style="font-size: 55px; color: white;"),
+                    ui.tags.i(class_="fa-solid fa-check", style="font-size: 50px; color: white;"),
                     class_="animate-pop",
-                    style="background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); border-radius: 50%; padding: 20px; box-shadow: 0 10px 25px rgba(74, 222, 128, 0.4); margin-bottom: 5px; display: flex; align-items: center; justify-content: center;"
+                    style="background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); border-radius: 50%; width: 85px; height: 85px; box-shadow: 0 10px 25px rgba(74, 222, 128, 0.4); margin-bottom: 10px; display: flex; align-items: center; justify-content: center;"
                 ),
-                ui.h2("Success!", style="font-size: 28px; color: #1A202C; font-weight: bold; margin: 0;"),
-                style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;"
+                ui.h2("Success!", style="font-size: 26px; color: #1A202C; font-weight: bold; margin: 0;"),
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; padding: 2rem 2.5rem; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.25);"
             ),
-            style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"
+            style="display: flex; align-items: center; justify-content: center;"
         ),
+        ui.tags.script("""
+            setTimeout(function() {
+                let el = document.getElementById('success-modal-overlay');
+                if (el) {
+                    el.remove();
+                    Shiny.setInputValue('close_success_modal_event', Math.random(), {priority: 'event'});
+                }
+            }, 1800);
+        """),
         id="success-modal-overlay",
-        onclick="this.style.display='none';",
-        style="""
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999;
-            background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(5px);
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
-            animation: autoFadeOut 2.2s forwards;
-        """
+        onclick="this.remove(); Shiny.setInputValue('close_success_modal_event', Math.random(), {priority: 'event'});",
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; cursor: pointer;"
     )
 
 # ==============================================================================
