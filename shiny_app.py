@@ -542,6 +542,12 @@ CUSTOM_HEAD = ui.head_content(
             100% { transform: scale(1); opacity: 1; }
         }
         .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes autoFadeOut {
+            0% { opacity: 1; visibility: visible; }
+            75% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; pointer-events: none; }
+        }
         
         .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
         .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
@@ -568,20 +574,35 @@ CUSTOM_HEAD = ui.head_content(
             cursor: not-allowed !important;
             border: none !important;
         }
+
+        /* --- UPLOADER BOX (STOCK MINUS & PUTAWAY) --- */
         .uploader-box {
-            border: 2px dashed #CBD5E0;
-            border-radius: 8px;
+            border: 2px dashed #1A202C !important;
+            border-radius: 10px;
             background: #F8FAFC;
-            padding: 1rem 1.5rem;
+            padding: 1.5rem;
+            min-height: 95px;
             width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: all 0.2s ease;
         }
         .uploader-box:hover {
-            border-color: #C5A059;
+            border-color: #000000 !important;
+            background-color: #F1F5F9;
         }
         .uploader-box .shiny-input-container {
             margin-bottom: 0 !important;
             width: 100%;
+            display: flex;
+            align-items: center;
+        }
+        .uploader-box .input-group {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 0 !important;
         }
         .uploader-box .btn-file {
             background-color: #C5A059 !important;
@@ -589,8 +610,10 @@ CUSTOM_HEAD = ui.head_content(
             font-weight: bold !important;
             border-radius: 6px !important;
             border: none !important;
-            padding: 8px 18px !important;
+            padding: 10px 20px !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            display: inline-flex;
+            align-items: center;
         }
         .uploader-box .btn-file:hover {
             filter: brightness(1.08);
@@ -602,16 +625,22 @@ CUSTOM_HEAD = ui.head_content(
             font-weight: bold !important;
             box-shadow: none !important;
             padding-left: 1rem !important;
+            height: auto !important;
+            display: flex;
+            align-items: center;
         }
         .uploader-box .form-control::placeholder {
             color: #718096 !important;
             font-weight: normal !important;
         }
+
+        /* --- UPLOADER BOX (BATCH CSV DATABASE ONGKIR) --- */
         .csv-batch-box {
-            border: 2px dashed #E50914;
+            border: 2px dashed #1A202C !important;
             border-radius: 12px;
-            background: #FFF5F5;
-            padding: 1.5rem;
+            background: #FAFAFA;
+            padding: 2rem 1.5rem;
+            min-height: 110px;
             width: 100%;
             text-align: center;
             margin-bottom: 1.25rem;
@@ -619,10 +648,24 @@ CUSTOM_HEAD = ui.head_content(
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .csv-batch-box:hover {
+            border-color: #000000 !important;
+            background-color: #F4F4F5;
         }
         .csv-batch-box .shiny-input-container {
             margin-bottom: 0 !important;
             width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        .csv-batch-box .input-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 0 !important;
         }
         .csv-batch-box .btn-file {
             background-color: #1A202C !important;
@@ -630,7 +673,7 @@ CUSTOM_HEAD = ui.head_content(
             font-weight: 700 !important;
             border-radius: 6px !important;
             border: none !important;
-            padding: 8px 18px !important;
+            padding: 9px 20px !important;
         }
         .csv-batch-box .btn-file:hover {
             background-color: #2D3748 !important;
@@ -642,11 +685,14 @@ CUSTOM_HEAD = ui.head_content(
             font-weight: bold !important;
             box-shadow: none !important;
             padding-left: 1rem !important;
+            text-align: left;
+            height: auto !important;
         }
         .csv-batch-box .form-control::placeholder {
             color: #718096 !important;
             font-weight: normal !important;
         }
+
         details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
         summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
         details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
