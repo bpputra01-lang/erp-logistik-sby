@@ -326,22 +326,116 @@ def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
 
 def sidebar(state: AppState):
     cur_menu = state.main_menu()
-    if not state.sidebar_open():
-        return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"), style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;")
 
+    # --- KONDISI KETIKA SIDEBAR DITUTUP (HANYA ICON BARS) ---
+    if not state.sidebar_open():
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"),
+                onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})",
+                style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"
+            ),
+            style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;"
+        )
+
+    # --- KONDISI KETIKA SIDEBAR TERBUKA PENUH ---
     return ui.div(
-        ui.div(ui.div(ui.span("ZKN LOGISTIC", style="color: #E50914; font-weight: 900; font-size: 20px;"), ui.span("WAREHOUSE SYSTEM", style="color: #FFFFFF; font-weight: 900; font-size: 20px;"), style="display: flex; gap: 2px; align-items: center;"), ui.tags.button(ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 16px; color: #CBD5E0;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px;"), style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.5rem;"),
+        # 1. HEADER LOGO + BRAND + TOMBOL CLOSE (<<)
         ui.div(
-            ui.div(section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_operational()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"), style="width: 100%;"),
-            ui.div(section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_inventory()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"), style="width: 100%;"),
-            ui.div(section_dropdown_header("REJECT & DEFECT", "reject", state.dropdown_reject()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_reject()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_reject() else "display: none;"), style="width: 100%;"),
-            ui.div(section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_extras()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"), style="width: 100%;"),
+            ui.div(
+                # Box Logo Merah
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #FFFFFF; font-size: 16px;"),
+                    style="""
+                        width: 38px; height: 38px; 
+                        background: linear-gradient(135deg, #E50914 0%, #B20710 100%); 
+                        border-radius: 8px; display: flex; align-items: center; justify-content: center; 
+                        box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); flex-shrink: 0;
+                    """
+                ),
+                # Teks Brand 2 Baris
+                ui.div(
+                    ui.span("ZKN LOGISTIC", style="color: #E50914; font-weight: 900; font-size: 14px; letter-spacing: 0.5px; line-height: 1.2;"),
+                    ui.span("WAREHOUSE SYSTEM", style="color: #FFFFFF; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; opacity: 0.9;"),
+                    style="display: flex; flex-direction: column; justify-content: center;"
+                ),
+                style="display: flex; align-items: center; gap: 10px;"
+            ),
+            # Tombol Collapse Sidebar (<<)
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 14px; color: #CBD5E0;"),
+                onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})",
+                style="background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; align-items: center;"
+            ),
+            style="""
+                display: flex; justify-content: space-between; width: 100%; align-items: center; 
+                margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            """
+        ),
+
+        # 2. DAFTAR MENU SIDEBAR (SCROLLABLE)
+        ui.div(
+            # OPERATIONAL
+            ui.div(
+                section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()),
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_operational()],
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"
+                ),
+                style="width: 100%;"
+            ),
+            # INVENTORY
+            ui.div(
+                section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()),
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_inventory()],
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"
+                ),
+                style="width: 100%;"
+            ),
+            # REJECT & DEFECT
+            ui.div(
+                section_dropdown_header("REJECT & DEFECT", "reject", state.dropdown_reject()),
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_reject()],
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_reject() else "display: none;"
+                ),
+                style="width: 100%;"
+            ),
+            # EXTRAS
+            ui.div(
+                section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()),
+                ui.div(
+                    *[menu_item(item, item, cur_menu) for item in state.get_menu_extras()],
+                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"
+                ),
+                style="width: 100%;"
+            ),
             style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
         ),
-        ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"), ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")), onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"), style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"),
-        style="width: 280px; min-width: 280px; padding: 1rem; background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%); border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: flex-start;"
-    )
 
+        # 3. TOMBOL LOGOUT SISTEM
+        ui.div(
+            ui.tags.button(
+                ui.tags.span(
+                    ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"),
+                    ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")
+                ),
+                onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})",
+                class_="btn-red-gradient",
+                style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"
+            ),
+            style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"
+        ),
+
+        # Styling Container Utama Sidebar
+        style="""
+            width: 280px; min-width: 280px; padding: 1rem;
+            background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%);
+            border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column;
+            align-items: flex-start; transition: width 0.3s ease;
+        """
+    )
 def login_page():
     return ui.div(
         ui.div(
