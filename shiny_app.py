@@ -1,16 +1,12 @@
 import io
 import re
 import pandas as pd
-import requests
 from shiny import reactive, req
 from shiny.express import input, render, ui
 
 # ==========================================
 # CONSTANTS & CONFIGURATION
 # ==========================================
-SUPABASE_URL = "https://your-supabase-url.supabase.co"  # Ganti dengan URL Supabase lu
-SUPABASE_KEY = "your-anon-key"                         # Ganti dengan Anon Key Supabase lu
-
 PRIOR_BINS = [
     "RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC",
     "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3",
@@ -39,146 +35,106 @@ putaway_processed = reactive.value(False)
 putaway_qty_system = reactive.value(0)
 putaway_total_setup = reactive.value(0)
 putaway_kurang_setup = reactive.value(0)
-putaway_sisa_stok = reactive.value(0)
 df_comp = reactive.value(pd.DataFrame())
 df_plist = reactive.value(pd.DataFrame())
 df_kurang = reactive.value(pd.DataFrame())
-df_out = reactive.value(pd.DataFrame())
-df_updated = reactive.value(pd.DataFrame())
 
 # ==========================================
 # GLOBAL STYLING & CSS CUSTOM
 # ==========================================
 ui.tags.style("""
-    /* Reset & Full Page Background Gambar + Gradient Overlay */
-    * {
-        box-sizing: border-box !important;
-    }
-
+    * { box-sizing: border-box !important; }
     body, html {
-        height: 100vh;
-        margin: 0;
-        padding: 0;
-        background-color: #0f172a;
-        color: #f8fafc;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        height: 100vh; margin: 0; padding: 0;
+        background-color: #0f172a; color: #f8fafc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-
     .bg-login {
-        background-image: 
-            radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 100%), 
-            url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
+        background: radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%);
         min-height: 100vh;
     }
-
-    /* Container Tengah */
     .login-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        width: 100%;
-        padding: 1.5rem;
+        display: flex; justify-content: center; align-items: center;
+        min-height: 100vh; width: 100%; padding: 1.5rem;
     }
-
-    /* Card Glassmorphism */
     .login-card {
-        width: 100%;
-        max-width: 480px;
-        padding: 2.8rem 2.2rem;
-        background: rgba(12, 12, 15, 0.88) !important;
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        width: 100%; max-width: 450px; padding: 2.5rem 2rem;
+        background: rgba(15, 23, 42, 0.95) !important;
+        border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1);
         border-left: 5px solid #E50914 !important;
-        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
     }
-
-    /* Custom Field */
     .custom-field {
-        width: 100% !important;
-        display: block !important;
-        background: rgba(0, 0, 0, 0.75) !important;
-        border: 1px solid rgba(229, 9, 20, 0.4) !important;
-        color: #FFFFFF !important;
-        border-radius: 10px !important;
-        padding: 0 1.2rem !important;
-        height: 50px !important;
-        font-size: 0.95rem !important;
-        outline: none !important;
-        transition: all 0.2s ease-in-out;
+        width: 100% !important; background: #020617 !important;
+        border: 1px solid rgba(229, 9, 20, 0.4) !important; color: #FFFFFF !important;
+        border-radius: 8px !important; padding: 0 1rem !important;
+        height: 46px !important; font-size: 0.95rem !important; outline: none !important;
     }
-
-    .custom-field::placeholder { color: #555555 !important; }
     .custom-field:focus {
         border-color: #E50914 !important;
-        box-shadow: 0 0 12px rgba(229, 9, 20, 0.5) !important;
-        background: rgba(0, 0, 0, 0.9) !important;
+        box-shadow: 0 0 10px rgba(229, 9, 20, 0.5) !important;
     }
-
-    /* Gradient Button Full Width */
     .btn-login {
         background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
-        color: #FFFFFF !important;
-        font-weight: 800 !important;
-        border-radius: 10px !important;
-        cursor: pointer !important;
-        box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4) !important;
-        height: 50px !important;
-        width: 100% !important;
-        border: none !important;
-        letter-spacing: 1px;
-        font-size: 0.95rem !important;
-        transition: all 0.2s ease;
-        margin-top: 0.5rem;
+        color: #FFFFFF !important; font-weight: 800 !important;
+        border-radius: 8px !important; cursor: pointer !important;
+        height: 48px !important; width: 100% !important; border: none !important;
+        letter-spacing: 1px; font-size: 0.95rem !important; margin-top: 0.5rem;
     }
-
-    .btn-login:hover {
-        opacity: 0.95;
-        transform: translateY(-1px);
-        box-shadow: 0 6px 20px rgba(229, 9, 20, 0.6) !important;
-    }
-
-    /* Dashboard UI */
-    .card { background-color: #1e293b; border: 1px solid #334155; color: white; margin-bottom: 15px; }
-    .btn-primary { background-color: #3b82f6; border: none; }
-    .btn-success { background-color: #22c55e; border: none; }
-    .btn-danger { background-color: #ef4444; border: none; }
-    .metric-box { padding: 15px; border-radius: 8px; background: #334155; text-align: center; }
+    .btn-login:hover { opacity: 0.95; transform: translateY(-1px); }
+    .metric-box { padding: 15px; border-radius: 8px; background: #1e293b; text-align: center; border: 1px solid #334155; }
     .metric-val { font-size: 24px; font-weight: bold; }
 """)
 
-# ------------------------------------------
-# HEADER AUTHENTICATION (SETELAH LOGIN)
-# ------------------------------------------
-@render.ui
-def header_auth():
-    if not logged_in.get():
-        return ui.div()
-    return ui.div(
-        ui.span(f"👤 {user_display_name.get()} ({role.get().upper()})", style="font-weight: bold; margin-right: 15px;"),
-        ui.input_action_button("btn_logout", "Logout", class_="btn-danger btn-sm"),
-        style="display: flex; justify-content: flex-end; align-items: center; padding: 15px 25px; background: #1e293b; border-bottom: 1px solid #334155;"
-    )
+# ==========================================
+# AUTH HANDLERS & ROUTER
+# ==========================================
 
+# Handler Login
 @reactive.effect
-@reactive.event(input.btn_logout)
+@reactive.event(input.btn_login, ignore_none=True)
+def _login():
+    u = input.login_user().strip() if input.login_user() else ""
+    p = input.login_pass().strip() if input.login_pass() else ""
+    
+    if u == "admin" and p == "sby123":
+        logged_in.set(True)
+        role.set("DC")
+        branch.set("SURABAYA")
+        user_display_name.set("Admin DC Surabaya")
+        ui.notification_show("Berhasil Login sebagai Admin DC!", type="message")
+    elif u == "toko" and p == "toko123":
+        logged_in.set(True)
+        role.set("CABANG")
+        branch.set("SURABAYA")
+        user_display_name.set("User Cabang")
+        ui.notification_show("Berhasil Login sebagai User Cabang!", type="message")
+    elif u != "" or p != "":
+        ui.notification_show("❌ Username atau Password Salah!", type="error")
+
+# Handler Logout
+@reactive.effect
+@reactive.event(input.btn_logout, ignore_none=True)
 def _logout():
     logged_in.set(False)
     role.set("toko")
     user_display_name.set("")
 
-# ------------------------------------------
-# MAIN APP ROUTER (SWITCH LOGIN / DASHBOARD)
-# ------------------------------------------
+# Top Header Bar
+@render.ui
+def header_auth():
+    if not logged_in.get():
+        return ui.div()
+    return ui.div(
+        ui.span(f"👤 {user_display_name.get()} ({role.get()})", style="font-weight: bold; margin-right: 15px;"),
+        ui.input_action_button("btn_logout", "Logout", class_="btn-danger btn-sm"),
+        style="display: flex; justify-content: flex-end; align-items: center; padding: 15px 25px; background: #1e293b; border-bottom: 1px solid #334155;"
+    )
+
+# Main UI Router
 @render.ui
 def main_app():
     if not logged_in.get():
-        # FORM LOGIN GLASSMORPHISM CUSTOM
         return ui.div(
             ui.div(
                 ui.div(
@@ -219,7 +175,7 @@ def main_app():
             class_="bg-login"
         )
     
-    # KETIKA BERHASIL LOGIN -> TAMPILKAN MAIN DASHBOARD
+    # Dashboard Utama Setelah Login
     tabs = ["📦 Putaway System", "⚠️ Stock Minus"]
     if role.get() == "DC":
         tabs = ["🚚 Database Ongkir In/Out", "📦 Putaway System", "⚠️ Stock Minus", "🚫 Reject / Defect", "📊 Reporting & PIC"]
@@ -230,29 +186,6 @@ def main_app():
         ),
         style="padding: 20px;"
     )
-# ------------------------------------------
-# SINGLE HANDLER LOGIC FOR LOGIN
-# ------------------------------------------
-@reactive.effect
-@reactive.event(input.btn_login)
-def _login():
-    u = input.login_user().strip() if input.login_user() else ""
-    p = input.login_pass().strip() if input.login_pass() else ""
-    
-    if u == "admin" and p == "sby123":
-        logged_in.set(True)
-        role.set("DC")
-        branch.set("SURABAYA")
-        user_display_name.set("Admin DC Surabaya")
-        ui.notification_show("Berhasil Login sebagai Admin DC!", type="message")
-    elif u == "toko" and p == "toko123":
-        logged_in.set(True)
-        role.set("CABANG")
-        branch.set("SURABAYA")
-        user_display_name.set("User Cabang")
-        ui.notification_show("Berhasil Login sebagai User Cabang!", type="message")
-    else:
-        ui.notification_show("❌ Username atau Password Salah!", type="error")
 
 def render_tab_content(tab_name):
     if "Stock Minus" in tab_name:
@@ -271,15 +204,15 @@ def render_tab_content(tab_name):
             ui.output_ui("ui_putaway_results")
         )
     else:
-        return ui.div(ui.p(f"Menu {tab_name} aktif dan siap dikembangkan."))
+        return ui.div(ui.p(f"Menu {tab_name} aktif dan siap digunakan."))
 
 # ==========================================
-# LOGIC & COMPUTATION (EFFECTS & HANDLERS)
+# BUSINESS LOGIC (PROCESSORS)
 # ==========================================
 
-# STOCK MINUS LOGIC
+# PROCESS STOCK MINUS
 @reactive.effect
-@reactive.event(input.file_stock_minus)
+@reactive.event(input.file_stock_minus, ignore_none=True)
 def _process_stock_minus():
     file_info = input.file_stock_minus()
     if not file_info: return
@@ -288,8 +221,7 @@ def _process_stock_minus():
     df = pd.read_excel(path) if path.endswith(('.xlsx', '.xls')) else pd.read_csv(path)
     df.columns = [str(c).strip().upper() for c in df.columns]
     
-    col_sku = 'SKU'
-    col_bin = 'BIN'
+    col_sku, col_bin = 'SKU', 'BIN'
     col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c or 'QTY' in c), None)
     
     if not col_qty:
@@ -309,12 +241,10 @@ def _process_stock_minus():
         if s not in inventory: inventory[s] = {}
         inventory[s][b] = inventory[s].get(b, 0) + q
         
-    set_up_results = []
-    need_adj_list = []
+    set_up_results, need_adj_list = [], []
     
     for _, row in df_minus.iterrows():
-        sku = row[col_sku]
-        bin_asal = row[col_bin]
+        sku, bin_asal = row[col_sku], row[col_bin]
         sisa_minus = abs(row[col_qty])
         
         if sku in inventory:
@@ -345,11 +275,8 @@ def _process_stock_minus():
                 ambil = min(sisa_minus, qty_avail)
                 
                 set_up_results.append({
-                    'BIN_AWAL': bin_solusi,
-                    'BIN_TUJUAN': bin_asal,
-                    'SKU': sku,
-                    'QUANTITY': ambil,
-                    'NOTES': 'STOCK MINUS'
+                    'BIN_AWAL': bin_solusi, 'BIN_TUJUAN': bin_asal,
+                    'SKU': sku, 'QUANTITY': ambil, 'NOTES': 'STOCK MINUS'
                 })
                 
                 sku_stock[bin_solusi] -= ambil
@@ -367,9 +294,7 @@ def _process_stock_minus():
     total_tercover.set(res_setup['QUANTITY'].sum() if not res_setup.empty else 0)
     total_sisa_adj.set(abs(res_adj[col_qty].sum()) if not res_adj.empty else 0)
     
-    df_minus_awal.set(df_minus)
     df_set_up.set(res_setup)
-    df_need_adj.set(res_adj)
     stock_minus_processed.set(True)
     ui.notification_show("🚀 Proses Stock Minus Selesai!", type="message")
 
@@ -380,17 +305,17 @@ def ui_stock_minus_results():
         ui.hr(),
         ui.row(
             ui.column(4, ui.div(ui.div("Total Qty Minus Awal", class_="text-muted"), ui.div(f"{total_qty_minus.get():,}", class_="metric-val text-danger"), class_="metric-box")),
-            ui.column(4, ui.div(ui.div("Total Qty Ter-cover Set Up", class_="text-muted"), ui.div(f"{total_tercover.get():,}", class_="metric-val text-success"), class_="metric-box")),
-            ui.column(4, ui.div(ui.div("Total Sisa Qty (Need Adj)", class_="text-muted"), ui.div(f"{total_sisa_adj.get():,}", class_="metric-val text-warning"), class_="metric-box")),
+            ui.column(4, ui.div(ui.div("Total Ter-cover Set Up", class_="text-muted"), ui.div(f"{total_tercover.get():,}", class_="metric-val text-success"), class_="metric-box")),
+            ui.column(4, ui.div(ui.div("Sisa Qty (Need Adj)", class_="text-muted"), ui.div(f"{total_sisa_adj.get():,}", class_="metric-val text-warning"), class_="metric-box")),
         ),
         ui.hr(),
         ui.h5("Preview Template Set Up:"),
         render.data_frame(render.DataGrid(df_set_up.get().head(10)))
     )
 
-# PUTAWAY LOGIC
+# PROCESS PUTAWAY
 @reactive.effect
-@reactive.event(input.btn_process_putaway)
+@reactive.event(input.btn_process_putaway, ignore_none=True)
 def _process_putaway():
     f_ds, f_asal = input.file_ds(), input.file_asal()
     if not f_ds or not f_asal:
@@ -446,7 +371,6 @@ def _process_putaway():
                     take = min(rem, qty_avail)
                     bin_qty_dict[k] -= take
                     rem -= take
-                    
                     out_data.append({
                         'BIN_ASAL': bin_tujuan, 'SKU': sku, 'QTY_PUTAWAY': diff_qty,
                         'BIN_DITEMUKAN': b_name, 'QUANTITY': take, 'DIFF': rem,
@@ -469,9 +393,7 @@ def _process_putaway():
     putaway_total_setup.set(res_plist['QUANTITY'].sum() if not res_plist.empty else 0)
     putaway_kurang_setup.set(res_kurang['DIFF'].sum() if not res_kurang.empty else 0)
     
-    df_comp.set(res_comp)
     df_plist.set(res_plist)
-    df_kurang.set(res_kurang)
     putaway_processed.set(True)
     ui.notification_show("✅ System Compare Putaway Selesai!", type="message")
 
