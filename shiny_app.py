@@ -544,6 +544,12 @@ CUSTOM_HEAD = ui.head_content(
             100% { transform: scale(1); opacity: 1; }
         }
         .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes autoFadeOut {
+            0% { opacity: 1; visibility: visible; }
+            75% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; pointer-events: none; }
+        }
         
         .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
         .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
@@ -730,7 +736,14 @@ def success_modal(show: bool):
             ),
             style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"
         ),
-        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center;"
+        id="success-modal-overlay",
+        onclick="this.style.display='none';",
+        style="""
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999;
+            background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            animation: autoFadeOut 2.2s forwards;
+        """
     )
 
 # ==============================================================================
