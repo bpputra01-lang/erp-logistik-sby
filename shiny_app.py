@@ -241,23 +241,39 @@ def _logout():
     user_display_name.set("")
 
 # ------------------------------------------
-# MAIN CONTENT AREA
+# MAIN CONTENT AREA (LOGIN & DASHBOARD)
 # ------------------------------------------
 @render.ui
 def main_app():
     if not logged_in.get():
-        # FORM LOGIN
+        # FORM LOGIN UI CUSTOM (Dengan ID yang sesuai)
         return ui.div(
-            ui.card(
-                ui.card_header("🔐 LOGIN ERP SURABAYA"),
-                ui.input_text("login_user", "Username"),
-                ui.input_password("login_pass", "Password"),
-                ui.input_action_button("btn_login", "Sign In", class_="btn-primary w-100 mt-2"),
-                style="max-width: 400px; margin: 80px auto;"
+            ui.div(
+                ui.h4("LOGISTIC DISTRIBUTION", style="color: white; font-weight: bold; margin-bottom: 2px;"),
+                ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #a1a1aa; font-size: 13px; margin-bottom: 20px;"),
+                
+                # INPUT USERNAME (ID: login_user)
+                ui.input_text("login_user", "USERNAME", placeholder="admin"),
+                
+                # INPUT PASSWORD (ID: login_pass)
+                ui.input_password("login_pass", "PASSWORD", placeholder="••••••"),
+                
+                # TOMBOL SIGN IN (ID WAJIB: btn_login)
+                ui.input_action_button("btn_login", "SIGN IN TO SYSTEM →", class_="btn-danger w-100 mt-3", style="background-color: #dc2626; border: none; font-weight: bold; padding: 12px;"),
+                
+                style="""
+                    width: 380px; 
+                    margin: 100px auto; 
+                    padding: 30px; 
+                    background: rgba(18, 18, 18, 0.9); 
+                    border-radius: 12px; 
+                    border-left: 4px solid #dc2626;
+                    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+                """
             )
         )
     
-    # NAVIGATION TABS (SESUAI ROLE)
+    # NAVIGATION TABS (JIKA SUDAH LOGIN)
     tabs = ["📦 Putaway System", "⚠️ Stock Minus"]
     if role.get() == "DC":
         tabs = ["🚚 Database Ongkir In/Out", "📦 Putaway System", "⚠️ Stock Minus", "🚫 Reject / Defect", "📊 Reporting & PIC"]
@@ -266,25 +282,32 @@ def main_app():
         *[ui.nav_panel(title, render_tab_content(title)) for title in tabs]
     )
 
-# Login Event Handler
+
+# ------------------------------------------
+# HANDLER LOGIC LOGIN (MEMPROSES TOMBOL)
+# ------------------------------------------
 @reactive.effect
 @reactive.event(input.btn_login)
 def _login():
-    u = input.login_user()
-    p = input.login_pass()
+    u = input.login_user().strip() if input.login_user() else ""
+    p = input.login_pass().strip() if input.login_pass() else ""
+    
+    # Kredensial Hardcoded dari state Reflex kamu
     if u == "admin" and p == "sby123":
         logged_in.set(True)
         role.set("DC")
         branch.set("SURABAYA")
         user_display_name.set("Admin DC Surabaya")
+        ui.notification_show("Berhasil Login sebagai Admin DC!", type="message")
     elif u == "toko" and p == "toko123":
         logged_in.set(True)
         role.set("CABANG")
         branch.set("SURABAYA")
         user_display_name.set("User Cabang")
+        ui.notification_show("Berhasil Login sebagai User Cabang!", type="message")
     else:
-        ui.notification_show("Username atau Password Salah!", type="error")
-
+        ui.notification_show("❌ Username atau Password Salah!", type="error")
+        
 def render_tab_content(tab_name):
     # --------------------------------------
     # TAB: STOCK MINUS
