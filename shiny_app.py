@@ -1535,7 +1535,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             ui.notification_show(msg, type="error")
 
-    @render.download(filename="Data_Minus_Awal.xlsx")
+    @render.download_button(filename="Data_Minus_Awal.xlsx")
     def btn_dl_minus_awal():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -1543,7 +1543,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         return buf.getvalue()
 
-    @render.download(filename="Template_Set_Up.xlsx")
+    @render.download_button(filename="Template_Set_Up.xlsx")
     def btn_dl_set_up():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -1551,7 +1551,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         return buf.getvalue()
 
-    @render.download(filename="Data_Justifikasi.xlsx")
+    @render.download_button(filename="Data_Justifikasi.xlsx")
     def btn_dl_justifikasi():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -1604,7 +1604,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         else:
             ui.notification_show(msg, type="error")
 
-    @render.download(filename="REPORT_PUTAWAY_SYSTEM.xlsx")
+    @render.download_button(filename="REPORT_PUTAWAY_SYSTEM.xlsx")
     def btn_dl_putaway_report():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
