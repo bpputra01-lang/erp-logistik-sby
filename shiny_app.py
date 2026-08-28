@@ -570,7 +570,85 @@ CUSTOM_HEAD = ui.head_content(
             cursor: not-allowed !important;
             border: none !important;
         }
-        
+        .uploader-box {
+            border: 2px dashed #CBD5E0;
+            border-radius: 8px;
+            background: #F8FAFC;
+            padding: 1rem 1.5rem;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+        .uploader-box:hover {
+            border-color: #C5A059;
+        }
+        .uploader-box .shiny-input-container {
+            margin-bottom: 0 !important;
+            width: 100%;
+        }
+        .uploader-box .btn-file {
+            background-color: #C5A059 !important;
+            color: #FFFFFF !important;
+            font-weight: bold !important;
+            border-radius: 6px !important;
+            border: none !important;
+            padding: 8px 18px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        }
+        .uploader-box .btn-file:hover {
+            filter: brightness(1.08);
+        }
+        .uploader-box .form-control {
+            background-color: transparent !important;
+            border: none !important;
+            color: #38A169 !important;
+            font-weight: bold !important;
+            box-shadow: none !important;
+            padding-left: 1rem !important;
+        }
+        .uploader-box .form-control::placeholder {
+            color: #718096 !important;
+            font-weight: normal !important;
+        }
+        .csv-batch-box {
+            border: 2px dashed #E50914;
+            border-radius: 12px;
+            background: #FFF5F5;
+            padding: 1.5rem;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .csv-batch-box .shiny-input-container {
+            margin-bottom: 0 !important;
+            width: 100%;
+        }
+        .csv-batch-box .btn-file {
+            background-color: #1A202C !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            border-radius: 6px !important;
+            border: none !important;
+            padding: 8px 18px !important;
+        }
+        .csv-batch-box .btn-file:hover {
+            background-color: #2D3748 !important;
+        }
+        .csv-batch-box .form-control {
+            background-color: transparent !important;
+            border: none !important;
+            color: #1A202C !important;
+            font-weight: bold !important;
+            box-shadow: none !important;
+            padding-left: 1rem !important;
+        }
+        .csv-batch-box .form-control::placeholder {
+            color: #718096 !important;
+            font-weight: normal !important;
+        }
         details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
         summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
         details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
@@ -678,19 +756,15 @@ def stock_minus_view(state: AppState, has_file: bool):
     uploader_ui = ui.div(
         ui.span("Upload File STOCK MINUS", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
         ui.div(
-            ui.div(
-                ui.tags.label(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
-                    style="background-color: #C5A059; color: white; font-weight: bold; border-radius: 6px; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; pointer-events: none;"
-                ),
-                ui.div(
-                    ui.output_ui("stock_minus_file_label"),
-                    style="display: flex; align-items: center; margin-left: 1rem; flex: 1;"
-                ),
-                style="display: flex; align-items: center; width: 100%; margin-bottom: 0.5rem;"
+            ui.input_file(
+                "upload_stock_file",
+                None,
+                accept=[".xlsx", ".xls"],
+                multiple=False,
+                button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
+                placeholder="200MB per file • XLSX, XLS"
             ),
-            ui.input_file("upload_stock_file", None, accept=[".xlsx", ".xls"], multiple=False, button_label="Pilih File", placeholder="200MB per file • XLSX, XLS"),
-            style="border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC; padding: 1.5rem; min-height: 100px; width: 100%; cursor: pointer;"
+            class_="uploader-box"
         ),
         ui.div(
             btn_process,
@@ -773,25 +847,21 @@ def stock_minus_view(state: AppState, has_file: bool):
 # ==============================================================================
 # 6. VIEW PUTAWAY SYSTEM
 # ==============================================================================
-def custom_uploader_box(id_str: str, title: str, file_label_output_id: str):
+def custom_uploader_box(id_str: str, title: str):
     return ui.div(
         ui.span(title, style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
         ui.div(
-            ui.div(
-                ui.tags.label(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
-                    style="background-color: #C5A059; color: white; font-weight: bold; border-radius: 6px; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; pointer-events: none;"
-                ),
-                ui.div(
-                    ui.output_ui(file_label_output_id),
-                    style="display: flex; align-items: center; margin-left: 1rem; flex: 1;"
-                ),
-                style="display: flex; align-items: center; width: 100%; margin-bottom: 0.5rem;"
+            ui.input_file(
+                id_str,
+                None,
+                accept=[".xlsx", ".xls", ".csv"],
+                multiple=False,
+                button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
+                placeholder="200MB per file • XLSX, XLS, CSV"
             ),
-            ui.input_file(id_str, None, accept=[".xlsx", ".xls", ".csv"], multiple=False, button_label="Pilih File", placeholder="200MB per file • XLSX, XLS, CSV"),
-            style="border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC; padding: 1.5rem; min-height: 100px; width: 100%; cursor: pointer;"
+            class_="uploader-box"
         ),
-        style="width: 100%; margin-bottom: 0.5rem;"
+        style="flex: 1; min-width: 280px; margin-bottom: 0.5rem;"
     )
 
 def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
@@ -822,8 +892,8 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
                 style="background: #ebf8ff; border-left: 4px solid #3182ce; padding: 10px 16px; border-radius: 6px; width: 100%; display: flex; align-items: center; margin-bottom: 1rem;"
             ),
             ui.div(
-                custom_uploader_box("ds_putaway_file", "Upload DS PUTAWAY", "ds_file_label"),
-                custom_uploader_box("asal_putaway_file", "Upload ASAL BIN", "asal_file_label"),
+                custom_uploader_box("ds_putaway_file", "Upload DS PUTAWAY"),
+                custom_uploader_box("asal_putaway_file", "Upload ASAL BIN"),
                 style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.5rem; flex-wrap: wrap;"
             ),
             ui.div(
@@ -930,6 +1000,7 @@ def main_dashboard_view(state: AppState):
     STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
 
     tab1_content = ui.div(
+        # Box Kiri: Manual Input
         ui.div(
             ui.div(
                 ui.span("📝", style="font-size: 20px; margin-right: 8px;"),
@@ -984,6 +1055,7 @@ def main_dashboard_view(state: AppState):
             ),
             style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
         ),
+        # Box Kanan: Batch CSV Upload (Single Integrated Box)
         ui.div(
             ui.div(
                 ui.span("📁", style="font-size: 20px; margin-right: 8px;"),
@@ -993,13 +1065,19 @@ def main_dashboard_view(state: AppState):
             ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
             ui.div(
                 ui.div(
-                    ui.div(ui.span("☁️", style="font-size: 24px;"), style="padding: 10px; background: #E2E8F0; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;"),
-                    ui.tags.label("Pilih File CSV", style="background: #1A202C !important; color: #FFFFFF !important; font-weight: 700; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; pointer-events: none; margin-bottom: 6px;"),
-                    ui.span("atau tarik & lepaskan file CSV di sini", style="font-size: 13px; color: #4A5568; font-weight: bold;"),
-                    style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+                    ui.span("☁️", style="font-size: 24px;"),
+                    style="padding: 10px; background: #E2E8F0; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;"
                 ),
-                ui.input_file("upload_csv_batch", None, accept=[".csv"], multiple=False, button_label="Browse", placeholder="Pilih file CSV"),
-                style="border: 2px dashed #E50914; padding: 2.5rem 1.5rem; border-radius: 12px; background: #FFF5F5; width: 100%; text-align: center; margin-bottom: 1.25rem;"
+                ui.span("Tarik & lepaskan file CSV di sini atau klik Pilih File:", style="font-size: 13px; color: #4A5568; font-weight: bold; margin-bottom: 10px;"),
+                ui.input_file(
+                    "upload_csv_batch",
+                    None,
+                    accept=[".csv"],
+                    multiple=False,
+                    button_label="Pilih File CSV",
+                    placeholder="Pilih file CSV..."
+                ),
+                class_="csv-batch-box"
             ),
             ui.input_action_button(
                 "btn_execute_batch_upload",
@@ -1011,6 +1089,7 @@ def main_dashboard_view(state: AppState):
         style="display: flex; flex-wrap: wrap; gap: 1.25rem; width: 100%; margin-top: 1.5rem;"
     )
 
+    # --- TAB 2: METRICS & TABEL HISTORY ---
     selected_count = len(state.selected_ids())
     del_btn_ui = ui.tags.button(
         f"🗑️ HAPUS ({selected_count}) DATA",
@@ -1106,7 +1185,6 @@ def main_dashboard_view(state: AppState):
         ),
         style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;"
     )
-
 # ==============================================================================
 # 8. VIEW SIDEBAR & LOGIN PAGE
 # ==============================================================================
