@@ -4,7 +4,8 @@ from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from state import AppState
 from views import (
     CUSTOM_HEAD, static_loading_spinner, success_modal, error_modal,
-    render_clean_table, compare_system_view, stock_minus_view,
+    render_clean_table, metric_box, dark_metric_box,   # <-- Tambahkan metric_box & dark_metric_box di sini
+    compare_system_view, stock_minus_view,
     putaway_view, main_dashboard_view, sidebar, login_page, global_header
 )
 
