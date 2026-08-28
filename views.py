@@ -52,10 +52,17 @@ CUSTOM_HEAD = ui.head_content(
         .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
 
         .reflex-upload-container {
-            border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC;
-            padding: 1.25rem 1.5rem; min-height: 85px; width: 100%;
-            display: flex !important; align-items: center !important; justify-content: flex-start !important;
-            position: relative; transition: all 0.2s ease;
+            border: 2px dashed #000000 !important;   /* <-- Ganti warna di sini */
+            border-radius: 8px;
+            background: #F8FAFC;
+            padding: 1.25rem 1.5rem;
+            min-height: 85px;
+            width: 100%;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            position: relative;
+            transition: all 0.2s ease;
         }
         .reflex-upload-container:hover { border-color: #C5A059; background-color: #FFFFFF; }
         .reflex-upload-container .shiny-input-container { margin-bottom: 0 !important; width: 100%; display: flex !important; align-items: center !important; }
@@ -199,26 +206,37 @@ def custom_uploader_box(id_str: str, title: str, placeholder: str = "200MB per f
 
 # Page Views
 def compare_system_view(state: AppState):
-    info_box = ui.tags.details(
-        ui.tags.summary("📋 Informasi Format File & Kolom Mapping"),
-        ui.div(
-            ui.div(ui.tags.strong("Kondisi Stok Berkurang (Sys1 > Sys2):"), ui.tags.ul(ui.tags.li(ui.strong("Stock Tracking:"), " Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty (Index 10)."), ui.tags.li(ui.strong("RTO Out:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7).")), style="margin-bottom: 0.75rem;"),
-            ui.div(ui.tags.strong("Kondisi Stok Bertambah (Sys2 > Sys1):"), ui.tags.ul(ui.tags.li(ui.strong("Purchase Order:"), " Kolom A=No PO, Kolom E=SKU (Index 4), Kolom M=Qty (Index 12)."), ui.tags.li(ui.strong("RTO In:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7)."), ui.tags.li(ui.strong("Mutasi Refund:"), " Kolom D=SKU (Index 3), Kolom K=Qty (Index 10)."))),
-            class_="accordion-content"
-        ), open=False
-    )
     upload_section = ui.div(
         ui.h4("📥 1. Upload File Utama Stock System", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-        ui.div(custom_uploader_box("uploader_sys1", "Stock System Start Shift"), custom_uploader_box("uploader_sys2", "Stock System End Shift"), style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"),
+        ui.div(
+            custom_uploader_box("uploader_sys1", "Stock System Start Shift"),
+            custom_uploader_box("uploader_sys2", "Stock System End Shift"),
+            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"
+        ),
         ui.h4("📤 2. Upload Dokumen Pendukung (Stok Berkurang)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-        ui.div(custom_uploader_box("uploader_track", "Upload Stock Tracking"), custom_uploader_box("uploader_rto_out", "Upload RTO OUT"), style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"),
+        ui.div(
+            custom_uploader_box("uploader_track", "Upload Stock Tracking"),
+            custom_uploader_box("uploader_rto_out", "Upload RTO OUT"),
+            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"
+        ),
         ui.h4("📥 3. Upload Dokumen Pendukung (Stok Bertambah)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-        ui.div(custom_uploader_box("uploader_po", "Upload Purchase Order (PO)"), custom_uploader_box("uploader_rto_in", "Upload RTO IN"), custom_uploader_box("uploader_refund", "Upload Mutasi REFUND"), style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"),
+        ui.div(
+            custom_uploader_box("uploader_po", "Upload Purchase Order (PO)"),
+            custom_uploader_box("uploader_rto_in", "Upload RTO IN"),
+            custom_uploader_box("uploader_refund", "Upload Mutasi REFUND"),
+            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"
+        ),
         ui.output_ui("compare_system_action_btn_ui"),
         style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
     )
-    return ui.div(info_box, upload_section, ui.output_ui("compare_system_results_container"), style="width: 100%; padding: 1rem;")
 
+    results_ui = ui.output_ui("compare_system_results_container")
+
+    return ui.div(
+        upload_section,
+        results_ui,
+        style="width: 100%; padding: 1rem;"
+    )
 def stock_minus_view(state: AppState):
     return ui.div(
         ui.div(
