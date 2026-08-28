@@ -64,16 +64,26 @@ ui.tags.style("""
         border-left: 5px solid #E50914 !important;
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
     }
-    .custom-field {
-        width: 100% !important; background: #020617 !important;
-        border: 1px solid rgba(229, 9, 20, 0.4) !important; color: #FFFFFF !important;
-        border-radius: 8px !important; padding: 0 1rem !important;
-        height: 46px !important; font-size: 0.95rem !important; outline: none !important;
+
+    /* Styling Target Seluruh Input Field di Card Login */
+    .login-card input[type="text"], 
+    .login-card input[type="password"] {
+        width: 100% !important; 
+        background: #020617 !important;
+        border: 1px solid rgba(229, 9, 20, 0.4) !important; 
+        color: #FFFFFF !important;
+        border-radius: 8px !important; 
+        padding: 0 1rem !important;
+        height: 46px !important; 
+        font-size: 0.95rem !important; 
+        outline: none !important;
     }
-    .custom-field:focus {
+    .login-card input[type="text"]:focus, 
+    .login-card input[type="password"]:focus {
         border-color: #E50914 !important;
         box-shadow: 0 0 10px rgba(229, 9, 20, 0.5) !important;
     }
+
     .btn-login {
         background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
         color: #FFFFFF !important; font-weight: 800 !important;
@@ -150,17 +160,17 @@ def main_app():
                     ui.hr(style="border-color: rgba(255, 255, 255, 0.1); margin: 1rem 0 1.2rem 0;"),
                     ui.div("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 0.85rem; margin-bottom: 1.5rem;"),
 
-                    # Field Input Username
+                    # Field Input Username (Sudah Diperbaiki)
                     ui.div(
                         ui.div("USERNAME", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;"),
-                        ui.input_text("login_user", "", placeholder="Masukkan username...", class_="custom-field"),
+                        ui.input_text("login_user", "", placeholder="Masukkan username..."),
                         style="margin-bottom: 1.2rem; width: 100%;"
                     ),
 
-                    # Field Input Password
+                    # Field Input Password (Sudah Diperbaiki)
                     ui.div(
                         ui.div("PASSWORD", style="font-size: 0.72rem; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 0.4rem;"),
-                        ui.input_password("login_pass", "", placeholder="Masukkan password...", class_="custom-field"),
+                        ui.input_password("login_pass", "", placeholder="Masukkan password..."),
                         style="margin-bottom: 1.6rem; width: 100%;"
                     ),
 
