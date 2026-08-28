@@ -548,12 +548,33 @@ class AppState:
                 self.cs_match_count.set(0)
                 self.cs_unmatch_count.set(0)
                 self.cs_no_sales_count.set(0)
+# Tambahkan fungsi format angka pintar:
+            def format_smart_num(val):
+                try:
+                    if pd.isna(val) or val is None or val == "":
+                        return ""
+                    f_val = float(val)
+                    # Jika angka bulat (misal 1.0, 25.0) -> ubah jadi integer '1', '25'
+                    if f_val.is_integer():
+                        return str(int(f_val))
+                    # Jika ada komanya (misal 1.5, 2.75) -> pertahankan komanya
+                    return f"{f_val:g}"
+                except (ValueError, TypeError):
+                    return str(val)
 
             ordered_cols = ['SKU', 'QTY_Sys1', 'QTY_Sys2', 'DIFF', 'TRACK_INVOICE', 'TRACK_BIN', 'TRACK_QTY', 'STATUS_CHECK']
             display_df = discrepancies[[c for c in ordered_cols if c in discrepancies.columns]].copy()
-            self._raw_df_cs_all, self._raw_df_cs_diff = comparison, display_df
+
+            # Bersihkan angka .0 di kolom QTY dan DIFF
+            for col in ['QTY_Sys1', 'QTY_Sys2', 'DIFF', 'TRACK_QTY']:
+                if col in display_df.columns:
+                    display_df[col] = display_df[col].apply(format_smart_num)
+
+            self._raw_df_cs_all = comparison
+            self._raw_df_cs_diff = display_df
             self.df_cs_headers.set(display_df.columns.tolist() if not display_df.empty else [])
             self.df_cs_rows.set(display_df.fillna("").astype(str).values.tolist() if not display_df.empty else [])
             self.compare_sys_processed.set(True)
             return True, "Comparison Selesai!"
+            
         except Exception as e: return False, f"Terjadi Kesalahan: {e}"

@@ -126,7 +126,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         diff_rows = state.df_cs_rows()
         if diff_rows and len(diff_rows) > 0:
             table_display = ui.div(
-                ui.div(ui.span("⚠️ Daftar Perbedaan Stok Berdasarkan Compare In & Out:", style="font-weight: bold; color: #DD6B20; font-size: 14px;"), ui.download_button("btn_dl_compare_system", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Hasil Selisih (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"), style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"),
+                ui.div(
+                    ui.span("⚠️ Daftar Perbedaan Stok Berdasarkan Compare In & Out:", style="font-weight: bold; color: #DD6B20; font-size: 14px;"),
+                    ui.download_button("btn_dl_compare_system", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Hasil Selisih (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
                 render_clean_table(state.df_cs_headers(), state.df_cs_rows())
             )
         else:
@@ -135,9 +139,23 @@ def server(input: Inputs, output: Outputs, session: Session):
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             ui.h4("📋 RINGKASAN PERBANDINGAN STOK", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
-            ui.div(ui.div(ui.div("📦 TOTAL ITEM DICEK", style="color: #4A5568; font-size: 11px; font-weight: 800;"), ui.div(f"{state.cs_total_checked():,} ROW", style="color: #1A202C; font-size: 20px; font-weight: 800;"), style="background: linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%); padding: 1rem; border-radius: 12px; text-align: center;"), ui.div(ui.div("⚠️ TOTAL ITEM SELISIH", style="color: #4A5568; font-size: 11px; font-weight: 800;"), ui.div(f"{state.cs_total_diff():,} SKU", style="color: #C53030; font-size: 20px; font-weight: 800;"), style="background: linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%); padding: 1rem; border-radius: 12px; text-align: center;"), style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"),
-            ui.div(ui.div(ui.div("✅ SELISIH MATCH (DONE)", style="color: #A0AEC0; font-size: 11px; font-weight: bold;"), ui.div(f"{state.cs_match_count()} SKU", style="color: #C5A059; font-size: 22px; font-weight: bold;"), style="background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid #C5A059; text-align: center;"), ui.div(ui.div("⚠️ QTY SELISIH ≠ QTY FOUND", style="color: #A0AEC0; font-size: 11px; font-weight: bold;"), ui.div(f"{state.cs_unmatch_count()} SKU", style="color: #E53E3E; font-size: 22px; font-weight: bold;"), style="background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid #E53E3E; text-align: center;"), ui.div(ui.div("🔍 SELISIH (NO HISTORY)", style="color: #A0AEC0; font-size: 11px; font-weight: bold;"), ui.div(f"{state.cs_no_sales_count()} SKU", style="color: #ECC94B; font-size: 22px; font-weight: bold;"), style="background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid #ECC94B; text-align: center;"), style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"),
-            table_display, style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+            
+            # --- 2 KOTAK ATAS: SEKARANG WARNA GELAP SAMA DENGAN BAWAH ---
+            ui.div(
+                dark_metric_box("📦 TOTAL ITEM DICEK", f"{state.cs_total_checked():,} ROW", "#3182CE"),
+                dark_metric_box("⚠️ TOTAL ITEM SELISIH", f"{state.cs_total_diff():,} SKU", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+            
+            # --- 3 KOTAK BAWAH ---
+            ui.div(
+                dark_metric_box("✅ SELISIH MATCH (DONE)", f"{state.cs_match_count()} SKU", "#C5A059"),
+                dark_metric_box("⚠️ QTY SELISIH ≠ QTY FOUND", f"{state.cs_unmatch_count()} SKU", "#E53E3E"),
+                dark_metric_box("🔍 SELISIH (NO HISTORY)", f"{state.cs_no_sales_count()} SKU", "#ECC94B"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
+            ),
+            table_display,
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
         )
 
     @render.ui
