@@ -1,6 +1,5 @@
 import io
 import time
-import asyncio
 from datetime import datetime
 import pandas as pd
 from supabase import create_client, Client
@@ -28,13 +27,13 @@ def safe_int(val, default=0) -> int:
         return default
 
 # ==============================================================================
-# 2. STATE APLIKASI (PERSIS REFLEX STATE)
+# 2. STATE APLIKASI
 # ==============================================================================
 class AppState:
     def __init__(self):
         # --- NAVIGATION & ROLE ---
         self.logged_in = reactive.Value(False)
-        self.role = reactive.Value("toko")  # "DC" atau "CABANG"
+        self.role = reactive.Value("DC")
         self.branch = reactive.Value("SURABAYA")
         self.user_display_name = reactive.Value("")
         self.username = reactive.Value("")
@@ -49,9 +48,8 @@ class AppState:
         self.dropdown_reject = reactive.Value(False)
         self.dropdown_extras = reactive.Value(False)
 
-        # --- MODAL & LOADING STATES ---
+        # --- MODAL & POPUP STATES ---
         self.is_info_open = reactive.Value(False)
-        self.is_loading = reactive.Value(False)
         self.show_success_modal = reactive.Value(False)
         self.show_error_modal = reactive.Value(False)
         self.error_modal_message = reactive.Value("")
@@ -143,7 +141,7 @@ class AppState:
         self.logged_in.set(False)
         self.username.set("")
         self.password.set("")
-        self.role.set("toko")
+        self.role.set("DC")
         self.login_timestamp_ms.set(0)
 
     def get_menu_operational(self) -> list[str]:
@@ -169,8 +167,8 @@ class AppState:
 
     def get_active_content_type(self) -> str:
         cur_menu = self.main_menu()
-        if cur_menu == "Database Ongkir In/Out":
-            return "dashboard_ongkir" if self.role() == "DC" else "access_denied"
+        if cur_menu in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
+            return "dashboard_ongkir"
         elif cur_menu == "Stock Minus":
             return "stock_minus"
         elif cur_menu == "Putaway System":
@@ -226,7 +224,7 @@ class AppState:
                 ongkir = safe_int(row.get("ONGKIR", 0))
                 tgl_raw = row["TANGGAL_JAM"]
                 fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if pd.isna(tgl_raw) else str(tgl_raw)
-                batch_data.append({"supplier": sup, "ekspedisi": eks, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
+                batch_data.append({"supplier": sup, "ekspedisi": eksp, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
 
             if batch_data:
                 client = get_supabase()
@@ -304,7 +302,7 @@ class AppState:
             col_qty = next((c for c in df.columns if 'QTY SYSTEM' in c or 'QTY SYS' in c), None)
 
             if col_qty is None:
-                return False, "❌ Kolom 'QTY SYSTEM' tidak ditemukan!"
+                return False, "Kolom 'QTY SYSTEM' tidak ditemukan!"
 
             df[col_qty] = pd.to_numeric(df[col_qty], errors='coerce').fillna(0)
             df[col_sku] = df[col_sku].astype(str).str.strip().str.upper()
@@ -395,7 +393,7 @@ class AppState:
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
         try:
             df_ds = pd.read_excel(io.BytesIO(ds_bytes), engine="openpyxl") if ds_name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(ds_bytes))
-            df_asal = pd.read_excel(io.BytesIO(asal_bytes), engine="openpyxl") if asal_name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(asal_bytes))
+            df_asal = pd.read_excel(io.BytesIO(asal_bytes), engine="openpyxl") if asal_name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(ds_bytes))
 
             df_asal_updated = df_asal.copy()
             self.putaway_qty_system.set(int(pd.to_numeric(df_asal_updated.iloc[:, 9], errors='coerce').sum()))
@@ -523,7 +521,7 @@ class AppState:
             return False, f"Gagal memproses file Putaway: {e}"
 
 # ==============================================================================
-# 3. CSS & JAVASCRIPT ASSETS (IDENTIK REFLEX THEME)
+# 3. CSS & JAVASCRIPT ASSETS (PERBAIKAN VERTICAL ALIGNMENT & PROGRESS BAR)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
@@ -545,12 +543,11 @@ CUSTOM_HEAD = ui.head_content(
             100% { transform: rotate(360deg); }
         }
 
-        /* --- OVERLAY LOADING OTOMATIS (SHINY BUSY + MANUAL TRIGGER) --- */
+        /* --- LOADING OVERLAY: HANYA MUNCUL SAAT TOMBOL PROSES DIKLIK --- */
         #global_reflex_loading {
             display: none;
         }
-        html.shiny-busy #global_reflex_loading,
-        body.loading-active #global_reflex_loading {
+        body.process-running #global_reflex_loading {
             display: flex !important;
             position: fixed !important;
             top: 0 !important;
@@ -601,35 +598,104 @@ CUSTOM_HEAD = ui.head_content(
             border: none !important; padding: 0.75rem 1.5rem;
         }
 
-        /* --- DROPZONE UPLOADER PERSIS REFLEX RX.UPLOAD --- */
+        /* --- DROPZONE UPLOADER: PRESISI VERTIKAL CENTER & HILANGKAN BAR BIRU --- */
         .reflex-upload-container {
-            border: 2px dashed #CBD5E0; border-radius: 8px; background: #F8FAFC;
-            padding: 1.5rem; min-height: 95px; width: 100%; cursor: pointer;
-            transition: all 0.2s ease; position: relative; display: flex; align-items: center;
+            border: 2px dashed #CBD5E0;
+            border-radius: 8px;
+            background: #F8FAFC;
+            padding: 1.25rem 1.5rem;
+            min-height: 85px;
+            width: 100%;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            position: relative;
+            transition: all 0.2s ease;
         }
-        .reflex-upload-container:hover { border-color: #C5A059; background-color: #FFFFFF; }
-        .reflex-upload-container .shiny-input-container { margin-bottom: 0 !important; width: 100%; }
-        .reflex-upload-container .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
+        .reflex-upload-container:hover {
+            border-color: #C5A059;
+            background-color: #FFFFFF;
+        }
+        .reflex-upload-container .shiny-input-container {
+            margin-bottom: 0 !important;
+            width: 100%;
+            display: flex !important;
+            align-items: center !important;
+        }
+        .reflex-upload-container .input-group {
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+            margin-bottom: 0 !important;
+        }
+        .reflex-upload-container .input-group-prepend,
+        .reflex-upload-container .input-group-btn {
+            display: flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+        }
         .reflex-upload-container .btn-file {
-            background-color: #C5A059 !important; color: white !important; font-weight: bold !important;
-            border-radius: 6px !important; border: none !important; padding: 8px 18px !important;
-            margin-right: 12px !important; display: inline-flex !important; align-items: center !important;
+            background-color: #C5A059 !important;
+            color: white !important;
+            font-weight: bold !important;
+            border-radius: 6px !important;
+            border: none !important;
+            padding: 8px 18px !important;
+            margin-right: 14px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            height: 38px !important;
         }
         .reflex-upload-container input[type="text"].form-control {
-            background-color: transparent !important; border: none !important; color: #38A169 !important;
-            font-weight: 700 !important; font-size: 14px !important; box-shadow: none !important;
-            padding: 0 !important; height: auto !important; width: 100% !important; flex: 1 1 auto !important;
-            display: block !important; text-overflow: ellipsis !important; overflow: hidden !important; white-space: nowrap !important;
+            background-color: transparent !important;
+            border: none !important;
+            color: #38A169 !important;
+            font-weight: 700 !important;
+            font-size: 14px !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            height: 38px !important;
+            line-height: 38px !important;
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+            flex: 1 1 auto !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
         }
         .reflex-upload-container input[type="text"].form-control::placeholder {
-            color: #718096 !important; font-weight: normal !important; font-size: 13px !important;
+            color: #718096 !important;
+            font-weight: normal !important;
+            font-size: 13px !important;
+        }
+
+        /* --- HILANGKAN BAR BIRU UPLOAD COMPLETE SECARA PERMANEN --- */
+        .reflex-upload-container .shiny-file-input-progress,
+        .reflex-upload-container .progress,
+        .csv-batch-box .shiny-file-input-progress,
+        .csv-batch-box .progress {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            opacity: 0 !important;
         }
 
         /* --- BATCH CSV UPLOADER --- */
         .csv-batch-box {
-            border: 2px dashed #E50914 !important; border-radius: 12px; background: #FFF5F5;
-            padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 2px dashed #E50914 !important;
+            border-radius: 12px;
+            background: #FFF5F5;
+            padding: 2rem 1.5rem;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         .csv-batch-box .shiny-input-container { margin-bottom: 0 !important; width: 100%; }
         .csv-batch-box .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
@@ -711,13 +777,14 @@ def success_modal(show: bool):
             style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent;"
         ),
         ui.tags.script("""
+            document.body.classList.remove('process-running');
             setTimeout(function() {
                 let el = document.getElementById('success-modal-overlay');
                 if (el) { el.remove(); Shiny.setInputValue('close_success_modal_event', Math.random(), {priority: 'event'}); }
             }, 1800);
         """),
         id="success-modal-overlay",
-        onclick="this.remove(); Shiny.setInputValue('close_success_modal_event', Math.random(), {priority: 'event'});",
+        onclick="document.body.classList.remove('process-running'); this.remove(); Shiny.setInputValue('close_success_modal_event', Math.random(), {priority: 'event'});",
         style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; cursor: pointer;"
     )
 
@@ -735,13 +802,14 @@ def error_modal(show: bool, message: str = ""):
             style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent;"
         ),
         ui.tags.script("""
+            document.body.classList.remove('process-running');
             setTimeout(function() {
                 let el = document.getElementById('error-modal-overlay');
                 if (el) { el.remove(); Shiny.setInputValue('close_error_modal_event', Math.random(), {priority: 'event'}); }
             }, 2600);
         """),
         id="error-modal-overlay",
-        onclick="this.remove(); Shiny.setInputValue('close_error_modal_event', Math.random(), {priority: 'event'});",
+        onclick="document.body.classList.remove('process-running'); this.remove(); Shiny.setInputValue('close_error_modal_event', Math.random(), {priority: 'event'});",
         style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; cursor: pointer;"
     )
 
@@ -756,7 +824,7 @@ def static_loading_spinner():
     )
 
 # ==============================================================================
-# 5. VIEW STOCK MINUS (100% PERSIS REFLEX)
+# 5. VIEW STOCK MINUS
 # ==============================================================================
 def stock_minus_view(state: AppState):
     uploader_ui = ui.div(
@@ -777,7 +845,7 @@ def stock_minus_view(state: AppState):
     return ui.div(uploader_ui, results_ui, style="width: 100%; padding: 1rem;")
 
 # ==============================================================================
-# 6. VIEW PUTAWAY SYSTEM (100% PERSIS REFLEX)
+# 6. VIEW PUTAWAY SYSTEM
 # ==============================================================================
 def custom_uploader_box(id_str: str, title: str):
     return ui.div(
@@ -842,7 +910,7 @@ def putaway_view(state: AppState):
     return ui.div(top_section, results_ui, style="width: 100%; padding: 1rem;")
 
 # ==============================================================================
-# 7. VIEW DATABASE ONGKIR (MAIN DASHBOARD PERSIS REFLEX)
+# 7. VIEW DATABASE ONGKIR (MAIN DASHBOARD)
 # ==============================================================================
 def main_dashboard_view(state: AppState):
     STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
@@ -889,13 +957,14 @@ def main_dashboard_view(state: AppState):
             ui.tags.button(
                 "🚀 SIMPAN DATA ONGKIR",
                 onclick="""
+                    document.body.classList.add('process-running');
                     Shiny.setInputValue('btn_save_ongkir_manual', {
                         supplier: document.getElementById('input_supplier').value,
                         ekspedisi: document.getElementById('input_ekspedisi').value,
                         koli: document.getElementById('input_koli').value,
                         ongkir: document.getElementById('input_ongkir').value,
                         tgl: document.getElementById('input_tgl').value
-                    }, {priority: 'event'})
+                    }, {priority: 'event'});
                 """,
                 class_="btn-red-gradient",
                 style="width: 100%; height: 48px; font-size: 14px;"
@@ -921,9 +990,9 @@ def main_dashboard_view(state: AppState):
                 ),
                 class_="csv-batch-box"
             ),
-            ui.input_action_button(
-                "btn_execute_batch_upload",
+            ui.tags.button(
                 "⚡ EXECUTE BATCH UPLOAD",
+                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_execute_batch_upload', Math.random(), {priority: 'event'});",
                 style="background: #1A202C; color: #FFFFFF !important; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); width: 100%; height: 48px; border: none; font-size: 14px;"
             ),
             style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
@@ -1022,7 +1091,7 @@ def main_dashboard_view(state: AppState):
     )
 
 # ==============================================================================
-# 8. SIDEBAR, LOGIN & GLOBAL HEADER PERSIS REFLEX
+# 8. SIDEBAR, LOGIN & GLOBAL HEADER
 # ==============================================================================
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
@@ -1274,7 +1343,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     def global_error_modal_ui():
         return error_modal(state.show_error_modal(), state.error_modal_message())
 
-    # --- LOGIN & LOGOUT ---
+    # --- LOGIN & LOGOUT (INSTAN TANPA LOADING) ---
     @reactive.Effect
     @reactive.event(input.btn_submit_login)
     def _login_event():
@@ -1295,6 +1364,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.logout()
         ui.notification_show("Anda telah keluar dari sistem.", type="warning", duration=4)
 
+    # --- PINDAH MENU (INSTAN TANPA LOADING) ---
     @reactive.Effect
     @reactive.event(input.select_menu_item)
     def _nav_event():
@@ -1310,15 +1380,15 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _drop_toggle():
         state.toggle_dropdown(input.toggle_dropdown_section())
 
-    # --- ACTION BUTTON SUB-RENDERS (PERSIS REFLEX RX.COND LOCKED/ACTIVE) ---
+    # --- ACTION BUTTON SUB-RENDERS ---
     @render.ui
     def stock_minus_action_btn_ui():
         f = input.upload_stock_file() if "upload_stock_file" in input else None
         if f and len(f) > 0:
             return ui.div(
-                ui.input_action_button(
-                    "btn_process_stock_minus",
+                ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_process_stock_minus', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
@@ -1340,9 +1410,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         f_as = input.asal_putaway_file() if "asal_putaway_file" in input else None
         if (f_ds and len(f_ds) > 0) and (f_as and len(f_as) > 0):
             return ui.div(
-                ui.input_action_button(
-                    "btn_compare_putaway",
+                ui.tags.button(
                     ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "COMPARE PUTAWAY"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_compare_putaway', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient"
                 ),
                 style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
@@ -1446,7 +1516,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             style="width: 100%;"
         )
 
-    # --- PROCESS EXECUTIONS ---
+    # --- PROCESS ACTIONS ---
     @reactive.Effect
     @reactive.event(input.btn_save_ongkir_manual)
     def _save_manual():
@@ -1493,7 +1563,11 @@ def server(input: Inputs, output: Outputs, session: Session):
             easy_close=True,
             footer=ui.div(
                 ui.modal_button("Batal"),
-                ui.tags.button("Ya, Hapus Permanen", onclick="Shiny.setInputValue('btn_confirm_delete_permanent', Math.random(), {priority: 'event'})", style="background: #E53E3E; color: white; border: none; padding: 6px 12px; border-radius: 6px; margin-left: 8px; font-weight: bold; cursor: pointer;"),
+                ui.tags.button(
+                    "Ya, Hapus Permanen",
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_confirm_delete_permanent', Math.random(), {priority: 'event'});",
+                    style="background: #E53E3E; color: white; border: none; padding: 6px 12px; border-radius: 6px; margin-left: 8px; font-weight: bold; cursor: pointer;"
+                ),
                 style="display: flex; justify-content: flex-end;"
             )
         )
