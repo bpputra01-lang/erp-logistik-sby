@@ -1,8 +1,6 @@
 from shiny import reactive
 from shiny.express import input, render, ui
 
-# 1. Konfigurasi Halaman & CSS Kustom untuk Menjaga Tema & Background Reflex
-ui.page_opts(title="LOGISTIC DISTRIBUTION CENTER WAREHOUSE • SURABAYA", fillable=True)
 
 ui.tags.style("""
     /* Full Page Background Gambar + Gradient Overlay */
