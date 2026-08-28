@@ -238,7 +238,7 @@ class AppState:
                 ongkir = safe_int(row.get("ONGKIR", 0))
                 tgl_raw = row["TANGGAL_JAM"]
                 fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if pd.isna(tgl_raw) else str(tgl_raw)
-                batch_data.append({"supplier": sup, "ekspedisi": eks, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
+                batch_data.append({"supplier": sup, "ekspedisi": eksp, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
 
             if batch_data:
                 client = get_supabase()
@@ -536,7 +536,7 @@ class AppState:
             return False, f"Gagal memproses file Putaway: {e}"
 
 # ==============================================================================
-# 3. CSS & JAVASCRIPT ASSETS (INCLUDING REFLEX SPINNER & UPLOADER FIX)
+# 3. CSS & JAVASCRIPT ASSETS
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
@@ -544,7 +544,7 @@ CUSTOM_HEAD = ui.head_content(
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
         
-        /* --- RADIX / REFLEX RED SPINNER CONVERSION --- */
+        /* --- RADIX / REFLEX RED SPINNER --- */
         .reflex-spinner-red {
             width: 38px;
             height: 38px;
@@ -632,9 +632,9 @@ CUSTOM_HEAD = ui.head_content(
             border: none !important;
         }
 
-        /* --- UPLOADER BOX STYLING & FILE NAME VISIBILITY FIX --- */
+        /* --- UPLOADER BOX STYLING & PERBAIKAN TEXT INPUT NAMA FILE --- */
         .uploader-box {
-            border: 2px dashed #4A5568 !important;
+            border: 2px dashed #718096 !important;
             border-radius: 10px;
             background: #F8FAFC;
             padding: 1rem 1.25rem;
@@ -663,36 +663,37 @@ CUSTOM_HEAD = ui.head_content(
             font-weight: bold !important;
             border-radius: 6px !important;
             border: none !important;
-            padding: 8px 16px !important;
+            padding: 8px 18px !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
             display: inline-flex;
             align-items: center;
-            margin-right: 8px !important;
+            margin-right: 10px !important;
         }
         .uploader-box .btn-file:hover {
             filter: brightness(1.08);
         }
-        .uploader-box .form-control {
+        .uploader-box input[type="text"].form-control {
             background-color: #FFFFFF !important;
-            border: 1px solid #CBD5E0 !important;
+            border: 1.5px solid #CBD5E0 !important;
             border-radius: 6px !important;
             color: #1A202C !important;
             font-weight: 700 !important;
             font-size: 13px !important;
             box-shadow: none !important;
             padding: 8px 12px !important;
-            height: 38px !important;
+            height: 40px !important;
             width: 100% !important;
             flex: 1 1 auto !important;
             display: block !important;
             text-overflow: ellipsis !important;
             overflow: hidden !important;
             white-space: nowrap !important;
+            opacity: 1 !important;
         }
 
         /* --- BATCH CSV UPLOADER BOX --- */
         .csv-batch-box {
-            border: 2px dashed #4A5568 !important;
+            border: 2px dashed #718096 !important;
             border-radius: 12px;
             background: #FAFAFA;
             padding: 1.5rem 1.25rem;
@@ -726,27 +727,28 @@ CUSTOM_HEAD = ui.head_content(
             border-radius: 6px !important;
             border: none !important;
             padding: 8px 16px !important;
-            margin-right: 8px !important;
+            margin-right: 10px !important;
         }
         .csv-batch-box .btn-file:hover {
             background-color: #2D3748 !important;
         }
-        .csv-batch-box .form-control {
+        .csv-batch-box input[type="text"].form-control {
             background-color: #FFFFFF !important;
-            border: 1px solid #CBD5E0 !important;
+            border: 1.5px solid #CBD5E0 !important;
             border-radius: 6px !important;
             color: #1A202C !important;
             font-weight: 700 !important;
             font-size: 13px !important;
             box-shadow: none !important;
             padding: 8px 12px !important;
-            height: 38px !important;
+            height: 40px !important;
             width: 100% !important;
             flex: 1 1 auto !important;
             display: block !important;
             text-overflow: ellipsis !important;
             overflow: hidden !important;
             white-space: nowrap !important;
+            opacity: 1 !important;
         }
 
         details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
@@ -814,7 +816,7 @@ def render_clean_table(headers: list, rows: list):
         style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;"
     )
 
-# --- SUCCESS MODAL (CHECKLIST POP-UP GLOBAL HANYA PROSES) ---
+# --- SUCCESS MODAL ---
 def success_modal(show: bool):
     if not show:
         return ui.div()
@@ -842,7 +844,7 @@ def success_modal(show: bool):
         style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; cursor: pointer;"
     )
 
-# --- ERROR MODAL (TANDA SILANG MERAH GLOBAL) ---
+# --- ERROR MODAL ---
 def error_modal(show: bool, message: str = ""):
     if not show:
         return ui.div()
@@ -871,7 +873,7 @@ def error_modal(show: bool, message: str = ""):
         style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; cursor: pointer;"
     )
 
-# --- GLOBAL LOADING OVERLAY (CONVERTED DARI REFLEX KUTIPAN USER) ---
+# --- GLOBAL LOADING OVERLAY (CONVERTED DARI REFLEX) ---
 def render_reflex_loading_overlay(is_loading: bool):
     if not is_loading:
         return ui.div()
@@ -911,23 +913,7 @@ def render_reflex_loading_overlay(is_loading: bool):
 # ==============================================================================
 # 5. VIEW STOCK MINUS
 # ==============================================================================
-def stock_minus_view(state: AppState, has_file: bool):
-    if has_file:
-        btn_process = ui.input_action_button(
-            "btn_process_stock_minus",
-            ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"),
-            class_="btn-red-gradient",
-            style="padding: 0.75rem 1.5rem; font-weight: bold; border-radius: 6px;"
-        )
-    else:
-        btn_process = ui.tags.button(
-            ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-            "PILIH FILE UNTUK MEMULAI",
-            disabled=True,
-            class_="btn-locked",
-            style="padding: 0.75rem 1.5rem;"
-        )
-
+def stock_minus_view(state: AppState):
     uploader_ui = ui.div(
         ui.span("Upload File STOCK MINUS", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
         ui.div(
@@ -937,76 +923,15 @@ def stock_minus_view(state: AppState, has_file: bool):
                 accept=[".xlsx", ".xls"],
                 multiple=False,
                 button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
-                placeholder="Pilih file Excel (XLSX, XLS)..."
+                placeholder="200MB per file • XLSX, XLS"
             ),
             class_="uploader-box"
         ),
-        ui.div(
-            btn_process,
-            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
-        ),
+        ui.output_ui("stock_minus_action_btn_ui"),
         style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
-    if not state.stock_minus_processed():
-        return ui.div(uploader_ui, style="width: 100%; padding: 1rem;")
-
-    results_ui = ui.div(
-        ui.div(
-            dark_metric_box("TOTAL QTY MINUS", f"{state.total_qty_minus()}", "#E53E3E"),
-            dark_metric_box("TERCOVER", f"{state.total_tercover()}", "#38A169"),
-            dark_metric_box("SISA ADJ", f"{state.total_sisa_adj()}", "#DD6B20"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; margin-bottom: 1.25rem;"
-        ),
-        ui.navset_card_tab(
-            ui.nav_panel(
-                "MINUS AWAL",
-                ui.div(
-                    ui.div(
-                        ui.download_button(
-                            "btn_dl_minus_awal",
-                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
-                            style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
-                        ),
-                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
-                    ),
-                    render_clean_table(state.df_minus_awal_headers(), state.df_minus_awal_rows()),
-                    style="padding: 0.75rem 0;"
-                )
-            ),
-            ui.nav_panel(
-                "TEMPLATE SET UP",
-                ui.div(
-                    ui.div(
-                        ui.download_button(
-                            "btn_dl_set_up",
-                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
-                            style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
-                        ),
-                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
-                    ),
-                    render_clean_table(state.df_set_up_headers(), state.df_set_up_rows()),
-                    style="padding: 0.75rem 0;"
-                )
-            ),
-            ui.nav_panel(
-                "JUSTIFIKASI",
-                ui.div(
-                    ui.div(
-                        ui.download_button(
-                            "btn_dl_justifikasi",
-                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
-                            style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
-                        ),
-                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
-                    ),
-                    render_clean_table(state.df_need_adj_headers(), state.df_need_adj_rows()),
-                    style="padding: 0.75rem 0;"
-                )
-            )
-        ),
-        style="width: 100%;"
-    )
+    results_ui = ui.output_ui("stock_minus_results_container")
 
     return ui.div(uploader_ui, results_ui, style="width: 100%; padding: 1rem;")
 
@@ -1023,31 +948,15 @@ def custom_uploader_box(id_str: str, title: str):
                 accept=[".xlsx", ".xls", ".csv"],
                 multiple=False,
                 button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
-                placeholder="Pilih file..."
+                placeholder="200MB per file • XLSX, XLS, CSV"
             ),
             class_="uploader-box"
         ),
         style="flex: 1; min-width: 280px; margin-bottom: 0.5rem;"
     )
 
-def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
+def putaway_view(state: AppState):
     cur_area = state.area_putaway()
-
-    if has_ds and has_asal:
-        btn_compare = ui.input_action_button(
-            "btn_compare_putaway",
-            ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "COMPARE PUTAWAY"),
-            class_="btn-red-gradient",
-            style="padding: 0.75rem 1.5rem; font-weight: bold; border-radius: 6px;"
-        )
-    else:
-        btn_compare = ui.tags.button(
-            ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
-            "PILIH KEDUA FILE UNTUK MEMULAI",
-            disabled=True,
-            class_="btn-locked",
-            style="padding: 0.75rem 1.5rem;"
-        )
 
     if cur_area != "":
         area_content = ui.div(
@@ -1060,12 +969,9 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
             ui.div(
                 custom_uploader_box("ds_putaway_file", "Upload DS PUTAWAY"),
                 custom_uploader_box("asal_putaway_file", "Upload ASAL BIN"),
-                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.5rem; flex-wrap: wrap;"
+                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1rem; flex-wrap: wrap;"
             ),
-            ui.div(
-                btn_compare,
-                style="display: flex; justify-content: flex-end; width: 100%;"
-            ),
+            ui.output_ui("putaway_action_btn_ui"),
             style="width: 100%;"
         )
     else:
@@ -1094,59 +1000,7 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
         style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
-    if not state.putaway_processed():
-        return ui.div(top_section, style="width: 100%; padding: 1rem;")
-
-    kurang_rows = state.df_kurang_rows()
-    if kurang_rows and len(kurang_rows) > 0:
-        kurang_content = render_clean_table(state.df_kurang_headers(), kurang_rows)
-    else:
-        kurang_content = ui.div("✅ Semua Tercover!", style="background: #C6F6D5; color: #38A169; font-weight: bold; padding: 1rem; border-radius: 8px; text-align: center;")
-
-    out_rows = state.df_out_rows()
-    if out_rows and len(out_rows) > 0:
-        out_content = render_clean_table(state.df_out_headers(), out_rows)
-    else:
-        out_content = ui.div("✅ Tidak ada Outstanding!", style="background: #C6F6D5; color: #38A169; font-weight: bold; padding: 1rem; border-radius: 8px; text-align: center;")
-
-    results_ui = ui.div(
-        ui.hr(style="margin: 1.5rem 0 1rem 0; border-color: #E2E8F0;"),
-        ui.h4("📋 RINGKASAN HASIL", style="font-size: 16px; color: #010B13; font-weight: 800; margin: 1rem 0;"),
-        ui.div(
-            dark_metric_box("Qty System Putaway", f"{state.putaway_qty_system()}", "#E53E3E"),
-            dark_metric_box("Total Tersetup", f"{state.putaway_total_setup()}", "#38A169"),
-            dark_metric_box("Kurang Setup", f"{state.putaway_kurang_setup()}", "#DD6B20"),
-            dark_metric_box("Sisa Stok Putaway", f"{state.putaway_sisa_stok()}", "#3182CE"),
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; margin-bottom: 1.25rem;"
-        ),
-        ui.div(
-            ui.download_button(
-                "btn_dl_putaway_report",
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD REPORT LENGKAP"),
-                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
-            ),
-            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
-        ),
-        ui.navset_card_tab(
-            ui.nav_panel(
-                "Hasil Compare",
-                ui.div(render_clean_table(state.df_comp_headers(), state.df_comp_rows()), style="padding: 0.75rem 0;")
-            ),
-            ui.nav_panel(
-                "List Setup",
-                ui.div(render_clean_table(state.df_plist_headers(), state.df_plist_rows()), style="padding: 0.75rem 0;")
-            ),
-            ui.nav_panel(
-                "Kurang Setup",
-                ui.div(kurang_content, style="padding: 0.75rem 0;")
-            ),
-            ui.nav_panel(
-                "Outstanding",
-                ui.div(out_content, style="padding: 0.75rem 0;")
-            )
-        ),
-        style="width: 100%;"
-    )
+    results_ui = ui.output_ui("putaway_results_container")
 
     return ui.div(top_section, results_ui, style="width: 100%; padding: 1rem;")
 
@@ -1234,11 +1088,7 @@ def main_dashboard_view(state: AppState):
                 ),
                 class_="csv-batch-box"
             ),
-            ui.input_action_button(
-                "btn_execute_batch_upload",
-                "⚡ EXECUTE BATCH UPLOAD",
-                style="background: #1A202C; color: #FFFFFF !important; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); width: 100%; height: 48px; border: none; font-size: 14px;"
-            ),
+            ui.output_ui("batch_csv_action_btn_ui"),
             style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
         ),
         style="display: flex; flex-wrap: wrap; gap: 1.25rem; width: 100%; margin-top: 1.5rem;"
@@ -1709,7 +1559,208 @@ def server(input: Inputs, output: Outputs, session: Session):
         )
         ui.modal_show(modal)
 
-    # --- ASYNC PROCESS HANDLERS (POPUP LOADING & SUCCESS TRIGGERED) ---
+    # --- DYNAMIC ACTION BUTTONS & FILE BADGES (NO RE-RENDER UPLOADER) ---
+    @render.ui
+    def stock_minus_action_btn_ui():
+        f = input.upload_stock_file() if "upload_stock_file" in input else None
+        if f and len(f) > 0:
+            file_name = f[0]["name"]
+            size_kb = round(f[0]["size"] / 1024, 1) if "size" in f[0] else 0
+            return ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-file-excel", style="color: #10B981; font-size: 16px; margin-right: 8px;"),
+                    ui.span("File Terpilih: ", style="color: #4A5568; font-size: 13px; font-weight: bold;"),
+                    ui.span(f"{file_name} ({size_kb} KB)", style="color: #10B981; font-size: 13px; font-weight: 800;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.input_action_button(
+                    "btn_process_stock_minus",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"),
+                    class_="btn-red-gradient",
+                    style="padding: 0.75rem 1.5rem; font-weight: bold; border-radius: 6px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1rem;"
+            )
+        else:
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                    "PILIH FILE UNTUK MEMULAI",
+                    disabled=True,
+                    class_="btn-locked",
+                    style="padding: 0.75rem 1.5rem;"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+            )
+
+    @render.ui
+    def putaway_action_btn_ui():
+        f_ds = input.ds_putaway_file() if "ds_putaway_file" in input else None
+        f_as = input.asal_putaway_file() if "asal_putaway_file" in input else None
+        has_ds = f_ds is not None and len(f_ds) > 0
+        has_as = f_as is not None and len(f_as) > 0
+
+        if has_ds and has_as:
+            return ui.div(
+                ui.div(
+                    ui.div(
+                        ui.tags.i(class_="fa-solid fa-check-circle", style="color: #10B981; margin-right: 6px;"),
+                        ui.span(f"DS: {f_ds[0]['name']}", style="color: #2D3748; font-size: 12px; font-weight: bold; margin-right: 12px;"),
+                        ui.tags.i(class_="fa-solid fa-check-circle", style="color: #10B981; margin-right: 6px;"),
+                        ui.span(f"ASAL: {f_as[0]['name']}", style="color: #2D3748; font-size: 12px; font-weight: bold;"),
+                        style="display: flex; align-items: center;"
+                    )
+                ),
+                ui.input_action_button(
+                    "btn_compare_putaway",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "COMPARE PUTAWAY"),
+                    class_="btn-red-gradient",
+                    style="padding: 0.75rem 1.5rem; font-weight: bold; border-radius: 6px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 0.5rem;"
+            )
+        else:
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                    "PILIH KEDUA FILE UNTUK MEMULAI",
+                    disabled=True,
+                    class_="btn-locked",
+                    style="padding: 0.75rem 1.5rem;"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+
+    @render.ui
+    def batch_csv_action_btn_ui():
+        f = input.upload_csv_batch() if "upload_csv_batch" in input else None
+        if f and len(f) > 0:
+            return ui.div(
+                ui.div(
+                    ui.tags.i(class_="fa-solid fa-file-csv", style="color: #10B981; font-size: 16px; margin-right: 6px;"),
+                    ui.span(f"File: {f[0]['name']}", style="color: #276749; font-weight: bold; font-size: 13px;"),
+                    style="margin-bottom: 8px; display: flex; align-items: center; justify-content: center;"
+                ),
+                ui.input_action_button(
+                    "btn_execute_batch_upload",
+                    "⚡ EXECUTE BATCH UPLOAD",
+                    style="background: #1A202C; color: #FFFFFF !important; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); width: 100%; height: 48px; border: none; font-size: 14px;"
+                )
+            )
+        else:
+            return ui.input_action_button(
+                "btn_execute_batch_upload",
+                "⚡ EXECUTE BATCH UPLOAD",
+                style="background: #1A202C; color: #FFFFFF !important; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); width: 100%; height: 48px; border: none; font-size: 14px;"
+            )
+
+    # --- RENDER HASIL STOCK MINUS & PUTAWAY ---
+    @render.ui
+    def stock_minus_results_container():
+        if not state.stock_minus_processed():
+            return ui.div()
+        return ui.div(
+            ui.div(
+                dark_metric_box("TOTAL QTY MINUS", f"{state.total_qty_minus()}", "#E53E3E"),
+                dark_metric_box("TERCOVER", f"{state.total_tercover()}", "#38A169"),
+                dark_metric_box("SISA ADJ", f"{state.total_sisa_adj()}", "#DD6B20"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel(
+                    "MINUS AWAL",
+                    ui.div(
+                        ui.div(
+                            ui.download_button(
+                                "btn_dl_minus_awal",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                            ),
+                            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+                        ),
+                        render_clean_table(state.df_minus_awal_headers(), state.df_minus_awal_rows()),
+                        style="padding: 0.75rem 0;"
+                    )
+                ),
+                ui.nav_panel(
+                    "TEMPLATE SET UP",
+                    ui.div(
+                        ui.div(
+                            ui.download_button(
+                                "btn_dl_set_up",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                            ),
+                            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+                        ),
+                        render_clean_table(state.df_set_up_headers(), state.df_set_up_rows()),
+                        style="padding: 0.75rem 0;"
+                    )
+                ),
+                ui.nav_panel(
+                    "JUSTIFIKASI",
+                    ui.div(
+                        ui.div(
+                            ui.download_button(
+                                "btn_dl_justifikasi",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                            ),
+                            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+                        ),
+                        render_clean_table(state.df_need_adj_headers(), state.df_need_adj_rows()),
+                        style="padding: 0.75rem 0;"
+                    )
+                )
+            ),
+            style="width: 100%;"
+        )
+
+    @render.ui
+    def putaway_results_container():
+        if not state.putaway_processed():
+            return ui.div()
+
+        kurang_rows = state.df_kurang_rows()
+        if kurang_rows and len(kurang_rows) > 0:
+            kurang_content = render_clean_table(state.df_kurang_headers(), kurang_rows)
+        else:
+            kurang_content = ui.div("✅ Semua Tercover!", style="background: #C6F6D5; color: #38A169; font-weight: bold; padding: 1rem; border-radius: 8px; text-align: center;")
+
+        out_rows = state.df_out_rows()
+        if out_rows and len(out_rows) > 0:
+            out_content = render_clean_table(state.df_out_headers(), out_rows)
+        else:
+            out_content = ui.div("✅ Tidak ada Outstanding!", style="background: #C6F6D5; color: #38A169; font-weight: bold; padding: 1rem; border-radius: 8px; text-align: center;")
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0 1rem 0; border-color: #E2E8F0;"),
+            ui.h4("📋 RINGKASAN HASIL", style="font-size: 16px; color: #010B13; font-weight: 800; margin: 1rem 0;"),
+            ui.div(
+                dark_metric_box("Qty System Putaway", f"{state.putaway_qty_system()}", "#E53E3E"),
+                dark_metric_box("Total Tersetup", f"{state.putaway_total_setup()}", "#38A169"),
+                dark_metric_box("Kurang Setup", f"{state.putaway_kurang_setup()}", "#DD6B20"),
+                dark_metric_box("Sisa Stok Putaway", f"{state.putaway_sisa_stok()}", "#3182CE"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.download_button(
+                    "btn_dl_putaway_report",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD REPORT LENGKAP"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel("Hasil Compare", ui.div(render_clean_table(state.df_comp_headers(), state.df_comp_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("List Setup", ui.div(render_clean_table(state.df_plist_headers(), state.df_plist_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("Kurang Setup", ui.div(kurang_content, style="padding: 0.75rem 0;")),
+                ui.nav_panel("Outstanding", ui.div(out_content, style="padding: 0.75rem 0;"))
+            ),
+            style="width: 100%;"
+        )
+
+    # --- ASYNC PROCESS HANDLERS ---
     @reactive.Effect
     @reactive.event(input.btn_save_ongkir_manual)
     async def _save_manual():
@@ -1856,23 +1907,20 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         return buf.getvalue()
 
-    # --- ROOT CONTAINER ROUTER (SMOOTH NO BLANK SCREEN) ---
+    # --- ROOT CONTAINER ROUTER (HANYA REAKTIF PADA MENU & LOGIN) ---
     @render.ui
     def main_root_container():
         if not state.logged_in():
             return login_page()
 
         content_type = state.get_active_content_type()
-        has_stock_file = bool(input.upload_stock_file()) if "upload_stock_file" in input else False
-        has_ds_file = bool(input.ds_putaway_file()) if "ds_putaway_file" in input else False
-        has_asal_file = bool(input.asal_putaway_file()) if "asal_putaway_file" in input else False
 
         if content_type == "dashboard_ongkir":
             page_content = main_dashboard_view(state)
         elif content_type == "stock_minus":
-            page_content = stock_minus_view(state, has_stock_file)
+            page_content = stock_minus_view(state)
         elif content_type == "putaway_system":
-            page_content = putaway_view(state, has_ds_file, has_asal_file)
+            page_content = putaway_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(
                 ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold; margin-bottom: 0.5rem;"),
