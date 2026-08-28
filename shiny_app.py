@@ -1671,13 +1671,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             style="display: flex; width: 100vw; height: 100vh; overflow: hidden;"
         )
-        except Exception as e:
-            traceback.print_exc()
-            return ui.div(
-                ui.h3("Terjadi kesalahan pada tampilan:", style="color: red;"),
-                ui.pre(str(e)),
-                style="padding: 2rem;"
-            )
 
 # ==============================================================================
 # 10. INISIALISASI APLIKASI
