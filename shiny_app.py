@@ -210,7 +210,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_cs_diff.to_excel(writer, sheet_name='SELISIH_VALIDATED', index=False)
             state._raw_df_cs_all.to_excel(writer, sheet_name='ALL_COMPARISON', index=False)
         buf.seek(0)
-        return buf.getvalue()
+        yield buf.getvalue()
 
     @reactive.Effect
     @reactive.event(input.btn_save_ongkir_manual)
@@ -287,21 +287,21 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer: state._raw_df_minus_awal.to_excel(writer, index=False)
         buf.seek(0)
-        return buf.getvalue()
+        yield buf.getvalue()
 
     @render.download(filename="Template_Set_Up.xlsx")
     def btn_dl_set_up():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer: state._raw_df_set_up.to_excel(writer, index=False)
         buf.seek(0)
-        return buf.getvalue()
+        yield buf.getvalue()
 
     @render.download(filename="Data_Justifikasi.xlsx")
     def btn_dl_justifikasi():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer: state._raw_df_need_adj.to_excel(writer, index=False)
         buf.seek(0)
-        return buf.getvalue()
+        yield buf.getvalue()
 
     @reactive.Effect
     @reactive.event(input.select_area_putaway)
@@ -332,7 +332,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_out.to_excel(writer, sheet_name='OUTSTANDING', index=False)
             state._raw_df_updated.to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
         buf.seek(0)
-        return buf.getvalue()
+        yield buf.getvalue()
 
     # Main Dynamic Router
     @render.ui
