@@ -440,13 +440,50 @@ def login_page():
     return ui.div(
         ui.div(
             ui.div(
-                ui.div(ui.div(style="width: 12px; height: 38px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h2("LOGISTIC DISTRIBUTION", style="color: #FFFFFF; font-size: 22px; font-weight: 800; letter-spacing: 1px; margin: 0; line-height: 1.1;"), ui.span("CENTER WAREHOUSE • SURABAYA", style="color: #E50914; font-size: 11px; font-weight: 700; letter-spacing: 2px;"), style="display: flex; flex-direction: column;"), style="display: flex; align-items: center; margin-bottom: 1.25rem;"),
-                ui.hr(style="border-color: rgba(255, 255, 255, 0.1); margin-bottom: 1.25rem;"),
-                ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 13px; margin-bottom: 1.5rem;"),
-                ui.div(ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"), ui.tags.input(id="login_username_field", type="text", placeholder="Masukkan username...", onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();", style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"), style="margin-bottom: 1rem;"),
-                ui.div(ui.span("PASSWORD", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"), ui.tags.input(id="login_password_field", type="password", placeholder="Masukkan password...", onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();", style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"), style="margin-bottom: 1.5rem;"),
-                ui.div(style="height: 10px;"),
-                ui.tags.button("SIGN IN TO SYSTEM →", id="btn_sign_in", onclick="Shiny.setInputValue('btn_submit_login', {user: document.getElementById('login_username_field').value, pass: document.getElementById('login_password_field').value}, {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; height: 48px; font-size: 14px; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);"),
+                # --- HEADER JUDUL (JARAK BAWAH DIRAPATKAN) ---
+                ui.div(
+                    ui.div(style="width: 10px; height: 36px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
+                    ui.div(
+                        ui.h2("LOGISTIC DISTRIBUTION", style="color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 0; line-height: 1.1;"),
+                        ui.span("CENTER WAREHOUSE • SURABAYA", style="color: #E50914; font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-top: 2px;"),
+                        style="display: flex; flex-direction: column;"
+                    ),
+                    style="display: flex; align-items: center; margin-bottom: 0.5rem;"
+                ),
+                
+                # --- GARIS PEMISAH (MARGIN ATAS & BAWAH DIKUNCI RAPAT) ---
+                ui.hr(style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.12); margin: 0.4rem 0 0.75rem 0;"),
+                
+                # --- TEKS PETUNJUK (JARAK KE INPUT DIRAPATKAN) ---
+                ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 13px; margin: 0 0 1.1rem 0;"),
+                
+                # --- FORM INPUT USERNAME & PASSWORD ---
+                ui.div(
+                    ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"),
+                    ui.tags.input(
+                        id="login_username_field", type="text", placeholder="Masukkan username...",
+                        onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
+                        style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"
+                    ),
+                    style="margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.span("PASSWORD", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"),
+                    ui.tags.input(
+                        id="login_password_field", type="password", placeholder="Masukkan password...",
+                        onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
+                        style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"
+                    ),
+                    style="margin-bottom: 1.5rem;"
+                ),
+                ui.div(style="height: 6px;"),
+                ui.tags.button(
+                    "SIGN IN TO SYSTEM →",
+                    id="btn_sign_in",
+                    onclick="Shiny.setInputValue('btn_submit_login', {user: document.getElementById('login_username_field').value, pass: document.getElementById('login_password_field').value}, {priority: 'event'})",
+                    class_="btn-red-gradient",
+                    style="width: 100%; height: 48px; font-size: 14px; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);"
+                ),
                 ui.div("🟢 Warehouse Supporting Tools v2.0", style="color: #888888; font-size: 12px; text-align: center; margin-top: 10px;"),
                 style="display: flex; flex-direction: column; width: 100%;"
             ),
@@ -454,7 +491,6 @@ def login_page():
         ),
         style="background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070'); background-size: cover; background-position: center; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;"
     )
-
 def global_header(state: AppState):
     return ui.div(
         ui.div(ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"), ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"), style="display: flex; flex-direction: column; align-items: flex-start;"), style="display: flex; align-items: center;"),
