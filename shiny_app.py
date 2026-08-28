@@ -1331,11 +1331,11 @@ def global_header(state: AppState):
 # ==============================================================================
 # 9. ROOT UI & SERVER CONTROLLER
 # ==============================================================================
-app_ui = ui.div(
+app_ui = ui.page_fluid(
     CUSTOM_HEAD,
     ui.output_ui("global_loading_overlay_ui"),
     ui.output_ui("main_root_container"),
-    style="width: 100vw; height: 100vh; overflow: hidden; margin: 0; padding: 0;"
+    style="padding: 0; margin: 0;"
 )
 
 def server(input: Inputs, output: Outputs, session: Session):
@@ -1635,43 +1635,42 @@ def server(input: Inputs, output: Outputs, session: Session):
 
     @render.ui
     def main_root_container():
-        try:
-            if not state.logged_in():
-                return login_page()
+        if not state.logged_in():
+            return login_page()
 
-            content_type = state.get_active_content_type()
-            has_stock_file = input.upload_stock_file() is not None if "upload_stock_file" in input else False
-            has_ds_file = input.ds_putaway_file() is not None if "ds_putaway_file" in input else False
-            has_asal_file = input.asal_putaway_file() is not None if "asal_putaway_file" in input else False
+        content_type = state.get_active_content_type()
+        has_stock_file = bool(input.upload_stock_file()) if "upload_stock_file" in input else False
+        has_ds_file = bool(input.ds_putaway_file()) if "ds_putaway_file" in input else False
+        has_asal_file = bool(input.asal_putaway_file()) if "asal_putaway_file" in input else False
 
-            if content_type == "dashboard_ongkir":
-                page_content = main_dashboard_view(state)
-            elif content_type == "stock_minus":
-                page_content = stock_minus_view(state, has_stock_file)
-            elif content_type == "putaway_system":
-                page_content = putaway_view(state, has_ds_file, has_asal_file)
-            elif content_type == "access_denied":
-                page_content = ui.div(
-                    ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold; margin-bottom: 0.5rem;"),
-                    ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"),
-                    style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
-                )
-            else:
-                page_content = ui.div(
-                    ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold; margin-bottom: 0.5rem;"),
-                    ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"),
-                    style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
-                )
-
-            return ui.div(
-                sidebar(state),
-                ui.div(
-                    global_header(state),
-                    page_content,
-                    style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
-                ),
-                style="display: flex; width: 100vw; height: 100vh; overflow: hidden;"
+        if content_type == "dashboard_ongkir":
+            page_content = main_dashboard_view(state)
+        elif content_type == "stock_minus":
+            page_content = stock_minus_view(state, has_stock_file)
+        elif content_type == "putaway_system":
+            page_content = putaway_view(state, has_ds_file, has_asal_file)
+        elif content_type == "access_denied":
+            page_content = ui.div(
+                ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold; margin-bottom: 0.5rem;"),
+                ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"),
+                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
             )
+        else:
+            page_content = ui.div(
+                ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold; margin-bottom: 0.5rem;"),
+                ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"),
+                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+            )
+
+        return ui.div(
+            sidebar(state),
+            ui.div(
+                global_header(state),
+                page_content,
+                style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
+            ),
+            style="display: flex; width: 100vw; height: 100vh; overflow: hidden;"
+        )
         except Exception as e:
             traceback.print_exc()
             return ui.div(
