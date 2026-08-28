@@ -73,21 +73,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     # Panduan & Logic Modal
     @reactive.Effect
     @reactive.event(input.btn_open_panduan_modal)
-    def _panduan_modal():
-        cur = state.main_menu()
-        if cur == "Compare System":
-            guide_body = ui.div(
-                ui.tags.details(
-                    ui.tags.summary("📋 Informasi Format File & Mapping"),
-                    ui.div(
-                        ui.tags.strong("Kondisi Stok Berkurang (Sys1 > Sys2):"),
-                        ui.tags.ul(ui.tags.li(ui.strong("Stock Tracking:"), " Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty (Index 10)."), ui.tags.li(ui.strong("RTO Out:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7).")),
-                        ui.tags.strong("Kondisi Stok Bertambah (Sys2 > Sys1):"),
-                        ui.tags.ul(ui.tags.li(ui.strong("Purchase Order:"), " Kolom A=No PO, Kolom E=SKU (Index 4), Kolom M=Qty (Index 12)."), ui.tags.li(ui.strong("RTO In:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7)."), ui.tags.li(ui.strong("Mutasi Refund:"), " Kolom D=SKU (Index 3), Kolom K=Qty (Index 10).")),
-                        class_="accordion-content"
-                    ), open=True
-                )
-            )
+    
         elif cur == "Stock Minus":
             guide_body = ui.div(ui.tags.details(ui.tags.summary("📋 Format File"), ui.div("Download Multiple Adjusmet dari Jezpro dan pilih 'Termasuk yang sudah habis'.", class_="accordion-content"), open=True))
         elif cur == "Putaway System":
