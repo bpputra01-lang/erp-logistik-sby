@@ -1,6 +1,7 @@
 import io
 import time
 import asyncio
+import traceback
 from datetime import datetime
 import pandas as pd
 from supabase import create_client, Client
@@ -15,17 +16,27 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 def get_supabase() -> Client:
     try:
         return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception:
+    except Exception as e:
+        print("Supabase Init Error:", e)
         return None
 
+# Helper aman untuk parsing angka
+def safe_int(val, default=0) -> int:
+    try:
+        if pd.isna(val) or val is None: return default
+        cleaned = str(val).replace("Rp", "").replace(".", "").replace(",", "").strip()
+        return int(float(cleaned))
+    except Exception:
+        return default
+
 # ==============================================================================
-# 2. APP STATE & SELURUH LOGIKA (REFLEX STATE EQUIVALENT)
+# 2. APP STATE & SELURUH LOGIKA
 # ==============================================================================
 class AppState:
     def __init__(self):
         # --- NAVIGATION & ROLE STATE ---
         self.logged_in = reactive.Value(False)
-        self.role = reactive.Value("toko")  # "DC" atau "CABANG"
+        self.role = reactive.Value("DC")
         self.branch = reactive.Value("SURABAYA")
         self.user_display_name = reactive.Value("")
         self.username = reactive.Value("")
@@ -158,8 +169,8 @@ class AppState:
 
     def get_active_content_type(self) -> str:
         cur_menu = self.main_menu()
-        if cur_menu == "Database Ongkir In/Out":
-            return "dashboard_ongkir" if self.role() == "DC" else "access_denied"
+        if cur_menu in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
+            return "dashboard_ongkir"
         elif cur_menu == "Stock Minus":
             return "stock_minus"
         elif cur_menu == "Putaway System":
@@ -179,11 +190,8 @@ class AppState:
     def save_single_ongkir(self, supp: str, eksp: str, koli_str: str, ongkir_str: str, tgl_str: str):
         if not supp.strip():
             return False, "Nama Supplier Wajib Diisi!"
-        try:
-            koli_val = int(koli_str) if koli_str else 0
-            ongkir_val = int(ongkir_str) if ongkir_str else 0
-        except ValueError:
-            return False, "Koli dan Ongkir harus berupa angka!"
+        koli_val = safe_int(koli_str, 0)
+        ongkir_val = safe_int(ongkir_str, 0)
 
         fix_dt = f"{tgl_str} {datetime.now().strftime('%H:%M:%S')}"
         payload = {
@@ -214,10 +222,8 @@ class AppState:
                 sup = str(row["SUPPLIER"]).upper().strip() if not pd.isna(row["SUPPLIER"]) else ""
                 if not sup: continue
                 eks = str(row["EKSPEDISI"]).upper().strip() if not pd.isna(row["EKSPEDISI"]) else ""
-                try: koli = int(float(row["TOTAL KOLI"]))
-                except: koli = 0
-                try: ongkir = int(float(str(row["ONGKIR"]).replace('Rp', '').replace('.', '').replace(',', '').strip()))
-                except: ongkir = 0
+                koli = safe_int(row.get("TOTAL KOLI", 0))
+                ongkir = safe_int(row.get("ONGKIR", 0))
                 tgl_raw = row["TANGGAL_JAM"]
                 fix_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if pd.isna(tgl_raw) else str(tgl_raw)
                 batch_data.append({"supplier": sup, "ekspedisi": eks, "total_koli": koli, "total_ongkir": ongkir, "created_at": fix_dt})
@@ -232,7 +238,7 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Upload Batch: {e}"
 
-    def toggle_select_id(self, item_id: int):
+    def toggle_select_id(self, item_id: str):
         s = list(self.selected_ids())
         if item_id in s: s.remove(item_id)
         else: s.append(item_id)
@@ -255,33 +261,39 @@ class AppState:
         res = self.data_list()
         flt = self.filter_ekspedisi()
         if flt != "SEMUA":
-            res = [x for x in res if x.get("ekspedisi") == flt]
+            res = [x for x in res if str(x.get("ekspedisi", "")).upper() == flt.upper()]
         return res
 
     def get_list_ekspedisi_options(self) -> list[str]:
-        eksp = list(set([x.get("ekspedisi", "") for x in self.data_list() if x.get("ekspedisi")]))
+        eksp = list(set([str(x.get("ekspedisi", "")).upper() for x in self.data_list() if x.get("ekspedisi")]))
         return ["SEMUA"] + sorted(eksp)
 
     def metric_total_biaya_all(self) -> str:
-        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.get_filtered_ongkir()]):,.0f}"
+        total = sum([safe_int(x.get('total_ongkir', 0)) for x in self.get_filtered_ongkir()])
+        return f"Rp {total:,.0f}"
 
     def metric_total_koli_all(self) -> str:
-        return f"{sum([x.get('total_koli', 0) for x in self.get_filtered_ongkir()]):,.0f} Koli"
+        total = sum([safe_int(x.get('total_koli', x.get('koli', 0))) for x in self.get_filtered_ongkir()])
+        return f"{total:,.0f} Koli"
 
     def metric_avg_cost_all(self) -> str:
         data = self.get_filtered_ongkir()
-        biaya = sum([x.get("total_ongkir", 0) for x in data])
-        koli = sum([x.get("total_koli", 0) for x in data])
-        return f"Rp {biaya / koli if koli > 0 else 0:,.0f}"
+        biaya = sum([safe_int(x.get("total_ongkir", 0)) for x in data])
+        koli = sum([safe_int(x.get("total_koli", x.get("koli", 0))) for x in data])
+        avg = (biaya / koli) if koli > 0 else 0
+        return f"Rp {avg:,.0f}"
 
     def metric_biaya_datang(self) -> str:
-        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', ''))]):,.0f}"
+        total = sum([safe_int(x.get('total_ongkir', 0)) for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', ''))])
+        return f"Rp {total:,.0f}"
 
     def metric_koli_datang(self) -> str:
-        return f"{sum([x.get('total_koli', 0) for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', ''))]):,.0f} Koli"
+        total = sum([safe_int(x.get('total_koli', x.get('koli', 0))) for x in self.get_filtered_ongkir() if 'RTO' not in str(x.get('supplier', ''))])
+        return f"{total:,.0f} Koli"
 
     def metric_biaya_rto(self) -> str:
-        return f"Rp {sum([x.get('total_ongkir', 0) for x in self.get_filtered_ongkir() if 'RTO' in str(x.get('supplier', ''))]):,.0f}"
+        total = sum([safe_int(x.get('total_ongkir', 0)) for x in self.get_filtered_ongkir() if 'RTO' in str(x.get('supplier', ''))])
+        return f"Rp {total:,.0f}"
 
     def process_stock_minus_file(self, file_bytes: bytes, file_name: str):
         try:
@@ -512,7 +524,7 @@ class AppState:
             return False, f"Gagal memproses file Putaway: {e}"
 
 # ==============================================================================
-# 3. CSS & JAVASCRIPT LENGKAP
+# 3. CSS & JAVASCRIPT ASSETS
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
@@ -533,21 +545,6 @@ CUSTOM_HEAD = ui.head_content(
             100% { transform: scale(1); opacity: 1; }
         }
         .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        
-        .form-input-dark {
-            background-color: #FFFFFF !important;
-            color: #111111 !important;
-            border: 2px solid #4A5568 !important;
-            border-radius: 8px !important;
-            font-weight: 600;
-            padding: 8px 12px;
-            width: 100%;
-        }
-        .form-input-dark:focus {
-            border: 2px solid #E50914 !important;
-            box-shadow: 0 0 0 1px #E50914 !important;
-            outline: none !important;
-        }
         
         .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
         .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
@@ -604,10 +601,10 @@ CUSTOM_HEAD = ui.head_content(
 # ==============================================================================
 # 4. HELPER KOMPONEN TABEL, METRICS & MODAL
 # ==============================================================================
-def metric_box(title: str, val_ui, text_color: str, bg_gradient: str):
+def metric_box(title: str, val_str: str, text_color: str, bg_gradient: str):
     return ui.div(
         ui.div(title, style="color: #4A5568; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;"),
-        ui.div(val_ui, style=f"color: {text_color}; font-size: 20px; font-weight: 800;"),
+        ui.div(val_str, style=f"color: {text_color}; font-size: 20px; font-weight: 800;"),
         style=f"background: {bg_gradient}; padding: 1rem; border-radius: 12px; border: 1px solid rgba(0,0,0,0.06); text-align: center; width: 100%; box-shadow: 0 2px 6px rgba(0,0,0,0.03);"
     )
 
@@ -719,7 +716,7 @@ def stock_minus_view(state: AppState, has_file: bool):
         ),
         ui.navset_card_tab(
             ui.nav_panel(
-                ui.tags.span(ui.tags.i(class_="fa-regular fa-file-lines", style="margin-right: 6px; font-size: 14px;"), "MINUS AWAL"),
+                "MINUS AWAL",
                 ui.div(
                     ui.div(
                         ui.download_button(
@@ -734,7 +731,7 @@ def stock_minus_view(state: AppState, has_file: bool):
                 )
             ),
             ui.nav_panel(
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px; font-size: 14px;"), "TEMPLATE SET UP"),
+                "TEMPLATE SET UP",
                 ui.div(
                     ui.div(
                         ui.download_button(
@@ -749,7 +746,7 @@ def stock_minus_view(state: AppState, has_file: bool):
                 )
             ),
             ui.nav_panel(
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-triangle-exclamation", style="margin-right: 6px; font-size: 14px;"), "JUSTIFIKASI"),
+                "JUSTIFIKASI",
                 ui.div(
                     ui.div(
                         ui.download_button(
@@ -901,19 +898,19 @@ def putaway_view(state: AppState, has_ds: bool, has_asal: bool):
         ),
         ui.navset_card_tab(
             ui.nav_panel(
-                ui.tags.span("📋 Hasil Compare", style="font-weight: bold;"),
+                "Hasil Compare",
                 ui.div(render_clean_table(state.df_comp_headers(), state.df_comp_rows()), style="padding: 0.75rem 0;")
             ),
             ui.nav_panel(
-                ui.tags.span("📝 List Setup", style="font-weight: bold;"),
+                "List Setup",
                 ui.div(render_clean_table(state.df_plist_headers(), state.df_plist_rows()), style="padding: 0.75rem 0;")
             ),
             ui.nav_panel(
-                ui.tags.span("⚠️ Kurang Setup", style="font-weight: bold;"),
+                "Kurang Setup",
                 ui.div(kurang_content, style="padding: 0.75rem 0;")
             ),
             ui.nav_panel(
-                ui.tags.span("📦 Outstanding", style="font-weight: bold;"),
+                "Outstanding",
                 ui.div(out_content, style="padding: 0.75rem 0;")
             )
         ),
@@ -1030,20 +1027,26 @@ def main_dashboard_view(state: AppState):
     sel_set = set(state.selected_ids())
 
     for row in filtered_data:
-        r_id = row.get("id", 0)
+        r_id = str(row.get("id", ""))
         is_chk = r_id in sel_set
         chk = ui.tags.input(
             type="checkbox",
             checked=is_chk,
-            onchange=f"Shiny.setInputValue('toggle_row_id', {r_id}, {{priority: 'event'}})"
+            onchange=f"Shiny.setInputValue('toggle_row_id', '{r_id}', {{priority: 'event'}})"
         )
+        tgl_display = str(row.get("created_at", row.get("tanggal", "")))
+        supp_display = str(row.get("supplier", ""))
+        eksp_display = str(row.get("ekspedisi", ""))
+        koli_display = safe_int(row.get("total_koli", row.get("koli", 0)))
+        ongkir_display = safe_int(row.get("total_ongkir", 0))
+
         table_rows.append(ui.tags.tr(
             ui.tags.td(chk, style="text-align: center; width: 60px;"),
-            ui.tags.td(str(row.get("created_at", row.get("tanggal", "")))),
-            ui.tags.td(str(row.get("supplier", ""))),
-            ui.tags.td(str(row.get("ekspedisi", ""))),
-            ui.tags.td(str(row.get("total_koli", row.get("koli", 0)))),
-            ui.tags.td(f"Rp {row.get('total_ongkir', 0):,}")
+            ui.tags.td(tgl_display),
+            ui.tags.td(supp_display),
+            ui.tags.td(eksp_display),
+            ui.tags.td(str(koli_display)),
+            ui.tags.td(f"Rp {ongkir_display:,}")
         ))
 
     tab2_content = ui.div(
@@ -1094,11 +1097,11 @@ def main_dashboard_view(state: AppState):
     return ui.div(
         ui.navset_card_tab(
             ui.nav_panel(
-                ui.tags.span("📥 INPUT & BATCH DATA", style="color: #1A202C; font-weight: 800;"),
+                "📥 INPUT & BATCH DATA",
                 tab1_content
             ),
             ui.nav_panel(
-                ui.tags.span("📊 SUMMARY & HISTORY", style="color: #1A202C; font-weight: 800;"),
+                "📊 SUMMARY & HISTORY",
                 tab2_content
             )
         ),
@@ -1478,7 +1481,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.Effect
     @reactive.event(input.toggle_row_id)
     def _toggle_chk():
-        state.toggle_select_id(int(input.toggle_row_id()))
+        state.toggle_select_id(str(input.toggle_row_id()))
 
     @reactive.Effect
     @reactive.event(input.change_filter_ekspedisi)
@@ -1511,7 +1514,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @output
     @render.ui
     def stock_minus_file_label():
-        f = input.upload_stock_file()
+        f = input.upload_stock_file() if "upload_stock_file" in input else None
         if f:
             return ui.div(
                 ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
@@ -1567,7 +1570,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @output
     @render.ui
     def ds_file_label():
-        f = input.ds_putaway_file()
+        f = input.ds_putaway_file() if "ds_putaway_file" in input else None
         if f:
             return ui.div(
                 ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
@@ -1579,7 +1582,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @output
     @render.ui
     def asal_file_label():
-        f = input.asal_putaway_file()
+        f = input.asal_putaway_file() if "asal_putaway_file" in input else None
         if f:
             return ui.div(
                 ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
@@ -1637,44 +1640,52 @@ def server(input: Inputs, output: Outputs, session: Session):
     @output
     @render.ui
     def main_root_container():
-        if not state.logged_in():
-            return login_page()
+        try:
+            if not state.logged_in():
+                return login_page()
 
-        content_type = state.get_active_content_type()
-        has_stock_file = input.upload_stock_file() is not None
-        has_ds_file = input.ds_putaway_file() is not None
-        has_asal_file = input.asal_putaway_file() is not None
+            content_type = state.get_active_content_type()
+            has_stock_file = input.upload_stock_file() is not None if "upload_stock_file" in input else False
+            has_ds_file = input.ds_putaway_file() is not None if "ds_putaway_file" in input else False
+            has_asal_file = input.asal_putaway_file() is not None if "asal_putaway_file" in input else False
 
-        if content_type == "dashboard_ongkir":
-            page_content = main_dashboard_view(state)
-        elif content_type == "stock_minus":
-            page_content = stock_minus_view(state, has_stock_file)
-        elif content_type == "putaway_system":
-            page_content = putaway_view(state, has_ds_file, has_asal_file)
-        elif content_type == "access_denied":
-            page_content = ui.div(
-                ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold; margin-bottom: 0.5rem;"),
-                ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"),
-                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+            if content_type == "dashboard_ongkir":
+                page_content = main_dashboard_view(state)
+            elif content_type == "stock_minus":
+                page_content = stock_minus_view(state, has_stock_file)
+            elif content_type == "putaway_system":
+                page_content = putaway_view(state, has_ds_file, has_asal_file)
+            elif content_type == "access_denied":
+                page_content = ui.div(
+                    ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold; margin-bottom: 0.5rem;"),
+                    ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"),
+                    style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+                )
+            else:
+                page_content = ui.div(
+                    ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold; margin-bottom: 0.5rem;"),
+                    ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"),
+                    style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+                )
+
+            return ui.div(
+                sidebar(state),
+                ui.div(
+                    global_header(state),
+                    page_content,
+                    style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
+                ),
+                style="display: flex; width: 100vw; height: 100vh; overflow: hidden;"
             )
-        else:
-            page_content = ui.div(
-                ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold; margin-bottom: 0.5rem;"),
-                ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"),
-                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+        except Exception as e:
+            traceback.print_exc()
+            return ui.div(
+                ui.h3("Terjadi kesalahan pada tampilan:", style="color: red;"),
+                ui.pre(str(e)),
+                style="padding: 2rem;"
             )
-
-        return ui.div(
-            sidebar(state),
-            ui.div(
-                global_header(state),
-                page_content,
-                style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
-            ),
-            style="display: flex; width: 100vw; height: 100vh; overflow: hidden;"
-        )
 
 # ==============================================================================
-# 10. INISIALISASI UTUH
+# 10. INISIALISASI APLIKASI
 # ==============================================================================
 app = App(app_ui, server)
