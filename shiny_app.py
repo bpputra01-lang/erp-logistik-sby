@@ -1,7 +1,5 @@
 import io
 import time
-import asyncio
-import traceback
 from datetime import datetime
 import pandas as pd
 from supabase import create_client, Client
@@ -544,12 +542,6 @@ CUSTOM_HEAD = ui.head_content(
             100% { transform: scale(1); opacity: 1; }
         }
         .animate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-
-        @keyframes autoFadeOut {
-            0% { opacity: 1; visibility: visible; }
-            75% { opacity: 1; }
-            100% { opacity: 0; visibility: hidden; pointer-events: none; }
-        }
         
         .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
         .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
@@ -727,23 +719,27 @@ def success_modal(show: bool):
         ui.div(
             ui.div(
                 ui.div(
-                    ui.tags.i(class_="fa-solid fa-check", style="font-size: 55px; color: white;"),
+                    ui.tags.i(class_="fa-solid fa-check", style="font-size: 48px; color: white;"),
                     class_="animate-pop",
-                    style="background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); border-radius: 50%; padding: 20px; box-shadow: 0 10px 25px rgba(74, 222, 128, 0.4); margin-bottom: 5px; display: flex; align-items: center; justify-content: center;"
+                    style="background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%); border-radius: 50%; width: 80px; height: 80px; box-shadow: 0 10px 25px rgba(74, 222, 128, 0.4); margin-bottom: 8px; display: flex; align-items: center; justify-content: center;"
                 ),
-                ui.h2("Success!", style="font-size: 28px; color: #1A202C; font-weight: bold; margin: 0;"),
-                style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;"
+                ui.h2("Success!", style="font-size: 24px; color: #1A202C; font-weight: bold; margin: 0;"),
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; padding: 1.8rem 2.2rem; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.2);"
             ),
-            style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;"
+            style="display: flex; align-items: center; justify-content: center;"
         ),
+        ui.tags.script("""
+            setTimeout(function() {
+                let el = document.getElementById('success-modal-overlay');
+                if (el) {
+                    el.remove();
+                    Shiny.setInputValue('close_success_modal_event', Math.random(), {priority: 'event'});
+                }
+            }, 1800);
+        """),
         id="success-modal-overlay",
-        onclick="this.style.display='none';",
-        style="""
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999;
-            background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(5px);
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
-            animation: autoFadeOut 2.2s forwards;
-        """
+        onclick="this.remove(); Shiny.setInputValue('close_success_modal_event', Math.random(), {priority: 'event'});",
+        style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 99999; background: rgba(0, 0, 0, 0.25); display: flex; align-items: center; justify-content: center; cursor: pointer;"
     )
 
 # ==============================================================================
@@ -1013,7 +1009,6 @@ def main_dashboard_view(state: AppState):
     STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
 
     tab1_content = ui.div(
-        # Box Kiri: Manual Input
         ui.div(
             ui.div(
                 ui.span("📝", style="font-size: 20px; margin-right: 8px;"),
@@ -1068,7 +1063,6 @@ def main_dashboard_view(state: AppState):
             ),
             style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
         ),
-        # Box Kanan: Batch CSV Upload (Single Integrated Box)
         ui.div(
             ui.div(
                 ui.span("📁", style="font-size: 20px; margin-right: 8px;"),
@@ -1102,7 +1096,6 @@ def main_dashboard_view(state: AppState):
         style="display: flex; flex-wrap: wrap; gap: 1.25rem; width: 100%; margin-top: 1.5rem;"
     )
 
-    # --- TAB 2: METRICS & TABEL HISTORY ---
     selected_count = len(state.selected_ids())
     del_btn_ui = ui.tags.button(
         f"🗑️ HAPUS ({selected_count}) DATA",
@@ -1198,6 +1191,7 @@ def main_dashboard_view(state: AppState):
         ),
         style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;"
     )
+
 # ==============================================================================
 # 8. VIEW SIDEBAR & LOGIN PAGE
 # ==============================================================================
@@ -1252,7 +1246,7 @@ def sidebar(state: AppState):
             ui.div(
                 ui.span("JEZ", style="color: #E50914; font-weight: 900; font-size: 20px;"),
                 ui.span("PRO", style="color: #FFFFFF; font-weight: 900; font-size: 20px;"),
-                style="display: gap: 2px; align-items: center;"
+                style="display: flex; gap: 2px; align-items: center;"
             ),
             ui.tags.button(
                 ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 16px; color: #CBD5E0;"),
@@ -1432,6 +1426,12 @@ app_ui = ui.page_fluid(
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
 
+    # --- LISTENER PENUTUP MODAL SUCCESS ---
+    @reactive.Effect
+    @reactive.event(input.close_success_modal_event)
+    def _on_close_success_modal():
+        state.show_success_modal.set(False)
+
     @reactive.Effect
     @reactive.event(input.btn_submit_login)
     def _login_event():
@@ -1550,7 +1550,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         succ, msg = state.save_single_ongkir(d.get("supplier", ""), d.get("ekspedisi", ""), d.get("koli", "1"), d.get("ongkir", "0"), d.get("tgl", ""))
         if succ:
             state.show_success_modal.set(True)
-            asyncio.create_task(_auto_hide_success())
         else:
             ui.notification_show(msg, type="error")
 
@@ -1565,7 +1564,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             succ, msg = state.batch_upload_csv(fp.read())
         if succ:
             state.show_success_modal.set(True)
-            asyncio.create_task(_auto_hide_success())
         else:
             ui.notification_show(msg, type="error")
 
@@ -1602,33 +1600,19 @@ def server(input: Inputs, output: Outputs, session: Session):
         if succ: ui.notification_show(msg, type="message")
         else: ui.notification_show(msg, type="error")
 
-    @render.ui
-    def stock_minus_file_label():
-        f = input.upload_stock_file() if "upload_stock_file" in input else None
-        if f:
-            return ui.div(
-                ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
-                ui.span(f[0]["name"], style="color: #38A169; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px;"),
-                style="display: flex; align-items: center;"
-            )
-        return ui.span("200MB per file • XLSX, XLS", style="color: #718096; font-size: 13px;")
-
     @reactive.Effect
     @reactive.event(input.btn_process_stock_minus)
     def _proc_stock_file():
         f = input.upload_stock_file()
         if not f: return
-        state.is_loading.set(True)
         with open(f[0]["datapath"], "rb") as fp:
             succ, msg = state.process_stock_minus_file(fp.read(), f[0]["name"])
-        state.is_loading.set(False)
         if succ:
             state.show_success_modal.set(True)
-            asyncio.create_task(_auto_hide_success())
         else:
             ui.notification_show(msg, type="error")
 
-    @render.download_button(filename="Data_Minus_Awal.xlsx")
+    @render.download(filename="Data_Minus_Awal.xlsx")
     def btn_dl_minus_awal():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -1636,7 +1620,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         return buf.getvalue()
 
-    @render.download_button(filename="Template_Set_Up.xlsx")
+    @render.download(filename="Template_Set_Up.xlsx")
     def btn_dl_set_up():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -1644,7 +1628,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         return buf.getvalue()
 
-    @render.download_button(filename="Data_Justifikasi.xlsx")
+    @render.download(filename="Data_Justifikasi.xlsx")
     def btn_dl_justifikasi():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -1657,45 +1641,20 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _area_sel():
         state.area_putaway.set(input.select_area_putaway())
 
-    @render.ui
-    def ds_file_label():
-        f = input.ds_putaway_file() if "ds_putaway_file" in input else None
-        if f:
-            return ui.div(
-                ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
-                ui.span(f[0]["name"], style="color: #38A169; font-weight: bold;"),
-                style="display: flex; align-items: center;"
-            )
-        return ui.span("200MB per file • XLSX, XLS, CSV", style="color: #718096; font-size: 13px;")
-
-    @render.ui
-    def asal_file_label():
-        f = input.asal_putaway_file() if "asal_putaway_file" in input else None
-        if f:
-            return ui.div(
-                ui.tags.i(class_="fa-solid fa-circle-check", style="color: #38A169; font-size: 20px; margin-right: 6px;"),
-                ui.span(f[0]["name"], style="color: #38A169; font-weight: bold;"),
-                style="display: flex; align-items: center;"
-            )
-        return ui.span("200MB per file • XLSX, XLS, CSV", style="color: #718096; font-size: 13px;")
-
     @reactive.Effect
     @reactive.event(input.btn_compare_putaway)
     def _proc_putaway_files():
         f_ds = input.ds_putaway_file()
         f_as = input.asal_putaway_file()
         if not f_ds or not f_as: return
-        state.is_loading.set(True)
         with open(f_ds[0]["datapath"], "rb") as fp_ds, open(f_as[0]["datapath"], "rb") as fp_as:
             succ, msg = state.process_putaway_compare(fp_ds.read(), f_ds[0]["name"], fp_as.read(), f_as[0]["name"])
-        state.is_loading.set(False)
         if succ:
             state.show_success_modal.set(True)
-            asyncio.create_task(_auto_hide_success())
         else:
             ui.notification_show(msg, type="error")
 
-    @render.download_button(filename="REPORT_PUTAWAY_SYSTEM.xlsx")
+    @render.download(filename="REPORT_PUTAWAY_SYSTEM.xlsx")
     def btn_dl_putaway_report():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -1706,10 +1665,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_updated.to_excel(writer, sheet_name='SISA_STOK_SYSTEM', index=False)
         buf.seek(0)
         return buf.getvalue()
-
-    async def _auto_hide_success():
-        await asyncio.sleep(2.5)
-        state.show_success_modal.set(False)
 
     @render.ui
     def global_loading_overlay_ui():
