@@ -356,6 +356,31 @@ def cycle_count_view(state: AppState):
         results_ui,
         style="width: 100%; padding: 1rem;"
     )
+
+# ==============================================================================
+# VIEW PUTAWAY & PICKING AUDIT LIST
+# ==============================================================================
+def ppa_audit_view(state: AppState):
+    upload_section = ui.div(
+        ui.h4("📥 Upload Dokumen Audit (Sales, RTO, & Mutasi)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("uploader_ppa_sales", "1. File Sales (Excel / CSV)"),
+            custom_uploader_box("uploader_ppa_rto", "2. File RTO (Excel / CSV)"),
+            custom_uploader_box("uploader_ppa_mutasi", "3. File Mutasi (Excel / CSV)"),
+            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"
+        ),
+        ui.output_ui("ppa_action_btn_ui"),
+        style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+    )
+
+    results_ui = ui.output_ui("ppa_results_container")
+
+    return ui.div(
+        upload_section,
+        results_ui,
+        style="width: 100%; padding: 1rem;"
+    )
+
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
     bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"

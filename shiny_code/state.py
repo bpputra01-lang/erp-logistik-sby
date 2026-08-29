@@ -105,6 +105,30 @@ class AppState:
         self._raw_df_cc_filtered = pd.DataFrame()
         self._cc_col_mapping = {}
 
+        # --- PUTAWAY & PICKING AUDIT STATE ---
+        self.ppa_processed = reactive.Value(False)
+        self.ppa_total_picking_qty = reactive.Value(0)
+        self.ppa_unique_picking_bin = reactive.Value(0)
+        self.ppa_unique_putaway_bin = reactive.Value(0)
+        self.ppa_final_matching_bin = reactive.Value(0)
+
+        self.df_ppa_picking_headers = reactive.Value([])
+        self.df_ppa_picking_rows = reactive.Value([])
+        self.df_ppa_upicking_headers = reactive.Value([])
+        self.df_ppa_upicking_rows = reactive.Value([])
+        self.df_ppa_putaway_headers = reactive.Value([])
+        self.df_ppa_putaway_rows = reactive.Value([])
+        self.df_ppa_uputaway_headers = reactive.Value([])
+        self.df_ppa_uputaway_rows = reactive.Value([])
+        self.df_ppa_final_headers = reactive.Value([])
+        self.df_ppa_final_rows = reactive.Value([])
+
+        self._raw_df_ppa_picking = pd.DataFrame()
+        self._raw_df_ppa_upicking = pd.DataFrame()
+        self._raw_df_ppa_putaway = pd.DataFrame()
+        self._raw_df_ppa_uputaway = pd.DataFrame()
+        self._raw_df_ppa_final = pd.DataFrame()
+
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -164,6 +188,7 @@ class AppState:
         elif cur_menu == "Putaway System": return "putaway_system"
         elif cur_menu == "Compare System": return "compare_system"
         elif cur_menu == "List Bin Cycle Count": return "cycle_count"
+        elif cur_menu in ["Putaway & Picking Audit List", "Putaway & Picking Audit"]: return "ppa_audit"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -696,3 +721,132 @@ class AppState:
         self._raw_df_cc_filtered = display_df
         self.df_cc_headers.set(display_df.columns.tolist() if not display_df.empty else [])
         self.df_cc_rows.set(display_df.fillna("").astype(str).values.tolist() if not display_df.empty else [])
+
+        # --- PUTAWAY & PICKING AUDIT ALGORITHM ---
+    def process_ppa_audit(self, f_sales, f_rto, f_mutasi):
+        try:
+            if not f_sales and not f_rto and not f_mutasi:
+                return False, "Harap upload setidaknya salah satu file (Sales, RTO, atau Mutasi)!"
+
+            # 1. Olah Data Picking (Sales & RTO)
+            combined_list = []
+            if f_sales:
+                df_s = load_data_from_info(f_sales)
+                if not df_s.empty and df_s.shape[1] > 10:
+                    df_sales = df_s.iloc[:, [1, 6, 10]].copy()
+                    df_sales.columns = ['SKU', 'BIN', 'QTY']
+                    df_sales['SKU'] = df_sales['SKU'].astype(str).str.strip().str.upper()
+                    df_sales['BIN'] = df_sales['BIN'].astype(str).str.strip().str.upper()
+                    df_sales['QTY'] = pd.to_numeric(df_sales['QTY'], errors='coerce').fillna(0).astype(int)
+                    df_sales = df_sales[(df_sales['SKU'] != '') & (df_sales['BIN'] != '') & (df_sales['SKU'] != 'SKU')]
+                    df_sales = df_sales.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                    df_sales['SOURCE'] = 'SALES'
+                    combined_list.append(df_sales)
+
+            if f_rto:
+                df_r = load_data_from_info(f_rto)
+                if not df_r.empty and df_r.shape[1] > 8:
+                    df_rto = df_r.iloc[:, [3, 8, 7]].copy()
+                    df_rto.columns = ['SKU', 'BIN', 'QTY']
+                    df_rto['SKU'] = df_rto['SKU'].astype(str).str.strip().str.upper()
+                    df_rto['BIN'] = df_rto['BIN'].astype(str).str.strip().str.upper()
+                    df_rto['QTY'] = pd.to_numeric(df_rto['QTY'], errors='coerce').fillna(0).astype(int)
+                    df_rto = df_rto[(df_rto['SKU'] != '') & (df_rto['BIN'] != '') & (df_rto['SKU'] != 'SKU')]
+                    df_rto = df_rto.groupby(['SKU', 'BIN'], as_index=False)['QTY'].sum()
+                    df_rto['SOURCE'] = 'RTO'
+                    combined_list.append(df_rto)
+
+            if combined_list:
+                df_picking = pd.concat(combined_list, ignore_index=True)
+                df_picking = df_picking[df_picking['QTY'] > 0].reset_index(drop=True)
+            else:
+                df_picking = pd.DataFrame(columns=['SKU', 'BIN', 'QTY', 'SOURCE'])
+
+            # 2. Olah Data Putaway (Rantai Mutasi)
+            if f_mutasi:
+                df_m = load_data_from_info(f_mutasi)
+                if not df_m.empty and df_m.shape[1] >= 13:
+                    df_mutasi = df_m.iloc[:, [0, 3, 8, 12]].copy()
+                    df_mutasi.columns = ['WAKTU', 'SKU', 'BIN AWAL', 'BIN TUJUAN']
+                    df_mutasi['WAKTU'] = pd.to_datetime(df_mutasi['WAKTU'], errors='coerce')
+                    df_mutasi['SKU'] = df_mutasi['SKU'].astype(str).str.strip().str.upper()
+                    df_mutasi['BIN AWAL'] = df_mutasi['BIN AWAL'].astype(str).str.strip().str.upper()
+                    df_mutasi['BIN TUJUAN'] = df_mutasi['BIN TUJUAN'].astype(str).str.strip().str.upper()
+                    df_mutasi = df_mutasi.dropna(subset=['SKU'])
+                    df_mutasi = df_mutasi[(df_mutasi['BIN AWAL'] != '') & (df_mutasi['BIN TUJUAN'] != '') & (df_mutasi['BIN AWAL'] != 'NAN') & (df_mutasi['BIN TUJUAN'] != 'NAN')]
+
+                    # Process Mutation Chain
+                    records = []
+                    for sku, group in df_mutasi.groupby('SKU', sort=False):
+                        group_sorted = group.sort_values(by='WAKTU', ascending=True)
+                        active_chains = []
+                        for idx, row in group_sorted.iterrows():
+                            bin_awal, bin_tujuan = row['BIN AWAL'], row['BIN TUJUAN']
+                            matched = False
+                            for chain in active_chains:
+                                if chain['current_bin'] == bin_awal:
+                                    chain['current_bin'] = bin_tujuan
+                                    chain['history'].append(bin_tujuan)
+                                    matched = True
+                                    break
+                            if not matched:
+                                active_chains.append({'current_bin': bin_tujuan, 'history': [bin_awal, bin_tujuan]})
+                        for chain in active_chains:
+                            records.append({
+                                'SKU': sku,
+                                'BIN AWAL': chain['history'][0],
+                                'LAST BIN MUTASI': chain['current_bin'],
+                                'TOTAL PERJALANAN': len(chain['history']) - 1,
+                                'ALUR MUTASI': " ➔ ".join(chain['history'])
+                            })
+                    df_putaway = pd.DataFrame(records).drop_duplicates().reset_index(drop=True) if records else pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
+                else:
+                    df_putaway = pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
+            else:
+                df_putaway = pd.DataFrame(columns=['SKU', 'BIN AWAL', 'LAST BIN MUTASI', 'TOTAL PERJALANAN', 'ALUR MUTASI'])
+
+            # 3. Unique BIN DataFrames
+            df_upicking = pd.DataFrame({'BIN': sorted(df_picking['BIN'].unique())}) if not df_picking.empty else pd.DataFrame(columns=['BIN'])
+            df_uputaway = pd.DataFrame({'LAST BIN MUTASI': sorted(df_putaway['LAST BIN MUTASI'].unique())}) if not df_putaway.empty else pd.DataFrame(columns=['LAST BIN MUTASI'])
+
+            # 4. Final Matching List (Irisan)
+            if not df_picking.empty and not df_putaway.empty:
+                set_p = set(df_picking['BIN'].astype(str).str.strip())
+                set_m = set(df_putaway['LAST BIN MUTASI'].astype(str).str.strip())
+                match_bins = sorted(list(set_p.intersection(set_m)))
+                df_final = pd.DataFrame({'NO': range(1, len(match_bins) + 1), 'BIN AUDIT FINAL': match_bins}) if match_bins else pd.DataFrame(columns=['NO', 'BIN AUDIT FINAL'])
+            else:
+                df_final = pd.DataFrame(columns=['NO', 'BIN AUDIT FINAL'])
+
+            # Set Metrik
+            self.ppa_total_picking_qty.set(int(df_picking['QTY'].sum()) if not df_picking.empty else 0)
+            self.ppa_unique_picking_bin.set(len(df_upicking))
+            self.ppa_unique_putaway_bin.set(len(df_uputaway))
+            self.ppa_final_matching_bin.set(len(df_final))
+
+            # Set Data Tabel
+            self._raw_df_ppa_picking = df_picking
+            self._raw_df_ppa_upicking = df_upicking
+            self._raw_df_ppa_putaway = df_putaway
+            self._raw_df_ppa_uputaway = df_uputaway
+            self._raw_df_ppa_final = df_final
+
+            self.df_ppa_picking_headers.set(df_picking.columns.tolist() if not df_picking.empty else [])
+            self.df_ppa_picking_rows.set(df_picking.fillna("").astype(str).values.tolist() if not df_picking.empty else [])
+
+            self.df_ppa_upicking_headers.set(df_upicking.columns.tolist() if not df_upicking.empty else [])
+            self.df_ppa_upicking_rows.set(df_upicking.fillna("").astype(str).values.tolist() if not df_upicking.empty else [])
+
+            self.df_ppa_putaway_headers.set(df_putaway.columns.tolist() if not df_putaway.empty else [])
+            self.df_ppa_putaway_rows.set(df_putaway.fillna("").astype(str).values.tolist() if not df_putaway.empty else [])
+
+            self.df_ppa_uputaway_headers.set(df_uputaway.columns.tolist() if not df_uputaway.empty else [])
+            self.df_ppa_uputaway_rows.set(df_uputaway.fillna("").astype(str).values.tolist() if not df_uputaway.empty else [])
+
+            self.df_ppa_final_headers.set(df_final.columns.tolist() if not df_final.empty else [])
+            self.df_ppa_final_rows.set(df_final.fillna("").astype(str).values.tolist() if not df_final.empty else [])
+
+            self.ppa_processed.set(True)
+            return True, "Seluruh proses audit berhasil dijalankan!"
+        except Exception as e:
+            return False, f"Terjadi kesalahan saat memproses data: {e}"
