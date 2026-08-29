@@ -341,52 +341,95 @@ def main_dashboard_view(state: AppState):
     return ui.div(ui.navset_card_tab(ui.nav_panel("📥 INPUT & BATCH DATA", tab1_content), ui.nav_panel("📊 SUMMARY & HISTORY", tab2_content)), style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;")
 
 # ==============================================================================
-# VIEW LIST BIN CYCLE COUNT
+# VIEW CYCLE COUNT ANALYZER (LAYOUT FILTER PERSIS GAMBAR)
 # ==============================================================================
-def cycle_count_view(state: AppState):
-    uploader_ui = ui.div(
-        ui.span("Upload File Multiple Adjustment", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
+def cycle_count_analyzer_view(state: AppState):
+    list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
+    list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
+    list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
+
+    # --- FILTER SECTION (SESUAI GAMBAR) ---
+    filter_section = ui.div(
+        # BARIS 1: PILIH CABANG (LEBAR PENUH 100%)
         ui.div(
-            ui.input_file(
-                "upload_cycle_count_file", None, accept=[".xlsx", ".xls", ".csv"], multiple=False,
-                button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
-                placeholder="200MB per file • XLSX, XLS, CSV"
-            ),
-            class_="reflex-upload-container"
+            ui.input_select("cca_branch", "🏢 Pilih Cabang / Branch:", choices=list(BRANCH_BIN_MAPPING.keys()), selected="SURABAYA", width="100%"),
+            style="width: 100%; margin-bottom: 1rem;"
         ),
-        ui.output_ui("cycle_count_action_btn_ui"),
-        style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        # BARIS 2: 4 KOLOM SEJAJAR (SUB KATEGORI, BRAND, BIN SYSTEM, BIN COVERAGE)
+        ui.div(
+            ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.input_selectize("cca_bin_cov", "📡 BIN Coverage:", choices=list_bin_cov, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
+        ),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
-    results_ui = ui.output_ui("cycle_count_results_container")
+    # Step 1: Upload Data Scan & Stock
+    step1_ui = ui.div(
+        ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("cca_up_scan", "📥 DATA SCAN"),
+            custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
+        ),
+        ui.output_ui("cca_step1_btn_ui"),
+        ui.output_ui("cca_step1_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 2: Upload BIN Coverage
+    step2_ui = ui.div(
+        ui.h4("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_cov", "📥 FILE BIN COVERAGE"),
+        ui.output_ui("cca_step2_btn_ui"),
+        ui.output_ui("cca_step2_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 3: Recon Reports
+    step3_ui = ui.div(
+        ui.h4("3️⃣ RECON REPORTS (STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.output_ui("cca_step3_btn_ui"),
+        ui.output_ui("cca_step3_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 4: Recon Real + Process
+    step4_ui = ui.div(
+        ui.h4("4️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_recon_real", "📥 Upload HASIL RECON REAL +"),
+        ui.output_ui("cca_step4_btn_ui"),
+        ui.output_ui("cca_step4_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 5: Recon System + Process
+    step5_ui = ui.div(
+        ui.h4("5️⃣ RECON SYSTEM + PROCESS (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON (File Master Hasil Audit)"),
+        ui.output_ui("cca_step5_btn_ui"),
+        ui.output_ui("cca_step5_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 6: Miss Location Report
+    step6_ui = ui.div(
+        ui.h4("📊 MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.output_ui("cca_step6_btn_ui"),
+        ui.output_ui("cca_step6_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
 
     return ui.div(
-        uploader_ui,
-        results_ui,
-        style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW PUTAWAY & PICKING AUDIT LIST
-# ==============================================================================
-def ppa_audit_view(state: AppState):
-    upload_section = ui.div(
-        ui.h4("📥 Upload Dokumen Audit (Sales, RTO, & Mutasi)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.div(
-            custom_uploader_box("uploader_ppa_sales", "1. File Sales (Excel / CSV)"),
-            custom_uploader_box("uploader_ppa_rto", "2. File RTO (Excel / CSV)"),
-            custom_uploader_box("uploader_ppa_mutasi", "3. File Mutasi (Excel / CSV)"),
-            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"
-        ),
-        ui.output_ui("ppa_action_btn_ui"),
-        style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
-    )
-
-    results_ui = ui.output_ui("ppa_results_container")
-
-    return ui.div(
-        upload_section,
-        results_ui,
+        filter_section,
+        step1_ui,
+        step2_ui,
+        step3_ui,
+        step4_ui,
+        step5_ui,
+        step6_ui,
         style="width: 100%; padding: 1rem;"
     )
 

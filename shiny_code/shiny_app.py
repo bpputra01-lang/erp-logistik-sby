@@ -560,8 +560,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     def cca_bin_sys_ui():
         b = input.cca_branch() if "cca_branch" in input else "SURABAYA"
         choices = BRANCH_BIN_MAPPING.get(b, [])
-        return ui.input_selectize("cca_bin_sys", "🏭 BIN System:", choices=choices, multiple=True)
-
+        return ui.input_selectize("cca_bin_sys", "🏭 BIN System:", choices=choices, multiple=True, width="100%")
     # Step 1 UI & Handlers
     @render.ui
     def cca_step1_btn_ui():
