@@ -453,4 +453,102 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_cc_filtered.to_excel(writer, sheet_name='CYCLE_COUNT', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+# --- PUTAWAY & PICKING AUDIT BUTTON & HASIL ---
+    @render.ui
+    def ppa_action_btn_ui():
+        f1 = input.uploader_ppa_sales() if "uploader_ppa_sales" in input else None
+        f2 = input.uploader_ppa_rto() if "uploader_ppa_rto" in input else None
+        f3 = input.uploader_ppa_mutasi() if "uploader_ppa_mutasi" in input else None
+
+        if (f1 and len(f1) > 0) or (f2 and len(f2) > 0) or (f3 and len(f3) > 0):
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN AUDIT PROCESS"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_process_ppa_audit', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD SETIDAKNYA 1 FILE UNTUK MEMULAI", disabled=True, class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
+
+    @render.ui
+    def ppa_results_container():
+        if not state.ppa_processed():
+            return ui.div()
+
+        # Tab 5 matching alert
+        if state.ppa_final_matching_bin() > 0:
+            final_content = render_clean_table(state.df_ppa_final_headers(), state.df_ppa_final_rows())
+        else:
+            final_content = ui.div("⚠️ Tidak ada BIN yang sama/cocok antara hasil Picking Audit dan Putaway Audit.", style="background: #FFF5F5; color: #E53E3E; font-weight: bold; padding: 1.25rem; border-radius: 8px; text-align: center;")
+
+        return ui.div(
+            ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
+            ui.h4("📋 RINGKASAN INTEGRATED AUDIT", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            
+            # --- 4 KOTAK METRIK DARK THEME ---
+            ui.div(
+                dark_metric_box("🔢 Total QTY Picking (Sales/RTO)", f"{state.ppa_total_picking_qty():,}", "#C5A059"),
+                dark_metric_box("🎯 Unique BIN Picking", f"{state.ppa_unique_picking_bin():,} BIN", "#3182CE"),
+                dark_metric_box("🎯 Unique Last BIN Mutasi", f"{state.ppa_unique_putaway_bin():,} BIN", "#10B981"),
+                dark_metric_box("✅ Final Match BIN Audit", f"{state.ppa_final_matching_bin():,} BIN", "#E50914"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+
+            # --- DOWNLOAD REPORT LENGKAP MULTI-SHEET ---
+            ui.div(
+                ui.download_button(
+                    "btn_dl_ppa_all",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD ALL AUDIT REPORT (.xlsx)"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+            ),
+
+            # --- 5 TAB DETAIL HASIL ---
+            ui.navset_card_tab(
+                ui.nav_panel("📋 DETAIL PICKING AUDIT", ui.div(render_clean_table(state.df_ppa_picking_headers(), state.df_ppa_picking_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("🎯 UNIQUE BIN PICKING", ui.div(render_clean_table(state.df_ppa_upicking_headers(), state.df_ppa_upicking_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("📋 DETAIL PUTAWAY AUDIT", ui.div(render_clean_table(state.df_ppa_putaway_headers(), state.df_ppa_putaway_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("🎯 UNIQUE LAST BIN PUTAWAY", ui.div(render_clean_table(state.df_ppa_uputaway_headers(), state.df_ppa_uputaway_rows()), style="padding: 0.75rem 0;")),
+                ui.nav_panel("✅ FINAL LIST (MATCH BIN)", ui.div(final_content, style="padding: 0.75rem 0;"))
+            ),
+            style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0;"
+        )
+
+    # Eksekusi Proses Audit
+    @reactive.Effect
+    @reactive.event(input.btn_process_ppa_audit)
+    def _proc_ppa_audit():
+        f_sales = input.uploader_ppa_sales()
+        f_rto = input.uploader_ppa_rto()
+        f_mutasi = input.uploader_ppa_mutasi()
+
+        succ, msg = state.process_ppa_audit(f_sales, f_rto, f_mutasi)
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # Handler Download Excel Multi-Sheet
+    @render.download(filename="REPORT_PUTAWAY_PICKING_AUDIT.xlsx")
+    def btn_dl_ppa_all():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_ppa_final.to_excel(writer, sheet_name='FINAL_MATCH_BIN', index=False)
+            state._raw_df_ppa_picking.to_excel(writer, sheet_name='PICKING_DETAIL', index=False)
+            state._raw_df_ppa_upicking.to_excel(writer, sheet_name='UNIQUE_BIN_PICKING', index=False)
+            state._raw_df_ppa_putaway.to_excel(writer, sheet_name='PUTAWAY_DETAIL', index=False)
+            state._raw_df_ppa_uputaway.to_excel(writer, sheet_name='UNIQUE_LAST_BIN', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+        
 app = App(app_ui, server)
