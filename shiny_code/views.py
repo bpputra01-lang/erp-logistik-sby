@@ -137,6 +137,15 @@ CUSTOM_HEAD = ui.head_content(
     """)
 )
 
+BRANCH_BIN_MAPPING = {
+    "SURABAYA": ["GUDANG LT.2", "LIVE", "KL2", "KL1", "GL2-STORE", "GL2-STR", "OFFLINE", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL", "GL3-DC-RAK", "GL4-DC-RAK", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "BANDING"],
+    "MALANG": ["GL1-BACKLINE", "GL1-C1", "GL1-C2", "GL1-C3-CTN", "GL1-C4-KL3", "GL1-KAVLING2", "DAU", "KAV2", "KAV7", "KAV8", "KAV9", "KAV10", "GL1-C0", "OFFLINE", "TOKO", "PUTAWAY", "KEEP AMP", "MARKOM", "DEFECT", "REJECT", "INBOUND", "REFUND", "BANDING"],
+    "JEMBER": ["GL2-JBR", "GUDANG", "GL2-JBR-KL1", "GL2-JBR-KL2", "GL2-JBR-CTN", "GL2-JBR-GKH", "GL2-JBR-KL3", "GL2-JBR-KOLI2", "EVENT", "GAGAL QC", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING"],
+    "KEDIRI": ["GL1-KDR-BACKLINE", "GL1-KDR", "GL2-KDR", "GL2-KDR-CTN", "GL3-KDR-KL1", "GL3-KDR-KL2", "GL3-KDR-KL3", "GL3-KOLI", "EVENT", "GAGAL QC", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING"],
+    "SIDOARJO": ["GL2-SDA-RAK", "GL3-SDA", "GL3-SDA-BIN OFFLINE", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"],
+    "SEMARANG": ["GL2-SMG", "GL2-SMG-CTN-", "GUDANG LT 2", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"],
+    "HUB JAKARTA": ["GL1-JKT-A", "GL1-JKT-B", "GL1-JKT-C", "GL1-JKT-D", "GL1-JKT-E", "INBOUND", "PUTAWAY", "REFUND", "GAGAL QC", "RU HUB"]
+}
 # Helper UI Components
 def metric_box(title: str, val_str: str, text_color: str, bg_gradient: str):
     return ui.div(
@@ -378,6 +387,98 @@ def ppa_audit_view(state: AppState):
     return ui.div(
         upload_section,
         results_ui,
+        style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW CYCLE COUNT ANALYZER (LENGKAP 6 STEP)
+# ==============================================================================
+def cycle_count_analyzer_view(state: AppState):
+    list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
+    list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
+    list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
+
+    # Filter Section
+    filter_section = ui.div(
+        ui.h4("🏢 Pilih Cabang & Filter Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            ui.div(ui.input_select("cca_branch", "🏢 Cabang / Branch:", choices=list(BRANCH_BIN_MAPPING.keys()), selected="SURABAYA"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.input_selectize("cca_sub_kat", "🗂️ Sub Kategori:", choices=list_sub_kat, multiple=True), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True), style="flex: 1; min-width: 200px;"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.75rem;"
+        ),
+        ui.div(
+            ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 240px;"),
+            ui.div(ui.input_selectize("cca_bin_cov", "📡 BIN Coverage (Step 2):", choices=list_bin_cov, multiple=True), style="flex: 1; min-width: 240px;"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
+        ),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 1: Upload Data Scan & Stock
+    step1_ui = ui.div(
+        ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("cca_up_scan", "📥 DATA SCAN"),
+            custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
+        ),
+        ui.output_ui("cca_step1_btn_ui"),
+        ui.output_ui("cca_step1_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 2: Upload BIN Coverage
+    step2_ui = ui.div(
+        ui.h4("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_cov", "📥 FILE BIN COVERAGE"),
+        ui.output_ui("cca_step2_btn_ui"),
+        ui.output_ui("cca_step2_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 3: Recon Reports
+    step3_ui = ui.div(
+        ui.h4("3️⃣ RECON REPORTS (STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.output_ui("cca_step3_btn_ui"),
+        ui.output_ui("cca_step3_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 4: Recon Real + Process
+    step4_ui = ui.div(
+        ui.h4("4️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_recon_real", "📥 Upload HASIL RECON REAL +"),
+        ui.output_ui("cca_step4_btn_ui"),
+        ui.output_ui("cca_step4_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 5: Recon System + Process
+    step5_ui = ui.div(
+        ui.h4("5️⃣ RECON SYSTEM + PROCESS (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON (File Master Hasil Audit)"),
+        ui.output_ui("cca_step5_btn_ui"),
+        ui.output_ui("cca_step5_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 6: Miss Location Report
+    step6_ui = ui.div(
+        ui.h4("📊 MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.output_ui("cca_step6_btn_ui"),
+        ui.output_ui("cca_step6_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    return ui.div(
+        filter_section,
+        step1_ui,
+        step2_ui,
+        step3_ui,
+        step4_ui,
+        step5_ui,
+        step6_ui,
         style="width: 100%; padding: 1rem;"
     )
 
