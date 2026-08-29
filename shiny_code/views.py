@@ -711,3 +711,29 @@ def global_header(state: AppState):
         ),
         style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
     )
+
+# ==============================================================================
+# VIEW LIST BIN CYCLE COUNT (MENU: "List Bin Cycle Count")
+# ==============================================================================
+def cycle_count_view(state: AppState):
+    uploader_ui = ui.div(
+        ui.span("Upload File Multiple Adjustment", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
+        ui.div(
+            ui.input_file(
+                "upload_cycle_count_file", None, accept=[".xlsx", ".xls", ".csv"], multiple=False,
+                button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
+                placeholder="200MB per file • XLSX, XLS, CSV"
+            ),
+            class_="reflex-upload-container"
+        ),
+        ui.output_ui("cycle_count_action_btn_ui"),
+        style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    results_ui = ui.output_ui("cycle_count_results_container")
+
+    return ui.div(
+        uploader_ui,
+        results_ui,
+        style="width: 100%; padding: 1rem;"
+    )
