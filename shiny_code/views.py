@@ -7,12 +7,20 @@ from config import safe_int
 # CSS & JAVASCRIPT ASSETS (PERSIS REFLEX)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. JUDUL TAB BROWSER ---
-    ui.tags.title("ZKN WAREHOUSE ERP"),
+    # --- 1. SCRIPT OTOMATIS GANTI JUDUL & FAVICON PERMANEN ---
+    ui.tags.script("""
+        // Mengubah judul tab secara otomatis & permanen
+        document.title = "ZKN WAREHOUSE ERP";
 
-    # --- 2. ICON TAB BROWSER (Menggunakan image_981625.png) ---
-    ui.tags.link(rel="icon", type="image/png", href="image_981625.png"),
-
+        // Mengubah icon tab menjadi image_981625.png secara otomatis
+        let favicon = document.querySelector("link[rel~='icon']");
+        if (!favicon) {
+            favicon = document.createElement('link');
+            favicon.rel = 'icon';
+            document.head.appendChild(favicon);
+        }
+        favicon.href = './image_981625.png';
+    """),
     # --- 3. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
