@@ -323,6 +323,31 @@ def main_dashboard_view(state: AppState):
     )
     return ui.div(ui.navset_card_tab(ui.nav_panel("📥 INPUT & BATCH DATA", tab1_content), ui.nav_panel("📊 SUMMARY & HISTORY", tab2_content)), style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;")
 
+# ==============================================================================
+# VIEW LIST BIN CYCLE COUNT
+# ==============================================================================
+def cycle_count_view(state: AppState):
+    uploader_ui = ui.div(
+        ui.span("Upload File Multiple Adjustment", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
+        ui.div(
+            ui.input_file(
+                "upload_cycle_count_file", None, accept=[".xlsx", ".xls", ".csv"], multiple=False,
+                button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
+                placeholder="200MB per file • XLSX, XLS, CSV"
+            ),
+            class_="reflex-upload-container"
+        ),
+        ui.output_ui("cycle_count_action_btn_ui"),
+        style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    results_ui = ui.output_ui("cycle_count_results_container")
+
+    return ui.div(
+        uploader_ui,
+        results_ui,
+        style="width: 100%; padding: 1rem;"
+    )
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
     bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"

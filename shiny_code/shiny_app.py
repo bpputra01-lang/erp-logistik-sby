@@ -6,7 +6,7 @@ from views import (
     CUSTOM_HEAD, static_loading_spinner, success_modal, error_modal,
     render_clean_table, metric_box, dark_metric_box,   # <-- Tambahkan metric_box & dark_metric_box di sini
     compare_system_view, stock_minus_view,
-    putaway_view, main_dashboard_view, sidebar, login_page, global_header
+    putaway_view, main_dashboard_view, sidebar, cycle_count_view, login_page, global_header
 )
 
 app_ui = ui.page_fluid(
@@ -344,6 +344,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "stock_minus": page_content = stock_minus_view(state)
         elif content_type == "putaway_system": page_content = putaway_view(state)
         elif content_type == "compare_system": page_content = compare_system_view(state)
+        elif content_type == "cycle_count": page_content = cycle_count_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -354,5 +355,102 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.div(global_header(state), page_content, style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"),
             style="display: flex; width: 100vw; height: 100vh; overflow: hidden; background-color: #111318;"
         )
+# --- CYCLE COUNT BUTTON & HASIL ---
+    @render.ui
+    def cycle_count_action_btn_ui():
+        f = input.upload_cycle_count_file() if "upload_cycle_count_file" in input else None
+        if f and len(f) > 0:
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "PROSES DATA"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_process_cycle_count', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+            )
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "PILIH FILE UNTUK MEMULAI", disabled=True, class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 1rem;"
+        )
 
+    @render.ui
+    def cycle_count_results_container():
+        if not state.cc_processed():
+            return ui.div()
+
+        return ui.div(
+            # --- 1. FILTER MULTI-SELECT ---
+            ui.div(
+                ui.h4("🔍 Filter Brand, Sub Kategori & Kategori Harga", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                ui.div(
+                    ui.div(ui.input_selectize("cc_filter_sub", "🗂 Sub Kategori:", choices=state.cc_list_sub(), multiple=True), style="flex: 1; min-width: 200px;"),
+                    ui.div(ui.input_selectize("cc_filter_brand", "🏷️ Brand:", choices=state.cc_list_brand(), multiple=True), style="flex: 1; min-width: 200px;"),
+                    ui.div(ui.input_selectize("cc_filter_tier", "💰 Kategori Harga:", choices=state.cc_list_tier(), multiple=True), style="flex: 1; min-width: 200px;"),
+                    style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 1rem;"
+                ),
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+            ),
+
+            # --- 2. KOTAK METRIK DARK GOLD THEME ---
+            ui.div(
+                dark_metric_box("🏭 Total BIN Harus Di-Scan", f"{state.cc_total_bin():,}", "#C5A059"),
+                dark_metric_box("📦 Total SKU Harus Di-Scan", f"{state.cc_total_sku():,}", "#C5A059"),
+                dark_metric_box("🔢 Total QTY Harus di Scan", f"{state.cc_total_qty():,}", "#C5A059"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+
+            # --- 3. DETAIL PREVIEW TABLE & DOWNLOAD ---
+            ui.div(
+                ui.div(
+                    ui.h4("📋 Detail List Data Bin Cycle Count", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_cycle_count",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel (.xlsx)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_cc_headers(), state.df_cc_rows()),
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
+            ),
+            style="width: 100%;"
+        )
+
+    # Listener Filter Interaktif (Real-time Filter)
+    @reactive.Effect
+    def _on_cc_filter_change():
+        if state.cc_processed():
+            sub = input.cc_filter_sub() if "cc_filter_sub" in input else []
+            brand = input.cc_filter_brand() if "cc_filter_brand" in input else []
+            tier = input.cc_filter_tier() if "cc_filter_tier" in input else []
+            state.apply_cc_filters(sub, brand, tier)
+
+    # Eksekusi Proses File
+    @reactive.Effect
+    @reactive.event(input.btn_process_cycle_count)
+    def _proc_cycle_count():
+        f = input.upload_cycle_count_file()
+        if not f:
+            state.error_modal_message.set("Pilih file Multiple Adjustment terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        with open(f[0]["datapath"], "rb") as fp:
+            succ, msg = state.process_cycle_count_file(fp.read(), f[0]["name"])
+        if succ:
+            state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # Handler Download Excel
+    @render.download(filename="List_Bin_Cycle_Count.xlsx")
+    def btn_dl_cycle_count():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_cc_filtered.to_excel(writer, sheet_name='CYCLE_COUNT', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 app = App(app_ui, server)

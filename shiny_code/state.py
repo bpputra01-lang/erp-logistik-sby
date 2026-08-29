@@ -16,6 +16,7 @@ class AppState:
         self.password = reactive.Value("")
         self.login_timestamp_ms = reactive.Value(0)
         self.main_menu = reactive.Value("Database Ongkir In/Out")
+        
 
         # Sidebar Dropdowns
         self.sidebar_open = reactive.Value(True)
@@ -89,6 +90,21 @@ class AppState:
         self._raw_df_cs_all = pd.DataFrame()
         self._raw_df_cs_diff = pd.DataFrame()
 
+        #list bin cycle count
+        # --- CYCLE COUNT STATE ---
+        self.cc_processed = reactive.Value(False)
+        self.cc_list_sub = reactive.Value([])
+        self.cc_list_brand = reactive.Value([])
+        self.cc_list_tier = reactive.Value([])
+        self.cc_total_bin = reactive.Value(0)
+        self.cc_total_sku = reactive.Value(0)
+        self.cc_total_qty = reactive.Value(0)
+        self.df_cc_headers = reactive.Value([])
+        self.df_cc_rows = reactive.Value([])
+        self._raw_df_cc_base = pd.DataFrame()
+        self._raw_df_cc_filtered = pd.DataFrame()
+        self._cc_col_mapping = {}
+
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -147,6 +163,7 @@ class AppState:
         elif cur_menu == "Stock Minus": return "stock_minus"
         elif cur_menu == "Putaway System": return "putaway_system"
         elif cur_menu == "Compare System": return "compare_system"
+        elif cur_menu == "List Bin Cycle Count": return "cycle_count"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -578,3 +595,104 @@ class AppState:
             return True, "Comparison Selesai!"
             
         except Exception as e: return False, f"Terjadi Kesalahan: {e}"
+
+
+    # --- LIST BIN CYCLE COUNT ---
+    def process_cycle_count_file(self, file_bytes: bytes, file_name: str):
+        try:
+            df_raw = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl") if file_name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(file_bytes))
+            if df_raw.shape[1] < 10:
+                return False, "⚠️ File kurang dari 10 kolom! Pastikan format file sesuai (Kolom B, C, G, J)."
+
+            df_scan = df_raw.copy()
+            col_bin = df_raw.columns[1]
+            col_sku = df_raw.columns[2]
+            col_item = df_raw.columns[4]
+            col_variant = df_raw.columns[5]
+            col_sub = df_raw.columns[6]
+            col_harga = df_raw.columns[7]
+            col_qty = df_raw.columns[9]
+
+            brand_col = [col for col in df_raw.columns if 'BRAND' in str(col).upper()]
+            col_brand = brand_col[0] if brand_col else "BRAND"
+            if not brand_col:
+                df_scan["BRAND"] = "UNKNOWN"
+
+            df_scan[col_bin] = df_scan[col_bin].astype(str).str.strip()
+            df_scan[col_sku] = df_scan[col_sku].astype(str).str.strip()
+            df_scan[col_item] = df_scan[col_item].astype(str).str.strip().str.upper()
+            df_scan[col_variant] = df_scan[col_variant].astype(str).str.strip().str.upper()
+            df_scan[col_sub] = df_scan[col_sub].astype(str).str.strip().str.upper()
+            df_scan[col_brand] = df_scan[col_brand].astype(str).str.strip().str.upper()
+            df_scan[col_qty] = pd.to_numeric(df_scan[col_qty], errors='coerce').fillna(0).astype(int)
+            df_scan["HARGA_NUMERIC"] = pd.to_numeric(df_scan[col_harga], errors='coerce').fillna(0)
+
+            # Tiering Harga
+            kondisi = [
+                (df_scan["HARGA_NUMERIC"] >= 1000000),
+                (df_scan["HARGA_NUMERIC"] >= 700000) & (df_scan["HARGA_NUMERIC"] < 1000000),
+                (df_scan["HARGA_NUMERIC"] >= 400000) & (df_scan["HARGA_NUMERIC"] < 700000),
+                (df_scan["HARGA_NUMERIC"] >= 100000) & (df_scan["HARGA_NUMERIC"] < 400000),
+                (df_scan["HARGA_NUMERIC"] >= 0) & (df_scan["HARGA_NUMERIC"] < 100000)
+            ]
+            pilihan_tier = [
+                "LUXURY TIER (>= 1 JUTA)",
+                "TOP TIER (700 RIBU - < 1 JUTA)",
+                "MID TIER (400 RIBU - < 700 RIBU)",
+                "ENTRY TIER (100 RIBU - < 400 RIBU)",
+                "MASS MARKET TIER (0 - < 100 RIBU)"
+            ]
+            df_scan["TIER_HARGA"] = np.select(kondisi, pilihan_tier, default="Tidak Terdefinisi")
+
+            # Filter Block Bin
+            kata_kunci_block = "DEFECT|REJECT|KARANTINA|STAG|INB|OUT|PUTAWAY"
+            df_scan = df_scan[~df_scan[col_bin].str.contains(kata_kunci_block, case=False, na=False)]
+
+            # Simpan Opsi Filter
+            list_sub = sorted([str(x).strip().upper() for x in df_scan[col_sub].unique() if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'])
+            list_brand = sorted([str(x).strip().upper() for x in df_scan[col_brand].unique() if pd.notna(x) and str(x).strip() != '' and str(x).upper() != 'NAN'])
+            tier_unik = df_scan["TIER_HARGA"].unique()
+            list_tier = [t for t in pilihan_tier if t in tier_unik]
+
+            self.cc_list_sub.set(list_sub)
+            self.cc_list_brand.set(list_brand)
+            self.cc_list_tier.set(list_tier)
+
+            self._cc_col_mapping = {
+                "bin": col_bin, "sku": col_sku, "qty": col_qty,
+                "sub": col_sub, "brand": col_brand, "cols_asli": list(df_raw.columns)
+            }
+            self._raw_df_cc_base = df_scan
+            self.apply_cc_filters([], [], [])
+            self.cc_processed.set(True)
+            return True, "Data Cycle Count Berhasil Diproses!"
+        except Exception as e:
+            return False, f"Terjadi kesalahan saat memproses data: {e}"
+
+    def apply_cc_filters(self, selected_sub, selected_brand, selected_tier):
+        if self._raw_df_cc_base.empty:
+            return
+        df = self._raw_df_cc_base.copy()
+        cols = self._cc_col_mapping
+
+        if selected_sub and len(selected_sub) > 0:
+            df = df[df[cols["sub"]].isin(selected_sub)]
+        if selected_brand and len(selected_brand) > 0:
+            df = df[df[cols["brand"]].isin(selected_brand)]
+        if selected_tier and len(selected_tier) > 0:
+            df = df[df["TIER_HARGA"].isin(selected_tier)]
+
+        total_bin = df[cols["bin"]].nunique() if not df.empty else 0
+        unique_sku = df[cols["sku"]].nunique() if not df.empty else 0
+        total_qty = int(df[cols["qty"]].sum()) if not df.empty else 0
+
+        self.cc_total_bin.set(total_bin)
+        self.cc_total_sku.set(unique_sku)
+        self.cc_total_qty.set(total_qty)
+
+        cols_asli = [c for c in cols["cols_asli"] if c in df.columns]
+        display_df = df[cols_asli].copy()
+
+        self._raw_df_cc_filtered = display_df
+        self.df_cc_headers.set(display_df.columns.tolist() if not display_df.empty else [])
+        self.df_cc_rows.set(display_df.fillna("").astype(str).values.tolist() if not display_df.empty else [])
