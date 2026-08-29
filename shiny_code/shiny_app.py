@@ -492,7 +492,7 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         return ui.div(
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
-            ui.h4("📋 RINGKASAN INTEGRATED AUDIT", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
+            ui.h4("📋 RINGKASAN DETAIL AUDIT", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
             
             # --- 4 KOTAK METRIK DARK THEME ---
             ui.div(
