@@ -1,3 +1,5 @@
+import os
+import base64
 from datetime import datetime
 from shiny import ui
 from state import AppState
@@ -147,6 +149,17 @@ BRANCH_BIN_MAPPING = {
     "HUB JAKARTA": ["GL1-JKT-A", "GL1-JKT-B", "GL1-JKT-C", "GL1-JKT-D", "GL1-JKT-E", "INBOUND", "PUTAWAY", "REFUND", "GAGAL QC", "RU HUB"]
 }
 
+
+# Helper membaca gambar otomatis agar tidak pernah broken/gagal load
+def get_image_base64(filename):
+    try:
+        if os.path.exists(filename):
+            with open(filename, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/png;base64,{encoded}"
+    except Exception:
+        pass
+    return f"./{filename}"
 # Helper UI Components
 def metric_box(title: str, val_str: str, text_color: str, bg_gradient: str):
     return ui.div(
@@ -461,7 +474,19 @@ def sidebar(state: AppState):
     return ui.div(
         ui.div(
             ui.div(
-                ui.div(ui.tags.img(src="image_981625.png", style="width: 24px; height: 24px; object-fit: contain;"), style="width: 38px; height: 38px; background: linear-gradient(135deg, #E50914 0%, #B20710 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); flex-shrink: 0;"),
+                # --- BOX LOGO GAMBAR (100% AMAN & ANTI-BROKEN) ---
+                ui.div(
+                    ui.tags.img(
+                        src=get_image_base64("image_981625.png"), 
+                        style="width: 24px; height: 24px; object-fit: contain;"
+                    ),
+                    style="""
+                        width: 38px; height: 38px; 
+                        background: linear-gradient(135deg, #E50914 0%, #B20710 100%); 
+                        border-radius: 8px; display: flex; align-items: center; justify-content: center; 
+                        box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); flex-shrink: 0;
+                    """
+                ),
                 ui.div(ui.span("ZKN LOGISTIC", style="color: #E50914; font-weight: 900; font-size: 14px; letter-spacing: 0.5px; line-height: 1.2;"), ui.span("WAREHOUSE SYSTEM", style="color: #FFFFFF; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; opacity: 0.9;"), style="display: flex; flex-direction: column; justify-content: center;"),
                 style="display: flex; align-items: center; gap: 10px;"
             ),
