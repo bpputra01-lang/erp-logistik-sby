@@ -1891,6 +1891,34 @@ def server(input: Inputs, output: Outputs, session: Session):
 # ==========================================================================
     # JUSTIFICATION SO CONTROLLER & HANDLERS
     # ==========================================================================
+
+    @render.ui
+    def justification_so_action_btn_ui():
+        f1 = input.uploader_jso_case() if "uploader_jso_case" in input else None
+        f2 = input.uploader_jso_track() if "uploader_jso_track" in input else None
+        f3 = input.uploader_jso_all() if "uploader_jso_all" in input else None
+
+        # Jika 3 file utama sudah di-upload -> Tombol Merah Aktif
+        if (f1 and len(f1) > 0) and (f2 and len(f2) > 0) and (f3 and len(f3) > 0):
+            return ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE JUSTIFICATION"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_jso', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            )
+        # Jika belum lengkap -> Tombol Terkunci Transparan
+        return ui.div(
+            ui.tags.button(
+                ui.tags.i(class_="fa-solid fa-lock", style="margin-right: 6px; font-size: 14px;"),
+                "UPLOAD 3 FILE UTAMA UNTUK MEMULAI",
+                disabled=True,
+                class_="btn-locked"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        )
+
     @render.ui
     def justification_so_results_container():
         if not state.jso_processed(): return ui.div()

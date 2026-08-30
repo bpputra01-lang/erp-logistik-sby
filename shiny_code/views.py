@@ -824,7 +824,7 @@ def stock_opname_view(state: AppState):
     )
 
 # ==============================================================================
-# VIEW JUSTIFICATION SO (JUSTIFICATION ADJUSTMENT ANALYZER)
+# VIEW JUSTIFICATION SO (DENGAN LOGIKA KUNCI TOMBOL OTOMATIS)
 # ==============================================================================
 def justification_so_view(state: AppState):
     upload_section = ui.div(
@@ -836,14 +836,8 @@ def justification_so_view(state: AppState):
             custom_uploader_box("uploader_jso_scan", "4. Data Scan (Opsional)"),
             style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
         ),
-        ui.div(
-            ui.tags.button(
-                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE JUSTIFICATION"),
-                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_jso', Math.random(), {priority: 'event'});",
-                class_="btn-red-gradient"
-            ),
-            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
-        ),
+        # Ganti tombol statis dengan sub-render tombol otomatis:
+        ui.output_ui("justification_so_action_btn_ui"),
         style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
     )
 
