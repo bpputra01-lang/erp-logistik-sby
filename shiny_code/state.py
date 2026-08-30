@@ -1,6 +1,7 @@
 import io
 import time
 from datetime import datetime
+import numpy as np       
 import pandas as pd
 from shiny import reactive
 from config import get_supabase, safe_int, load_data_from_info
