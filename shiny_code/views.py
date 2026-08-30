@@ -21,9 +21,7 @@ def get_image_base64(filename):
 # ==============================================================================
 # CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK ANTI-LONCAT)
 # ==============================================================================
-# ==============================================================================
-# CSS & JAVASCRIPT ASSETS (ZERO-GLITCH SCROLL LOCK & SMOOTH)
-# ==============================================================================
+
 CUSTOM_HEAD = ui.head_content(
     # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & ZERO-GLITCH SCROLL) ---
     ui.tags.script("""
@@ -208,6 +206,30 @@ CUSTOM_HEAD = ui.head_content(
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
         
+        .selectize-control .selectize-input {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 14px !important;
+            padding-right: 2.25rem !important;
+        }
+
+        /* Saat dropdown sedang diklik/dibuka (Panah berbalik ke atas & berubah merah) */
+        .selectize-control .selectize-input.dropdown-active {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E50914' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='18 15 12 9 6 15'%3E%3C/polyline%3E%3C/svg%3E") !important;
+        }
+
+        /* 2. Untuk Semua Dropdown Native (<select>) */
+        select.form-control, select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A5568' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 14px !important;
+            padding-right: 2.25rem !important;
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+        }
         /* Mematikan reflek loncat otomatis browser */
         #main-scroll-container {
             overflow-anchor: none !important;
