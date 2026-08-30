@@ -218,6 +218,38 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
             )
 
+            elif cur == "Compare RTO":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Informasi Format File"),
+                    ui.div(
+                        ui.tags.strong("Format yang diharapkan:"),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("DS RTO:"), " Kolom A = SKU, Kolom B = QTY SCAN."),
+                            ui.tags.li(ui.strong("APPSHEET RTO:"), " Download Spreadsheet Rekap AppSheet sesuai sheet RTO yang dituju."),
+                            ui.tags.li(ui.strong("UPLOAD HASIL CEK REAL:"), " Upload hasil rekonsiliasi yang sudah diisi real fisik."),
+                            ui.tags.li(ui.strong("DRAFT RTO:"), " Download Draft RTO yang dibuat purchasing di awal.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                ),
+                ui.tags.details(
+                    ui.tags.summary("💡 Logic Thinking"),
+                    ui.div(
+                        ui.tags.strong("Alur Process Compare RTO (DS vs AppSheet vs Draft):"),
+                        ui.tags.ol(
+                            ui.tags.li("Compare SKU & QTY antara Data Scan (DS) vs AppSheet."),
+                            ui.tags.li(ui.strong("Kelebihan Ambil:"), " QTY di DS > AppSheet. ", ui.strong("Kurang Ambil:"), " QTY di DS < AppSheet."),
+                            ui.tags.li("Hasil rekonsiliasi dimasukkan untuk refresh sinkronisasi."),
+                            ui.tags.li("Compare hasil AppSheet dengan Draft RTO Jezpro (Validasi QTY & BIN)."),
+                            ui.tags.li("Status: ", ui.strong("OK"), ", ", ui.strong("Perlu Edit QTY Draft"), ", ", ui.strong("Perlu Edit BIN Draft"), ", ", ui.strong("Delete Item"), ", dan ", ui.strong("Add New"), "."),
+                            ui.tags.li("Generate New Draft otomatis untuk upload balik ke Jezpro.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
         # FALLBACK JIKA MENU LAIN
         else:
             guide_body = ui.div(
@@ -481,6 +513,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "cycle_count": page_content = cycle_count_view(state)
         elif content_type == "ppa_audit": page_content = ppa_audit_view(state)
         elif content_type == "cycle_count_analyzer": page_content = cycle_count_analyzer_view(state)
+        elif content_type == "compare_rto": page_content = compare_rto_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
