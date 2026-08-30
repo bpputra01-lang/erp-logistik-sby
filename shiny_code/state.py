@@ -336,6 +336,17 @@ class AppState:
         self._raw_df_so_adj_detail = pd.DataFrame()
         self._raw_df_so_adj_sum = pd.DataFrame()
 
+        # --- JUSTIFICATION SO STATE ---
+        self.jso_processed = reactive.Value(False)
+        self.jso_c_undef = reactive.Value(0)
+        self.jso_c_sys = reactive.Value(0)
+        self.jso_c_adj = reactive.Value(0)
+        self.jso_c_rto = reactive.Value(0)
+        self.jso_c_rekon = reactive.Value(0)
+        self.df_jso_headers = reactive.Value([])
+        self.df_jso_rows = reactive.Value([])
+        self._raw_df_jso_res = pd.DataFrame()
+
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -399,6 +410,7 @@ class AppState:
         elif cur_menu == "Cycle Count": return "cycle_count_analyzer"
         elif cur_menu == "Compare RTO": return "compare_rto"
         elif cur_menu == "Stock Opname": return "stock_opname"
+        elif cur_menu == "Justification SO": return "justification_so"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -2267,3 +2279,188 @@ class AppState:
             return True, "Summary Adjustment Berhasil Dibuat!"
         except Exception as e:
             return False, f"Gagal Summary Adjustment: {e}"
+
+# ==========================================================================
+    # JUSTIFICATION SO ALGORITHM (PORTED FROM STREAMLIT)
+    # ==========================================================================
+    def process_justification_so(self, f_case, f_track, f_all_stock, f_scan=None):
+        try:
+            df_case = load_data_from_info(f_case)
+            df_tracking = load_data_from_info(f_track)
+            df_all_stock = load_data_from_info(f_all_stock)
+            df_scan = load_data_from_info(f_scan) if f_scan else None
+
+            if df_case.empty or df_tracking.empty or df_all_stock.empty:
+                return False, "File Adjustment, Summary Stock, dan All Data Stock wajib diupload!"
+
+            res = df_case.copy()
+            res.columns = [str(c).upper().strip() for c in res.columns]
+
+            df_tracking = df_tracking.copy()
+            df_tracking.columns = [str(c).upper().strip() for c in df_tracking.columns]
+
+            df_all_stock = df_all_stock.copy()
+            df_all_stock.columns = [str(c).upper().strip() for c in df_all_stock.columns]
+
+            sku_col_case = 'SKU'
+            qty_sys_col_case = 'QTY SYSTEM'
+            qty_so_col_case = 'QTY SO'
+
+            res['SKU_KEY_JOIN'] = res[sku_col_case].astype(str).str.split('.').str[0].str.strip().str.upper()
+
+            # 2. Aggregasi Tracking (Kolom A-O)
+            sku_col_track = df_tracking.columns[2]
+            track_agg = df_tracking.groupby(sku_col_track).agg({
+                df_tracking.columns[4]: 'sum',
+                df_tracking.columns[5]: 'sum',
+                df_tracking.columns[6]: 'sum',
+                df_tracking.columns[7]: 'sum',
+                df_tracking.columns[8]: 'sum',
+                df_tracking.columns[9]: 'sum',
+                df_tracking.columns[10]: 'sum',
+                df_tracking.columns[11]: 'sum',
+                df_tracking.columns[12]: 'sum',
+                df_tracking.columns[13]: 'sum',
+                df_tracking.columns[14]: 'sum'
+            }).reset_index()
+
+            track_agg.columns = [
+                'SKU_KEY', 'BEGINNING STOCK', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN',
+                '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT',
+                '_N_ENDING_STOCK', '_O_CURR_STOCK'
+            ]
+            track_agg['SKU_KEY'] = track_agg['SKU_KEY'].astype(str).str.split('.').str[0].str.strip().str.upper()
+
+            # 3. Aggregasi All Data Stock
+            sku_col_all = df_all_stock.columns[2]
+            qty_sys_col_all = df_all_stock.columns[9]
+
+            all_stock_agg = df_all_stock.groupby(sku_col_all).agg({
+                qty_sys_col_all: 'sum'
+            }).reset_index()
+
+            all_stock_agg.columns = ['SKU_KEY_ALL', '_QTY_SYS_ALL']
+            all_stock_agg['SKU_KEY_ALL'] = all_stock_agg['SKU_KEY_ALL'].astype(str).str.split('.').str[0].str.strip().str.upper()
+
+            # 4. Merge Data
+            res = res.merge(track_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY', how='left').fillna(0)
+            res = res.merge(all_stock_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_ALL', how='left').fillna(0)
+
+            # 5. Mapping Kolom Final
+            res['BEGINNING STOCK'] = res['BEGINNING STOCK']
+            res['ENDING STOCK'] = res['_N_ENDING_STOCK']
+            res['CURRENT STOCK'] = res['_O_CURR_STOCK']
+            res['TOTAL_STOCKIN'] = res['_F_STOCK_IN']
+            res['TOTAL_ADJ_PLUS'] = res['_G_ADJ_IN']
+            res['TOTAL TRF_IN'] = res['_H_TRF_IN']
+            res['TOTAL DRAFT_TRF_IN'] = res['_I_DRAFT_IN']
+            res['TOTAL SALES'] = res['_J_SALES']
+            res['TOTAL_ADJ_MINUS'] = res['_K_ADJ_OUT']
+            res['TOTAL DRAFT_TRF_OUT'] = res['_L_DRAFT_OUT']
+            res['TOTAL TRF_OUT'] = res['_M_TRF_OUT']
+            res['QTY SYSTEM ALL'] = res['_QTY_SYS_ALL']
+            res['GAP ADJUSMENT'] = res['TOTAL_ADJ_PLUS'] - res['TOTAL_ADJ_MINUS']
+
+            # Real QTY Calculation
+            if df_scan is not None and not df_scan.empty:
+                df_scan_copy = df_scan.copy()
+                sku_col_scan = df_scan_copy.columns[1]
+                qty_col_scan = df_scan_copy.columns[2]
+
+                scan_agg = df_scan_copy.groupby(sku_col_scan).agg({qty_col_scan: 'sum'}).reset_index()
+                scan_agg.columns = ['SKU_KEY_SCAN', 'REAL_QTY_SCAN']
+                scan_agg['SKU_KEY_SCAN'] = scan_agg['SKU_KEY_SCAN'].astype(str).str.split('.').str[0].str.strip().str.upper()
+
+                res = res.merge(scan_agg, left_on='SKU_KEY_JOIN', right_on='SKU_KEY_SCAN', how='left').fillna(0)
+                res['REAL QTY'] = res['REAL_QTY_SCAN']
+                res = res.drop(columns=['SKU_KEY_SCAN', 'REAL_QTY_SCAN'], errors='ignore')
+            else:
+                res['REAL QTY'] = (
+                    res['BEGINNING STOCK'] + res['TOTAL_STOCKIN'] + res['TOTAL TRF_IN']
+                    - res['TOTAL SALES'] - res['TOTAL TRF_OUT'] - res['TOTAL DRAFT_TRF_OUT']
+                )
+
+            # 6. Formula Justifikasi Otomatis
+            def run_formula(row):
+                try:
+                    qty_sys_row = round(float(row[qty_sys_col_case]), 2)
+                    qty_so_row = round(float(row[qty_so_col_case]), 2)
+                    begin_stock = round(float(row['BEGINNING STOCK']), 2)
+                    stock_in = round(float(row['TOTAL_STOCKIN']), 2)
+                    trf_in = round(float(row['TOTAL TRF_IN']), 2)
+                    sales = round(float(row['TOTAL SALES']), 2)
+                    trf_out = round(float(row['TOTAL TRF_OUT']), 2)
+                    gap_adj = round(float(row['GAP ADJUSMENT']), 2)
+                    curr_stock = round(float(row['CURRENT STOCK']), 2)
+                    qty_sys_all = round(float(row['QTY SYSTEM ALL']), 2)
+                    draft_in = round(float(row['TOTAL DRAFT_TRF_IN']), 2)
+                    draft_out = round(float(row['TOTAL DRAFT_TRF_OUT']), 2)
+                    ending_stock = round(float(row['ENDING STOCK']), 2)
+                    real_qty = round(float(row['REAL QTY']), 2)
+
+                    if qty_so_row > qty_sys_row and begin_stock < 0:
+                        if gap_adj > 0 and gap_adj < abs(begin_stock): return "KESALAHAN SYSTEM (BEGIN STOCK -)"
+                        elif gap_adj == 0: return "KESALAHAN SYSTEM (BEGIN STOCK -)"
+
+                    if gap_adj == 0 and begin_stock == 0:
+                        if ending_stock == real_qty == curr_stock:
+                            if qty_sys_all < ending_stock: return "KESALAHAN SYSTEM"
+
+                    if qty_sys_row > qty_so_row and gap_adj > 0: return "KESALAHAN ADJUSMENT +"
+                    elif qty_sys_row < qty_so_row and gap_adj < 0: return "KESALAHAN ADJUSMENT -"
+
+                    if qty_so_row > qty_sys_row and begin_stock >= 0 and gap_adj == 0 and draft_in == 0 and draft_out == 0:
+                        mutasi_bersih = round(begin_stock + (stock_in + trf_in) - (sales + trf_out), 2)
+                        if mutasi_bersih != ending_stock: return "KESALAHAN SYSTEM"
+
+                    if gap_adj == 0:
+                        if qty_sys_row > qty_so_row:
+                            diff = qty_sys_row - qty_so_row
+                            if round(qty_sys_all - diff, 2) == curr_stock: return "KESALAHAN SYSTEM"
+                        elif qty_sys_row < qty_so_row:
+                            diff = qty_so_row - qty_sys_row
+                            if round(qty_sys_all + diff, 2) == curr_stock: return "KESALAHAN SYSTEM"
+
+                    if draft_in > 0 or draft_out > 0: return "KESALAHAN RTO"
+                    if qty_sys_all == curr_stock: return "CEK HASIL REKONSILIASI"
+
+                    return "UNDEFINED"
+                except:
+                    return "ERROR DATA"
+
+            res['JUSTIFICATION'] = res.apply(run_formula, axis=1)
+
+            ordered_headers = [
+                'IDENTIFY', 'BIN', 'SKU', 'BRAND', 'ITEM NAME', 'VARIANT', 'SUB KATEGORI',
+                'HARGA BELI', 'HARGA JUAL', 'QTY SYSTEM', 'QTY SO',
+                'BEGINNING STOCK', 'TOTAL_STOCKIN', 'TOTAL_ADJ_PLUS', 'TOTAL TRF_IN',
+                'TOTAL DRAFT_TRF_IN', 'TOTAL SALES', 'TOTAL_ADJ_MINUS', 'TOTAL DRAFT_TRF_OUT',
+                'TOTAL TRF_OUT', 'ENDING STOCK', 'REAL QTY', 'CURRENT STOCK',
+                'QTY SYSTEM ALL', 'GAP ADJUSMENT', 'JUSTIFICATION'
+            ]
+
+            drop_cols = ['SKU_KEY_JOIN', 'SKU_KEY', 'SKU_KEY_ALL', '_F_STOCK_IN', '_G_ADJ_IN', '_H_TRF_IN', '_I_DRAFT_IN', '_J_SALES', '_K_ADJ_OUT', '_L_DRAFT_OUT', '_M_TRF_OUT', '_N_ENDING_STOCK', '_O_CURR_STOCK', '_QTY_SYS_ALL']
+            res = res.drop(columns=[c for c in drop_cols if c in res.columns], errors='ignore')
+            final_df = res[[c for c in ordered_headers if c in res.columns]].copy()
+
+            # Hitung Metrik
+            c_undef = len(final_df[final_df['JUSTIFICATION'] == "UNDEFINED"])
+            c_sys = len(final_df[final_df['JUSTIFICATION'].isin(["KESALAHAN SYSTEM", "KESALAHAN SYSTEM (BEGIN STOCK -)"])])
+            c_adj = len(final_df[final_df['JUSTIFICATION'].isin(["KESALAHAN ADJUSMENT +", "KESALAHAN ADJUSMENT -"])])
+            c_rto = len(final_df[final_df['JUSTIFICATION'] == "KESALAHAN RTO"])
+            c_rekon = len(final_df[final_df['JUSTIFICATION'] == "CEK HASIL REKONSILIASI"])
+
+            self.jso_c_undef.set(c_undef)
+            self.jso_c_sys.set(c_sys)
+            self.jso_c_adj.set(c_adj)
+            self.jso_c_rto.set(c_rto)
+            self.jso_c_rekon.set(c_rekon)
+
+            self._raw_df_jso_res = final_df.copy()
+            self.df_jso_headers.set(final_df.columns.tolist())
+            self.df_jso_rows.set(final_df.fillna("").astype(str).values.tolist())
+
+            self.jso_processed.set(True)
+            return True, f"Justifikasi Selesai! ({len(final_df):,} Baris Diproses)"
+        except Exception as e:
+            return False, f"Gagal Justifikasi SO: {e}"

@@ -823,6 +823,38 @@ def stock_opname_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# VIEW JUSTIFICATION SO (JUSTIFICATION ADJUSTMENT ANALYZER)
+# ==============================================================================
+def justification_so_view(state: AppState):
+    upload_section = ui.div(
+        ui.h4("📥 Upload Dokumen Justifikasi Adjustment", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("uploader_jso_case", "1. File Adjustment (Plus & Minus)"),
+            custom_uploader_box("uploader_jso_track", "2. Summary Stock (Dashboard Asset)"),
+            custom_uploader_box("uploader_jso_all", "3. All Data Stock (Multiple Adj.)"),
+            custom_uploader_box("uploader_jso_scan", "4. Data Scan (Opsional)"),
+            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+        ),
+        ui.div(
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE JUSTIFICATION"),
+                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_jso', Math.random(), {priority: 'event'});",
+                class_="btn-red-gradient"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        ),
+        style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+    )
+
+    results_ui = ui.output_ui("justification_so_results_container")
+
+    return ui.div(
+        upload_section,
+        results_ui,
+        style="width: 100%; padding: 1rem;"
+    )
+
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)

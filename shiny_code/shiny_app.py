@@ -6,7 +6,7 @@ from views import (
     CUSTOM_HEAD, static_loading_spinner, success_modal, error_modal,
     render_clean_table, metric_box, dark_metric_box,  BRANCH_BIN_MAPPING, 
     custom_uploader_box, compare_system_view, stock_minus_view, stock_opname_view,
-    putaway_view, main_dashboard_view, sidebar, compare_rto_view, cycle_count_view, login_page, ppa_audit_view, cycle_count_analyzer_view, global_header
+    putaway_view, main_dashboard_view, sidebar, compare_rto_view, justification_so_view, cycle_count_view, login_page, ppa_audit_view, cycle_count_analyzer_view, global_header
 )
 
 app_ui = ui.page_fluid(
@@ -249,7 +249,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ), open=True
                 )
             )
-            
+
         elif cur == "Stock Opname":
             guide_body = ui.div(
                 ui.tags.details(
@@ -279,6 +279,40 @@ def server(input: Inputs, output: Outputs, session: Session):
                             ui.tags.li(ui.strong("Final Adjustment:"), " Sinkronisasi ke Staging Inbound untuk Multiple & Single Adj +."),
                             ui.tags.li(ui.strong("Set Up Karantina:"), " Selisih fisik positif (DIFF > 0) dimutasi ke BIN Karantina (Note: NOT FOUND)."),
                             ui.tags.li(ui.strong("Miss Location & Summary:"), " Evaluasi rekapitulasi salah letak dan net finansial value adjustment.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
+        elif cur == "Justification SO":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Informasi Format File"),
+                    ui.div(
+                        ui.tags.strong("Format yang diharapkan:"),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("ADJUSTMENT FILE:"), " Gabungkan Multiple Adjustment (Plus) dan (Minus) dalam 1 File."),
+                            ui.tags.li(ui.strong("SUMMARY STOCK:"), " Download dari Jezpro pada menu Dashboard Asset (Store: JEZ SURABAYA)."),
+                            ui.tags.li(ui.strong("ALL DATA STOCK:"), " File Multiple Adjustment dengan filter 'HANYA ADA STOCK'."),
+                            ui.tags.li(ui.strong("DATA SCAN (Opsional):"), " Jika diupload, perhitungan Real QTY akan mengambil langsung dari hasil scan fisik.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                ),
+                ui.tags.details(
+                    ui.tags.summary("💡 Logic Thinking (7 Aturan Justifikasi)"),
+                    ui.div(
+                        ui.tags.strong("Rumus Real QTY Manual:"),
+                        ui.p("BEGINNING STOCK + (TOTAL_STOCKIN + TOTAL TRF_IN) - (TOTAL SALES + TOTAL TRF_OUT + TOTAL DRAFT TRF_OUT)", style="font-family: monospace; font-weight: bold; background: #EDF2F7; padding: 6px; border-radius: 4px;"),
+                        ui.tags.ol(
+                            ui.tags.li(ui.strong("Kesalahan System (Begin Stock -):"), " Stok SO > Sistem, tetapi Beginning Stock minus (< 0)."),
+                            ui.tags.li(ui.strong("Kesalahan System (Ending Stock != Qty System All):"), " Gap Adj & Begin Stock = 0, tetapi Qty System All < Ending Stock."),
+                            ui.tags.li(ui.strong("Kesalahan Adjustment (+/-):"), " Terjadi pembalikan selisih akibat koreksi adjustment sebelumnya."),
+                            ui.tags.li(ui.strong("Kesalahan System (Mutasi Bersih != Ending Stock):"), " Hasil hitungan manual barang masuk-keluar tidak sinkron dengan stok akhir."),
+                            ui.tags.li(ui.strong("Kesalahan System (Stock System Lost):"), " Selisih fisik pas dengan selisih master Current Stock."),
+                            ui.tags.li(ui.strong("Kesalahan RTO (Barang Gantung):"), " Masih ada transaksi draft transfer in / out yang belum selesai."),
+                            ui.tags.li(ui.strong("Cek Hasil Rekonsiliasi:"), " Total stock di multiple pas persis dengan Current / Ending Stock.")
                         ),
                         class_="accordion-content"
                     ), open=True
@@ -549,6 +583,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "cycle_count_analyzer": page_content = cycle_count_analyzer_view(state)
         elif content_type == "compare_rto": page_content = compare_rto_view(state)
         elif content_type == "stock_opname": page_content = stock_opname_view(state)
+        elif content_type == "justification_so": page_content = justification_so_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -1850,6 +1885,66 @@ def server(input: Inputs, output: Outputs, session: Session):
             if not state._raw_df_so_sing.empty: state._raw_df_so_sing.to_excel(writer, sheet_name='9_SINGLE ADJ PLUS', index=False)
             if not state._raw_df_so_res4.empty: state._raw_df_so_res4.to_excel(writer, sheet_name='10_HASIL CEK ADJ', index=False)
             if not state._raw_df_so_karantina.empty: state._raw_df_so_karantina.to_excel(writer, sheet_name='11_KARANTINA', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+# ==========================================================================
+    # JUSTIFICATION SO CONTROLLER & HANDLERS
+    # ==========================================================================
+    @render.ui
+    def justification_so_results_container():
+        if not state.jso_processed(): return ui.div()
+        return ui.div(
+            ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+            ui.h4("📋 RINGKASAN METRIK JUSTIFIKASI ADJUSTMENT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            ui.div(
+                dark_metric_box("❓ UNDEFINED", f"{state.jso_c_undef():,} SKU", "#DD6B20"),
+                dark_metric_box("💻 SYS ERROR", f"{state.jso_c_sys():,} SKU", "#E53E3E"),
+                dark_metric_box("❌ KESALAHAN ADJ", f"{state.jso_c_adj():,} SKU", "#E53E3E"),
+                dark_metric_box("🗳️ KESALAHAN RTO", f"{state.jso_c_rto():,} SKU", "#3182CE"),
+                dark_metric_box("🔁 CEK REKON", f"{state.jso_c_rekon():,} SKU", "#C5A059"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.div(
+                ui.div(
+                    ui.h4("📋 Ringkasan Hasil Analisis Justifikasi", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_jso_excel",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL REKON (.XLSX)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_jso_headers(), state.df_jso_rows(), "tbl_jso_summary"),
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
+            ),
+            style="width: 100%;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_jso)
+    def _proc_jso():
+        f1 = input.uploader_jso_case()
+        f2 = input.uploader_jso_track()
+        f3 = input.uploader_jso_all()
+        f4 = input.uploader_jso_scan()
+
+        if not f1 or not f2 or not f3:
+            state.error_modal_message.set("Pilih ketiga file utama (File Adjustment, Summary Stock, All Data Stock) terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        succ, msg = state.process_justification_so(f1, f2, f3, f4)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="rekon_stock_so.xlsx")
+    def btn_dl_jso_excel():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_jso_res.to_excel(writer, sheet_name='Summary', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
