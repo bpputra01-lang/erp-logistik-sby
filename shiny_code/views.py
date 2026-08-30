@@ -646,8 +646,26 @@ def global_header(state: AppState):
     return ui.div(
         ui.div(ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"), ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"), style="display: flex; flex-direction: column; align-items: flex-start;"), style="display: flex; align-items: center;"),
         ui.div(
-            ui.tags.button(ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"), "Panduan & Logic", onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})", style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"),
-            ui.div(ui.div(ui.div(style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px;"), ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"), style="display: flex; align-items: center;"), ui.div(ui.span(str(state.login_timestamp_ms()), id="login-time-store", style="display: none;"), ui.tags.i(class_="fa-regular fa-clock", style="font-size: 12px; color: #4A5568; margin-right: 4px;"), ui.span("00:00:00", id="live-timer", style="color: #4A5568; font-weight: bold; font-size: 12px; font-family: monospace;"), style="display: flex; align-items: center; justify-content: center;"), style="display: flex; flex-direction: column; align-items: center; gap: 2px;"),
+            ui.tags.button(ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"), "Panduan & Logic", onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})", style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
+            ),
+            ui.div(
+                ui.div(
+                    # --- TITIK HIJAU BERKEDIP ---
+                    ui.div(
+                        style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px; animation: blinkAnimation 1.5s infinite ease-in-out;",
+                        class_="blink-online"
+                    ),
+                    ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"),
+                    style="display: flex; align-items: center;"
+                ),
+                ui.div(
+                    ui.span(str(state.login_timestamp_ms()), id="login-time-store", style="display: none;"),
+                    ui.tags.i(class_="fa-regular fa-clock", style="font-size: 12px; color: #4A5568; margin-right: 4px;"),
+                    ui.span("00:00:00", id="live-timer", style="color: #4A5568; font-weight: bold; font-size: 12px; font-family: monospace;"),
+                    style="display: flex; align-items: center; justify-content: center;"
+                ),
+                style="display: flex; flex-direction: column; align-items: center; gap: 2px;"
+            ),
             style="display: flex; align-items: center; gap: 1.25rem;"
         ),
         style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
