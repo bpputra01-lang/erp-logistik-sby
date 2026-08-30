@@ -488,7 +488,12 @@ def server(input: Inputs, output: Outputs, session: Session):
 
         return ui.div(
             sidebar(state),
-            ui.div(global_header(state), page_content, style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"),
+            ui.div(
+                global_header(state),
+                page_content,
+                id="main-scroll-container",   # <-- TAMBAHKAN ID INI DI SINI
+                style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
+            ),
             style="display: flex; width: 100vw; height: 100vh; overflow: hidden; background-color: #111318;"
         )
 # --- CYCLE COUNT BUTTON & HASIL ---

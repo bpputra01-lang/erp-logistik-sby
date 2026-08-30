@@ -19,10 +19,10 @@ def get_image_base64(filename):
     return f"./{filename}"
 
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (PERSIS REFLEX) - HANYA 1 KALI
+# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK ANTI-LONCAT)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT OTOMATIS: JUDUL, FAVICON, PAGINASI, DRAG & DROP, & SCROLL KEEPER ---
+    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & SCROLL LOCK ANTI-LONCAT) ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -33,7 +33,7 @@ CUSTOM_HEAD = ui.head_content(
         }
         favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
 
-        // --- 1. ENGINE PAGINASI CEPAT (0ms) ---
+        // --- ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
         window.renderFastTablePage = function(tableId) {
             let tState = window.fastTables[tableId];
@@ -96,7 +96,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
-        // --- 2. FITUR DRAG & DROP FILE DARI EXPLORER KE SELURUH BOX ---
+        // --- DRAG & DROP DARI EXPLORER KE SELURUH BOX ---
         document.addEventListener('dragover', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box) {
@@ -105,7 +105,6 @@ CUSTOM_HEAD = ui.head_content(
                 box.style.backgroundColor = '#FFF5F5';
             }
         });
-
         document.addEventListener('dragleave', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box) {
@@ -114,7 +113,6 @@ CUSTOM_HEAD = ui.head_content(
                 box.style.backgroundColor = '';
             }
         });
-
         document.addEventListener('drop', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box && e.dataTransfer && e.dataTransfer.files.length > 0) {
@@ -129,21 +127,54 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 3. SMART SCROLL POSITION KEEPER (AGAR LAYAR TIDAK LONCAT KE ATAS) ---
-        let currentScrollY = 0;
-        window.addEventListener('scroll', function() {
-            let container = document.querySelector('div[style*="overflow-y: auto"]');
-            if (container) {
-                currentScrollY = container.scrollTop;
+        // --- 100% BULLETPROOF SMART SCROLL LOCK (ANTI-LONCAT KE ATAS) ---
+        let lastUserScrollY = 0;
+        let isManualScroll = false;
+        let scrollDebounce = null;
+
+        function getScrollPanel() {
+            return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
+        }
+
+        // Catat posisi scroll aktual yang digeser oleh user
+        document.addEventListener("scroll", function(e) {
+            let panel = getScrollPanel();
+            if (panel && (e.target === panel || e.target === document)) {
+                lastUserScrollY = panel.scrollTop;
+                isManualScroll = true;
+                clearTimeout(scrollDebounce);
+                scrollDebounce = setTimeout(function() {
+                    isManualScroll = false;
+                }, 150);
             }
         }, true);
 
-        setInterval(function() {
-            let container = document.querySelector('div[style*="overflow-y: auto"]');
-            if (container && document.body.classList.contains('process-running')) {
-                container.scrollTop = currentScrollY;
+        // Kunci dan pulihkan posisi scroll setiap kali ada perubahan file / DOM di Shiny
+        function lockAndRestoreScroll() {
+            let panel = getScrollPanel();
+            if (panel && lastUserScrollY > 0 && !isManualScroll) {
+                panel.scrollTop = lastUserScrollY;
             }
-        }, 100);
+        }
+
+        // Monitor otomatis setiap kali tombol berubah / file selesai dipilih
+        let scrollObserver = new MutationObserver(function() {
+            lockAndRestoreScroll();
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            let panel = getScrollPanel();
+            if (panel) {
+                scrollObserver.observe(panel, { childList: true, subtree: true });
+            }
+        });
+
+        setInterval(function() {
+            let panel = getScrollPanel();
+            if (panel && lastUserScrollY > 0 && panel.scrollTop === 0 && !isManualScroll) {
+                panel.scrollTop = lastUserScrollY;
+            }
+        }, 50);
     """),
 
     # --- 2. FONT AWESOME ICONS ---
