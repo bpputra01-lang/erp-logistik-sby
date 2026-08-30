@@ -95,6 +95,16 @@ CUSTOM_HEAD = ui.head_content(
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
+
+        /* --- ANIMASI TITIK HIJAU ONLINE BERKEDIP --- */
+        @keyframes blinkAnimation {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.25; transform: scale(0.75); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .blink-online {
+            animation: blinkAnimation 1.5s infinite ease-in-out;
+        }
         .reflex-spinner-red {
             width: 38px; height: 38px;
             border: 3.5px solid rgba(229, 9, 20, 0.2);
