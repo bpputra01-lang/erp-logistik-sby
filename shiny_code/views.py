@@ -21,10 +21,10 @@ CUSTOM_HEAD = ui.head_content(
         }
         favicon.href = './image_981625.png';
     """),
-    # --- 3. FONT AWESOME ICONS ---
+    # --- 2. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
-    # --- 4. CSS STYLING LENGKAP ---
+    # --- 3. CSS STYLING LENGKAP ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
@@ -68,7 +68,7 @@ CUSTOM_HEAD = ui.head_content(
         .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
 
         .reflex-upload-container {
-            border: 2px dashed #000000 !important;   /* <-- Ganti warna di sini */
+            border: 2px dashed #000000 !important;
             border-radius: 8px;
             background: #F8FAFC;
             padding: 1.25rem 1.5rem;
@@ -104,7 +104,7 @@ CUSTOM_HEAD = ui.head_content(
         .csv-batch-box .progress { display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; }
 
         .csv-batch-box {
-            border: 2px dashed #E50914 !important; border-radius: 12px; background: #FFF5F5;
+            border: 2px dashed #000000 !important; border-radius: 12px; background: #FFF5F5;
             padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
@@ -146,6 +146,7 @@ BRANCH_BIN_MAPPING = {
     "SEMARANG": ["GL2-SMG", "GL2-SMG-CTN-", "GUDANG LT 2", "INBOUND", "PUTAWAY", "REFUND", "DEFECT", "REJECT", "OFFLINE", "TOKO", "BANDING", "EVENT", "GAGAL QC"],
     "HUB JAKARTA": ["GL1-JKT-A", "GL1-JKT-B", "GL1-JKT-C", "GL1-JKT-D", "GL1-JKT-E", "INBOUND", "PUTAWAY", "REFUND", "GAGAL QC", "RU HUB"]
 }
+
 # Helper UI Components
 def metric_box(title: str, val_str: str, text_color: str, bg_gradient: str):
     return ui.div(
@@ -229,7 +230,9 @@ def custom_uploader_box(id_str: str, title: str, placeholder: str = "200MB per f
         style="flex: 1; min-width: 260px; margin-bottom: 0.5rem;"
     )
 
-# Page Views
+# ==============================================================================
+# VIEW 1: COMPARE SYSTEM
+# ==============================================================================
 def compare_system_view(state: AppState):
     upload_section = ui.div(
         ui.h4("📥 1. Upload File Utama Stock System", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
@@ -254,14 +257,11 @@ def compare_system_view(state: AppState):
         ui.output_ui("compare_system_action_btn_ui"),
         style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
     )
+    return ui.div(upload_section, ui.output_ui("compare_system_results_container"), style="width: 100%; padding: 1rem;")
 
-    results_ui = ui.output_ui("compare_system_results_container")
-
-    return ui.div(
-        upload_section,
-        results_ui,
-        style="width: 100%; padding: 1rem;"
-    )
+# ==============================================================================
+# VIEW 2: STOCK MINUS
+# ==============================================================================
 def stock_minus_view(state: AppState):
     return ui.div(
         ui.div(
@@ -274,6 +274,9 @@ def stock_minus_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
+# ==============================================================================
+# VIEW 3: PUTAWAY SYSTEM
+# ==============================================================================
 def putaway_view(state: AppState):
     cur_area = state.area_putaway()
     if cur_area != "":
@@ -292,6 +295,9 @@ def putaway_view(state: AppState):
     )
     return ui.div(top_section, ui.output_ui("putaway_results_container"), style="width: 100%; padding: 1rem;")
 
+# ==============================================================================
+# VIEW 4: DATABASE ONGKIR (MAIN DASHBOARD)
+# ==============================================================================
 def main_dashboard_view(state: AppState):
     STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
     tab1_content = ui.div(
@@ -341,379 +347,7 @@ def main_dashboard_view(state: AppState):
     return ui.div(ui.navset_card_tab(ui.nav_panel("📥 INPUT & BATCH DATA", tab1_content), ui.nav_panel("📊 SUMMARY & HISTORY", tab2_content)), style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;")
 
 # ==============================================================================
-# VIEW CYCLE COUNT ANALYZER (LAYOUT FILTER PERSIS GAMBAR)
-# ==============================================================================
-def cycle_count_analyzer_view(state: AppState):
-    list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
-    list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
-    list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
-
-    # --- FILTER SECTION (SESUAI GAMBAR) ---
-    filter_section = ui.div(
-        # BARIS 1: PILIH CABANG (LEBAR PENUH 100%)
-        ui.div(
-            ui.input_select("cca_branch", "🏢 Pilih Cabang / Branch:", choices=list(BRANCH_BIN_MAPPING.keys()), selected="SURABAYA", width="100%"),
-            style="width: 100%; margin-bottom: 1rem;"
-        ),
-        # BARIS 2: 4 KOLOM SEJAJAR (SUB KATEGORI, BRAND, BIN SYSTEM, BIN COVERAGE)
-        ui.div(
-            ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
-            ui.div(ui.input_selectize("cca_bin_cov", "📡 BIN Coverage:", choices=list_bin_cov, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
-            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
-        ),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 1: Upload Data Scan & Stock
-    step1_ui = ui.div(
-        ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.div(
-            custom_uploader_box("cca_up_scan", "📥 DATA SCAN"),
-            custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
-        ),
-        ui.output_ui("cca_step1_btn_ui"),
-        ui.output_ui("cca_step1_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 2: Upload BIN Coverage
-    step2_ui = ui.div(
-        ui.h4("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_cov", "📥 FILE BIN COVERAGE"),
-        ui.output_ui("cca_step2_btn_ui"),
-        ui.output_ui("cca_step2_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 3: Recon Reports
-    step3_ui = ui.div(
-        ui.h4("3️⃣ RECON REPORTS (STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.output_ui("cca_step3_btn_ui"),
-        ui.output_ui("cca_step3_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 4: Recon Real + Process
-    step4_ui = ui.div(
-        ui.h4("4️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_recon_real", "📥 Upload HASIL RECON REAL +"),
-        ui.output_ui("cca_step4_btn_ui"),
-        ui.output_ui("cca_step4_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 5: Recon System + Process
-    step5_ui = ui.div(
-        ui.h4("5️⃣ RECON SYSTEM + PROCESS (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON (File Master Hasil Audit)"),
-        ui.output_ui("cca_step5_btn_ui"),
-        ui.output_ui("cca_step5_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 6: Miss Location Report
-    step6_ui = ui.div(
-        ui.h4("📊 MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.output_ui("cca_step6_btn_ui"),
-        ui.output_ui("cca_step6_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    return ui.div(
-        filter_section,
-        step1_ui,
-        step2_ui,
-        step3_ui,
-        step4_ui,
-        step5_ui,
-        step6_ui,
-        style="width: 100%; padding: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW CYCLE COUNT ANALYZER (LENGKAP 6 STEP)
-# ==============================================================================
-def cycle_count_analyzer_view(state: AppState):
-    list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
-    list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
-    list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
-
-    # Filter Section
-    filter_section = ui.div(
-        ui.h4("🏢 Pilih Cabang & Filter Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.div(
-            ui.div(ui.input_select("cca_branch", "🏢 Cabang / Branch:", choices=list(BRANCH_BIN_MAPPING.keys()), selected="SURABAYA"), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.input_selectize("cca_sub_kat", "🗂️ Sub Kategori:", choices=list_sub_kat, multiple=True), style="flex: 1; min-width: 200px;"),
-            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True), style="flex: 1; min-width: 200px;"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.75rem;"
-        ),
-        ui.div(
-            ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 240px;"),
-            ui.div(ui.input_selectize("cca_bin_cov", "📡 BIN Coverage (Step 2):", choices=list_bin_cov, multiple=True), style="flex: 1; min-width: 240px;"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
-        ),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 1: Upload Data Scan & Stock
-    step1_ui = ui.div(
-        ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.div(
-            custom_uploader_box("cca_up_scan", "📥 DATA SCAN"),
-            custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"),
-            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
-        ),
-        ui.output_ui("cca_step1_btn_ui"),
-        ui.output_ui("cca_step1_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 2: Upload BIN Coverage
-    step2_ui = ui.div(
-        ui.h4("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_cov", "📥 FILE BIN COVERAGE"),
-        ui.output_ui("cca_step2_btn_ui"),
-        ui.output_ui("cca_step2_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 3: Recon Reports
-    step3_ui = ui.div(
-        ui.h4("3️⃣ RECON REPORTS (STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.output_ui("cca_step3_btn_ui"),
-        ui.output_ui("cca_step3_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 4: Recon Real + Process
-    step4_ui = ui.div(
-        ui.h4("4️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_recon_real", "📥 Upload HASIL RECON REAL +"),
-        ui.output_ui("cca_step4_btn_ui"),
-        ui.output_ui("cca_step4_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 5: Recon System + Process
-    step5_ui = ui.div(
-        ui.h4("5️⃣ RECON SYSTEM + PROCESS (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON (File Master Hasil Audit)"),
-        ui.output_ui("cca_step5_btn_ui"),
-        ui.output_ui("cca_step5_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    # Step 6: Miss Location Report
-    step6_ui = ui.div(
-        ui.h4("📊 MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.output_ui("cca_step6_btn_ui"),
-        ui.output_ui("cca_step6_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-
-    return ui.div(
-        filter_section,
-        step1_ui,
-        step2_ui,
-        step3_ui,
-        step4_ui,
-        step5_ui,
-        step6_ui,
-        style="width: 100%; padding: 1rem;"
-    )
-
-def menu_item(label: str, target_menu: str, current_menu: str):
-    is_active = (current_menu == target_menu)
-    bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
-    return ui.tags.button(label, onclick=f"Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}})", style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}")
-
-def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
-    icon_tag = "fa-chevron-down" if is_open else "fa-chevron-right"
-    return ui.tags.div(ui.tags.span(title, style="font-size: 11px; font-weight: bold; color: #FFFFFF; letter-spacing: 0.05em;"), ui.tags.i(class_=f"fa-solid {icon_tag}", style="font-size: 12px; color: #FFFFFF;"), onclick=f"Shiny.setInputValue('toggle_dropdown_section', '{dropdown_key}', {{priority: 'event'}})", style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; background: rgba(255, 255, 255, 0.05); margin-top: 0.8rem; margin-bottom: 0.3rem;")
-
-def sidebar(state: AppState):
-    cur_menu = state.main_menu()
-
-    # --- KONDISI KETIKA SIDEBAR DITUTUP (HANYA ICON BARS) ---
-    if not state.sidebar_open():
-        return ui.div(
-            ui.tags.button(
-                ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"),
-                onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})",
-                style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"
-            ),
-            style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;"
-        )
-
-    # --- KONDISI KETIKA SIDEBAR TERBUKA PENUH ---
-    return ui.div(
-        # 1. HEADER LOGO + BRAND + TOMBOL CLOSE (<<)
-        ui.div(
-            ui.div(
-                # Box Logo Merah
-                ui.div(
-                    ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #FFFFFF; font-size: 16px;"),
-                    style="""
-                        width: 38px; height: 38px; 
-                        background: linear-gradient(135deg, #E50914 0%, #B20710 100%); 
-                        border-radius: 8px; display: flex; align-items: center; justify-content: center; 
-                        box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); flex-shrink: 0;
-                    """
-                ),
-                # Teks Brand 2 Baris
-                ui.div(
-                    ui.span("ZKN LOGISTIC", style="color: #E50914; font-weight: 900; font-size: 14px; letter-spacing: 0.5px; line-height: 1.2;"),
-                    ui.span("WAREHOUSE SYSTEM", style="color: #FFFFFF; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; opacity: 0.9;"),
-                    style="display: flex; flex-direction: column; justify-content: center;"
-                ),
-                style="display: flex; align-items: center; gap: 10px;"
-            ),
-            # Tombol Collapse Sidebar (<<)
-            ui.tags.button(
-                ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 14px; color: #CBD5E0;"),
-                onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})",
-                style="background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; align-items: center;"
-            ),
-            style="""
-                display: flex; justify-content: space-between; width: 100%; align-items: center; 
-                margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            """
-        ),
-
-        # 2. DAFTAR MENU SIDEBAR (SCROLLABLE)
-        ui.div(
-            # OPERATIONAL
-            ui.div(
-                section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()),
-                ui.div(
-                    *[menu_item(item, item, cur_menu) for item in state.get_menu_operational()],
-                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"
-                ),
-                style="width: 100%;"
-            ),
-            # INVENTORY
-            ui.div(
-                section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()),
-                ui.div(
-                    *[menu_item(item, item, cur_menu) for item in state.get_menu_inventory()],
-                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"
-                ),
-                style="width: 100%;"
-            ),
-            # REJECT & DEFECT
-            ui.div(
-                section_dropdown_header("REJECT & DEFECT", "reject", state.dropdown_reject()),
-                ui.div(
-                    *[menu_item(item, item, cur_menu) for item in state.get_menu_reject()],
-                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_reject() else "display: none;"
-                ),
-                style="width: 100%;"
-            ),
-            # EXTRAS
-            ui.div(
-                section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()),
-                ui.div(
-                    *[menu_item(item, item, cur_menu) for item in state.get_menu_extras()],
-                    style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"
-                ),
-                style="width: 100%;"
-            ),
-            style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
-        ),
-
-        # 3. TOMBOL LOGOUT SISTEM
-        ui.div(
-            ui.tags.button(
-                ui.tags.span(
-                    ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"),
-                    ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")
-                ),
-                onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})",
-                class_="btn-red-gradient",
-                style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"
-            ),
-            style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"
-        ),
-
-        # Styling Container Utama Sidebar
-        style="""
-            width: 280px; min-width: 280px; padding: 1rem;
-            background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%);
-            border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column;
-            align-items: flex-start; transition: width 0.3s ease;
-        """
-    )
-def login_page():
-    return ui.div(
-        ui.div(
-            ui.div(
-                # --- HEADER JUDUL (JARAK BAWAH DIRAPATKAN) ---
-                ui.div(
-                    ui.div(style="width: 10px; height: 36px; background: #E50914; border-radius: 4px; margin-right: 12px;"),
-                    ui.div(
-                        ui.h2("LOGISTIC DISTRIBUTION", style="color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 0; line-height: 1.1;"),
-                        ui.span("CENTER WAREHOUSE • SURABAYA", style="color: #E50914; font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-top: 2px;"),
-                        style="display: flex; flex-direction: column;"
-                    ),
-                    style="display: flex; align-items: center; margin-bottom: 0.5rem;"
-                ),
-                
-                # --- GARIS PEMISAH (MARGIN ATAS & BAWAH DIKUNCI RAPAT) ---
-                ui.hr(style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.12); margin: 0.4rem 0 0.75rem 0;"),
-                
-                # --- TEKS PETUNJUK (JARAK KE INPUT DIRAPATKAN) ---
-                ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 13px; margin: 0 0 1.1rem 0;"),
-                
-                # --- FORM INPUT USERNAME & PASSWORD ---
-                ui.div(
-                    ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"),
-                    ui.tags.input(
-                        id="login_username_field", type="text", placeholder="Masukkan username...",
-                        onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
-                        style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"
-                    ),
-                    style="margin-bottom: 1rem;"
-                ),
-                ui.div(
-                    ui.span("PASSWORD", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"),
-                    ui.tags.input(
-                        id="login_password_field", type="password", placeholder="Masukkan password...",
-                        onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();",
-                        style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"
-                    ),
-                    style="margin-bottom: 1.5rem;"
-                ),
-                ui.div(style="height: 6px;"),
-                ui.tags.button(
-                    "SIGN IN TO SYSTEM →",
-                    id="btn_sign_in",
-                    onclick="Shiny.setInputValue('btn_submit_login', {user: document.getElementById('login_username_field').value, pass: document.getElementById('login_password_field').value}, {priority: 'event'})",
-                    class_="btn-red-gradient",
-                    style="width: 100%; height: 48px; font-size: 14px; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);"
-                ),
-                ui.div("🟢 Warehouse Supporting Tools v2.0", style="color: #888888; font-size: 12px; text-align: center; margin-top: 10px;"),
-                style="display: flex; flex-direction: column; width: 100%;"
-            ),
-            style="width: 100%; max-width: 520px; padding: 3rem 2.5rem; background: rgba(12, 12, 15, 0.88); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); border-left: 5px solid #E50914; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);"
-        ),
-        style="background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070'); background-size: cover; background-position: center; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;"
-    )
-def global_header(state: AppState):
-    return ui.div(
-        ui.div(ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"), ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"), style="display: flex; flex-direction: column; align-items: flex-start;"), style="display: flex; align-items: center;"),
-        ui.div(
-            ui.tags.button(ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"), "Panduan & Logic", onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})", style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"),
-            ui.div(ui.div(ui.div(style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px;"), ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"), style="display: flex; align-items: center;"), ui.div(ui.span(str(state.login_timestamp_ms()), id="login-time-store", style="display: none;"), ui.tags.i(class_="fa-regular fa-clock", style="font-size: 12px; color: #4A5568; margin-right: 4px;"), ui.span("00:00:00", id="live-timer", style="color: #4A5568; font-weight: bold; font-size: 12px; font-family: monospace;"), style="display: flex; align-items: center; justify-content: center;"), style="display: flex; flex-direction: column; align-items: center; gap: 2px;"),
-            style="display: flex; align-items: center; gap: 1.25rem;"
-        ),
-        style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
-    )
-
-# ==============================================================================
-# VIEW LIST BIN CYCLE COUNT (MENU: "List Bin Cycle Count")
+# VIEW 5: LIST BIN CYCLE COUNT (MENU: "List Bin Cycle Count")
 # ==============================================================================
 def cycle_count_view(state: AppState):
     uploader_ui = ui.div(
@@ -729,11 +363,148 @@ def cycle_count_view(state: AppState):
         ui.output_ui("cycle_count_action_btn_ui"),
         style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
+    return ui.div(uploader_ui, ui.output_ui("cycle_count_results_container"), style="width: 100%; padding: 1rem;")
 
-    results_ui = ui.output_ui("cycle_count_results_container")
+# ==============================================================================
+# VIEW 6: PUTAWAY & PICKING AUDIT LIST (MENU: "Putaway & Picking Audit List")
+# ==============================================================================
+def ppa_audit_view(state: AppState):
+    upload_section = ui.div(
+        ui.h4("📥 Upload Dokumen Audit (Sales, RTO, & Mutasi)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("uploader_ppa_sales", "1. File Sales (Excel / CSV)"),
+            custom_uploader_box("uploader_ppa_rto", "2. File RTO (Excel / CSV)"),
+            custom_uploader_box("uploader_ppa_mutasi", "3. File Mutasi (Excel / CSV)"),
+            style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"
+        ),
+        ui.output_ui("ppa_action_btn_ui"),
+        style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+    )
+    return ui.div(upload_section, ui.output_ui("ppa_results_container"), style="width: 100%; padding: 1rem;")
+
+# ==============================================================================
+# VIEW 7: CYCLE COUNT ANALYZER (MENU: "Cycle Count")
+# ==============================================================================
+def cycle_count_analyzer_view(state: AppState):
+    list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
+    list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
+    list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
+
+    # Filter Section (Baris 1 Full Width, Baris 2 Grid 4 Kolom)
+    filter_section = ui.div(
+        ui.div(
+            ui.input_select("cca_branch", "🏢 Pilih Cabang / Branch:", choices=list(BRANCH_BIN_MAPPING.keys()), selected="SURABAYA", width="100%"),
+            style="width: 100%; margin-bottom: 1rem;"
+        ),
+        ui.div(
+            ui.div(ui.input_selectize("cca_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.input_selectize("cca_brand", "🏷️ Brand:", choices=list_brand, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.output_ui("cca_bin_sys_ui"), style="flex: 1; min-width: 180px;"),
+            ui.div(ui.input_selectize("cca_bin_cov", "📡 BIN Coverage:", choices=list_bin_cov, multiple=True, width="100%"), style="flex: 1; min-width: 180px;"),
+            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
+        ),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    step1_ui = ui.div(
+        ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(custom_uploader_box("cca_up_scan", "📥 DATA SCAN"), custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"), style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"),
+        ui.output_ui("cca_step1_btn_ui"), ui.output_ui("cca_step1_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+    step2_ui = ui.div(
+        ui.h4("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_cov", "📥 FILE BIN COVERAGE"),
+        ui.output_ui("cca_step2_btn_ui"), ui.output_ui("cca_step2_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+    step3_ui = ui.div(
+        ui.h4("3️⃣ RECON REPORTS (STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.output_ui("cca_step3_btn_ui"), ui.output_ui("cca_step3_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+    step4_ui = ui.div(
+        ui.h4("4️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_recon_real", "📥 Upload HASIL RECON REAL +"),
+        ui.output_ui("cca_step4_btn_ui"), ui.output_ui("cca_step4_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+    step5_ui = ui.div(
+        ui.h4("5️⃣ RECON SYSTEM + PROCESS (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON (File Master Hasil Audit)"),
+        ui.output_ui("cca_step5_btn_ui"), ui.output_ui("cca_step5_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+    step6_ui = ui.div(
+        ui.h4("📊 MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.output_ui("cca_step6_btn_ui"), ui.output_ui("cca_step6_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    return ui.div(filter_section, step1_ui, step2_ui, step3_ui, step4_ui, step5_ui, step6_ui, style="width: 100%; padding: 1rem;")
+
+# Navigation Components
+def menu_item(label: str, target_menu: str, current_menu: str):
+    is_active = (current_menu == target_menu)
+    bg_style = "background: linear-gradient(135deg, #E50914 0%, #B20710 100%); color: #FFFFFF; font-weight: 700; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);" if is_active else "background: transparent; color: #CBD5E0; font-weight: 500;"
+    return ui.tags.button(label, onclick=f"Shiny.setInputValue('select_menu_item', '{target_menu}', {{priority: 'event'}})", style=f"width: 100%; text-align: left; padding: 0.5rem 0.75rem; margin-bottom: 3px; border-radius: 6px; font-size: 0.85rem; border: none; cursor: pointer; justify-content: flex-start; transition: all 0.2s ease; {bg_style}")
+
+def section_dropdown_header(title: str, dropdown_key: str, is_open: bool):
+    icon_tag = "fa-chevron-down" if is_open else "fa-chevron-right"
+    return ui.tags.div(ui.tags.span(title, style="font-size: 11px; font-weight: bold; color: #FFFFFF; letter-spacing: 0.05em;"), ui.tags.i(class_=f"fa-solid {icon_tag}", style="font-size: 12px; color: #FFFFFF;"), onclick=f"Shiny.setInputValue('toggle_dropdown_section', '{dropdown_key}', {{priority: 'event'}})", style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; background: rgba(255, 255, 255, 0.05); margin-top: 0.8rem; margin-bottom: 0.3rem;")
+
+def sidebar(state: AppState):
+    cur_menu = state.main_menu()
+    if not state.sidebar_open():
+        return ui.div(ui.tags.button(ui.tags.i(class_="fa-solid fa-bars", style="font-size: 18px; color: #FFFFFF;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 0.5rem; border-radius: 6px;"), style="width: 60px; min-width: 60px; padding: 1rem 0.5rem; background: #111318; border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: center;")
 
     return ui.div(
-        uploader_ui,
-        results_ui,
-        style="width: 100%; padding: 1rem;"
+        ui.div(
+            ui.div(
+                ui.div(ui.tags.img(src="image_981625.png", style="width: 24px; height: 24px; object-fit: contain;"), style="width: 38px; height: 38px; background: linear-gradient(135deg, #E50914 0%, #B20710 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4); flex-shrink: 0;"),
+                ui.div(ui.span("ZKN LOGISTIC", style="color: #E50914; font-weight: 900; font-size: 14px; letter-spacing: 0.5px; line-height: 1.2;"), ui.span("WAREHOUSE SYSTEM", style="color: #FFFFFF; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; opacity: 0.9;"), style="display: flex; flex-direction: column; justify-content: center;"),
+                style="display: flex; align-items: center; gap: 10px;"
+            ),
+            ui.tags.button(ui.tags.i(class_="fa-solid fa-angles-left", style="font-size: 14px; color: #CBD5E0;"), onclick="Shiny.setInputValue('btn_toggle_sidebar', Math.random(), {priority: 'event'})", style="background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; align-items: center;"),
+            style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);"
+        ),
+        ui.div(
+            ui.div(section_dropdown_header("OPERATIONAL", "operational", state.dropdown_operational()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_operational()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_operational() else "display: none;"), style="width: 100%;"),
+            ui.div(section_dropdown_header("INVENTORY", "inventory", state.dropdown_inventory()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_inventory()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_inventory() else "display: none;"), style="width: 100%;"),
+            ui.div(section_dropdown_header("REJECT & DEFECT", "reject", state.dropdown_reject()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_reject()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_reject() else "display: none;"), style="width: 100%;"),
+            ui.div(section_dropdown_header("EXTRAS", "extras", state.dropdown_extras()), ui.div(*[menu_item(item, item, cur_menu) for item in state.get_menu_extras()], style="width: 100%; padding-left: 0.5rem; display: flex; flex-direction: column;" if state.dropdown_extras() else "display: none;"), style="width: 100%;"),
+            style="width: 100%; flex: 1; overflow-y: auto; padding-right: 4px;"
+        ),
+        ui.div(ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-right-from-bracket", style="margin-right: 8px; font-size: 14px;"), ui.span("Logout Sistem", style="font-weight: bold; font-size: 13px;")), onclick="Shiny.setInputValue('btn_execute_logout', Math.random(), {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; padding: 0.5rem; border-radius: 6px; display: flex; align-items: center; justify-content: center;"), style="width: 100%; padding-top: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: auto;"),
+        style="width: 280px; min-width: 280px; padding: 1rem; background: linear-gradient(180deg, #111318 0%, #1A1D24 50%, #0D0F12 100%); border-right: 1px solid #2D3748; height: 100vh; display: flex; flex-direction: column; align-items: flex-start;"
+    )
+
+def login_page():
+    return ui.div(
+        ui.div(
+            ui.div(
+                ui.div(ui.div(style="width: 10px; height: 36px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h2("LOGISTIC DISTRIBUTION", style="color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 0; line-height: 1.1;"), ui.span("CENTER WAREHOUSE • SURABAYA", style="color: #E50914; font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-top: 2px;"), style="display: flex; flex-direction: column;"), style="display: flex; align-items: center; margin-bottom: 0.5rem;"),
+                ui.hr(style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.12); margin: 0.4rem 0 0.75rem 0;"),
+                ui.p("Silakan masuk dengan akun resmi gudang Anda.", style="color: #B0B0B0; font-size: 13px; margin: 0 0 1.1rem 0;"),
+                ui.div(ui.span("USERNAME", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"), ui.tags.input(id="login_username_field", type="text", placeholder="Masukkan username...", onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();", style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"), style="margin-bottom: 1rem;"),
+                ui.div(ui.span("PASSWORD", style="font-size: 11px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px; margin-bottom: 4px; display: block;"), ui.tags.input(id="login_password_field", type="password", placeholder="Masukkan password...", onkeydown="if (event.key === 'Enter') document.getElementById('btn_sign_in').click();", style="background: rgba(0, 0, 0, 0.75); border: 1px solid rgba(229, 9, 20, 0.4); color: #FFFFFF; border-radius: 10px; padding: 0.8rem 1rem; width: 100%; outline: none;"), style="margin-bottom: 1.5rem;"),
+                ui.div(style="height: 6px;"),
+                ui.tags.button("SIGN IN TO SYSTEM →", id="btn_sign_in", onclick="Shiny.setInputValue('btn_submit_login', {user: document.getElementById('login_username_field').value, pass: document.getElementById('login_password_field').value}, {priority: 'event'})", class_="btn-red-gradient", style="width: 100%; height: 48px; font-size: 14px; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);"),
+                ui.div("🟢 Warehouse Supporting Tools v2.0", style="color: #888888; font-size: 12px; text-align: center; margin-top: 10px;"),
+                style="display: flex; flex-direction: column; width: 100%;"
+            ),
+            style="width: 100%; max-width: 520px; padding: 3rem 2.5rem; background: rgba(12, 12, 15, 0.88); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); border-left: 5px solid #E50914; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);"
+        ),
+        style="background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.45) 100%), url('https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=2070'); background-size: cover; background-position: center; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem;"
+    )
+
+def global_header(state: AppState):
+    return ui.div(
+        ui.div(ui.div(style="width: 10px; height: 32px; background: #E50914; border-radius: 4px; margin-right: 12px;"), ui.div(ui.h3(state.main_menu(), style="font-size: 18px; color: #111111; font-weight: 800; margin: 0; line-height: 1.2;"), ui.span(f"Logged in as: {state.user_display_name()} ({state.role()})", style="font-size: 12px; color: #4A5568;"), style="display: flex; flex-direction: column; align-items: flex-start;"), style="display: flex; align-items: center;"),
+        ui.div(
+            ui.tags.button(ui.tags.i(class_="fa-solid fa-bullhorn", style="margin-right: 6px; color: #1A202C; font-size: 14px;"), "Panduan & Logic", onclick="Shiny.setInputValue('btn_open_panduan_modal', Math.random(), {priority: 'event'})", style="background: #E2E8F0; color: #1A202C; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"),
+            ui.div(ui.div(ui.div(style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; margin-right: 6px;"), ui.span("ONLINE", style="font-size: 12px; font-weight: 800; color: #065F46;"), style="display: flex; align-items: center;"), ui.div(ui.span(str(state.login_timestamp_ms()), id="login-time-store", style="display: none;"), ui.tags.i(class_="fa-regular fa-clock", style="font-size: 12px; color: #4A5568; margin-right: 4px;"), ui.span("00:00:00", id="live-timer", style="color: #4A5568; font-weight: bold; font-size: 12px; font-family: monospace;"), style="display: flex; align-items: center; justify-content: center;"), style="display: flex; flex-direction: column; align-items: center; gap: 2px;"),
+            style="display: flex; align-items: center; gap: 1.25rem;"
+        ),
+        style="padding: 12px 20px; background: #D1FAE5; border: 1.5px solid #A7F3D0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
     )
