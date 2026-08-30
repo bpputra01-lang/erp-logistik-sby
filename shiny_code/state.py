@@ -930,8 +930,10 @@ class AppState:
             return False, f"Terjadi kesalahan saat memproses data: {e}"
 
 # ==========================================================================
-    # CYCLE COUNT ANALYZER LOGIC (VERSI OPTIMAL SUPER CEPAT)
+    # CYCLE COUNT ANALYZER LOGIC & ALGORITHMS (LENGKAP STEP 1 - 6)
     # ==========================================================================
+
+    # --- STEP 1: COMPARE SCAN VS STOCK ---
     def run_cca_step1(self, f_scan, f_stock, sub_sel, brand_sel, bin_sys_sel):
         try:
             df_s_raw = load_data_from_info(f_scan)
@@ -949,9 +951,7 @@ class AppState:
 
             # 2. Bersihkan & Filter Stock System
             dt = df_t_raw.copy()
-            col_b = dt.columns[1]
-            col_s = dt.columns[2]
-            col_q_sys = dt.columns[9]
+            col_b, col_s, col_q_sys = dt.columns[1], dt.columns[2], dt.columns[9]
 
             if sub_sel and len(sub_sel) > 0 and dt.shape[1] > 6:
                 dt = dt[dt.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in sub_sel])]
@@ -998,14 +998,14 @@ class AppState:
             self.cca_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
             self.cca_qty_sys_plus.set(int(system_plus['DIFF'].sum()) if not system_plus.empty else 0)
 
-            # 6. Simpan 100% Data Asli untuk Download Excel
+            # Simpan 100% Data Utuh
             self._raw_df_cca_scan = res_scan.copy()
             self._raw_df_cca_stock = res_stock.copy()
             self._raw_df_cca_real_plus = real_plus.copy()
             self._raw_df_cca_sys_plus = system_plus.copy()
             self._cca_map_dict = map_dict
 
-            # 7. Format Angka Bersih (Tanpa .0) untuk Tampilan Tabel
+            # Format Angka Bersih untuk Tampilan
             def clean_num_str(val):
                 try:
                     if pd.isna(val) or val == "" or val is None: return ""
@@ -1013,10 +1013,8 @@ class AppState:
                     return str(int(f)) if f.is_integer() else f"{f:g}"
                 except: return str(val)
 
-            disp_scan = res_scan.copy()
-            disp_stock = res_stock.copy()
-            disp_real = real_plus.copy()
-            disp_sys = system_plus.copy()
+            disp_scan, disp_stock = res_scan.copy(), res_stock.copy()
+            disp_real, disp_sys = real_plus.copy(), system_plus.copy()
 
             for c in ['QTY_SCAN', 'QTY_SYSTEM', 'DIFF']:
                 if c in disp_scan.columns: disp_scan[c] = disp_scan[c].apply(clean_num_str)
@@ -1026,7 +1024,6 @@ class AppState:
                 if c in disp_stock.columns: disp_stock[c] = disp_stock[c].apply(clean_num_str)
                 if c in disp_sys.columns: disp_sys[c] = disp_sys[c].apply(clean_num_str)
 
-            # Pasang ke State UI
             self.df_cca_scan_headers.set(disp_scan.columns.tolist())
             self.df_cca_scan_rows.set(disp_scan.fillna("").astype(str).values.tolist())
             self.df_cca_stock_headers.set(disp_stock.columns.tolist())
@@ -1041,6 +1038,7 @@ class AppState:
         except Exception as e:
             return False, f"Gagal Compare Step 1: {e}"
 
+    # --- STEP 2 & 3: ALLOCATION & RECON REPORTS ---
     def run_cca_step2(self, f_bin_cov, selected_bin_cov):
         try:
             if self._raw_df_cca_real_plus.empty or self._raw_df_cca_sys_plus.empty:
@@ -1050,7 +1048,6 @@ class AppState:
             if df_cov_raw.empty:
                 return False, "File BIN Coverage kosong!"
 
-            # Fast Filter Regex
             import re
             if selected_bin_cov and len(selected_bin_cov) > 0:
                 pattern = "|".join([re.escape(str(b).strip().upper()) for b in selected_bin_cov])
@@ -1059,23 +1056,19 @@ class AppState:
             else:
                 df_cov = df_cov_raw.copy()
 
-            # --- OPTIMASI SPEED: INDEXING DICTIONARY PER SKU O(1) ---
-            # Kelompokkan stok System + langsung berdasarkan SKU
+            # Indexing Dictionary per SKU O(1)
             system_by_sku = {}
             for _, row in self._raw_df_cca_sys_plus.iterrows():
-                b = str(row['BIN']).strip().upper()
-                s = str(row['SKU']).strip().upper()
+                b, s = str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper()
                 q = float(row.get('DIFF', 0))
                 if q > 0:
                     if s not in system_by_sku: system_by_sku[s] = {}
                     system_by_sku[s][b] = system_by_sku[s].get(b, 0) + q
 
-            # Kelompokkan stok BIN Coverage langsung berdasarkan SKU
             selected_bins = set(df_cov.iloc[:, 1].astype(str).str.strip().str.upper().unique())
             coverage_by_sku = {}
             for _, row in df_cov.iterrows():
-                b_val = str(row.iloc[1]).strip().upper()
-                s_val = str(row.iloc[2]).strip().upper()
+                b_val, s_val = str(row.iloc[1]).strip().upper(), str(row.iloc[2]).strip().upper()
                 if b_val in selected_bins:
                     try: val = float(row.iloc[9])
                     except: val = 0
@@ -1087,7 +1080,6 @@ class AppState:
             df_sys_updated = self._raw_df_cca_sys_plus.copy()
             sys_reduction = {}
 
-            # Loop Alokasi Instan
             for _, row in self._raw_df_cca_real_plus.iterrows():
                 sku = str(row['SKU']).strip().upper()
                 diff_needed = float(row['DIFF'])
@@ -1098,8 +1090,6 @@ class AppState:
                     continue
 
                 remaining = diff_needed
-
-                # Phase 1: Cek System Dict (Hanya untuk SKU yang cocok!)
                 if sku in system_by_sku:
                     for bin_src, qty_avail in list(system_by_sku[sku].items()):
                         if remaining <= 0: break
@@ -1112,7 +1102,6 @@ class AppState:
                             sys_reduction[(bin_src, sku)] = sys_reduction.get((bin_src, sku), 0) + alloc
                             remaining -= alloc
 
-                # Phase 2: Cek Coverage Dict (Hanya untuk SKU yang cocok!)
                 if remaining > 0 and sku in coverage_by_sku:
                     for bin_src, qty_avail in list(coverage_by_sku[sku].items()):
                         if remaining <= 0: break
@@ -1160,11 +1149,11 @@ class AppState:
             outstanding = df_sys_updated[df_sys_updated['DIFF'] != 0].copy()
             outstanding['HASIL REKONSILIASI'] = ""
 
-            self._raw_df_cca_alloc = allocated
-            self._raw_df_cca_sys_upd = df_sys_updated
-            self._raw_df_cca_setup_real = df_setup_real
-            self._raw_df_cca_rec_real = recon_real
-            self._raw_df_cca_rec_sys = outstanding
+            self._raw_df_cca_alloc = allocated.copy()
+            self._raw_df_cca_sys_upd = df_sys_updated.copy()
+            self._raw_df_cca_setup_real = df_setup_real.copy()
+            self._raw_df_cca_rec_real = recon_real.copy()
+            self._raw_df_cca_rec_sys = outstanding.copy()
 
             self.df_cca_alloc_headers.set(allocated.columns.tolist())
             self.df_cca_alloc_rows.set(allocated.fillna("").astype(str).values.tolist())
@@ -1182,3 +1171,114 @@ class AppState:
             return True, "Allocation Step 2 & Recon Step 3 Selesai!"
         except Exception as e:
             return False, f"Gagal Allocation Step 2: {e}"
+
+    # --- STEP 4: RECON REAL + ANALYSIS ---
+    def run_cca_step4(self, f_recon_real):
+        try:
+            df_r = load_data_from_info(f_recon_real)
+            if df_r.empty or df_r.shape[1] < 7:
+                return False, "File Recon Real + kurang kolom (butuh minimal 7 kolom)!"
+
+            q_recon = np.nan_to_num(pd.to_numeric(df_r.iloc[:, 6], errors='coerce').values, nan=0.0)
+            q_sys = np.nan_to_num(pd.to_numeric(df_r.iloc[:, 4], errors='coerce').values, nan=0.0)
+            
+            diff = q_recon - q_sys
+            mask = diff != 0
+
+            df_res = df_r[mask].copy()
+            df_res['NEED_ADJ'] = diff[mask]
+
+            self.cca_qty_need_adj.set(int(np.sum(diff[mask])))
+            self.cca_sku_need_adj.set(len(df_res))
+
+            self._raw_df_cca_adj4 = df_res.copy()
+            self.df_cca_adj4_headers.set(df_res.columns.tolist())
+            self.df_cca_adj4_rows.set(df_res.fillna("").astype(str).values.tolist())
+
+            self.cca_step4_done.set(True)
+            return True, "Analisis Step 4 Berhasil!"
+        except Exception as e:
+            return False, f"Gagal Step 4: {e}"
+
+    # --- STEP 5: RECON SYSTEM + (SET UP KARANTINA) ---
+    def run_cca_step5(self, f_recon_sys):
+        try:
+            df_raw6 = load_data_from_info(f_recon_sys)
+            if df_raw6.empty:
+                return False, "File System + Recon kosong!"
+
+            df_raw6.columns = df_raw6.columns.astype(str).str.strip().str.upper()
+            audit_results, karantina_results = [], []
+
+            for _, row in df_raw6.iterrows():
+                try:
+                    bin_raw, sku_raw = row.get('BIN'), row.get('SKU')
+                    if pd.isna(bin_raw) and pd.isna(sku_raw): continue
+
+                    bin_val = str(bin_raw).strip().upper()
+                    sku_val = str(sku_raw).strip().upper()
+                    if bin_val.endswith('.0'): bin_val = bin_val[:-2]
+                    if sku_val.endswith('.0'): sku_val = sku_val[:-2]
+
+                    q_sys_num = pd.to_numeric(row.get('QTY SYSTEM', '0'), errors='coerce') or 0
+                    q_rec_num = pd.to_numeric(row.get('HASIL REKONSILIASI', '0'), errors='coerce') or 0
+                    diff = q_sys_num - q_rec_num
+
+                    if diff != 0:
+                        audit_results.append({'BIN': bin_val, 'SKU': sku_val, 'QTY_SYSTEM_J': q_sys_num, 'QTY_RECON_N': q_rec_num, 'SELISIH': diff})
+                        karantina_results.append({"BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val, "QUANTITY": int(abs(diff)), "NOTES": "MISS LOCATION"})
+                except: continue
+
+            df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+            df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN', 'SKU', 'QTY_SYSTEM_J', 'QTY_RECON_N', 'SELISIH'])
+
+            self.cca_qty_karantina.set(int(df_karantina['QUANTITY'].sum()) if not df_karantina.empty and 'QUANTITY' in df_karantina.columns else 0)
+            self.cca_sku_karantina.set(df_karantina['SKU'].nunique() if not df_karantina.empty and 'SKU' in df_karantina.columns else 0)
+
+            self._raw_df_cca_karantina = df_karantina.copy()
+            self._raw_df_cca_check5 = df_check.copy()
+
+            self.df_cca_karantina_headers.set(df_karantina.columns.tolist())
+            self.df_cca_karantina_rows.set(df_karantina.fillna("").astype(str).values.tolist())
+            self.df_cca_check5_headers.set(df_check.columns.tolist())
+            self.df_cca_check5_rows.set(df_check.fillna("").astype(str).values.tolist())
+
+            self.cca_step5_done.set(True)
+            return True, "Analisis Karantina Step 5 Selesai!"
+        except Exception as e:
+            return False, f"Gagal Step 5: {e}"
+
+    # --- STEP 6: MISS LOCATION REPORT ---
+    def run_cca_step6(self):
+        try:
+            if self._raw_df_cca_setup_real.empty:
+                return False, "Data Set Up Real + kosong! Jalankan Step 2 terlebih dahulu."
+
+            columns_ref = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
+            df_out = self._raw_df_cca_setup_real.iloc[:, 0:4].copy()
+            df_out.columns = columns_ref
+            df_out["QTY MISS LOC."] = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').fillna(0)
+
+            count_sku = df_out["SKU"].nunique()
+            count_qty = int(df_out["QTY MISS LOC."].sum())
+
+            df_sum = pd.DataFrame({
+                "METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"],
+                "VALUE": [count_sku, count_qty]
+            })
+
+            self.cca_sku_miss_loc.set(count_sku)
+            self.cca_qty_miss_loc.set(count_qty)
+
+            self._raw_df_cca_miss_loc = df_out.copy()
+            self._raw_df_cca_sum_miss = df_sum.copy()
+
+            self.df_cca_miss_loc_headers.set(df_out.columns.tolist())
+            self.df_cca_miss_loc_rows.set(df_out.fillna("").astype(str).values.tolist())
+            self.df_cca_sum_miss_headers.set(df_sum.columns.tolist())
+            self.df_cca_sum_miss_rows.set(df_sum.fillna("").astype(str).values.tolist())
+
+            self.cca_step6_done.set(True)
+            return True, "Miss Location Report Berhasil Dibuat!"
+        except Exception as e:
+            return False, f"Gagal Step 6: {e}"

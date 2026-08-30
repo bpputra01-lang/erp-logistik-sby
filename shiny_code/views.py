@@ -11,7 +11,7 @@ from config import safe_int
 # CSS & JAVASCRIPT ASSETS (PERSIS REFLEX)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- SCRIPT FAST VIRTUAL PAGINATION (0.1 DETIK INSTAN) ---
+    # --- SCRIPT FAST VIRTUAL PAGINATION + SMART NUMBER CLEANER ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -22,7 +22,6 @@ CUSTOM_HEAD = ui.head_content(
         }
         favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
 
-        // --- ENGINE PAGINASI VIRTUAL CEPAT ---
         window.fastTables = window.fastTables || {};
 
         window.renderFastTablePage = function(tableId) {
@@ -40,20 +39,24 @@ CUSTOM_HEAD = ui.head_content(
             let start = (tState.currentPage - 1) * size;
             let end = Math.min(start + size, total);
 
-            // Hanya gambar 10 baris yang tampak di layar (Super Ringan!)
             let htmlStr = "";
             for (let i = start; i < end; i++) {
                 let row = tState.data[i];
                 htmlStr += "<tr>";
                 for (let j = 0; j < row.length; j++) {
-                    let cell = row[j] !== null && row[j] !== undefined ? row[j] : "";
+                    let cell = row[j] !== null && row[j] !== undefined ? String(row[j]).trim() : "";
+                    
+                    // --- SMART NUMBER CLEANER: Hapus .0 tapi pertahankan .5 / desimal lainnya ---
+                    if (/^-?\\d+\\.0+$/.test(cell)) {
+                        cell = cell.replace(/\\.0+$/, "");
+                    }
+                    
                     htmlStr += "<td>" + cell + "</td>";
                 }
                 htmlStr += "</tr>";
             }
             tbody.innerHTML = htmlStr;
 
-            // Update info baris dan tombol navigasi
             let info = document.getElementById(tableId + "_info");
             let pageNum = document.getElementById(tableId + "_page_num");
             let prevBtn = document.getElementById(tableId + "_prev_btn");
@@ -85,6 +88,131 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
     """),
+
+    # Library icon & CSS tetap di bawahnya
+    ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
+    ui.tags.style("""
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
+        
+        @keyframes blinkAnimation {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.25; transform: scale(0.75); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .blink-online {
+            animation: blinkAnimation 1.5s infinite ease-in-out;
+        }
+
+        .reflex-spinner-red {
+            width: 38px; height: 38px;
+            border: 3.5px solid rgba(229, 9, 20, 0.2);
+            border-top-color: #E50914; border-radius: 50%;
+            animation: reflexSpin 0.75s linear infinite;
+        }
+        @keyframes reflexSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #global_reflex_loading { display: none; }
+        body.process-running #global_reflex_loading {
+            display: flex !important; position: fixed !important;
+            top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;
+            background: rgba(0, 0, 0, 0.5) !important; z-index: 99999 !important;
+            align-items: center !important; justify-content: center !important;
+        }
+
+        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop { animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        
+        #shiny-notification-panel { top: 25px !important; right: 25px !important; bottom: auto !important; left: auto !important; position: fixed !important; z-index: 999999 !important; width: 360px !important; }
+        .shiny-notification { border-radius: 10px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.18) !important; font-weight: 700 !important; font-size: 13px !important; padding: 14px 18px !important; margin-bottom: 10px !important; }
+        .shiny-notification-message { background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important; color: #FFFFFF !important; border: none !important; }
+        .shiny-notification-error { background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important; color: #FFFFFF !important; border: none !important; }
+        .shiny-notification-warning { background: linear-gradient(135deg, #DD6B20 0%, #C05621 100%) !important; color: #FFFFFF !important; border: none !important; }
+
+        .custom-clean-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        .custom-clean-table th { background: #EDF2F7; color: #1A202C; font-weight: bold; font-size: 12px; padding: 10px; white-space: nowrap; border-bottom: 1px solid #CBD5E0; }
+        .custom-clean-table td { color: #2D3748; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #EDF2F7; }
+        .custom-clean-table tr:hover { background-color: #F8FAFC; }
+        
+        .btn-red-gradient {
+            background: linear-gradient(135deg, #E50914 0%, #B20710 100%) !important;
+            color: #FFFFFF !important; font-weight: 800 !important; border-radius: 6px !important;
+            border: none !important; cursor: pointer; box-shadow: 0 4px 12px rgba(229, 9, 20, 0.25);
+            padding: 0.75rem 1.5rem; transition: all 0.2s ease;
+        }
+        .btn-red-gradient:hover { filter: brightness(1.1); }
+        .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
+
+        .btn-page-nav {
+            background: #FFFFFF; border: 1.5px solid #CBD5E0; border-radius: 6px;
+            padding: 4px 12px; font-weight: 700; font-size: 12px; color: #1A202C;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .btn-page-nav:hover:not(:disabled) { background: #EDF2F7; border-color: #A0AEC0; }
+        .btn-page-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .reflex-upload-container {
+            border: 2px dashed #000000 !important; border-radius: 8px; background: #F8FAFC;
+            padding: 1.25rem 1.5rem; min-height: 85px; width: 100%;
+            display: flex !important; align-items: center !important; justify-content: flex-start !important;
+            position: relative; transition: all 0.2s ease;
+        }
+        .reflex-upload-container:hover { border-color: #C5A059; background-color: #FFFFFF; }
+        .reflex-upload-container .shiny-input-container { margin-bottom: 0 !important; width: 100%; display: flex !important; align-items: center !important; }
+        .reflex-upload-container .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
+        .reflex-upload-container .input-group-prepend, .reflex-upload-container .input-group-btn { display: flex !important; align-items: center !important; margin: 0 !important; }
+        .reflex-upload-container .btn-file {
+            background-color: #C5A059 !important; color: white !important; font-weight: bold !important;
+            border-radius: 6px !important; border: none !important; padding: 8px 18px !important;
+            margin-right: 14px !important; display: inline-flex !important; align-items: center !important; height: 38px !important;
+        }
+        .reflex-upload-container input[type="text"].form-control {
+            background-color: transparent !important; border: none !important; color: #38A169 !important;
+            font-weight: 700 !important; font-size: 14px !important; box-shadow: none !important;
+            padding: 0 !important; height: 38px !important; line-height: 38px !important; display: flex !important;
+            align-items: center !important; width: 100% !important; flex: 1 1 auto !important;
+            overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important;
+        }
+        .reflex-upload-container input[type="text"].form-control::placeholder { color: #718096 !important; font-weight: normal !important; font-size: 13px !important; }
+
+        .reflex-upload-container .shiny-file-input-progress,
+        .reflex-upload-container .progress,
+        .csv-batch-box .shiny-file-input-progress,
+        .csv-batch-box .progress { display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; }
+
+        .csv-batch-box {
+            border: 2px dashed #E50914 !important; border-radius: 12px; background: #FFF5F5;
+            padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .csv-batch-box .shiny-input-container { margin-bottom: 0 !important; width: 100%; }
+        .csv-batch-box .input-group { display: flex !important; align-items: center !important; width: 100% !important; margin-bottom: 0 !important; }
+        .csv-batch-box .btn-file { background: #1A202C !important; color: #FFFFFF !important; font-weight: 700 !important; border-radius: 6px !important; border: none !important; padding: 8px 16px !important; margin-right: 10px !important; }
+        .csv-batch-box input[type="text"].form-control { background-color: transparent !important; border: none !important; color: #2D3748 !important; font-weight: 700 !important; font-size: 13px !important; box-shadow: none !important; }
+
+        details { border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 8px; background: #FFFFFF; }
+        summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
+        details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
+        .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
+    """),
+    ui.tags.script("""
+        setInterval(function() {
+            let elStore = document.getElementById('login-time-store');
+            let elTimer = document.getElementById('live-timer');
+            if (elStore && elTimer) {
+                let loginTime = parseInt(elStore.innerText);
+                if (loginTime && loginTime > 0) {
+                    let now = new Date().getTime();
+                    let diff = Math.floor((now - loginTime) / 1000);
+                    let h = String(Math.floor(diff / 3600)).padStart(2, '0');
+                    let m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+                    let s = String(diff % 60).padStart(2, '0');
+                    elTimer.innerText = h + ':' + m + ':' + s;
+                } else { elTimer.innerText = "00:00:00"; }
+            }
+        }, 1000);
+    """)
+)
 
     # Library FontAwesome & CSS tetap di bawahnya
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
@@ -321,7 +449,7 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
         """),
         style="width: 100%; margin-bottom: 0.5rem;"
     )
-    
+
 def success_modal(show: bool):
     if not show: return ui.div()
     return ui.div(
