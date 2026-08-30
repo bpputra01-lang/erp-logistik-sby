@@ -255,11 +255,18 @@ def static_loading_spinner():
         id="global_reflex_loading"
     )
 
+# ==============================================================================
+# HELPER KOMPONEN UPLOADER BOX
+# ==============================================================================
 def custom_uploader_box(id_str: str, title: str, placeholder: str = "200MB per file • XLSX, CSV"):
     return ui.div(
         ui.span(title, style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
         ui.div(
-            ui.input_file(id_str, None, accept=[".xlsx", ".xls", ".csv"], multiple=False, button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"), placeholder=placeholder),
+            ui.input_file(
+                id_str, None, accept=[".xlsx", ".xls", ".csv"], multiple=False,
+                button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"),
+                placeholder=placeholder
+            ),
             class_="reflex-upload-container"
         ),
         style="flex: 1; min-width: 260px; margin-bottom: 0.5rem;"
