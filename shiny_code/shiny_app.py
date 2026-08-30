@@ -218,7 +218,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 )
             )
 
-            elif cur == "Compare RTO":
+        elif cur == "Compare RTO":
             guide_body = ui.div(
                 ui.tags.details(
                     ui.tags.summary("📋 Informasi Format File"),
