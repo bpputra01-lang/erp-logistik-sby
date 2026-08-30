@@ -717,6 +717,40 @@ def cycle_count_analyzer_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
     
+
+# ==============================================================================
+# VIEW COMPARE RTO (RTO GATEWAY SYSTEM)
+# ==============================================================================
+def compare_rto_view(state: AppState):
+    # Step 1: Upload DS RTO & AppSheet RTO
+    step1_ui = ui.div(
+        ui.h4("1️⃣ Upload Data Scan (DS RTO) & AppSheet RTO", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("uploader_rto_ds", "1. DS RTO (Kolom A=SKU, B=QTY)"),
+            custom_uploader_box("uploader_rto_app", "2. APPSHEET RTO (Rekap Spreadsheet)"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
+        ),
+        ui.div(
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "JALANKAN PROSES"),
+                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rto_step1', Math.random(), {priority: 'event'});",
+                class_="btn-red-gradient"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        ),
+        ui.output_ui("rto_step1_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    return ui.div(
+        step1_ui,
+        ui.output_ui("rto_step2_card_ui"),
+        ui.output_ui("rto_step3_card_ui"),
+        ui.output_ui("rto_step4_card_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+
+    
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)

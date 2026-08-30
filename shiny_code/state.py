@@ -206,6 +206,37 @@ class AppState:
         self._raw_df_cca_miss_loc = pd.DataFrame()
         self._raw_df_cca_sum_miss = pd.DataFrame()
 
+        # --- COMPARE RTO STATE ---
+        self.rto_step1_done = reactive.Value(False)
+        self.rto_q_total = reactive.Value(0)
+        self.rto_q_sesuai = reactive.Value(0)
+        self.rto_q_lebih = reactive.Value(0)
+        self.rto_q_kurang = reactive.Value(0)
+        self.df_rto_ds_headers = reactive.Value([])
+        self.df_rto_ds_rows = reactive.Value([])
+        self.df_rto_selisih_headers = reactive.Value([])
+        self.df_rto_selisih_rows = reactive.Value([])
+        self._raw_df_rto_ds = pd.DataFrame()
+        self._raw_df_rto_selisih = pd.DataFrame()
+        self._raw_df_rto_app = pd.DataFrame()
+
+        # Step 2 & 3: Draft Compared
+        self.rto_draft_done = reactive.Value(False)
+        self.rto_q_draft_total = reactive.Value(0)
+        self.rto_q_ok = reactive.Value(0)
+        self.rto_q_edit = reactive.Value(0)
+        self.rto_q_del = reactive.Value(0)
+        self.df_rto_draft_comp_headers = reactive.Value([])
+        self.df_rto_draft_comp_rows = reactive.Value([])
+        self._raw_df_rto_draft_comp = pd.DataFrame()
+
+        # Step 4: New Draft
+        self.rto_new_draft_done = reactive.Value(False)
+        self.rto_q_new_draft_total = reactive.Value(0)
+        self.df_rto_new_draft_headers = reactive.Value([])
+        self.df_rto_new_draft_rows = reactive.Value([])
+        self._raw_df_rto_new_draft = pd.DataFrame()
+
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -267,6 +298,7 @@ class AppState:
         elif cur_menu == "List Bin Cycle Count": return "cycle_count"
         elif cur_menu in ["Putaway & Picking Audit List", "Putaway & Picking Audit"]: return "ppa_audit"
         elif cur_menu == "Cycle Count": return "cycle_count_analyzer"
+        elif cur_menu == "Compare RTO": return "compare_rto"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -1282,3 +1314,312 @@ class AppState:
             return True, "Miss Location Report Berhasil Dibuat!"
         except Exception as e:
             return False, f"Gagal Step 6: {e}"
+
+# ==========================================================================
+    # COMPARE RTO ALGORITHMS (PORTED FROM STREAMLIT)
+    # ==========================================================================
+    def run_rto_step1(self, f_ds, f_app):
+        try:
+            df_ds_raw = load_data_from_info(f_ds)
+            df_app_raw = load_data_from_info(f_app)
+
+            if df_ds_raw.empty or df_app_raw.empty:
+                return False, "File DS RTO dan AppSheet RTO tidak boleh kosong!"
+
+            def clean_sku(val):
+                if pd.isna(val): return ""
+                if isinstance(val, float) and val.is_integer():
+                    s = str(int(val)).strip().upper()
+                else:
+                    s = str(val).strip().upper()
+                if s.endswith('.0'): s = s[:-2]
+                if s in ["NAN", "0", "NONE", ""]: return ""
+                return s
+
+            df_a = df_app_raw.copy()
+            df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
+            
+            mask_status = df_a['2'].astype(str).str.strip().str.upper().isin(['DONE', 'KURANG AMBIL'])
+            df_filtered = df_a[mask_status].copy()
+
+            dict_qty_total = {}
+            for _, row in df_filtered.iterrows():
+                sku1 = clean_sku(row.get('9', ''))
+                qty1 = pd.to_numeric(row.get('13', 0), errors='coerce') or 0
+                if sku1: dict_qty_total[sku1] = dict_qty_total.get(sku1, 0) + qty1
+
+                sku2 = clean_sku(row.get('15', ''))
+                qty2 = pd.to_numeric(row.get('17', 0), errors='coerce') or 0
+                if sku2: dict_qty_total[sku2] = dict_qty_total.get(sku2, 0) + qty2
+
+            res_ds = df_ds_raw.copy()
+            cols = list(res_ds.columns)
+            sku_col, scan_col = cols[0], cols[1]
+
+            res_ds['SKU_UPPER'] = res_ds[sku_col].apply(clean_sku)
+            res_ds['QTY AMBIL'] = res_ds['SKU_UPPER'].map(dict_qty_total).fillna(0).astype(int)
+
+            def check_note(row):
+                scan = pd.to_numeric(row[scan_col], errors='coerce') or 0
+                ambil = row['QTY AMBIL']
+                if scan > ambil: return "KELEBIHAN AMBIL"
+                elif scan < ambil: return "KURANG AMBIL"
+                else: return "SESUAI"
+
+            res_ds['NOTE'] = res_ds.apply(check_note, axis=1)
+
+            results_selisih = []
+            mismatch_ds = res_ds[res_ds['NOTE'] != 'SESUAI'].copy()
+
+            for _, row in mismatch_ds.iterrows():
+                sku = row['SKU_UPPER']
+                mask_app = (df_a['9'].apply(clean_sku) == sku) | (df_a['15'].apply(clean_sku) == sku)
+                found_rows = df_a[mask_app]
+                if not found_rows.empty:
+                    for _, r_app in found_rows.iterrows():
+                        if clean_sku(r_app.get('9')) == sku:
+                            results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('12', '-'), r_app.get('13', 0), 0])
+                        if clean_sku(r_app.get('15')) == sku:
+                            results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], r_app.get('16', '-'), r_app.get('17', 0), 0])
+                else:
+                    results_selisih.append([sku, row[scan_col], row['QTY AMBIL'], row['NOTE'], "-", 0, 0])
+
+            skus_in_ds = set(res_ds['SKU_UPPER'].unique())
+            for sku_app, total_qty in dict_qty_total.items():
+                if sku_app and sku_app not in skus_in_ds:
+                    mask_app = (df_a['9'].apply(clean_sku) == sku_app) | (df_a['15'].apply(clean_sku) == sku_app)
+                    found_rows = df_a[mask_app]
+                    for _, r_app in found_rows.iterrows():
+                        note_khusus = "DI APPSHEET DIAMBIL DI DS TIDAK ADA"
+                        if clean_sku(r_app.get('9')) == sku_app:
+                            results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('12', '-'), r_app.get('13', 0), 0])
+                        if clean_sku(r_app.get('15')) == sku_app:
+                            results_selisih.append([sku_app, 0, total_qty, note_khusus, r_app.get('16', '-'), r_app.get('17', 0), 0])
+
+            res_selisih = pd.DataFrame(results_selisih, columns=['SKU','QTY SCAN','QTY AMBIL','NOTE','BIN','QTY AMBIL BIN','HASIL CEK REAL'])
+            res_selisih = res_selisih.drop_duplicates(subset=['SKU', 'BIN', 'QTY AMBIL BIN', 'NOTE'], keep='first')
+            res_selisih['SKU'] = res_selisih['SKU'].apply(clean_sku)
+            res_ds.drop(columns=['SKU_UPPER'], inplace=True, errors='ignore')
+
+            # Kalkulasi Metrik
+            v_scan = pd.to_numeric(res_selisih['QTY SCAN'], errors='coerce').fillna(0)
+            v_ambil = pd.to_numeric(res_selisih['QTY AMBIL BIN'], errors='coerce').fillna(0)
+            v_notes = res_selisih['NOTE'].astype(str).str.strip().str.upper()
+
+            q_tot = int(pd.to_numeric(res_ds[scan_col], errors='coerce').sum())
+            q_ses = int(pd.to_numeric(res_ds[res_ds['NOTE'] == 'SESUAI'][scan_col], errors='coerce').sum())
+            
+            mask_l = v_notes == 'KELEBIHAN AMBIL'
+            q_leb = int((v_scan[mask_l] - res_selisih.loc[mask_l, 'QTY AMBIL']).sum()) if mask_l.any() else 0
+
+            mask_k = v_notes == 'KURANG AMBIL'
+            mask_m = v_notes == 'DI APPSHEET DIAMBIL DI DS TIDAK ADA'
+            selisih_k = (res_selisih.loc[mask_k, 'QTY AMBIL'] - v_scan[mask_k]).sum() if mask_k.any() else 0
+            total_m = v_ambil[mask_m].sum() if mask_m.any() else 0
+            q_kur = int(selisih_k + total_m)
+
+            self.rto_q_total.set(q_tot)
+            self.rto_q_sesuai.set(q_ses)
+            self.rto_q_lebih.set(q_leb)
+            self.rto_q_kurang.set(q_kur)
+
+            self._raw_df_rto_ds = res_ds.copy()
+            self._raw_df_rto_selisih = res_selisih.copy()
+            self._raw_df_rto_app = df_app_raw.copy()
+
+            self.df_rto_ds_headers.set(res_ds.columns.tolist())
+            self.df_rto_ds_rows.set(res_ds.fillna("").astype(str).values.tolist())
+            self.df_rto_selisih_headers.set(res_selisih.columns.tolist())
+            self.df_rto_selisih_rows.set(res_selisih.fillna("").astype(str).values.tolist())
+
+            self.rto_step1_done.set(True)
+            return True, "Compare DS vs AppSheet Selesai!"
+        except Exception as e:
+            return False, f"Gagal Compare RTO Step 1: {e}"
+
+    def run_rto_step2_refresh(self, f_cek):
+        try:
+            if self._raw_df_rto_app.empty or self._raw_df_rto_ds.empty:
+                return False, "Jalankan Step 1 terlebih dahulu!"
+
+            df_selisih = load_data_from_info(f_cek)
+            if df_selisih.empty:
+                return False, "File Hasil Cek Real kosong!"
+
+            df_app_res = self._raw_df_rto_app.copy()
+            df_ds_res = self._raw_df_rto_ds.copy()
+
+            real_map = {}
+            for _, row in df_selisih.iterrows():
+                sku_real = str(row.iloc[0]).strip().upper()
+                bin_real = str(row.iloc[4]).strip().upper()
+                qty_real = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+                if sku_real not in ["", "NAN", "NONE"]:
+                    real_map[f"{sku_real}|{bin_real}"] = qty_real
+
+            for idx in df_app_res.index:
+                try:
+                    sku = str(df_app_res.iloc[idx, 8]).strip().upper()
+                    if sku in ["", "NAN", "0", "NONE"]: sku = str(df_app_res.iloc[idx, 14]).strip().upper()
+                    b1, b2 = str(df_app_res.iloc[idx, 11]).strip().upper(), str(df_app_res.iloc[idx, 15]).strip().upper()
+                    target_qty = real_map.get(f"{sku}|{b1}") if f"{sku}|{b1}" in real_map else real_map.get(f"{sku}|{b2}")
+                    if target_qty is not None:
+                        val_n = str(df_app_res.iloc[idx, 13]).strip()
+                        if val_n == "" or val_n.lower() == "nan": df_app_res.iloc[idx, 12] = target_qty
+                        else: df_app_res.iloc[idx, 16] = target_qty
+                except: continue
+
+            if not df_ds_res.empty:
+                df_app_res['TMP_SKU'] = df_app_res.apply(lambda r: str(r.iloc[8]).strip().upper() if str(r.iloc[8]).strip() not in ["","0","nan"] else str(r.iloc[14]).strip().upper(), axis=1)
+                df_app_res['TMP_QTY'] = df_app_res.apply(lambda r: (pd.to_numeric(r.iloc[12], errors='coerce') or 0) + (pd.to_numeric(r.iloc[16], errors='coerce') or 0), axis=1)
+                summary_map = df_app_res.groupby('TMP_SKU')['TMP_QTY'].sum().to_dict()
+                sku_col, scan_col, ambil_col = df_ds_res.columns[0], df_ds_res.columns[1], df_ds_res.columns[2]
+                df_ds_res[ambil_col] = df_ds_res[sku_col].astype(str).str.strip().str.upper().map(summary_map).fillna(0)
+                df_ds_res[scan_col] = df_ds_res[ambil_col]
+                if 'NOTE' in df_ds_res.columns: df_ds_res['NOTE'] = "SESUAI"
+                df_app_res.drop(columns=['TMP_SKU', 'TMP_QTY'], inplace=True, errors='ignore')
+
+            self._raw_df_rto_ds = df_ds_res.copy()
+            self._raw_df_rto_app = df_app_res.copy()
+            self.df_rto_ds_rows.set(df_ds_res.fillna("").astype(str).values.tolist())
+
+            return True, "Data RTO Berhasil Di-refresh!"
+        except Exception as e:
+            return False, f"Gagal Refresh RTO: {e}"
+
+    def run_rto_step3_draft(self, f_draft):
+        try:
+            if self._raw_df_rto_app.empty:
+                return False, "Jalankan Step 1 terlebih dahulu!"
+
+            df_draft = load_data_from_info(f_draft)
+            if df_draft.empty:
+                return False, "File Draft Jezpro kosong!"
+
+            df_res = df_draft.copy()
+            df_a = self._raw_df_rto_app.copy()
+            df_a.columns = [str(i) for i in range(1, len(df_a.columns) + 1)]
+
+            def clean_sku(val):
+                if pd.isna(val): return ""
+                s = str(val).strip().upper()
+                if s.endswith('.0'): s = s[:-2]
+                return s if s not in ["NAN", "0", "NONE"] else ""
+
+            app_summary = {}
+            for _, r in df_a.iterrows():
+                pairs = [(clean_sku(r.get('9')), str(r.get('12','')).strip().upper(), pd.to_numeric(r.get('13',0), errors='coerce') or 0),
+                         (clean_sku(r.get('15')) or clean_sku(r.get('9')), str(r.get('16','')).strip().upper(), pd.to_numeric(r.get('17',0), errors='coerce') or 0)]
+                for s, b, q in pairs:
+                    if s and b not in ["", "0", "NAN"]:
+                        app_summary[(s, b)] = app_summary.get((s, b), 0) + q
+
+            rem_app = app_summary.copy()
+            processed_indices = set()
+
+            for idx, row in df_res.iterrows():
+                sku_d = clean_sku(row.iloc[3])
+                bin_d = str(row.iloc[8]).strip().upper()
+                qty_h = pd.to_numeric(row.iloc[7], errors='coerce') or 0
+                key_d = (sku_d, bin_d)
+
+                if rem_app.get(key_d, 0) > 0:
+                    qty_j = rem_app[key_d]
+                    rem_app[key_d] = 0
+                    note = "DRAFT SESUAI" if qty_j == qty_h else "BEDA QTY"
+                    status = "OK" if qty_j == qty_h else "PERLU EDIT QTY DRAFT"
+                    df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [qty_j, note, "", 0, status]
+                    processed_indices.add(idx)
+
+            for idx, row in df_res.iterrows():
+                if idx in processed_indices: continue
+                sku_d = clean_sku(row.iloc[3])
+                possible_bins = [k for k, v in rem_app.items() if k[0] == sku_d and v > 0]
+                if possible_bins:
+                    bin_lain = ", ".join([b[1] for b in possible_bins])
+                    qty_lain = sum([rem_app[b] for b in possible_bins])
+                    df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [0, "PINDAH BIN", bin_lain, qty_lain, "PERLU EDIT BIN DRAFT"]
+                else:
+                    df_res.loc[idx, ['QTY AMBIL', 'NOTE', 'BIN AMBIL LAIN', 'QTY BIN LAIN', 'STATUS']] = [0, "HAPUS ITEM INI", "", 0, "DELETE ITEM"]
+
+            sku_in_draft = set(df_draft.iloc[:, 3].apply(clean_sku).unique())
+            new_rows = []
+            for (sku_a, bin_a), qty_a in rem_app.items():
+                if qty_a > 0 and sku_a not in sku_in_draft:
+                    new_entry = {col: "" for col in df_res.columns}
+                    new_entry[df_res.columns[0]] = "-"
+                    new_entry[df_res.columns[3]] = sku_a
+                    new_entry[df_res.columns[7]] = 0
+                    new_entry[df_res.columns[8]] = bin_a
+                    new_entry['QTY AMBIL'] = qty_a
+                    new_entry['NOTE'] = "TAMBAH ITEM BARU"
+                    new_entry['STATUS'] = "ADD NEW"
+                    new_rows.append(new_entry)
+                    rem_app[(sku_a, bin_a)] = 0
+
+            if new_rows:
+                df_res = pd.concat([df_res, pd.DataFrame(new_rows)], ignore_index=True)
+
+            for col in ['QTY AMBIL', 'QTY BIN LAIN', df_res.columns[7]]:
+                if col in df_res.columns:
+                    df_res[col] = pd.to_numeric(df_res[col], errors='coerce').fillna(0).astype(int)
+
+            # Hitung Metrik Final
+            qty_ambil = pd.to_numeric(df_res['QTY AMBIL'], errors='coerce').fillna(0)
+            qty_lain = pd.to_numeric(df_res['QTY BIN LAIN'], errors='coerce').fillna(0)
+
+            q_draft_tot = int((qty_ambil + qty_lain).sum())
+            mask_ok = (df_res['STATUS'] == 'OK')
+            q_ok = int((qty_ambil[mask_ok] + qty_lain[mask_ok]).sum())
+            mask_edit = df_res['STATUS'].str.contains('EDIT', na=False)
+            q_edit = int((qty_ambil[mask_edit] + qty_lain[mask_edit]).sum())
+            
+            qty_col_name = df_draft.columns[7]
+            q_del = int(pd.to_numeric(df_res[df_res['STATUS'] == 'DELETE ITEM'][qty_col_name], errors='coerce').sum()) if 'DELETE ITEM' in df_res['STATUS'].values else 0
+
+            self.rto_q_draft_total.set(q_draft_tot)
+            self.rto_q_ok.set(q_ok)
+            self.rto_q_edit.set(q_edit)
+            self.rto_q_del.set(q_del)
+
+            self._raw_df_rto_draft_comp = df_res.copy()
+            self.df_rto_draft_comp_headers.set(df_res.columns.tolist())
+            self.df_rto_draft_comp_rows.set(df_res.fillna("").astype(str).values.tolist())
+
+            self.rto_draft_done.set(True)
+            return True, "Compare Draft Jezpro Berhasil!"
+        except Exception as e:
+            return False, f"Gagal Compare Draft: {e}"
+
+    def run_rto_step4_new_draft(self):
+        try:
+            if self._raw_df_rto_draft_comp.empty:
+                return False, "Jalankan Compare Draft Jezpro terlebih dahulu!"
+
+            dict_final = {}
+            for _, row in self._raw_df_rto_draft_comp.iterrows():
+                sku = str(row.iloc[3]).strip().upper()
+                bin_i = str(row.iloc[8]).strip().upper()
+                bin_l = str(row.iloc[11]).strip().upper() if not pd.isna(row.iloc[11]) else ""
+                q_j = pd.to_numeric(row['QTY AMBIL'], errors='coerce') or 0
+                q_m = pd.to_numeric(row['QTY BIN LAIN'], errors='coerce') or 0
+                if q_j > 0:
+                    k = f"{bin_i}|{sku}"
+                    dict_final[k] = dict_final.get(k, 0) + q_j
+                if q_m > 0 and bin_l not in ["", "-", "NAN"]:
+                    k_l = f"{bin_l}|{sku}"
+                    dict_final[k_l] = dict_final.get(k_l, 0) + q_m
+
+            res = pd.DataFrame([{'BIN': k.split('|')[0], 'SKU': k.split('|')[1], 'QUANTITY': int(v)} for k, v in dict_final.items()])
+            if not res.empty:
+                res = res.sort_values(['BIN', 'SKU']).reset_index(drop=True)
+
+            self.rto_q_new_draft_total.set(int(res['QUANTITY'].sum()) if not res.empty else 0)
+            self._raw_df_rto_new_draft = res.copy()
+            self.df_rto_new_draft_headers.set(res.columns.tolist() if not res.empty else [])
+            self.df_rto_new_draft_rows.set(res.fillna("").astype(str).values.tolist() if not res.empty else [])
+
+            self.rto_new_draft_done.set(True)
+            return True, f"Generate New Draft Selesai! Total: {self.rto_q_new_draft_total()} Pcs"
+        except Exception as e:
+            return False, f"Gagal Generate New Draft: {e}"
