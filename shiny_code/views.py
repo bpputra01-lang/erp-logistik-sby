@@ -22,10 +22,10 @@ def get_image_base64(filename):
 # CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK ANTI-LONCAT)
 # ==============================================================================
 # ==============================================================================
-# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN USER-INTENT SCROLL GUARD)
+# CSS & JAVASCRIPT ASSETS (ZERO-GLITCH SCROLL LOCK & SMOOTH)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT UTAMA: JUDUL, FAVICON, PAGINASI, DRAG & DROP, & SCROLL GUARD ---
+    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & ZERO-GLITCH SCROLL) ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -36,7 +36,7 @@ CUSTOM_HEAD = ui.head_content(
         }
         favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
 
-        // --- ENGINE PAGINASI CEPAT (0ms) ---
+        // --- 1. ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
         window.renderFastTablePage = function(tableId) {
             let tState = window.fastTables[tableId];
@@ -99,7 +99,7 @@ CUSTOM_HEAD = ui.head_content(
             }
         };
 
-        // --- DRAG & DROP DARI EXPLORER KE SELURUH BOX ---
+        // --- 2. DRAG & DROP FILE DARI EXPLORER ---
         document.addEventListener('dragover', function(e) {
             let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
             if (box) {
@@ -130,65 +130,74 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 100% ROCK-SOLID USER-INTENT SCROLL GUARD (ANTI-LONCAT KE ATAS) ---
-        let userExactScrollY = 0;
-        let isUserActuallyScrolling = false;
-        let userActionTimeout = null;
+        // --- 3. ZERO-GLITCH SYNCHRONOUS SCROLL LOCK (100% DIAM MEMATUNG) ---
+        window._lockedScrollPos = 0;
+        let isUserActivelyScrolling = false;
+        let scrollResetTimer = null;
 
-        function getScrollContainer() {
+        function getContainer() {
             return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
         }
 
-        function flagUserInteraction() {
-            isUserActuallyScrolling = true;
-            clearTimeout(userActionTimeout);
-            userActionTimeout = setTimeout(function() {
-                isUserActuallyScrolling = false;
-            }, 350);
-        }
-
-        // Tangkap hanya pergerakan fisik asli dari user (Wheel, Touch, Keydown, Click)
-        window.addEventListener('wheel', flagUserInteraction, { passive: true, capture: true });
-        window.addEventListener('touchmove', flagUserInteraction, { passive: true, capture: true });
-        window.addEventListener('mousedown', flagUserInteraction, { passive: true, capture: true });
-        window.addEventListener('keydown', function(e) {
-            if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Space', 'Home', 'End'].includes(e.code)) {
-                flagUserInteraction();
-            }
+        // Catat posisi scroll setiap user menggeser mouse
+        window.addEventListener('wheel', function() {
+            isUserActivelyScrolling = true;
+            clearTimeout(scrollResetTimer);
+            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
         }, { passive: true, capture: true });
 
-        // Simpan posisi scroll HANYA jika digeser secara sadar oleh user
-        document.addEventListener("scroll", function(e) {
-            let sc = getScrollContainer();
-            if (sc && isUserActuallyScrolling && sc.scrollTop > 0) {
-                userExactScrollY = sc.scrollTop;
+        window.addEventListener('touchmove', function() {
+            isUserActivelyScrolling = true;
+            clearTimeout(scrollResetTimer);
+            scrollResetTimer = setTimeout(function() { isUserActivelyScrolling = false; }, 200);
+        }, { passive: true, capture: true });
+
+        document.addEventListener('scroll', function(e) {
+            let c = getContainer();
+            if (c && isUserActivelyScrolling && c.scrollTop > 0) {
+                window._lockedScrollPos = c.scrollTop;
             }
         }, true);
 
-        // Kunci dan tahan posisi scroll saat upload/render Shiny berjalan
-        function forceHoldScroll() {
-            let sc = getScrollContainer();
-            if (!sc) return;
-
-            // Jika posisi layar anjlok ke 0 padahal user tidak menggeser ke 0 secara sadar:
-            if (!isUserActuallyScrolling && userExactScrollY > 0 && sc.scrollTop === 0) {
-                sc.scrollTop = userExactScrollY;
+        // Rekam posisi saat klik tombol atau pilih file
+        document.addEventListener('mousedown', function() {
+            let c = getContainer();
+            if (c && c.scrollTop > 0) {
+                window._lockedScrollPos = c.scrollTop;
             }
+        }, true);
+
+        // Kunci instan tepat di siklus hidup Shiny sebelum frame digambar (Zero-Flicker)
+        if (window.jQuery) {
+            $(document).on('shiny:inputchanged shiny:recalculating', function() {
+                let c = getContainer();
+                if (c && c.scrollTop > 0) {
+                    window._lockedScrollPos = c.scrollTop;
+                }
+            });
+
+            $(document).on('shiny:value shiny:recalculated', function() {
+                let c = getContainer();
+                if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling) {
+                    c.scrollTop = window._lockedScrollPos;
+                }
+            });
         }
 
-        let scrollObserver = new MutationObserver(function() {
-            forceHoldScroll();
+        // Penjaga ganda MutationObserver
+        let domWatcher = new MutationObserver(function() {
+            let c = getContainer();
+            if (c && window._lockedScrollPos > 0 && !isUserActivelyScrolling && c.scrollTop !== window._lockedScrollPos) {
+                c.scrollTop = window._lockedScrollPos;
+            }
         });
 
         document.addEventListener("DOMContentLoaded", function() {
-            let sc = getScrollContainer();
-            if (sc) {
-                scrollObserver.observe(sc, { childList: true, subtree: true });
+            let c = getContainer();
+            if (c) {
+                domWatcher.observe(c, { childList: true, subtree: true });
             }
         });
-
-        // Loop penjaga posisi setiap 30ms (Sangat halus tanpa lag)
-        setInterval(forceHoldScroll, 30);
     """),
 
     # --- 2. FONT AWESOME ICONS ---
@@ -199,6 +208,12 @@ CUSTOM_HEAD = ui.head_content(
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
         
+        /* Mematikan reflek loncat otomatis browser */
+        #main-scroll-container {
+            overflow-anchor: none !important;
+            scroll-behavior: auto !important;
+        }
+
         @keyframes blinkAnimation {
             0% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.25; transform: scale(0.75); }
