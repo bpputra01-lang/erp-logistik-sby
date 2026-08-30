@@ -5,7 +5,7 @@ from state import AppState
 from views import (
     CUSTOM_HEAD, static_loading_spinner, success_modal, error_modal,
     render_clean_table, metric_box, dark_metric_box,  BRANCH_BIN_MAPPING, 
-    compare_system_view, stock_minus_view,
+    custom_uploader_box, compare_system_view, stock_minus_view,
     putaway_view, main_dashboard_view, sidebar, cycle_count_view, login_page, ppa_audit_view, cycle_count_analyzer_view, global_header
 )
 
