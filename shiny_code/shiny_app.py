@@ -71,32 +71,167 @@ def server(input: Inputs, output: Outputs, session: Session):
     def _drop_toggle(): state.toggle_dropdown(input.toggle_dropdown_section())
 
     # Panduan & Logic Modal
+   # ==========================================================================
+    # MODAL PANDUAN & LOGIC LENGKAP UNTUK SELURUH MENU
+    # ==========================================================================
     @reactive.Effect
     @reactive.event(input.btn_open_panduan_modal)
     def _panduan_modal():
         cur = state.main_menu()
-        if cur == "Compare System":
+
+        # 1. PANDUAN: CYCLE COUNT (ANALYZER)
+        if cur == "Cycle Count":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Informasi Format File"),
+                    ui.div(
+                        ui.tags.strong("Format yang diharapkan:"),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("FILTER:"), " Pilih Cabang, Sub Kategori, Brand, dan BIN System sesuai data yang dianalisa."),
+                            ui.tags.li(ui.strong("1. DATA SCAN:"), " Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN."),
+                            ui.tags.li(ui.strong("2. STOCK SYSTEM:"), " Download All Stock dari Multiple Adjustment (Pilih 'Termasuk yang sudah habis')."),
+                            ui.tags.li(ui.strong("3. BIN COVERAGE:"), " Download dari Multiple Adjustment (Pilih 'Hanya ada di stock')."),
+                            ui.tags.li(ui.strong("4. RECON REAL +:"), " Upload file hasil recon (Pastikan Kolom A bukan Number)."),
+                            ui.tags.li(ui.strong("5. SYSTEM + RECON:"), " Upload file master audit hasil rekonsiliasi untuk generate Karantina.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                ),
+                ui.tags.details(
+                    ui.tags.summary("💡 Logic Thinking"),
+                    ui.div(
+                        ui.tags.strong("Alur Logika Cycle Count Analyzer:"),
+                        ui.tags.ol(
+                            ui.tags.li(ui.strong("REAL +:"), " QTY SCAN > QTY SYSTEM (Fokus pada data scan aktual fisik)."),
+                            ui.tags.li(ui.strong("SYSTEM +:"), " QTY SYSTEM > QTY SCAN (Fokus pada data sistem yang belum terscan)."),
+                            ui.tags.li(ui.strong("ALOKASI REAL +:"), " Mencari kover stok dari System + dan BIN Coverage (Status: FULL, PARTIAL, atau NO ALLOCATION)."),
+                            ui.tags.li(ui.strong("RECON REPORT:"), " Item NO ALLOCATION otomatis ditarik untuk investigasi rekonsiliasi lanjutan."),
+                            ui.tags.li(ui.strong("SET UP KARANTINA:"), " Item selisih (DIFF > 0) dimutasi ke BIN KARANTINA dengan note MISS LOCATION."),
+                            ui.tags.li(ui.strong("MISS LOCATION REPORT:"), " Rekapitulasi total SKU & QTY yang mengalami salah letak lokasi.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
+        # 2. PANDUAN: COMPARE SYSTEM
+        elif cur == "Compare System":
             guide_body = ui.div(
                 ui.tags.details(
                     ui.tags.summary("📋 Informasi Format File & Mapping"),
                     ui.div(
                         ui.tags.strong("Kondisi Stok Berkurang (Sys1 > Sys2):"),
-                        ui.tags.ul(ui.tags.li(ui.strong("Stock Tracking:"), " Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty (Index 10)."), ui.tags.li(ui.strong("RTO Out:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7).")),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("Stock Tracking:"), " Kolom A=Invoice, Kolom B=SKU, Kolom G=BIN, Kolom K=Qty (Index 10)."),
+                            ui.tags.li(ui.strong("RTO Out:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7).")
+                        ),
                         ui.tags.strong("Kondisi Stok Bertambah (Sys2 > Sys1):"),
-                        ui.tags.ul(ui.tags.li(ui.strong("Purchase Order:"), " Kolom A=No PO, Kolom E=SKU (Index 4), Kolom M=Qty (Index 12)."), ui.tags.li(ui.strong("RTO In:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7)."), ui.tags.li(ui.strong("Mutasi Refund:"), " Kolom D=SKU (Index 3), Kolom K=Qty (Index 10).")),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("Purchase Order:"), " Kolom A=No PO, Kolom E=SKU (Index 4), Kolom M=Qty (Index 12)."),
+                            ui.tags.li(ui.strong("RTO In:"), " Kolom A=No TF, Kolom D=SKU (Index 3), Kolom H=Qty (Index 7)."),
+                            ui.tags.li(ui.strong("Mutasi Refund:"), " Kolom D=SKU (Index 3), Kolom K=Qty (Index 10).")
+                        ),
                         class_="accordion-content"
                     ), open=True
                 )
             )
+
+        # 3. PANDUAN: LIST BIN CYCLE COUNT
+        elif cur == "List Bin Cycle Count":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Informasi Format File"),
+                    ui.div(
+                        ui.tags.strong("Format yang diharapkan:"),
+                        ui.tags.ul(
+                            ui.tags.li("Upload file ", ui.strong("Multiple Adjustment"), " dari Jezpro."),
+                            ui.tags.li("File minimal memiliki 10 kolom: Kolom B (BIN), Kolom C (SKU), Kolom G (Sub Kategori), Kolom H (Harga Jual), dan Kolom J (Qty System)."),
+                            ui.tags.li("Gunakan filter interaktif untuk memilah berdasarkan Sub Kategori, Brand, atau Tiering Kategori Harga.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
+        # 4. PANDUAN: PUTAWAY & PICKING AUDIT LIST
+        elif cur in ["Putaway & Picking Audit List", "Putaway & Picking Audit"]:
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Format Dokumen Audit"),
+                    ui.div(
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("1. File Sales:"), " Memeriksa data penjualan (Minimal hingga Kolom K / Qty Sales)."),
+                            ui.tags.li(ui.strong("2. File RTO:"), " Memeriksa data retur keluar (Minimal hingga Kolom I / Qty RTO)."),
+                            ui.tags.li(ui.strong("3. File Mutasi:"), " Memeriksa rantai perjalanan perpindahan BIN secara kronologis (Kolom A=Waktu, D=SKU, I=Bin Awal, M=Bin Tujuan)."),
+                            ui.tags.li(ui.strong("4. Final Match BIN:"), " Menghasilkan irisan BIN yang mengalami Picking dan Putaway secara bersamaan.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
+        # 5. PANDUAN: STOCK MINUS
         elif cur == "Stock Minus":
-            guide_body = ui.div(ui.tags.details(ui.tags.summary("📋 Format File"), ui.div("Download Multiple Adjusmet dari Jezpro dan pilih 'Termasuk yang sudah habis'.", class_="accordion-content"), open=True))
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Informasi Format File & Logic"),
+                    ui.div(
+                        ui.tags.ul(
+                            ui.tags.li("Download file ", ui.strong("Multiple Adjustment"), " dari Jezpro dan pilih ", ui.strong("'Termasuk yang sudah habis'"), "."),
+                            ui.tags.li("Sistem akan mendeteksi seluruh SKU dengan Qty System minus (-)."),
+                            ui.tags.li("Sistem memprioritaskan penutupan stok minus dari BIN Prioritas (Staging Inbound/Outbound, Karantina, dll)."),
+                            ui.tags.li("Jika stok minus terjadi di Toko, sistem akan memprioritaskan kover dari Gudang Lt.2, begitupun sebaliknya.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
+        # 6. PANDUAN: PUTAWAY SYSTEM
         elif cur == "Putaway System":
-            guide_body = ui.div(ui.tags.details(ui.tags.summary("📋 Format File"), ui.div("Upload Data Scan Putaway & Data Asal Bin Jezpro.", class_="accordion-content"), open=True))
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Format File Putaway"),
+                    ui.div(
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("DATA SCAN PUTAWAY:"), " Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN."),
+                            ui.tags.li(ui.strong("DATA ASAL BIN:"), " Sesuai format template Jezpro."),
+                            ui.tags.li("Pilih Area Putaway terlebih dahulu (DC Lt.1, Lt.2, Lt.3, atau Jersey Zone) sebelum komparasi.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
+        # 7. PANDUAN: DATABASE ONGKIR
+        elif cur in ["Database Ongkir In/Out", "Database Ongkir", "dashboard_ongkir"]:
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Panduan Input & Upload Ongkir"),
+                    ui.div(
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("Input Manual:"), " Masukkan Supplier, Ekspedisi, Total Koli, Total Biaya Ongkir, dan Tanggal Transaksi."),
+                            ui.tags.li(ui.strong("Batch CSV Upload:"), " Format header CSV wajib: SUPPLIER, EKSPEDISI, TOTAL KOLI, ONGKIR, TANGGAL_JAM.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
+
+        # FALLBACK JIKA MENU LAIN
         else:
-            guide_body = ui.div(ui.p(f"Panduan dan Logic untuk halaman '{cur}' belum tersedia.", style="color: #718096; font-style: italic;"), style="text-align: center; padding: 2rem;")
+            guide_body = ui.div(
+                ui.tags.i(class_="fa-regular fa-folder-open", style="font-size: 40px; color: #CBD5E0; margin-bottom: 8px;"),
+                ui.p(f"Panduan dan Logic untuk halaman '{cur}' belum tersedia.", style="color: #718096; font-style: italic;"),
+                style="text-align: center; padding: 2rem;"
+            )
 
-        ui.modal_show(ui.modal(guide_body, title=ui.div(ui.tags.i(class_="fa-solid fa-book-open", style="color: #C5A059; margin-right: 8px;"), f"Panduan & Logic - {cur}"), easy_close=True, footer=ui.modal_button("Tutup", class_="btn-red-gradient")))
-
+        ui.modal_show(ui.modal(
+            guide_body, 
+            title=ui.div(ui.tags.i(class_="fa-solid fa-book-open", style="color: #C5A059; margin-right: 8px;"), f"Panduan & Logic - {cur}"), 
+            easy_close=True, 
+            footer=ui.modal_button("Tutup", class_="btn-red-gradient")
+        ))
     # Sub-render Action Buttons
     @render.ui
     def stock_minus_action_btn_ui():

@@ -22,7 +22,7 @@ def get_image_base64(filename):
 # CSS & JAVASCRIPT ASSETS (PERSIS REFLEX) - HANYA 1 KALI
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT OTOMATIS GANTI JUDUL, FAVICON & ENGINE PAGINASI CEPAT ---
+    # --- 1. SCRIPT OTOMATIS: JUDUL, FAVICON, PAGINASI, DRAG & DROP, & SCROLL KEEPER ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -33,9 +33,8 @@ CUSTOM_HEAD = ui.head_content(
         }
         favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
 
-        // --- ENGINE PAGINASI VIRTUAL CEPAT (0ms) ---
+        // --- 1. ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
-
         window.renderFastTablePage = function(tableId) {
             let tState = window.fastTables[tableId];
             if (!tState) return;
@@ -96,6 +95,55 @@ CUSTOM_HEAD = ui.head_content(
                 window.renderFastTablePage(tableId);
             }
         };
+
+        // --- 2. FITUR DRAG & DROP FILE DARI EXPLORER KE SELURUH BOX ---
+        document.addEventListener('dragover', function(e) {
+            let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
+            if (box) {
+                e.preventDefault();
+                box.style.borderColor = '#E50914';
+                box.style.backgroundColor = '#FFF5F5';
+            }
+        });
+
+        document.addEventListener('dragleave', function(e) {
+            let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
+            if (box) {
+                e.preventDefault();
+                box.style.borderColor = '';
+                box.style.backgroundColor = '';
+            }
+        });
+
+        document.addEventListener('drop', function(e) {
+            let box = e.target.closest('.reflex-upload-container, .csv-batch-box');
+            if (box && e.dataTransfer && e.dataTransfer.files.length > 0) {
+                e.preventDefault();
+                box.style.borderColor = '';
+                box.style.backgroundColor = '';
+                let fileInput = box.querySelector('input[type="file"]');
+                if (fileInput) {
+                    fileInput.files = e.dataTransfer.files;
+                    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        });
+
+        // --- 3. SMART SCROLL POSITION KEEPER (AGAR LAYAR TIDAK LONCAT KE ATAS) ---
+        let currentScrollY = 0;
+        window.addEventListener('scroll', function() {
+            let container = document.querySelector('div[style*="overflow-y: auto"]');
+            if (container) {
+                currentScrollY = container.scrollTop;
+            }
+        }, true);
+
+        setInterval(function() {
+            let container = document.querySelector('div[style*="overflow-y: auto"]');
+            if (container && document.body.classList.contains('process-running')) {
+                container.scrollTop = currentScrollY;
+            }
+        }, 100);
     """),
 
     # --- 2. FONT AWESOME ICONS ---
@@ -106,7 +154,6 @@ CUSTOM_HEAD = ui.head_content(
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
         
-        /* Animasi Blink Titik Online */
         @keyframes blinkAnimation {
             0% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.25; transform: scale(0.75); }
