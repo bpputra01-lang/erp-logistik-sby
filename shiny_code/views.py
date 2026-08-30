@@ -409,7 +409,7 @@ def cycle_count_analyzer_view(state: AppState):
     list_brand = ["MILLS", "ORTUSEIGHT", "SPECS", "ARDILES", "NINETEN", "LYCAN", "PATROBAS", "PIERO", "PORTO", "BRODO", "JACK IDN", "JOHNSON", "NOIJ", "VENTELA", "DESLE", "LEAGUE", "UNERD", "CALCI", "HUNDRED", "FIXCH", "YONEX", "NIKE", "AZA", "ASICS", "EAGLE", "PUMA", "KARGE", "GUMI", "ZUMA", "MILESTONE", "WEIDENMANN", "DIADORA", "HEIDEN HERITAGE", "LOTTO", "KRONIKEL", "ADIDAS", "VOOLA", "RECOIR", "MIZUNO", "UNKNOWN", "WARRIOR", "AVO", "KANKY"]
     list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
 
-    # Filter Section (Baris 1 Full Width, Baris 2 Grid 4 Kolom)
+    # Filter Section
     filter_section = ui.div(
         ui.div(
             ui.input_select("cca_branch", "🏢 Pilih Cabang / Branch:", choices=list(BRANCH_BIN_MAPPING.keys()), selected="SURABAYA", width="100%"),
@@ -425,43 +425,27 @@ def cycle_count_analyzer_view(state: AppState):
         style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
+    # Step 1 Selalu Muncul
     step1_ui = ui.div(
         ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.div(custom_uploader_box("cca_up_scan", "📥 DATA SCAN"), custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"), style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"),
-        ui.output_ui("cca_step1_btn_ui"), ui.output_ui("cca_step1_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-    step2_ui = ui.div(
-        ui.h4("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_cov", "📥 FILE BIN COVERAGE"),
-        ui.output_ui("cca_step2_btn_ui"), ui.output_ui("cca_step2_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-    step3_ui = ui.div(
-        ui.h4("3️⃣ RECON REPORTS (STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.output_ui("cca_step3_btn_ui"), ui.output_ui("cca_step3_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-    step4_ui = ui.div(
-        ui.h4("4️⃣ RECON REAL + PROCESS", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_recon_real", "📥 Upload HASIL RECON REAL +"),
-        ui.output_ui("cca_step4_btn_ui"), ui.output_ui("cca_step4_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-    step5_ui = ui.div(
-        ui.h4("5️⃣ RECON SYSTEM + PROCESS (SET UP KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        custom_uploader_box("cca_up_recon_sys", "📥 Upload SYSTEM + RECON (File Master Hasil Audit)"),
-        ui.output_ui("cca_step5_btn_ui"), ui.output_ui("cca_step5_results_ui"),
-        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
-    )
-    step6_ui = ui.div(
-        ui.h4("📊 MISS LOCATION REPORT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-        ui.output_ui("cca_step6_btn_ui"), ui.output_ui("cca_step6_results_ui"),
+        ui.div(
+            custom_uploader_box("cca_up_scan", "📥 DATA SCAN"),
+            custom_uploader_box("cca_up_stock", "📥 STOCK SYSTEM"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
+        ),
+        ui.output_ui("cca_step1_btn_ui"),
+        ui.output_ui("cca_step1_results_ui"),
         style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
-    return ui.div(filter_section, step1_ui, step2_ui, step3_ui, step4_ui, step5_ui, step6_ui, style="width: 100%; padding: 1rem;")
-
+    # Step 2 sampai 6 dirender secara dinamis bertahap
+    return ui.div(
+        filter_section,
+        step1_ui,
+        ui.output_ui("cca_dynamic_steps_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
+    
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
