@@ -1,6 +1,7 @@
 import os
 import base64
 import random
+import json
 from datetime import datetime
 from shiny import ui
 from state import AppState
@@ -10,7 +11,7 @@ from config import safe_int
 # CSS & JAVASCRIPT ASSETS (PERSIS REFLEX)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT OTOMATIS GANTI JUDUL, FAVICON & SISTEM PAGINASI TABEL ---
+    # --- SCRIPT FAST VIRTUAL PAGINATION (0.1 DETIK INSTAN) ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -21,71 +22,66 @@ CUSTOM_HEAD = ui.head_content(
         }
         favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
 
-        // --- SISTEM PAGINASI TABEL CLIENT-SIDE SUPER CEPAT (0ms) ---
-        window.tablePaginations = window.tablePaginations || {};
+        // --- ENGINE PAGINASI VIRTUAL CEPAT ---
+        window.fastTables = window.fastTables || {};
 
-        window.initTablePagination = function(tableId, defaultSize) {
-            let table = document.getElementById(tableId);
-            if (!table) return;
-            let rows = table.querySelectorAll("tbody tr");
-            window.tablePaginations[tableId] = {
-                pageSize: parseInt(defaultSize) || 10,
-                currentPage: 1,
-                totalRows: rows.length
-            };
-            window.renderTablePage(tableId);
-        };
+        window.renderFastTablePage = function(tableId) {
+            let tState = window.fastTables[tableId];
+            if (!tState) return;
+            let tbody = document.getElementById(tableId + "_tbody");
+            if (!tbody) return;
 
-        window.renderTablePage = function(tableId) {
-            let pState = window.tablePaginations[tableId];
-            if (!pState) return;
-            let table = document.getElementById(tableId);
-            if (!table) return;
-            let rows = table.querySelectorAll("tbody tr");
-            let total = rows.length;
-            pState.totalRows = total;
-
-            let size = pState.pageSize === -1 ? total : pState.pageSize;
+            let total = tState.data.length;
+            let size = tState.pageSize === -1 ? total : tState.pageSize;
             let maxPages = Math.max(1, Math.ceil(total / size));
-            if (pState.currentPage > maxPages) pState.currentPage = maxPages;
-            if (pState.currentPage < 1) pState.currentPage = 1;
+            if (tState.currentPage > maxPages) tState.currentPage = maxPages;
+            if (tState.currentPage < 1) tState.currentPage = 1;
 
-            let start = (pState.currentPage - 1) * size;
-            let end = start + size;
+            let start = (tState.currentPage - 1) * size;
+            let end = Math.min(start + size, total);
 
-            rows.forEach(function(r, idx) {
-                r.style.display = (idx >= start && idx < end) ? "" : "none";
-            });
+            // Hanya gambar 10 baris yang tampak di layar (Super Ringan!)
+            let htmlStr = "";
+            for (let i = start; i < end; i++) {
+                let row = tState.data[i];
+                htmlStr += "<tr>";
+                for (let j = 0; j < row.length; j++) {
+                    let cell = row[j] !== null && row[j] !== undefined ? row[j] : "";
+                    htmlStr += "<td>" + cell + "</td>";
+                }
+                htmlStr += "</tr>";
+            }
+            tbody.innerHTML = htmlStr;
 
+            // Update info baris dan tombol navigasi
             let info = document.getElementById(tableId + "_info");
             let pageNum = document.getElementById(tableId + "_page_num");
             let prevBtn = document.getElementById(tableId + "_prev_btn");
             let nextBtn = document.getElementById(tableId + "_next_btn");
 
             if (info) {
-                let dispEnd = Math.min(end, total);
                 let dispStart = total > 0 ? (start + 1) : 0;
-                info.innerText = "Menampilkan " + dispStart + " - " + dispEnd + " dari " + total.toLocaleString() + " baris";
+                info.innerText = "Menampilkan " + dispStart + " - " + end + " dari " + total.toLocaleString() + " baris";
             }
             if (pageNum) {
-                pageNum.innerText = "Hal " + pState.currentPage + " / " + maxPages;
+                pageNum.innerText = "Hal " + tState.currentPage + " / " + maxPages;
             }
-            if (prevBtn) prevBtn.disabled = (pState.currentPage <= 1);
-            if (nextBtn) nextBtn.disabled = (pState.currentPage >= maxPages);
+            if (prevBtn) prevBtn.disabled = (tState.currentPage <= 1);
+            if (nextBtn) nextBtn.disabled = (tState.currentPage >= maxPages);
         };
 
-        window.changePageSize = function(tableId, sizeVal) {
-            if (window.tablePaginations[tableId]) {
-                window.tablePaginations[tableId].pageSize = parseInt(sizeVal);
-                window.tablePaginations[tableId].currentPage = 1;
-                window.renderTablePage(tableId);
+        window.changeFastPageSize = function(tableId, sizeVal) {
+            if (window.fastTables[tableId]) {
+                window.fastTables[tableId].pageSize = parseInt(sizeVal);
+                window.fastTables[tableId].currentPage = 1;
+                window.renderFastTablePage(tableId);
             }
         };
 
-        window.navTablePage = function(tableId, delta) {
-            if (window.tablePaginations[tableId]) {
-                window.tablePaginations[tableId].currentPage += delta;
-                window.renderTablePage(tableId);
+        window.navFastTablePage = function(tableId, delta) {
+            if (window.fastTables[tableId]) {
+                window.fastTables[tableId].currentPage += delta;
+                window.renderFastTablePage(tableId);
             }
         };
     """),
@@ -95,8 +91,8 @@ CUSTOM_HEAD = ui.head_content(
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
-
-        /* --- ANIMASI TITIK HIJAU ONLINE BERKEDIP --- */
+        
+        /* Animasi Blink Titik Online */
         @keyframes blinkAnimation {
             0% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.25; transform: scale(0.75); }
@@ -105,6 +101,7 @@ CUSTOM_HEAD = ui.head_content(
         .blink-online {
             animation: blinkAnimation 1.5s infinite ease-in-out;
         }
+
         .reflex-spinner-red {
             width: 38px; height: 38px;
             border: 3.5px solid rgba(229, 9, 20, 0.2);
@@ -150,7 +147,7 @@ CUSTOM_HEAD = ui.head_content(
             cursor: pointer; transition: all 0.2s ease;
         }
         .btn-page-nav:hover:not(:disabled) { background: #EDF2F7; border-color: #A0AEC0; }
-        .btn-page-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-page-nav:disabled { opacity: 0.35; cursor: not-allowed; }
 
         .reflex-upload-container {
             border: 2px dashed #000000 !important; border-radius: 8px; background: #F8FAFC;
@@ -182,7 +179,7 @@ CUSTOM_HEAD = ui.head_content(
         .csv-batch-box .progress { display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; }
 
         .csv-batch-box {
-            border: 2px dashed #000000 !important; border-radius: 12px; background: #FFF5F5;
+            border: 2px dashed #E50914 !important; border-radius: 12px; background: #FFF5F5;
             padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
@@ -258,8 +255,11 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
     if not table_id:
         table_id = f"tbl_{random.randint(100000, 999999)}"
 
+    # Hanya render header di HTML
     th_cells = [ui.tags.th(str(h)) for h in headers]
-    tr_rows = [ui.tags.tr(*[ui.tags.td(str(c)) for c in r]) for r in rows]
+
+    # Ubah data baris ke JSON (0.01 detik instan)
+    json_data = json.dumps(rows)
 
     return ui.div(
         # --- KONTROL ATAS: FILTER BARIS DI KIRI ATAS ---
@@ -272,7 +272,7 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
                     ui.tags.option("50", value="50"),
                     ui.tags.option("100", value="100"),
                     ui.tags.option("Semua", value="-1"),
-                    onchange=f"window.changePageSize('{table_id}', this.value)",
+                    onchange=f"window.changeFastPageSize('{table_id}', this.value)",
                     style="padding: 4px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer;"
                 ),
                 ui.span("baris per halaman", style="font-size: 13px; font-weight: 700; color: #4A5568;"),
@@ -281,11 +281,11 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
             style="display: flex; justify-content: flex-start; align-items: center; width: 100%; margin-bottom: 0.6rem;"
         ),
 
-        # --- TABEL DATA ---
+        # --- TABEL DATA (Hanya 10 baris yang dibuat oleh JS) ---
         ui.div(
             ui.tags.table(
                 ui.tags.thead(ui.tags.tr(*th_cells)),
-                ui.tags.tbody(*tr_rows),
+                ui.tags.tbody(id=f"{table_id}_tbody"),
                 id=table_id,
                 class_="custom-clean-table"
             ),
@@ -294,26 +294,34 @@ def render_clean_table(headers: list, rows: list, table_id: str = None):
 
         # --- KONTROL BAWAH: INFO DI KIRI BAWAH, NEXT/PREV DI KANAN BAWAH ---
         ui.div(
-            # Kiri Bawah: Info Baris
             ui.div(
                 id=f"{table_id}_info",
                 style="font-size: 12px; font-weight: 600; color: #718096;"
             ),
-            # Kanan Bawah: Tombol Navigasi Next & Prev
             ui.div(
-                ui.tags.button("❮ Prev", id=f"{table_id}_prev_btn", onclick=f"window.navTablePage('{table_id}', -1)", class_="btn-page-nav"),
+                ui.tags.button("❮ Prev", id=f"{table_id}_prev_btn", onclick=f"window.navFastTablePage('{table_id}', -1)", class_="btn-page-nav"),
                 ui.span("Hal 1 / 1", id=f"{table_id}_page_num", style="font-weight: 800; font-size: 12px; color: #1A202C; padding: 0 6px;"),
-                ui.tags.button("Next ❯", id=f"{table_id}_next_btn", onclick=f"window.navTablePage('{table_id}', 1)", class_="btn-page-nav"),
+                ui.tags.button("Next ❯", id=f"{table_id}_next_btn", onclick=f"window.navFastTablePage('{table_id}', 1)", class_="btn-page-nav"),
                 style="display: flex; align-items: center; gap: 6px;"
             ),
             style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 0.75rem; padding: 0 4px;"
         ),
 
-        # Inisialisasi Paginasi 10 Baris
-        ui.tags.script(f"setTimeout(function() {{ window.initTablePagination('{table_id}', 10); }}, 50);"),
+        # Script render instan 10 baris pertama
+        ui.tags.script(f"""
+            (function() {{
+                window.fastTables = window.fastTables || {{}};
+                window.fastTables['{table_id}'] = {{
+                    data: {json_data},
+                    pageSize: 10,
+                    currentPage: 1
+                }};
+                window.renderFastTablePage('{table_id}');
+            }})();
+        """),
         style="width: 100%; margin-bottom: 0.5rem;"
     )
-
+    
 def success_modal(show: bool):
     if not show: return ui.div()
     return ui.div(
