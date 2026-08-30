@@ -724,10 +724,10 @@ def cycle_count_analyzer_view(state: AppState):
 def compare_rto_view(state: AppState):
     # Step 1: Upload DS RTO & AppSheet RTO
     step1_ui = ui.div(
-        ui.h4("1️⃣ Upload Data Scan (DS RTO) & AppSheet RTO", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.h4("1️⃣ Upload Data Scan (DS RTO) & Spreadsheet RTO", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
         ui.div(
-            custom_uploader_box("uploader_rto_ds", "1. DS RTO (Kolom A=SKU, B=QTY)"),
-            custom_uploader_box("uploader_rto_app", "2. APPSHEET RTO (Rekap Spreadsheet)"),
+            custom_uploader_box("uploader_rto_ds", "1. DS RTO "),
+            custom_uploader_box("uploader_rto_app", "2. APPSHEET RTO "),
             style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
         ),
         ui.div(
@@ -750,7 +750,7 @@ def compare_rto_view(state: AppState):
         style="width: 100%; padding: 1rem;"
     )
 
-    
+
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
