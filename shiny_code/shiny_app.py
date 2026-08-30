@@ -1016,4 +1016,235 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf.seek(0)
         yield buf.getvalue()
 
+# ==========================================================================
+    # COMPARE RTO CONTROLLER & HANDLERS
+    # ==========================================================================
+    @render.ui
+    def rto_step1_results_ui():
+        if not state.rto_step1_done(): return ui.div()
+        return ui.div(
+            ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+            ui.h4("📋 RINGKASAN HASIL DATA SCAN VS APPSHEET", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+            ui.div(
+                dark_metric_box("Total Qty Scan", f"{state.rto_q_total():,}", "#C5A059"),
+                dark_metric_box("Qty Sesuai", f"{state.rto_q_sesuai():,}", "#10B981"),
+                dark_metric_box("Qty Kelebihan", f"{state.rto_q_lebih():,}", "#E53E3E"),
+                dark_metric_box("Qty Kurang", f"{state.rto_q_kurang():,}", "#DD6B20"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel(
+                    "📝 Summary Compare",
+                    ui.div(
+                        ui.div(
+                            ui.download_button(
+                                "btn_dl_rto_all",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download All Data (.xlsx)"),
+                                style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                            ),
+                            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                        ),
+                        render_clean_table(state.df_rto_ds_headers(), state.df_rto_ds_rows(), "tbl_rto_ds"),
+                        style="padding: 0.75rem 0;"
+                    )
+                ),
+                ui.nav_panel(
+                    "⚠️ Item Selisih",
+                    ui.div(
+                        ui.div(
+                            ui.download_button(
+                                "btn_dl_rto_selisih",
+                                ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Item Selisih (.xlsx)"),
+                                style="background-color: #E50914; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                            ),
+                            style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                        ),
+                        render_clean_table(state.df_rto_selisih_headers(), state.df_rto_selisih_rows(), "tbl_rto_selisih"),
+                        style="padding: 0.75rem 0;"
+                    )
+                )
+            ),
+            style="width: 100%;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_rto_step1)
+    def _proc_rto_step1():
+        f1, f2 = input.uploader_rto_ds(), input.uploader_rto_app()
+        if not f1 or not f2:
+            state.error_modal_message.set("Pilih kedua file DS RTO & AppSheet RTO terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        succ, msg = state.run_rto_step1(f1, f2)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="ALL_DATA_RTO.xlsx")
+    def btn_dl_rto_all():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_rto_ds.to_excel(writer, sheet_name='ALL_DATA_RTO', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="DETAIL_SELISIH_RTO.xlsx")
+    def btn_dl_rto_selisih():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_rto_selisih.to_excel(writer, sheet_name='SELISIH_RTO', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- STEP 2: REFRESH DATA (SETELAH CEK REAL) ---
+    @render.ui
+    def rto_step2_card_ui():
+        if not state.rto_step1_done(): return ui.div()
+        return ui.div(
+            ui.h4("🔄 2. Refresh Data (Setelah Cek Real)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            custom_uploader_box("uploader_rto_cek", "Upload Hasil Cek Real"),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-arrows-rotate", style="margin-right: 6px; font-size: 14px;"), "REFRESH DATA"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rto_step2_refresh', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            ),
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_rto_step2_refresh)
+    def _proc_rto_step2_refresh():
+        f = input.uploader_rto_cek()
+        if not f:
+            state.error_modal_message.set("Pilih file Hasil Cek Real terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        succ, msg = state.run_rto_step2_refresh(f)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    # --- STEP 3: COMPARE APPSHEET VS DRAFT JEZPRO ---
+    @render.ui
+    def rto_step3_card_ui():
+        if not state.rto_step1_done(): return ui.div()
+        step3_results = ui.div()
+        if state.rto_draft_done():
+            step3_results = ui.div(
+                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                ui.h4("📋 RINGKASAN HASIL APPSHEET VS DRAFT", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+                ui.div(
+                    dark_metric_box("Total Qty Ambil", f"{state.rto_q_draft_total():,}", "#C5A059"),
+                    dark_metric_box("Qty OK", f"{state.rto_q_ok():,}", "#10B981"),
+                    dark_metric_box("Qty Perlu Edit", f"{state.rto_q_edit():,}", "#DD6B20"),
+                    dark_metric_box("Qty Delete", f"{state.rto_q_del():,}", "#E53E3E"),
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.download_button(
+                        "btn_dl_rto_draft_comp",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Draft Compared (.xlsx)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_rto_draft_comp_headers(), state.df_rto_draft_comp_rows(), "tbl_rto_draft_comp")
+            )
+
+        return ui.div(
+            ui.h4("3️⃣ Upload Draft Jezpro & Compare", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            custom_uploader_box("uploader_rto_draft", "Upload Draft Jezpro"),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-magnifying-glass", style="margin-right: 6px; font-size: 14px;"), "COMPARE DRAFT JEZPRO"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rto_step3_draft', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            ),
+            step3_results,
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_rto_step3_draft)
+    def _proc_rto_step3_draft():
+        f = input.uploader_rto_draft()
+        if not f:
+            state.error_modal_message.set("Pilih file Draft Jezpro terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        succ, msg = state.run_rto_step3_draft(f)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="DRAFT_COMPARED.xlsx")
+    def btn_dl_rto_draft_comp():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_rto_draft_comp.to_excel(writer, sheet_name='DRAFT_COMPARED', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- STEP 4: GENERATE NEW DRAFT RTO ---
+    @render.ui
+    def rto_step4_card_ui():
+        if not state.rto_draft_done(): return ui.div()
+        step4_results = ui.div()
+        if state.rto_new_draft_done():
+            step4_results = ui.div(
+                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                ui.div(
+                    dark_metric_box("📦 Total QTY New Draft", f"{state.rto_q_new_draft_total():,} PCS", "#10B981"),
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.download_button(
+                        "btn_dl_rto_new_draft",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download New Draft (.xlsx)"),
+                        style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                    ),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                render_clean_table(state.df_rto_new_draft_headers(), state.df_rto_new_draft_rows(), "tbl_rto_new_draft")
+            )
+
+        return ui.div(
+            ui.h4("4️⃣ Generate New Draft Jezpro", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-file-circle-plus", style="margin-right: 6px; font-size: 14px;"), "GENERATE NEW DRAFT"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rto_step4_new_draft', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            ),
+            step4_results,
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_rto_step4_new_draft)
+    def _proc_rto_step4_new_draft():
+        succ, msg = state.run_rto_step4_new_draft()
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="NEW_DRAFT_RTO.xlsx")
+    def btn_dl_rto_new_draft():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_rto_new_draft.to_excel(writer, sheet_name='NEW_DRAFT', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
 app = App(app_ui, server)
