@@ -1,5 +1,6 @@
 import os
 import base64
+import random
 from datetime import datetime
 from shiny import ui
 from state import AppState
@@ -9,7 +10,7 @@ from config import safe_int
 # CSS & JAVASCRIPT ASSETS (PERSIS REFLEX)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT OTOMATIS GANTI JUDUL & FAVICON PERMANEN ---
+    # --- 1. SCRIPT OTOMATIS GANTI JUDUL, FAVICON & SISTEM PAGINASI TABEL ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -19,11 +20,78 @@ CUSTOM_HEAD = ui.head_content(
             document.head.appendChild(favicon);
         }
         favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
-    """),
-    # --- 2. FONT AWESOME ICONS ---
-    ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
 
-    # --- 3. CSS STYLING LENGKAP ---
+        // --- SISTEM PAGINASI TABEL CLIENT-SIDE SUPER CEPAT (0ms) ---
+        window.tablePaginations = window.tablePaginations || {};
+
+        window.initTablePagination = function(tableId, defaultSize) {
+            let table = document.getElementById(tableId);
+            if (!table) return;
+            let rows = table.querySelectorAll("tbody tr");
+            window.tablePaginations[tableId] = {
+                pageSize: parseInt(defaultSize) || 10,
+                currentPage: 1,
+                totalRows: rows.length
+            };
+            window.renderTablePage(tableId);
+        };
+
+        window.renderTablePage = function(tableId) {
+            let pState = window.tablePaginations[tableId];
+            if (!pState) return;
+            let table = document.getElementById(tableId);
+            if (!table) return;
+            let rows = table.querySelectorAll("tbody tr");
+            let total = rows.length;
+            pState.totalRows = total;
+
+            let size = pState.pageSize === -1 ? total : pState.pageSize;
+            let maxPages = Math.max(1, Math.ceil(total / size));
+            if (pState.currentPage > maxPages) pState.currentPage = maxPages;
+            if (pState.currentPage < 1) pState.currentPage = 1;
+
+            let start = (pState.currentPage - 1) * size;
+            let end = start + size;
+
+            rows.forEach(function(r, idx) {
+                r.style.display = (idx >= start && idx < end) ? "" : "none";
+            });
+
+            let info = document.getElementById(tableId + "_info");
+            let pageNum = document.getElementById(tableId + "_page_num");
+            let prevBtn = document.getElementById(tableId + "_prev_btn");
+            let nextBtn = document.getElementById(tableId + "_next_btn");
+
+            if (info) {
+                let dispEnd = Math.min(end, total);
+                let dispStart = total > 0 ? (start + 1) : 0;
+                info.innerText = "Menampilkan " + dispStart + " - " + dispEnd + " dari " + total.toLocaleString() + " baris";
+            }
+            if (pageNum) {
+                pageNum.innerText = "Hal " + pState.currentPage + " / " + maxPages;
+            }
+            if (prevBtn) prevBtn.disabled = (pState.currentPage <= 1);
+            if (nextBtn) nextBtn.disabled = (pState.currentPage >= maxPages);
+        };
+
+        window.changePageSize = function(tableId, sizeVal) {
+            if (window.tablePaginations[tableId]) {
+                window.tablePaginations[tableId].pageSize = parseInt(sizeVal);
+                window.tablePaginations[tableId].currentPage = 1;
+                window.renderTablePage(tableId);
+            }
+        };
+
+        window.navTablePage = function(tableId, delta) {
+            if (window.tablePaginations[tableId]) {
+                window.tablePaginations[tableId].currentPage += delta;
+                window.renderTablePage(tableId);
+            }
+        };
+    """),
+
+    # Library FontAwesome & CSS tetap di bawahnya
+    ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
@@ -66,18 +134,19 @@ CUSTOM_HEAD = ui.head_content(
         .btn-red-gradient:hover { filter: brightness(1.1); }
         .btn-locked { background-color: #E50914 !important; opacity: 0.5 !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; cursor: not-allowed !important; border: none !important; padding: 0.75rem 1.5rem; }
 
+        .btn-page-nav {
+            background: #FFFFFF; border: 1.5px solid #CBD5E0; border-radius: 6px;
+            padding: 4px 12px; font-weight: 700; font-size: 12px; color: #1A202C;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .btn-page-nav:hover:not(:disabled) { background: #EDF2F7; border-color: #A0AEC0; }
+        .btn-page-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+
         .reflex-upload-container {
-            border: 2px dashed #000000 !important;
-            border-radius: 8px;
-            background: #F8FAFC;
-            padding: 1.25rem 1.5rem;
-            min-height: 85px;
-            width: 100%;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: flex-start !important;
-            position: relative;
-            transition: all 0.2s ease;
+            border: 2px dashed #000000 !important; border-radius: 8px; background: #F8FAFC;
+            padding: 1.25rem 1.5rem; min-height: 85px; width: 100%;
+            display: flex !important; align-items: center !important; justify-content: flex-start !important;
+            position: relative; transition: all 0.2s ease;
         }
         .reflex-upload-container:hover { border-color: #C5A059; background-color: #FFFFFF; }
         .reflex-upload-container .shiny-input-container { margin-bottom: 0 !important; width: 100%; display: flex !important; align-items: center !important; }
@@ -116,15 +185,6 @@ CUSTOM_HEAD = ui.head_content(
         summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
         details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
         .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
-
-        /* --- MENAMBAHKAN PANAH DROPDOWN DI MULTI-SELECT SELECTIZE --- */
-        .selectize-control.multi .selectize-input {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 0.75rem center !important;
-            background-size: 14px 10px !important;
-            padding-right: 2rem !important;
-        }
     """),
     ui.tags.script("""
         setInterval(function() {
@@ -181,27 +241,67 @@ def dark_metric_box(title: str, val_str: str, border_color: str):
         style=f"background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid {border_color}; width: 100%; text-align: center;"
     )
 
-def render_clean_table(headers: list, rows: list, max_display: int = 100):
+def render_clean_table(headers: list, rows: list, table_id: str = None):
     if not rows or len(rows) == 0:
         return ui.div(ui.div("Tidak ada data untuk ditampilkan.", style="color: #718096; padding: 1.5rem; font-style: italic; text-align: center;"), style="background: white; border-radius: 8px; border: 1px solid #E2E8F0; width: 100%;")
     
-    total_rows = len(rows)
-    display_rows = rows[:max_display]  # Batasi render HTML ke 100 baris agar instan 0.1 detik
-    
+    if not table_id:
+        table_id = f"tbl_{random.randint(100000, 999999)}"
+
     th_cells = [ui.tags.th(str(h)) for h in headers]
-    tr_rows = [ui.tags.tr(*[ui.tags.td(str(c)) for c in r]) for r in display_rows]
-    
-    footer_info = ui.div()
-    if total_rows > max_display:
-        footer_info = ui.div(
-            f"ℹ️ Menampilkan {max_display} dari total {total_rows:,} baris data (Gunakan tombol Download Excel untuk melihat 100% seluruh data).",
-            style="color: #718096; font-size: 12px; font-style: italic; padding: 8px 12px; background: #F8FAFC; border-top: 1px solid #E2E8F0;"
-        )
+    tr_rows = [ui.tags.tr(*[ui.tags.td(str(c)) for c in r]) for r in rows]
 
     return ui.div(
-        ui.tags.table(ui.tags.thead(ui.tags.tr(*th_cells)), ui.tags.tbody(*tr_rows), class_="custom-clean-table"),
-        footer_info,
-        style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;"
+        # --- KONTROL ATAS: FILTER BARIS DI KIRI ATAS ---
+        ui.div(
+            ui.div(
+                ui.span("Tampilkan", style="font-size: 13px; font-weight: 700; color: #4A5568;"),
+                ui.tags.select(
+                    ui.tags.option("10", value="10", selected=True),
+                    ui.tags.option("25", value="25"),
+                    ui.tags.option("50", value="50"),
+                    ui.tags.option("100", value="100"),
+                    ui.tags.option("Semua", value="-1"),
+                    onchange=f"window.changePageSize('{table_id}', this.value)",
+                    style="padding: 4px 10px; border-radius: 6px; border: 1.5px solid #CBD5E0; font-weight: 700; font-size: 12px; outline: none; background: white; cursor: pointer;"
+                ),
+                ui.span("baris per halaman", style="font-size: 13px; font-weight: 700; color: #4A5568;"),
+                style="display: flex; align-items: center; gap: 8px;"
+            ),
+            style="display: flex; justify-content: flex-start; align-items: center; width: 100%; margin-bottom: 0.6rem;"
+        ),
+
+        # --- TABEL DATA ---
+        ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*th_cells)),
+                ui.tags.tbody(*tr_rows),
+                id=table_id,
+                class_="custom-clean-table"
+            ),
+            style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; border: 1px solid #E2E8F0;"
+        ),
+
+        # --- KONTROL BAWAH: INFO DI KIRI BAWAH, NEXT/PREV DI KANAN BAWAH ---
+        ui.div(
+            # Kiri Bawah: Info Baris
+            ui.div(
+                id=f"{table_id}_info",
+                style="font-size: 12px; font-weight: 600; color: #718096;"
+            ),
+            # Kanan Bawah: Tombol Navigasi Next & Prev
+            ui.div(
+                ui.tags.button("❮ Prev", id=f"{table_id}_prev_btn", onclick=f"window.navTablePage('{table_id}', -1)", class_="btn-page-nav"),
+                ui.span("Hal 1 / 1", id=f"{table_id}_page_num", style="font-weight: 800; font-size: 12px; color: #1A202C; padding: 0 6px;"),
+                ui.tags.button("Next ❯", id=f"{table_id}_next_btn", onclick=f"window.navTablePage('{table_id}', 1)", class_="btn-page-nav"),
+                style="display: flex; align-items: center; gap: 6px;"
+            ),
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 0.75rem; padding: 0 4px;"
+        ),
+
+        # Inisialisasi Paginasi 10 Baris
+        ui.tags.script(f"setTimeout(function() {{ window.initTablePagination('{table_id}', 10); }}, 50);"),
+        style="width: 100%; margin-bottom: 0.5rem;"
     )
 
 def success_modal(show: bool):

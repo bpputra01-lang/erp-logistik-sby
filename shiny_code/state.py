@@ -942,7 +942,32 @@ class AppState:
 
             def clean_sku_bin(series):
                 return series.astype(str).str.strip().str.upper().apply(lambda s: s[:-2] if s.endswith('.0') else s)
+            # Format angka agar tidak ada .0
+            def clean_num(val):
+                try:
+                    if pd.isna(val) or val == "": return ""
+                    f = float(val)
+                    return str(int(f)) if f.is_integer() else f"{f:g}"
+                except: return str(val)
 
+            for c in ['QTY_SCAN', 'QTY_SYSTEM', 'DIFF']:
+                if c in res_scan.columns: res_scan[c] = res_scan[c].apply(clean_num)
+            for c in ['QTY_SYSTEM', 'QTY SO', 'DIFF']:
+                if c in res_stock.columns: res_stock[c] = res_stock[c].apply(clean_num)
+            for c in ['QTY_SCAN', 'QTY_SYSTEM', 'DIFF']:
+                if c in real_plus.columns: real_plus[c] = real_plus[c].apply(clean_num)
+            for c in ['QTY_SYSTEM', 'QTY SO', 'DIFF']:
+                if c in system_plus.columns: system_plus[c] = system_plus[c].apply(clean_num)
+
+            self.df_cca_scan_headers.set(res_scan.columns.tolist())
+            self.df_cca_scan_rows.set(res_scan.fillna("").astype(str).values.tolist())
+            self.df_cca_stock_headers.set(res_stock.columns.tolist())
+            self.df_cca_stock_rows.set(res_stock.fillna("").astype(str).values.tolist())
+            self.df_cca_real_headers.set(real_plus.columns.tolist())
+            self.df_cca_real_rows.set(real_plus.fillna("").astype(str).values.tolist())
+            self.df_cca_sys_headers.set(system_plus.columns.tolist())
+            self.df_cca_sys_rows.set(system_plus.fillna("").astype(str).values.tolist())
+            
             # Filtering Stock System
             if sub_sel and len(sub_sel) > 0 and df_t_raw.shape[1] > 6:
                 df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in sub_sel])]
@@ -1022,7 +1047,7 @@ class AppState:
             return True, "Compare Step 1 Berhasil!"
         except Exception as e:
             return False, f"Gagal Compare Step 1: {e}"
-            
+
     def run_cca_step2(self, f_bin_cov, selected_bin_cov):
         try:
             if self._raw_df_cca_real_plus.empty or self._raw_df_cca_sys_plus.empty:

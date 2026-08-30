@@ -553,7 +553,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
 # ==========================================================================
-    # CYCLE COUNT ANALYZER CONTROLLER (PROGRESSIVE STEP-BY-STEP FLOW)
+    # CYCLE COUNT ANALYZER CONTROLLER & HANDLERS (PERBAIKAN TOTAL)
     # ==========================================================================
     @render.ui
     def cca_bin_sys_ui():
@@ -561,7 +561,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         choices = BRANCH_BIN_MAPPING.get(b, [])
         return ui.input_selectize("cca_bin_sys", "🏭 BIN System:", choices=choices, multiple=True, width="100%")
 
-    # Step 1 Button & Results
+    # --- STEP 1: BUTTON, HASIL & DOWNLOAD ---
     @render.ui
     def cca_step1_btn_ui():
         f1 = input.cca_up_scan() if "cca_up_scan" in input else None
@@ -589,11 +589,20 @@ def server(input: Inputs, output: Outputs, session: Session):
                 dark_metric_box("🔐 QTY SYSTEM +", f"{state.cca_qty_sys_plus():,}", "#E53E3E"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
             ),
+            # Tombol Download Excel Khusus Step 1
+            ui.div(
+                ui.download_button(
+                    "btn_dl_cca_step1",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD EXCEL STEP 1 (.xlsx)"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+            ),
             ui.navset_card_tab(
-                ui.nav_panel("📋 DATA SCAN", ui.div(render_clean_table(state.df_cca_scan_headers(), state.df_cca_scan_rows()), style="padding: 0.75rem 0;")),
-                ui.nav_panel("📊 STOCK SYSTEM", ui.div(render_clean_table(state.df_cca_stock_headers(), state.df_cca_stock_rows()), style="padding: 0.75rem 0;")),
-                ui.nav_panel("➕ REAL +", ui.div(render_clean_table(state.df_cca_real_headers(), state.df_cca_real_rows()), style="padding: 0.75rem 0;")),
-                ui.nav_panel("➖ SYSTEM +", ui.div(render_clean_table(state.df_cca_sys_headers(), state.df_cca_sys_rows()), style="padding: 0.75rem 0;"))
+                ui.nav_panel("📋 DATA SCAN", ui.div(render_clean_table(state.df_cca_scan_headers(), state.df_cca_scan_rows(), "tbl_cca_scan"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("📊 STOCK SYSTEM", ui.div(render_clean_table(state.df_cca_stock_headers(), state.df_cca_stock_rows(), "tbl_cca_stock"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("➕ REAL +", ui.div(render_clean_table(state.df_cca_real_headers(), state.df_cca_real_rows(), "tbl_cca_real"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("➖ SYSTEM +", ui.div(render_clean_table(state.df_cca_sys_headers(), state.df_cca_sys_rows(), "tbl_cca_sys"), style="padding: 0.75rem 0;"))
             ), style="width: 100%;"
         )
 
@@ -611,7 +620,18 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # --- PROGRESSIVE DYNAMIC STEPS (STEP 2 SAMPAI 6 HANYA MUNCUL BERTAHAP) ---
+    @render.download(filename="Step1_Compare_Scan_Stock.xlsx")
+    def btn_dl_cca_step1():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_cca_scan.to_excel(writer, sheet_name='DATA_SCAN', index=False)
+            state._raw_df_cca_stock.to_excel(writer, sheet_name='STOCK_SYSTEM', index=False)
+            state._raw_df_cca_real_plus.to_excel(writer, sheet_name='REAL_PLUS', index=False)
+            state._raw_df_cca_sys_plus.to_excel(writer, sheet_name='SYSTEM_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- PROGRESSIVE DYNAMIC STEPS (STEP 2 SAMPAI 6 BERTAHAP) ---
     @render.ui
     def cca_dynamic_steps_ui():
         if not state.cca_step1_done():
@@ -622,31 +642,32 @@ def server(input: Inputs, output: Outputs, session: Session):
         if state.cca_step2_done():
             step2_results = ui.div(
                 ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
-                ui.h4("✅ HASIL ALOKASI", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
-                ui.navset_card_tab(
-                    ui.nav_panel("📊 ALLOCATION DETAIL", ui.div(render_clean_table(state.df_cca_alloc_headers(), state.df_cca_alloc_rows()), style="padding: 0.75rem 0;")),
-                    ui.nav_panel("📉 UPDATED SYSTEM", ui.div(render_clean_table(state.df_cca_sys_upd_headers(), state.df_cca_sys_upd_rows()), style="padding: 0.75rem 0;")),
-                    ui.nav_panel("📦 SET UP REAL +", ui.div(render_clean_table(state.df_cca_setup_real_headers(), state.df_cca_setup_real_rows()), style="padding: 0.75rem 0;"))
-                ),
-                ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
+                # Header Step 2 dengan Tombol Download Excel Khusus Step 2
                 ui.div(
-                    ui.h4("📋 RECON REPORTS (HASIL STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.h4("✅ HASIL ALOKASI", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
                     ui.download_button(
-                        "btn_dl_cca_step13",
-                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD ALL EXCEL (STEP 1-3)"),
+                        "btn_dl_cca_step2",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL ALOKASI (.xlsx)"),
                         style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
                     ),
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;"
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
                 ),
+                ui.navset_card_tab(
+                    ui.nav_panel("📊 ALLOCATION DETAIL", ui.div(render_clean_table(state.df_cca_alloc_headers(), state.df_cca_alloc_rows(), "tbl_cca_alloc"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("📉 UPDATED SYSTEM", ui.div(render_clean_table(state.df_cca_sys_upd_headers(), state.df_cca_sys_upd_rows(), "tbl_cca_sys_upd"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("📦 SET UP REAL +", ui.div(render_clean_table(state.df_cca_setup_real_headers(), state.df_cca_setup_real_rows(), "tbl_cca_setup_real"), style="padding: 0.75rem 0;"))
+                ),
+                ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
+                ui.h4("📋 RECON REPORTS (HASIL STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
                 ui.div(
                     ui.div(
                         ui.h4("📋 REAL + RECON", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-                        render_clean_table(state.df_cca_rec_real_headers(), state.df_cca_rec_real_rows()),
+                        render_clean_table(state.df_cca_rec_real_headers(), state.df_cca_rec_real_rows(), "tbl_cca_rec_real"),
                         style="flex: 1; min-width: 300px;"
                     ),
                     ui.div(
                         ui.h4("🔐 SYSTEM + OUTSTANDING", style="font-size: 14px; font-weight: 800; color: #1A202C; margin-bottom: 0.5rem;"),
-                        render_clean_table(state.df_cca_rec_sys_headers(), state.df_cca_rec_sys_rows()),
+                        render_clean_table(state.df_cca_rec_sys_headers(), state.df_cca_rec_sys_rows(), "tbl_cca_rec_sys"),
                         style="flex: 1; min-width: 300px;"
                     ),
                     style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
@@ -673,7 +694,16 @@ def server(input: Inputs, output: Outputs, session: Session):
                         dark_metric_box("📦 TOTAL SKU", f"{state.cca_sku_need_adj():,} SKU", "#3182CE"),
                         style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                     ),
-                    render_clean_table(state.df_cca_adj4_headers(), state.df_cca_adj4_rows())
+                    # Tombol Download Excel Khusus Step 4
+                    ui.div(
+                        ui.download_button(
+                            "btn_dl_cca_step4",
+                            ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL RECON REAL + (.xlsx)"),
+                            style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                        ),
+                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                    ),
+                    render_clean_table(state.df_cca_adj4_headers(), state.df_cca_adj4_rows(), "tbl_cca_adj4")
                 )
 
             step4_box = ui.div(
@@ -696,6 +726,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         dark_metric_box("🏷️ SKU TO KARANTINA", f"{state.cca_sku_karantina():,} SKU", "#ECC94B"),
                         style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                     ),
+                    # Tombol Download Excel Khusus Step 5
                     ui.div(
                         ui.download_button(
                             "btn_dl_cca_karantina",
@@ -704,8 +735,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                         ), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
                     ),
                     ui.navset_card_tab(
-                        ui.nav_panel("📦 HASIL KARANTINA", ui.div(render_clean_table(state.df_cca_karantina_headers(), state.df_cca_karantina_rows()), style="padding: 0.75rem 0;")),
-                        ui.nav_panel("🔍 DATA PENGECEKAN (AUDIT)", ui.div(render_clean_table(state.df_cca_check5_headers(), state.df_cca_check5_rows()), style="padding: 0.75rem 0;"))
+                        ui.nav_panel("📦 HASIL KARANTINA", ui.div(render_clean_table(state.df_cca_karantina_headers(), state.df_cca_karantina_rows(), "tbl_cca_karantina"), style="padding: 0.75rem 0;")),
+                        ui.nav_panel("🔍 DATA PENGECEKAN (AUDIT)", ui.div(render_clean_table(state.df_cca_check5_headers(), state.df_cca_check5_rows(), "tbl_cca_check5"), style="padding: 0.75rem 0;"))
                     )
                 )
 
@@ -729,6 +760,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                         dark_metric_box("🔢 TOTAL QTY MISS LOC.", f"{state.cca_qty_miss_loc():,} ITEM", "#E53E3E"),
                         style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
                     ),
+                    # Tombol Download Excel Khusus Step 6
                     ui.div(
                         ui.download_button(
                             "btn_dl_cca_miss_loc",
@@ -737,8 +769,8 @@ def server(input: Inputs, output: Outputs, session: Session):
                         ), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
                     ),
                     ui.navset_card_tab(
-                        ui.nav_panel("📄 Detail List", ui.div(render_clean_table(state.df_cca_miss_loc_headers(), state.df_cca_miss_loc_rows()), style="padding: 0.75rem 0;")),
-                        ui.nav_panel("📊 Summary", ui.div(render_clean_table(state.df_cca_sum_miss_headers(), state.df_cca_sum_miss_rows()), style="padding: 0.75rem 0;"))
+                        ui.nav_panel("📄 Detail List", ui.div(render_clean_table(state.df_cca_miss_loc_headers(), state.df_cca_miss_loc_rows(), "tbl_cca_miss_loc"), style="padding: 0.75rem 0;")),
+                        ui.nav_panel("📊 Summary", ui.div(render_clean_table(state.df_cca_sum_miss_headers(), state.df_cca_sum_miss_rows(), "tbl_cca_sum_miss"), style="padding: 0.75rem 0;"))
                     )
                 )
 
@@ -760,7 +792,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             step6_box
         )
 
-    # Step 2 Action Button
+    # --- STEP 2 EXECUTION & DOWNLOAD HANDLER ---
     @render.ui
     def cca_step2_btn_ui():
         f = input.cca_up_cov() if "cca_up_cov" in input else None
@@ -788,18 +820,17 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    @render.download(filename="Report_SO_Part1.xlsx")
-    def btn_dl_cca_step13():
+    @render.download(filename="Hasil_Alokasi_Step2.xlsx")
+    def btn_dl_cca_step2():
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-            state._raw_df_cca_scan.to_excel(writer, sheet_name='DATA SCAN', index=False)
-            state._raw_df_cca_setup_real.to_excel(writer, sheet_name='SET UP REAL +', index=False)
-            state._raw_df_cca_rec_real.to_excel(writer, sheet_name='REAL + RECON', index=False)
-            state._raw_df_cca_rec_sys.to_excel(writer, sheet_name='SYSTEM OUTSTANDING', index=False)
+            state._raw_df_cca_alloc.to_excel(writer, sheet_name='ALLOCATION_DETAIL', index=False)
+            state._raw_df_cca_sys_upd.to_excel(writer, sheet_name='UPDATED_SYSTEM', index=False)
+            state._raw_df_cca_setup_real.to_excel(writer, sheet_name='SET_UP_REAL_PLUS', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
-    # Step 4 Action Button & Listeners
+    # --- STEP 4 EXECUTION & DOWNLOAD HANDLER ---
     @render.ui
     def cca_step4_btn_ui():
         f = input.cca_up_recon_real() if "cca_up_recon_real" in input else None
@@ -826,7 +857,15 @@ def server(input: Inputs, output: Outputs, session: Session):
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
 
-    # Step 5 Action Button & Listeners
+    @render.download(filename="Hasil_Recon_Real_Plus_Need_Adj.xlsx")
+    def btn_dl_cca_step4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_cca_adj4.to_excel(writer, sheet_name='RECON_REAL_PLUS_ADJ', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- STEP 5 EXECUTION & DOWNLOAD HANDLER ---
     @render.ui
     def cca_step5_btn_ui():
         f = input.cca_up_recon_sys() if "cca_up_recon_sys" in input else None
@@ -858,10 +897,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
             state._raw_df_cca_karantina.to_excel(writer, sheet_name='Karantina', index=False)
+            state._raw_df_cca_check5.to_excel(writer, sheet_name='Data_Pengecekan_Audit', index=False)
         buf.seek(0)
         yield buf.getvalue()
 
-    # Step 6 Listener & Download
+    # --- STEP 6 EXECUTION & DOWNLOAD HANDLER ---
     @reactive.Effect
     @reactive.event(input.btn_run_cca_step6)
     def _proc_cca_step6():
