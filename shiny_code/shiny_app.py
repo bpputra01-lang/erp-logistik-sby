@@ -50,7 +50,6 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.notification_show(msg, type="message", duration=4)
         else:
             state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
             ui.notification_show(msg, type="error", duration=4)
 
     @reactive.Effect

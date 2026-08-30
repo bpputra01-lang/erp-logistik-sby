@@ -11,17 +11,14 @@ from config import safe_int
 CUSTOM_HEAD = ui.head_content(
     # --- 1. SCRIPT OTOMATIS GANTI JUDUL & FAVICON PERMANEN ---
     ui.tags.script("""
-        // Mengubah judul tab secara otomatis & permanen
         document.title = "ZKN WAREHOUSE ERP";
-
-        // Mengubah icon tab menjadi image_981625.png secara otomatis
         let favicon = document.querySelector("link[rel~='icon']");
         if (!favicon) {
             favicon = document.createElement('link');
             favicon.rel = 'icon';
             document.head.appendChild(favicon);
         }
-        favicon.href = './image_981625.png';
+        favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
     """),
     # --- 2. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
@@ -474,12 +471,8 @@ def sidebar(state: AppState):
     return ui.div(
         ui.div(
             ui.div(
-                # --- BOX LOGO GAMBAR (100% AMAN & ANTI-BROKEN) ---
                 ui.div(
-                    ui.tags.img(
-                        src=get_image_base64("image_981625.png"), 
-                        style="width: 24px; height: 24px; object-fit: contain;"
-                    ),
+                    ui.tags.i(class_="fa-solid fa-boxes-stacked", style="color: #FFFFFF; font-size: 18px;"),
                     style="""
                         width: 38px; height: 38px; 
                         background: linear-gradient(135deg, #E50914 0%, #B20710 100%); 
