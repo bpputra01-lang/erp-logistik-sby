@@ -237,6 +237,105 @@ class AppState:
         self.df_rto_new_draft_rows = reactive.Value([])
         self._raw_df_rto_new_draft = pd.DataFrame()
 
+        # --- STOCK OPNAME ANALYZER STATE ---
+        self.so_step1_done = reactive.Value(False)
+        self.so_qty_real_plus = reactive.Value(0)
+        self.so_qty_sys_plus = reactive.Value(0)
+
+        self.df_so_scan_headers = reactive.Value([])
+        self.df_so_scan_rows = reactive.Value([])
+        self.df_so_stock_headers = reactive.Value([])
+        self.df_so_stock_rows = reactive.Value([])
+        self.df_so_real_headers = reactive.Value([])
+        self.df_so_real_rows = reactive.Value([])
+        self.df_so_sys_headers = reactive.Value([])
+        self.df_so_sys_rows = reactive.Value([])
+
+        self._raw_df_so_scan = pd.DataFrame()
+        self._raw_df_so_stock = pd.DataFrame()
+        self._raw_df_so_real_plus = pd.DataFrame()
+        self._raw_df_so_sys_plus = pd.DataFrame()
+        self._so_map_dict = {}
+
+        # Step 2 & 3: Allocation & Recon
+        self.so_step2_done = reactive.Value(False)
+        self.df_so_alloc_headers = reactive.Value([])
+        self.df_so_alloc_rows = reactive.Value([])
+        self.df_so_sys_upd_headers = reactive.Value([])
+        self.df_so_sys_upd_rows = reactive.Value([])
+        self.df_so_setup_real_headers = reactive.Value([])
+        self.df_so_setup_real_rows = reactive.Value([])
+        self.df_so_rec_real_headers = reactive.Value([])
+        self.df_so_rec_real_rows = reactive.Value([])
+        self.df_so_rec_sys_headers = reactive.Value([])
+        self.df_so_rec_sys_rows = reactive.Value([])
+
+        self._raw_df_so_alloc = pd.DataFrame()
+        self._raw_df_so_sys_upd = pd.DataFrame()
+        self._raw_df_so_setup_real = pd.DataFrame()
+        self._raw_df_so_rec_real = pd.DataFrame()
+        self._raw_df_so_rec_sys = pd.DataFrame()
+
+        # Step 4: Final Adjustment + Process
+        self.so_step4_done = reactive.Value(False)
+        self.so_step4_setup_done = reactive.Value(False)
+        self.df_so_mult_headers = reactive.Value([])
+        self.df_so_mult_rows = reactive.Value([])
+        self.df_so_sing_headers = reactive.Value([])
+        self.df_so_sing_rows = reactive.Value([])
+        self.df_so_res4_headers = reactive.Value([])
+        self.df_so_res4_rows = reactive.Value([])
+        self.df_so_setup4_headers = reactive.Value([])
+        self.df_so_setup4_rows = reactive.Value([])
+        self.df_so_miss4_headers = reactive.Value([])
+        self.df_so_miss4_rows = reactive.Value([])
+
+        self._raw_df_so_mult = pd.DataFrame()
+        self._raw_df_so_sing = pd.DataFrame()
+        self._raw_df_so_res4 = pd.DataFrame()
+        self._raw_df_so_setup4 = pd.DataFrame()
+        self._raw_df_so_miss4 = pd.DataFrame()
+
+        # Step 5: Karantina Generator
+        self.so_step5_done = reactive.Value(False)
+        self.so_qty_karantina = reactive.Value(0)
+        self.so_sku_karantina = reactive.Value(0)
+        self.df_so_karantina_headers = reactive.Value([])
+        self.df_so_karantina_rows = reactive.Value([])
+        self.df_so_check5_headers = reactive.Value([])
+        self.df_so_check5_rows = reactive.Value([])
+
+        self._raw_df_so_karantina = pd.DataFrame()
+        self._raw_df_so_check5 = pd.DataFrame()
+
+        # Step 6A: Miss Location Report
+        self.so_step6a_done = reactive.Value(False)
+        self.so_sku_miss_loc = reactive.Value(0)
+        self.so_qty_miss_loc = reactive.Value(0)
+        self.df_so_miss_loc_headers = reactive.Value([])
+        self.df_so_miss_loc_rows = reactive.Value([])
+        self.df_so_sum_miss_headers = reactive.Value([])
+        self.df_so_sum_miss_rows = reactive.Value([])
+
+        self._raw_df_so_miss_loc = pd.DataFrame()
+        self._raw_df_so_sum_miss = pd.DataFrame()
+
+        # Step 6B: Summary Adjustment Report
+        self.so_step6b_done = reactive.Value(False)
+        self.so_adj_val_p = reactive.Value(0)
+        self.so_adj_val_m = reactive.Value(0)
+        self.so_adj_val_net = reactive.Value(0)
+        self.so_adj_qty_p = reactive.Value(0)
+        self.so_adj_qty_m = reactive.Value(0)
+        self.so_adj_sku_tot = reactive.Value(0)
+        self.df_so_adj_detail_headers = reactive.Value([])
+        self.df_so_adj_detail_rows = reactive.Value([])
+        self.df_so_adj_sum_headers = reactive.Value([])
+        self.df_so_adj_sum_rows = reactive.Value([])
+
+        self._raw_df_so_adj_detail = pd.DataFrame()
+        self._raw_df_so_adj_sum = pd.DataFrame()
+
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -299,6 +398,7 @@ class AppState:
         elif cur_menu in ["Putaway & Picking Audit List", "Putaway & Picking Audit"]: return "ppa_audit"
         elif cur_menu == "Cycle Count": return "cycle_count_analyzer"
         elif cur_menu == "Compare RTO": return "compare_rto"
+        elif cur_menu == "Stock Opname": return "stock_opname"
         return "under_development"
 
     # --- Ongkir Methods ---
@@ -1623,3 +1723,547 @@ class AppState:
             return True, f"Generate New Draft Selesai! Total: {self.rto_q_new_draft_total()} Pcs"
         except Exception as e:
             return False, f"Gagal Generate New Draft: {e}"
+
+# ==========================================================================
+    # STOCK OPNAME ANALYZER LOGIC & ALGORITHMS (LENGKAP STEP 1 - 6)
+    # ==========================================================================
+    def run_so_step1(self, f_scan, f_stock, sub_sel, bin_sys_sel):
+        try:
+            df_s_raw = load_data_from_info(f_scan)
+            df_t_raw = load_data_from_info(f_stock)
+            if df_s_raw.empty or df_t_raw.empty:
+                return False, "File Data Scan dan Stock System tidak boleh kosong!"
+
+            ds = df_s_raw.iloc[:, [0, 1, 2]].copy()
+            ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
+            ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
+            ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
+            ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+
+            dt = df_t_raw.copy()
+            col_b, col_s, col_q_sys = dt.columns[1], dt.columns[2], dt.columns[9]
+
+            if sub_sel and len(sub_sel) > 0 and dt.shape[1] > 6:
+                dt = dt[dt.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in sub_sel])]
+            if bin_sys_sel and len(bin_sys_sel) > 0 and dt.shape[1] > 1:
+                dt = dt[dt.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in bin_sys_sel))]
+
+            dt[col_b] = dt[col_b].astype(str).str.strip().str.upper()
+            dt[col_s] = dt[col_s].astype(str).str.strip().str.upper()
+            dt[col_q_sys] = pd.to_numeric(dt[col_q_sys], errors='coerce').fillna(0)
+
+            dt_sub = dt[[col_b, col_s, col_q_sys]].copy()
+            dt_sub.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+            dt_grouped = dt_sub.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
+
+            res_scan = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
+            res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
+            res_scan['NOTE'] = np.where(res_scan['DIFF'] > 0, "REAL +", np.where(res_scan['DIFF'] < 0, "SYSTEM +", "OK"))
+
+            ds_g = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
+            ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
+
+            dt_merged = dt.merge(ds_g, left_on=[col_b, col_s], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
+            dt_merged['QTY SO'] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
+            dt_merged['DIFF'] = dt_merged[col_q_sys] - dt_merged['QTY SO']
+            dt_merged['NOTE'] = np.where(dt_merged['DIFF'] > 0, "SYSTEM +", np.where(dt_merged['DIFF'] < 0, "REAL +", "OK"))
+            res_stock = dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'], errors='ignore')
+
+            item_map = dt.iloc[:, [2, 4]].dropna().astype(str)
+            item_map.columns = ['SKU', 'NAME']
+            item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
+            map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
+
+            res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict).fillna("-")
+            res_stock['ITEM NAME'] = res_stock.iloc[:, 2].astype(str).str.upper().map(map_dict).fillna("-")
+
+            real_plus = res_scan[res_scan['NOTE'] == "REAL +"].copy()
+            system_plus = res_stock[res_stock['NOTE'] == "SYSTEM +"].copy()
+
+            self.so_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
+            self.so_qty_sys_plus.set(int(system_plus['DIFF'].sum()) if not system_plus.empty else 0)
+
+            self._raw_df_so_scan = res_scan.copy()
+            self._raw_df_so_stock = res_stock.copy()
+            self._raw_df_so_real_plus = real_plus.copy()
+            self._raw_df_so_sys_plus = system_plus.copy()
+            self._so_map_dict = map_dict
+
+            self.df_so_scan_headers.set(res_scan.columns.tolist())
+            self.df_so_scan_rows.set(res_scan.fillna("").astype(str).values.tolist())
+            self.df_so_stock_headers.set(res_stock.columns.tolist())
+            self.df_so_stock_rows.set(res_stock.fillna("").astype(str).values.tolist())
+            self.df_so_real_headers.set(real_plus.columns.tolist())
+            self.df_so_real_rows.set(real_plus.fillna("").astype(str).values.tolist())
+            self.df_so_sys_headers.set(system_plus.columns.tolist())
+            self.df_so_sys_rows.set(system_plus.fillna("").astype(str).values.tolist())
+
+            self.so_step1_done.set(True)
+            return True, "Compare Step 1 Berhasil!"
+        except Exception as e:
+            return False, f"Gagal Compare Step 1: {e}"
+
+    def run_so_step2(self, f_bin_cov, selected_bin_cov):
+        try:
+            if self._raw_df_so_real_plus.empty or self._raw_df_so_sys_plus.empty:
+                return False, "Jalankan Step 1 terlebih dahulu!"
+
+            df_cov_raw = load_data_from_info(f_bin_cov)
+            if df_cov_raw.empty: return False, "File BIN Coverage kosong!"
+
+            import re
+            if selected_bin_cov and len(selected_bin_cov) > 0:
+                pattern = "|".join([re.escape(str(b).strip().upper()) for b in selected_bin_cov])
+                mask = df_cov_raw.iloc[:, 1].astype(str).str.strip().str.upper().str.contains(pattern, na=False)
+                df_cov = df_cov_raw[mask].copy()
+            else:
+                df_cov = df_cov_raw.copy()
+
+            system_by_sku = {}
+            for _, row in self._raw_df_so_sys_plus.iterrows():
+                b, s = str(row['BIN']).strip().upper(), str(row['SKU']).strip().upper()
+                q = float(row.get('DIFF', 0))
+                if q > 0:
+                    if s not in system_by_sku: system_by_sku[s] = {}
+                    system_by_sku[s][b] = system_by_sku[s].get(b, 0) + q
+
+            selected_bins = set(df_cov.iloc[:, 1].astype(str).str.strip().str.upper().unique())
+            coverage_by_sku = {}
+            for _, row in df_cov.iterrows():
+                b_val, s_val = str(row.iloc[1]).strip().upper(), str(row.iloc[2]).strip().upper()
+                if b_val in selected_bins:
+                    try: val = float(row.iloc[9])
+                    except: val = 0
+                    if val > 0:
+                        if s_val not in coverage_by_sku: coverage_by_sku[s_val] = {}
+                        coverage_by_sku[s_val][b_val] = coverage_by_sku[s_val].get(b_val, 0) + val
+
+            new_rows = []
+            df_sys_updated = self._raw_df_so_sys_plus.copy()
+            sys_reduction = {}
+
+            for _, row in self._raw_df_so_real_plus.iterrows():
+                sku = str(row['SKU']).strip().upper()
+                diff_needed = float(row['DIFF'])
+                if diff_needed <= 0:
+                    r_copy = row.to_dict()
+                    r_copy.update({'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO DIFF'})
+                    new_rows.append(r_copy)
+                    continue
+
+                remaining = diff_needed
+                if sku in system_by_sku:
+                    for bin_src, qty_avail in list(system_by_sku[sku].items()):
+                        if remaining <= 0: break
+                        if qty_avail > 0:
+                            alloc = min(qty_avail, remaining)
+                            r_alloc = row.to_dict()
+                            r_alloc.update({'BIN ALOKASI': bin_src, 'QTY ALLOCATION': alloc, 'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'})
+                            new_rows.append(r_alloc)
+                            system_by_sku[sku][bin_src] -= alloc
+                            sys_reduction[(bin_src, sku)] = sys_reduction.get((bin_src, sku), 0) + alloc
+                            remaining -= alloc
+
+                if remaining > 0 and sku in coverage_by_sku:
+                    for bin_src, qty_avail in list(coverage_by_sku[sku].items()):
+                        if remaining <= 0: break
+                        if qty_avail > 0:
+                            alloc = min(qty_avail, remaining)
+                            r_alloc = row.to_dict()
+                            r_alloc.update({'BIN ALOKASI': bin_src, 'QTY ALLOCATION': alloc, 'STATUS': 'FULL ALLOCATION' if alloc == remaining else 'PARTIAL ALLOCATION'})
+                            new_rows.append(r_alloc)
+                            coverage_by_sku[sku][bin_src] -= alloc
+                            remaining -= alloc
+
+                if remaining > 0:
+                    r_no = row.to_dict()
+                    r_no.update({'DIFF': remaining, 'BIN ALOKASI': '', 'QTY ALLOCATION': 0, 'STATUS': 'NO ALLOCATION'})
+                    new_rows.append(r_no)
+
+            allocated = pd.DataFrame(new_rows)
+            for (b, s), q in sys_reduction.items():
+                mask = (df_sys_updated['BIN'].astype(str).str.upper() == b) & (df_sys_updated['SKU'].astype(str).str.upper() == s)
+                if mask.any(): df_sys_updated.loc[mask, 'DIFF'] -= q
+
+            allocated['ITEM NAME'] = allocated['SKU'].map(self._so_map_dict)
+
+            filtered_setup = allocated[allocated['STATUS'].isin(['FULL ALLOCATION', 'PARTIAL ALLOCATION'])].copy()
+            if not filtered_setup.empty:
+                filtered_setup['BIN AWAL'] = filtered_setup['BIN ALOKASI']
+                filtered_setup['BIN TUJUAN'] = filtered_setup['BIN']
+                filtered_setup['QUANTITY'] = filtered_setup['QTY ALLOCATION']
+                filtered_setup['NOTES'] = "MISS LOCATION"
+                df_setup_real = filtered_setup[['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES']].copy()
+            else:
+                df_setup_real = pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+
+            # Step 3 Auto-Gen
+            filtered_no_alloc = allocated[allocated['STATUS'] == "NO ALLOCATION"].copy()
+            if not filtered_no_alloc.empty:
+                cols_r = [c for c in ['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF'] if c in filtered_no_alloc.columns]
+                recon_real = filtered_no_alloc[cols_r].copy()
+                recon_real['HASIL RECONCILIATION'] = ""
+            else:
+                recon_real = pd.DataFrame(columns=['BIN', 'SKU', 'ITEM NAME', 'QTY_SCAN', 'QTY_SYSTEM', 'DIFF', 'HASIL RECONCILIATION'])
+
+            outstanding = df_sys_updated[df_sys_updated['DIFF'] != 0].copy()
+            outstanding['HASIL REKONSILIASI'] = ""
+
+            self._raw_df_so_alloc = allocated.copy()
+            self._raw_df_so_sys_upd = df_sys_updated.copy()
+            self._raw_df_so_setup_real = df_setup_real.copy()
+            self._raw_df_so_rec_real = recon_real.copy()
+            self._raw_df_so_rec_sys = outstanding.copy()
+
+            self.df_so_alloc_headers.set(allocated.columns.tolist())
+            self.df_so_alloc_rows.set(allocated.fillna("").astype(str).values.tolist())
+            self.df_so_sys_upd_headers.set(df_sys_updated.columns.tolist())
+            self.df_so_sys_upd_rows.set(df_sys_updated.fillna("").astype(str).values.tolist())
+            self.df_so_setup_real_headers.set(df_setup_real.columns.tolist())
+            self.df_so_setup_real_rows.set(df_setup_real.fillna("").astype(str).values.tolist())
+            self.df_so_rec_real_headers.set(recon_real.columns.tolist())
+            self.df_so_rec_real_rows.set(recon_real.fillna("").astype(str).values.tolist())
+            self.df_so_rec_sys_headers.set(outstanding.columns.tolist())
+            self.df_so_rec_sys_rows.set(outstanding.fillna("").astype(str).values.tolist())
+
+            self.so_step2_done.set(True)
+            return True, "Allocation & Recon Selesai!"
+        except Exception as e:
+            return False, f"Gagal Allocation Step 2: {e}"
+
+    def run_so_step4(self, f_r4, f_s4, f_m5):
+        try:
+            df_r4 = load_data_from_info(f_r4)
+            df_s4 = load_data_from_info(f_s4)
+            df_m5 = load_data_from_info(f_m5)
+
+            if df_r4.empty or df_s4.empty or df_m5.empty:
+                return False, "Ketiga file (Real+ Recon, Cek Stock Adj+, Staging Inbound) wajib diupload!"
+
+            def super_clean(val):
+                if pd.isna(val) or str(val).strip().lower() in ['nan', 'null', '']: return ""
+                s = str(val).strip().upper()
+                if s.endswith('.0'): s = s[:-2]
+                return s
+
+            df_s = df_s4.copy()
+            df_r = df_r4.copy()
+
+            df_s['JOIN_KEY'] = df_s.iloc[:, 1].fillna('').astype(str).apply(super_clean) + "|" + df_s.iloc[:, 2].fillna('').astype(str).apply(super_clean)
+            df_r['JOIN_KEY'] = df_r.iloc[:, 0].fillna('').astype(str).apply(super_clean) + "|" + df_r.iloc[:, 1].fillna('').astype(str).apply(super_clean)
+
+            recon_map = {}
+            for _, row in df_r.iterrows():
+                b, s = super_clean(row.iloc[0]), super_clean(row.iloc[1])
+                q = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+                if b and s: recon_map[f"{b}|{s}"] = q
+
+            new_qty_so = df_s['JOIN_KEY'].map(recon_map)
+            sys_qty = pd.to_numeric(df_s.iloc[:, 9], errors='coerce').fillna(0)
+            new_diff = np.where(new_qty_so.notna(), (sys_qty - new_qty_so.fillna(0)).abs(), np.nan)
+
+            cols_to_keep = [i for i in range(len(df_s.columns)) if i not in [10, 11]]
+            df_final_stock = df_s.iloc[:, cols_to_keep].copy()
+            df_final_stock.insert(10, "QTY SO", new_qty_so.fillna(0))
+            df_final_stock.insert(11, "DIFF", new_diff)
+
+            matched_keys = set(df_s[new_qty_so.notna()]['JOIN_KEY'])
+            df_missing_raw = df_r[~df_r['JOIN_KEY'].isin(matched_keys)].copy()
+
+            valid_missing_rows = []
+            for _, row in df_missing_raw.iterrows():
+                q_rec_val = pd.to_numeric(row.iloc[6], errors='coerce') or 0
+                if q_rec_val > 0: valid_missing_rows.append(row)
+
+            if valid_missing_rows:
+                df_missing = pd.DataFrame(valid_missing_rows)
+                df_missing['FINAL_RECON_QTY'] = pd.to_numeric(df_missing.iloc[:, 6], errors='coerce').fillna(0)
+                df_missing['QTY_SYSTEM'] = 0
+            else:
+                df_missing = pd.DataFrame(columns=df_r.columns.tolist() + ['FINAL_RECON_QTY', 'QTY_SYSTEM'])
+
+            df_final_stock.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
+            df_missing.drop(columns=['JOIN_KEY'], errors='ignore', inplace=True)
+
+            # Logic Pivot Adjustment
+            pivot_list, single_list = [], []
+            col_sku_stock = next((c for c in df_final_stock.columns if 'SKU' in c.upper()), df_final_stock.columns[2])
+            q_so_v = pd.to_numeric(df_final_stock["QTY SO"], errors='coerce').fillna(0)
+            q_sys_v = pd.to_numeric(df_final_stock.iloc[:, 9], errors='coerce').fillna(0)
+            mask_plus = (q_so_v > q_sys_v) & (df_final_stock["DIFF"].notna())
+
+            if mask_plus.any():
+                for _, r in df_final_stock[mask_plus].iterrows():
+                    pivot_list.append({'SKU_KEY_TEMP': super_clean(r[col_sku_stock]), 'QTY_TOTAL': pd.to_numeric(r["DIFF"], errors='coerce')})
+
+            inbound_master = df_m5.copy()
+            col_sku_inb = next((c for c in inbound_master.columns if 'SKU' in c.upper()), inbound_master.columns[2])
+            inbound_master['SKU_JOIN'] = inbound_master[col_sku_inb].apply(super_clean)
+            m_clean = inbound_master.drop_duplicates(subset=['SKU_JOIN'])
+            inbound_skus_set = set(m_clean['SKU_JOIN'].unique())
+
+            if not df_missing.empty:
+                col_b_m = df_missing.columns[0]
+                col_s_m = df_missing.columns[1]
+                col_q_r = 'FINAL_RECON_QTY' if 'FINAL_RECON_QTY' in df_missing.columns else df_missing.columns[6]
+                col_q_s = 'QTY_SYSTEM' if 'QTY_SYSTEM' in df_missing.columns else None
+
+                for _, row in df_missing.iterrows():
+                    s_rec = super_clean(row[col_s_m])
+                    if not s_rec: continue
+                    q_r_v = pd.to_numeric(row[col_q_r], errors='coerce') or 0
+                    q_s_v = pd.to_numeric(row[col_q_s], errors='coerce') if col_q_s else 0
+                    q_calc = q_r_v - q_s_v
+                    if q_calc <= 0: continue
+
+                    if s_rec in inbound_skus_set:
+                        pivot_list.append({'SKU_KEY_TEMP': s_rec, 'QTY_TOTAL': q_calc})
+                    else:
+                        single_list.append({'BIN': row[col_b_m], 'SKU': row[col_s_m], 'QTY ADJ': q_calc})
+
+            df_mult_res = pd.DataFrame()
+            if pivot_list:
+                df_p = pd.DataFrame(pivot_list)
+                df_p_g = df_p.groupby('SKU_KEY_TEMP')['QTY_TOTAL'].sum().reset_index()
+                mask_has_m = df_p_g['SKU_KEY_TEMP'].isin(inbound_skus_set)
+
+                for _, row in df_p_g[~mask_has_m].iterrows():
+                    single_list.append({'BIN': 'STAGING INBOUND (MISS MASTER)', 'SKU': row['SKU_KEY_TEMP'], 'QTY ADJ': row['QTY_TOTAL']})
+
+                df_p_val = df_p_g[mask_has_m]
+                if not df_p_val.empty:
+                    df_mult_res = df_p_val.merge(m_clean, left_on='SKU_KEY_TEMP', right_on='SKU_JOIN', how='inner')
+                    col_t_so = next((c for c in df_mult_res.columns if 'QTY SO' in c.upper() or 'SO' in c.upper()), None)
+                    if col_t_so: df_mult_res[col_t_so] = df_mult_res['QTY_TOTAL']
+                    else: df_mult_res['QTY SO'] = df_mult_res['QTY_TOTAL']
+                    df_mult_res.drop(columns=['SKU_KEY_TEMP', 'QTY_TOTAL', 'SKU_JOIN'], errors='ignore', inplace=True)
+
+            df_sing_res = pd.DataFrame(single_list) if single_list else pd.DataFrame(columns=['BIN', 'SKU', 'QTY ADJ'])
+
+            if not df_mult_res.empty:
+                last_col = df_mult_res.columns[-1]
+                df_mult_res[last_col] = pd.to_numeric(df_mult_res[last_col], errors='coerce').fillna(0)
+                df_mult_res = df_mult_res[df_mult_res[last_col] > 0].reset_index(drop=True)
+
+            if not df_sing_res.empty:
+                last_c = df_sing_res.columns[-1]
+                df_sing_res[last_c] = pd.to_numeric(df_sing_res[last_c], errors='coerce').fillna(0)
+                df_sing_res = df_sing_res[df_sing_res[last_c] > 0].reset_index(drop=True)
+
+            self._raw_df_so_mult = df_mult_res.copy()
+            self._raw_df_so_sing = df_sing_res.copy()
+            self._raw_df_so_res4 = df_final_stock.copy()
+            self._raw_df_so_miss4 = df_missing.copy()
+
+            self.df_so_mult_headers.set(df_mult_res.columns.tolist() if not df_mult_res.empty else [])
+            self.df_so_mult_rows.set(df_mult_res.fillna("").astype(str).values.tolist() if not df_mult_res.empty else [])
+            self.df_so_sing_headers.set(df_sing_res.columns.tolist() if not df_sing_res.empty else [])
+            self.df_so_sing_rows.set(df_sing_res.fillna("").astype(str).values.tolist() if not df_sing_res.empty else [])
+            self.df_so_res4_headers.set(df_final_stock.columns.tolist() if not df_final_stock.empty else [])
+            self.df_so_res4_rows.set(df_final_stock.fillna("").astype(str).values.tolist() if not df_final_stock.empty else [])
+            self.df_so_miss4_headers.set(df_missing.columns.tolist() if not df_missing.empty else [])
+            self.df_so_miss4_rows.set(df_missing.fillna("").astype(str).values.tolist() if not df_missing.empty else [])
+
+            self.so_step4_done.set(True)
+            return True, "Final Adjustment Step 4 Selesai!"
+        except Exception as e:
+            return False, f"Gagal Step 4: {e}"
+
+    def run_so_step4_setup_real(self):
+        try:
+            if self._raw_df_so_res4.empty or self._raw_df_so_mult.empty:
+                return False, "Jalankan Step 4 terlebih dahulu!"
+
+            def clean_val(x):
+                if pd.isna(x): return ""
+                s = str(x).strip().upper()
+                if s.startswith("SPE"): s = s[3:]
+                if s.endswith('.0'): s = s[:-2]
+                return s
+
+            allowed_skus = set()
+            col_s_m = self._raw_df_so_mult.columns[2] if len(self._raw_df_so_mult.columns) > 2 else self._raw_df_so_mult.columns[0]
+            allowed_skus = set(self._raw_df_so_mult[col_s_m].apply(clean_val).unique())
+
+            setup_real_data = []
+            seen_entry = set()
+
+            df_stock = self._raw_df_so_res4.copy()
+            qty_system = pd.to_numeric(df_stock.iloc[:, 9], errors='coerce').fillna(0)
+            qty_so = pd.to_numeric(df_stock.iloc[:, 10], errors='coerce').fillna(0)
+            diff_val = pd.to_numeric(df_stock.iloc[:, 11], errors='coerce').fillna(0)
+
+            for i in range(len(df_stock)):
+                if qty_so.iloc[i] > qty_system.iloc[i]:
+                    sku_key = clean_val(df_stock.iloc[i, 2])
+                    bin_tujuan = df_stock.iloc[i, 1]
+                    qty_mutasi = diff_val.iloc[i]
+                    if sku_key in allowed_skus:
+                        setup_real_data.append({"BIN AWAL": "STAGING INBOUND", "BIN TUJUAN": bin_tujuan, "SKU": sku_key, "QUANTITY": qty_mutasi, "NOTES": "MISS LOCATION"})
+                        seen_entry.add(f"{sku_key}|{bin_tujuan}")
+
+            if not self._raw_df_so_miss4.empty:
+                for _, row_m in self._raw_df_so_miss4.iterrows():
+                    bin_t_m = row_m.iloc[0]
+                    sku_k_m = clean_val(row_m.iloc[1])
+                    qty_m = pd.to_numeric(row_m.iloc[6], errors='coerce') or 0
+                    if sku_k_m in allowed_skus and f"{sku_k_m}|{bin_t_m}" not in seen_entry:
+                        setup_real_data.append({"BIN AWAL": "STAGING INBOUND", "BIN TUJUAN": bin_t_m, "SKU": sku_k_m, "QUANTITY": qty_m, "NOTES": "RELOCATION (MISSING)"})
+
+            df_real = pd.DataFrame(setup_real_data) if setup_real_data else pd.DataFrame(columns=["BIN AWAL", "BIN TUJUAN", "SKU", "QUANTITY", "NOTES"])
+            self._raw_df_so_setup4 = df_real.copy()
+            self.df_so_setup4_headers.set(df_real.columns.tolist())
+            self.df_so_setup4_rows.set(df_real.fillna("").astype(str).values.tolist())
+
+            self.so_step4_setup_done.set(True)
+            return True, "Set Up Real + Berhasil Dibuat!"
+        except Exception as e:
+            return False, f"Gagal Set Up Real +: {e}"
+
+    def run_so_step5(self, f_k6, f_adj6):
+        try:
+            df_outstanding = load_data_from_info(f_k6)
+            df_recon = load_data_from_info(f_adj6)
+
+            if df_outstanding.empty or df_recon.empty:
+                return False, "File System+ Recon & Stock Cek Adj- tidak boleh kosong!"
+
+            def clean_val(x):
+                if pd.isna(x): return ""
+                s = str(x).strip().upper()
+                if s.startswith("SPE"): s = s[3:].strip()
+                if s.endswith('.0'): s = s[:-2]
+                return s
+
+            sys_map = {}
+            for _, row in df_recon.iterrows():
+                try:
+                    k_sys = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+                    val_sys = pd.to_numeric(row.iloc[9], errors='coerce')
+                    sys_map[k_sys] = val_sys if not pd.isna(val_sys) else 0
+                except: continue
+
+            recon_map = {}
+            for _, row in df_outstanding.iterrows():
+                try:
+                    k_rec = f"{clean_val(row.iloc[1])}|{clean_val(row.iloc[2])}"
+                    val_rec = pd.to_numeric(row.iloc[13], errors='coerce')
+                    recon_map[k_rec] = val_rec if not pd.isna(val_rec) else 0
+                except: continue
+
+            audit_results, karantina_results = [], []
+            for _, row in df_outstanding.iterrows():
+                bin_val, sku_val = row.iloc[1], row.iloc[2]
+                key = f"{clean_val(bin_val)}|{clean_val(sku_val)}"
+                q_sys = sys_map.get(key, 0)
+                q_rec = recon_map.get(key, 0)
+                diff = q_sys - q_rec
+
+                if diff != 0:
+                    audit_results.append({'BIN': bin_val, 'SKU': sku_val, 'QTY_SYSTEM_J': q_sys, 'QTY_RECON_N': q_rec, 'SELISIH': diff})
+                    if diff > 0:
+                        karantina_results.append({"BIN AWAL": bin_val, "BIN TUJUAN": "KARANTINA", "SKU": sku_val, "QUANTITY": diff, "NOTES": "NOT FOUND"})
+
+            df_karantina = pd.DataFrame(karantina_results) if karantina_results else pd.DataFrame(columns=['BIN AWAL', 'BIN TUJUAN', 'SKU', 'QUANTITY', 'NOTES'])
+            df_check = pd.DataFrame(audit_results) if audit_results else pd.DataFrame(columns=['BIN','SKU','QTY_SYSTEM_J','QTY_RECON_N','SELISIH'])
+
+            self.so_qty_karantina.set(int(df_karantina['QUANTITY'].sum()) if not df_karantina.empty and 'QUANTITY' in df_karantina.columns else 0)
+            self.so_sku_karantina.set(df_karantina['SKU'].nunique() if not df_karantina.empty and 'SKU' in df_karantina.columns else 0)
+
+            self._raw_df_so_karantina = df_karantina.copy()
+            self._raw_df_so_check5 = df_check.copy()
+
+            self.df_so_karantina_headers.set(df_karantina.columns.tolist())
+            self.df_so_karantina_rows.set(df_karantina.fillna("").astype(str).values.tolist())
+            self.df_so_check5_headers.set(df_check.columns.tolist())
+            self.df_so_check5_rows.set(df_check.fillna("").astype(str).values.tolist())
+
+            self.so_step5_done.set(True)
+            return True, "Analisis Karantina Step 5 Selesai!"
+        except Exception as e:
+            return False, f"Gagal Step 5: {e}"
+
+    def run_so_step6_miss_loc(self):
+        try:
+            data_src = self._raw_df_so_setup_real if not self._raw_df_so_setup_real.empty else self._raw_df_so_setup4
+            if data_src.empty: return False, "Data Set Up Real + belum tersedia!"
+
+            columns_ref = ["BIN SYSTEM +", "BIN REAL +", "SKU", "QTY MISS LOC."]
+            df_out = data_src.iloc[:, 0:4].copy()
+            df_out.columns = columns_ref
+            df_out["QTY MISS LOC."] = pd.to_numeric(df_out["QTY MISS LOC."], errors='coerce').fillna(0)
+
+            count_sku = df_out["SKU"].nunique()
+            count_qty = int(df_out["QTY MISS LOC."].sum())
+            df_sum = pd.DataFrame({"METRIC": ["Total SKU Miss Loc", "Total Qty Miss Loc"], "VALUE": [count_sku, count_qty]})
+
+            self.so_sku_miss_loc.set(count_sku)
+            self.so_qty_miss_loc.set(count_qty)
+
+            self._raw_df_so_miss_loc = df_out.copy()
+            self._raw_df_so_sum_miss = df_sum.copy()
+
+            self.df_so_miss_loc_headers.set(df_out.columns.tolist())
+            self.df_so_miss_loc_rows.set(df_out.fillna("").astype(str).values.tolist())
+            self.df_so_sum_miss_headers.set(df_sum.columns.tolist())
+            self.df_so_sum_miss_rows.set(df_sum.fillna("").astype(str).values.tolist())
+
+            self.so_step6a_done.set(True)
+            return True, "Miss Location Report Berhasil Dibuat!"
+        except Exception as e:
+            return False, f"Gagal Miss Location: {e}"
+
+    def run_so_step6_summary_adj(self, f_plus=None, f_minus=None):
+        try:
+            cols_header = ["BIN", "SKU", "BRAND", "ITEM NAME", "VARIANT", "SUB KATEGORI", "HARGA BELI", "HARGA JUAL", "QTY SYSTEM", "QTY SO", "VALUE ADJ", "STATUS ADJ"]
+
+            active_plus = load_data_from_info(f_plus) if f_plus else self._raw_df_so_mult
+            active_minus = load_data_from_info(f_minus) if f_minus else None
+
+            if active_plus.empty:
+                return False, "Data Stock Adj + tidak ditemukan!"
+
+            def process_data(df, status):
+                if df is None or (isinstance(df, pd.DataFrame) and df.empty):
+                    return pd.DataFrame(columns=cols_header)
+                temp = df.iloc[:, 1:11].copy()
+                temp.columns = cols_header[:10]
+                for col in ["HARGA BELI", "QTY SO", "QTY SYSTEM"]:
+                    temp[col] = pd.to_numeric(temp[col], errors='coerce').fillna(0)
+                temp["VALUE ADJ"] = (temp["QTY SO"] - temp["QTY SYSTEM"]) * temp["HARGA BELI"]
+                temp["STATUS ADJ"] = status
+                return temp
+
+            df_adj_plus = process_data(active_plus, "ADJ +")
+            df_adj_minus = process_data(active_minus, "ADJ -")
+            df_final = pd.concat([df_adj_plus, df_adj_minus], ignore_index=True)
+
+            val_plus = df_adj_plus["VALUE ADJ"].sum() if not df_adj_plus.empty else 0
+            val_minus = df_adj_minus["VALUE ADJ"].sum() if not df_adj_minus.empty else 0
+            qty_plus = (df_adj_plus["QTY SO"] - df_adj_plus["QTY SYSTEM"]).abs().sum() if not df_adj_plus.empty else 0
+            qty_minus = -(df_adj_minus["QTY SO"] - df_adj_minus["QTY SYSTEM"]).abs().sum() if not df_adj_minus.empty else 0
+
+            df_sum = pd.DataFrame({
+                "METRIC": ["Total SKU Adj.", "Total Value Adj. +", "Total Value Adj. -", "Total QTY Adj. +", "Total QTY Adj. -", "Total Value", "Total QTY"],
+                "VALUE": [len(df_final[df_final["SKU"].astype(str).str.strip() != ""]), val_plus, val_minus, qty_plus, qty_minus, val_plus + val_minus, qty_plus + qty_minus]
+            })
+
+            self.so_adj_val_p.set(val_plus)
+            self.so_adj_val_m.set(val_minus)
+            self.so_adj_val_net.set(val_plus + val_minus)
+            self.so_adj_qty_p.set(int(qty_plus))
+            self.so_adj_qty_m.set(int(qty_minus))
+            self.so_adj_sku_tot.set(len(df_final))
+
+            self._raw_df_so_adj_detail = df_final.copy()
+            self._raw_df_so_adj_sum = df_sum.copy()
+
+            self.df_so_adj_detail_headers.set(df_final.columns.tolist())
+            self.df_so_adj_detail_rows.set(df_final.fillna("").astype(str).values.tolist())
+            self.df_so_adj_sum_headers.set(df_sum.columns.tolist())
+            self.df_so_adj_sum_rows.set(df_sum.fillna("").astype(str).values.tolist())
+
+            self.so_step6b_done.set(True)
+            return True, "Summary Adjustment Berhasil Dibuat!"
+        except Exception as e:
+            return False, f"Gagal Summary Adjustment: {e}"

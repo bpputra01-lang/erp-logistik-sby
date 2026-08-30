@@ -5,7 +5,7 @@ from state import AppState
 from views import (
     CUSTOM_HEAD, static_loading_spinner, success_modal, error_modal,
     render_clean_table, metric_box, dark_metric_box,  BRANCH_BIN_MAPPING, 
-    custom_uploader_box, compare_system_view, stock_minus_view,
+    custom_uploader_box, compare_system_view, stock_minus_view, stock_opname_view,
     putaway_view, main_dashboard_view, sidebar, compare_rto_view, cycle_count_view, login_page, ppa_audit_view, cycle_count_analyzer_view, global_header
 )
 
@@ -249,7 +249,41 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ), open=True
                 )
             )
-
+            
+        elif cur == "Stock Opname":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Informasi Format File"),
+                    ui.div(
+                        ui.tags.strong("Format yang diharapkan:"),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("FILTER:"), " Pilih Cabang, Sub Kategori, dan BIN System."),
+                            ui.tags.li(ui.strong("1. DATA SCAN:"), " Kolom A = BIN, Kolom B = SKU, Kolom C = QTY SCAN."),
+                            ui.tags.li(ui.strong("2. STOCK SYSTEM:"), " Download All Stock dari Multiple Adjustment (Termasuk yang sudah habis)."),
+                            ui.tags.li(ui.strong("3. BIN COVERAGE:"), " Download All BIN & Karantina (Hanya ada di stock)."),
+                            ui.tags.li(ui.strong("4. FINAL ADJ +:"), " Upload Real+ Recon, Cek Stock Adj+, dan File Staging Inbound."),
+                            ui.tags.li(ui.strong("5. KARANTINA:"), " Upload System+ Recon dan Stock Cek Adj (-)."),
+                            ui.tags.li(ui.strong("6. SUMMARY ADJ:"), " Laporan rekapitulasi finansial & QTY adjustment.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                ),
+                ui.tags.details(
+                    ui.tags.summary("💡 Logic Thinking"),
+                    ui.div(
+                        ui.tags.strong("Alur Logika Stock Opname Analyzer:"),
+                        ui.tags.ol(
+                            ui.tags.li(ui.strong("DS VS Stock System:"), " Real + (QTY Scan > Qty System), System + (Qty System > Qty Scan)."),
+                            ui.tags.li(ui.strong("Alokasi Real +:"), " Cover stok ke BIN Coverage & System +."),
+                            ui.tags.li(ui.strong("Recon Reports:"), " Validasi rekonsiliasi Real + & System Outstanding."),
+                            ui.tags.li(ui.strong("Final Adjustment:"), " Sinkronisasi ke Staging Inbound untuk Multiple & Single Adj +."),
+                            ui.tags.li(ui.strong("Set Up Karantina:"), " Selisih fisik positif (DIFF > 0) dimutasi ke BIN Karantina (Note: NOT FOUND)."),
+                            ui.tags.li(ui.strong("Miss Location & Summary:"), " Evaluasi rekapitulasi salah letak dan net finansial value adjustment.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
         # FALLBACK JIKA MENU LAIN
         else:
             guide_body = ui.div(
@@ -514,6 +548,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "ppa_audit": page_content = ppa_audit_view(state)
         elif content_type == "cycle_count_analyzer": page_content = cycle_count_analyzer_view(state)
         elif content_type == "compare_rto": page_content = compare_rto_view(state)
+        elif content_type == "stock_opname": page_content = stock_opname_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
@@ -1277,6 +1312,544 @@ def server(input: Inputs, output: Outputs, session: Session):
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as writer:
             state._raw_df_rto_new_draft.to_excel(writer, sheet_name='NEW_DRAFT', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+# ==========================================================================
+    # STOCK OPNAME ANALYZER CONTROLLER & HANDLERS
+    # ==========================================================================
+    @render.ui
+    def so_bin_sys_ui():
+        b = input.so_branch() if "so_branch" in input else "SURABAYA"
+        choices = BRANCH_BIN_MAPPING.get(b, [])
+        return ui.input_selectize("so_bin_sys", "🏭 BIN System:", choices=choices, multiple=True, width="100%")
+
+    # --- STEP 1 ---
+    @render.ui
+    def so_step1_results_ui():
+        if not state.so_step1_done(): return ui.div()
+        return ui.div(
+            ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+            ui.div(
+                dark_metric_box("📦 QTY REAL +", f"{state.so_qty_real_plus():,}", "#C5A059"),
+                dark_metric_box("🔐 QTY SYSTEM +", f"{state.so_qty_sys_plus():,}", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+            ),
+            ui.div(
+                ui.download_button(
+                    "btn_dl_so_step1",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD EXCEL STEP 1 (.xlsx)"),
+                    style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel("📋 DATA SCAN", ui.div(render_clean_table(state.df_so_scan_headers(), state.df_so_scan_rows(), "tbl_so_scan"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("📊 STOCK SYSTEM", ui.div(render_clean_table(state.df_so_stock_headers(), state.df_so_stock_rows(), "tbl_so_stock"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("➕ REAL +", ui.div(render_clean_table(state.df_so_real_headers(), state.df_so_real_rows(), "tbl_so_real"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("➖ SYSTEM +", ui.div(render_clean_table(state.df_so_sys_headers(), state.df_so_sys_rows(), "tbl_so_sys"), style="padding: 0.75rem 0;"))
+            ), style="width: 100%;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_so_step1)
+    def _proc_so_step1():
+        f_scan, f_stock = input.so_up_scan(), input.so_up_stock()
+        if not f_scan or not f_stock:
+            state.error_modal_message.set("Pilih kedua file Data Scan & Stock System terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+
+        sub = input.so_sub_kat() if "so_sub_kat" in input else []
+        bin_sys = input.so_bin_sys() if "so_bin_sys" in input else []
+        succ, msg = state.run_so_step1(f_scan, f_stock, sub, bin_sys)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="Step1_SO_Compare.xlsx")
+    def btn_dl_so_step1():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_scan.to_excel(writer, sheet_name='DATA_SCAN', index=False)
+            state._raw_df_so_stock.to_excel(writer, sheet_name='STOCK_SYSTEM', index=False)
+            state._raw_df_so_real_plus.to_excel(writer, sheet_name='REAL_PLUS', index=False)
+            state._raw_df_so_sys_plus.to_excel(writer, sheet_name='SYSTEM_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- STEP 2 & 3: ALLOCATION & RECON ---
+    @render.ui
+    def so_step2_card_ui():
+        if not state.so_step1_done(): return ui.div()
+        step2_results = ui.div()
+        if state.so_step2_done():
+            step2_results = ui.div(
+                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                ui.div(
+                    ui.h4("✅ HASIL ALOKASI", style="font-size: 15px; font-weight: 800; color: #1A202C; margin: 0;"),
+                    ui.download_button("btn_dl_so_step2", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL ALOKASI (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                ui.navset_card_tab(
+                    ui.nav_panel("📊 ALLOCATION DETAIL", ui.div(render_clean_table(state.df_so_alloc_headers(), state.df_so_alloc_rows(), "tbl_so_alloc"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("📉 UPDATED SYSTEM", ui.div(render_clean_table(state.df_so_sys_upd_headers(), state.df_so_sys_upd_rows(), "tbl_so_sys_upd"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("📦 SET UP REAL +", ui.div(render_clean_table(state.df_so_setup_real_headers(), state.df_so_setup_real_rows(), "tbl_so_setup_real"), style="padding: 0.75rem 0;"))
+                ),
+                ui.hr(style="margin: 1.5rem 0; border-color: #E2E8F0;"),
+                ui.h4("📋 RECON REPORTS (HASIL STEP 1 - 3)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 1rem;"),
+                ui.div(
+                    ui.div(
+                        ui.div(
+                            ui.h4("📋 REAL + RECON", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
+                            ui.download_button("btn_dl_so_rec_real", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 4px 10px; cursor: pointer; font-size: 12px;"),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.5rem;"
+                        ),
+                        render_clean_table(state.df_so_rec_real_headers(), state.df_so_rec_real_rows(), "tbl_so_rec_real"),
+                        style="flex: 1; min-width: 300px;"
+                    ),
+                    ui.div(
+                        ui.div(
+                            ui.h4("🔐 SYSTEM + RECON (OUTSTANDING)", style="font-size: 14px; font-weight: 800; color: #1A202C; margin: 0;"),
+                            ui.download_button("btn_dl_so_rec_sys", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 4px 10px; cursor: pointer; font-size: 12px;"),
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.5rem;"
+                        ),
+                        render_clean_table(state.df_so_rec_sys_headers(), state.df_so_rec_sys_rows(), "tbl_so_rec_sys"),
+                        style="flex: 1; min-width: 300px;"
+                    ),
+                    style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;"
+                )
+            )
+
+        return ui.div(
+            ui.h4("2️⃣ Upload BIN COVERAGE (ALL BIN DEFAULT & KARANTINA)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            custom_uploader_box("so_up_cov", "📥 FILE BIN COVERAGE"),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN ALLOCATION"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step2', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            ),
+            step2_results,
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_so_step2)
+    def _proc_so_step2():
+        f = input.so_up_cov()
+        if not f:
+            state.error_modal_message.set("Pilih file BIN Coverage terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        bin_cov = input.so_bin_cov() if "so_bin_cov" in input else []
+        succ, msg = state.run_so_step2(f, bin_cov)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="Hasil_Alokasi_SO.xlsx")
+    def btn_dl_so_step2():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_alloc.to_excel(writer, sheet_name='ALLOCATION_DETAIL', index=False)
+            state._raw_df_so_sys_upd.to_excel(writer, sheet_name='UPDATED_SYSTEM', index=False)
+            state._raw_df_so_setup_real.to_excel(writer, sheet_name='SET_UP_REAL_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Report_Real_Plus_Recon.xlsx")
+    def btn_dl_so_rec_real():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_rec_real.to_excel(writer, sheet_name='REAL_PLUS_RECON', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="Report_System_Plus_Recon.xlsx")
+    def btn_dl_so_rec_sys():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_rec_sys.to_excel(writer, sheet_name='SYSTEM_PLUS_RECON', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- STEP 4: FINAL ADJUSTMENT + PROCESS ---
+    @render.ui
+    def so_step4_card_ui():
+        if not state.so_step2_done(): return ui.div()
+        step4_results = ui.div()
+        if state.so_step4_done():
+            # Setup real content
+            if state.so_step4_setup_done():
+                setup_content = ui.div(
+                    ui.div(
+                        ui.download_button("btn_dl_so_setup4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Set Up Real + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"),
+                        style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"
+                    ),
+                    render_clean_table(state.df_so_setup4_headers(), state.df_so_setup4_rows(), "tbl_so_setup4")
+                )
+            else:
+                setup_content = ui.div(
+                    ui.p("➡️ Klik tombol di bawah untuk membuat relokasi mutasi ke STAGING INBOUND:", style="color: #4A5568; font-weight: 600; margin-bottom: 0.75rem;"),
+                    ui.tags.button(
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-arrows-split-up-and-left", style="margin-right: 6px; font-size: 14px;"), "GENERATE SET UP REAL +"),
+                        onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step4_setup', Math.random(), {priority: 'event'});",
+                        class_="btn-red-gradient"
+                    )
+                )
+
+            step4_results = ui.div(
+                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                ui.navset_card_tab(
+                    ui.nav_panel(
+                        "📦 MULTIPLE ADJ +",
+                        ui.div(
+                            ui.div(ui.download_button("btn_dl_so_mult", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Multiple Adj + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"),
+                            render_clean_table(state.df_so_mult_headers(), state.df_so_mult_rows(), "tbl_so_mult"),
+                            style="padding: 0.75rem 0;"
+                        )
+                    ),
+                    ui.nav_panel(
+                        "⚠️ SINGLE ADJ +",
+                        ui.div(
+                            ui.div(ui.download_button("btn_dl_so_sing", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Single Adj + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"),
+                            render_clean_table(state.df_so_sing_headers(), state.df_so_sing_rows(), "tbl_so_sing"),
+                            style="padding: 0.75rem 0;"
+                        )
+                    ),
+                    ui.nav_panel(
+                        "🔍 CEK ADJ + RESULT",
+                        ui.div(
+                            ui.div(ui.download_button("btn_dl_so_res4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Hasil Cek Adj + (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"),
+                            render_clean_table(state.df_so_res4_headers(), state.df_so_res4_rows(), "tbl_so_res4"),
+                            style="padding: 0.75rem 0;"
+                        )
+                    ),
+                    ui.nav_panel("➡️ SET UP REAL +", ui.div(setup_content, style="padding: 0.75rem 0;")),
+                    ui.nav_panel(
+                        "❌ Miss Lookup SKU on BIN",
+                        ui.div(
+                            ui.div(ui.download_button("btn_dl_so_miss4", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 13px;"), "Download Missing Items (.xlsx)"), style="background-color: #E50914; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 12px; cursor: pointer; font-size: 13px;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"),
+                            render_clean_table(state.df_so_miss4_headers(), state.df_so_miss4_rows(), "tbl_so_miss4"),
+                            style="padding: 0.75rem 0;"
+                        )
+                    )
+                )
+            )
+
+        return ui.div(
+            ui.h4("3️⃣ Final Adjustment + Process (3 File Upload)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            ui.div(
+                custom_uploader_box("so_up_r4", "1. Sheet REAL + RECON"),
+                custom_uploader_box("so_up_s4", "2. Sheet CEK STOCK ADJ +"),
+                custom_uploader_box("so_up_m5", "3. File STAGGING INBOUND"),
+                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+            ),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN FINAL ADJUSTMENT"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step4', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            ),
+            step4_results,
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_so_step4)
+    def _proc_so_step4():
+        f1, f2, f3 = input.so_up_r4(), input.so_up_s4(), input.so_up_m5()
+        if not f1 or not f2 or not f3:
+            state.error_modal_message.set("Pilih ketiga file (Real+ Recon, Cek Stock Adj+, Staging Inbound) terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        succ, msg = state.run_so_step4(f1, f2, f3)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_so_step4_setup)
+    def _proc_so_step4_setup():
+        succ, msg = state.run_so_step4_setup_real()
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="final_adj_multiple.xlsx")
+    def btn_dl_so_mult():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_mult.to_excel(writer, sheet_name='MULTIPLE_ADJ_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="final_adj_single.xlsx")
+    def btn_dl_so_sing():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_sing.to_excel(writer, sheet_name='SINGLE_ADJ_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="hasil_lookup_full.xlsx")
+    def btn_dl_so_res4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_res4.to_excel(writer, sheet_name='CEK_ADJ_RESULT', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="set_up_real_plus.xlsx")
+    def btn_dl_so_setup4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_setup4.to_excel(writer, sheet_name='SET_UP_REAL_PLUS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="missing_items_recon.xlsx")
+    def btn_dl_so_miss4():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_miss4.to_excel(writer, sheet_name='MISSING_ITEMS', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- STEP 5: RECON SYSTEM + (SET UP KARANTINA) ---
+    @render.ui
+    def so_step5_card_ui():
+        if not state.so_step4_done(): return ui.div()
+        step5_results = ui.div()
+        if state.so_step5_done():
+            step5_results = ui.div(
+                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                ui.div(
+                    dark_metric_box("☣️ QTY TO KARANTINA", f"{state.so_qty_karantina():,} QTY", "#ECC94B"),
+                    dark_metric_box("🏷️ SKU TO KARANTINA", f"{state.so_sku_karantina():,} SKU", "#ECC94B"),
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.download_button("btn_dl_so_karantina", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD HASIL KARANTINA (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                ui.navset_card_tab(
+                    ui.nav_panel("📦 HASIL KARANTINA", ui.div(render_clean_table(state.df_so_karantina_headers(), state.df_so_karantina_rows(), "tbl_so_karantina"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("🔍 DATA PENGECEKAN (AUDIT)", ui.div(render_clean_table(state.df_so_check5_headers(), state.df_so_check5_rows(), "tbl_so_check5"), style="padding: 0.75rem 0;"))
+                )
+            )
+
+        return ui.div(
+            ui.h4("4️⃣ Recon System + Process (Set Up Karantina)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+            ui.div(
+                custom_uploader_box("so_up_k6", "1. Upload SYSTEM + RECON"),
+                custom_uploader_box("so_up_adj6", "2. Upload STOCK CEK ADJUSMENT (-)"),
+                style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+            ),
+            ui.div(
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "GENERATE KARANTINA"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step5', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient"
+                ),
+                style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+            ),
+            step5_results,
+            style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_so_step5)
+    def _proc_so_step5():
+        f1, f2 = input.so_up_k6(), input.so_up_adj6()
+        if not f1 or not f2:
+            state.error_modal_message.set("Pilih kedua file (System+ Recon & Stock Cek Adj-) terlebih dahulu!")
+            state.show_error_modal.set(True)
+            return
+        succ, msg = state.run_so_step5(f1, f2)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="Karantina_SO.xlsx")
+    def btn_dl_so_karantina():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_karantina.to_excel(writer, sheet_name='Karantina', index=False)
+            state._raw_df_so_check5.to_excel(writer, sheet_name='Data_Pengecekan_Audit', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # --- STEP 6: MISS LOCATION, SUMMARY ADJ, & MASTER REPORT ---
+    @render.ui
+    def so_step6_card_ui():
+        if not state.so_step5_done(): return ui.div()
+
+        # Miss Location Results
+        miss_loc_results = ui.div()
+        if state.so_step6a_done():
+            miss_loc_results = ui.div(
+                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                ui.div(
+                    dark_metric_box("📦 TOTAL SKU MISS LOC.", f"{state.so_sku_miss_loc():,} ITEM", "#E53E3E"),
+                    dark_metric_box("🔢 TOTAL QTY MISS LOC.", f"{state.so_qty_miss_loc():,} ITEM", "#E53E3E"),
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.download_button("btn_dl_so_miss_loc", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MISS LOC REPORT (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                ui.navset_card_tab(
+                    ui.nav_panel("📄 Detail List", ui.div(render_clean_table(state.df_so_miss_loc_headers(), state.df_so_miss_loc_rows(), "tbl_so_miss_loc"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("📊 Summary", ui.div(render_clean_table(state.df_so_sum_miss_headers(), state.df_so_sum_miss_rows(), "tbl_so_sum_miss"), style="padding: 0.75rem 0;"))
+                )
+            )
+
+        # Summary Adj Results
+        summary_adj_results = ui.div()
+        if state.so_step6b_done():
+            c_val_p = "#10B981" if state.so_adj_val_p() >= 0 else "#E53E3E"
+            c_val_m = "#10B981" if state.so_adj_val_m() >= 0 else "#E53E3E"
+            c_val_n = "#10B981" if state.so_adj_val_net() >= 0 else "#E53E3E"
+
+            summary_adj_results = ui.div(
+                ui.hr(style="margin: 1rem 0; border-color: #E2E8F0;"),
+                ui.div(
+                    dark_metric_box("📈 TOTAL VALUE ADJ (+)", f"Rp {state.so_adj_val_p():,.0f}", c_val_p),
+                    dark_metric_box("📉 TOTAL VALUE ADJ (-)", f"Rp {state.so_adj_val_m():,.0f}", c_val_m),
+                    dark_metric_box("⚖️ NET VALUE ADJ", f"Rp {state.so_adj_val_net():,.0f}", c_val_n),
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    dark_metric_box("🟢 TOTAL QTY ADJ (+)", f"{state.so_adj_qty_p():,} ITEM", "#10B981"),
+                    dark_metric_box("🔴 TOTAL QTY ADJ (-)", f"{state.so_adj_qty_m():,} ITEM", "#E53E3E"),
+                    dark_metric_box("🔺 TOTAL SKU ADJ", f"{state.so_adj_sku_tot():,} SKU", "#3182CE"),
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1rem;"
+                ),
+                ui.div(
+                    ui.download_button("btn_dl_so_adj_master", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "DOWNLOAD MASTER ADJUSTMENT REPORT (.xlsx)"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 8px 16px; cursor: pointer;"),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.75rem;"
+                ),
+                ui.navset_card_tab(
+                    ui.nav_panel("📄 Detail Report", ui.div(render_clean_table(state.df_so_adj_detail_headers(), state.df_so_adj_detail_rows(), "tbl_so_adj_det"), style="padding: 0.75rem 0;")),
+                    ui.nav_panel("📊 Summary Adjustment", ui.div(render_clean_table(state.df_so_adj_sum_headers(), state.df_so_adj_sum_rows(), "tbl_so_adj_sum"), style="padding: 0.75rem 0;"))
+                )
+            )
+
+        return ui.div(
+            # 5A. Miss Location Section
+            ui.div(
+                ui.h4("5️⃣ Miss Location Report", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                ui.div(
+                    ui.tags.button(
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-chart-pie", style="margin-right: 6px; font-size: 14px;"), "GENERATE MISS LOC REPORT"),
+                        onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step6_miss', Math.random(), {priority: 'event'});",
+                        class_="btn-red-gradient"
+                    ),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+                ),
+                miss_loc_results,
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+            ),
+
+            # 5B. Summary Adjustment Section
+            ui.div(
+                ui.h4("6️⃣ Summary Adjustment Report (Financial & Inventory)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                ui.div(
+                    custom_uploader_box("so_up_adj_minus", "Upload STOCK ADJ - (Opsional)"),
+                    custom_uploader_box("so_up_adj_plus", "Upload STOCK ADJ + (Opsional)"),
+                    style="display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap;"
+                ),
+                ui.div(
+                    ui.tags.button(
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-calculator", style="margin-right: 6px; font-size: 14px;"), "RUN SUMMARY ADJUSTMENT"),
+                        onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step6_adj', Math.random(), {priority: 'event'});",
+                        class_="btn-red-gradient"
+                    ),
+                    style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+                ),
+                summary_adj_results,
+                style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+            ),
+
+            # 5C. Master Full Report (All 11 Sheets)
+            ui.div(
+                ui.div(
+                    ui.h4("🏆 Download Full Master Report (All 11 Sheets)", style="font-size: 16px; font-weight: 800; color: #065F46; margin: 0;"),
+                    ui.download_button(
+                        "btn_dl_so_master_all",
+                        ui.tags.span(ui.tags.i(class_="fa-solid fa-file-excel", style="margin-right: 8px; font-size: 16px;"), "DOWNLOAD FULL SO ANALYZER REPORT (.XLSX)"),
+                        style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; font-weight: 800; border-radius: 8px; border: none; padding: 12px 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);"
+                    ),
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%;"
+                ),
+                style="background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;"
+            )
+        )
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_so_step6_miss)
+    def _proc_so_step6_miss():
+        succ, msg = state.run_so_step6_miss_loc()
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="Miss_Location_Report_SO.xlsx")
+    def btn_dl_so_miss_loc():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_miss_loc.to_excel(writer, sheet_name='DETAIL_MISS_LOC', index=False)
+            state._raw_df_so_sum_miss.to_excel(writer, sheet_name='SUMMARY', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @reactive.Effect
+    @reactive.event(input.btn_run_so_step6_adj)
+    def _proc_so_step6_adj():
+        f_p = input.so_up_adj_plus()
+        f_m = input.so_up_adj_minus()
+        succ, msg = state.run_so_step6_summary_adj(f_p, f_m)
+        if succ: state.show_success_modal.set(True)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+
+    @render.download(filename="Master_Adjustment_Report.xlsx")
+    def btn_dl_so_adj_master():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._raw_df_so_adj_detail.to_excel(writer, sheet_name='DETAIL_DATA', index=False)
+            state._raw_df_so_adj_sum.to_excel(writer, sheet_name='SUMMARY_ADJUSTMENT', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    @render.download(filename="FULL_SO_ANALYZER_REPORT.xlsx")
+    def btn_dl_so_master_all():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            if not state._raw_df_so_scan.empty: state._raw_df_so_scan.to_excel(writer, sheet_name='1_DATA SCAN', index=False)
+            if not state._raw_df_so_stock.empty: state._raw_df_so_stock.to_excel(writer, sheet_name='2_STOCK SYSTEM', index=False)
+            if not state._raw_df_so_real_plus.empty: state._raw_df_so_real_plus.to_excel(writer, sheet_name='3_REAL PLUS', index=False)
+            if not state._raw_df_so_sys_plus.empty: state._raw_df_so_sys_plus.to_excel(writer, sheet_name='4_SYSTEM PLUS', index=False)
+            if not state._raw_df_so_setup_real.empty: state._raw_df_so_setup_real.to_excel(writer, sheet_name='5_SET UP REAL PLUS', index=False)
+            if not state._raw_df_so_rec_real.empty: state._raw_df_so_rec_real.to_excel(writer, sheet_name='6_REAL PLUS RECON', index=False)
+            if not state._raw_df_so_rec_sys.empty: state._raw_df_so_rec_sys.to_excel(writer, sheet_name='7_SYSTEM OUTSTANDING', index=False)
+            if not state._raw_df_so_mult.empty: state._raw_df_so_mult.to_excel(writer, sheet_name='8_MULTIPLE ADJ PLUS', index=False)
+            if not state._raw_df_so_sing.empty: state._raw_df_so_sing.to_excel(writer, sheet_name='9_SINGLE ADJ PLUS', index=False)
+            if not state._raw_df_so_res4.empty: state._raw_df_so_res4.to_excel(writer, sheet_name='10_HASIL CEK ADJ', index=False)
+            if not state._raw_df_so_karantina.empty: state._raw_df_so_karantina.to_excel(writer, sheet_name='11_KARANTINA', index=False)
         buf.seek(0)
         yield buf.getvalue()
 

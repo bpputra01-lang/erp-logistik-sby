@@ -771,7 +771,57 @@ def compare_rto_view(state: AppState):
         ui.output_ui("rto_step4_card_ui"),
         style="width: 100%; padding: 1rem;"
     )
+# ==============================================================================
+# VIEW STOCK OPNAME ANALYZER (LENGKAP 6 STEP)
+# ==============================================================================
+def stock_opname_view(state: AppState):
+    list_sub_kat = ["BAG", "BALL", "BASELAYER", "BOTTLE", "CLEANNING & CARE", "EXTRA SHOES", "HARDWARE", "JACKET", "JERSEY", "LOWER BODY", "NUTRITION", "OTHER", "OTHERS", "PANTS", "RACKET", "SANDALS", "SET APPAREL", "SHIRT", "SHOES", "SHORT", "SWLM", "UKNOWN SC", "UNDERLAYER", "UPPER BODY"]
+    list_bin_cov = ["KARANTINA", "STAGGING", "STAGING", "GUDANG LT.2", "TOKO", "GL1-DC", "RAK ACC LT.1", "GL3-DC-A", "GL3-DC-B", "GL3-DC-C", "GL3-DC-D", "GL3-DC-E", "GL3-DC-F", "GL3-DC-G", "GL3-DC-H", "GL3-DC-I", "GL3-DC-J", "GL4-DC-A", "GL4-DC-B", "GL4-DC-KL1", "GL4-DC-KL2", "GL3-DC-RAK", "GL4-DC-RAK", "LIVE", "MARKOM", "AMP", "GL2-STORE", "PUTAWAY", "OUT", "INB"]
 
+    # Filter Section (Baris 1 Cabang, Baris 2 Sub Kat, BIN Sys, BIN Cov)
+    filter_section = ui.div(
+        ui.div(
+            ui.input_select("so_branch", "🏢 Pilih Cabang / Branch:", choices=list(BRANCH_BIN_MAPPING.keys()), selected="SURABAYA", width="100%"),
+            style="width: 100%; margin-bottom: 1rem;"
+        ),
+        ui.div(
+            ui.div(ui.input_selectize("so_sub_kat", "📁 Sub Kategori:", choices=list_sub_kat, multiple=True, width="100%"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.output_ui("so_bin_sys_ui"), style="flex: 1; min-width: 200px;"),
+            ui.div(ui.input_selectize("so_bin_cov", "📡 BIN Coverage (Step 2):", choices=list_bin_cov, multiple=True, width="100%"), style="flex: 1; min-width: 200px;"),
+            style="display: flex; gap: 1rem; width: 100%; flex-wrap: wrap;"
+        ),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    # Step 1: Upload Data Scan & All Data Stock
+    step1_ui = ui.div(
+        ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+        ui.div(
+            custom_uploader_box("so_up_scan", "📥 DATA SCAN"),
+            custom_uploader_box("so_up_stock", "📥 STOCK SYSTEM"),
+            style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; margin-bottom: 0.5rem;"
+        ),
+        ui.div(
+            ui.tags.button(
+                ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px; font-size: 14px;"), "RUN COMPARE"),
+                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_so_step1', Math.random(), {priority: 'event'});",
+                class_="btn-red-gradient"
+            ),
+            style="display: flex; justify-content: flex-end; width: 100%; margin-top: 0.5rem;"
+        ),
+        ui.output_ui("so_step1_results_ui"),
+        style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+    )
+
+    return ui.div(
+        filter_section,
+        step1_ui,
+        ui.output_ui("so_step2_card_ui"),
+        ui.output_ui("so_step4_card_ui"),
+        ui.output_ui("so_step5_card_ui"),
+        ui.output_ui("so_step6_card_ui"),
+        style="width: 100%; padding: 1rem;"
+    )
 
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
