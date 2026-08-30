@@ -21,8 +21,11 @@ def get_image_base64(filename):
 # ==============================================================================
 # CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK ANTI-LONCAT)
 # ==============================================================================
+# ==============================================================================
+# CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN USER-INTENT SCROLL GUARD)
+# ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- SCRIPT KUNCI SCROLL ELEMEN AKTIF & PAGINASI ---
+    # --- 1. SCRIPT UTAMA: JUDUL, FAVICON, PAGINASI, DRAG & DROP, & SCROLL GUARD ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -127,54 +130,71 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 100% ROCK-SOLID ELEMENT ANCHOR SCROLL LOCK ---
-        let lockedScrollY = 0;
-        let activeTargetElement = null;
+        // --- 100% ROCK-SOLID USER-INTENT SCROLL GUARD (ANTI-LONCAT KE ATAS) ---
+        let userExactScrollY = 0;
+        let isUserActuallyScrolling = false;
+        let userActionTimeout = null;
 
-        document.addEventListener('click', function(e) {
-            let targetCard = e.target.closest('.step-card-box, .reflex-upload-container, .btn-red-gradient, .btn-locked');
-            if (targetCard) {
-                activeTargetElement = targetCard;
-                let sc = document.getElementById("main-scroll-container");
-                if (sc) lockedScrollY = sc.scrollTop;
+        function getScrollContainer() {
+            return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
+        }
+
+        function flagUserInteraction() {
+            isUserActuallyScrolling = true;
+            clearTimeout(userActionTimeout);
+            userActionTimeout = setTimeout(function() {
+                isUserActuallyScrolling = false;
+            }, 350);
+        }
+
+        // Tangkap hanya pergerakan fisik asli dari user (Wheel, Touch, Keydown, Click)
+        window.addEventListener('wheel', flagUserInteraction, { passive: true, capture: true });
+        window.addEventListener('touchmove', flagUserInteraction, { passive: true, capture: true });
+        window.addEventListener('mousedown', flagUserInteraction, { passive: true, capture: true });
+        window.addEventListener('keydown', function(e) {
+            if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Space', 'Home', 'End'].includes(e.code)) {
+                flagUserInteraction();
+            }
+        }, { passive: true, capture: true });
+
+        // Simpan posisi scroll HANYA jika digeser secara sadar oleh user
+        document.addEventListener("scroll", function(e) {
+            let sc = getScrollContainer();
+            if (sc && isUserActuallyScrolling && sc.scrollTop > 0) {
+                userExactScrollY = sc.scrollTop;
             }
         }, true);
 
-        document.addEventListener('change', function(e) {
-            let targetCard = e.target.closest('.step-card-box, .reflex-upload-container');
-            if (targetCard) {
-                activeTargetElement = targetCard;
-                let sc = document.getElementById("main-scroll-container");
-                if (sc) lockedScrollY = sc.scrollTop;
-            }
-        }, true);
-
-        function maintainActiveScroll() {
-            let sc = document.getElementById("main-scroll-container");
+        // Kunci dan tahan posisi scroll saat upload/render Shiny berjalan
+        function forceHoldScroll() {
+            let sc = getScrollContainer();
             if (!sc) return;
-            if (activeTargetElement && document.body.contains(activeTargetElement)) {
-                activeTargetElement.scrollIntoView({ behavior: 'auto', block: 'nearest' });
-            } else if (lockedScrollY > 0) {
-                sc.scrollTop = lockedScrollY;
+
+            // Jika posisi layar anjlok ke 0 padahal user tidak menggeser ke 0 secara sadar:
+            if (!isUserActuallyScrolling && userExactScrollY > 0 && sc.scrollTop === 0) {
+                sc.scrollTop = userExactScrollY;
             }
         }
 
-        let observer = new MutationObserver(function() {
-            maintainActiveScroll();
+        let scrollObserver = new MutationObserver(function() {
+            forceHoldScroll();
         });
 
         document.addEventListener("DOMContentLoaded", function() {
-            let sc = document.getElementById("main-scroll-container");
+            let sc = getScrollContainer();
             if (sc) {
-                observer.observe(sc, { childList: true, subtree: true });
+                scrollObserver.observe(sc, { childList: true, subtree: true });
             }
         });
 
-        setInterval(maintainActiveScroll, 100);
+        // Loop penjaga posisi setiap 30ms (Sangat halus tanpa lag)
+        setInterval(forceHoldScroll, 30);
     """),
 
-    # Library icon & CSS tetap di bawahnya
+    # --- 2. FONT AWESOME ICONS ---
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
+
+    # --- 3. CSS STYLING LENGKAP ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
@@ -265,7 +285,7 @@ CUSTOM_HEAD = ui.head_content(
         .csv-batch-box .progress { display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; }
 
         .csv-batch-box {
-            border: 2px dashed #E50914 !important; border-radius: 12px; background: #FFF5F5;
+            border: 2px dashed #000000 !important; border-radius: 12px; background: #FFF5F5;
             padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
