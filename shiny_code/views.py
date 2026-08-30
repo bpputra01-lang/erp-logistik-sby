@@ -116,6 +116,15 @@ CUSTOM_HEAD = ui.head_content(
         summary { font-weight: bold; padding: 10px 14px; cursor: pointer; color: #1A202C; background: #F8FAFC; border-radius: 6px; }
         details[open] summary { border-bottom: 1px solid #E2E8F0; border-radius: 6px 6px 0 0; }
         .accordion-content { padding: 14px; font-size: 13px; color: #4A5568; background: #F7FAFC; }
+
+        /* --- MENAMBAHKAN PANAH DROPDOWN DI MULTI-SELECT SELECTIZE --- */
+        .selectize-control.multi .selectize-input {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 0.75rem center !important;
+            background-size: 14px 10px !important;
+            padding-right: 2rem !important;
+        }
     """),
     ui.tags.script("""
         setInterval(function() {
