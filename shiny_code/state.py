@@ -940,53 +940,53 @@ class AppState:
             if df_s_raw.empty or df_t_raw.empty:
                 return False, "File Data Scan dan Stock System tidak boleh kosong!"
 
-            # 1. Fast Vectorized Cleaning (Jauh Lebih Cepat dari Lambda)
+            def clean_sku_bin(series):
+                return series.astype(str).str.strip().str.upper().apply(lambda s: s[:-2] if s.endswith('.0') else s)
+
+            # Filtering Stock System
+            if sub_sel and len(sub_sel) > 0 and df_t_raw.shape[1] > 6:
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in sub_sel])]
+            if brand_sel and len(brand_sel) > 0 and df_t_raw.shape[1] > 3:
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 3].astype(str).str.upper().isin([x.upper() for x in brand_sel])]
+            if bin_sys_sel and len(bin_sys_sel) > 0 and df_t_raw.shape[1] > 1:
+                df_t_raw = df_t_raw[df_t_raw.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in bin_sys_sel))]
+
+            # 1. Compare Scan to Stock
             ds = df_s_raw.iloc[:, [0, 1, 2]].copy()
             ds.columns = ['BIN', 'SKU', 'QTY_SCAN']
-            ds['BIN'] = ds['BIN'].astype(str).str.strip().str.upper()
-            ds['SKU'] = ds['SKU'].astype(str).str.strip().str.upper()
+            dt = df_t_raw.iloc[:, [1, 2, 9]].copy()
+            dt.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
+
+            ds['BIN'], ds['SKU'] = clean_sku_bin(ds['BIN']), clean_sku_bin(ds['SKU'])
+            dt['BIN'], dt['SKU'] = clean_sku_bin(dt['BIN']), clean_sku_bin(dt['SKU'])
             ds['QTY_SCAN'] = pd.to_numeric(ds['QTY_SCAN'], errors='coerce').fillna(0)
+            dt['QTY_SYSTEM'] = pd.to_numeric(dt['QTY_SYSTEM'], errors='coerce').fillna(0)
 
-            dt = df_t_raw.copy()
-            col_b = dt.columns[1]
-            col_s = dt.columns[2]
-            col_q_sys = dt.columns[9]
-
-            # Fast Filtering
-            if sub_sel and len(sub_sel) > 0 and dt.shape[1] > 6:
-                dt = dt[dt.iloc[:, 6].astype(str).str.upper().isin([x.upper() for x in sub_sel])]
-            if brand_sel and len(brand_sel) > 0 and dt.shape[1] > 3:
-                dt = dt[dt.iloc[:, 3].astype(str).str.upper().isin([x.upper() for x in brand_sel])]
-            if bin_sys_sel and len(bin_sys_sel) > 0 and dt.shape[1] > 1:
-                dt = dt[dt.iloc[:, 1].astype(str).str.upper().apply(lambda x: any(c.upper() in x for c in bin_sys_sel))]
-
-            dt[col_b] = dt[col_b].astype(str).str.strip().str.upper()
-            dt[col_s] = dt[col_s].astype(str).str.strip().str.upper()
-            dt[col_q_sys] = pd.to_numeric(dt[col_q_sys], errors='coerce').fillna(0)
-
-            # 2. Fast Compare Scan to Stock
-            dt_sub = dt[[col_b, col_s, col_q_sys]].copy()
-            dt_sub.columns = ['BIN', 'SKU', 'QTY_SYSTEM']
-            dt_grouped = dt_sub.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
-
+            dt_grouped = dt.groupby(['BIN', 'SKU'], as_index=False)['QTY_SYSTEM'].sum()
             res_scan = ds.merge(dt_grouped, on=['BIN', 'SKU'], how='left').fillna(0)
             res_scan['DIFF'] = res_scan['QTY_SCAN'] - res_scan['QTY_SYSTEM']
             res_scan['NOTE'] = np.where(res_scan['DIFF'] > 0, "REAL +", np.where(res_scan['DIFF'] < 0, "SYSTEM +", "OK"))
 
-            # 3. Fast Compare Stock to Scan
+            # 2. Compare Stock to Scan
             ds_g = ds.groupby(['BIN', 'SKU'], as_index=False)['QTY_SCAN'].sum()
             ds_g.columns = ['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN']
+            col_b, col_s, col_q_sys = df_t_raw.columns[1], df_t_raw.columns[2], df_t_raw.columns[9]
 
-            dt_merged = dt.merge(ds_g, left_on=[col_b, col_s], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
+            dt_raw_clean = df_t_raw.copy()
+            dt_raw_clean[col_b] = clean_sku_bin(dt_raw_clean[col_b])
+            dt_raw_clean[col_s] = clean_sku_bin(dt_raw_clean[col_s])
+            dt_raw_clean[col_q_sys] = pd.to_numeric(dt_raw_clean[col_q_sys], errors='coerce').fillna(0)
+
+            dt_merged = dt_raw_clean.merge(ds_g, left_on=[col_b, col_s], right_on=['BIN_SCAN', 'SKU_SCAN'], how='left')
             dt_merged['QTY SO'] = dt_merged['QTY_TOTAL_SCAN'].fillna(0)
             dt_merged['DIFF'] = dt_merged[col_q_sys] - dt_merged['QTY SO']
             dt_merged['NOTE'] = np.where(dt_merged['DIFF'] > 0, "SYSTEM +", np.where(dt_merged['DIFF'] < 0, "REAL +", "OK"))
             res_stock = dt_merged.drop(columns=['BIN_SCAN', 'SKU_SCAN', 'QTY_TOTAL_SCAN'], errors='ignore')
 
-            # Fast Item Name Mapping
-            item_map = dt.iloc[:, [2, 4]].dropna().astype(str)
+            # Item Map
+            item_map = df_t_raw.iloc[:, [2, 4]].dropna().astype(str)
             item_map.columns = ['SKU', 'NAME']
-            item_map['SKU'] = item_map['SKU'].str.strip().str.upper()
+            item_map['SKU'] = clean_sku_bin(item_map['SKU'])
             map_dict = item_map.drop_duplicates('SKU').set_index('SKU')['NAME'].to_dict()
 
             res_scan['ITEM NAME'] = res_scan['SKU'].map(map_dict)
@@ -998,26 +998,31 @@ class AppState:
             self.cca_qty_real_plus.set(int(real_plus['DIFF'].sum()) if not real_plus.empty else 0)
             self.cca_qty_sys_plus.set(int(system_plus['DIFF'].sum()) if not system_plus.empty else 0)
 
+            # Simpan 100% Data Utuh untuk Download Excel
             self._raw_df_cca_scan = res_scan
             self._raw_df_cca_stock = res_stock
             self._raw_df_cca_real_plus = real_plus
             self._raw_df_cca_sys_plus = system_plus
             self._cca_map_dict = map_dict
 
+            # Kirim data ke UI (Hanya preview 100 baris pertama agar browser tidak lemot)
             self.df_cca_scan_headers.set(res_scan.columns.tolist())
-            self.df_cca_scan_rows.set(res_scan.fillna("").astype(str).values.tolist())
+            self.df_cca_scan_rows.set(res_scan.head(100).fillna("").astype(str).values.tolist())
+            
             self.df_cca_stock_headers.set(res_stock.columns.tolist())
-            self.df_cca_stock_rows.set(res_stock.fillna("").astype(str).values.tolist())
+            self.df_cca_stock_rows.set(res_stock.head(100).fillna("").astype(str).values.tolist())
+            
             self.df_cca_real_headers.set(real_plus.columns.tolist())
-            self.df_cca_real_rows.set(real_plus.fillna("").astype(str).values.tolist())
+            self.df_cca_real_rows.set(real_plus.head(100).fillna("").astype(str).values.tolist())
+            
             self.df_cca_sys_headers.set(system_plus.columns.tolist())
-            self.df_cca_sys_rows.set(system_plus.fillna("").astype(str).values.tolist())
+            self.df_cca_sys_rows.set(system_plus.head(100).fillna("").astype(str).values.tolist())
 
             self.cca_step1_done.set(True)
             return True, "Compare Step 1 Berhasil!"
         except Exception as e:
             return False, f"Gagal Compare Step 1: {e}"
-
+            
     def run_cca_step2(self, f_bin_cov, selected_bin_cov):
         try:
             if self._raw_df_cca_real_plus.empty or self._raw_df_cca_sys_plus.empty:

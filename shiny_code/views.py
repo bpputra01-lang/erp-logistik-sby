@@ -181,12 +181,28 @@ def dark_metric_box(title: str, val_str: str, border_color: str):
         style=f"background: #1A1A1A; padding: 1rem; border-radius: 8px; border-left: 4px solid {border_color}; width: 100%; text-align: center;"
     )
 
-def render_clean_table(headers: list, rows: list):
+def render_clean_table(headers: list, rows: list, max_display: int = 100):
     if not rows or len(rows) == 0:
         return ui.div(ui.div("Tidak ada data untuk ditampilkan.", style="color: #718096; padding: 1.5rem; font-style: italic; text-align: center;"), style="background: white; border-radius: 8px; border: 1px solid #E2E8F0; width: 100%;")
+    
+    total_rows = len(rows)
+    display_rows = rows[:max_display]  # Batasi render HTML ke 100 baris agar instan 0.1 detik
+    
     th_cells = [ui.tags.th(str(h)) for h in headers]
-    tr_rows = [ui.tags.tr(*[ui.tags.td(str(c)) for c in r]) for r in rows]
-    return ui.div(ui.tags.table(ui.tags.thead(ui.tags.tr(*th_cells)), ui.tags.tbody(*tr_rows), class_="custom-clean-table"), style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;")
+    tr_rows = [ui.tags.tr(*[ui.tags.td(str(c)) for c in r]) for r in display_rows]
+    
+    footer_info = ui.div()
+    if total_rows > max_display:
+        footer_info = ui.div(
+            f"ℹ️ Menampilkan {max_display} dari total {total_rows:,} baris data (Gunakan tombol Download Excel untuk melihat 100% seluruh data).",
+            style="color: #718096; font-size: 12px; font-style: italic; padding: 8px 12px; background: #F8FAFC; border-top: 1px solid #E2E8F0;"
+        )
+
+    return ui.div(
+        ui.tags.table(ui.tags.thead(ui.tags.tr(*th_cells)), ui.tags.tbody(*tr_rows), class_="custom-clean-table"),
+        footer_info,
+        style="overflow-x: auto; width: 100%; background: white; border-radius: 8px; padding: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;"
+    )
 
 def success_modal(show: bool):
     if not show: return ui.div()
@@ -445,7 +461,7 @@ def cycle_count_analyzer_view(state: AppState):
         ui.output_ui("cca_dynamic_steps_ui"),
         style="width: 100%; padding: 1rem;"
     )
-    
+
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
