@@ -22,7 +22,7 @@ def get_image_base64(filename):
 # CSS & JAVASCRIPT ASSETS (LENGKAP DENGAN SMART SCROLL LOCK ANTI-LONCAT)
 # ==============================================================================
 CUSTOM_HEAD = ui.head_content(
-    # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, & SCROLL LOCK ANTI-LONCAT) ---
+    # --- SCRIPT KUNCI SCROLL ELEMEN AKTIF & PAGINASI ---
     ui.tags.script("""
         document.title = "ZKN WAREHOUSE ERP";
         let favicon = document.querySelector("link[rel~='icon']");
@@ -127,60 +127,54 @@ CUSTOM_HEAD = ui.head_content(
             }
         });
 
-        // --- 100% BULLETPROOF SMART SCROLL LOCK (ANTI-LONCAT KE ATAS) ---
-        let lastUserScrollY = 0;
-        let isManualScroll = false;
-        let scrollDebounce = null;
+        // --- 100% ROCK-SOLID ELEMENT ANCHOR SCROLL LOCK ---
+        let lockedScrollY = 0;
+        let activeTargetElement = null;
 
-        function getScrollPanel() {
-            return document.getElementById("main-scroll-container") || document.querySelector('div[style*="overflow-y: auto"]');
-        }
-
-        // Catat posisi scroll aktual yang digeser oleh user
-        document.addEventListener("scroll", function(e) {
-            let panel = getScrollPanel();
-            if (panel && (e.target === panel || e.target === document)) {
-                lastUserScrollY = panel.scrollTop;
-                isManualScroll = true;
-                clearTimeout(scrollDebounce);
-                scrollDebounce = setTimeout(function() {
-                    isManualScroll = false;
-                }, 150);
+        document.addEventListener('click', function(e) {
+            let targetCard = e.target.closest('.step-card-box, .reflex-upload-container, .btn-red-gradient, .btn-locked');
+            if (targetCard) {
+                activeTargetElement = targetCard;
+                let sc = document.getElementById("main-scroll-container");
+                if (sc) lockedScrollY = sc.scrollTop;
             }
         }, true);
 
-        // Kunci dan pulihkan posisi scroll setiap kali ada perubahan file / DOM di Shiny
-        function lockAndRestoreScroll() {
-            let panel = getScrollPanel();
-            if (panel && lastUserScrollY > 0 && !isManualScroll) {
-                panel.scrollTop = lastUserScrollY;
+        document.addEventListener('change', function(e) {
+            let targetCard = e.target.closest('.step-card-box, .reflex-upload-container');
+            if (targetCard) {
+                activeTargetElement = targetCard;
+                let sc = document.getElementById("main-scroll-container");
+                if (sc) lockedScrollY = sc.scrollTop;
+            }
+        }, true);
+
+        function maintainActiveScroll() {
+            let sc = document.getElementById("main-scroll-container");
+            if (!sc) return;
+            if (activeTargetElement && document.body.contains(activeTargetElement)) {
+                activeTargetElement.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+            } else if (lockedScrollY > 0) {
+                sc.scrollTop = lockedScrollY;
             }
         }
 
-        // Monitor otomatis setiap kali tombol berubah / file selesai dipilih
-        let scrollObserver = new MutationObserver(function() {
-            lockAndRestoreScroll();
+        let observer = new MutationObserver(function() {
+            maintainActiveScroll();
         });
 
         document.addEventListener("DOMContentLoaded", function() {
-            let panel = getScrollPanel();
-            if (panel) {
-                scrollObserver.observe(panel, { childList: true, subtree: true });
+            let sc = document.getElementById("main-scroll-container");
+            if (sc) {
+                observer.observe(sc, { childList: true, subtree: true });
             }
         });
 
-        setInterval(function() {
-            let panel = getScrollPanel();
-            if (panel && lastUserScrollY > 0 && panel.scrollTop === 0 && !isManualScroll) {
-                panel.scrollTop = lastUserScrollY;
-            }
-        }, 50);
+        setInterval(maintainActiveScroll, 100);
     """),
 
-    # --- 2. FONT AWESOME ICONS ---
+    # Library icon & CSS tetap di bawahnya
     ui.tags.link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"),
-
-    # --- 3. CSS STYLING LENGKAP ---
     ui.tags.style("""
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100%; width: 100%; overflow-x: hidden; background-color: #111318; margin: 0; padding: 0; }
@@ -271,7 +265,7 @@ CUSTOM_HEAD = ui.head_content(
         .csv-batch-box .progress { display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; opacity: 0 !important; }
 
         .csv-batch-box {
-            border: 2px dashed #000000 !important; border-radius: 12px; background: #FFF5F5;
+            border: 2px dashed #E50914 !important; border-radius: 12px; background: #FFF5F5;
             padding: 2rem 1.5rem; width: 100%; text-align: center; margin-bottom: 1.25rem;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
@@ -663,7 +657,7 @@ def cycle_count_analyzer_view(state: AppState):
         style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
-    # Step 1 Selalu Muncul
+    # Step 1
     step1_ui = ui.div(
         ui.h4("1️⃣ Upload Data Scan & All Data Stock", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
         ui.div(
@@ -673,17 +667,21 @@ def cycle_count_analyzer_view(state: AppState):
         ),
         ui.output_ui("cca_step1_btn_ui"),
         ui.output_ui("cca_step1_results_ui"),
+        class_="step-card-box",
         style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
     )
 
-    # Step 2 sampai 6 dirender secara dinamis bertahap
+    # Setiap Step Mandiri Tidak Tergabung
     return ui.div(
         filter_section,
         step1_ui,
-        ui.output_ui("cca_dynamic_steps_ui"),
+        ui.output_ui("cca_step2_card_ui"),
+        ui.output_ui("cca_step4_card_ui"),
+        ui.output_ui("cca_step5_card_ui"),
+        ui.output_ui("cca_step6_card_ui"),
         style="width: 100%; padding: 1rem;"
     )
-
+    
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
     is_active = (current_menu == target_menu)
