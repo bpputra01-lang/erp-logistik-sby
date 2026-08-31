@@ -606,54 +606,7 @@ def putaway_view(state: AppState):
 # ==============================================================================
 # VIEW 4: DATABASE ONGKIR (MAIN DASHBOARD)
 # ==============================================================================
-def main_dashboard_view(state: AppState):
-    STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
-    tab1_content = ui.div(
-        ui.div(
-            ui.div(ui.span("📝", style="font-size: 20px; margin-right: 8px;"), ui.h4("Input Transaksi Manual", style="font-size: 16px; font-weight: bold; color: #1A202C; margin: 0;"), style="display: flex; align-items: center; margin-bottom: 0.75rem;"),
-            ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
-            ui.div(ui.span("NAMA SUPPLIER", style=STYLE_LABEL_CSS), ui.tags.input(id="input_supplier", type="text", placeholder="Masukkan Nama Supplier...", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="margin-bottom: 0.75rem; width: 100%;"),
-            ui.div(ui.div(ui.span("EKSPEDISI", style=STYLE_LABEL_CSS), ui.tags.input(id="input_ekspedisi", type="text", placeholder="Nama Ekspedisi...", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="flex: 1; margin-right: 8px;"), ui.div(ui.span("TOTAL KOLI", style=STYLE_LABEL_CSS), ui.tags.input(id="input_koli", type="number", value="1", placeholder="Jumlah Koli", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="flex: 1;"), style="display: flex; width: 100%; margin-bottom: 0.75rem;"),
-            ui.div(ui.div(ui.span("TOTAL ONGKIR (RP)", style=STYLE_LABEL_CSS), ui.tags.input(id="input_ongkir", type="number", value="0", placeholder="Rp 0", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="flex: 1; margin-right: 8px;"), ui.div(ui.span("TANGGAL", style=STYLE_LABEL_CSS), ui.tags.input(id="input_tgl", type="date", value=datetime.now().strftime("%Y-%m-%d"), style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="flex: 1;"), style="display: flex; width: 100%; margin-bottom: 1.25rem;"),
-            ui.tags.button("🚀 SIMPAN DATA ONGKIR", onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_save_ongkir_manual', {supplier: document.getElementById('input_supplier').value, ekspedisi: document.getElementById('input_ekspedisi').value, koli: document.getElementById('input_koli').value, ongkir: document.getElementById('input_ongkir').value, tgl: document.getElementById('input_tgl').value}, {priority: 'event'});", class_="btn-red-gradient", style="width: 100%; height: 48px; font-size: 14px;"),
-            style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
-        ),
-        ui.div(
-            ui.div(ui.span("📁", style="font-size: 20px; margin-right: 8px;"), ui.h4("Batch CSV Upload", style="font-size: 16px; font-weight: bold; color: #1A202C; margin: 0;"), style="display: flex; align-items: center; margin-bottom: 0.75rem;"),
-            ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
-            ui.div(ui.div(ui.span("☁️", style="font-size: 24px;"), style="padding: 10px; background: #E2E8F0; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;"), ui.span("atau tarik & lepaskan file CSV di sini", style="font-size: 13px; color: #4A5568; font-weight: bold; margin-bottom: 10px;"), ui.input_file("upload_csv_batch", None, accept=[".csv"], multiple=False, button_label="Pilih File CSV", placeholder="Pilih file CSV..."), class_="csv-batch-box"),
-            ui.tags.button("⚡ EXECUTE BATCH UPLOAD", onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_execute_batch_upload', Math.random(), {priority: 'event'});", style="background: #1A202C; color: #FFFFFF !important; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); width: 100%; height: 48px; border: none; font-size: 14px;"),
-            style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
-        ), style="display: flex; flex-wrap: wrap; gap: 1.25rem; width: 100%; margin-top: 1.5rem;"
-    )
-
-    selected_count = len(state.selected_ids())
-    del_btn_ui = ui.tags.button(f"🗑️ HAPUS ({selected_count}) DATA", onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;") if selected_count > 0 else ui.div()
-    
-    # Opsi Dropdown Ekspedisi & Periode
-    select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in state.get_list_ekspedisi_options()]
-    
-    periode_pilihan = [
-        ("SEMUA", "Semua Waktu"),
-        ("HARI INI", "Hari Ini"),
-        ("7 HARI TERAKHIR", "7 Hari Terakhir"),
-        ("BULAN INI", "Bulan Ini"),
-        ("BULAN LALU", "Bulan Lalu")
-    ]
-    select_periode_options = [
-        ui.tags.option(label, value=val, selected=(val == state.filter_periode())) 
-        for val, label in periode_pilihan
-    ]
-
-    table_rows = [
-        ui.tags.tr(
-            ui.tags.td(ui.tags.input(type="checkbox", checked=(str(r.get("id", "")) in set(state.selected_ids())), onchange=f"Shiny.setInputValue('toggle_row_id', '{r.get('id', '')}', {{priority: 'event'}})")),
-            ui.tags.td(str(r.get("created_at", r.get("tanggal", "")))), ui.tags.td(str(r.get("supplier", ""))), ui.tags.td(str(r.get("ekspedisi", ""))),
-            ui.tags.td(str(safe_int(r.get("total_koli", r.get("koli", 0))))), ui.tags.td(f"Rp {safe_int(r.get('total_ongkir', 0)):,}")
-        ) for r in state.get_filtered_ongkir()
-    ]
-
- def ongkir_tab2_view(state: AppState):
+def ongkir_tab2_view(state: AppState):
     selected_count = len(state.selected_ids())
     del_btn_ui = ui.tags.button(f"🗑️ HAPUS ({selected_count}) DATA", onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;") if selected_count > 0 else ui.div()
     
@@ -706,9 +659,31 @@ def main_dashboard_view(state: AppState):
             metric_box("🔄 BIAYA RTO", state.metric_biaya_rto(), "#9B2C2C", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
             style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.5rem;"
         ),
-        ui.div(ui.tags.table(ui.tags.thead(ui.tags.tr(ui.tags.th("SELECT", style="text-align: center;"), ui.tags.th("TANGGAL"), ui.tags.th("SUPPLIER"), ui.tags.th("EKSPEDISI"), ui.tags.th("KOLI"), ui.tags.th("TOTAL ONGKIR")), style="background-color: #CBD5E0 !important;"), ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(ui.tags.td("Tidak ada transaksi ongkir.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")), class_="custom-clean-table"), style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.03); overflow-x: auto;"),
+        ui.div(ui.tags.table(ui.tags.thead(ui.tags.tr(ui.tags.th("SELECT", style="text-align: center;"), ui.tags.th("TANGGAL"), ui.tags.th("SUPPLIER"), ui.tags.th("EKSPEDISI"), ui.tags.th("KOLI"), ui.tags.th("TOTAL ONGKIR")), style="background-color: #CBD5E0 !important;"), ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(ui.tags.td("Tidak ada transaksi ongkir.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")), class_="custom-clean-table"), style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"),
         style="width: 100%;"
     )
+
+def main_dashboard_view(state: AppState):
+    STYLE_LABEL_CSS = "font-size: 11px; font-weight: 800; color: #1A202C; margin-bottom: 2px; letter-spacing: 0.5px; display: block;"
+    tab1_content = ui.div(
+        ui.div(
+            ui.div(ui.span("📝", style="font-size: 20px; margin-right: 8px;"), ui.h4("Input Transaksi Manual", style="font-size: 16px; font-weight: bold; color: #1A202C; margin: 0;"), style="display: flex; align-items: center; margin-bottom: 0.75rem;"),
+            ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
+            ui.div(ui.span("NAMA SUPPLIER", style=STYLE_LABEL_CSS), ui.tags.input(id="input_supplier", type="text", placeholder="Masukkan Nama Supplier...", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="margin-bottom: 0.75rem; width: 100%;"),
+            ui.div(ui.div(ui.span("EKSPEDISI", style=STYLE_LABEL_CSS), ui.tags.input(id="input_ekspedisi", type="text", placeholder="Nama Ekspedisi...", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="flex: 1; margin-right: 8px;"), ui.div(ui.span("TOTAL KOLI", style=STYLE_LABEL_CSS), ui.tags.input(id="input_koli", type="number", value="1", placeholder="Jumlah Koli", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="flex: 1;"), style="display: flex; width: 100%; margin-bottom: 0.75rem;"),
+            ui.div(ui.div(ui.span("TOTAL ONGKIR (RP)", style=STYLE_LABEL_CSS), ui.tags.input(id="input_ongkir", type="number", value="0", placeholder="Rp 0", style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="flex: 1; margin-right: 8px;"), ui.div(ui.span("TANGGAL", style=STYLE_LABEL_CSS), ui.tags.input(id="input_tgl", type="date", value=datetime.now().strftime("%Y-%m-%d"), style="background-color: #FFFFFF; color: #111111; border: 2px solid #4A5568; border-radius: 8px; font-weight: 600; padding: 0.6rem 0.8rem; width: 100%; outline: none;"), style="flex: 1;"), style="display: flex; width: 100%; margin-bottom: 1.25rem;"),
+            ui.tags.button("🚀 SIMPAN DATA ONGKIR", onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_save_ongkir_manual', {supplier: document.getElementById('input_supplier').value, ekspedisi: document.getElementById('input_ekspedisi').value, koli: document.getElementById('input_koli').value, ongkir: document.getElementById('input_ongkir').value, tgl: document.getElementById('input_tgl').value}, {priority: 'event'});", class_="btn-red-gradient", style="width: 100%; height: 48px; font-size: 14px;"),
+            style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
+        ),
+        ui.div(
+            ui.div(ui.span("📁", style="font-size: 20px; margin-right: 8px;"), ui.h4("Batch CSV Upload", style="font-size: 16px; font-weight: bold; color: #1A202C; margin: 0;"), style="display: flex; align-items: center; margin-bottom: 0.75rem;"),
+            ui.hr(style="border-color: #CBD5E0; margin-bottom: 1rem;"),
+            ui.div(ui.div(ui.span("☁️", style="font-size: 24px;"), style="padding: 10px; background: #E2E8F0; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;"), ui.span("atau tarik & lepaskan file CSV di sini", style="font-size: 13px; color: #4A5568; font-weight: bold; margin-bottom: 10px;"), ui.input_file("upload_csv_batch", None, accept=[".csv"], multiple=False, button_label="Pilih File CSV", placeholder="Pilih file CSV..."), class_="csv-batch-box"),
+            ui.tags.button("⚡ EXECUTE BATCH UPLOAD", onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_execute_batch_upload', Math.random(), {priority: 'event'});", style="background: #1A202C; color: #FFFFFF !important; font-weight: 800; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); width: 100%; height: 48px; border: none; font-size: 14px;"),
+            style="background: #FFFFFF; border-radius: 16px; border: 2px solid #CBD5E0; box-shadow: 0 10px 25px rgba(0,0,0,0.03); padding: 1.8rem; flex: 1; min-width: 320px;"
+        ), style="display: flex; flex-wrap: wrap; gap: 1.25rem; width: 100%; margin-top: 1.5rem;"
+    )
+
     return ui.div(
         ui.navset_card_tab(
             ui.nav_panel("📥 INPUT & BATCH DATA", tab1_content), 
