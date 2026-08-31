@@ -550,10 +550,10 @@ def server(input: Inputs, output: Outputs, session: Session):
                 ui.nav_panel("JUSTIFIKASI", ui.div(ui.div(ui.download_button("btn_dl_justifikasi", ui.tags.span(ui.tags.i(class_="fa-solid fa-download", style="margin-right: 6px; font-size: 14px;"), "Download Excel"), style="background-color: #10B981; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 6px 14px; cursor: pointer;"), style="display: flex; justify-content: flex-end; width: 100%; margin-bottom: 0.5rem;"), render_clean_table(state.df_need_adj_headers(), state.df_need_adj_rows()), style="padding: 0.75rem 0;"))
             ), style="width: 100%;"
         )
-        
+
     @render.ui
     def ongkir_tab2_dynamic_ui():
-    return ongkir_tab2_view(state)
+        return ongkir_tab2_view(state)
 
     @render.ui
     def putaway_results_container():
