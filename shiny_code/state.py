@@ -614,8 +614,8 @@ class AppState:
             import json
             from config import SUPABASE_URL, SUPABASE_KEY
             
-            # URL Edge Function Supabase yang baru saja Anda buat
-            edge_url = f"{SUPABASE_URL}/functions/v1/sync-jezpro"
+            # GANTI MENJADI smart-handler SESUAI LINK ASLI SUPABASE ANDA:
+            edge_url = f"{SUPABASE_URL}/functions/v1/smart-handler"
             
             req = urllib.request.Request(
                 edge_url,
@@ -629,7 +629,6 @@ class AppState:
             with urllib.request.urlopen(req, timeout=90) as resp:
                 excel_bytes = resp.read()
                 
-            # Cek jika terjadi error dari scraper
             if excel_bytes.startswith(b'{"error"'):
                 err_json = json.loads(excel_bytes.decode('utf-8', errors='ignore'))
                 return False, f"Gagal dari Jezpro: {err_json.get('error')}"
@@ -641,6 +640,8 @@ class AppState:
             return self.process_stock_minus_file(excel_bytes, "Stock_Minus_Jezpro.xlsx")
         except Exception as e:
             return False, f"Gagal menarik data Jezpro: {e}"
+
+            
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
         try:
