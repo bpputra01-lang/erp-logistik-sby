@@ -608,32 +608,80 @@ class AppState:
             return True, "Data Stock Minus berhasil diproses!"
         except Exception as e: return False, f"Gagal memproses file: {e}"
         
-    def sync_stock_minus_via_google_sheets(self):
+    def fetch_stock_minus_from_supabase_table(self):
         try:
-            import urllib.request
-            import io
+            from config import get_supabase
             import pandas as pd
 
-            # =========================================================================
-            # MASUKKAN URL HASIL DEPLOY APPS SCRIPT ANDA DI SINI (Berakhiran /exec):
-            # =========================================================================
-            APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw6rxxxxxxxxxxxxxx/exec"
-            
-            req = urllib.request.Request(
-                APPS_SCRIPT_URL,
-                headers={"User-Agent": "Mozilla/5.0"}
-            )
-            
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                csv_bytes = resp.read()
-                
-            if not csv_bytes or csv_bytes.startswith(b"ERROR:"):
-                return False, f"Gagal membaca sheet: {csv_bytes.decode('utf-8', errors='ignore')}"
-                
-            # Langsung olah data ke fungsi Stock Minus
-            return self.process_stock_minus_file(csv_bytes, "Stock_Minus_GoogleSheets.csv")
+            client = get_supabase()
+            # Tarik data dari tabel jezpro_stock yang diisi Google Sheet
+            res = client.table("jezpro_stock").select("bin, sku, qty_system").execute()
+
+            if not res.data or len(res.data) == 0:
+                return False, "Data stok di Supabase masih kosong! Pastikan Google Sheet sudah dikirim."
+
+            # Ubah data Supabase ke DataFrame
+            df = pd.DataFrame(res.data)
+            df.columns = ["BIN", "SKU", "QTY SYSTEM"]
+            df["QTY SYSTEM"] = pd.to_numeric(df["QTY SYSTEM"], errors="coerce").fillna(0)
+
+            # Langsung olah data ke algoritma Stock Minus
+            df_minus_awal = df[df["QTY SYSTEM"] < 0].copy()
+            df_positif = df[df["QTY SYSTEM"] > 0].copy()
+
+            inventory = {}
+            for _, row in df_positif.iterrows():
+                sku, bn, qt = row["SKU"], row["BIN"], row["QTY SYSTEM"]
+                if sku not in inventory: inventory[sku] = {}
+                inventory[sku][bn] = inventory[sku].get(bn, 0) + qt
+
+            prior_bins = ["RAK ACC LT.1", "STAGGING INBOUND", "STAGGING OUTBOUND", "KARANTINA DC", "KARANTINA STORE 02", "STAGGING REFUND", "STAGING GAGAL QC", "STAGGING LT.3", "STAGGING OUTBOUND SEMARANG", "STAGGING OUTBOUND SIDOARJO", "STAGGING LT.2", "LT.4"]
+            set_up_results, df_need_adj_list = [], []
+
+            for _, row in df_minus_awal.iterrows():
+                sku, bin_asal = row["SKU"], row["BIN"]
+                sisa_minus = abs(row["QTY SYSTEM"])
+                if sku in inventory and any(v > 0 for v in inventory[sku].values()):
+                    sku_stock = inventory[sku]
+                    while sisa_minus > 0:
+                        bin_solusi = ""
+                        if bin_asal == "TOKO":
+                            if sku_stock.get("STAGGING LT.2", 0) > 0: bin_solusi = "STAGGING LT.2"
+                            elif sku_stock.get("LT.2", 0) > 0: bin_solusi = "LT.2"
+                        elif bin_asal in ["STAGGING LT.2", "LT.2"] and sku_stock.get("TOKO", 0) > 0: bin_solusi = "TOKO"
+                        if not bin_solusi:
+                            for b in prior_bins:
+                                if sku_stock.get(b, 0) > 0: bin_solusi = b; break
+                        if not bin_solusi:
+                            for b, q in sku_stock.items():
+                                if b != "REJECT DEFECT" and q > 0: bin_solusi = b; break
+                        if not bin_solusi: break
+                        else:
+                            qty_tersedia = sku_stock[bin_solusi]
+                            ambil = min(sisa_minus, qty_tersedia)
+                            set_up_results.append({"BIN AWAL": bin_solusi, "BIN TUJUAN": bin_asal, "SKU": sku, "QUANTITY": ambil, "NOTES": "STOCK MINUS"})
+                            sku_stock[bin_solusi] -= ambil
+                            sisa_minus -= ambil
+                if sisa_minus > 0:
+                    row_adj = row.to_dict()
+                    row_adj["QTY SYSTEM"] = -sisa_minus
+                    df_need_adj_list.append(row_adj)
+
+            df_s, df_n = pd.DataFrame(set_up_results), pd.DataFrame(df_need_adj_list)
+            self.total_qty_minus.set(int(abs(df_minus_awal["QTY SYSTEM"].sum())))
+            self.total_tercover.set(int(df_s["QUANTITY"].sum()) if not df_s.empty else 0)
+            self.total_sisa_adj.set(int(abs(df_n["QTY SYSTEM"].sum())) if not df_n.empty else 0)
+            self._raw_df_minus_awal, self._raw_df_set_up, self._raw_df_need_adj = df_minus_awal, df_s, df_n
+            self.df_minus_awal_headers.set(df_minus_awal.columns.tolist() if not df_minus_awal.empty else [])
+            self.df_minus_awal_rows.set(df_minus_awal.fillna("").astype(str).values.tolist() if not df_minus_awal.empty else [])
+            self.df_set_up_headers.set(df_s.columns.tolist() if not df_s.empty else [])
+            self.df_set_up_rows.set(df_s.fillna("").astype(str).values.tolist() if not df_s.empty else [])
+            self.df_need_adj_headers.set(df_n.columns.tolist() if not df_n.empty else [])
+            self.df_need_adj_rows.set(df_n.fillna("").astype(str).values.tolist() if not df_n.empty else [])
+            self.stock_minus_processed.set(True)
+            return True, "Data Stock Minus dari Supabase berhasil diproses!"
         except Exception as e:
-            return False, f"Gagal membaca data dari Google Apps Script: {e}"
+            return False, f"Gagal memproses data Supabase: {e}"
 
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
