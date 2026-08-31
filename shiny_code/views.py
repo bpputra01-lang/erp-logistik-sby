@@ -568,24 +568,39 @@ def compare_system_view(state: AppState):
     return ui.div(upload_section, ui.output_ui("compare_system_results_container"), style="width: 100%; padding: 1rem;")
 
 # ==============================================================================
-# VIEW 2: STOCK MINUS
-# ==============================================================================
-# ==============================================================================
-# VIEW 2: STOCK MINUS
+# VIEW 2: STOCK MINUS (INTEGRASI GOOGLE APPS SCRIPT + SUPABASE)
 # ==============================================================================
 def stock_minus_view(state: AppState):
+    # Link Deployment Google Apps Script Anda:
+    APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx9OExrgbDLMe4tC-8Vds-BTVCxJop8AsraGGwydLNg9c9FmvTa0ig9ArKVnhDkMPuOHg/exec"
+
+    trigger_js = f"""
+        document.body.classList.add('process-running');
+        fetch('{APPS_SCRIPT_URL}', {{ mode: 'no-cors' }})
+        .then(() => {{
+            // Beri jeda 7 detik agar server Google selesai mengambil data Jezpro dan menimpa file di Supabase
+            setTimeout(() => {{
+                Shiny.setInputValue('btn_load_from_supabase_done', Math.random(), {{priority: 'event'}});
+            }}, 7000);
+        }})
+        .catch((err) => {{
+            document.body.classList.remove('process-running');
+            alert('Gagal memicu Google Apps Script: ' + err);
+        }});
+    """
+
     return ui.div(
-        # --- KOTAK 1: TOMBOL TARIK LANGSUNG DARI JEZPRO ---
+        # --- KOTAK 1: TOMBOL TRIGGER OTOMATIS ---
         ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("⚡ Sinkronisasi Otomatis Jezpro", style="font-size: 15px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
-                    ui.p("Tarik data all stock terbaru langsung dari server Jezpro dengan 1x klik.", style="color: #4A5568; font-size: 12px; margin: 0;"),
+                    ui.h4("⚡ Sinkronisasi Otomatis Jezpro ➔ Google Sheet ➔ Supabase", style="font-size: 15px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
+                    ui.p("Klik untuk menarik stok terbaru dari Jezpro, memperbarui Spreadsheet, dan langsung memproses data di Shiny.", style="color: #4A5568; font-size: 12px; margin: 0;"),
                     style="display: flex; flex-direction: column;"
                 ),
                 ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-table", style="margin-right: 8px; font-size: 14px;"), "TARIK DARI GOOGLE SPREADSHEET"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_fetch_stock_sheets', Math.random(), {priority: 'event'});",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-bolt", style="margin-right: 8px; font-size: 14px;"), "TARIK DATA STOK TERKINI"),
+                    onclick=trigger_js,
                     class_="btn-red-gradient",
                     style="padding: 10px 20px; font-size: 13px;"
                 ),
