@@ -572,7 +572,7 @@ def compare_system_view(state: AppState):
 # ==============================================================================
 def stock_minus_view(state: AppState):
     # Link Deployment Google Apps Script Anda:
-    APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx9OExrgbDLMe4tC-8Vds-BTVCxJop8AsraGGwydLNg9c9FmvTa0ig9ArKVnhDkMPuOHg/exec"
+    APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrvpbGf_JsLEFjuNYOREnyQ1-AZ2VEYDgEOfiyICWEmMLigtasNl7fcAmrBLg0Sf1U7g/exec"
 
     trigger_js = f"""
         document.body.classList.add('process-running');
