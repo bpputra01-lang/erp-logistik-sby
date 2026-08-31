@@ -33,9 +33,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.filter_periode.set(input.change_filter_periode())
 
     @reactive.Effect
-    @reactive.event(input.btn_load_from_supabase_done)
-    def _on_sync_done():
-        succ, msg = state.load_stock_minus_from_supabase()
+    @reactive.event(input.btn_fetch_stock_minus_jezpro)
+    def _fetch_stock_minus_jezpro():
+        succ, msg = state.trigger_pc_sync_and_load()
         if succ:
             state.show_success_modal.set(True)
         else:
