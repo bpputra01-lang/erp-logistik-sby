@@ -3,9 +3,18 @@ import json
 import urllib.request
 import pandas as pd
 
-# Konfigurasi Supabase
-SUPABASE_URL = "https://ufhjrsxzcffdfswfqlzk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmaGpyc3h6Y2ZmZGZzd2ZxbHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTI5NjgsImV4cCI6MjA5MTcyODk2OH0.DDlKkXU5-nVvNYK_uLYzXLgaj8oDT4s8vbjAoWMWacI"
+# ==============================================================================
+# Konfigurasi Supabase Baru
+# ==============================================================================
+SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
+
+# Gunakan Publishable Key (Anon Key)
+SUPABASE_KEY = "sb_publishable_pKXe0FX4YxwNhuqD1saHaw_NORud8cJ"
+
+# CATATAN: Jika nanti saat insert/delete data muncul error izin/RLS (Row Level Security),
+# Anda bisa mengganti SUPABASE_KEY di atas dengan Secret Key Anda:
+# SUPABASE_KEY = "sb_secret_Jqy-KREUEOXyjXLQi_5wCQ_aPTx2SKW"
+# ==============================================================================
 
 class SimpleSupabaseTable:
     def __init__(self, base_url, key, table_name):
