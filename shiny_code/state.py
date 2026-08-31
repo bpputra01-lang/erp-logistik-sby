@@ -608,40 +608,35 @@ class AppState:
             return True, "Data Stock Minus berhasil diproses!"
         except Exception as e: return False, f"Gagal memproses file: {e}"
 
-    def fetch_stock_minus_from_jezpro(self):
+    def sync_via_google_apps_script(self):
         try:
             import urllib.request
             import json
-            from config import SUPABASE_URL, SUPABASE_KEY
+            import pandas as pd
+
+            # 1. URL Apps Script Web App Anda (Ganti dengan link deployment Anda)
+            APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxxxxx/exec"
             
-            # GANTI MENJADI smart-handler SESUAI LINK ASLI SUPABASE ANDA:
-            edge_url = f"{SUPABASE_URL}/functions/v1/smart-handler"
+            # 2. ID Spreadsheet Anda (Ganti dengan ID spreadsheet Anda)
+            SPREADSHEET_ID = "1BxiMVs0XRA5nFMdKvBdBZj_xxxxxx"
             
-            req = urllib.request.Request(
-                edge_url,
-                headers={
-                    "apikey": SUPABASE_KEY,
-                    "Authorization": f"Bearer {SUPABASE_KEY}"
-                },
-                method="POST"
-            )
-            
+            # TRIGGER PEMBERSIHAN & UPDATE DI GOOGLE APPS SCRIPT
+            req = urllib.request.Request(APPS_SCRIPT_URL, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=90) as resp:
-                excel_bytes = resp.read()
+                res_json = json.loads(resp.read().decode("utf-8"))
                 
-            if excel_bytes.startswith(b'{"error"'):
-                err_json = json.loads(excel_bytes.decode('utf-8', errors='ignore'))
-                return False, f"Gagal dari Jezpro: {err_json.get('error')}"
+            if res_json.get("status") != "success":
+                return False, f"Gagal update Google Sheet: {res_json.get('message')}"
 
-            if not excel_bytes or len(excel_bytes) < 100:
-                return False, "File yang diterima dari Jezpro kosong!"
-                
+            # 3. BACA DATA TERBARU DARI GOOGLE SHEET (SEKETIKA MASUK KE SHINY)
+            sheet_csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=STOCK"
+            df = pd.read_csv(sheet_csv_url)
+
             # Langsung proses ke algoritma Stock Minus
-            return self.process_stock_minus_file(excel_bytes, "Stock_Minus_Jezpro.xlsx")
+            # (Pastikan dataframe memiliki kolom SKU, BIN, QTY SYSTEM)
+            return True, "✅ Data berhasil disinkronkan dari Google Sheet!"
         except Exception as e:
-            return False, f"Gagal menarik data Jezpro: {e}"
-
-            
+            return False, f"Gagal proses Google Sheet: {e}"        
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
         try:
