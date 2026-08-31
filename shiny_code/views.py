@@ -568,21 +568,21 @@ def compare_system_view(state: AppState):
     return ui.div(upload_section, ui.output_ui("compare_system_results_container"), style="width: 100%; padding: 1rem;")
 
 # ==============================================================================
-# VIEW 2: STOCK MINUS
+# VIEW 2: STOCK MINUS (DENGAN INTEGRASI SUPABASE STORAGE)
 # ==============================================================================
 def stock_minus_view(state: AppState):
     return ui.div(
-        # --- KOTAK 1: TOMBOL TARIK OTOMATIS DARI JEZPRO ---
+        # --- KOTAK 1: AMBIL OTOMATIS DARI SUPABASE ---
         ui.div(
             ui.div(
                 ui.div(
-                    ui.h4("⚡ Sinkronisasi Otomatis Jezpro", style="font-size: 15px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
-                    ui.p("Tarik all data stock terkini langsung dari server Jezpro tanpa perlu download & upload file manual.", style="color: #4A5568; font-size: 12px; margin: 0;"),
+                    ui.h4("⚡ Ambil Data Stok Terkini dari Supabase", style="font-size: 15px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
+                    ui.p("Gunakan data stok terbaru yang tersimpan di cloud Supabase tanpa perlu cari file di laptop.", style="color: #4A5568; font-size: 12px; margin: 0;"),
                     style="display: flex; flex-direction: column;"
                 ),
                 ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"), "TARIK STOK DARI JEZPRO"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_fetch_stock_minus_jezpro', Math.random(), {priority: 'event'});",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"), "AMBIL STOK DARI SUPABASE"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_fetch_stock_supabase', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient",
                     style="padding: 10px 20px; font-size: 13px;"
                 ),
@@ -591,9 +591,9 @@ def stock_minus_view(state: AppState):
             style="width: 100%; background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.25rem; border-radius: 10px; margin-bottom: 1rem;"
         ),
 
-        # --- KOTAK 2: OPSI UPLOAD MANUAL (CADANGAN) ---
+        # --- KOTAK 2: OPSI UPLOAD MANUAL DARI LAPTOP (CADANGAN) ---
         ui.div(
-            ui.span("📁 Atau Upload File Manual (Multiple Adjustment)", style="font-weight: bold; color: #1A202C; font-size: 13px; margin-bottom: 0.25rem; display: block;"),
+            ui.span("📁 Atau Upload File dari Laptop (Multiple Adjustment)", style="font-weight: bold; color: #1A202C; font-size: 13px; margin-bottom: 0.25rem; display: block;"),
             ui.div(
                 ui.input_file(
                     "upload_stock_file", None, accept=[".xlsx", ".xls"], multiple=False, 
