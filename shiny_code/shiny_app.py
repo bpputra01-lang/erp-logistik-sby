@@ -32,9 +32,9 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.filter_periode.set(input.change_filter_periode())
     
     @reactive.Effect
-    @reactive.event(input.btn_fetch_stock_sheets)
-    def _fetch_stock_sheets():
-        succ, msg = state.sync_stock_minus_via_google_sheets()
+    @reactive.event(input.btn_fetch_stock_minus_jezpro)
+    def _fetch_stock_minus_jezpro():
+        succ, msg = state.fetch_stock_minus_from_supabase_table()
         if succ:
             state.show_success_modal.set(True)
         else:
