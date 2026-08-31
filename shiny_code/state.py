@@ -607,36 +607,35 @@ class AppState:
             self.stock_minus_processed.set(True)
             return True, "Data Stock Minus berhasil diproses!"
         except Exception as e: return False, f"Gagal memproses file: {e}"
-
-    def sync_via_google_apps_script(self):
+        
+    def sync_stock_minus_via_google_sheets(self):
         try:
             import urllib.request
-            import json
+            import io
             import pandas as pd
 
-            # 1. URL Apps Script Web App Anda (Ganti dengan link deployment Anda)
-            APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxxxxx/exec"
+            # ID Spreadsheet Anda
+            SPREADSHEET_ID = "1suRTGhFtVTYqSjPt5hMK2R2cDzm_3MA6gRpJkrpm4k0"
             
-            # 2. ID Spreadsheet Anda (Ganti dengan ID spreadsheet Anda)
-            SPREADSHEET_ID = "1BxiMVs0XRA5nFMdKvBdBZj_xxxxxx"
+            # URL download CSV langsung dari Google Sheet Anda (Bebas CORS 100%)
+            csv_export_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=0"
             
-            # TRIGGER PEMBERSIHAN & UPDATE DI GOOGLE APPS SCRIPT
-            req = urllib.request.Request(APPS_SCRIPT_URL, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                res_json = json.loads(resp.read().decode("utf-8"))
+            req = urllib.request.Request(
+                csv_export_url,
+                headers={"User-Agent": "Mozilla/5.0"}
+            )
+            
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                csv_bytes = resp.read()
                 
-            if res_json.get("status") != "success":
-                return False, f"Gagal update Google Sheet: {res_json.get('message')}"
-
-            # 3. BACA DATA TERBARU DARI GOOGLE SHEET (SEKETIKA MASUK KE SHINY)
-            sheet_csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=STOCK"
-            df = pd.read_csv(sheet_csv_url)
-
-            # Langsung proses ke algoritma Stock Minus
-            # (Pastikan dataframe memiliki kolom SKU, BIN, QTY SYSTEM)
-            return True, "✅ Data berhasil disinkronkan dari Google Sheet!"
+            if not csv_bytes or len(csv_bytes) < 10:
+                return False, "Isi Google Spreadsheet masih kosong!"
+                
+            # Langsung olah data ke fungsi Stock Minus
+            return self.process_stock_minus_file(csv_bytes, "Stock_Minus_GoogleSheets.csv")
         except Exception as e:
-            return False, f"Gagal proses Google Sheet: {e}"        
+            return False, f"Gagal membaca data dari Google Spreadsheet: {e}"
+
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
         try:

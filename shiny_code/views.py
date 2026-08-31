@@ -584,8 +584,8 @@ def stock_minus_view(state: AppState):
                     style="display: flex; flex-direction: column;"
                 ),
                 ui.tags.button(
-                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"), "TARIK STOK DARI JEZPRO"),
-                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_fetch_stock_minus_jezpro', Math.random(), {priority: 'event'});",
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-table", style="margin-right: 8px; font-size: 14px;"), "TARIK DARI GOOGLE SPREADSHEET"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_fetch_stock_sheets', Math.random(), {priority: 'event'});",
                     class_="btn-red-gradient",
                     style="padding: 10px 20px; font-size: 13px;"
                 ),
