@@ -92,3 +92,26 @@ def load_data_from_info(file_info) -> pd.DataFrame:
     except Exception as e:
         print(f"Error loading {name}: {e}")
         return pd.DataFrame()
+
+# ==============================================================================
+# Helper Format Tanggal WIB (Mengubah ISO Supabase ke Waktu Indonesia)
+# ==============================================================================
+def format_datetime_wib(df: pd.DataFrame, kolom: str, format_tampilan: str = "%d-%m-%Y %H:%M") -> pd.DataFrame:
+    """
+    Mengubah format ISO Supabase (UTC) ke waktu Indonesia Barat (WIB) yang rapi.
+    Contoh output: 08-07-2026 02:38
+    """
+    if df is not None and not df.empty and kolom in df.columns:
+        try:
+            # Parse datetime
+            converted = pd.to_datetime(df[kolom], errors="coerce")
+            # Konversi timezone ke Asia/Jakarta (WIB)
+            if converted.dt.tz is not None:
+                converted = converted.dt.tz_convert("Asia/Jakarta")
+            else:
+                converted = converted.dt.tz_localize("UTC").dt.tz_convert("Asia/Jakarta")
+            
+            df[kolom] = converted.dt.strftime(format_tampilan)
+        except Exception as e:
+            print(f"Error saat memformat tanggal kolom '{kolom}': {e}")
+    return df
