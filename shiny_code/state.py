@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from shiny import reactive
 from config import get_supabase, safe_int, load_data_from_info, format_datetime_wib
-from jezpro_service import fetch_jezpro_stock_excel_bytes
+
 
 class AppState:
     def __init__(self):
@@ -606,68 +606,6 @@ class AppState:
             self.stock_minus_processed.set(True)
             return True, "Data Stock Minus berhasil diproses!"
         except Exception as e: return False, f"Gagal memproses file: {e}"
-    def auto_sync_stock_minus_from_jezpro(self):
-        try:
-            # 1. Download file langsung dari Jezpro
-            excel_bytes = fetch_jezpro_stock_excel_bytes(store_id=3, qty_filter=1)
-            # 2. Langsung proses ke algoritma Stock Minus yang sudah ada
-            return self.process_stock_minus_file(excel_bytes, "Stock_Minus_Jezpro.xlsx")
-        except Exception as e:
-            return False, f"Gagal Sinkronisasi Jezpro: {e}"
-
-    def load_stock_minus_from_supabase(self):
-        try:
-            import urllib.request
-            from config import SUPABASE_URL, SUPABASE_KEY
-            
-            # URL file langsung dari Supabase Storage
-            file_url = f"{SUPABASE_URL}/storage/v1/object/public/stock_files/latest_stock.xlsx"
-            
-            req = urllib.request.Request(
-                file_url,
-                headers={
-                    "apikey": SUPABASE_KEY,
-                    "Authorization": f"Bearer {SUPABASE_KEY}"
-                }
-            )
-            
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                excel_bytes = resp.read()
-                
-            if not excel_bytes:
-                return False, "File di Supabase kosong!"
-                
-            # Langsung proses ke algoritma Stock Minus
-            return self.process_stock_minus_file(excel_bytes, "latest_stock.xlsx")
-        except Exception as e:
-            return False, f"Gagal mengambil file dari Supabase: {e}"
-
-    def load_stock_minus_from_supabase(self):
-        try:
-            import urllib.request
-            from config import SUPABASE_URL, SUPABASE_KEY
-            
-            # URL file dari Supabase Storage
-            file_url = f"{SUPABASE_URL}/storage/v1/object/public/stock_files/latest_stock.xlsx"
-            
-            req = urllib.request.Request(
-                file_url,
-                headers={
-                    "apikey": SUPABASE_KEY,
-                    "Authorization": f"Bearer {SUPABASE_KEY}"
-                }
-            )
-            
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                excel_bytes = resp.read()
-                
-            if not excel_bytes:
-                return False, "File di Supabase kosong!"
-                
-            # Langsung proses ke algoritma Stock Minus
-            return self.process_stock_minus_file(excel_bytes, "latest_stock.xlsx")
-        except Exception as e:
-            return False, f"Gagal mengambil file dari Supabase: {e}"
 
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):

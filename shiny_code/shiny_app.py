@@ -30,27 +30,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.change_filter_periode)
     def _update_filter_periode():
         state.filter_periode.set(input.change_filter_periode())
-
-    @reactive.Effect
-    @reactive.event(input.btn_fetch_stock_minus_jezpro)
-    def _fetch_stock_minus_jezpro():
-        succ, msg = state.auto_sync_stock_minus_from_jezpro()
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            # Hanya tampilkan pop up modal tengah (notifikasi kanan atas dimatikan)
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
-    
-    @reactive.Effect
-    @reactive.event(input.btn_fetch_stock_supabase)
-    def _fetch_stock_supabase():
-        succ, msg = state.load_stock_minus_from_supabase()
-        if succ:
-            state.show_success_modal.set(True)
-        else:
-            state.error_modal_message.set(msg)
-            state.show_error_modal.set(True)
+        
 
     @reactive.Effect
     @reactive.event(input.close_error_modal_event)
