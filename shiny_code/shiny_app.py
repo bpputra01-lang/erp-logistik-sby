@@ -32,6 +32,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.filter_periode.set(input.change_filter_periode())
 
     @reactive.Effect
+    def _track_ongkir_tab():
+        if "ongkir_tabs" in input and input.ongkir_tabs():
+            state.active_ongkir_tab.set(input.ongkir_tabs())
+
+    @reactive.Effect
     @reactive.event(input.close_error_modal_event)
     def _on_close_error_modal():
         state.show_error_modal.set(False)

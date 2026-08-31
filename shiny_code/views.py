@@ -685,7 +685,15 @@ def main_dashboard_view(state: AppState):
         ui.div(ui.tags.table(ui.tags.thead(ui.tags.tr(ui.tags.th("SELECT", style="text-align: center;"), ui.tags.th("TANGGAL"), ui.tags.th("SUPPLIER"), ui.tags.th("EKSPEDISI"), ui.tags.th("KOLI"), ui.tags.th("TOTAL ONGKIR")), style="background-color: #CBD5E0 !important;"), ui.tags.tbody(*table_rows) if len(table_rows) > 0 else ui.tags.tr(ui.tags.td("Tidak ada transaksi ongkir.", colspan="6", style="text-align: center; color: #718096; padding: 2rem;")), class_="custom-clean-table"), style="background: #FFFFFF; border-radius: 16px; border: 2.5px solid #1A202C; padding: 1rem; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.04); overflow-x: auto;"),
         style="width: 100%;"
     )
-    return ui.div(ui.navset_card_tab(ui.nav_panel("📥 INPUT & BATCH DATA", tab1_content), ui.nav_panel("📊 SUMMARY & HISTORY", tab2_content)), style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;")
+    return ui.div(
+        ui.navset_card_tab(
+            ui.nav_panel("📥 INPUT & BATCH DATA", tab1_content, value="tab_input"), 
+            ui.nav_panel("📊 SUMMARY & HISTORY", tab2_content, value="tab_summary"),
+            id="ongkir_tabs",
+            selected=state.active_ongkir_tab()
+        ), 
+        style="width: 100%; background-color: #F7FAFC; min-height: 100vh; padding: 1rem;"
+    )
 
 # ==============================================================================
 # VIEW 5: LIST BIN CYCLE COUNT (MENU: "List Bin Cycle Count")

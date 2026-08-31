@@ -41,6 +41,7 @@ class AppState:
         self.input_tgl = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
         self.filter_ekspedisi = reactive.Value("SEMUA")
         self.filter_periode = reactive.Value("SEMUA")
+        self.active_ongkir_tab = reactive.Value("tab_input")
         self.selected_ids = reactive.Value([])
         self.show_delete_modal = reactive.Value(False)
 
