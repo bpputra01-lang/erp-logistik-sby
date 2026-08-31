@@ -40,6 +40,7 @@ class AppState:
         self.input_ongkir = reactive.Value("0")
         self.input_tgl = reactive.Value(datetime.now().strftime("%Y-%m-%d"))
         self.filter_ekspedisi = reactive.Value("SEMUA")
+        self.filter_periode = reactive.Value("SEMUA")
         self.selected_ids = reactive.Value([])
         self.show_delete_modal = reactive.Value(False)
 
@@ -485,9 +486,41 @@ class AppState:
 
     def get_filtered_ongkir(self) -> list[dict]:
         res = self.data_list()
-        flt = self.filter_ekspedisi()
-        if flt != "SEMUA":
-            res = [x for x in res if str(x.get("ekspedisi", "")).upper() == flt.upper()]
+        
+        # 1. Filter Ekspedisi
+        flt_eks = self.filter_ekspedisi()
+        if flt_eks != "SEMUA":
+            res = [x for x in res if str(x.get("ekspedisi", "")).upper() == flt_eks.upper()]
+            
+        # 2. Filter Periode Waktu
+        flt_waktu = self.filter_periode()
+        if flt_waktu != "SEMUA" and res:
+            now = datetime.now()
+            filtered_res = []
+            for x in res:
+                tgl_str = str(x.get("created_at", "")).strip()
+                try:
+                    # Parse format tanggal DD-MM-YYYY HH:MM
+                    dt = pd.to_datetime(tgl_str, dayfirst=True)
+                    if flt_waktu == "HARI INI":
+                        if dt.date() == now.date():
+                            filtered_res.append(x)
+                    elif flt_waktu == "7 HARI TERAKHIR":
+                        if (now - dt).days <= 7 and dt <= now:
+                            filtered_res.append(x)
+                    elif flt_waktu == "BULAN INI":
+                        if dt.year == now.year and dt.month == now.month:
+                            filtered_res.append(x)
+                    elif flt_waktu == "BULAN LALU":
+                        # Hitung bulan lalu
+                        first_day_cur = now.replace(day=1)
+                        last_month = first_day_cur - pd.Timedelta(days=1)
+                        if dt.year == last_month.year and dt.month == last_month.month:
+                            filtered_res.append(x)
+                except Exception:
+                    filtered_res.append(x)
+            res = filtered_res
+
         return res
 
     def get_list_ekspedisi_options(self) -> list[str]:

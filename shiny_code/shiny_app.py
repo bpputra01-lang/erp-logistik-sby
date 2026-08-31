@@ -26,6 +26,11 @@ def server(input: Inputs, output: Outputs, session: Session):
     @reactive.event(input.close_success_modal_event)
     def _on_close_success_modal(): state.show_success_modal.set(False)
 
+    @reactive.effect
+    @reactive.event(input.filter_periode)
+    def _update_filter_periode():
+        state.filter_periode.set(input.filter_periode())
+
     @reactive.Effect
     @reactive.event(input.close_error_modal_event)
     def _on_close_error_modal():

@@ -629,7 +629,22 @@ def main_dashboard_view(state: AppState):
 
     selected_count = len(state.selected_ids())
     del_btn_ui = ui.tags.button(f"🗑️ HAPUS ({selected_count}) DATA", onclick="Shiny.setInputValue('btn_open_delete_modal', Math.random(), {priority: 'event'})", style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;") if selected_count > 0 else ui.div()
+    
+    # Opsi Dropdown Ekspedisi & Periode
     select_options = [ui.tags.option(opt, value=opt, selected=(opt == state.filter_ekspedisi())) for opt in state.get_list_ekspedisi_options()]
+    
+    periode_pilihan = [
+        ("SEMUA", "Semua Waktu"),
+        ("HARI INI", "Hari Ini"),
+        ("7 HARI TERAKHIR", "7 Hari Terakhir"),
+        ("BULAN INI", "Bulan Ini"),
+        ("BULAN LALU", "Bulan Lalu")
+    ]
+    select_periode_options = [
+        ui.tags.option(label, value=val, selected=(val == state.filter_periode())) 
+        for val, label in periode_pilihan
+    ]
+
     table_rows = [
         ui.tags.tr(
             ui.tags.td(ui.tags.input(type="checkbox", checked=(str(r.get("id", "")) in set(state.selected_ids())), onchange=f"Shiny.setInputValue('toggle_row_id', '{r.get('id', '')}', {{priority: 'event'}})")),
@@ -639,7 +654,25 @@ def main_dashboard_view(state: AppState):
     ]
 
     tab2_content = ui.div(
-        ui.div(ui.div(ui.span("FILTER EKSPEDISI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 8px;"), ui.tags.select(*select_options, id="select_filter_ekspedisi", onchange="Shiny.setInputValue('change_filter_ekspedisi', this.value, {priority: 'event'})", style="background-color: #FFFFFF !important; color: #000000 !important; border: 2.5px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 220px; padding: 6px 10px; cursor: pointer;"), style="display: flex; align-items: center;"), del_btn_ui, style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 0.5rem;"),
+        ui.div(
+            ui.div(
+                # Filter Ekspedisi
+                ui.div(
+                    ui.span("EKSPEDISI:", style="font-size: 12px; font-weight: 800; color: #111111; margin-right: 6px;"),
+                    ui.tags.select(*select_options, id="select_filter_ekspedisi", onchange="Shiny.setInputValue('change_filter_ekspedisi', this.value, {priority: 'event'})", style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 170px; padding: 6px 10px; cursor: pointer;"),
+                    style="display: flex; align-items: center;"
+                ),
+                # Filter Periode Waktu
+                ui.div(
+                    ui.span("PERIODE:", style="font-size: 12px; font-weight: 800; color: #111111; margin-left: 12px; margin-right: 6px;"),
+                    ui.tags.select(*select_periode_options, id="select_filter_periode", onchange="Shiny.setInputValue('change_filter_periode', this.value, {priority: 'event'})", style="background-color: #FFFFFF !important; color: #000000 !important; border: 2px solid #1A202C !important; border-radius: 8px !important; font-weight: 800 !important; width: 170px; padding: 6px 10px; cursor: pointer;"),
+                    style="display: flex; align-items: center;"
+                ),
+                style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px;"
+            ), 
+            del_btn_ui, 
+            style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 1.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 10px;"
+        ),
         ui.div(
             metric_box("💰 BIAYA ALL", state.metric_total_biaya_all(), "#C53030", "linear-gradient(135deg, #FED7D7 0%, #FEB2B2 100%)"),
             metric_box("📦 KOLI ALL", state.metric_total_koli_all(), "#1A202C", "linear-gradient(135deg, #E2E8F0 0%, #CBD5E0 100%)"),
