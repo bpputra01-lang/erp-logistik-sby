@@ -32,6 +32,18 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.filter_periode.set(input.change_filter_periode())
 
     @reactive.Effect
+    @reactive.event(input.btn_fetch_stock_minus_jezpro)
+    def _fetch_stock_minus_jezpro():
+        succ, msg = state.auto_sync_stock_minus_from_jezpro()
+        if succ:
+            state.show_success_modal.set(True)
+            ui.notification_show("✅ Data Stock Minus berhasil ditarik otomatis dari Jezpro!", type="message", duration=4)
+        else:
+            state.error_modal_message.set(msg)
+            state.show_error_modal.set(True)
+            ui.notification_show(msg, type="error", duration=5)
+
+    @reactive.Effect
     @reactive.event(input.close_error_modal_event)
     def _on_close_error_modal():
         state.show_error_modal.set(False)
