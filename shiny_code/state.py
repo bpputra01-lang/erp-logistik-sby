@@ -614,27 +614,26 @@ class AppState:
             import io
             import pandas as pd
 
-            # ID Spreadsheet Anda
-            SPREADSHEET_ID = "1suRTGhFtVTYqSjPt5hMK2R2cDzm_3MA6gRpJkrpm4k0"
-            
-            # URL download CSV langsung dari Google Sheet Anda (Bebas CORS 100%)
-            csv_export_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=0"
+            # =========================================================================
+            # MASUKKAN URL HASIL DEPLOY APPS SCRIPT ANDA DI SINI (Berakhiran /exec):
+            # =========================================================================
+            APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw6rxxxxxxxxxxxxxx/exec"
             
             req = urllib.request.Request(
-                csv_export_url,
+                APPS_SCRIPT_URL,
                 headers={"User-Agent": "Mozilla/5.0"}
             )
             
             with urllib.request.urlopen(req, timeout=60) as resp:
                 csv_bytes = resp.read()
                 
-            if not csv_bytes or len(csv_bytes) < 10:
-                return False, "Isi Google Spreadsheet masih kosong!"
+            if not csv_bytes or csv_bytes.startswith(b"ERROR:"):
+                return False, f"Gagal membaca sheet: {csv_bytes.decode('utf-8', errors='ignore')}"
                 
             # Langsung olah data ke fungsi Stock Minus
             return self.process_stock_minus_file(csv_bytes, "Stock_Minus_GoogleSheets.csv")
         except Exception as e:
-            return False, f"Gagal membaca data dari Google Spreadsheet: {e}"
+            return False, f"Gagal membaca data dari Google Apps Script: {e}"
 
     # --- Putaway Compare Processing ---
     def process_putaway_compare(self, ds_bytes: bytes, ds_name: str, asal_bytes: bytes, asal_name: str):
