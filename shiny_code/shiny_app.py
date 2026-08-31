@@ -24,13 +24,14 @@ def server(input: Inputs, output: Outputs, session: Session):
     # Modal Dismiss Listeners
     @reactive.Effect
     @reactive.event(input.close_success_modal_event)
-    def _on_close_success_modal(): state.show_success_modal.set(False)
+    def _on_close_success_modal():
+        state.show_success_modal.set(False)
 
     @reactive.Effect
     @reactive.event(input.change_filter_periode)
     def _update_filter_periode():
         state.filter_periode.set(input.change_filter_periode())
-    
+
     @reactive.Effect
     @reactive.event(input.btn_load_from_supabase_done)
     def _on_sync_done():
@@ -48,11 +49,18 @@ def server(input: Inputs, output: Outputs, session: Session):
         state.error_modal_message.set("")
 
     @render.ui
-    def global_success_modal_ui(): return success_modal(state.show_success_modal())
+    def global_success_modal_ui():
+        return success_modal(state.show_success_modal())
 
     @render.ui
-    def global_error_modal_ui(): return error_modal(state.show_error_modal(), state.error_modal_message())
+    def global_error_modal_ui():
+        return error_modal(state.show_error_modal(), state.error_modal_message())
 
+    @render.ui
+    def ongkir_tab2_dynamic_ui():
+        return ongkir_tab2_view(state)
+
+    # Authentication & Navigation
     @render.ui
     def ongkir_tab2_dynamic_ui():
         return ongkir_tab2_view(state)
