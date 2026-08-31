@@ -572,7 +572,7 @@ def compare_system_view(state: AppState):
 # ==============================================================================
 def stock_minus_view(state: AppState):
     return ui.div(
-        # Kotak 1: Opsi Tarik Otomatis dari Jezpro
+        # --- KOTAK 1: TOMBOL TARIK OTOMATIS DARI JEZPRO ---
         ui.div(
             ui.div(
                 ui.div(
@@ -590,17 +590,25 @@ def stock_minus_view(state: AppState):
             ),
             style="width: 100%; background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.25rem; border-radius: 10px; margin-bottom: 1rem;"
         ),
-        # Kotak 2: Opsi Upload Manual (Tetap Disediakan sebagai Backup)
+
+        # --- KOTAK 2: OPSI UPLOAD MANUAL (CADANGAN) ---
         ui.div(
             ui.span("📁 Atau Upload File Manual (Multiple Adjustment)", style="font-weight: bold; color: #1A202C; font-size: 13px; margin-bottom: 0.25rem; display: block;"),
-            ui.div(ui.input_file("upload_stock_file", None, accept=[".xlsx", ".xls"], multiple=False, button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"), placeholder="200MB per file • XLSX, XLS"), class_="reflex-upload-container"),
+            ui.div(
+                ui.input_file(
+                    "upload_stock_file", None, accept=[".xlsx", ".xls"], multiple=False, 
+                    button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"), 
+                    placeholder="200MB per file • XLSX, XLS"
+                ), 
+                class_="reflex-upload-container"
+            ),
             ui.output_ui("stock_minus_action_btn_ui"),
             style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         ),
+
         ui.output_ui("stock_minus_results_container"),
         style="width: 100%; padding: 1rem;"
     )
-
 # ==============================================================================
 # VIEW 3: PUTAWAY SYSTEM
 # ==============================================================================
