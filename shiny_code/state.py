@@ -4,7 +4,7 @@ from datetime import datetime
 import numpy as np       
 import pandas as pd
 from shiny import reactive
-from config import get_supabase, safe_int, load_data_from_info
+from config import get_supabase, safe_int, load_data_from_info, format_datetime_wib
 
 class AppState:
     def __init__(self):
@@ -419,8 +419,16 @@ class AppState:
             client = get_supabase()
             if client:
                 res = client.table("shipping_costs").select("*").execute()
-                self.data_list.set(res.data if res.data else [])
-        except Exception as e: print("Supabase load error:", e)
+                if res.data:
+                    df = pd.DataFrame(res.data)
+                    # Otomatis ubah tanggal ISO Supabase ke format WIB
+                    if "created_at" in df.columns:
+                        df = format_datetime_wib(df, "created_at")
+                    self.data_list.set(df.to_dict(orient="records"))
+                else:
+                    self.data_list.set([])
+        except Exception as e:
+            print("Supabase load error:", e)
 
     def save_single_ongkir(self, supp: str, eksp: str, koli_str: str, ongkir_str: str, tgl_str: str):
         if not supp.strip(): return False, "Nama Supplier Wajib Diisi!"
