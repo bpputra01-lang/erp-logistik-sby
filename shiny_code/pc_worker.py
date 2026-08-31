@@ -34,7 +34,7 @@ def check_and_execute_task():
         print("🌐 Mendownload stok dari Jezpro...")
         excel_bytes = fetch_jezpro_stock_excel_bytes(
             email="fajarbintang786@jez.co.id",
-            password="999", # Gunakan password akun Jezpro Anda
+            password="131199", # Gunakan password akun Jezpro Anda
             store_id=3,
             qty_filter=0
         )
