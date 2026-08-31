@@ -11,11 +11,6 @@ SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
 # Gunakan Publishable Key (Anon Key)
 SUPABASE_KEY = "sb_publishable_pKXe0FX4YxwNhuqD1saHaw_NORud8cJ"
 
-# CATATAN: Jika nanti saat insert/delete data muncul error izin/RLS (Row Level Security),
-# Anda bisa mengganti SUPABASE_KEY di atas dengan Secret Key Anda:
-# SUPABASE_KEY = "sb_secret_Jqy-KREUEOXyjXLQi_5wCQ_aPTx2SKW"
-# ==============================================================================
-
 class SimpleSupabaseTable:
     def __init__(self, base_url, key, table_name):
         self.url = f"{base_url}/rest/v1/{table_name}"
