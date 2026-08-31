@@ -570,14 +570,45 @@ def compare_system_view(state: AppState):
 # ==============================================================================
 # VIEW 2: STOCK MINUS
 # ==============================================================================
+# ==============================================================================
+# VIEW 2: STOCK MINUS
+# ==============================================================================
 def stock_minus_view(state: AppState):
     return ui.div(
+        # --- KOTAK 1: TOMBOL TARIK LANGSUNG DARI JEZPRO ---
         ui.div(
-            ui.span("Upload File STOCK MINUS", style="font-weight: bold; color: #1A202C; font-size: 14px; margin-bottom: 0.25rem; display: block;"),
-            ui.div(ui.input_file("upload_stock_file", None, accept=[".xlsx", ".xls"], multiple=False, button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"), placeholder="200MB per file • XLSX, XLS"), class_="reflex-upload-container"),
+            ui.div(
+                ui.div(
+                    ui.h4("⚡ Sinkronisasi Otomatis Jezpro", style="font-size: 15px; font-weight: 800; color: #065F46; margin: 0 0 4px 0;"),
+                    ui.p("Tarik data all stock terbaru langsung dari server Jezpro dengan 1x klik.", style="color: #4A5568; font-size: 12px; margin: 0;"),
+                    style="display: flex; flex-direction: column;"
+                ),
+                ui.tags.button(
+                    ui.tags.span(ui.tags.i(class_="fa-solid fa-cloud-arrow-down", style="margin-right: 8px; font-size: 14px;"), "TARIK STOK DARI JEZPRO"),
+                    onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_fetch_stock_minus_jezpro', Math.random(), {priority: 'event'});",
+                    class_="btn-red-gradient",
+                    style="padding: 10px 20px; font-size: 13px;"
+                ),
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;"
+            ),
+            style="width: 100%; background: #D1FAE5; border: 1.5px solid #A7F3D0; padding: 1.25rem; border-radius: 10px; margin-bottom: 1rem;"
+        ),
+
+        # --- KOTAK 2: UPLOAD MANUAL (CADANGAN) ---
+        ui.div(
+            ui.span("📁 Atau Upload File Manual (Multiple Adjustment)", style="font-weight: bold; color: #1A202C; font-size: 13px; margin-bottom: 0.25rem; display: block;"),
+            ui.div(
+                ui.input_file(
+                    "upload_stock_file", None, accept=[".xlsx", ".xls"], multiple=False, 
+                    button_label=ui.tags.span(ui.tags.i(class_="fa-solid fa-upload", style="margin-right: 6px; font-size: 14px;"), "Upload"), 
+                    placeholder="200MB per file • XLSX, XLS"
+                ), 
+                class_="reflex-upload-container"
+            ),
             ui.output_ui("stock_minus_action_btn_ui"),
             style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
         ),
+
         ui.output_ui("stock_minus_results_container"),
         style="width: 100%; padding: 1rem;"
     )
