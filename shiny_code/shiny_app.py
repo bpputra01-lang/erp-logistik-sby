@@ -18,6 +18,7 @@ app_ui = ui.page_fluid(
     ui.output_ui("global_success_modal_ui"),
     ui.output_ui("global_error_modal_ui"),
     ui.output_ui("main_root_container"),
+    title="ZKN WAREHOUSE ERP",  # <-- TAMBAHKAN INI AGAR SHINY TIDAK MENGGANTI KE 'Shiny App'
     style="padding: 0; margin: 0; background-color: #111318;"
 )
 

@@ -4,7 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ZKN WAREHOUSE ERP</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>" />
+    
+    <!-- FAVICON DARI FILE GAMBAR ASLI: image_981625.png -->
+    <link rel="icon" type="image/png" href="./image_981625.png" />
     
     <script
       src="./shinylive/load-shinylive-sw.js"
@@ -22,10 +24,10 @@
     <link rel="stylesheet" href="./shinylive/shinylive.css" />
 
     <!-- =====================================================================
-         CSS CUSTOM PREMIUM SPLASH SCREEN (MENUTUPI LOADER HEXAGON MADU)
+         CSS CUSTOM PREMIUM SPLASH SCREEN (MENGGUNAKAN LOGO image_981625.png)
     ====================================================================== -->
     <style>
-      /* 1. Sembunyikan semua default loader & SVG hexagon bawaan Shinylive */
+      /* 1. Sembunyikan default loader & SVG bawaan Shinylive */
       .shinylive-loading, 
       .pyodide-loading, 
       .loading-spinner, 
@@ -55,25 +57,34 @@
         transition: opacity 0.6s ease, visibility 0.6s ease;
       }
 
-      /* 3. Logo & Glow Box Denyut */
+      /* 3. Logo Box & Gambar Asli (image_981625.png) */
       .zkn-splash-logo-box {
-        width: 80px;
-        height: 80px;
-        background: linear-gradient(135deg, #E50914 0%, #B20710 100%);
-        border-radius: 20px;
+        width: 90px;
+        height: 90px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 2px solid rgba(229, 9, 20, 0.4);
+        border-radius: 22px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 40px;
-        box-shadow: 0 0 40px rgba(229, 9, 20, 0.6);
+        box-shadow: 0 0 35px rgba(229, 9, 20, 0.5);
         margin-bottom: 22px;
         animation: zknPulse 2s infinite ease-in-out;
+        padding: 12px;
+        backdrop-filter: blur(5px);
+      }
+
+      .zkn-splash-logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
       }
 
       @keyframes zknPulse {
-        0% { transform: scale(1); box-shadow: 0 0 25px rgba(229, 9, 20, 0.4); }
-        50% { transform: scale(1.08); box-shadow: 0 0 50px rgba(229, 9, 20, 0.85); }
-        100% { transform: scale(1); box-shadow: 0 0 25px rgba(229, 9, 20, 0.4); }
+        0% { transform: scale(1); box-shadow: 0 0 25px rgba(229, 9, 20, 0.4); border-color: rgba(229, 9, 20, 0.4); }
+        50% { transform: scale(1.06); box-shadow: 0 0 45px rgba(229, 9, 20, 0.75); border-color: rgba(229, 9, 20, 0.8); }
+        100% { transform: scale(1); box-shadow: 0 0 25px rgba(229, 9, 20, 0.4); border-color: rgba(229, 9, 20, 0.4); }
       }
 
       .zkn-splash-title {
@@ -147,9 +158,11 @@
     <!-- TEMPAT SHINY BERJALAN -->
     <div style="height: 100vh; width: 100vw" id="root"></div>
 
-    <!-- STRUKTUR SPLASH SCREEN ZKN LOGISTIC -->
+    <!-- STRUKTUR SPLASH SCREEN DENGAN GAMBAR image_981625.png -->
     <div id="zkn-splash-screen">
-      <div class="zkn-splash-logo-box">📦</div>
+      <div class="zkn-splash-logo-box">
+        <img src="./image_981625.png" alt="ZKN Logo" class="zkn-splash-logo-img" />
+      </div>
       <div class="zkn-splash-title">ZKN <span>LOGISTIC</span></div>
       <div class="zkn-splash-subtitle">CENTER WAREHOUSE SYSTEM • SURABAYA</div>
       
@@ -185,6 +198,9 @@
             }, 300);
           }
         }, 1800);
+
+        // Kunci Favicon & Judul Tab
+        document.title = "ZKN WAREHOUSE ERP";
 
         // Deteksi secara real-time kapan Shiny selesai merender UI ke #root
         const checkReady = setInterval(function() {
