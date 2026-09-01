@@ -387,6 +387,9 @@ class AppState:
         self._raw_df_bs_off_missing = pd.DataFrame()
         self._raw_df_bs_on_missing = pd.DataFrame()
 
+        # --- PHYSICAL INVENTORY LIST STATE (UNIFIED) ---
+        self.pil_mode = reactive.Value("PUTAWAY & PICKING AUDIT")
+
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -453,6 +456,7 @@ class AppState:
         elif cur_menu == "Justification SO": return "justification_so"
         elif cur_menu in ["Cross Check Real & System", "Match Real & System"]: return "cross_check_real_sys"
         elif cur_menu == "Balancing Stock": return "balancing_stock"
+        elif cur_menu == "Physical Inventory List": return "physical_inventory_list"
         return "under_development"
 
 

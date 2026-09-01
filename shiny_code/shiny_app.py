@@ -9,7 +9,7 @@ from views import (
     putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, 
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
     cycle_count_analyzer_view, global_header, cross_check_real_system_view,
-    balancing_stock_view
+    balancing_stock_view, physical_inventory_list_view
 )
 
 app_ui = ui.page_fluid(
@@ -551,6 +551,36 @@ def server(input: Inputs, output: Outputs, session: Session):
                     ), open=True
                 )
             )
+
+            # PANDUAN: PHYSICAL INVENTORY LIST (2-IN-1 MODE)
+        elif cur == "Physical Inventory List":
+            guide_body = ui.div(
+                ui.tags.details(
+                    ui.tags.summary("📋 Mode 1: Putaway & Picking Audit"),
+                    ui.div(
+                        ui.tags.strong("Format Dokumen Audit:"),
+                        ui.tags.ul(
+                            ui.tags.li(ui.strong("1. File Sales:"), " Data riwayat penjualan (Minimal hingga Kolom K / Qty Sales)."),
+                            ui.tags.li(ui.strong("2. File RTO:"), " Data riwayat retur keluar (Minimal hingga Kolom I / Qty RTO)."),
+                            ui.tags.li(ui.strong("3. File Mutasi:"), " Rantai mutasi BIN kronologis (Kolom A=Waktu, D=SKU, I=Bin Awal, M=Bin Tujuan)."),
+                            ui.tags.li(ui.strong("4. Final Match BIN:"), " Menghasilkan irisan BIN yang mengalami Picking dan Putaway secara bersamaan.")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                ),
+                ui.tags.details(
+                    ui.tags.summary("📋 Mode 2: Non Audit (Filter Multiple Adjustment)"),
+                    ui.div(
+                        ui.tags.strong("Format Dokumen Multiple Adjustment:"),
+                        ui.tags.ul(
+                            ui.tags.li("Upload file ", ui.strong("Multiple Adjustment"), " dari Jezpro."),
+                            ui.tags.li("File minimal 10 kolom: Kolom B (BIN), Kolom C (SKU), Kolom G (Sub Kategori), Kolom H (Harga Jual), dan Kolom J (Qty System)."),
+                            ui.tags.li("Gunakan filter interaktif untuk memilah target BIN berdasarkan Sub Kategori, Brand, atau Tiering Kategori Harga (Luxury, Top, Mid, Entry, Mass Market).")
+                        ),
+                        class_="accordion-content"
+                    ), open=True
+                )
+            )
         # FALLBACK JIKA MENU LAIN
         else:
             guide_body = ui.div(
@@ -565,6 +595,8 @@ def server(input: Inputs, output: Outputs, session: Session):
             easy_close=True, 
             footer=ui.modal_button("Tutup", class_="btn-red-gradient")
         ))
+
+        
     # Sub-render Action Buttons
     @render.ui
     def stock_minus_action_btn_ui():
@@ -2398,5 +2430,46 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_bs_on_missing.to_excel(writer, sheet_name='DEFISIT_ONLINE', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+        # ==========================================================================
+    # PHYSICAL INVENTORY LIST CONTROLLER (UNIFIED DYNAMIC UI)
+    # ==========================================================================
+    @reactive.Effect
+    @reactive.event(input.change_pil_mode)
+    def _on_change_pil_mode():
+        state.pil_mode.set(input.change_pil_mode())
+
+    @render.ui
+    def pil_dynamic_body_ui():
+        mode = state.pil_mode()
+
+        # MODE 1: BY PUTAWAY & PICKING AUDIT
+        if mode == "PUTAWAY & PICKING AUDIT":
+            return ui.div(
+                ui.div(
+                    ui.h4("📥 Upload Dokumen Audit (Sales, RTO, & Mutasi)", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                    ui.div(
+                        custom_uploader_box("uploader_ppa_sales", "1. File Sales (Excel / CSV)"),
+                        custom_uploader_box("uploader_ppa_rto", "2. File RTO (Excel / CSV)"),
+                        custom_uploader_box("uploader_ppa_mutasi", "3. File Mutasi (Excel / CSV)"),
+                        style="display: flex; gap: 1rem; width: 100%; margin-bottom: 1.25rem; flex-wrap: wrap;"
+                    ),
+                    ui.output_ui("ppa_action_btn_ui"),
+                    style="width: 100%; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+                ),
+                ui.output_ui("ppa_results_container")
+            )
+
+        # MODE 2: BY NON AUDIT (FILTER MULTIPLE ADJUSTMENT)
+        else:
+            return ui.div(
+                ui.div(
+                    ui.h4("📥 Upload File Multiple Adjustment", style="font-size: 15px; font-weight: 800; color: #1A202C; margin-bottom: 0.75rem;"),
+                    custom_uploader_box("upload_cycle_count_file", "Upload File Multiple Adjustment"),
+                    ui.output_ui("cycle_count_action_btn_ui"),
+                    style="width: 100%; background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 1.25rem;"
+                ),
+                ui.output_ui("cycle_count_results_container")
+            )
 
 app = App(app_ui, server)
