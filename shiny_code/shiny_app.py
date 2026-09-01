@@ -2463,12 +2463,39 @@ def server(input: Inputs, output: Outputs, session: Session):
             return berat * 2000 * 3.2
         return 0
 
-    # 7. Fungsi Helper Tarik & Filter Data Timbang
+    # G. HELPER: TARIK DATA & FILTER PERIODE DARI SUPABASE LAMA (VERSI AMAN PANDAS)
     def _get_filtered_timbang_data():
-        sb = config.get_supabase_old()
-        res = sb.table("timbang_kolian").select("*").order("created_at", desc=True).execute()
-        df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
-        if df.empty:
+        try:
+            sb = config.get_supabase_old()
+            # Panggil select murni tanpa .order() agar tidak kena AttributeError
+            res = sb.table("timbang_kolian").select("*").execute()
+            data = res.data if hasattr(res, "data") and res.data else []
+            if not data:
+                return pd.DataFrame()
+
+            df = pd.DataFrame(data)
+
+            # 1. Hitung Kolom Estimasi Harga (4 Rumus)
+            df['Harga (Rp)'] = df.apply(_hitung_harga_timbang, axis=1)
+
+            # 2. Parsing Tanggal & Sorting Terbaru di Atas
+            if "created_at" in df.columns:
+                df['created_at_dt'] = pd.to_datetime(df['created_at'], errors='coerce')
+                # Sort descending (data terbaru di baris paling atas)
+                df = df.sort_values(by="created_at_dt", ascending=False).reset_index(drop=True)
+
+                # 3. Filter Periode (Today / Month / All)
+                flt = str(state.timbang_filter_periode() or "ALL").upper()
+                if flt != "ALL":
+                    now_date = datetime.now().date()
+                    if flt == "TODAY":
+                        df = df[df['created_at_dt'].dt.date == now_date]
+                    elif flt == "MONTH":
+                        df = df[(df['created_at_dt'].dt.year == now_date.year) & (df['created_at_dt'].dt.month == now_date.month)]
+
+            return df
+        except Exception as e:
+            print(f"Error fetch timbang: {e}")
             return pd.DataFrame()
 
         # Konversi Timezone ke WIB
