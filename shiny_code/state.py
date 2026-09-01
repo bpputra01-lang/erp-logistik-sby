@@ -350,6 +350,19 @@ class AppState:
         self.df_jso_rows = reactive.Value([])
         self._raw_df_jso_res = pd.DataFrame()
 
+        # --- CROSS CHECK REAL & SYSTEM (MATCHING KARANTINA) ---
+        self.crs_processed = reactive.Value(False)
+        self.crs_total_real = reactive.Value(0)
+        self.crs_total_matched = reactive.Value(0)
+        self.crs_total_unmatched = reactive.Value(0)
+        self.crs_system_left = reactive.Value(0)
+        self.crs_status_choices = reactive.Value([])
+
+        self.df_crs_headers = reactive.Value([])
+        self.df_crs_rows = reactive.Value([])
+        self._raw_df_crs_all = pd.DataFrame()
+        self._raw_df_crs_filtered = pd.DataFrame()
+
     def set_main_menu(self, menu: str): self.main_menu.set(menu)
     def toggle_sidebar(self): self.sidebar_open.set(not self.sidebar_open())
     def toggle_dropdown(self, key: str):
@@ -414,6 +427,7 @@ class AppState:
         elif cur_menu == "Compare RTO": return "compare_rto"
         elif cur_menu == "Stock Opname": return "stock_opname"
         elif cur_menu == "Justification SO": return "justification_so"
+        elif cur_menu in ["Cross Check Real & System", "Match Real & System"]: return "cross_check_real_sys"
         return "under_development"
 
 
@@ -2544,3 +2558,138 @@ class AppState:
             return True, f"Justifikasi Selesai! ({len(final_df):,} Baris Diproses)"
         except Exception as e:
             return False, f"Gagal Justifikasi SO: {e}"
+
+# ==========================================================================
+    # CROSS CHECK REAL & SYSTEM LOGIC (STREAMLIT PORT)
+    # ==========================================================================
+    def process_cross_check_real_system(self, f_sys, f_real):
+        try:
+            df_sys_raw = load_data_from_info(f_sys)
+            df_real_raw = load_data_from_info(f_real)
+
+            if df_sys_raw.empty or df_real_raw.empty:
+                return False, "Kedua file (Laporan System & Real Aktual) wajib diupload!"
+
+            if df_sys_raw.shape[1] < 11:
+                return False, "File System kurang dari 11 kolom (Kolom A=Cabang, D=SKU, K=Qty)!"
+            if df_real_raw.shape[1] < 13:
+                return False, "File Real kurang dari 13 kolom (Kolom A=Cabang, E=SKU, M=Qty)!"
+
+            # 1. Standardisasi Data System (Kolom A=0, D=3, K=10)
+            df_sys = pd.DataFrame({
+                'Cabang': df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper(),
+                'SKU_Sys': df_sys_raw.iloc[:, 3].astype(str).str.strip().str.upper(),
+                'Qty_Sys': pd.to_numeric(df_sys_raw.iloc[:, 10], errors='coerce').fillna(0)
+            })
+
+            # 2. Standardisasi Data Real (Kolom A=0, E=4, M=12)
+            df_real = pd.DataFrame({
+                'Cabang': df_real_raw.iloc[:, 0].astype(str).str.strip().str.upper(),
+                'SKU_Real': df_real_raw.iloc[:, 4].astype(str).str.strip().str.upper(),
+                'Qty_Real': pd.to_numeric(df_real_raw.iloc[:, 12], errors='coerce').fillna(0)
+            })
+
+            # 3. Bangun Pool System Kuota
+            system_pool = {}
+            for _, row in df_sys.iterrows():
+                cabang = row['Cabang']
+                sku_sys = row['SKU_Sys']
+                qty_sys = row['Qty_Sys']
+                if sku_sys and qty_sys > 0:
+                    if cabang not in system_pool:
+                        system_pool[cabang] = {}
+                    system_pool[cabang][sku_sys] = system_pool[cabang].get(sku_sys, 0) + qty_sys
+
+            # 4. Alokasi Stok Berdasarkan Data Real
+            matched_details = []
+            total_real_qty = int(df_real['Qty_Real'].sum())
+            total_allocated_qty = 0
+
+            for _, row in df_real.iterrows():
+                cabang_real = row['Cabang']
+                sku_real = row['SKU_Real']
+                qty_real_sisa = row['Qty_Real']
+
+                if not sku_real or qty_real_sisa <= 0:
+                    continue
+
+                # A. Prioritas 1: Cabang Sendiri (Perfect Match)
+                if cabang_real in system_pool and sku_real in system_pool[cabang_real] and system_pool[cabang_real][sku_real] > 0:
+                    allocated_qty = min(qty_real_sisa, system_pool[cabang_real][sku_real])
+                    system_pool[cabang_real][sku_real] -= allocated_qty
+                    qty_real_sisa -= allocated_qty
+                    total_allocated_qty += allocated_qty
+
+                    matched_details.append({
+                        "SKU": sku_real,
+                        "Cabang Real": cabang_real,
+                        "Cabang System": cabang_real,
+                        "Qty Match": int(allocated_qty),
+                        "Status": "MATCH PERFECT"
+                    })
+
+                # B. Prioritas 2: Lintas Cabang (Cross-Branch)
+                if qty_real_sisa > 0:
+                    for cabang_sys, skus in system_pool.items():
+                        if sku_real in skus and skus[sku_real] > 0:
+                            allocated_qty = min(qty_real_sisa, skus[sku_real])
+                            system_pool[cabang_sys][sku_real] -= allocated_qty
+                            qty_real_sisa -= allocated_qty
+                            total_allocated_qty += allocated_qty
+
+                            matched_details.append({
+                                "SKU": sku_real,
+                                "Cabang Real": cabang_real,
+                                "Cabang System": cabang_sys,
+                                "Qty Match": int(allocated_qty),
+                                "Status": "MATCH CROSS-BRANCH"
+                            })
+                            if qty_real_sisa <= 0:
+                                break
+
+                # C. Prioritas 3: Sisa Kuota Habis (Unmatched)
+                if qty_real_sisa > 0:
+                    matched_details.append({
+                        "SKU": sku_real,
+                        "Cabang Real": cabang_real,
+                        "Cabang System": "TIDAK KETEMU / SYSTEM HABIS",
+                        "Qty Match": int(qty_real_sisa),
+                        "Status": "UNMATCHED / NO SYSTEM QTY"
+                    })
+
+            total_system_left = int(sum(sum(skus.values()) for skus in system_pool.values()))
+
+            df_res = pd.DataFrame(matched_details)
+            if df_res.empty:
+                df_res = pd.DataFrame(columns=["SKU", "Cabang Real", "Cabang System", "Qty Match", "Status"])
+
+            # Simpan Data & Metrik
+            self.crs_total_real.set(total_real_qty)
+            self.crs_total_matched.set(int(total_allocated_qty))
+            self.crs_total_unmatched.set(int(total_real_qty - total_allocated_qty))
+            self.crs_system_left.set(total_system_left)
+
+            statuses = sorted(df_res["Status"].unique().tolist()) if not df_res.empty else []
+            self.crs_status_choices.set(statuses)
+
+            self._raw_df_crs_all = df_res.copy()
+            self._raw_df_crs_filtered = df_res.copy()
+
+            self.df_crs_headers.set(df_res.columns.tolist())
+            self.df_crs_rows.set(df_res.fillna("").astype(str).values.tolist())
+
+            self.crs_processed.set(True)
+            return True, f"Matching Selesai! {len(df_res):,} baris alokasi terbentuk."
+        except Exception as e:
+            return False, f"Gagal Match Real & System: {e}"
+
+    def filter_crs_status(self, selected_statuses):
+        if self._raw_df_crs_all.empty:
+            return
+        df = self._raw_df_crs_all.copy()
+        if selected_statuses and len(selected_statuses) > 0:
+            df = df[df["Status"].isin(selected_statuses)]
+
+        self._raw_df_crs_filtered = df
+        self.df_crs_headers.set(df.columns.tolist())
+        self.df_crs_rows.set(df.fillna("").astype(str).values.tolist())
