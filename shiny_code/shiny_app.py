@@ -1,5 +1,9 @@
 import io
 import pandas as pd
+import state
+import config
+from shiny import App, render, Session
+from view import create_ui
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from state import AppState
 from views import (
@@ -2143,5 +2147,29 @@ def server(input: Inputs, output: Outputs, session: Session):
             state._raw_df_jso_res.to_excel(writer, sheet_name='Summary', index=False)
         buf.seek(0)
         yield buf.getvalue()
+
+app_ui = create_ui()
+
+def server(input, output, session: Session):
+    # 1. Ketika user membuka browser/tab, tambah user aktif (+1)
+    state.active_users.set(state.active_users.get() + 1)
+
+    # 2. Ketika user menutup browser/tab (sesi putus), kurangi user aktif (-1)
+    @session.on_ended
+    def _on_session_ended():
+        current_count = state.active_users.get()
+        state.active_users.set(max(0, current_count - 1))
+
+    # 3. Output reactive (otomatis terupdate di semua user saat ada yang masuk/keluar)
+    @render.text
+    def txt_active_users():
+        count = state.active_users.get()
+        return f"{count} User Online"
+
+app = App(app_ui, server)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("shiny_app:app", host=config.APP_HOST, port=config.APP_PORT, reload=True)
 
 app = App(app_ui, server)

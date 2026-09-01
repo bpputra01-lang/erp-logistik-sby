@@ -4,13 +4,21 @@ import urllib.request
 import pandas as pd
 
 # ==============================================================================
-# Konfigurasi Supabase Baru
+# 1. KONFIGURASI UMUM APLIKASI
+# ==============================================================================
+APP_TITLE = "Logistic Dashboard"
+APP_HOST = "127.0.0.1"
+APP_PORT = 8000
+
+# ==============================================================================
+# 2. KONFIGURASI SUPABASE
 # ==============================================================================
 SUPABASE_URL = "https://fanzsmghhbefhhaicrok.supabase.co"
-
-# Gunakan Publishable Key (Anon Key)
 SUPABASE_KEY = "sb_publishable_pKXe0FX4YxwNhuqD1saHaw_NORud8cJ"
 
+# ==============================================================================
+# 3. SUPABASE MINI CLIENT (REST API POSTGREST)
+# ==============================================================================
 class SimpleSupabaseTable:
     def __init__(self, base_url, key, table_name):
         self.url = f"{base_url}/rest/v1/{table_name}"
@@ -38,6 +46,7 @@ class SimpleSupabaseTable:
         return self
 
     def in_(self, column, values):
+        # Format list value ke syntax postgREST: in.(val1,val2)
         val_str = ",".join(map(str, values))
         self.params.append(f"{column}=in.({val_str})")
         return self
@@ -55,7 +64,7 @@ class SimpleSupabaseTable:
                 res_data = resp.read().decode("utf-8")
                 return type("Response", (), {"data": json.loads(res_data) if res_data else []})()
         except Exception as e:
-            print(f"Supabase REST error: {e}")
+            print(f"[Supabase REST Error]: {e}")
             return type("Response", (), {"data": []})()
 
 class SimpleSupabaseClient:
@@ -66,9 +75,12 @@ class SimpleSupabaseClient:
     def table(self, table_name):
         return SimpleSupabaseTable(self.url, self.key, table_name)
 
-def get_supabase():
+def get_supabase() -> SimpleSupabaseClient:
     return SimpleSupabaseClient(SUPABASE_URL, SUPABASE_KEY)
 
+# ==============================================================================
+# 4. HELPER UTILITY (PANDAS & PARSER)
+# ==============================================================================
 def safe_int(val, default=0) -> int:
     try:
         if pd.isna(val) or val is None:
@@ -79,10 +91,13 @@ def safe_int(val, default=0) -> int:
         return default
 
 def load_data_from_info(file_info) -> pd.DataFrame:
+    """Membaca file upload dari input file Shiny (CSV atau Excel)"""
     if not file_info or len(file_info) == 0:
         return pd.DataFrame()
+    
     path = file_info[0]["datapath"]
     name = str(file_info[0]["name"]).lower()
+    
     try:
         if name.endswith('.csv'):
             df = pd.read_csv(path)
@@ -93,19 +108,17 @@ def load_data_from_info(file_info) -> pd.DataFrame:
         print(f"Error loading {name}: {e}")
         return pd.DataFrame()
 
-# ==============================================================================
-# Helper Format Tanggal WIB (Mengubah ISO Supabase ke Waktu Indonesia)
-# ==============================================================================
 def format_datetime_wib(df: pd.DataFrame, kolom: str, format_tampilan: str = "%d-%m-%Y %H:%M") -> pd.DataFrame:
     """
-    Mengubah format ISO Supabase (UTC) ke waktu Indonesia Barat (WIB) yang rapi.
+    Mengubah format ISO Supabase (UTC) ke waktu Indonesia Barat (WIB).
     Contoh output: 08-07-2026 02:38
     """
     if df is not None and not df.empty and kolom in df.columns:
         try:
-            # Parse datetime
+            # Gunakan .copy() agar tidak terkena SettingWithCopyWarning
+            df = df.copy()
             converted = pd.to_datetime(df[kolom], errors="coerce")
-            # Konversi timezone ke Asia/Jakarta (WIB)
+            
             if converted.dt.tz is not None:
                 converted = converted.dt.tz_convert("Asia/Jakarta")
             else:

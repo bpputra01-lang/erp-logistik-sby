@@ -6,6 +6,11 @@ import pandas as pd
 from shiny import reactive
 
 
+# ==========================================
+# GLOBAL STATE (Dishare ke semua user)
+# ==========================================
+active_users = reactive.Value(0)
+
 class AppState:
     def __init__(self):
         # Navigation & Role
