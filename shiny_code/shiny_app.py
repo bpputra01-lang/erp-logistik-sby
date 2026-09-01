@@ -2204,23 +2204,16 @@ def server(input: Inputs, output: Outputs, session: Session):
         f_sys = input.uploader_crs_sys()
         f_real = input.uploader_crs_real()
         if not f_sys or not f_real:
-            state.error_modal_message.set("Pilih kedua file (Laporan System & Real) terlebih dahulu!")
+            state.error_modal_message.set("Pilih kedua file (Laporan System & Real Aktual) terlebih dahulu!")
             state.show_error_modal.set(True)
             return
 
         succ, msg = state.process_cross_check_real_system(f_sys, f_real)
-        
-        # Reset dulu ke False agar trigger modal PASTI terbaca oleh Shiny
-        state.show_success_modal.set(False)
-        state.show_error_modal.set(False)
-
         if succ:
             state.show_success_modal.set(True)
-            ui.notification_show(msg, type="message", duration=4)
         else:
             state.error_modal_message.set(msg)
             state.show_error_modal.set(True)
-            ui.notification_show(msg, type="error", duration=5)
 
     @reactive.Effect
     def _on_crs_filter_change():
