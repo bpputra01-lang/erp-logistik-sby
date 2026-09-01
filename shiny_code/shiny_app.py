@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent.resolve()))
 
 # 2. Package Library
 import io
+import uuid
 import pandas as pd
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
@@ -36,30 +37,28 @@ app_ui = ui.page_fluid(
 
 def server(input: Inputs, output: Outputs, session: Session):
     state = AppState()
+    
+    # Buat ID unik untuk laptop/browser ini
+    session_id = str(uuid.uuid4())
 
-    # =========================================================================
-    # LOGIKA USER AKTIF (DIPERBAIKI DENGAN ISOLATE)
-    # =========================================================================
-    with reactive.isolate():
-        active_users.set(active_users.get() + 1)
-
+    # 1. Hapus session saat browser ditutup
     @session.on_ended
     def _on_session_ended():
-        with reactive.isolate():
-            current_count = active_users.get()
-            active_users.set(max(0, current_count - 1))
+        config.remove_active_user(session_id)
 
+    # 2. Polling Heartbeat ke Supabase & Tampilkan User Aktif Global
     @render.text
     def txt_active_users():
-        return f"{active_users.get()} User Aktif"
-    # =========================================================================
-
-    # Modal Dismiss Listeners
-    @reactive.Effect
-    @reactive.event(input.close_success_modal_event)
-    def _on_close_success_modal():
-        state.show_success_modal.set(False)
-
+        # Otomatis refresh data setiap 15 detik
+        reactive.invalidate_later(15)
+        
+        # Kirim sinyal online
+        user_name = state.user_display_name() if state.logged_in() else "Tamu"
+        config.ping_active_user(session_id, user_name)
+        
+        # Ambil total user aktif di semua laptop dari Supabase
+        total_online = config.count_online_users()
+        return f"{total_online} User Aktif"
     
 
     @reactive.Effect
