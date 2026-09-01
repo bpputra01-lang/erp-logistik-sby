@@ -851,6 +851,7 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "justification_so": page_content = justification_so_view(state)
         elif content_type == "cross_check_real_sys": page_content = cross_check_real_system_view(state)
         elif content_type == "balancing_stock": page_content = balancing_stock_view(state)
+        elif content_type == "physical_inventory_list": page_content = physical_inventory_list_view(state)
         elif content_type == "access_denied":
             page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
         else:
