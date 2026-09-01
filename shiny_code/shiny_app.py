@@ -10,6 +10,7 @@ import uuid
 import pandas as pd
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
+
 # 3. File Lokal Proyek Anda
 import config
 import state
@@ -22,7 +23,7 @@ from views import (
     custom_uploader_box, compare_system_view, stock_minus_view, stock_opname_view,
     putaway_view, main_dashboard_view, sidebar, ongkir_tab2_view, compare_rto_view, 
     justification_so_view, cycle_count_view, login_page, ppa_audit_view, 
-    cycle_count_analyzer_view, global_header, create_ui
+    cycle_count_analyzer_view, global_header, po_receiving_view, refill_toko_view, rto_decision_view, create_ui
 )
 
 
@@ -761,11 +762,17 @@ def server(input: Inputs, output: Outputs, session: Session):
         yield buf.getvalue()
 
     # Main Dynamic Router
+    # Main Dynamic Router
     @render.ui
     def main_root_container():
-        if not state.logged_in(): return login_page()
+        if not state.logged_in(): 
+            return login_page()
+            
         content_type = state.get_active_content_type()
 
+        # =====================================================================
+        # 1. 10 MENU ASLI ANDA
+        # =====================================================================
         if content_type == "dashboard_ongkir": page_content = main_dashboard_view(state)
         elif content_type == "stock_minus": page_content = stock_minus_view(state)
         elif content_type == "putaway_system": page_content = putaway_view(state)
@@ -776,17 +783,44 @@ def server(input: Inputs, output: Outputs, session: Session):
         elif content_type == "compare_rto": page_content = compare_rto_view(state)
         elif content_type == "stock_opname": page_content = stock_opname_view(state)
         elif content_type == "justification_so": page_content = justification_so_view(state)
-        elif content_type == "access_denied":
-            page_content = ui.div(ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
-        else:
-            page_content = ui.div(ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold;"), ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"), style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;")
 
+        # =====================================================================
+        # 2. MENU BARU HASIL KONVERSI DARI STREAMLIT
+        # =====================================================================
+        elif content_type == "po_receiving": page_content = po_receiving_view(state)
+        elif content_type == "penerimaan_rto": page_content = penerimaan_rto_view(state)
+        elif content_type == "scan_out": page_content = scan_out_view(state)
+        elif content_type == "refill_overstock": page_content = refill_overstock_view(state)
+        elif content_type == "balancing_stock": page_content = balancing_stock_view(state)
+        elif content_type == "fl_request": page_content = fl_request_view(state)
+        elif content_type == "refill_toko": page_content = refill_toko_view(state)
+        elif content_type == "rto_decision": page_content = rto_decision_view(state)
+
+        # =====================================================================
+        # 3. FALLBACK / AKSES DITOLAK
+        # =====================================================================
+        elif content_type == "access_denied":
+            page_content = ui.div(
+                ui.h2("⛔ Akses Ditolak", style="font-size: 28px; color: #E53E3E; font-weight: bold;"), 
+                ui.p("Maaf, halaman ini dibatasi hak aksesnya.", style="color: #718096; font-size: 15px;"), 
+                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+            )
+        else:
+            page_content = ui.div(
+                ui.h2(f"Halaman: {state.main_menu()}", style="font-size: 28px; color: #1A202C; font-weight: bold;"), 
+                ui.p("Halaman ini sedang dalam tahap pengembangan.", style="color: #718096; font-size: 15px;"), 
+                style="padding: 3rem; text-align: center; height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;"
+            )
+
+        # =====================================================================
+        # 4. RENDER LAYOUT UTAMA (SIDEBAR + GLOBAL HEADER + KONTEN AKTIF)
+        # =====================================================================
         return ui.div(
             sidebar(state),
             ui.div(
                 global_header(state),
                 page_content,
-                id="main-scroll-container",   # <-- TAMBAHKAN ID INI DI SINI
+                id="main-scroll-container",
                 style="flex: 1; height: 100vh; overflow-y: auto; padding: 1.5rem; background-color: #F7FAFC;"
             ),
             style="display: flex; width: 100vw; height: 100vh; overflow: hidden; background-color: #111318;"
@@ -854,15 +888,64 @@ def server(input: Inputs, output: Outputs, session: Session):
             ),
             style="width: 100%;"
         )
+# 1. Download PO Receiving (Multi-Sheet)
+    @render.download(filename="Hasil_PO_Receiving.xlsx")
+    def btn_dl_po_all():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._df_po_hasil.to_excel(writer, sheet_name='DETAIL_ALOKASI', index=False)
+            state._df_po_extra.to_excel(writer, sheet_name='OVER_SCAN', index=False)
+            state._df_po_miss.to_excel(writer, sheet_name='KURANG_SCAN', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 
-    # Listener Filter Interaktif (Real-time Filter)
-    @reactive.Effect
-    def _on_cc_filter_change():
-        if state.cc_processed():
-            sub = input.cc_filter_sub() if "cc_filter_sub" in input else []
-            brand = input.cc_filter_brand() if "cc_filter_brand" in input else []
-            tier = input.cc_filter_tier() if "cc_filter_tier" in input else []
-            state.apply_cc_filters(sub, brand, tier)
+    # 2. Download Refill Toko
+    @render.download(filename="Refill_Toko_SBY.xlsx")
+    def btn_dl_refill_toko():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._df_refill_toko.to_excel(writer, sheet_name='REFILL_TOKO', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # 3. Download Scan Out Validation
+    @render.download(filename="SCAN_OUT_RESULT.xlsx")
+    def btn_dl_scan_out():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._df_scan_out_res.to_excel(writer, sheet_name='DATA_SCAN', index=False)
+            state._df_scan_out_draft.to_excel(writer, sheet_name='DRAFT_SETUP', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # 4. Download Refill & Overstock
+    @render.download(filename="Refill_Overstock_Report.xlsx")
+    def btn_dl_rf_os():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._df_rf_res.to_excel(writer, sheet_name='REFILL', index=False)
+            state._df_os_res.to_excel(writer, sheet_name='OVERSTOCK', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # 5. Download Store Leader RTO Decision
+    @render.download(filename="HASIL_COMPARE_LOGISTIK.xlsx")
+    def btn_dl_rto_dec():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._df_rto_dec.to_excel(writer, sheet_name='HASIL_COMPARE', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
+
+    # 6. Download Permintaan FL
+    @render.download(filename="Analisis_Permintaan_FL.xlsx")
+    def btn_dl_fl_req():
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            state._df_fl_bad.to_excel(writer, sheet_name='OVER_REQUEST', index=False)
+            state._df_fl_comp.to_excel(writer, sheet_name='COMPARE_ALL', index=False)
+        buf.seek(0)
+        yield buf.getvalue()
 
     # Eksekusi Proses File
     @reactive.Effect

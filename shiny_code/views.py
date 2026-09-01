@@ -946,6 +946,171 @@ def create_ui():
         ui.output_ui("app_root_ui"),
         style="padding: 0; margin: 0; background-color: #111318; min-height: 100vh;"
     )
+
+# ==============================================================================
+# VIEW 1: PURCHASE ORDER RECEIVING
+# ==============================================================================
+def po_receiving_view(state: AppState):
+    m = state.po_rec_metrics()
+    results_ui = ui.div()
+    if state.po_rec_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("📦 TOTAL QTY PO", f"{m.get('total_po', 0):,}", "#00d2ff"),
+                dark_metric_box("📲 TOTAL QTY SCAN", f"{m.get('total_scan', 0):,}", "#00d2ff"),
+                dark_metric_box("➕ DIFF SCAN > PO", f"{m.get('kurang_po', 0):,}", "#ff4b4b"),
+                dark_metric_box("➖ DIFF PO > SCAN", f"{m.get('lebih_po', 0):,}", "#ffa500"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel("📊 Detail Alokasi", ui.div(render_clean_table(state._df_po_hasil.columns.tolist(), state._df_po_hasil.values.tolist(), "tbl_po_hasil"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("➕ QTY SCAN > PO", ui.div(render_clean_table(state._df_po_extra.columns.tolist(), state._df_po_extra.values.tolist(), "tbl_po_extra"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("➖ QTY PO > SCAN", ui.div(render_clean_table(state._df_po_miss.columns.tolist(), state._df_po_miss.values.tolist(), "tbl_po_miss"), style="padding: 0.75rem 0;"))
+            )
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 1. Upload File PO & Data Scan", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(custom_uploader_box("uploader_po_scan", "1. Data Scan Penerimaan"), custom_uploader_box("uploader_po_file", "2. File Purchase Order"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "RUN COMPARE PO"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_po_rec', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 2: COMPARE PENERIMAAN RTO
+# ==============================================================================
+def penerimaan_rto_view(state: AppState):
+    m = state.rto_rec_metrics()
+    results_ui = ui.div()
+    if state.rto_rec_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("Total Qty TF", f"{m.get('total_tf', 0):,}", "#C5A059"),
+                dark_metric_box("Total Qty Scan", f"{m.get('total_scan', 0):,}", "#10B981"),
+                dark_metric_box("Total Kurang TF", f"{m.get('kurang_tf', 0):,}", "#E53E3E"),
+                dark_metric_box("Total Lebih TF", f"{m.get('lebih_tf', 0):,}", "#DD6B20"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel("📊 Compare Alokasi", ui.div(render_clean_table(state._df_rto_rec_hasil.columns.tolist(), state._df_rto_rec_hasil.values.tolist(), "tbl_rto_rec_h"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("➖ Kurang TF", ui.div(render_clean_table(state._df_rto_rec_kurang.columns.tolist(), state._df_rto_rec_kurang.values.tolist(), "tbl_rto_rec_k"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("➕ Lebih TF", ui.div(render_clean_table(state._df_rto_rec_lebih.columns.tolist(), state._df_rto_rec_lebih.values.tolist(), "tbl_rto_rec_l"), style="padding: 0.75rem 0;"))
+            )
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload Scan RTO & Transfer Stock", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(custom_uploader_box("uploader_rto_rec_scan", "1. Hasil Scan RTO"), custom_uploader_box("uploader_rto_rec_tf", "2. Transfer Stock"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "RUN DATA RTO"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_penerimaan_rto', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 3: SCAN OUT VALIDATION
+# ==============================================================================
+def scan_out_view(state: AppState):
+    results_ui = ui.div()
+    if state.scan_out_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.navset_card_tab(
+                ui.nav_panel("📋 DATA SCAN (COMPARED)", ui.div(render_clean_table(state._df_scan_out_res.columns.tolist(), state._df_scan_out_res.values.tolist(), "tbl_scan_out"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("📝 DRAFT SET UP", ui.div(render_clean_table(state._df_scan_out_draft.columns.tolist(), state._df_scan_out_draft.values.tolist(), "tbl_scan_out_dr"), style="padding: 0.75rem 0;"))
+            )
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload Scan Out, History Set Up & Tracking", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(custom_uploader_box("uploader_so_scan", "1. Data Scan Out"), custom_uploader_box("uploader_so_hist", "2. History Set Up"), custom_uploader_box("uploader_so_track", "3. Stock Tracking"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "COMPARE SCAN OUT"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_scan_out', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 4: REFILL & OVERSTOCK
+# ==============================================================================
+def refill_overstock_view(state: AppState):
+    results_ui = ui.div()
+    if state.rf_os_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.navset_card_tab(
+                ui.nav_panel("📦 REFILL", ui.div(render_clean_table(state._df_rf_res.columns.tolist(), state._df_rf_res.values.tolist(), "tbl_rf"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("⚠️ OVERSTOCK", ui.div(render_clean_table(state._df_os_res.columns.tolist(), state._df_os_res.values.tolist(), "tbl_os"), style="padding: 0.75rem 0;"))
+            )
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload All Data Stock (GL3 & GL4)", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            custom_uploader_box("uploader_rf_os_stock", "Upload All Data Stock"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES REFILL & OVERSTOCK"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_rf_os', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 5: BALANCING STOCK
+# ==============================================================================
+def balancing_stock_view(state: AppState):
+    m = state.bal_stock_metrics()
+    results_ui = ui.div()
+    if state.bal_stock_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("📦 Total SKU Aktif", f"{m.get('total_sku', 0):,}", "#7B61FF"),
+                dark_metric_box("🏪 DC to Store (Avail)", f"{m.get('dc_avail', 0):,}", "#00C853"),
+                dark_metric_box("⚠️ Belum Terdistribusi DC", f"{m.get('dc_miss', 0):,}", "#E91E63"),
+                dark_metric_box("🏗️ GL4 to GL3 (Avail)", f"{m.get('gl_avail', 0):,}", "#FFAB00"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel("DC ➔ Store", ui.div(render_clean_table(state._df_bal_dc.columns.tolist(), state._df_bal_dc.values.tolist(), "tbl_bal_dc"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("GL4 ➔ GL3", ui.div(render_clean_table(state._df_bal_gl.columns.tolist(), state._df_bal_gl.values.tolist(), "tbl_bal_gl"), style="padding: 0.75rem 0;"))
+            )
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload All Stock System", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            custom_uploader_box("uploader_bal_stock", "Upload All Data Stock"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES BALANCING STOCK"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_bal_stock', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
+
+# ==============================================================================
+# VIEW 6: PERCENTAGE REQUEST FL TO STORE
+# ==============================================================================
+def fl_request_view(state: AppState):
+    m = state.fl_req_metrics()
+    results_ui = ui.div()
+    if state.fl_req_done():
+        results_ui = ui.div(
+            ui.hr(),
+            ui.div(
+                dark_metric_box("📋 Total Permintaan FL", f"{m.get('total_valid', 0):,}", "#C5A059"),
+                dark_metric_box("⚠️ Indikasi Over-Request", f"{m.get('total_bad', 0):,}", "#FF4B4B"),
+                dark_metric_box("🚨 Persentase Over Request", f"{m.get('percentage', 0):.2f}%", "#E53E3E"),
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;"
+            ),
+            ui.navset_card_tab(
+                ui.nav_panel("📋 SKU Over-Request", ui.div(render_clean_table(state._df_fl_bad.columns.tolist(), state._df_fl_bad.values.tolist(), "tbl_fl_bad"), style="padding: 0.75rem 0;")),
+                ui.nav_panel("🔄 Compare SKU Permintaan vs Stock", ui.div(render_clean_table(state._df_fl_comp.columns.tolist(), state._df_fl_comp.values.tolist(), "tbl_fl_comp"), style="padding: 0.75rem 0;"))
+            )
+        )
+    return ui.div(
+        ui.div(
+            ui.h4("📥 Upload All Stock & File Permintaan FL", style="font-size: 15px; font-weight: 800; margin-bottom: 0.5rem;"),
+            ui.div(custom_uploader_box("uploader_fl_stock", "1. File All Stock"), custom_uploader_box("uploader_fl_req", "2. File Permintaan FL"), style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"),
+            ui.tags.button(ui.tags.span(ui.tags.i(class_="fa-solid fa-play", style="margin-right: 6px;"), "PROSES ANALISIS PERMINTAAN"), onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_run_fl_req', Math.random(), {priority: 'event'});", class_="btn-red-gradient"),
+            style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1.5rem;"
+        ), results_ui, style="width: 100%; padding: 1rem;"
+    )
     
 # Navigation Components
 def menu_item(label: str, target_menu: str, current_menu: str):
