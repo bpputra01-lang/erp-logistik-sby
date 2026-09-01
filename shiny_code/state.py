@@ -643,9 +643,9 @@ class AppState:
             return False, f"Gagal mengambil file dari Supabase: {e}"
 
     def upload_dan_bersihkan_file_lama(file_bytes, nama_file="latest_stock.xlsx"):
-    from config import SUPABASE_URL, SUPABASE_KEY
-    import urllib.request
-    import json
+        from config import SUPABASE_URL, SUPABASE_KEY
+        import urllib.request
+        import json
 
     # 1. HAPUS FILE LAMA DI BUCKET
     delete_url = f"{SUPABASE_URL}/storage/v1/object/stock_files"
