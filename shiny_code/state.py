@@ -2560,7 +2560,7 @@ class AppState:
             return False, f"Gagal Justifikasi SO: {e}"
 
 # ==========================================================================
-    # ULTRA-FAST CROSS CHECK REAL & SYSTEM (INSTANT ENGINE < 0.2s)
+    # CROSS CHECK REAL & SYSTEM (PERSIS SEPERTI MENU LAINNYA)
     # ==========================================================================
     def process_cross_check_real_system(self, f_sys, f_real):
         try:
@@ -2569,14 +2569,14 @@ class AppState:
             df_real_raw = load_data_from_info(f_real)
 
             if df_sys_raw.empty or df_real_raw.empty:
-                return False, "Kedua file (Laporan System & Real Aktual) wajib diupload!"
+                return False, "Kedua file (Laporan System & Real) wajib diupload!"
 
             if df_sys_raw.shape[1] < 11:
                 return False, "File System kurang dari 11 kolom (Kolom A=Cabang, D=SKU, K=Qty)!"
             if df_real_raw.shape[1] < 13:
                 return False, "File Real kurang dari 13 kolom (Kolom A=Cabang, E=SKU, M=Qty)!"
 
-            # 2. Ekstraksi Cepat Menggunakan NumPy Array (50x lebih cepat dari Pandas)
+            # 2. Ekstraksi NumPy C-Level
             cab_sys_arr = df_sys_raw.iloc[:, 0].astype(str).str.strip().str.upper().to_numpy()
             sku_sys_arr = df_sys_raw.iloc[:, 3].astype(str).str.strip().str.upper().to_numpy()
             qty_sys_arr = pd.to_numeric(df_sys_raw.iloc[:, 10], errors='coerce').fillna(0).to_numpy()
@@ -2585,34 +2585,27 @@ class AppState:
             sku_real_arr = df_real_raw.iloc[:, 4].astype(str).str.strip().str.upper().to_numpy()
             qty_real_arr = pd.to_numeric(df_real_raw.iloc[:, 12], errors='coerce').fillna(0).to_numpy()
 
-            # 3. Inverted Hash Map (O(1) Instant Lookup): {SKU: {CABANG: QTY}}
+            # 3. Hash Map O(1) Lookup: {SKU: {CABANG: QTY}}
             system_pool = {}
             for i in range(len(sku_sys_arr)):
-                s = sku_sys_arr[i]
-                q = qty_sys_arr[i]
+                s, q, c = sku_sys_arr[i], qty_sys_arr[i], cab_sys_arr[i]
                 if q > 0 and s not in ("", "NAN", "NONE"):
-                    c = cab_sys_arr[i]
                     if s not in system_pool:
                         system_pool[s] = {}
                     system_pool[s][c] = system_pool[s].get(c, 0.0) + q
 
-            # 4. Fast Loop Menggunakan Pure Python Tuple
+            # 4. Fast Loop Matching
             matched_records = []
             total_real_qty = 0
             total_allocated_qty = 0
 
             for i in range(len(sku_real_arr)):
-                sku_r = sku_real_arr[i]
-                qty_r = qty_real_arr[i]
-                cab_r = cab_real_arr[i]
-
+                sku_r, qty_r, cab_r = sku_real_arr[i], qty_real_arr[i], cab_real_arr[i]
                 if not sku_r or sku_r in ("", "NAN", "NONE") or qty_r <= 0:
                     continue
 
                 total_real_qty += qty_r
                 qty_sisa = qty_r
-
-                # Ambil pool cabang hanya untuk SKU ini (O(1) langsung dapat tanpa scan cabang lain)
                 pool_sku = system_pool.get(sku_r)
 
                 if pool_sku:
@@ -2625,7 +2618,7 @@ class AppState:
                         total_allocated_qty += take
                         matched_records.append((sku_r, cab_r, cab_r, int(take), "MATCH PERFECT"))
 
-                    # B. Prioritas 2: Lintas Cabang (Hanya cabang yang benar-benar punya stok SKU ini)
+                    # B. Prioritas 2: Lintas Cabang (Cross-Branch)
                     if qty_sisa > 0:
                         for cab_other, avail_other in pool_sku.items():
                             if avail_other > 0:
@@ -2637,18 +2630,17 @@ class AppState:
                                 if qty_sisa <= 0:
                                     break
 
-                # C. Prioritas 3: Unmatched / Sisa Habis
+                # C. Prioritas 3: Unmatched
                 if qty_sisa > 0:
                     matched_records.append((sku_r, cab_r, "TIDAK KETEMU / SYSTEM HABIS", int(qty_sisa), "UNMATCHED / NO SYSTEM QTY"))
 
-            # 5. Hitung Sisa Kuota System
+            # 5. Hitung Sisa Kuota
             total_system_left = sum(sum(branches.values()) for branches in system_pool.values())
 
-            # 6. Buat DataFrame Sekaligus
+            # 6. Buat DataFrame Lengkap
             headers = ["SKU", "Cabang Real", "Cabang System", "Qty Match", "Status"]
             df_res = pd.DataFrame(matched_records, columns=headers) if matched_records else pd.DataFrame(columns=headers)
 
-            # Simpan Metrik & Hasil
             self.crs_total_real.set(int(total_real_qty))
             self.crs_total_matched.set(int(total_allocated_qty))
             self.crs_total_unmatched.set(int(total_real_qty - total_allocated_qty))
@@ -2660,10 +2652,22 @@ class AppState:
             self._raw_df_crs_all = df_res.copy()
             self._raw_df_crs_filtered = df_res.copy()
 
+            # Set seluruh baris data (Engine JS render_clean_table akan otomatis menampilkan 10 baris per halaman)
             self.df_crs_headers.set(headers)
-            self.df_crs_rows.set(df_res.astype(str).values.tolist())
+            self.df_crs_rows.set(df_res.fillna("").astype(str).values.tolist())
 
             self.crs_processed.set(True)
-            return True, f"Matching Selesai! ({len(df_res):,} baris diproses instan)"
+            return True, f"Matching Selesai! ({len(df_res):,} baris data terhitung)"
         except Exception as e:
             return False, f"Gagal Match Real & System: {e}"
+
+    def filter_crs_status(self, selected_statuses):
+        if self._raw_df_crs_all.empty:
+            return
+        df = self._raw_df_crs_all.copy()
+        if selected_statuses and len(selected_statuses) > 0:
+            df = df[df["Status"].isin(selected_statuses)]
+
+        self._raw_df_crs_filtered = df
+        self.df_crs_headers.set(df.columns.tolist())
+        self.df_crs_rows.set(df.fillna("").astype(str).values.tolist())

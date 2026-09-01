@@ -2230,7 +2230,7 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.hr(style="margin: 1.5rem 0; border-color: #CBD5E0;"),
             ui.h4("📋 RINGKASAN HASIL MATCHING LINTAS CABANG", style="font-size: 16px; color: #010B13; font-weight: 800; margin-bottom: 1rem;"),
             
-            # --- 4 KOTAK METRIK DARK THEME ---
+            # 4 KOTAK METRIK DARK THEME
             ui.div(
                 dark_metric_box("📦 TOTAL QTY REAL +", f"{state.crs_total_real():,} QTY", "#C5A059"),
                 dark_metric_box("✅ TOTAL MATCHED", f"{state.crs_total_matched():,} QTY", "#10B981"),
@@ -2239,7 +2239,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; margin-bottom: 1.25rem;"
             ),
 
-            # --- FILTER STATUS & DOWNLOAD BUTTON ---
+            # FILTER & DOWNLOAD BUTTON
             ui.div(
                 ui.div(
                     ui.input_selectize("crs_status_filter", "🔍 Filter Status Laporan:", choices=state.crs_status_choices(), multiple=True, width="320px"),
@@ -2256,7 +2256,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;"
             ),
 
-            # --- TABEL DETAIL ---
+            # TABEL STANDAR DENGAN 10 BARIS PER HALAMAN
             ui.div(
                 render_clean_table(state.df_crs_headers(), state.df_crs_rows(), "tbl_crs_detail"),
                 style="background: white; padding: 1.25rem; border-radius: 10px; border: 1px solid #E2E8F0;"
