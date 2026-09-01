@@ -24,15 +24,17 @@ def get_image_base64(filename):
 CUSTOM_HEAD = ui.head_content(
     # --- 1. SCRIPT UTAMA (PAGINASI, DRAG & DROP, SCROLL LOCK, AUTO-DISMISS, & URL ROUTING) ---
     ui.tags.script("""
-        document.title = "ZKN WAREHOUSE ERP";
-        let favicon = document.querySelector("link[rel~='icon']");
-        if (!favicon) {
-            favicon = document.createElement('link');
+        function setBrandTab() {
+            document.title = "ZKN WAREHOUSE ERP";
+            let favicon = document.querySelector("link[rel~='icon']") || document.createElement('link');
             favicon.rel = 'icon';
+            favicon.type = 'image/png';
+            favicon.href = './image_981625.png';
             document.head.appendChild(favicon);
         }
-        favicon.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>";
-
+        setBrandTab();
+        setInterval(setBrandTab, 1000); // Dikunci per detik agar tidak ditindih lagi oleh Shinylive
+        
         // --- 1. ENGINE PAGINASI CEPAT (0ms) ---
         window.fastTables = window.fastTables || {};
         window.renderFastTablePage = function(tableId) {
