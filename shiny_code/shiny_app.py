@@ -2492,82 +2492,198 @@ def server(input: Inputs, output: Outputs, session: Session):
         return df
 
     # 8. Render 4 Kotak Metrik
+# =========================================================================
+    # 1. SERVER LOGIC: DATA TIMBANG ONGKIR (SUPABASE LAMA + 4 RUMUS TARIF)
+    # =========================================================================
+
+    # A. SIMPAN DATA BARU KE SUPABASE LAMA
+    @reactive.Effect
+    @reactive.event(input.btn_save_timbang)
+    def _save_timbang():
+        try:
+            sb = config.get_supabase_old()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            sb.table("timbang_kolian").insert({
+                "ekspedisi": str(input.tb_ekspedisi()).upper().strip(),
+                "jenis_pengiriman": str(input.tb_jenis()).strip(),
+                "pengiriman_dari": str(input.tb_dari()).upper().strip(),
+                "pengiriman_ke": str(input.tb_ke()).upper().strip(),
+                "total_koli": int(input.tb_koli()),
+                "berat_total_timbang": float(input.tb_berat()),
+                "created_at": now_iso
+            }).execute()
+            state.show_success_modal.set(True)
+        except Exception as e:
+            state.error_modal_message.set(f"Gagal simpan: {e}")
+            state.show_error_modal.set(True)
+
+    # B. GANTI FILTER PERIODE
+    @reactive.Effect
+    @reactive.event(input.change_filter_timbang_periode)
+    def _chg_flt_timbang():
+        state.timbang_filter_periode.set(str(input.change_filter_timbang_periode()))
+
+    # C. CHECKBOX MULTI-ROW DELETE
+    @reactive.Effect
+    @reactive.event(input.toggle_timbang_row_id)
+    def _toggle_timbang_chk():
+        target_id = str(input.toggle_timbang_row_id())
+        current = list(state.timbang_selected_ids())
+        if target_id in current: current.remove(target_id)
+        else: current.append(target_id)
+        state.timbang_selected_ids.set(current)
+
+    # D. TOMBOL HAPUS ROW TERPILIH
+    @render.ui
+    def timbang_delete_selected_btn_ui():
+        selected = state.timbang_selected_ids()
+        if selected and len(selected) > 0:
+            return ui.tags.button(
+                f"🗑️ HAPUS ({len(selected)}) DATA SELECTED",
+                onclick="document.body.classList.add('process-running'); Shiny.setInputValue('btn_confirm_del_timbang', Math.random(), {priority: 'event'});",
+                style="background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;"
+            )
+        return ui.div()
+
+    # E. EKSEKUSI HAPUS DARI SUPABASE
+    @reactive.Effect
+    @reactive.event(input.btn_confirm_del_timbang)
+    def _del_timbang_exec():
+        selected = state.timbang_selected_ids()
+        if selected:
+            try:
+                sb = config.get_supabase_old()
+                sb.table("timbang_kolian").delete().in_("id", selected).execute()
+                state.timbang_selected_ids.set([])
+                state.show_success_modal.set(True)
+            except Exception as e:
+                state.error_modal_message.set(f"Gagal hapus: {e}")
+                state.show_error_modal.set(True)
+
+    # F. HELPER: KALKULASI 4 RUMUS TARIF HARGA
+    def _hitung_harga_timbang(row):
+        eksp = str(row.get('ekspedisi', '')).upper()
+        tujuan = str(row.get('pengiriman_ke', '')).upper()
+        koli = float(row.get('total_koli', 0) or 0)
+        berat = float(row.get('berat_total_timbang', 0) or 0)
+        
+        # 1. ACCESS + SEMARANG = Koli * 40.000 * 3.2
+        if "ACCESS" in eksp and "SEMARANG" in tujuan:
+            return koli * 40000 * 3.2
+        # 2. ACCESS + HUB JAKARTA = Kg * 2.500 * 3.2
+        elif "ACCESS" in eksp and "HUB JAKARTA" in tujuan:
+            return berat * 2500 * 3.2
+        # 3. ADEX + SEMARANG / MALANG = Kg * 1.000 * 3.2
+        elif "ADEX" in eksp and ("SEMARANG" in tujuan or "MALANG" in tujuan):
+            return berat * 1000 * 3.2
+        # 4. ADEX + HUB JAKARTA = Kg * 2.000 * 3.2
+        elif "ADEX" in eksp and "HUB JAKARTA" in tujuan:
+            return berat * 2000 * 3.2
+        return 0
+
+    # G. HELPER: TARIK DATA & FILTER PERIODE DARI SUPABASE LAMA
+    def _get_filtered_timbang_data():
+        try:
+            sb = config.get_supabase_old()
+            res = sb.table("timbang_kolian").select("*").order("created_at", desc=True).execute()
+            df = pd.DataFrame(res.data) if res and res.data else pd.DataFrame()
+            if df.empty: return pd.DataFrame()
+
+            # Konversi Timezone ke WIB
+            df['created_at_dt'] = pd.to_datetime(df['created_at'], errors='coerce')
+            if df['created_at_dt'].dt.tz is None:
+                df['created_at_dt'] = df['created_at_dt'].dt.tz_localize('UTC')
+            df['created_at_dt'] = df['created_at_dt'].dt.tz_convert('Asia/Jakarta')
+
+            # Filter Periode
+            flt = state.timbang_filter_periode()
+            now_jkt = datetime.now(timezone(timedelta(hours=7)))
+
+            if flt == "TODAY":
+                df = df[df['created_at_dt'].dt.date == now_jkt.date()]
+            elif flt == "MONTH":
+                df = df[(df['created_at_dt'].dt.year == now_jkt.year) & (df['created_at_dt'].dt.month == now_jkt.month)]
+
+            # Hitung Kolom Estimasi Harga
+            if not df.empty:
+                df['Harga (Rp)'] = df.apply(_hitung_harga_timbang, axis=1)
+            return df
+        except Exception as e:
+            print(f"Error fetch timbang: {e}")
+            return pd.DataFrame()
+
+    # H. RENDER 4 KOTAK METRIK (TOTAL KOLI, BERAT, BIAYA, DATA)
     @render.ui
     def timbang_ongkir_metrics_ui():
-        try:
-            df = _get_filtered_timbang_data()
-            if df.empty:
-                return ui.div(
-                    dark_metric_box("📦 TOTAL KOLI", "0", "#FFD700"),
-                    dark_metric_box("⚖️ TOTAL BERAT", "0.00 Kg", "#FFD700"),
-                    dark_metric_box("💰 TOTAL BIAYA", "Rp 0", "#00FF66"),
-                    dark_metric_box("📝 TOTAL DATA", "0", "#FFD700"),
-                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
-                )
-
-            tot_koli = int(pd.to_numeric(df['total_koli'], errors='coerce').sum())
-            tot_berat = float(pd.to_numeric(df['berat_total_timbang'], errors='coerce').sum())
-            tot_harga = float(df['Harga (Rp)'].sum())
-            tot_data = len(df)
-
+        df = _get_filtered_timbang_data()
+        if df.empty:
             return ui.div(
-                dark_metric_box("📦 TOTAL KOLI", f"{tot_koli:,}", "#FFD700"),
-                dark_metric_box("⚖️ TOTAL BERAT", f"{tot_berat:,.2f} Kg", "#FFD700"),
-                dark_metric_box("💰 TOTAL BIAYA", f"Rp {tot_harga:,.0f}", "#00FF66"),
-                dark_metric_box("📝 TOTAL DATA", f"{tot_data:,}", "#FFD700"),
+                dark_metric_box("📦 TOTAL KOLI", "0", "#FFD700"),
+                dark_metric_box("⚖️ TOTAL BERAT", "0.00 Kg", "#FFD700"),
+                dark_metric_box("💰 TOTAL BIAYA", "Rp 0", "#00FF66"),
+                dark_metric_box("📝 TOTAL DATA", "0", "#FFD700"),
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
             )
-        except Exception:
-            return ui.div()
 
-    # 9. Render Tabel History dengan Checkbox Hapus
+        tot_koli = int(pd.to_numeric(df['total_koli'], errors='coerce').sum())
+        tot_berat = float(pd.to_numeric(df['berat_total_timbang'], errors='coerce').sum())
+        tot_harga = float(df['Harga (Rp)'].sum())
+        tot_data = len(df)
+
+        return ui.div(
+            dark_metric_box("📦 TOTAL KOLI", f"{tot_koli:,}", "#FFD700"),
+            dark_metric_box("⚖️ TOTAL BERAT", f"{tot_berat:,.2f} Kg", "#FFD700"),
+            dark_metric_box("💰 TOTAL BIAYA", f"Rp {tot_harga:,.0f}", "#00FF66"),
+            dark_metric_box("📝 TOTAL DATA", f"{tot_data:,}", "#FFD700"),
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
+        )
+
+    # I. RENDER TABEL RIWAYAT DENGAN CHECKBOX DELETE
     @render.ui
     def timbang_ongkir_table_ui():
-        try:
-            df = _get_filtered_timbang_data()
-            if df.empty:
-                return ui.div("💡 Belum ada data timbang masuk untuk periode ini.", style="text-align: center; padding: 2rem; color: #718096;")
+        df = _get_filtered_timbang_data()
+        if df.empty:
+            return ui.div("💡 Belum ada data timbang masuk untuk periode ini.", style="text-align: center; padding: 2rem; color: #718096; font-style: italic;")
 
-            selected_set = set(state.timbang_selected_ids())
+        selected_set = set(state.timbang_selected_ids())
+        table_rows = []
+        for _, r in df.iterrows():
+            row_id = str(r.get("id", ""))
+            is_checked = row_id in selected_set
+            waktu_str = r['created_at_dt'].strftime('%d-%m-%Y | %H:%M') if pd.notna(r['created_at_dt']) else "-"
             
-            table_rows = []
-            for _, r in df.iterrows():
-                row_id = str(r.get("id", ""))
-                is_checked = row_id in selected_set
-                waktu_str = r['created_at_dt'].strftime('%d %b %Y | %H:%M') if pd.notna(r['created_at_dt']) else "-"
-                
-                table_rows.append(ui.tags.tr(
-                    ui.tags.td(ui.tags.input(type="checkbox", checked=is_checked, onchange=f"Shiny.setInputValue('toggle_timbang_row_id', '{row_id}', {{priority: 'event'}})")),
-                    ui.tags.td(waktu_str),
-                    ui.tags.td(str(r.get("ekspedisi", ""))),
-                    ui.tags.td(str(r.get("jenis_pengiriman", ""))),
-                    ui.tags.td(str(r.get("pengiriman_dari", ""))),
-                    ui.tags.td(str(r.get("pengiriman_ke", ""))),
-                    ui.tags.td(str(int(r.get("total_koli", 0)))),
-                    ui.tags.td(f"{float(r.get('berat_total_timbang', 0)):,.2f} Kg"),
-                    ui.tags.td(f"Rp {float(r.get('Harga (Rp)', 0)):,.0f}", style="font-weight: bold; color: #276749;")
-                ))
+            table_rows.append(ui.tags.tr(
+                ui.tags.td(ui.tags.input(type="checkbox", checked=is_checked, onchange=f"Shiny.setInputValue('toggle_timbang_row_id', '{row_id}', {{priority: 'event'}})")),
+                ui.tags.td(str(r.get("id", ""))),
+                ui.tags.td(waktu_str),
+                ui.tags.td(str(r.get("ekspedisi", ""))),
+                ui.tags.td(str(r.get("jenis_pengiriman", ""))),
+                ui.tags.td(str(int(r.get("total_koli", 0)))),
+                ui.tags.td(f"{float(r.get('berat_total_timbang', 0)):,.2f} Kg"),
+                ui.tags.td(str(r.get("pengiriman_dari", ""))),
+                ui.tags.td(str(r.get("pengiriman_ke", ""))),
+                ui.tags.td(f"Rp {float(r.get('Harga (Rp)', 0)):,.0f}", style="font-weight: bold; color: #276749;")
+            ))
 
-            return ui.div(
-                ui.tags.table(
-                    ui.tags.thead(ui.tags.tr(
-                        ui.tags.th("SELECT", style="text-align: center; width: 60px;"),
-                        ui.tags.th("WAKTU"),
-                        ui.tags.th("EKSPEDISI"),
-                        ui.tags.th("JENIS"),
-                        ui.tags.th("DARI"),
-                        ui.tags.th("KE"),
-                        ui.tags.th("TOTAL KOLI"),
-                        ui.tags.th("BERAT (KG)"),
-                        ui.tags.th("ESTIMASI HARGA")
-                    ), style="background-color: #CBD5E0 !important;"),
-                    ui.tags.tbody(*table_rows),
-                    class_="custom-clean-table"
-                ),
-                style="background: #FFFFFF; border-radius: 12px; border: 2px solid #CBD5E0; padding: 1rem; width: 100%; overflow-x: auto;"
-            )
-        except Exception as e:
-            return ui.div(f"Error memuat tabel timbang: {e}")
+        return ui.div(
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(
+                    ui.tags.th("SELECT", style="text-align: center; width: 60px;"),
+                    ui.tags.th("ID"),
+                    ui.tags.th("WAKTU"),
+                    ui.tags.th("EKSPEDISI"),
+                    ui.tags.th("JENIS"),
+                    ui.tags.th("TOTAL KOLI"),
+                    ui.tags.th("BERAT (KG)"),
+                    ui.tags.th("DARI"),
+                    ui.tags.th("KE"),
+                    ui.tags.th("ESTIMASI HARGA")
+                ), style="background-color: #CBD5E0 !important;"),
+                ui.tags.tbody(*table_rows),
+                class_="custom-clean-table"
+            ),
+            style="background: #FFFFFF; border-radius: 12px; border: 1.5px solid #CBD5E0; padding: 1rem; width: 100%; overflow-x: auto;"
+        )
 
     # 2. REPORTING & PIC
     current_pic = reactive.Value("VERREL & GALIH")
