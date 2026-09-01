@@ -3,7 +3,7 @@ import pandas as pd
 import state
 import config
 from shiny import App, render, Session
-from view import create_ui
+from views import create_ui
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 from state import AppState
 from views import (
